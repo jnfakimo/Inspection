@@ -467,32 +467,66 @@ async function init(){
 /* ===== LOAD ORDERS ===== */
 async function loadOrders(){
   try{
-    let q=db.from('work_orders').select('*').order('created_at',{ascending:false});
+    let q=db.from('maintenance_orders')
+      .select('*,repair_requests(*),users:assignee_id(name,username)')
+      .eq('hidden',false)
+      .order('created_at',{ascending:false});
 
-    // 技術人員只看指派給自己的（除非有主管/管理員權限）
     const role=normalizeRoleId(me_);
     if(role==='technician'){
       const myName=me_.name||me_.username||'';
-      const myId=me_.id||me_.username||'';
-      // 篩選 assigned_to 符合自己的工單
+      const myId=me_.user_id||me_.id||me_.username||'';
       if(myId){
-        q=db.from('work_orders').select('*')
-          .or(`assigned_to.eq.${myId},assigned_to_name.ilike.%${myName}%`)
+        q=db.from('maintenance_orders')
+          .select('*,repair_requests(*),users:assignee_id(name,username)')
+          .or(`assignee_id.eq.${myId},vendor.ilike.%${myName}%`)
+          .eq('hidden',false)
           .order('created_at',{ascending:false});
       }
     }
 
     const {data,error}=await q;
     if(error)throw error;
-    allOrders=data||[];
+    allOrders=(data||[]).map(normalizeOrderRow);
     updateCounts();
   }catch(e){
     console.error('loadOrders error',e);
-    toast('工單載入失敗：'+e.message,true);
+    toast('工單載入失敗：'+(e.message||'請確認資料表 maintenance_orders'),true);
     allOrders=[];
+    updateCounts();
   }
 }
 
+function normalizeOrderRow(o){
+  const r=o.repair_requests||{};
+  const assignee=o.users?.name||o.vendor||'未指派';
+  return {
+    ...o,
+    id:o.order_id,
+    order_id:o.order_id,
+    request_id:o.request_id,
+    req_no:r.req_no||o.wo_no||'',
+    wo_no:o.wo_no||'',
+    fault_type:r.fault_type||r.equipment_category||'—',
+    ftype:r.fault_type||r.equipment_category||'—',
+    location:r.fault_location||r.location_desc||r.location||'—',
+    location_desc:r.fault_location||r.location_desc||r.location||'—',
+    description:r.fault_desc||o.work_content||o.result_desc||'—',
+    fault_desc:r.fault_desc||'',
+    reporter_name:r.reporter||'—',
+    reporter:r.reporter||'—',
+    mobile:r.mobile||r.phone||'',
+    phone:r.phone||'',
+    department:r.department||'—',
+    urgency:r.urgency||'normal',
+    status:o.status||r.status||'pending',
+    assigned_to:o.assignee_id||'',
+    assigned_to_name:assignee,
+    created_at:o.created_at||r.created_at,
+    repair_result:o.result_desc||o.handle_method||o.note||'',
+    repair_finished_at:o.finish_time||null
+  };
+}
 /* ===== COUNT TABS ===== */
 function updateCounts(){
   const role=normalizeRoleId(me_);
@@ -630,13 +664,15 @@ async function openDetail(id){
   document.getElementById('d-title').textContent='工單詳情 ― '+(currentOrder.req_no||'');
   document.getElementById('d-badge').innerHTML=badge(currentOrder.status);
 
-  // Load repair log if exists
-  const {data:logs}=await db.from('repair_logs').select('*').eq('work_order_id',id).order('submitted_at',{ascending:false}).limit(1);
-  const repairLog=logs?.[0]||null;
+  const repairLog=currentOrder.repair_finished_at||currentOrder.repair_result?{
+    technician_name:currentOrder.assigned_to_name,
+    submitted_at:currentOrder.repair_finished_at||currentOrder.created_at,
+    repair_desc:currentOrder.repair_result||'—',
+    has_cost:false,
+    photo_urls:[]
+  }:null;
 
-  // Load timeline
-  const {data:timeline}=await db.from('work_order_logs').select('*').eq('work_order_id',id).order('created_at',{ascending:true});
-
+  const {data:timeline}=await db.from('case_status_log').select('*').eq('order_id',id).order('created_at',{ascending:true});
   document.getElementById('d-body').innerHTML=buildDetailBody(currentOrder,repairLog,timeline||[]);
   document.getElementById('m-detail').classList.add('show');
 }
@@ -878,40 +914,30 @@ async function submitRepairLog(){
       }
     }
 
-    // 2. Insert repair_log
     const myName=me_?.name||me_?.username||'維修人員';
-    const myId=me_?.id||me_?.username||'';
-    const {data:logData,error:logErr}=await db.from('repair_logs').insert({
-      work_order_id:currentOrder.id,
-      technician_id:myId,
-      technician_name:myName,
-      repair_desc:desc,
-      has_cost:hasCost,
-      cost_amount:hasCost?costAmt:0,
-      cost_note:costNote,
-      photo_urls:photoUrls,
-      submitted_at:new Date().toISOString()
-    }).select().single();
+    const myId=me_?.user_id||me_?.id||me_?.username||'';
+    const now=new Date().toISOString();
+    const resultText=desc+(hasCost?`\n費用：NT$${costAmt}${costNote?`（${costNote}）`:''}`:'\n無費用');
 
-    if(logErr)throw logErr;
-
-    // 3. Update work order status → pending_review
-    const {error:statusErr}=await db.from('work_orders').update({
+    const {error:statusErr}=await db.from('maintenance_orders').update({
       status:'pending_review',
-      repair_completed_at:new Date().toISOString(),
-      repair_log_id:logData?.id
-    }).eq('id',currentOrder.id);
+      finish_time:now,
+      result_desc:resultText,
+      note:photoUrls.length?`完工照片：${photoUrls.join('、')}`:null
+    }).eq('order_id',currentOrder.id);
     if(statusErr)throw statusErr;
 
-    // 4. Insert timeline log
-    await db.from('work_order_logs').insert({
-      work_order_id:currentOrder.id,
-      action:'完工回報',
-      status:'pending_review',
+    await db.from('repair_requests').update({status:'pending_review',updated_at:now}).eq('request_id',currentOrder.request_id);
+
+    await db.from('case_status_log').insert({
+      request_id:currentOrder.request_id,
+      order_id:currentOrder.id,
+      from_status:currentOrder.status,
+      to_status:'pending_review',
       operator_name:myName,
-      operator_id:myId,
-      note:`維修說明：${desc}${hasCost?` | 費用：NT$${costAmt}`:' | 無費用'}`,
-      created_at:new Date().toISOString()
+      operator_id:myId||null,
+      note:`維修完成，待驗收：${desc}${hasCost?` | 費用：NT$${costAmt}`:' | 無費用'}`,
+      created_at:now
     });
 
     // 5. Show success
@@ -941,35 +967,39 @@ async function doCloseCase(orderId){
 
   try{
     const myName=me_?.name||me_?.username||'主管';
-    const myId=me_?.id||me_?.username||'';
-    const {error}=await db.from('work_orders').update({
+    const myId=me_?.user_id||me_?.id||me_?.username||'';
+    const now=new Date().toISOString();
+    const order=allOrders.find(o=>o.id===orderId)||currentOrder||{};
+
+    const {error}=await db.from('maintenance_orders').update({
       status:'closed',
-      closed_at:new Date().toISOString(),
-      closed_by:myId,
-      closed_by_name:myName,
-      close_remark:remark||null
-    }).eq('id',orderId);
+      note:remark||order.note||null
+    }).eq('order_id',orderId);
     if(error)throw error;
 
-    await db.from('work_order_logs').insert({
-      work_order_id:orderId,
-      action:'結案',
-      status:'closed',
+    if(order.request_id){
+      await db.from('repair_requests').update({status:'closed',updated_at:now}).eq('request_id',order.request_id);
+    }
+
+    await db.from('case_status_log').insert({
+      request_id:order.request_id||null,
+      order_id:orderId,
+      from_status:order.status||'pending_review',
+      to_status:'closed',
       operator_name:myName,
-      operator_id:myId,
+      operator_id:myId||null,
       note:remark||'主管確認結案',
-      created_at:new Date().toISOString()
+      created_at:now
     });
 
-    toast('✅ 已成功結案！');
+    toast('已成功結案！');
     closeModal();
     await loadOrders();
     renderCards();
   }catch(e){
-    toast('結案失敗：'+e.message,true);
+    toast('結案失敗：'+(e.message||e),true);
   }
 }
-
 /* ===== HELPERS ===== */
 function setMsg(el,msg,type=''){
   if(!el)return;
