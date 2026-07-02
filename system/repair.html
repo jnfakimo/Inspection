@@ -426,7 +426,24 @@ function toast(msg,isErr=false){
 
 /* ===== LOGIN CACHE ===== */
 function readLoginCache(){
-  try{return JSON.parse(localStorage.getItem('loginUser')||sessionStorage.getItem('loginUser')||'null');}catch{return null;}
+  try{
+    const legacy=JSON.parse(localStorage.getItem('loginUser')||sessionStorage.getItem('loginUser')||'null');
+    if(legacy)return legacy;
+  }catch(e){}
+  const userId=sessionStorage.getItem('user_id')||'';
+  const username=sessionStorage.getItem('user_username')||'';
+  const name=sessionStorage.getItem('user_name')||'';
+  if(!userId&&!username&&!name)return null;
+  return {
+    id:userId||username,
+    user_id:userId||null,
+    username,
+    name,
+    department:sessionStorage.getItem('user_department')||'',
+    phone:sessionStorage.getItem('user_phone')||'',
+    role:sessionStorage.getItem('user_role')||'inspector',
+    rbac_role:sessionStorage.getItem('user_rbac_role')||'reporter'
+  };
 }
 
 /* ===== INIT ===== */
@@ -610,7 +627,7 @@ function goPage(p){currentPage=p;renderCards();window.scrollTo(0,0);}
 async function openDetail(id){
   currentOrder=allOrders.find(o=>o.id===id)||null;
   if(!currentOrder)return;
-  document.getElementById('d-title').textContent='工單詳情 ― '+（currentOrder.req_no||'');
+  document.getElementById('d-title').textContent='工單詳情 ― '+(currentOrder.req_no||'');
   document.getElementById('d-badge').innerHTML=badge(currentOrder.status);
 
   // Load repair log if exists
