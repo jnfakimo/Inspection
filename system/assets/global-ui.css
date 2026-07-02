@@ -1,0 +1,84 @@
+:root {
+  --global-userbar-h: 30px;
+}
+
+html {
+  zoom: 1;
+}
+
+body {
+  zoom: 1;
+}
+
+.global-userbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  min-height: var(--global-userbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 5px 16px;
+  background: rgba(2, 8, 20, .98);
+  border-bottom: 1px solid rgba(0, 212, 255, .28);
+  color: var(--text, #a8d8f0);
+  font-family: var(--font-mono, "Share Tech Mono", "Noto Sans TC", system-ui, sans-serif);
+  font-size: .72rem;
+  letter-spacing: .04em;
+  line-height: 1.35;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+
+.global-userbar::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--green, #00ff9d);
+  box-shadow: 0 0 10px var(--green, #00ff9d);
+  flex: 0 0 auto;
+}
+
+.global-userbar-label {
+  color: var(--text-dim, #3a6a8a);
+  white-space: nowrap;
+}
+
+.global-userbar-value {
+  color: var(--cyan, #00d4ff);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.global-userbar-account {
+  color: var(--text-hi, #d4eeff);
+  white-space: nowrap;
+}
+
+.global-userbar-sep {
+  color: var(--text-dim, #3a6a8a);
+}
+
+body.global-userbar-ready .navbar {
+  top: var(--global-userbar-h) !important;
+}
+
+body.global-userbar-ready #topbar {
+  top: var(--global-userbar-h) !important;
+}
+
+@media (max-width: 720px) {
+  .global-userbar {
+    justify-content: flex-start;
+    padding: 5px 10px;
+    font-size: .66rem;
+    overflow-x: auto;
+  }
+}
+
+@media print {
+  .global-userbar {
+    display: none !important;
+  }
+}

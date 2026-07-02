@@ -574,6 +574,7 @@ body{
 .line-toggle-slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:var(--text-dim);border-radius:50%;transition:.25s}
 .line-toggle input:checked+.line-toggle-slider:before{transform:translateX(20px);background:var(--cyan)}
 </style>
+<link rel="stylesheet" href="assets/global-ui.css?v=20260702-identity">
 </head>
 <body>
 
@@ -3117,5 +3118,6 @@ function showToast(msg, isErr = false) {
   setTimeout(() => { t.className = 'toast'; }, 2500);
 }
 </script>
+<script src="assets/global-ui.js?v=20260702-identity"></script>
 </body>
 </html>
