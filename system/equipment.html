@@ -63,7 +63,7 @@ tbody tr{cursor:pointer;transition:background .15s}tbody tr:hover{background:rgb
 .kcard .n{font-family:var(--font-head);font-size:1.3rem;color:var(--cyan)}.kcard .l{font-size:.64rem;color:var(--text-dim)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-hi);color:var(--text);padding:10px 20px;border-radius:4px;font-size:.78rem;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}.toast.show{opacity:1}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260702-identity">
+<link rel="stylesheet" href="assets/global-ui.css?v=20260703-ratio">
 </head>
 <body>
 <nav class="navbar">
@@ -266,6 +266,6 @@ function closeM(id){document.getElementById(id).classList.remove('show');}
 let _tt;function toast(m,err){const el=document.getElementById('toast');el.textContent=m;el.style.borderColor=err?'var(--red)':'var(--border-hi)';el.style.color=err?'var(--red)':'var(--text)';el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2400);}
 init().catch(e=>{document.getElementById('list').innerHTML=`<tr><td colspan="6" class="empty" style="color:var(--red)">載入失敗：${e.message}</td></tr>`;});
 </script>
-<script src="assets/global-ui.js?v=20260702-identity"></script>
+<script src="assets/global-ui.js?v=20260703-ratio"></script>
 </body>
 </html>

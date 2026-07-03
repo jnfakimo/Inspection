@@ -2,14 +2,6 @@
   --global-userbar-h: 30px;
 }
 
-html {
-  zoom: 1;
-}
-
-body {
-  zoom: 1;
-}
-
 .global-userbar {
   position: sticky;
   top: 0;
