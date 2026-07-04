@@ -126,10 +126,10 @@ function kp(n,l){return `<div class="kp"><div class="n">${n}</div><div class="l"
 
 function render(){
   document.getElementById('grid').innerHTML=reports.map((rp,i)=>`
-    <div class="card"><h3>${rp.title}<span class="ex">
+    <div class="card"><h3>${escapeHtml(rp.title)}<span class="ex">
       <button onclick="exp(${i},'csv')">CSV</button><button onclick="exp(${i},'xlsx')">Excel</button>
     </span></h3>
-    ${rp.rows.length?`<table><tr>${rp.cols.map((c,n)=>`<th class="${n>0?'num':''}">${c}</th>`).join('')}</tr>${rp.rows.slice(0,20).map(row=>`<tr>${row.map((c,n)=>`<td class="${n>0?'num':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`:'<div class="empty">無資料</div>'}
+    ${rp.rows.length?`<table><tr>${rp.cols.map((c,n)=>`<th class="${n>0?'num':''}">${escapeHtml(c)}</th>`).join('')}</tr>${rp.rows.slice(0,20).map(row=>`<tr>${row.map((c,n)=>`<td class="${n>0?'num':''}">${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</table>`:'<div class="empty">無資料</div>'}
     </div>`).join('');
 }
 function exp(i,type){

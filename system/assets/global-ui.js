@@ -221,6 +221,8 @@
     setTimeout(refresh, 2500);
   }
 
+  window.escapeHtml = escapeHtml;
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
   } else {

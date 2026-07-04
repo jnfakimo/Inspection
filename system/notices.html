@@ -68,10 +68,10 @@ async function load(){
   if(!data||!data.length){box.innerHTML='<div class="empty">目前沒有通知</div>';document.getElementById('cnt').textContent='';return;}
   const unread=data.filter(n=>!n.is_read).length;
   document.getElementById('cnt').textContent=`${data.length} 則通知 · ${unread} 則未讀`;
-  box.innerHTML=data.map(n=>`<div class="n ${n.is_read?'read':'unread'}" onclick="markOne('${n.notif_id}',${n.is_read})">
-    <div class="dot"></div><div class="body"><div class="t">${n.title||EV[n.event]||'通知'}</div>
-    ${n.body?`<div class="b">${n.body}</div>`:''}<div class="m">${fmt(n.created_at)}</div></div>
-    <span class="ev">${EV[n.event]||n.event||''}</span></div>`).join('');
+  box.innerHTML=data.map(n=>`<div class="n ${n.is_read?'read':'unread'}" onclick="markOne('${escapeHtml(n.notif_id)}',${n.is_read})">
+    <div class="dot"></div><div class="body"><div class="t">${escapeHtml(n.title||EV[n.event]||'通知')}</div>
+    ${n.body?`<div class="b">${escapeHtml(n.body)}</div>`:''}<div class="m">${fmt(n.created_at)}</div></div>
+    <span class="ev">${escapeHtml(EV[n.event]||n.event||'')}</span></div>`).join('');
 }
 async function markOne(id,read){ if(read)return; await db.from('notifications').update({is_read:true}).eq('notif_id',id); load(); }
 async function markAll(){ let q=db.from('notifications').update({is_read:true}).eq('is_read',false); if(me_.user_id)q=q.eq('recipient_id',me_.user_id); await q; load(); }

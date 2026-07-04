@@ -1024,11 +1024,11 @@ function renderEqList(eqs) {
     const timeStr = isDone ? `<div class="eq-time">${isAbnormal ? '⚠ 異常 ' : '✓ '} ${fmtTime(rec.inspect_time)}</div>` : '';
     const badgeClass = !isDone ? 'badge-todo' : (isAbnormal ? 'badge-abnormal' : 'badge-done');
     const badgeText = !isDone ? '待巡檢' : (isAbnormal ? '異常' : '完成');
-    return `<div class="eq-card" onclick="openInspectModal('${eq.equipment_id}')">
+    return `<div class="eq-card" onclick="openInspectModal('${escapeHtml(eq.equipment_id)}')">
       <div class="light ${lightClass}"></div>
       <div class="eq-info">
-        <div class="eq-name">${eq.name}</div>
-        <div class="eq-loc">📍 ${eq.location || '位置未設定'}</div>
+        <div class="eq-name">${escapeHtml(eq.name)}</div>
+        <div class="eq-loc">📍 ${escapeHtml(eq.location || '位置未設定')}</div>
         ${timeStr}
       </div>
       <span class="eq-badge ${badgeClass}">${badgeText}</span>
