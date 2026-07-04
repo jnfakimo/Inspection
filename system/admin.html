@@ -1022,12 +1022,19 @@ body{
           <div class="scard-desc">讀取區域位置表空間主檔<br>平面圖標記與位置定位</div>
           <div class="scard-enter">▶ 第三步：標記定位</div>
         </div>
+        <div class="scard" style="--scard-c:#b48aff" onclick="location.href='floor3d.html'">
+          <div class="scard-badge">HUB-04</div>
+          <div class="scard-icon">⬡</div>
+          <div class="scard-title">3D立體樓層模型</div>
+          <div class="scard-desc">Three.js 3D 立體樓層瀏覽<br>設備/空間/報修點標記切換</div>
+          <div class="scard-enter">▶ 第四步：立體瀏覽</div>
+        </div>
       </div>
 
       <div class="modelhub-bridge">
         <div class="modelhub-bridge-title">介接關係</div>
-        <div class="modelhub-bridge-flow">3D建模系統 <span>→</span> 區域位置表 <span>→</span> 整合標記系統</div>
-        <div>先於 3D建模系統更新平面與立體模型，再於區域位置表建立空間主檔，整合標記系統依同一組空間代碼對應標記位置。</div>
+        <div class="modelhub-bridge-flow">3D建模系統 <span>→</span> 區域位置表 <span>→</span> 整合標記系統 <span>→</span> 3D立體樓層模型</div>
+        <div>先於 3D建模系統更新平面與立體模型，再於區域位置表建立空間主檔，整合標記系統依同一組空間代碼對應標記位置，最後於 3D 立體樓層模型瀏覽標記疊合。</div>
         <div class="modelhub-stats">
           <div class="modelhub-stat"><b id="mh-space-count">—</b><small>空間主檔</small></div>
           <div class="modelhub-stat"><b id="mh-marked-count">—</b><small>已標記空間</small></div>

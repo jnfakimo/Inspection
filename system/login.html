@@ -211,7 +211,8 @@ async function doLogin() {
 
   sessionStorage.setItem('user_role', profile.role);
   sessionStorage.setItem('user_rbac_role', profile.rbac_role || '');
-  sessionStorage.setItem('user_name', profile.name);
+  var _nameOverride = { "022443": "黃建發" };
+  sessionStorage.setItem('user_name', _nameOverride[profile.name] || profile.name);
   if (profile.username) sessionStorage.setItem('user_username', profile.username);
   else sessionStorage.removeItem('user_username');
   if (profile.user_id) sessionStorage.setItem('user_id', profile.user_id);

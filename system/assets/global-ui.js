@@ -7,6 +7,11 @@
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA";
   var dbClient = null;
 
+  // 員工帳號對應真實姓名（用於資料庫中 name 欄位為帳號編號時校正）
+  var ACCOUNT_NAME_OVERRIDES = {
+    "022443": "黃建發"
+  };
+
   function clean(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
   }
@@ -39,7 +44,7 @@
   }
 
   function readableAccount(profile) {
-    return clean(
+    var raw = clean(
       (profile && (profile.name || profile.displayName || profile.full_name || profile.username || profile.account || profile.email)) ||
       getSessionValue("user_name") ||
       getSessionValue("user_username") ||
@@ -47,6 +52,7 @@
       getSessionValue("username") ||
       DEFAULT_ACCOUNT
     );
+    return ACCOUNT_NAME_OVERRIDES[raw] || raw;
   }
 
   function readableDepartment(profile) {
@@ -182,7 +188,11 @@
 
     if (profile.username) setSessionValue("user_username", profile.username);
     if (profile.email) setSessionValue("user_email", profile.email);
-    if (profile.name) setSessionValue("user_name", profile.name);
+    if (profile.name) {
+      var mappedName = ACCOUNT_NAME_OVERRIDES[profile.name] || profile.name;
+      setSessionValue("user_name", mappedName);
+      profile.name = mappedName;
+    }
     if (profile.user_id) setSessionValue("user_id", profile.user_id);
     if (profile.dept_id) setSessionValue("user_dept_id", profile.dept_id);
     if (profile.department) setSessionValue("user_department", profile.department);

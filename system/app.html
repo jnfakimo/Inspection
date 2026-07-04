@@ -860,6 +860,8 @@ function applyPerms() {
       const { data } = await db.from('users').select('*').eq('status', 'active').limit(1).maybeSingle();
       profile = data;
     }
+    var _nameOverride = { "022443": "黃建發" };
+    if (profile && _nameOverride[profile.name]) profile.name = _nameOverride[profile.name];
     currentUser = profile || { user_id: null, name: '巡檢人員', role: 'inspector' };
     document.getElementById('navUser').textContent = currentUser.name;
     applyPerms();

@@ -227,6 +227,8 @@ async function hydrateOperatorProfile(){
       data=res.data||null;
     }
     if(!data)return;
+    var _nmMap={ "022443":"黃建發" };
+    if(data && _nmMap[data.name]) data.name=_nmMap[data.name];
     me_={...me_,...data,name:cleanOperatorName(data.name||me_.name)};
     sessionStorage.setItem('user_name',me_.name);
     if(me_.username) sessionStorage.setItem('user_username',me_.username);
@@ -260,6 +262,8 @@ let reqs=[],orders=[],ordersByReq={},equip=[],locs=[],techs=[],currentTab='pendi
 async function init(){
   try{const {data:{session}}=await db.auth.getSession();
     if(session){const {data}=await db.from('users').select('*').eq('auth_id',session.user.id).single();if(data){
+      var _nm2={ "022443":"黃建發" };
+      if(data && _nm2[data.name]) data.name=_nm2[data.name];
       me_={...me_,...data,name:cleanOperatorName(data.name||me_.name)};
       sessionStorage.setItem('user_name',me_.name);
       if(me_.username) sessionStorage.setItem('user_username',me_.username);

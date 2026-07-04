@@ -432,7 +432,9 @@ function readLoginCache(){
   }catch(e){}
   const userId=sessionStorage.getItem('user_id')||'';
   const username=sessionStorage.getItem('user_username')||'';
-  const name=sessionStorage.getItem('user_name')||'';
+  var _nmMap={ "022443":"黃建發" };
+  var name=sessionStorage.getItem('user_name')||'';
+  if(_nmMap[name]) name=_nmMap[name];
   if(!userId&&!username&&!name)return null;
   return {
     id:userId||username,

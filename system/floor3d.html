@@ -21,16 +21,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 #c3d{position:fixed;inset:50px 0 0 0}
 #c3d canvas{display:block;touch-action:none}
 
-#floorsToggle{position:fixed;right:14px;top:62px;z-index:150;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:6px;color:var(--cyan);font-size:12px;font-weight:700;box-shadow:0 0 18px rgba(0,212,255,.12);cursor:pointer}
+#floorsToggle{position:fixed;right:14px;top:72px;z-index:150;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:6px;color:var(--cyan);font-size:12px;font-weight:700;box-shadow:0 0 18px rgba(0,212,255,.12);cursor:pointer}
 #floorsToggle:hover{border-color:var(--cyan)}
 #floorsToggle .cv{transition:transform .2s}
 #floorsToggle.open .cv{transform:rotate(180deg)}
-#floors{position:fixed;right:14px;top:104px;z-index:160;background:rgba(4,20,40,.97);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:none;box-shadow:0 0 22px rgba(0,212,255,.15)}
-#mkpanel{position:fixed;left:14px;top:106px;z-index:151;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:6px;padding:10px 13px;font-size:11px;line-height:1.9;min-width:150px;box-shadow:0 0 22px rgba(0,212,255,.12);display:none}
+#floors{position:fixed;right:14px;top:114px;z-index:160;background:rgba(4,20,40,.97);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:none;box-shadow:0 0 22px rgba(0,212,255,.15)}
+#mkpanel{position:fixed;left:14px;top:116px;z-index:151;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:6px;padding:10px 13px;font-size:11px;line-height:1.9;min-width:150px;box-shadow:0 0 22px rgba(0,212,255,.12);display:none}
 #mkpanel .p-t{color:var(--cyan);font-weight:700;font-size:12px}
 #mkpanel label{color:var(--text2);display:flex;align-items:center;gap:7px;cursor:pointer}
 #mkpanel input{accent-color:var(--cyan)}
-#mkToggle{position:fixed;left:14px;top:106px;z-index:150;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:5px;color:var(--cyan);font-size:12px;font-weight:700;box-shadow:0 0 18px rgba(0,212,255,.12);cursor:pointer}
+#mkToggle{position:fixed;left:14px;top:116px;z-index:150;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:5px;color:var(--cyan);font-size:12px;font-weight:700;box-shadow:0 0 18px rgba(0,212,255,.12);cursor:pointer}
 #mkToggle:hover{border-color:var(--cyan)}
 .fbtn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 16px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;text-align:left;transition:all .15s;white-space:nowrap}
 .fbtn:last-child{border-bottom:none}
@@ -39,7 +39,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .fbtn.on .dot{background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
 .fbtn.off{color:var(--text2)}
 
-#panel{position:fixed;left:14px;top:62px;z-index:150;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:6px;padding:11px 13px;font-size:11px;line-height:1.9;min-width:165px;max-width:min(280px,calc(100vw - 28px));box-shadow:0 0 22px rgba(0,212,255,.12)}
+#panel{position:fixed;left:14px;top:72px;z-index:150;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:6px;padding:11px 13px;font-size:11px;line-height:1.9;min-width:165px;max-width:min(280px,calc(100vw - 28px));box-shadow:0 0 22px rgba(0,212,255,.12)}
 .panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px}
 #panel .p-t{color:var(--cyan);font-weight:700;font-size:12px}
 .panel-close{display:inline-flex;background:none;border:1px solid var(--border);color:var(--text2);border-radius:3px;padding:3px 8px;font-size:10px;cursor:pointer}
@@ -48,7 +48,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 #panel label{color:var(--text2);display:flex;align-items:center;gap:7px;cursor:pointer}
 #panel input[type=range]{width:100%;accent-color:var(--cyan)}
 .ctrl-val{color:var(--text);font-family:monospace}
-#panelToggle{display:none;position:fixed;left:14px;top:62px;z-index:155;align-items:center;gap:6px;padding:8px 12px;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:5px;color:var(--cyan);font-size:12px;font-weight:700;box-shadow:0 0 18px rgba(0,212,255,.12);cursor:pointer}
+#panelToggle{display:none;position:fixed;left:14px;top:72px;z-index:155;align-items:center;gap:6px;padding:8px 12px;background:rgba(4,20,40,.95);border:1px solid var(--border);border-radius:5px;color:var(--cyan);font-size:12px;font-weight:700;box-shadow:0 0 18px rgba(0,212,255,.12);cursor:pointer}
 #panelToggle:hover{border-color:var(--cyan)}
 body.controls-hidden #panel{display:none}
 body.controls-hidden #panelToggle{display:inline-flex}
@@ -67,13 +67,13 @@ body.controls-hidden #panelToggle{display:inline-flex}
   .tb-logo{max-width:46vw;overflow:hidden;text-overflow:ellipsis}
   .tb-back{padding:5px 9px}
   #panelToggle{display:inline-flex}
-  #panel{display:none;top:104px;left:10px;right:auto}
+  #panel{display:none;top:114px;left:10px;right:auto}
   body.controls-open #panel{display:block}
   body.controls-open #panelToggle{display:none}
-  #floorsToggle{top:104px;right:10px}
-  #floors{top:146px;right:10px}
-  #mkpanel{left:10px;top:150px;font-size:10px;padding:8px 10px}
-  #mkToggle{left:10px;top:150px}
+  #floorsToggle{top:114px;right:10px}
+  #floors{top:156px;right:10px}
+  #mkpanel{left:10px;top:160px;font-size:10px;padding:8px 10px}
+  #mkToggle{left:10px;top:160px}
   .fbtn{padding:9px 13px}
   #hint{left:10px;right:10px;bottom:10px;text-align:center;background:rgba(2,11,24,.72);border:1px solid rgba(10,58,90,.45);border-radius:4px;padding:5px 8px}
 }
@@ -81,10 +81,10 @@ body.controls-hidden #panelToggle{display:inline-flex}
   #topbar{gap:8px;padding:0 10px}
   .tb-logo{max-width:38vw}
   .tb-back{font-size:10px;padding:5px 8px}
-  #panel{top:96px}
-  #panelToggle{left:10px;top:62px}
-  #floorsToggle{top:96px}
-  #floors{top:138px}
+  #panel{top:106px}
+  #panelToggle{left:10px;top:72px}
+  #floorsToggle{top:106px}
+  #floors{top:148px}
   .fbtn{font-size:11px;padding:8px 11px}
 }
 </style>
