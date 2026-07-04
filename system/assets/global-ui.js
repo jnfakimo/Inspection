@@ -24,11 +24,11 @@
 
   function readableAccount(profile) {
     return clean(
-      (profile && (profile.username || profile.account || profile.name || profile.email)) ||
+      (profile && (profile.name || profile.displayName || profile.full_name || profile.username || profile.account || profile.email)) ||
+      getSessionValue("user_name") ||
       getSessionValue("user_username") ||
       getSessionValue("user_account") ||
       getSessionValue("username") ||
-      getSessionValue("user_name") ||
       DEFAULT_ACCOUNT
     );
   }
@@ -88,11 +88,7 @@
     ["navUser", "sidebarUser"].forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
-      var text = department + " / " + account;
-      if (id === "sidebarUser" && window.currentUser && window.currentUser.name) {
-        text = department + " / " + account + " [" + window.currentUser.name + "]";
-      }
-      el.textContent = text;
+      el.textContent = department + " / " + account;
     });
   }
 
@@ -153,6 +149,7 @@
     }
 
     if (profile.username) setSessionValue("user_username", profile.username);
+    if (profile.name) setSessionValue("user_name", profile.name);
     if (profile.user_id) setSessionValue("user_id", profile.user_id);
     if (profile.dept_id) setSessionValue("user_dept_id", profile.dept_id);
     if (profile.department) setSessionValue("user_department", profile.department);

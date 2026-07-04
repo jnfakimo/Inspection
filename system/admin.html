@@ -36,6 +36,7 @@
   --text-dim:#3a6a8a;
   --font-mono:'Share Tech Mono',monospace;
   --font-head:'Rajdhani',sans-serif;
+  --admin-topbar-h:46px;
 }
 
 /* ===== BODY ===== */
@@ -89,7 +90,9 @@ body{
   flex-shrink:0;
   display:flex;
   flex-direction:column;
-  position:sticky;top:0;height:100vh;
+  position:sticky;top:0;
+  height:calc(100vh - var(--global-userbar-h, 30px) - var(--admin-topbar-h));
+  max-height:calc(100vh - var(--global-userbar-h, 30px) - var(--admin-topbar-h));
   overflow:hidden;
 }
 .sidebar::before{
@@ -101,11 +104,11 @@ body{
 }
 
 .sidebar-logo{
-  padding:22px 20px 18px;
+  padding:16px 18px 12px;
   border-bottom:1px solid var(--border);
   position:relative;
 }
-.brand-logo{display:block;max-width:120px;width:60%;height:auto;margin:0 auto 12px;
+.brand-logo{display:block;max-width:92px;width:48%;height:auto;margin:0 auto 8px;
   filter:drop-shadow(0 0 10px rgba(0,212,255,.25));border-radius:6px}
 .sidebar-logo::after{
   content:'';position:absolute;
@@ -115,31 +118,31 @@ body{
 }
 .org-label{
   font-family:'Noto Sans TC',system-ui,sans-serif;
-  font-size:1.32rem;
+  font-size:1.12rem;
   font-weight:700;
   color:var(--text-hi);
-  line-height:1.4;
-  margin-bottom:8px;
+  line-height:1.32;
+  margin-bottom:6px;
   letter-spacing:0.02em;
 }
 .sidebar-logo h1{
   font-family:var(--font-head);
-  font-size:1.1rem;font-weight:700;
+  font-size:1rem;font-weight:700;
   color:var(--cyan);
   letter-spacing:0.06em;
   text-shadow:var(--cyan-glow);
 }
 
-.sidebar-nav{flex:1;padding:14px 0;overflow-y:auto}
+.sidebar-nav{flex:1;min-height:0;padding:8px 0;overflow-y:auto}
 .sidebar-nav::-webkit-scrollbar{width:3px}
 .sidebar-nav::-webkit-scrollbar-track{background:transparent}
 .sidebar-nav::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px}
 
 .nav-item{
   display:flex;align-items:center;gap:10px;
-  padding:11px 18px 11px 22px;
+  padding:9px 16px 9px 20px;
   cursor:pointer;
-  font-size:0.84rem;
+  font-size:0.8rem;
   color:var(--text-dim);
   transition:all 0.2s;
   border-left:2px solid transparent;
@@ -166,22 +169,30 @@ body{
   background:linear-gradient(180deg,transparent,var(--cyan),transparent);
 }
 .nav-icon{font-size:1rem;width:20px;text-align:center}
+.sidebar-nav > a[style]{
+  padding:9px 20px !important;
+  font-size:0.8rem !important;
+}
 .sidebar-footer{
-  padding:14px 20px;
+  flex:0 0 auto;
+  padding:10px 16px 12px;
   border-top:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(2,9,16,.92),#020910);
 }
 .user-info{
-  font-size:0.72rem;
+  font-size:0.68rem;
   color:var(--text-dim);
-  margin-bottom:8px;
+  margin-bottom:6px;
   font-family:var(--font-mono);
   letter-spacing:0.04em;
+  line-height:1.35;
+  word-break:break-word;
 }
 .logout-btn{
-  font-size:0.72rem;color:var(--text-dim);
+  font-size:0.68rem;color:var(--text-dim);
   background:none;
   border:1px solid var(--border);
-  padding:6px 14px;border-radius:2px;
+  padding:5px 12px;border-radius:2px;
   cursor:pointer;width:100%;
   transition:all 0.2s;
   letter-spacing:0.06em;
@@ -505,7 +516,7 @@ body{
   .topbar{flex-wrap:wrap;gap:4px 12px;font-size:0.58rem;padding:6px 12px}
   .topbar-left,.topbar-right{gap:10px}
   .layout{flex-direction:column;min-height:0}
-  .sidebar{width:100%;height:auto;position:static;overflow:visible;
+  .sidebar{width:100%;height:auto;max-height:none;position:static;overflow:visible;
     border-right:none;border-bottom:1px solid var(--border)}
   .sidebar::before{display:none}
   .sidebar-logo{padding:14px 16px 12px}
@@ -574,7 +585,7 @@ body{
 .line-toggle-slider:before{content:'';position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:var(--text-dim);border-radius:50%;transition:.25s}
 .line-toggle input:checked+.line-toggle-slider:before{transform:translateX(20px);background:var(--cyan)}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260703-ratio">
+<link rel="stylesheet" href="assets/global-ui.css?v=20260704-layout">
 </head>
 <body>
 
@@ -3118,6 +3129,6 @@ function showToast(msg, isErr = false) {
   setTimeout(() => { t.className = 'toast'; }, 2500);
 }
 </script>
-<script src="assets/global-ui.js?v=20260703-ratio"></script>
+<script src="assets/global-ui.js?v=20260704-layout"></script>
 </body>
 </html>
