@@ -101,7 +101,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-hi);color:var(--text);padding:10px 20px;border-radius:4px;font-size:.78rem;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-layout">
+<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
 <nav class="navbar">
@@ -795,6 +795,6 @@ let _tt;function toast(m,err){const el=document.getElementById('toast');el.textC
 
 init().catch(e=>{document.getElementById('list').innerHTML=`<tr><td colspan="7" class="empty" style="color:var(--red)">載入失敗：${e.message}<br><small>請確認已執行 work_order_schema.sql</small></td></tr>`;});
 </script>
-<script src="assets/global-ui.js?v=20260704-layout"></script>
+<script src="assets/global-ui.js?v=20260704-userdisplay"></script>
 </body>
 </html>

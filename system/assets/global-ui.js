@@ -3,6 +3,9 @@
 
   var DEFAULT_DEPARTMENT = "未登入部門";
   var DEFAULT_ACCOUNT = "未登入帳號";
+  var SUPABASE_URL = "https://qztffronusdhgxhjjubt.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA";
+  var dbClient = null;
 
   function clean(value) {
     return String(value || "").replace(/\s+/g, " ").trim();
@@ -20,6 +23,19 @@
     try {
       if (value) sessionStorage.setItem(key, value);
     } catch (err) {}
+  }
+
+  function dataClient() {
+    if (window.db && window.db.from) return window.db;
+    if (dbClient && dbClient.from) return dbClient;
+    if (window.supabase && window.supabase.createClient) {
+      try {
+        dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        window.db = dbClient;
+        return dbClient;
+      } catch (err) {}
+    }
+    return null;
   }
 
   function readableAccount(profile) {
@@ -93,9 +109,10 @@
   }
 
   async function fetchDepartmentPath(profile) {
-    if (!window.db || !profile || !profile.dept_id) return "";
+    var db = dataClient();
+    if (!db || !profile || !profile.dept_id) return "";
     try {
-      var res = await window.db.from("departments").select("dept_id,name,parent_id").limit(1000);
+      var res = await db.from("departments").select("dept_id,name,parent_id").limit(1000);
       var rows = res && res.data ? res.data : [];
       var map = {};
       rows.forEach(function (d) { map[d.dept_id] = d; });
@@ -114,33 +131,48 @@
   }
 
   async function fetchProfileFromSupabase(seed) {
-    if (!window.db || !window.db.auth || !window.db.from) return seed;
+    var db = dataClient();
+    if (!db || !db.auth || !db.from) return seed;
     var profile = Object.assign({}, seed);
-    try {
-      var sessionRes = await window.db.auth.getSession();
-      var session = sessionRes && sessionRes.data && sessionRes.data.session;
-      if (session && session.user && session.user.id) {
-        var userRes = await window.db
+
+    async function findUser(column, value) {
+      value = clean(value);
+      if (!value) return null;
+      try {
+        var res = await db
           .from("users")
           .select("user_id,username,email,name,dept_id,department,role,rbac_role,phone")
-          .eq("auth_id", session.user.id)
+          .eq(column, value)
           .limit(1)
           .maybeSingle();
-        if (userRes && userRes.data) profile = Object.assign(profile, userRes.data);
+        return res && res.data ? res.data : null;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    try {
+      var sessionRes = await db.auth.getSession();
+      var session = sessionRes && sessionRes.data && sessionRes.data.session;
+      if (session && session.user && session.user.id) {
+        var byAuth = await findUser("auth_id", session.user.id);
+        if (byAuth) profile = Object.assign(profile, byAuth);
       }
     } catch (err) {}
 
-    if (!profile.user_id && profile.username && window.db && window.db.from) {
-      try {
-        var byName = await window.db
-          .from("users")
-          .select("user_id,username,email,name,dept_id,department,role,rbac_role,phone")
-          .eq("username", profile.username)
-          .eq("status", "active")
-          .limit(1)
-          .maybeSingle();
-        if (byName && byName.data) profile = Object.assign(profile, byName.data);
-      } catch (err) {}
+    if (!profile.name || !profile.department || !profile.dept_id) {
+      var candidates = [
+        ["user_id", profile.user_id || profile.id || getSessionValue("user_id")],
+        ["username", profile.username || profile.account || getSessionValue("user_username") || getSessionValue("user_account") || getSessionValue("username")],
+        ["email", profile.email || getSessionValue("user_email")]
+      ];
+      for (var i = 0; i < candidates.length; i += 1) {
+        var found = await findUser(candidates[i][0], candidates[i][1]);
+        if (found) {
+          profile = Object.assign(profile, found);
+          break;
+        }
+      }
     }
 
     if (!readableDepartment(profile) || readableDepartment(profile) === DEFAULT_DEPARTMENT) {
@@ -149,6 +181,7 @@
     }
 
     if (profile.username) setSessionValue("user_username", profile.username);
+    if (profile.email) setSessionValue("user_email", profile.email);
     if (profile.name) setSessionValue("user_name", profile.name);
     if (profile.user_id) setSessionValue("user_id", profile.user_id);
     if (profile.dept_id) setSessionValue("user_dept_id", profile.dept_id);
