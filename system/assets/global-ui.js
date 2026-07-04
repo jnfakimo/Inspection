@@ -3,9 +3,10 @@
 
   var DEFAULT_DEPARTMENT = "未登入部門";
   var DEFAULT_ACCOUNT = "未登入帳號";
-  var SUPABASE_URL = "https://qztffronusdhgxhjjubt.supabase.co";
-  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA";
+  var SUPABASE_URL = null;
+  var SUPABASE_ANON_KEY = null;
   var dbClient = null;
+  var configLoaded = false;
 
   // 員工帳號對應真實姓名（用於資料庫中 name 欄位為帳號編號時校正）
   var ACCOUNT_NAME_OVERRIDES = {
@@ -28,6 +29,39 @@
     try {
       if (value) sessionStorage.setItem(key, value);
     } catch (err) {}
+  }
+
+  async function loadConfig() {
+    if (configLoaded && SUPABASE_URL && SUPABASE_ANON_KEY) {
+      return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
+    }
+
+    // Try to load from window globals first (set by deployment script)
+    if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url && window.SUPABASE_CONFIG.key) {
+      SUPABASE_URL = window.SUPABASE_CONFIG.url;
+      SUPABASE_ANON_KEY = window.SUPABASE_CONFIG.key;
+      configLoaded = true;
+      return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
+    }
+
+    // Try to load from config.json (for development with local server)
+    try {
+      var response = await fetch('/config.json', { method: 'GET', credentials: 'same-origin' });
+      if (response && response.ok) {
+        var data = await response.json();
+        if (data && data.supabase_url && data.supabase_anon_key) {
+          SUPABASE_URL = data.supabase_url;
+          SUPABASE_ANON_KEY = data.supabase_anon_key;
+          configLoaded = true;
+          return { url: SUPABASE_URL, key: SUPABASE_ANON_KEY };
+        }
+      }
+    } catch (err) {
+      console.warn('Config loading error:', err);
+    }
+
+    configLoaded = true;
+    return { url: null, key: null };
   }
 
   function dataClient() {
@@ -212,8 +246,9 @@
     render(profile);
   }
 
-  function boot() {
+  async function boot() {
     if (!document.body) return;
+    await loadConfig();
     render(currentProfileSnapshot());
     refresh();
     window.addEventListener("storage", refresh);
@@ -222,6 +257,7 @@
   }
 
   window.escapeHtml = escapeHtml;
+  window.loadConfig = loadConfig;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
