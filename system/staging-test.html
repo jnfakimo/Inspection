@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staging 環境驗證測試</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #020b18;
+      --cyan: #00d4ff;
+      --green: #00ff00;
+      --red: #ff0000;
+      --yellow: #ffff00;
+      --text: #00ff00;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      border-bottom: 2px solid var(--cyan);
+      padding-bottom: 20px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      color: var(--cyan);
+      margin-bottom: 10px;
+      font-size: 2em;
+    }
+
+    .header p {
+      color: #00ff00;
+      font-size: 0.9em;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: var(--cyan);
+      color: var(--bg);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    button:hover {
+      background-color: #00ffff;
+      transform: scale(1.05);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button.secondary {
+      background-color: transparent;
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+    }
+
+    button.secondary:hover {
+      background-color: rgba(0, 212, 255, 0.1);
+    }
+
+    .test-suite {
+      margin-bottom: 30px;
+      border: 1px solid var(--cyan);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .test-suite-header {
+      background-color: rgba(0, 212, 255, 0.1);
+      padding: 15px;
+      border-bottom: 1px solid var(--cyan);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .test-suite-header:hover {
+      background-color: rgba(0, 212, 255, 0.2);
+    }
+
+    .test-suite-header h3 {
+      color: var(--cyan);
+      font-size: 1.1em;
+    }
+
+    .test-suite-header .status {
+      font-weight: bold;
+    }
+
+    .test-suite-body {
+      padding: 15px;
+      display: none;
+    }
+
+    .test-suite-body.expanded {
+      display: block;
+    }
+
+    .test-item {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-left: 4px solid var(--cyan);
+      background-color: rgba(0, 212, 255, 0.05);
+    }
+
+    .test-item.pass {
+      border-left-color: var(--green);
+      background-color: rgba(0, 255, 0, 0.05);
+    }
+
+    .test-item.fail {
+      border-left-color: var(--red);
+      background-color: rgba(255, 0, 0, 0.05);
+    }
+
+    .test-item.running {
+      border-left-color: var(--yellow);
+      background-color: rgba(255, 255, 0, 0.05);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .test-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .test-message {
+      color: #aaaaaa;
+      font-size: 0.9em;
+    }
+
+    .summary {
+      margin-top: 30px;
+      padding: 20px;
+      border: 2px solid var(--cyan);
+      border-radius: 4px;
+      background-color: rgba(0, 212, 255, 0.05);
+    }
+
+    .summary h2 {
+      color: var(--cyan);
+      margin-bottom: 15px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .summary-stat {
+      padding: 15px;
+      background-color: rgba(0, 212, 255, 0.1);
+      border-radius: 4px;
+      border: 1px solid var(--cyan);
+      text-align: center;
+    }
+
+    .summary-stat .number {
+      font-size: 1.8em;
+      font-weight: bold;
+      color: var(--cyan);
+    }
+
+    .summary-stat .label {
+      color: #aaaaaa;
+      font-size: 0.9em;
+      margin-top: 5px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background-color: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background-color: var(--green);
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .console-output {
+      background-color: rgba(0, 0, 0, 0.5);
+      border: 1px solid var(--cyan);
+      border-radius: 4px;
+      padding: 15px;
+      font-size: 0.85em;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+
+    .console-line {
+      margin-bottom: 5px;
+      padding: 2px 0;
+    }
+
+    .console-pass {
+      color: var(--green);
+    }
+
+    .console-fail {
+      color: var(--red);
+    }
+
+    .console-info {
+      color: var(--cyan);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+
+    .badge.pass {
+      background-color: var(--green);
+      color: var(--bg);
+    }
+
+    .badge.fail {
+      background-color: var(--red);
+      color: white;
+    }
+
+    .badge.running {
+      background-color: var(--yellow);
+      color: var(--bg);
+      animation: pulse 1s infinite;
+    }
+
+    .timestamp {
+      color: #888888;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🧪 Staging 環境驗證測試</h1>
+      <p>臺北農產巡檢系統 - 安全功能和性能測試套件</p>
+    </div>
+
+    <div class="controls">
+      <button onclick="runAllTests()">▶️ 運行全部測試</button>
+      <button class="secondary" onclick="toggleConsole()">📋 顯示控制台</button>
+      <button class="secondary" onclick="clearResults()">🗑️ 清除結果</button>
+      <button class="secondary" onclick="exportResults()">💾 導出結果</button>
+      <button class="secondary" onclick="listTests()">📝 列表</button>
+    </div>
+
+    <div id="test-suites"></div>
+
+    <div class="summary" id="summary" style="display: none;">
+      <h2>📊 測試摘要</h2>
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <div class="number" id="total-tests">0</div>
+          <div class="label">總測試數</div>
+        </div>
+        <div class="summary-stat">
+          <div class="number" id="passed-tests">0</div>
+          <div class="label">通過 ✅</div>
+        </div>
+        <div class="summary-stat">
+          <div class="number" id="failed-tests">0</div>
+          <div class="label">失敗 ❌</div>
+        </div>
+        <div class="summary-stat">
+          <div class="number" id="pass-rate">0%</div>
+          <div class="label">通過率</div>
+        </div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div id="timestamp" class="timestamp"></div>
+    </div>
+
+    <div class="console-output" id="console" style="display: none;">
+      <div id="console-content"></div>
+    </div>
+  </div>
+
+  <!-- 引入 Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.42.0/dist/module/index.js" type="module"></script>
+
+  <!-- 引入全局 UI 和安全模塊 -->
+  <script src="assets/global-ui.js"></script>
+
+  <!-- 引入測試套件 -->
+  <script src="assets/staging-tests.js"></script>
+
+  <script>
+    let consoleVisible = false;
+    let allTestResults = [];
+
+    // 攔截 console 輸出
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalGroup = console.group;
+    const originalGroupEnd = console.groupEnd;
+
+    const consoleLines = [];
+
+    function addConsoleLine(text, type = 'info') {
+      const line = document.createElement('div');
+      line.className = `console-line console-${type}`;
+      line.textContent = text;
+      document.getElementById('console-content').appendChild(line);
+      document.getElementById('console').scrollTop = document.getElementById('console').scrollHeight;
+    }
+
+    console.log = function (...args) {
+      originalLog.apply(console, args);
+      const text = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      addConsoleLine(text, 'info');
+    };
+
+    console.error = function (...args) {
+      originalError.apply(console, args);
+      const text = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      addConsoleLine(text, 'fail');
+    };
+
+    function toggleConsole() {
+      consoleVisible = !consoleVisible;
+      document.getElementById('console').style.display = consoleVisible ? 'block' : 'none';
+    }
+
+    function clearResults() {
+      document.getElementById('test-suites').innerHTML = '';
+      document.getElementById('summary').style.display = 'none';
+      document.getElementById('console-content').innerHTML = '';
+      allTestResults = [];
+    }
+
+    async function runAllTests() {
+      clearResults();
+      toggleConsole();
+
+      console.log('%c🧪 Staging 環境驗證測試\n', 'font-size: 16px; font-weight: bold; color: #00d4ff;');
+      console.log(`⏱️  開始時間: ${new Date().toLocaleString()}`);
+
+      try {
+        const result = await window.runStagingTests();
+        allTestResults = result.results;
+        updateSummary(result);
+      } catch (e) {
+        console.error(`❌ 測試執行失敗: ${e.message}`);
+      }
+    }
+
+    function updateSummary(result) {
+      const total = result.total;
+      const passed = result.passed;
+      const failed = result.failed;
+      const passRate = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
+
+      document.getElementById('total-tests').textContent = total;
+      document.getElementById('passed-tests').textContent = passed;
+      document.getElementById('failed-tests').textContent = failed;
+      document.getElementById('pass-rate').textContent = passRate + '%';
+      document.getElementById('progress-fill').style.width = passRate + '%';
+      document.getElementById('timestamp').textContent = `完成時間: ${new Date().toLocaleString()}`;
+      document.getElementById('summary').style.display = 'block';
+
+      // 按 Phase 分組結果
+      const groupedResults = {};
+      result.results.forEach((r) => {
+        const phase = r.test.split('-')[0];
+        if (!groupedResults[phase]) {
+          groupedResults[phase] = [];
+        }
+        groupedResults[phase].push(r);
+      });
+
+      const suitesDiv = document.getElementById('test-suites');
+      Object.keys(groupedResults)
+        .sort()
+        .forEach((phase) => {
+          const suite = document.createElement('div');
+          suite.className = 'test-suite';
+
+          const header = document.createElement('div');
+          header.className = 'test-suite-header';
+          const results = groupedResults[phase];
+          const suitePass = results.filter((r) => r.status === 'PASS').length;
+          const suiteFail = results.filter((r) => r.status === 'FAIL').length;
+          const statusText = suiteFail === 0 ? `${suitePass}/${results.length} ✅` : `${suitePass}/${results.length} ⚠️`;
+
+          header.innerHTML = `
+            <h3>Phase ${phase}: ${results.length} 個測試</h3>
+            <span class="status" style="color: ${suiteFail === 0 ? '#00ff00' : '#ff0000'}">${statusText}</span>
+          `;
+          header.onclick = () => {
+            body.classList.toggle('expanded');
+          };
+
+          const body = document.createElement('div');
+          body.className = 'test-suite-body expanded';
+
+          results.forEach((result) => {
+            const item = document.createElement('div');
+            item.className = `test-item ${result.status.toLowerCase()}`;
+            item.innerHTML = `
+              <div class="test-name">${result.status === 'PASS' ? '✅' : '❌'} ${result.test}</div>
+              <div class="test-message">${result.message}</div>
+            `;
+            body.appendChild(item);
+          });
+
+          suite.appendChild(header);
+          suite.appendChild(body);
+          suitesDiv.appendChild(suite);
+        });
+
+      console.log(`\n✅ 測試完成: ${passed}/${total} 通過 (${passRate}%)`);
+    }
+
+    function listTests() {
+      console.log('Available tests:');
+      if (window.listTests) {
+        window.listTests();
+      }
+    }
+
+    function exportResults() {
+      const json = JSON.stringify(allTestResults, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `staging-test-results-${new Date().getTime()}.json`;
+      a.click();
+    }
+
+    // 初始化提示
+    window.addEventListener('load', () => {
+      console.log('🎯 準備就緒');
+      console.log('💡 提示: 點擊「運行全部測試」開始 Staging 環境驗證');
+      console.log('');
+    });
+  </script>
+</body>
+</html>
