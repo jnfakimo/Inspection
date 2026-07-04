@@ -1277,6 +1277,26 @@ async function createRepairFromInspection(eq, faultDesc) {
     });
     await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', repairData.request_id);
     await writeAudit('repair_requests', repairData.request_id, 'insert', null, repair);
+    await notifyRepairCreated({...repair, ...repairData});
+  }
+}
+
+async function notifyRepairCreated(record) {
+  try {
+    const res = await fetch(SUPABASE_URL + '/functions/v1/line-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+      body: JSON.stringify({ table: 'repair_requests', record }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || body.ok === false) {
+      console.warn('LINE repair notify failed', res.status, body);
+      return body.msg || `HTTP ${res.status}`;
+    }
+    return '';
+  } catch (e) {
+    console.warn('LINE repair notify failed', e);
+    return e?.message || 'LINE notify failed';
   }
 }
 
@@ -1300,7 +1320,9 @@ async function submitRepair() {
   await db.from('maintenance_orders').insert({ request_id: data.request_id, equipment_id: eqId, status: 'pending' });
   await db.from('repair_requests').update({ status: 'transferred' }).eq('request_id', data.request_id);
   await writeAudit('repair_requests', data.request_id, 'insert', null, repair);
+  const lineErr = await notifyRepairCreated({...repair, ...data});
   showToast('報修單已送出');
+  if (lineErr) setTimeout(() => showToast('LINE 推播未送出：' + lineErr, true), 600);
   document.getElementById('repairReporter').value = '';
   document.getElementById('repairPhone').value = '';
   document.getElementById('repairDeptL1').value = '';

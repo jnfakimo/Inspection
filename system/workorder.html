@@ -730,6 +730,24 @@ async function insertRepairRequest(rec){
   }
   return await db.from('repair_requests').insert(payload).select('request_id,req_no').single();
 }
+async function notifyRepairCreated(record){
+  try{
+    const res=await fetch(SUPA_URL+'/functions/v1/line-notify',{
+      method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+SUPA_KEY},
+      body:JSON.stringify({table:'repair_requests',record})
+    });
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok || body.ok===false){
+      console.warn('LINE repair notify failed', res.status, body);
+      return body.msg||`HTTP ${res.status}`;
+    }
+    return '';
+  }catch(e){
+    console.warn('LINE repair notify failed', e);
+    return e?.message||'LINE notify failed';
+  }
+}
 function repairRequestErrorMessage(error){
   if(!error)return '送出失敗，請稍後再試';
   if(isEquipmentRequired(error)){
@@ -776,7 +794,9 @@ async function submitCreate(){
     if(!up.error){ await db.from('repair_attachments').insert({request_id:data.request_id,kind:kindOf(f),file_path:path,file_name:f.name,uploaded_by:me_.user_id}); }
   }
   await logStatus(data.request_id,null,null,'pending','建立報修');
+  const lineErr=await notifyRepairCreated({...rec,request_id:data.request_id,req_no:data.req_no||rec.req_no});
   closeM('m-create'); toast('已新增報修 '+displayReqNo(data));
+  if(lineErr)setTimeout(()=>toast('LINE 推播未送出：'+lineErr,true),600);
   await loadCases(); renderTableFilters(); renderChips(); renderList();
 }
 function kindOf(f){const t=f.type;if(t.startsWith('image'))return'photo';if(t.startsWith('video'))return'video';if(t.includes('pdf'))return'pdf';if(t.includes('word')||/\.docx?$/i.test(f.name))return'doc';if(t.includes('sheet')||/\.xlsx?$/i.test(f.name))return'xls';return'other';}
