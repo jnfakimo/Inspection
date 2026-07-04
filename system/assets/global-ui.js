@@ -246,9 +246,232 @@
     render(profile);
   }
 
+  // ========== 性能優化工具 ==========
+
+  // 分頁管理器
+  var paginationManager = {
+    pageSize: 50,
+    currentPage: 1,
+    totalItems: 0,
+
+    getOffset: function() {
+      return (this.currentPage - 1) * this.pageSize;
+    },
+
+    nextPage: function() {
+      this.currentPage++;
+    },
+
+    prevPage: function() {
+      if (this.currentPage > 1) this.currentPage--;
+    },
+
+    reset: function() {
+      this.currentPage = 1;
+    }
+  };
+
+  // 緩存管理器
+  var cacheManager = {
+    cache: new Map(),
+    ttl: 5 * 60 * 1000,
+
+    set: function(key, value) {
+      this.cache.set(key, { value: value, expiry: Date.now() + this.ttl });
+    },
+
+    get: function(key) {
+      var item = this.cache.get(key);
+      if (!item) return null;
+      if (Date.now() > item.expiry) {
+        this.cache.delete(key);
+        return null;
+      }
+      return item.value;
+    },
+
+    delete: function(key) {
+      this.cache.delete(key);
+    },
+
+    clear: function() {
+      this.cache.clear();
+    },
+
+    setTtl: function(ttl) {
+      this.ttl = ttl;
+    }
+  };
+
+  // 性能監控
+  var perfMonitor = {
+    marks: {},
+
+    start: function(name) {
+      this.marks[name] = performance.now();
+    },
+
+    end: function(name) {
+      if (this.marks[name]) {
+        var duration = performance.now() - this.marks[name];
+        console.log('[PERF] ' + name + ': ' + duration.toFixed(2) + 'ms');
+        delete this.marks[name];
+        return duration;
+      }
+      return 0;
+    },
+
+    measure: function(name, fn) {
+      this.start(name);
+      var result = fn();
+      this.end(name);
+      return result;
+    }
+  };
+
+  window.paginationManager = paginationManager;
+  window.cacheManager = cacheManager;
+  window.perfMonitor = perfMonitor;
+
+  // ========== 輸入驗證工具 ==========
+  var validateInput = {
+    email: function(email) {
+      var re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!re.test(email)) throw new Error('無效的郵件格式');
+      if (email.length > 254) throw new Error('郵件過長');
+      return true;
+    },
+
+    phone: function(phone) {
+      var re = /^[\d\-\+\(\)\s]{8,20}$/;
+      if (!re.test(phone)) throw new Error('無效的電話格式');
+      return true;
+    },
+
+    date: function(dateStr) {
+      var date = new Date(dateStr);
+      if (isNaN(date.getTime())) throw new Error('無效的日期');
+      if (date > new Date()) throw new Error('日期不能是未來');
+      return true;
+    },
+
+    dateRange: function(from, to, maxDays) {
+      maxDays = maxDays || 365;
+      this.date(from);
+      this.date(to);
+      var fromDate = new Date(from);
+      var toDate = new Date(to);
+      if (fromDate > toDate) throw new Error('開始日期不能晚於結束日期');
+      var days = (toDate - fromDate) / (1000 * 60 * 60 * 24);
+      if (days > maxDays) throw new Error('範圍超過 ' + maxDays + ' 天');
+      return true;
+    },
+
+    uuid: function(uuid) {
+      var re = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!re.test(uuid)) throw new Error('無效的 UUID');
+      return true;
+    },
+
+    notEmpty: function(str, fieldName) {
+      fieldName = fieldName || '字段';
+      if (!str || !String(str).trim()) throw new Error(fieldName + '不能為空');
+      return true;
+    },
+
+    length: function(str, min, max, fieldName) {
+      fieldName = fieldName || '字段';
+      var len = String(str).length;
+      if (len < min || len > max) {
+        throw new Error(fieldName + '長度需在 ' + min + '-' + max + ' 之間');
+      }
+      return true;
+    },
+
+    numberRange: function(num, min, max, fieldName) {
+      fieldName = fieldName || '數字';
+      var n = parseFloat(num);
+      if (isNaN(n) || n < min || n > max) {
+        throw new Error(fieldName + '需在 ' + min + '-' + max + ' 之間');
+      }
+      return true;
+    },
+
+    positive: function(num, fieldName) {
+      fieldName = fieldName || '數字';
+      if (parseFloat(num) <= 0) throw new Error(fieldName + '必須是正數');
+      return true;
+    },
+
+    enum: function(value, allowedValues, fieldName) {
+      fieldName = fieldName || '值';
+      if (!allowedValues.includes(value)) {
+        throw new Error(fieldName + '必須是 ' + allowedValues.join(', ') + ' 之一');
+      }
+      return true;
+    },
+
+    noSqlInjection: function(str) {
+      var keywords = ['DROP', 'DELETE', 'TRUNCATE', 'UNION', 'SELECT'];
+      var upper = String(str).toUpperCase();
+      for (var i = 0; i < keywords.length; i++) {
+        if (upper.indexOf(keywords[i]) !== -1) throw new Error('輸入包含不允許的關鍵字');
+      }
+      return true;
+    },
+
+    noXss: function(str) {
+      var patterns = [/<script/i, /javascript:/i, /on\w+=/i];
+      for (var i = 0; i < patterns.length; i++) {
+        if (patterns[i].test(str)) throw new Error('輸入包含不允許的內容');
+      }
+      return true;
+    }
+  };
+
+  window.validateInput = validateInput;
+
+  // ========== CSRF 令牌管理 ==========
+  var csrfManager = {
+    tokenKey: 'X-CSRF-Token',
+    tokenStorageKey: '_csrf_token',
+
+    generateToken: function() {
+      if (typeof crypto === 'undefined') {
+        var timestamp = Date.now().toString(36);
+        var randomStr = Math.random().toString(36).substr(2);
+        return (timestamp + randomStr).substr(0, 64);
+      }
+      var array = new Uint8Array(32);
+      crypto.getRandomValues(array);
+      return Array.from(array, function(byte) { return byte.toString(16).padStart(2, '0'); }).join('');
+    },
+
+    getToken: function() {
+      var token = sessionStorage.getItem(this.tokenStorageKey);
+      if (!token) {
+        token = this.generateToken();
+        sessionStorage.setItem(this.tokenStorageKey, token);
+      }
+      return token;
+    },
+
+    addToRequest: function(data) {
+      var result = {};
+      if (data && typeof data === 'object') {
+        Object.assign(result, data);
+      }
+      result._csrf_token = this.getToken();
+      return result;
+    }
+  };
+
+  window.csrfManager = csrfManager;
+
   async function boot() {
     if (!document.body) return;
     await loadConfig();
+    csrfManager.getToken();
     render(currentProfileSnapshot());
     refresh();
     window.addEventListener("storage", refresh);
