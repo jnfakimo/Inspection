@@ -11,15 +11,15 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe UI','Noto Sans TC',sans-serif;overflow:hidden}
 
-#topbar{position:fixed;top:0;left:0;right:0;height:50px;background:rgba(2,11,24,.97);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;z-index:1000;overflow-x:auto;overflow-y:hidden}
+#topbar{position:fixed;top:0;left:0;right:0;height:50px;background:rgba(2,11,24,.97);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;z-index:1000;overflow-x:auto;overflow-y:hidden;pointer-events:none}
 .tb-logo{font-size:13px;font-weight:700;color:var(--cyan);white-space:nowrap}
 .tb-sep{width:1px;height:24px;background:var(--border)}
-.tb-title{font-size:11px;color:var(--text2);white-space:nowrap;flex:0 0 auto}
+.tb-title{font-size:11px;color:var(--text2);white-space:nowrap;flex:0 0 auto;pointer-events:auto}
 .tb-space{flex:1 0 auto}
-.tb-back{color:var(--text2);text-decoration:none;display:inline-flex;align-items:center;padding:4px 10px;border:1px solid var(--border);border-radius:3px;font-size:11px;transition:all .2s;white-space:nowrap;flex:0 0 auto}
+.tb-back{color:var(--text2);text-decoration:none;display:inline-flex;align-items:center;padding:4px 10px;border:1px solid var(--border);border-radius:3px;font-size:11px;transition:all .2s;white-space:nowrap;flex:0 0 auto;pointer-events:auto}
 .tb-back:hover{border-color:var(--cyan);color:var(--cyan)}
 
-#osd{position:fixed;inset:50px 0 0 0;background:#04101f;z-index:1}
+#osd{position:fixed;inset:50px 0 0 0;background:#04101f;z-index:100}
 
 /* Left panel（可收合，預設隱藏，覆蓋在圖面上）*/
 #panel{position:fixed;left:0;top:50px;bottom:0;width:300px;background:rgba(4,20,40,.97);border-right:1px solid var(--border);z-index:900;display:flex;flex-direction:column;transform:translateX(-100%);transition:transform .25s;box-shadow:0 0 30px rgba(0,0,0,.55)}
