@@ -178,19 +178,48 @@
 
     <!-- 封面 -->
     <section data-background-color="#020b18">
-      <div style="display:grid; grid-template-columns:1.2fr 0.8fr; gap:20px; align-items:center; height:100%;">
-        <div class="title-slide" style="text-align:left; padding-left:30px;">
-          <div class="tag">壹、緣起</div>
-          <h1 style="font-size:2.4em; line-height:1.2;">數位化巡檢管理系統</h1>
-          <h2 style="color:var(--cyan); margin-top:0.2em; font-size:1.3em;">臺北農產 · 第一果菜市場</h2>
-          <p class="subtitle" style="font-size:0.55em; margin-top:0.3em;">從基礎監控邁向全生命週期智慧管理</p>
-          <p class="author" style="text-align:left; margin-top:1.5em;">設備巡檢 / 報修 / 派工系統規劃</p>
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:14px;">
+        <!-- Tagline -->
+        <div class="tag" style="font-size:0.4em; background:transparent; color:var(--cyan); border:1px solid rgba(0,212,255,0.25); margin-bottom:4px;">壹、緣起</div>
+        <h2 style="font-size:0.85em; color:#cce8f4; max-width:80%; line-height:1.5; margin:0;">
+          硬體已升級，管理數據卻仍在「紙本斷層」中迷失
+        </h2>
+        <!-- Cross layout: top card -->
+        <div style="display:grid; grid-template-columns:120px 1fr 120px; gap:12px; align-items:center; width:90%; max-width:900px;">
+          <!-- left card -->
+          <div style="background:rgba(0,212,255,0.04); border-radius:8px; padding:10px; text-align:center; border-top:3px solid var(--green);">
+            <div style="font-size:1.8em; color:var(--green); margin-bottom:2px;">✓</div>
+            <div style="font-size:0.38em; color:#8ab4cc; line-height:1.5;">設備監視<br>資料蒐集<br>異常警報</div>
+          </div>
+          <!-- center image -->
+          <div style="text-align:center;">
+            <img src="assets/img/cover-art.png" alt=""
+                 style="max-width:85%; max-height:38vh; border-radius:12px;
+                        box-shadow:0 0 30px rgba(0,212,255,0.12);
+                        display:block; margin:0 auto;">
+          </div>
+          <!-- right card -->
+          <div style="background:rgba(255,179,0,0.06); border-radius:8px; padding:10px; text-align:center; border-top:3px solid var(--amber);">
+            <div style="font-size:1.8em; color:var(--amber); margin-bottom:2px;">✗</div>
+            <div style="font-size:0.38em; color:var(--amber); line-height:1.5;">缺乏<br>設備履歷<br>巡檢排程</div>
+          </div>
         </div>
-        <div style="text-align:center;">
-          <img src="assets/img/cover-art.png" alt=""
-               style="max-width:90%; max-height:55vh; border-radius:12px;
-                      box-shadow:0 0 30px rgba(0,212,255,0.12);">
+        <!-- bottom row: two cards -->
+        <div style="display:grid; grid-template-columns:120px 1fr 120px; gap:12px; width:90%; max-width:900px;">
+          <div></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:rgba(255,179,0,0.06); border-radius:8px; padding:10px; text-align:center; border-top:3px solid var(--amber);">
+              <div style="font-size:1.8em; color:var(--amber); margin-bottom:2px;">✗</div>
+              <div style="font-size:0.38em; color:var(--amber); line-height:1.5;">缺乏<br>報修派工<br>生命週期管理</div>
+            </div>
+            <div style="background:rgba(255,59,59,0.06); border-radius:8px; padding:10px; text-align:center; border-top:3px solid var(--red);">
+              <div style="font-size:1.8em; color:var(--red); margin-bottom:2px;">✗</div>
+              <div style="font-size:0.38em; color:var(--red); line-height:1.5;">缺乏<br>決策分析<br>管理層儀表板</div>
+            </div>
+          </div>
+          <div></div>
         </div>
+        <p style="font-size:0.38em; color:#5a8ab0; margin-top:4px;">數位化巡檢管理系統 規劃</p>
       </div>
     </section>
 
