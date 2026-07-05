@@ -289,6 +289,208 @@
       </div>
     </section>
 
+    <!-- 系統總覽：四大核心模組 -->
+    <section data-background-color="#020b18">
+      <h2>系統總覽 — 四大核心模組</h2>
+      <div class="adv-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+        <div class="adv-card fragment">
+          <div class="adv-icon">◈</div>
+          <div class="adv-title">巡檢系統</div>
+          <div class="adv-desc">QR Code 掃描巡檢<br>即時記錄設備狀態<br>離線暫存、上線同步</div>
+        </div>
+        <div class="adv-card fragment">
+          <div class="adv-icon">◪</div>
+          <div class="adv-title">報修派工</div>
+          <div class="adv-desc">行動報修填單<br>自動派工 + LINE 通知<br>維修進度追蹤</div>
+        </div>
+        <div class="adv-card fragment">
+          <div class="adv-icon">◫</div>
+          <div class="adv-title">戰情儀表板</div>
+          <div class="adv-desc">KPI 即時掌握<br>報修趨勢分析<br>設備故障排行</div>
+        </div>
+        <div class="adv-card fragment">
+          <div class="adv-icon">⬢</div>
+          <div class="adv-title">後台管理</div>
+          <div class="adv-desc">帳號權限 RBAC<br>設備履歷維護<br>系統設定</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 巡檢系統流程 -->
+    <section data-background-color="#020b18">
+      <h2>巡檢系統 — 作業流程</h2>
+      <div class="timeline">
+        <div class="timeline-item fragment">
+          <div class="ti-date">① 掃描 QR Code</div>
+          <div class="ti-text">手機相機掃描設備 QR Code，自動識別設備</div>
+        </div>
+        <div class="timeline-item fragment">
+          <div class="ti-date">② 選擇運轉狀態</div>
+          <div class="ti-text">正常 ✓ / 異常 ✗ ，異常時強制填寫說明與拍照</div>
+        </div>
+        <div class="timeline-item fragment">
+          <div class="ti-date">③ 即時上傳</div>
+          <div class="ti-text">在線自動上傳 Supabase，離線暫存本機</div>
+        </div>
+        <div class="timeline-item fragment">
+          <div class="ti-date">④ 巡檢儀表板</div>
+          <div class="ti-text">今日巡檢進度條、異常率統計、Chart.js 圖表</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 報修派工流程 -->
+    <section data-background-color="#020b18">
+      <h2>報修派工 — 全流程管理</h2>
+      <div style="display:flex; gap:12px; margin-top:0.4em">
+        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
+          <div style="font-size:1.6em; color:var(--amber)">📝</div>
+          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+            <strong style="color:var(--cyan)">報修</strong><br>
+            填寫故障描述<br>
+            上傳照片<br>
+            選擇希望完成日期<br>
+            防呆：不可早於今天
+          </div>
+        </div>
+        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
+          <div style="font-size:1.6em; color:var(--cyan)">⚙️</div>
+          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+            <strong style="color:var(--cyan)">派工</strong><br>
+            指派技師 / 委外商<br>
+            LINE 推播通知<br>
+            技師接單 / 退回
+          </div>
+        </div>
+        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
+          <div style="font-size:1.6em; color:var(--green)">🔧</div>
+          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+            <strong style="color:var(--cyan)">維修</strong><br>
+            開始維修 / 等待料件<br>
+            維修完成回報<br>
+            使用單位驗收
+          </div>
+        </div>
+        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
+          <div style="font-size:1.6em; color:var(--red)">✅</div>
+          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+            <strong style="color:var(--cyan)">結案</strong><br>
+            主管簽核<br>
+            自動歸檔至設備履歷<br>
+            費用統計
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 戰情儀表板 -->
+    <section data-background-color="#020b18">
+      <h2>戰情儀表板 — 決策分析</h2>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="num">KPI</div>
+          <div class="label">關鍵指標即時看</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">排行</div>
+          <div class="label">單位/設備/人員</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">趨勢</div>
+          <div class="label">12 月報修走勢</div>
+        </div>
+      </div>
+      <div class="adv-grid fragment" style="grid-template-columns:1fr 1fr; margin-top:0.4em">
+        <div class="adv-card">
+          <div class="adv-title">各單位報修排行</div>
+          <div class="adv-desc">依部門統計報修量，掌握高頻報修單位</div>
+        </div>
+        <div class="adv-card">
+          <div class="adv-title">各設備故障排行</div>
+          <div class="adv-desc">識別高故障率設備，制定預防維護策略</div>
+        </div>
+        <div class="adv-card">
+          <div class="adv-title">維修人員案件數</div>
+          <div class="adv-desc">技師工作量可視化，派工決策最佳化</div>
+        </div>
+        <div class="adv-card">
+          <div class="adv-title">案件狀態分佈</div>
+          <div class="adv-desc">待處理 / 進行中 / 已完成 一目了然</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3D 立體樓層模型 -->
+    <section data-background-color="#020b18">
+      <h2>3D 立體樓層模型</h2>
+      <div style="display:flex; gap:14px; margin-top:0.4em">
+        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
+          <div style="font-size:0.42em; color:#8ab4cc; line-height:1.7">
+            <strong style="color:var(--cyan); font-size:1.3em">🏗️</strong><br><br>
+            <strong>Three.js 3D 引擎</strong><br>
+            B1～3F 樓層立體模型<br>
+            平面貼圖疊合 + 霓虹邊框<br>
+            支援旋轉 / 平移 / 縮放
+          </div>
+        </div>
+        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
+          <div style="font-size:0.42em; color:#8ab4cc; line-height:1.7">
+            <strong style="color:var(--cyan); font-size:1.3em">📍</strong><br><br>
+            <strong>整合標記系統</strong><br>
+            設備 / 空間 / 報修點標記<br>
+            文字標籤顯示 / 隱藏<br>
+            樓層可見度控制
+          </div>
+        </div>
+        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
+          <div style="font-size:0.42em; color:#8ab4cc; line-height:1.7">
+            <strong style="color:var(--cyan); font-size:1.3em">🎮</strong><br><br>
+            <strong>立體控制面板</strong><br>
+            樓層間距 / 水平平移<br>
+            Y 軸上下調整<br>
+            俯視 / 重置 / 真實比例
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 系統技術架構 -->
+    <section data-background-color="#020b18">
+      <h2>系統技術架構</h2>
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="num">前端</div>
+          <div class="label">純 HTML / CSS / JS</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">後端</div>
+          <div class="label">Supabase</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">部署</div>
+          <div class="label">GitHub Pages</div>
+        </div>
+      </div>
+      <div class="adv-grid fragment" style="grid-template-columns:1fr 1fr; margin-top:0.6em">
+        <div class="adv-card">
+          <div class="adv-title">📦 Supabase 資料庫</div>
+          <div class="adv-desc">PostgreSQL 關聯式資料庫<br>Row Level Security 權限控管<br>Storage 儲存照片 / 檔案</div>
+        </div>
+        <div class="adv-card">
+          <div class="adv-title">🔐 認證與授權</div>
+          <div class="adv-desc">Supabase Auth 帳號管理<br>RBAC 角色權限矩陣<br>Session 管理 + 離線暫存</div>
+        </div>
+        <div class="adv-card">
+          <div class="adv-title">📱 行動優先</div>
+          <div class="adv-desc">響應式設計 (RWD)<br>手機 / 平板 / 桌面皆適用<br>PWA 離線支援</div>
+        </div>
+        <div class="adv-card">
+          <div class="adv-title">🔔 即時通知</div>
+          <div class="adv-desc">LINE Messaging API 推播<br>Edge Function 服務端觸發<br>異常 / 報修 / 案件通知</div>
+        </div>
+      </div>
+    </section>
+
     <!-- 結論 -->
     <section data-background-color="#020b18">
       <h2>結語</h2>
