@@ -101,7 +101,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-hi);color:var(--text);padding:10px 20px;border-radius:4px;font-size:.78rem;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
+<link rel="stylesheet" href="assets/layout-fix.css?v=20260705-overlap2"><link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
 <nav class="navbar">
@@ -147,9 +147,54 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+// SUPABASE CONFIG - Loaded dynamically
+let SUPA_URL = null;
+let SUPA_KEY = null;
+let db = null;
+
+async function initSupabaseConfig() {
+  if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url && window.SUPABASE_CONFIG.key) {
+    SUPA_URL = window.SUPABASE_CONFIG.url;
+    SUPA_KEY = window.SUPABASE_CONFIG.key;
+  } else {
+    try {
+      const response = await fetch('/config.json', { method: 'GET', credentials: 'same-origin' });
+      if (response && response.ok) {
+        const data = await response.json();
+        if (data && data.supabase_url && data.supabase_anon_key) {
+          SUPA_URL = data.supabase_url;
+          SUPA_KEY = data.supabase_anon_key;
+        }
+      }
+    } catch (err) {
+      console.warn('Config loading error:', err);
+    }
+  }
+
+  if (SUPA_URL && SUPA_KEY && window.supabase) {
+    try {
+      db = supabase.createClient(SUPA_URL, SUPA_KEY);
+    } catch (err) {
+      console.error('Supabase initialization error:', err);
+    }
+  }
+
+  return db;
+}
+
+// XSS Prevention - HTML Escaping
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text).replace(/[&<>"']/g, function (ch) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[ch];
+  });
+}
 
 const ST={pending:['待派工','#ffb300'],transferred:['已轉派','#1a7fff'],assigned:['待接單','#1a7fff'],
   accepted:['已接單','#00d4ff'],in_progress:['維修中','#00d4ff'],waiting_parts:['等待料件','#b48aff'],
@@ -260,6 +305,13 @@ const PAGE_SIZE=15;
 let reqs=[],orders=[],ordersByReq={},equip=[],locs=[],techs=[],currentTab='pending',filterStatus='',currentPage=1,lastFilterKey='',reqNoDisplayMap={};
 
 async function init(){
+  // Initialize Supabase config first
+  await initSupabaseConfig();
+  if (!db) {
+    document.getElementById('list').innerHTML = `<tr><td colspan="7" class="empty" style="color:var(--red)">載入失敗：Supabase 設定載入失敗<br><small>請檢查 config.json 或 window.SUPABASE_CONFIG</small></td></tr>`;
+    return;
+  }
+
   try{const {data:{session}}=await db.auth.getSession();
     if(session){const {data}=await db.from('users').select('*').eq('auth_id',session.user.id).single();if(data){
       var _nm2={ "022443":"黃建發" };
@@ -442,11 +494,11 @@ function renderTableBody(pageRows){
     tb.innerHTML=pageRows.map(item=>{
       const r=item.req;
       const urg=r?.urgency||'normal';
-      const urgHtml=urg!=='normal'?`<span class="urg urg-${urg}">${urg==='urgent'?'緊急':urg==='high'?'高':''}</span>`:'';
-      return `<tr onclick="openPendingDetail('${r.request_id}')">
-        <td class="req-no">${displayReqNo(r)}</td>
-        <td>${r.fault_type||'—'}</td>
-        <td>${r.department||'—'}</td>
+      const urgHtml=urg!=='normal'?`<span class="urg urg-${escapeHtml(urg)}">${urg==='urgent'?'緊急':urg==='high'?'高':''}</span>`:'';
+      return `<tr onclick="openPendingDetail('${escapeHtml(r.request_id)}')">
+        <td class="req-no">${escapeHtml(displayReqNo(r))}</td>
+        <td>${escapeHtml(r.fault_type||'—')}</td>
+        <td>${escapeHtml(r.department||'—')}</td>
         <td>${urgHtml}</td>
         <td>${badge(r.status)}</td>
         <td style="color:var(--text-dim);font-size:.72rem">${fmt(r.created_at)}</td>
@@ -460,11 +512,11 @@ function renderTableBody(pageRows){
       const tech=o.users?.name||'';
       const vendor=o.vendor||'';
       const assignee=[tech,vendor].filter(Boolean).join(' / ');
-      return `<tr onclick="openOrderDetail('${o.order_id}')">
-        <td class="wo-no">${o.wo_no||'—'}</td>
-        <td class="req-no">${displayReqNo(r)}</td>
-        <td>${r?.fault_type||'—'}</td>
-        <td>${assignee||'—'}</td>
+      return `<tr onclick="openOrderDetail('${escapeHtml(o.order_id)}')">
+        <td class="wo-no">${escapeHtml(o.wo_no||'—')}</td>
+        <td class="req-no">${escapeHtml(displayReqNo(r))}</td>
+        <td>${escapeHtml(r?.fault_type||'—')}</td>
+        <td>${escapeHtml(assignee||'—')}</td>
         <td>${badge(o.status)}</td>
         <td style="color:var(--text-dim);font-size:.72rem">${fmt(o.created_at)}</td>
         <td style="color:var(--cyan)">檢視 ›</td>
@@ -581,20 +633,20 @@ async function openPendingDetail(id){
   ]);
   body.innerHTML=`
     <div class="d-info">
-      <div><span class="k">報修單號：</span><span class="v">${displayReqNo(curReq)}</span></div>
-      <div><span class="k">報修人：</span><span class="v">${curReq.reporter||'—'}</span></div>
-      <div><span class="k">故障類型：</span><span class="v">${curReq.fault_type||'—'}</span></div>
-      <div><span class="k">單位：</span><span class="v">${curReq.department||'—'}</span></div>
-      <div><span class="k">故障位置：</span><span class="v">${displayFaultLocation(curReq)}</span></div>
-      <div><span class="k">電話/手機：</span><span class="v">${curReq.phone||'—'} / ${curReq.mobile||'—'}</span></div>
-      <div><span class="k">希望完成：</span><span class="v">${curReq.desired_finish?fmtDate(curReq.desired_finish):'—'}</span></div>
-      <div><span class="k">急迫性：</span><span class="v">${curReq.urgency||'normal'}</span></div>
-      <div class="full"><span class="k">故障描述：</span><span class="v">${displayFaultDesc(curReq)}</span></div>
-      ${o?`<div class="full"><span class="k">上次派工：</span><span class="v">${o.wo_no||''} · 技師 ${o.users?.name||'—'}${o.vendor?' · 委外 '+o.vendor:''}（${(ST[o.status]||[o.status])[0]}）</span></div>`:''}
+      <div><span class="k">報修單號：</span><span class="v">${escapeHtml(displayReqNo(curReq))}</span></div>
+      <div><span class="k">報修人：</span><span class="v">${escapeHtml(curReq.reporter||'—')}</span></div>
+      <div><span class="k">故障類型：</span><span class="v">${escapeHtml(curReq.fault_type||'—')}</span></div>
+      <div><span class="k">單位：</span><span class="v">${escapeHtml(curReq.department||'—')}</span></div>
+      <div><span class="k">故障位置：</span><span class="v">${escapeHtml(displayFaultLocation(curReq))}</span></div>
+      <div><span class="k">電話/手機：</span><span class="v">${escapeHtml(curReq.phone||'—')} / ${escapeHtml(curReq.mobile||'—')}</span></div>
+      <div><span class="k">希望完成：</span><span class="v">${escapeHtml(curReq.desired_finish?fmtDate(curReq.desired_finish):'—')}</span></div>
+      <div><span class="k">急迫性：</span><span class="v">${escapeHtml(curReq.urgency||'normal')}</span></div>
+      <div class="full"><span class="k">故障描述：</span><span class="v">${escapeHtml(displayFaultDesc(curReq))}</span></div>
+      ${o?`<div class="full"><span class="k">上次派工：</span><span class="v">${escapeHtml(o.wo_no||'')} · 技師 ${escapeHtml(o.users?.name||'—')}${o.vendor?' · 委外 '+escapeHtml(o.vendor):''}（${escapeHtml((ST[o.status]||[o.status])[0])}）</span></div>`:''}
     </div>
     ${atts&&atts.length?`<div class="sect">附件</div><div class="atts" style="display:flex;flex-wrap:wrap;gap:8px">${atts.map(a=>attHtml(a)).join('')}</div>`:''}
     <div class="sect">處理歷程</div>
-    <ul class="tl">${(logs||[]).map(l=>`<li><div class="st">${(ST[l.to_status]||[l.to_status])[0]}</div>${l.note?`<div class="nt">${l.note}</div>`:''}<div class="op">${l.operator_name||''} · <span class="ts">${fmt(l.created_at)}</span></div></li>`).join('')||'<li><div class="nt">尚無歷程</div></li>'}</ul>
+    <ul class="tl">${(logs||[]).map(l=>`<li><div class="st">${escapeHtml((ST[l.to_status]||[l.to_status])[0])}</div>${l.note?`<div class="nt">${escapeHtml(l.note)}</div>`:''}<div class="op">${escapeHtml(l.operator_name||'')} · <span class="ts">${fmt(l.created_at)}</span></div></li>`).join('')||'<li><div class="nt">尚無歷程</div></li>'}</ul>
     <div class="sect">派工操作</div>
     <div class="actions" id="d-actions"></div>
     <div id="d-sub"></div>`;

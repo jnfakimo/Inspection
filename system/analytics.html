@@ -44,7 +44,7 @@ td.num,th.num{text-align:right;font-family:var(--font-mono);color:var(--cyan)}
 .kp .n{font-family:var(--font-head);font-size:1.5rem;color:var(--cyan)}.kp .l{font-size:.66rem;color:var(--text-dim)}
 @media print{.navbar,.toolbar,.nav-back,.card h3 .ex{display:none}body{background:#fff;color:#000}.card{border:1px solid #999;break-inside:avoid}.card h3{color:#000}td,th{color:#000}}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
+<link rel="stylesheet" href="assets/layout-fix.css?v=20260705-overlap2"><link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
 <nav class="navbar">
@@ -126,10 +126,10 @@ function kp(n,l){return `<div class="kp"><div class="n">${n}</div><div class="l"
 
 function render(){
   document.getElementById('grid').innerHTML=reports.map((rp,i)=>`
-    <div class="card"><h3>${rp.title}<span class="ex">
+    <div class="card"><h3>${escapeHtml(rp.title)}<span class="ex">
       <button onclick="exp(${i},'csv')">CSV</button><button onclick="exp(${i},'xlsx')">Excel</button>
     </span></h3>
-    ${rp.rows.length?`<table><tr>${rp.cols.map((c,n)=>`<th class="${n>0?'num':''}">${c}</th>`).join('')}</tr>${rp.rows.slice(0,20).map(row=>`<tr>${row.map((c,n)=>`<td class="${n>0?'num':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`:'<div class="empty">無資料</div>'}
+    ${rp.rows.length?`<table><tr>${rp.cols.map((c,n)=>`<th class="${n>0?'num':''}">${escapeHtml(c)}</th>`).join('')}</tr>${rp.rows.slice(0,20).map(row=>`<tr>${row.map((c,n)=>`<td class="${n>0?'num':''}">${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</table>`:'<div class="empty">無資料</div>'}
     </div>`).join('');
 }
 function exp(i,type){
@@ -145,6 +145,8 @@ function exp(i,type){
 function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
 quick('month');
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth-guard.js?v=20260705-auth"></script>
 <script src="assets/global-ui.js?v=20260704-userdisplay"></script>
 </body>
 </html>

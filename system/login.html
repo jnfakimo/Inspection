@@ -27,7 +27,7 @@ input:focus{border-color:#6366f1}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;padding:24px}
 .overlay.show{display:flex}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
+<link rel="stylesheet" href="assets/layout-fix.css?v=20260705-overlap2"><link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
 <div class="card" id="loginCard">
@@ -86,9 +86,40 @@ input:focus{border-color:#6366f1}
 </div>
 
 <script>
-const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// SUPABASE CONFIG - Loaded dynamically
+let SUPABASE_URL = null;
+let SUPABASE_ANON_KEY = null;
+let db = null;
+
+async function initSupabaseConfig() {
+  if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url && window.SUPABASE_CONFIG.key) {
+    SUPABASE_URL = window.SUPABASE_CONFIG.url;
+    SUPABASE_ANON_KEY = window.SUPABASE_CONFIG.key;
+  } else {
+    try {
+      const response = await fetch('/config.json', { method: 'GET', credentials: 'same-origin' });
+      if (response && response.ok) {
+        const data = await response.json();
+        if (data && data.supabase_url && data.supabase_anon_key) {
+          SUPABASE_URL = data.supabase_url;
+          SUPABASE_ANON_KEY = data.supabase_anon_key;
+        }
+      }
+    } catch (err) {
+      console.warn('Config loading error:', err);
+    }
+  }
+
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try {
+      db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      console.error('Supabase initialization error:', err);
+    }
+  }
+
+  return db;
+}
 
 const ROLE_ROUTES = {
   admin:       'admin.html',
@@ -158,6 +189,13 @@ function getLoginRoute(profile) {
 
 // ── Handle password-reset link (#type=recovery) ───────────────────────────────
 (async () => {
+  // Initialize Supabase config first
+  await initSupabaseConfig();
+  if (!db) {
+    document.getElementById('loginCard').innerHTML = '<div style="color:red;padding:20px">Error: Supabase configuration not loaded. Please check config.json or window.SUPABASE_CONFIG.</div>';
+    return;
+  }
+
   const hash = window.location.hash;
   if (hash.includes('type=recovery')) {
     document.getElementById('loginCard').style.display = 'none';

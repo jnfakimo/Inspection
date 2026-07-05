@@ -1,0 +1,279 @@
+/**
+ * 佈局修復 - 解決頂部導航欄與內容重疊問題
+ * Layout Fix - Resolve top navbar and content overlap
+ */
+
+/* ========== 全局佈局調整 ========== */
+
+/* 確保 body 有足夠的頂部空間 */
+body {
+  --navbar-height: 40px;
+  --topbar-height: 50px;
+  --userbar-height: 30px;
+  --total-header-height: calc(var(--userbar-height) + var(--topbar-height));
+
+  /* 給頁面頭部留出空間 */
+  padding-top: var(--total-header-height) !important;
+  min-height: 100vh;
+}
+
+/* ========== 全局用戶欄修復 ========== */
+
+.global-userbar {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
+  height: auto !important;
+  min-height: var(--userbar-height) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+/* ========== 頂部導航欄修復 ========== */
+
+.navbar,
+#navbar,
+.topbar,
+#topbar,
+.header,
+#header,
+.nav-header,
+.top-nav {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999 !important;
+}
+
+.navbar,
+#navbar,
+.nav-header {
+  top: var(--userbar-height) !important;
+  height: var(--navbar-height) !important;
+}
+
+.topbar,
+#topbar {
+  top: var(--userbar-height) !important;
+  min-height: var(--topbar-height) !important;
+}
+
+.header,
+#header,
+.top-nav {
+  top: var(--userbar-height) !important;
+}
+
+/* ========== 側邊欄修復 ========== */
+
+.sidebar,
+#sidebar,
+.side-menu,
+.side-panel {
+  position: fixed !important;
+  left: 0 !important;
+  top: var(--total-header-height) !important;
+  z-index: 100 !important;
+}
+
+/* ========== 主要內容區域修復 ========== */
+
+.container,
+.content,
+.main,
+#main,
+.page-content,
+.app-content,
+main {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  /* 確保內容不會被頁面頭部覆蓋 */
+}
+
+/* ========== 浮動元素修復 ========== */
+
+.floating,
+.float,
+.modal,
+.dialog {
+  z-index: 1001 !important;
+}
+
+/* ========== 響應式調整 ========== */
+
+@media (max-width: 768px) {
+  body {
+    --total-header-height: 90px;
+    padding-top: var(--total-header-height) !important;
+  }
+
+  .navbar,
+  #navbar,
+  .nav-header {
+    height: auto !important;
+    max-height: var(--navbar-height) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    --total-header-height: 80px;
+    padding-top: var(--total-header-height) !important;
+  }
+}
+
+/* ========== 列印模式 ========== */
+
+@media print {
+  .global-userbar,
+  .navbar,
+  #navbar,
+  .topbar,
+  #topbar,
+  .sidebar,
+  #sidebar {
+    display: none !important;
+  }
+
+  body {
+    padding-top: 0 !important;
+  }
+}
+
+/* ========== 無限卡片滾動修復 ========== */
+
+.card-container,
+.scroll-container,
+[class*="scroll"],
+[class*="list"] {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* ========== 特殊頁面修復 ========== */
+
+/* 平面圖頁面 */
+.floor-plan,
+.floorplan,
+[class*="plan"] {
+  position: relative !important;
+}
+
+/* 儀表板頁面 */
+.dashboard,
+#dashboard,
+[class*="dashboard"] {
+  padding-top: 0 !important;
+}
+
+/* 編輯器頁面 */
+.editor,
+#editor,
+[class*="editor"],
+.modeler {
+  padding-top: 0 !important;
+}
+
+/* ========== 視覺調整 ========== */
+
+/* 確保所有固定定位的元素都不會相互遮擋 */
+@supports (position: sticky) {
+  .navbar {
+    position: fixed !important;
+  }
+
+  .topbar {
+    position: fixed !important;
+  }
+}
+
+/* ========== Z-index 層級順序 ========== */
+
+/*
+  Z-index 層級 (從底到頂):
+  - 0-99: 普通內容
+  - 100-199: 側邊欄
+  - 200-499: 卡片/彈出窗
+  - 500-999: 導航欄
+  - 1000: 全局用戶欄
+  - 1001+: 浮動/模態框
+*/
+
+.global-userbar {
+  z-index: 1000 !important;
+}
+
+.navbar,
+.topbar,
+#navbar,
+#topbar {
+  z-index: 999 !important;
+}
+
+.sidebar,
+#sidebar {
+  z-index: 100 !important;
+}
+
+.modal,
+.dialog,
+.popup {
+  z-index: 1001 !important;
+}
+
+/* ========== 過渡效果保留 ========== */
+
+.navbar,
+.topbar,
+.sidebar,
+.global-userbar {
+  transition: none !important;
+}
+
+/* ========== 防止溢出 ========== */
+
+.navbar,
+.topbar,
+.global-userbar {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  white-space: nowrap !important;
+}
+
+/* Fullscreen map/model pages use fixed overlays that must move with the shared userbar. */
+body.global-userbar-ready #osd {
+  inset: calc(var(--userbar-height) + var(--topbar-height)) 0 0 0 !important;
+}
+
+body.global-userbar-ready #panel {
+  top: calc(var(--userbar-height) + var(--topbar-height)) !important;
+}
+
+body.global-userbar-ready #panelToggle,
+body.global-userbar-ready #placehint,
+body.global-userbar-ready #floors {
+  top: calc(var(--userbar-height) + var(--topbar-height) + 12px) !important;
+}
+
+body.global-userbar-ready #tools {
+  top: calc(var(--userbar-height) + var(--topbar-height) + 160px) !important;
+}
+
+body.global-userbar-ready #detail {
+  max-height: calc(100vh - var(--userbar-height) - var(--topbar-height) - 24px);
+}
+
+/* ========== 邊框修復 ========== */
+
+.navbar::after,
+.topbar::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 212, 255, 0.28);
+}

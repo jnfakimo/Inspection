@@ -28,7 +28,7 @@ h1{font-size:1.3rem;font-weight:700;color:#f8fafc;margin-bottom:6px}
 .btn{display:inline-block;margin-top:16px;padding:11px 24px;background:#6366f1;color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:600;cursor:pointer;text-decoration:none}
 .btn:hover{background:#4f46e5}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
+<link rel="stylesheet" href="assets/layout-fix.css?v=20260705-overlap2"><link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
 <div class="card">
@@ -70,11 +70,41 @@ h1{font-size:1.3rem;font-weight:700;color:#f8fafc;margin-bottom:6px}
 </div>
 
 <script>
-const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+// SUPABASE CONFIG - Loaded dynamically
+let SUPABASE_URL = null;
+let SUPABASE_ANON_KEY = null;
+let db = null;
 const ADMIN_AUTH_ID = 'eb771a87-aa4d-4066-b23d-9b810a5c00bd';
 
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+async function initSupabaseConfig() {
+  if (window.SUPABASE_CONFIG && window.SUPABASE_CONFIG.url && window.SUPABASE_CONFIG.key) {
+    SUPABASE_URL = window.SUPABASE_CONFIG.url;
+    SUPABASE_ANON_KEY = window.SUPABASE_CONFIG.key;
+  } else {
+    try {
+      const response = await fetch('/config.json', { method: 'GET', credentials: 'same-origin' });
+      if (response && response.ok) {
+        const data = await response.json();
+        if (data && data.supabase_url && data.supabase_anon_key) {
+          SUPABASE_URL = data.supabase_url;
+          SUPABASE_ANON_KEY = data.supabase_anon_key;
+        }
+      }
+    } catch (err) {
+      console.warn('Config loading error:', err);
+    }
+  }
+
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase) {
+    try {
+      db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (err) {
+      console.error('Supabase initialization error:', err);
+    }
+  }
+
+  return db;
+}
 
 function setStep(n, state, detail) {
   const icon = document.getElementById('i' + n);
@@ -91,6 +121,14 @@ function showResult(ok, msg, link) {
 }
 
 async function run() {
+  // Initialize Supabase config first
+  await initSupabaseConfig();
+  if (!db) {
+    setStep(1, 'fail', 'Supabase 設定載入失敗');
+    showResult(false, '❌ Supabase 設定載入失敗，請檢查 config.json 或 window.SUPABASE_CONFIG。');
+    return;
+  }
+
   // Step 1: Connect
   setStep(1, 'running', '連線中…');
   try {

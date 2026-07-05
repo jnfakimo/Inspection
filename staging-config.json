@@ -1,0 +1,55 @@
+{
+  "environment": "staging",
+  "description": "Staging 環境配置 - 測試和驗證用途",
+  "supabase": {
+    "url": "https://qztffronusdhgxhjjubt.supabase.co",
+    "anon_key": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA",
+    "project_id": "qztffronusdhgxhjjubt",
+    "project_name": "staging"
+  },
+  "features": {
+    "rls_enabled": true,
+    "csrf_protection": true,
+    "input_validation": true,
+    "caching_enabled": true,
+    "performance_monitoring": true,
+    "line_notify": false,
+    "analytics": false
+  },
+  "timeouts": {
+    "cache_ttl_ms": 300000,
+    "session_timeout_ms": 3600000,
+    "api_timeout_ms": 30000,
+    "db_query_timeout_ms": 10000
+  },
+  "performance": {
+    "pagination_size": 50,
+    "cache_enabled": true,
+    "cache_max_age_seconds": 300,
+    "enable_compression": true
+  },
+  "security": {
+    "enable_rls": true,
+    "enable_csrf": true,
+    "enable_input_validation": true,
+    "enable_xss_protection": true,
+    "enable_sql_injection_protection": true,
+    "require_https": false,
+    "cors_origin": "http://localhost:8765"
+  },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "console": true,
+    "file": false
+  },
+  "testing": {
+    "test_mode": true,
+    "mock_notifications": false,
+    "seed_data": false,
+    "verbose": true
+  },
+  "version": "1.0",
+  "created_at": "2026-07-05T00:00:00Z",
+  "updated_at": "2026-07-05T00:00:00Z"
+}

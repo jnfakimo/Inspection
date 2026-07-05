@@ -248,7 +248,7 @@
 }
 
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
+<link rel="stylesheet" href="assets/layout-fix.css?v=20260705-overlap2"><link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
   <div class="scanline"></div>
@@ -323,15 +323,8 @@
   </div>
 
 <script>
-  const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-  const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  db.from('system_settings').select('key,value').then(({ data }) => {
-    if (!data) return;
-    const s = Object.fromEntries(data.map(r => [r.key, r.value]));
-    document.querySelectorAll('[data-sysname="org"]').forEach(el => { if (s.org_name) el.textContent = s.org_name; });
-    document.querySelectorAll('[data-sysname="site"]').forEach(el => { if (s.site_name) el.textContent = s.site_name; });
-  });
+  // 公開首頁 - 無需認證
+  // Public homepage - no authentication required
 
   // Real-time clock
   function tick() {
@@ -342,7 +335,29 @@
   }
   tick();
   setInterval(tick, 1000);
+
+  // Optional: Load system settings from config
+  (async () => {
+    try {
+      const response = await fetch('/config.json', { method: 'GET', credentials: 'same-origin' });
+      if (response && response.ok) {
+        const config = await response.json();
+        // 可選：從配置文件加載組織名稱等信息
+        if (config.org_name) {
+          document.querySelectorAll('[data-sysname="org"]').forEach(el => { el.textContent = config.org_name; });
+        }
+        if (config.site_name) {
+          document.querySelectorAll('[data-sysname="site"]').forEach(el => { el.textContent = config.site_name; });
+        }
+      }
+    } catch (err) {
+      // 如果無法加載配置，使用默認名稱
+      console.info('Using default system names');
+    }
+  })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth-guard.js?v=20260705-auth"></script>
 <script src="assets/global-ui.js?v=20260704-userdisplay"></script>
 </body>
 </html>

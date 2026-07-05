@@ -103,7 +103,7 @@ tr:hover td{background:rgba(0,212,255,.04)}
 @media(max-width:720px){.grp-b{grid-template-columns:1fr 1fr}}
 @media(max-width:480px){.grp-b{grid-template-columns:1fr}}
 </style>
-<link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
+<link rel="stylesheet" href="assets/layout-fix.css?v=20260705-overlap2"><link rel="stylesheet" href="assets/global-ui.css?v=20260704-userdisplay">
 </head>
 <body>
 <nav class="navbar">
@@ -459,6 +459,8 @@ document.getElementById('m-edit').addEventListener('click',e=>{if(e.target.id===
 document.getElementById('m-qr').addEventListener('click',e=>{if(e.target.id==='m-qr')closeM('m-qr');});
 load();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/auth-guard.js?v=20260705-auth"></script>
 <script src="assets/global-ui.js?v=20260704-userdisplay"></script>
 </body>
 </html>
