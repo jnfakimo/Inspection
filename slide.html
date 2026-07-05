@@ -138,6 +138,38 @@
 
     .icon-check { color: var(--green); }
     .icon-warn { color: var(--amber); }
+
+    .quote-box {
+      background: rgba(0,212,255,0.06);
+      border-left: 4px solid var(--cyan);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 0.8em 0;
+      font-size: 0.55em;
+      color: #cce8f4;
+      font-style: italic;
+      line-height: 1.7;
+    }
+    .quote-author {
+      font-size: 0.4em;
+      color: #5a8ab0;
+      text-align: right;
+      margin-top: 8px;
+      font-style: normal;
+    }
+
+    .adv-card .adv-icon img {
+      width: 64px; height: 64px; object-fit: contain;
+      display: block; margin: 0 auto;
+      filter: drop-shadow(0 0 10px rgba(0,212,255,0.6));
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .fade-slow { transition: opacity 0.6s ease; }
   </style>
 </head>
 <body>
