@@ -16,6 +16,14 @@
       --red: #ff3b3b;
       --accent: var(--cyan);
     }
+    .svg-icon { display:block; margin:0 auto 8px; }
+    .svg-icon-sm { width:64px; height:64px; }
+    .svg-icon-md { width:80px; height:80px; }
+    .svg-icon-lg { width:120px; height:120px; }
+    .process-flow-svg { width:100%; max-width:700px; margin:0 auto; display:block; }
+    .arch-svg { width:100%; max-width:720px; margin:0 auto; display:block; }
+    .dashboard-svg { width:100%; max-width:700px; margin:0 auto; display:block; }
+    .building-svg { width:200px; height:200px; margin:0 auto; display:block; }
     .reveal { font-family: 'Noto Sans TC', 'Segoe UI', sans-serif; }
     .reveal h1, .reveal h2, .reveal h3 { font-family: 'Noto Sans TC', 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
     .reveal h1 { font-size: 2.4em; }
@@ -244,22 +252,30 @@
       <h2>數位化巡檢機制 — 三大核心價值</h2>
       <div class="adv-grid">
         <div class="adv-card fragment">
-          <div class="adv-icon">📊</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><path d="M20 40 L28 24 L36 32 L44 20" fill="none" stroke="#00ff9d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="20" cy="40" r="2.5" fill="#00d4ff"/><circle cx="28" cy="24" r="2.5" fill="#00d4ff"/><circle cx="36" cy="32" r="2.5" fill="#00d4ff"/><circle cx="44" cy="20" r="2.5" fill="#00d4ff"/><text x="32" y="54" text-anchor="middle" fill="#4fc3f7" font-size="7" font-weight="700">✓</text></svg>
+          </div>
           <div class="adv-title">數據真實性</div>
           <div class="adv-desc">即時紀錄取代紙本<br>強制欄位杜絕事後補填<br>GPS / QR Code 定位打卡</div>
         </div>
         <div class="adv-card fragment">
-          <div class="adv-icon">🔍</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><path d="M16 44 L28 44 L28 28 L40 28 L40 16" fill="none" stroke="#00ff9d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="44" r="2.5" fill="#00d4ff"/><circle cx="28" cy="44" r="2.5" fill="#00d4ff"/><circle cx="28" cy="28" r="2.5" fill="#00d4ff"/><circle cx="40" cy="28" r="2.5" fill="#00d4ff"/><circle cx="40" cy="16" r="2.5" fill="#00d4ff"/><polyline points="36,16 40,16 40,20" fill="none" stroke="#00d4ff" stroke-width="1.5"/><text x="32" y="54" text-anchor="middle" fill="#4fc3f7" font-size="7" font-weight="700">流程</text></svg>
+          </div>
           <div class="adv-title">流程透明化</div>
           <div class="adv-desc">巡檢 → 報修 → 派工 → 維修 → 驗收<br>全流程可追蹤、可查核<br>LINE 即時推播通知</div>
         </div>
         <div class="adv-card fragment">
-          <div class="adv-icon">📈</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><rect x="16" y="34" width="10" height="14" rx="1" fill="rgba(0,212,255,0.25)"/><rect x="28" y="26" width="10" height="22" rx="1" fill="rgba(0,255,157,0.25)"/><rect x="40" y="18" width="10" height="30" rx="1" fill="rgba(0,212,255,0.2)"/><line x1="21" y1="36" x2="21" y2="32" stroke="#00ff9d" stroke-width="1.5" stroke-dasharray="2,2"/><polygon points="21,30 19,34 23,34" fill="#00ff9d"/><line x1="33" y1="28" x2="33" y2="24" stroke="#00ff9d" stroke-width="1.5" stroke-dasharray="2,2"/><polygon points="33,22 31,26 35,26" fill="#00ff9d"/><text x="32" y="54" text-anchor="middle" fill="#4fc3f7" font-size="7" font-weight="700">趨勢</text></svg>
+          </div>
           <div class="adv-title">決策科學化</div>
           <div class="adv-desc">設備異常趨勢分析<br>維護成本生命周期統計<br>戰情儀表板即時掌握</div>
         </div>
         <div class="adv-card fragment">
-          <div class="adv-icon">🏗️</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><rect x="18" y="30" width="12" height="16" rx="1" fill="rgba(0,212,255,0.2)" stroke="#00d4ff" stroke-width="1"/><rect x="32" y="22" width="12" height="24" rx="1" fill="rgba(0,255,157,0.2)" stroke="#00ff9d" stroke-width="1"/><line x1="24" y1="30" x2="24" y2="26" stroke="#00ff9d" stroke-width="1.5"/><polygon points="24,24 22,28 26,28" fill="#00ff9d"/><line x1="38" y1="22" x2="38" y2="18" stroke="#00ff9d" stroke-width="1.5"/><polygon points="38,16 36,20 40,20" fill="#00ff9d"/><path d="M14 44 L50 44" stroke="rgba(0,212,255,0.3)" stroke-width="1"/><text x="32" y="54" text-anchor="middle" fill="#4fc3f7" font-size="7" font-weight="700">生命</text></svg>
+          </div>
           <div class="adv-title">全生命週期管理</div>
           <div class="adv-desc">設備履歷完整建置<br>購置 / 維修 / 汰換追蹤<br>3D 樓層模型視覺化</div>
         </div>
@@ -294,22 +310,30 @@
       <h2>系統總覽 — 四大核心模組</h2>
       <div class="adv-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
         <div class="adv-card fragment">
-          <div class="adv-icon">◈</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><rect x="18" y="18" width="11" height="11" rx="2" fill="none" stroke="#00ff9d" stroke-width="1.8"/><rect x="35" y="18" width="11" height="11" rx="2" fill="none" stroke="#00ff9d" stroke-width="1.8"/><rect x="18" y="35" width="11" height="11" rx="2" fill="none" stroke="#00ff9d" stroke-width="1.8"/><rect x="35" y="35" width="11" height="11" rx="2" fill="none" stroke="#00ff9d" stroke-width="1.8"/><line x1="29" y1="23" x2="35" y2="23" stroke="#00d4ff" stroke-width="1.5"/><line x1="23" y1="29" x2="23" y2="35" stroke="#00d4ff" stroke-width="1.5"/><line x1="29" y1="41" x2="35" y2="41" stroke="#00d4ff" stroke-width="1.5"/><line x1="41" y1="29" x2="41" y2="35" stroke="#00d4ff" stroke-width="1.5"/></svg>
+          </div>
           <div class="adv-title">巡檢系統</div>
           <div class="adv-desc">QR Code 掃描巡檢<br>即時記錄設備狀態<br>離線暫存、上線同步</div>
         </div>
         <div class="adv-card fragment">
-          <div class="adv-icon">◪</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><path d="M20 44 L32 20 L44 44" fill="none" stroke="#00ff9d" stroke-width="2" stroke-linejoin="round"/><line x1="24" y1="36" x2="40" y2="36" stroke="#00d4ff" stroke-width="1.8"/><circle cx="32" cy="32" r="4" fill="rgba(0,212,255,0.2)" stroke="#00d4ff" stroke-width="1"/></svg>
+          </div>
           <div class="adv-title">報修派工</div>
           <div class="adv-desc">行動報修填單<br>自動派工 + LINE 通知<br>維修進度追蹤</div>
         </div>
         <div class="adv-card fragment">
-          <div class="adv-icon">◫</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><rect x="14" y="30" width="16" height="14" rx="1" fill="rgba(0,212,255,0.15)" stroke="#00ff9d" stroke-width="1.2"/><rect x="34" y="18" width="16" height="26" rx="1" fill="rgba(0,255,157,0.15)" stroke="#00ff9d" stroke-width="1.2"/><line x1="22" y1="30" x2="22" y2="26" stroke="#00ff9d" stroke-width="1.5"/><polygon points="22,24 20,28 24,28" fill="#00ff9d"/><line x1="42" y1="18" x2="42" y2="14" stroke="#00ff9d" stroke-width="1.5"/><polygon points="42,12 40,16 44,16" fill="#00ff9d"/></svg>
+          </div>
           <div class="adv-title">戰情儀表板</div>
           <div class="adv-desc">KPI 即時掌握<br>報修趨勢分析<br>設備故障排行</div>
         </div>
         <div class="adv-card fragment">
-          <div class="adv-icon">⬢</div>
+          <div class="adv-icon">
+            <svg class="svg-icon svg-icon-sm" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="#00d4ff" stroke-width="2"/><circle cx="32" cy="24" r="6" fill="none" stroke="#00ff9d" stroke-width="2"/><path d="M20 44 Q26 34 32 38 Q38 34 44 44" fill="none" stroke="#00d4ff" stroke-width="1.8"/><circle cx="20" cy="44" r="2" fill="#00ff9d"/><circle cx="44" cy="44" r="2" fill="#00ff9d"/></svg>
+          </div>
           <div class="adv-title">後台管理</div>
           <div class="adv-desc">帳號權限 RBAC<br>設備履歷維護<br>系統設定</div>
         </div>
@@ -319,136 +343,215 @@
     <!-- 巡檢系統流程 -->
     <section data-background-color="#020b18">
       <h2>巡檢系統 — 作業流程</h2>
-      <div class="timeline">
-        <div class="timeline-item fragment">
-          <div class="ti-date">① 掃描 QR Code</div>
-          <div class="ti-text">手機相機掃描設備 QR Code，自動識別設備</div>
-        </div>
-        <div class="timeline-item fragment">
-          <div class="ti-date">② 選擇運轉狀態</div>
-          <div class="ti-text">正常 ✓ / 異常 ✗ ，異常時強制填寫說明與拍照</div>
-        </div>
-        <div class="timeline-item fragment">
-          <div class="ti-date">③ 即時上傳</div>
-          <div class="ti-text">在線自動上傳 Supabase，離線暫存本機</div>
-        </div>
-        <div class="timeline-item fragment">
-          <div class="ti-date">④ 巡檢儀表板</div>
-          <div class="ti-text">今日巡檢進度條、異常率統計、Chart.js 圖表</div>
-        </div>
+      <div style="text-align:center; margin-top:0.4em">
+        <svg class="process-flow-svg" viewBox="0 0 660 160">
+          <defs>
+            <marker id="arrowCyan" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#00d4ff"/></marker>
+            <linearGradient id="boxGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,212,255,0.12)"/><stop offset="100%" stop-color="rgba(0,212,255,0.04)"/></linearGradient>
+          </defs>
+          <rect x="10" y="10" width="140" height="110" rx="6" fill="url(#boxGrad)" stroke="rgba(0,212,255,0.35)" stroke-width="1.5"/>
+          <text x="80" y="42" text-anchor="middle" fill="#00d4ff" font-size="13" font-weight="700">① 掃描 QR Code</text>
+          <text x="80" y="60" text-anchor="middle" fill="#8ab4cc" font-size="8">手機相機掃描</text>
+          <text x="80" y="74" text-anchor="middle" fill="#8ab4cc" font-size="8">設備 QR Code</text>
+          <text x="80" y="88" text-anchor="middle" fill="#8ab4cc" font-size="8">自動識別設備</text>
+          <line x1="150" y1="65" x2="168" y2="65" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowCyan)"/>
+
+          <rect x="175" y="10" width="140" height="110" rx="6" fill="url(#boxGrad)" stroke="rgba(0,212,255,0.35)" stroke-width="1.5"/>
+          <text x="245" y="42" text-anchor="middle" fill="#00d4ff" font-size="13" font-weight="700">② 選擇運轉狀態</text>
+          <text x="245" y="60" text-anchor="middle" fill="#8ab4cc" font-size="8">正常 ✓ / 異常 ✗</text>
+          <text x="245" y="74" text-anchor="middle" fill="#8ab4cc" font-size="8">異常強制填寫</text>
+          <text x="245" y="88" text-anchor="middle" fill="#8ab4cc" font-size="8">說明 + 拍照</text>
+          <line x1="315" y1="65" x2="333" y2="65" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowCyan)"/>
+
+          <rect x="340" y="10" width="140" height="110" rx="6" fill="url(#boxGrad)" stroke="rgba(0,212,255,0.35)" stroke-width="1.5"/>
+          <text x="410" y="42" text-anchor="middle" fill="#00d4ff" font-size="13" font-weight="700">③ 即時上傳</text>
+          <text x="410" y="60" text-anchor="middle" fill="#8ab4cc" font-size="8">在線 → Supabase</text>
+          <text x="410" y="74" text-anchor="middle" fill="#8ab4cc" font-size="8">離線 → 本機暫存</text>
+          <text x="410" y="88" text-anchor="middle" fill="#8ab4cc" font-size="8">連線自動同步</text>
+          <line x1="480" y1="65" x2="498" y2="65" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowCyan)"/>
+
+          <rect x="505" y="10" width="145" height="110" rx="6" fill="url(#boxGrad)" stroke="rgba(0,255,157,0.35)" stroke-width="1.5"/>
+          <text x="577" y="42" text-anchor="middle" fill="#00ff9d" font-size="13" font-weight="700">④ 巡檢儀表板</text>
+          <text x="577" y="60" text-anchor="middle" fill="#8ab4cc" font-size="8">進度條即時看</text>
+          <text x="577" y="74" text-anchor="middle" fill="#8ab4cc" font-size="8">異常率統計</text>
+          <text x="577" y="88" text-anchor="middle" fill="#8ab4cc" font-size="8">Chart.js 圖表</text>
+        </svg>
       </div>
     </section>
 
     <!-- 報修派工流程 -->
     <section data-background-color="#020b18">
       <h2>報修派工 — 全流程管理</h2>
-      <div style="display:flex; gap:12px; margin-top:0.4em">
-        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
-          <div style="font-size:1.6em; color:var(--amber)">📝</div>
-          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
-            <strong style="color:var(--cyan)">報修</strong><br>
-            填寫故障描述<br>
-            上傳照片<br>
-            選擇希望完成日期<br>
-            防呆：不可早於今天
-          </div>
-        </div>
-        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
-          <div style="font-size:1.6em; color:var(--cyan)">⚙️</div>
-          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
-            <strong style="color:var(--cyan)">派工</strong><br>
-            指派技師 / 委外商<br>
-            LINE 推播通知<br>
-            技師接單 / 退回
-          </div>
-        </div>
-        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
-          <div style="font-size:1.6em; color:var(--green)">🔧</div>
-          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
-            <strong style="color:var(--cyan)">維修</strong><br>
-            開始維修 / 等待料件<br>
-            維修完成回報<br>
-            使用單位驗收
-          </div>
-        </div>
-        <div style="flex:1; text-align:center; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px" class="fragment">
-          <div style="font-size:1.6em; color:var(--red)">✅</div>
-          <div style="font-size:0.42em; color:#8ab4cc; margin-top:6px; line-height:1.7">
-            <strong style="color:var(--cyan)">結案</strong><br>
-            主管簽核<br>
-            自動歸檔至設備履歷<br>
-            費用統計
-          </div>
-        </div>
+      <div style="text-align:center; margin-top:0.2em">
+        <svg class="process-flow-svg" viewBox="0 0 700 180">
+          <defs>
+            <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#00ff9d"/></marker>
+            <marker id="arrowAmber" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6" fill="#ffb300"/></marker>
+            <linearGradient id="boxGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,212,255,0.12)"/><stop offset="100%" stop-color="rgba(0,212,255,0.04)"/></linearGradient>
+          </defs>
+          <!-- 報修 -->
+          <rect x="10" y="10" width="150" height="130" rx="8" fill="url(#boxGrad2)" stroke="rgba(255,179,0,0.4)" stroke-width="1.5"/>
+          <rect x="10" y="10" width="150" height="28" rx="8" fill="rgba(255,179,0,0.1)"/>
+          <text x="85" y="29" text-anchor="middle" fill="#ffb300" font-size="13" font-weight="700">📝 報修</text>
+          <text x="85" y="52" text-anchor="middle" fill="#8ab4cc" font-size="9">填寫故障描述</text>
+          <text x="85" y="68" text-anchor="middle" fill="#8ab4cc" font-size="9">上傳照片</text>
+          <text x="85" y="84" text-anchor="middle" fill="#8ab4cc" font-size="9">選擇希望完成日期</text>
+          <text x="85" y="102" text-anchor="middle" fill="#ffb300" font-size="9">防呆：不可早於今天</text>
+          <line x1="160" y1="75" x2="180" y2="75" stroke="#ffb300" stroke-width="1.8" marker-end="url(#arrowAmber)"/>
+
+          <!-- 派工 -->
+          <rect x="188" y="10" width="150" height="130" rx="8" fill="url(#boxGrad2)" stroke="rgba(0,212,255,0.4)" stroke-width="1.5"/>
+          <rect x="188" y="10" width="150" height="28" rx="8" fill="rgba(0,212,255,0.1)"/>
+          <text x="263" y="29" text-anchor="middle" fill="#00d4ff" font-size="13" font-weight="700">⚙️ 派工</text>
+          <text x="263" y="52" text-anchor="middle" fill="#8ab4cc" font-size="9">指派技師 / 委外商</text>
+          <text x="263" y="68" text-anchor="middle" fill="#8ab4cc" font-size="9">LINE 推播通知</text>
+          <text x="263" y="84" text-anchor="middle" fill="#8ab4cc" font-size="9">技師接單</text>
+          <text x="263" y="100" text-anchor="middle" fill="#ff3b3b" font-size="9">退回重派</text>
+          <line x1="338" y1="75" x2="358" y2="75" stroke="#00d4ff" stroke-width="1.8" marker-end="url(#arrowGreen)"/>
+
+          <!-- 維修 -->
+          <rect x="366" y="10" width="150" height="130" rx="8" fill="url(#boxGrad2)" stroke="rgba(0,255,157,0.4)" stroke-width="1.5"/>
+          <rect x="366" y="10" width="150" height="28" rx="8" fill="rgba(0,255,157,0.1)"/>
+          <text x="441" y="29" text-anchor="middle" fill="#00ff9d" font-size="13" font-weight="700">🔧 維修</text>
+          <text x="441" y="52" text-anchor="middle" fill="#8ab4cc" font-size="9">開始維修</text>
+          <text x="441" y="68" text-anchor="middle" fill="#8ab4cc" font-size="9">等待料件</text>
+          <text x="441" y="84" text-anchor="middle" fill="#8ab4cc" font-size="9">維修完成回報</text>
+          <text x="441" y="100" text-anchor="middle" fill="#ffb300" font-size="9">使用單位驗收</text>
+          <line x1="516" y1="75" x2="536" y2="75" stroke="#00ff9d" stroke-width="1.8" marker-end="url(#arrowGreen)"/>
+
+          <!-- 結案 -->
+          <rect x="544" y="10" width="145" height="130" rx="8" fill="url(#boxGrad2)" stroke="rgba(0,255,157,0.35)" stroke-width="1.5"/>
+          <rect x="544" y="10" width="145" height="28" rx="8" fill="rgba(0,255,157,0.08)"/>
+          <text x="616" y="29" text-anchor="middle" fill="#00ff9d" font-size="13" font-weight="700">✅ 結案</text>
+          <text x="616" y="52" text-anchor="middle" fill="#8ab4cc" font-size="9">主管簽核</text>
+          <text x="616" y="68" text-anchor="middle" fill="#8ab4cc" font-size="9">自動歸檔設備履歷</text>
+          <text x="616" y="84" text-anchor="middle" fill="#8ab4cc" font-size="9">費用統計與分析</text>
+
+          <!-- 週邊標示 -->
+          <rect x="85" y="152" width="120" height="18" rx="20" fill="rgba(0,212,255,0.08)" stroke="rgba(0,212,255,0.25)" stroke-width="1"/>
+          <text x="145" y="164" text-anchor="middle" fill="#4fc3f7" font-size="8">📱 手機 / 平板皆可操作</text>
+        </svg>
       </div>
     </section>
 
     <!-- 戰情儀表板 -->
     <section data-background-color="#020b18">
       <h2>戰情儀表板 — 決策分析</h2>
-      <div class="stat-row">
-        <div class="stat-card">
-          <div class="num">KPI</div>
-          <div class="label">關鍵指標即時看</div>
-        </div>
-        <div class="stat-card">
-          <div class="num">排行</div>
-          <div class="label">單位/設備/人員</div>
-        </div>
-        <div class="stat-card">
-          <div class="num">趨勢</div>
-          <div class="label">12 月報修走勢</div>
-        </div>
-      </div>
-      <div class="adv-grid fragment" style="grid-template-columns:1fr 1fr; margin-top:0.4em">
-        <div class="adv-card">
-          <div class="adv-title">各單位報修排行</div>
-          <div class="adv-desc">依部門統計報修量，掌握高頻報修單位</div>
-        </div>
-        <div class="adv-card">
-          <div class="adv-title">各設備故障排行</div>
-          <div class="adv-desc">識別高故障率設備，制定預防維護策略</div>
-        </div>
-        <div class="adv-card">
-          <div class="adv-title">維修人員案件數</div>
-          <div class="adv-desc">技師工作量可視化，派工決策最佳化</div>
-        </div>
-        <div class="adv-card">
-          <div class="adv-title">案件狀態分佈</div>
-          <div class="adv-desc">待處理 / 進行中 / 已完成 一目了然</div>
-        </div>
+      <div style="text-align:center; margin-top:0.2em">
+        <svg class="dashboard-svg" viewBox="0 0 700 220">
+          <defs>
+            <linearGradient id="barGrad1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="rgba(0,212,255,0.3)"/></linearGradient>
+            <linearGradient id="barGrad2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00ff9d"/><stop offset="100%" stop-color="rgba(0,255,157,0.3)"/></linearGradient>
+            <linearGradient id="barGrad3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ffb300"/><stop offset="100%" stop-color="rgba(255,179,0,0.3)"/></linearGradient>
+          </defs>
+
+          <!-- 左側：KPI 卡片 -->
+          <rect x="10" y="10" width="200" height="64" rx="6" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.2)" stroke-width="1"/>
+          <text x="30" y="38" fill="#00d4ff" font-size="22" font-weight="800">95%</text>
+          <text x="30" y="56" fill="#8ab4cc" font-size="9">今日巡檢完成率</text>
+
+          <rect x="10" y="80" width="200" height="64" rx="6" fill="rgba(0,255,157,0.06)" stroke="rgba(0,255,157,0.2)" stroke-width="1"/>
+          <text x="30" y="108" fill="#00ff9d" font-size="22" font-weight="800">12</text>
+          <text x="30" y="126" fill="#8ab4cc" font-size="9">待處理報修案件</text>
+
+          <rect x="10" y="150" width="200" height="64" rx="6" fill="rgba(255,179,0,0.06)" stroke="rgba(255,179,0,0.2)" stroke-width="1"/>
+          <text x="30" y="178" fill="#ffb300" font-size="22" font-weight="800">4.2d</text>
+          <text x="30" y="196" fill="#8ab4cc" font-size="9">平均維修天數</text>
+
+          <!-- 中間：長條圖 -->
+          <rect x="230" y="10" width="220" height="200" rx="6" fill="rgba(0,212,255,0.04)" stroke="rgba(0,212,255,0.15)" stroke-width="1"/>
+          <text x="340" y="30" text-anchor="middle" fill="#4fc3f7" font-size="10" font-weight="700">各單位報修排行</text>
+          <rect x="252" y="175" width="30" height="20" rx="2" fill="url(#barGrad1)"/>
+          <rect x="292" y="155" width="30" height="40" rx="2" fill="url(#barGrad2)"/>
+          <rect x="332" y="125" width="30" height="70" rx="2" fill="url(#barGrad3)"/>
+          <rect x="372" y="145" width="30" height="50" rx="2" fill="url(#barGrad1)"/>
+          <rect x="412" y="165" width="30" height="30" rx="2" fill="url(#barGrad2)"/>
+          <text x="267" y="200" text-anchor="middle" fill="#8ab4cc" font-size="7">A組</text>
+          <text x="307" y="200" text-anchor="middle" fill="#8ab4cc" font-size="7">B組</text>
+          <text x="347" y="200" text-anchor="middle" fill="#8ab4cc" font-size="7">C組</text>
+          <text x="387" y="200" text-anchor="middle" fill="#8ab4cc" font-size="7">D組</text>
+          <text x="427" y="200" text-anchor="middle" fill="#8ab4cc" font-size="7">E組</text>
+
+          <!-- 右側：圓餅圖 & 案件分佈 -->
+          <rect x="470" y="10" width="220" height="200" rx="6" fill="rgba(0,212,255,0.04)" stroke="rgba(0,212,255,0.15)" stroke-width="1"/>
+          <text x="580" y="30" text-anchor="middle" fill="#4fc3f7" font-size="10" font-weight="700">案件狀態分佈</text>
+          <circle cx="555" cy="110" r="50" fill="none" stroke="#ffb300" stroke-width="18" stroke-dasharray="80 180"/>
+          <circle cx="555" cy="110" r="50" fill="none" stroke="#00d4ff" stroke-width="18" stroke-dasharray="60 200" transform="rotate(80 555 110)"/>
+          <circle cx="555" cy="110" r="50" fill="none" stroke="#00ff9d" stroke-width="18" stroke-dasharray="50 210" transform="rotate(215 555 110)"/>
+          <circle cx="555" cy="110" r="42" fill="#020b18"/>
+          <text x="555" y="108" text-anchor="middle" fill="#4fc3f7" font-size="8">今日</text>
+          <text x="555" y="120" text-anchor="middle" fill="#00d4ff" font-size="14" font-weight="800">24</text>
+          <!-- 圖例 -->
+          <rect x="630" y="70" width="8" height="8" rx="2" fill="#ffb300"/>
+          <text x="644" y="78" fill="#8ab4cc" font-size="8">待處理</text>
+          <rect x="630" y="94" width="8" height="8" rx="2" fill="#00d4ff"/>
+          <text x="644" y="102" fill="#8ab4cc" font-size="8">進行中</text>
+          <rect x="630" y="118" width="8" height="8" rx="2" fill="#00ff9d"/>
+          <text x="644" y="126" fill="#8ab4cc" font-size="8">已完成</text>
+        </svg>
       </div>
     </section>
 
     <!-- 3D 立體樓層模型 -->
     <section data-background-color="#020b18">
       <h2>3D 立體樓層模型</h2>
-      <div style="display:flex; gap:14px; margin-top:0.4em">
-        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
-          <div style="font-size:0.42em; color:#8ab4cc; line-height:1.7">
-            <strong style="color:var(--cyan); font-size:1.3em">🏗️</strong><br><br>
-            <strong>Three.js 3D 引擎</strong><br>
-            B1～3F 樓層立體模型<br>
-            平面貼圖疊合 + 霓虹邊框<br>
-            支援旋轉 / 平移 / 縮放
-          </div>
+      <div style="display:flex; gap:14px; margin-top:0.2em; align-items:center">
+        <div style="flex:0 0 200px; text-align:center">
+          <svg class="building-svg" viewBox="0 0 180 180">
+            <defs>
+              <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,212,255,0.08)"/><stop offset="100%" stop-color="rgba(0,212,255,0.02)"/></linearGradient>
+            </defs>
+            <!-- 3F -->
+            <rect x="45" y="18" width="90" height="30" rx="2" fill="url(#floorGrad)" stroke="#00d4ff" stroke-width="1.2"/>
+            <text x="90" y="37" text-anchor="middle" fill="#00d4ff" font-size="8" font-weight="700">3F</text>
+            <!-- 2F -->
+            <rect x="38" y="52" width="104" height="30" rx="2" fill="url(#floorGrad)" stroke="#00d4ff" stroke-width="1.2"/>
+            <text x="90" y="71" text-anchor="middle" fill="#00d4ff" font-size="8" font-weight="700">2F</text>
+            <!-- 1F -->
+            <rect x="30" y="86" width="120" height="30" rx="2" fill="url(#floorGrad)" stroke="#00d4ff" stroke-width="1.2"/>
+            <text x="90" y="105" text-anchor="middle" fill="#00d4ff" font-size="8" font-weight="700">1F</text>
+            <!-- B1 -->
+            <rect x="30" y="120" width="120" height="30" rx="2" fill="url(#floorGrad)" stroke="#00d4ff" stroke-width="1.2" stroke-dasharray="3,2"/>
+            <text x="90" y="139" text-anchor="middle" fill="#4fc3f7" font-size="8" font-weight="700">B1</text>
+            <!-- 霓虹光暈 -->
+            <rect x="30" y="86" width="120" height="30" rx="2" fill="none" stroke="#00ff9d" stroke-width="0.5" opacity="0.4"/>
+            <!-- 標記點 -->
+            <circle cx="70" cy="33" r="3" fill="#00ff9d" opacity="0.8"/>
+            <circle cx="130" cy="67" r="3" fill="#ffb300" opacity="0.8"/>
+            <circle cx="55" cy="101" r="3" fill="#00ff9d" opacity="0.8"/>
+            <circle cx="115" cy="101" r="3" fill="#ff3b3b" opacity="0.8"/>
+            <!-- 標記線 -->
+            <line x1="70" y1="33" x2="60" y2="18" stroke="#00ff9d" stroke-width="0.6" opacity="0.5"/>
+            <line x1="130" y1="67" x2="142" y2="52" stroke="#ffb300" stroke-width="0.6" opacity="0.5"/>
+            <line x1="115" y1="101" x2="150" y2="86" stroke="#ff3b3b" stroke-width="0.6" opacity="0.5"/>
+            <!-- 底座 -->
+            <rect x="25" y="152" width="130" height="3" rx="1" fill="rgba(0,212,255,0.15)"/>
+          </svg>
         </div>
-        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
-          <div style="font-size:0.42em; color:#8ab4cc; line-height:1.7">
-            <strong style="color:var(--cyan); font-size:1.3em">📍</strong><br><br>
-            <strong>整合標記系統</strong><br>
-            設備 / 空間 / 報修點標記<br>
-            文字標籤顯示 / 隱藏<br>
-            樓層可見度控制
+        <div style="flex:1; display:flex; gap:10px">
+          <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px; text-align:center">
+            <strong style="color:var(--cyan); font-size:0.65em">🏗️ Three.js 引擎</strong>
+            <div style="font-size:0.4em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+              B1～3F 樓層立體模型<br>
+              平面貼圖疊合 + 霓虹邊框<br>
+              支援旋轉 / 平移 / 縮放
+            </div>
           </div>
-        </div>
-        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
-          <div style="font-size:0.42em; color:#8ab4cc; line-height:1.7">
-            <strong style="color:var(--cyan); font-size:1.3em">🎮</strong><br><br>
-            <strong>立體控制面板</strong><br>
-            樓層間距 / 水平平移<br>
-            Y 軸上下調整<br>
-            俯視 / 重置 / 真實比例
+          <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px; text-align:center">
+            <strong style="color:var(--cyan); font-size:0.65em">📍 整合標記系統</strong>
+            <div style="font-size:0.4em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+              設備 / 空間 / 報修點標記<br>
+              文字標籤顯示 / 隱藏<br>
+              樓層可見度控制
+            </div>
+          </div>
+          <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:14px; text-align:center">
+            <strong style="color:var(--cyan); font-size:0.65em">🎮 立體控制面板</strong>
+            <div style="font-size:0.4em; color:#8ab4cc; margin-top:6px; line-height:1.7">
+              樓層間距 / 水平平移<br>
+              Y 軸上下調整<br>
+              俯視 / 重置 / 真實比例
+            </div>
           </div>
         </div>
       </div>
@@ -457,37 +560,48 @@
     <!-- 系統技術架構 -->
     <section data-background-color="#020b18">
       <h2>系統技術架構</h2>
-      <div class="stat-row">
-        <div class="stat-card">
-          <div class="num">前端</div>
-          <div class="label">純 HTML / CSS / JS</div>
-        </div>
-        <div class="stat-card">
-          <div class="num">後端</div>
-          <div class="label">Supabase</div>
-        </div>
-        <div class="stat-card">
-          <div class="num">部署</div>
-          <div class="label">GitHub Pages</div>
-        </div>
-      </div>
-      <div class="adv-grid fragment" style="grid-template-columns:1fr 1fr; margin-top:0.6em">
-        <div class="adv-card">
-          <div class="adv-title">📦 Supabase 資料庫</div>
-          <div class="adv-desc">PostgreSQL 關聯式資料庫<br>Row Level Security 權限控管<br>Storage 儲存照片 / 檔案</div>
-        </div>
-        <div class="adv-card">
-          <div class="adv-title">🔐 認證與授權</div>
-          <div class="adv-desc">Supabase Auth 帳號管理<br>RBAC 角色權限矩陣<br>Session 管理 + 離線暫存</div>
-        </div>
-        <div class="adv-card">
-          <div class="adv-title">📱 行動優先</div>
-          <div class="adv-desc">響應式設計 (RWD)<br>手機 / 平板 / 桌面皆適用<br>PWA 離線支援</div>
-        </div>
-        <div class="adv-card">
-          <div class="adv-title">🔔 即時通知</div>
-          <div class="adv-desc">LINE Messaging API 推播<br>Edge Function 服務端觸發<br>異常 / 報修 / 案件通知</div>
-        </div>
+      <div style="text-align:center; margin-top:0.1em">
+        <svg class="arch-svg" viewBox="0 0 700 200">
+          <defs>
+            <marker id="arrowUp" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><path d="M0,6 L8,3 L0,0" fill="#00d4ff"/></marker>
+            <linearGradient id="layGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(0,212,255,0.12)"/><stop offset="100%" stop-color="rgba(0,212,255,0.02)"/></linearGradient>
+          </defs>
+
+          <!-- 底層：Supabase -->
+          <rect x="180" y="155" width="340" height="38" rx="6" fill="rgba(0,212,255,0.06)" stroke="rgba(0,212,255,0.25)" stroke-width="1.5"/>
+          <text x="350" y="179" text-anchor="middle" fill="#00d4ff" font-size="12" font-weight="700">Supabase 後端服務</text>
+          <line x1="350" y1="155" x2="350" y2="140" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowUp)"/>
+
+          <!-- 中層：核心服務 -->
+          <rect x="60" y="95" width="160" height="45" rx="6" fill="url(#layGrad)" stroke="rgba(0,255,157,0.3)" stroke-width="1.2"/>
+          <text x="140" y="116" text-anchor="middle" fill="#00ff9d" font-size="10" font-weight="700">PostgreSQL 資料庫</text>
+          <text x="140" y="130" text-anchor="middle" fill="#8ab4cc" font-size="7">RLS 權限控管</text>
+
+          <rect x="270" y="95" width="160" height="45" rx="6" fill="url(#layGrad)" stroke="rgba(0,255,157,0.3)" stroke-width="1.2"/>
+          <text x="350" y="116" text-anchor="middle" fill="#00ff9d" font-size="10" font-weight="700">Supabase Auth</text>
+          <text x="350" y="130" text-anchor="middle" fill="#8ab4cc" font-size="7">RBAC 角色權限</text>
+
+          <rect x="480" y="95" width="160" height="45" rx="6" fill="url(#layGrad)" stroke="rgba(0,255,157,0.3)" stroke-width="1.2"/>
+          <text x="560" y="116" text-anchor="middle" fill="#00ff9d" font-size="10" font-weight="700">Storage / Edge Func</text>
+          <text x="560" y="130" text-anchor="middle" fill="#8ab4cc" font-size="7">圖片儲存 · LINE 推播</text>
+
+          <line x1="140" y1="95" x2="140" y2="80" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowUp)"/>
+          <line x1="350" y1="95" x2="350" y2="80" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowUp)"/>
+          <line x1="560" y1="95" x2="560" y2="80" stroke="#00d4ff" stroke-width="1.5" marker-end="url(#arrowUp)"/>
+
+          <!-- 頂層：前端 -->
+          <rect x="180" y="35" width="340" height="45" rx="6" fill="rgba(0,255,157,0.06)" stroke="rgba(0,255,157,0.3)" stroke-width="1.5"/>
+          <text x="350" y="56" text-anchor="middle" fill="#00ff9d" font-size="10" font-weight="700">純前端 HTML + CSS + JavaScript</text>
+          <text x="350" y="70" text-anchor="middle" fill="#8ab4cc" font-size="7">響應式設計 · GitHub Pages 部署 · 離線暫存支援</text>
+
+          <!-- 左側標籤 -->
+          <text x="40" y="62" text-anchor="end" fill="#4fc3f7" font-size="8">前端層</text>
+          <line x1="44" y1="57" x2="60" y2="57" stroke="#4fc3f7" stroke-width="0.8" stroke-dasharray="2,2"/>
+          <text x="40" y="117" text-anchor="end" fill="#4fc3f7" font-size="8">服務層</text>
+          <line x1="44" y1="112" x2="60" y2="112" stroke="#4fc3f7" stroke-width="0.8" stroke-dasharray="2,2"/>
+          <text x="24" y="174" text-anchor="end" fill="#4fc3f7" font-size="8">後端層</text>
+          <line x1="44" y1="169" x2="60" y2="169" stroke="#4fc3f7" stroke-width="0.8" stroke-dasharray="2,2"/>
+        </svg>
       </div>
     </section>
 
