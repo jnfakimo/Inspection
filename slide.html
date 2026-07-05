@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>臺北農產第一果菜市場 — 數位化巡檢管理系統</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/night.css" />
+  <style>
+    :root {
+      --cyan: #00d4ff;
+      --cyan2: #4fc3f7;
+      --green: #00ff9d;
+      --amber: #ffb300;
+      --red: #ff3b3b;
+      --accent: var(--cyan);
+    }
+    .reveal { font-family: 'Noto Sans TC', 'Segoe UI', sans-serif; }
+    .reveal h1, .reveal h2, .reveal h3 { font-family: 'Noto Sans TC', 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+    .reveal h1 { font-size: 2.4em; }
+    .reveal h2 { font-size: 1.6em; color: var(--cyan); }
+    .reveal .progress { color: var(--cyan); }
+    .reveal .fragment { opacity: 0.15; }
+    .reveal .fragment.visible { opacity: 1; }
+
+    .title-slide { text-align: center; }
+    .title-slide .tag {
+      display: inline-block;
+      background: var(--cyan);
+      color: #001521;
+      padding: 6px 18px;
+      border-radius: 4px;
+      font-size: 0.55em;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.8em;
+      font-weight: 700;
+    }
+    .title-slide .subtitle { font-size: 0.7em; color: #8ab4cc; margin-top: 0.5em; }
+    .title-slide .author { margin-top: 2em; font-size: 0.5em; color: #5a8ab0; }
+
+    .stat-row { display: flex; gap: 18px; justify-content: center; margin-top: 1em; }
+    .stat-card {
+      background: rgba(0,212,255,0.06);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 6px;
+      padding: 20px 26px;
+      text-align: center;
+      flex: 1;
+    }
+    .stat-card .num { font-size: 1.6em; font-weight: 800; color: var(--cyan); line-height: 1; text-shadow: 0 0 14px rgba(0,212,255,0.5); }
+    .stat-card .label { font-size: 0.42em; color: #8ab4cc; margin-top: 6px; }
+
+    .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 0.6em; }
+    .adv-card {
+      background: rgba(0,212,255,0.04);
+      border-top: 3px solid var(--cyan);
+      border-radius: 6px;
+      padding: 16px;
+      text-align: center;
+    }
+    .adv-card .adv-icon { font-size: 2.2em; margin-bottom: 6px; }
+    .adv-card .adv-title { font-size: 0.5em; font-weight: 700; color: var(--cyan); margin-bottom: 6px; letter-spacing: 0.05em; }
+    .adv-card .adv-desc { font-size: 0.4em; color: #8ab4cc; line-height: 1.6; }
+
+    .vs-grid { display: grid; grid-template-columns: 1fr 50px 1fr; gap: 0; align-items: start; margin-top: 0.6em; }
+    .vs-col { background: rgba(255,255,255,0.04); border-radius: 6px; padding: 18px; }
+    .vs-col.left-col { border-top: 3px solid var(--cyan); }
+    .vs-col.right-col { border-top: 3px solid var(--green); }
+    .vs-label { font-size: 0.55em; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.05em; }
+    .vs-label.left { color: var(--cyan); }
+    .vs-label.right { color: var(--green); }
+    .vs-center { display: flex; align-items: center; justify-content: center; font-size: 1.2em; font-weight: 900; color: rgba(255,255,255,0.15); }
+    .vs-col ul { font-size: 0.4em; list-style: none; padding: 0; margin: 0; }
+    .vs-col ul li { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #bbb; }
+    .vs-col ul li:last-child { border-bottom: none; }
+    .vs-col ul li::before { content: "▸ "; color: var(--cyan); opacity: 0.6; }
+    .vs-col.right-col ul li::before { color: var(--green); }
+
+    .timeline { position: relative; padding-left: 36px; margin-top: 0.8em; }
+    .timeline::before {
+      content: ''; position: absolute; left: 14px; top: 4px; bottom: 4px;
+      width: 2px; background: rgba(0,212,255,0.25);
+    }
+    .timeline-item { position: relative; margin-bottom: 18px; font-size: 0.46em; }
+    .timeline-item::before {
+      content: ''; position: absolute; left: -28px; top: 4px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--cyan); box-shadow: 0 0 10px rgba(0,212,255,0.6);
+    }
+    .timeline-item .ti-date { color: var(--cyan); font-weight: 700; font-size: 1.1em; margin-bottom: 2px; }
+    .timeline-item .ti-text { color: #8ab4cc; }
+
+    .highlight-box {
+      background: rgba(0,212,255,0.06);
+      border-left: 4px solid var(--cyan);
+      border-radius: 6px;
+      padding: 18px 22px;
+      margin: 0.6em 0;
+      font-size: 0.5em;
+      color: #cce8f4;
+      line-height: 1.7;
+    }
+
+    .conclusion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 0.6em; }
+    .conclusion-card { border-radius: 6px; padding: 18px; font-size: 0.42em; }
+    .conclusion-card.goal {
+      background: rgba(0,212,255,0.08);
+      border: 1px solid rgba(0,212,255,0.3);
+    }
+    .conclusion-card.value {
+      background: rgba(0,255,157,0.06);
+      border: 1px solid rgba(0,255,157,0.25);
+    }
+    .conclusion-card .cc-title { font-size: 1.2em; font-weight: 700; margin-bottom: 8px; }
+    .conclusion-card.goal .cc-title { color: var(--cyan); }
+    .conclusion-card.value .cc-title { color: var(--green); }
+    .conclusion-card ul { list-style: none; padding: 0; margin: 0; color: #bbb; line-height: 1.8; }
+    .conclusion-card ul li::before { content: "✦ "; opacity: 0.6; }
+
+    .end-slide { text-align: center; }
+    .end-slide .big { font-size: 3em; margin-bottom: 0.2em; }
+    .end-slide .tagline { font-size: 0.6em; color: #8ab4cc; }
+    .end-slide .author-line { font-size: 0.45em; color: #5a8ab0; margin-top: 2em; }
+
+    .gap-list { font-size: 0.5em; list-style: none; padding: 0; margin: 0.6em 0; }
+    .gap-list li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #cce8f4; }
+    .gap-list li:last-child { border-bottom: none; }
+    .gap-list li::before { content: "✗ "; color: var(--amber); font-weight: 700; }
+
+    .icon-check { color: var(--green); }
+    .icon-warn { color: var(--amber); }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- 封面 -->
+    <section data-background-color="#020b18">
+      <div class="title-slide">
+        <div class="tag">壹、緣起</div>
+        <h1>數位化巡檢管理系統</h1>
+        <h2 style="color:var(--cyan); margin-top:0.2em;">臺北農產 · 第一果菜市場</h2>
+        <p class="subtitle">從基礎監控邁向全生命週期智慧管理</p>
+        <p class="author">設備巡檢 / 報修 / 派工系統規劃</p>
+      </div>
+    </section>
+
+    <!-- 現況：基礎建設已到位 -->
+    <section data-background-color="#020b18">
+      <h2>現況：基礎建設已到位</h2>
+      <div class="stat-row fragment">
+        <div class="stat-card">
+          <div class="num">BMS</div>
+          <div class="label">中央監控系統</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">11</div>
+          <div class="label">整合子系統</div>
+        </div>
+      </div>
+      <div class="timeline fragment" style="margin-top:0.4em">
+        <div class="timeline-item">
+          <div class="ti-date">✓ 電力監控</div>
+          <div class="ti-text">即時用電量、需量管理</div>
+        </div>
+        <div class="timeline-item">
+          <div class="ti-date">✓ 空調 / 消防 / 給排水</div>
+          <div class="ti-text">設備狀態監視與異常警報</div>
+        </div>
+        <div class="timeline-item">
+          <div class="ti-date">✓ 門禁 / 監視 / 停車</div>
+          <div class="ti-text">安全管理整合</div>
+        </div>
+        <div class="timeline-item">
+          <div class="ti-date">✓ 冷藏冷凍 / 空品 / 能源</div>
+          <div class="ti-text">環境與能耗監控</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 核心功能缺口 -->
+    <section data-background-color="#020b18">
+      <h2>核心功能缺口</h2>
+      <div style="display:flex; gap:14px; margin-top:0.4em">
+        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
+          <div style="font-size:2em; text-align:center; margin-bottom:8px">✓</div>
+          <div style="font-size:0.45em; color:#8ab4cc; text-align:center; line-height:1.7">
+            設備監視<br>資料蒐集<br>異常警報
+          </div>
+        </div>
+        <div style="flex:1; background:rgba(255,179,0,0.06); border-radius:6px; padding:16px">
+          <div style="font-size:2em; text-align:center; margin-bottom:8px; color:var(--amber)">✗</div>
+          <div style="font-size:0.45em; color:var(--amber); text-align:center; line-height:1.7">
+            <strong>缺乏</strong><br>設備履歷<br>巡檢排程
+          </div>
+        </div>
+        <div style="flex:1; background:rgba(255,179,0,0.06); border-radius:6px; padding:16px">
+          <div style="font-size:2em; text-align:center; margin-bottom:8px; color:var(--amber)">✗</div>
+          <div style="font-size:0.45em; color:var(--amber); text-align:center; line-height:1.7">
+            <strong>缺乏</strong><br>報修派工<br>生命週期管理
+          </div>
+        </div>
+        <div style="flex:1; background:rgba(255,59,59,0.06); border-radius:6px; padding:16px">
+          <div style="font-size:2em; text-align:center; margin-bottom:8px; color:var(--red)">✗</div>
+          <div style="font-size:0.45em; color:var(--red); text-align:center; line-height:1.7">
+            <strong>缺乏</strong><br>決策分析<br>管理層儀表板
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 管理風險：傳統模式 vs 數位化 -->
+    <section data-background-color="#020b18">
+      <h2>管理風險分析</h2>
+      <div class="vs-grid">
+        <div class="vs-col left-col">
+          <div class="vs-label left">⚠ 現行紙本模式</div>
+          <ul>
+            <li>高度依賴紙本記錄與人工發文</li>
+            <li>資訊傳遞破碎且延遲</li>
+            <li>漏記、事後補填</li>
+            <li>數據失真 — 無法追溯</li>
+            <li>難以支應大型市場需求</li>
+          </ul>
+        </div>
+        <div class="vs-center">VS</div>
+        <div class="vs-col right-col">
+          <div class="vs-label right">✓ 數位化目標</div>
+          <ul>
+            <li>即時數位記錄，取代紙本</li>
+            <li>資訊即時同步，零延遲</li>
+            <li>強制填寫，杜絕遺漏</li>
+            <li>數據真實且可完整追溯</li>
+            <li>支應萬筆設備層級管理</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 三大核心價值 -->
+    <section data-background-color="#020b18">
+      <h2>數位化巡檢機制 — 三大核心價值</h2>
+      <div class="adv-grid">
+        <div class="adv-card fragment">
+          <div class="adv-icon">📊</div>
+          <div class="adv-title">數據真實性</div>
+          <div class="adv-desc">即時紀錄取代紙本<br>強制欄位杜絕事後補填<br>GPS / QR Code 定位打卡</div>
+        </div>
+        <div class="adv-card fragment">
+          <div class="adv-icon">🔍</div>
+          <div class="adv-title">流程透明化</div>
+          <div class="adv-desc">巡檢 → 報修 → 派工 → 維修 → 驗收<br>全流程可追蹤、可查核<br>LINE 即時推播通知</div>
+        </div>
+        <div class="adv-card fragment">
+          <div class="adv-icon">📈</div>
+          <div class="adv-title">決策科學化</div>
+          <div class="adv-desc">設備異常趨勢分析<br>維護成本生命周期統計<br>戰情儀表板即時掌握</div>
+        </div>
+        <div class="adv-card fragment">
+          <div class="adv-icon">🏗️</div>
+          <div class="adv-title">全生命週期管理</div>
+          <div class="adv-desc">設備履歷完整建置<br>購置 / 維修 / 汰換追蹤<br>3D 樓層模型視覺化</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 目標願景 -->
+    <section data-background-color="#020b18">
+      <h2>目標：從基礎監控<br>升級為全生命週期管理</h2>
+      <div class="highlight-box">
+        「建立數位化巡檢管理機制，確保數據真實性並落實流程透明化，
+        以支應大型批發市場之維護管理需求。」
+      </div>
+      <div class="stat-row" style="margin-top:0.8em">
+        <div class="stat-card">
+          <div class="num">即時</div>
+          <div class="label">數據上傳</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">透明</div>
+          <div class="label">流程追蹤</div>
+        </div>
+        <div class="stat-card">
+          <div class="num">智慧</div>
+          <div class="label">決策分析</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 結論 -->
+    <section data-background-color="#020b18">
+      <h2>結語</h2>
+      <div class="conclusion-grid">
+        <div class="conclusion-card goal">
+          <div class="cc-title">🎯 問題</div>
+          <ul>
+            <li>BMS 基礎功能已到位，但缺乏管理層應用</li>
+            <li>紙本作業導致數據失真、效率低落</li>
+            <li>大型市場維護管理需求無法被滿足</li>
+          </ul>
+        </div>
+        <div class="conclusion-card value">
+          <div class="cc-title">🚀 解方</div>
+          <ul>
+            <li>數位化巡檢管理系統</li>
+            <li>設備履歷 + 巡檢排程 + 報修派工</li>
+            <li>戰情儀表板 + 3D 立體視覺化</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 封底 -->
+    <section data-background-color="#020b18">
+      <div class="end-slide">
+        <div class="big">⬡</div>
+        <h1 style="color:var(--cyan);">感謝聆聽</h1>
+        <p class="tagline">臺北農產運銷股份有限公司 · 第一果菜市場</p>
+        <p class="author-line">數位化巡檢管理系統 規劃簡報</p>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    transition: 'slide',
+    transitionSpeed: 'default',
+    backgroundTransition: 'fade',
+    center: true,
+    progress: true,
+    controls: true,
+    slideNumber: 'c/t',
+    plugins: []
+  });
+</script>
+</body>
+</html>
