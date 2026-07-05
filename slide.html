@@ -231,31 +231,40 @@
 
     <!-- 核心功能缺口 -->
     <section data-background-color="#020b18">
-      <h2>核心功能缺口</h2>
-      <div style="display:flex; gap:14px; margin-top:0.2em">
-        <div style="flex:1; background:rgba(0,212,255,0.04); border-radius:6px; padding:16px">
-          <div style="font-size:2em; text-align:center; margin-bottom:8px">✓</div>
-          <div style="font-size:0.45em; color:#8ab4cc; text-align:center; line-height:1.7">
-            設備監視<br>資料蒐集<br>異常警報
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:center; height:100%">
+        <div style="text-align:left">
+          <h2 style="text-align:center">核心功能缺口</h2>
+          <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:0.2em">
+            <div style="flex:1 1 45%; background:rgba(0,212,255,0.04); border-radius:6px; padding:12px; min-width:100px">
+              <div style="font-size:1.8em; text-align:center; margin-bottom:6px">✓</div>
+              <div style="font-size:0.42em; color:#8ab4cc; text-align:center; line-height:1.6">
+                設備監視<br>資料蒐集<br>異常警報
+              </div>
+            </div>
+            <div style="flex:1 1 45%; background:rgba(255,179,0,0.06); border-radius:6px; padding:12px; min-width:100px">
+              <div style="font-size:1.8em; text-align:center; margin-bottom:6px; color:var(--amber)">✗</div>
+              <div style="font-size:0.42em; color:var(--amber); text-align:center; line-height:1.6">
+                <strong>缺乏</strong><br>設備履歷<br>巡檢排程
+              </div>
+            </div>
+            <div style="flex:1 1 45%; background:rgba(255,179,0,0.06); border-radius:6px; padding:12px; min-width:100px">
+              <div style="font-size:1.8em; text-align:center; margin-bottom:6px; color:var(--amber)">✗</div>
+              <div style="font-size:0.42em; color:var(--amber); text-align:center; line-height:1.6">
+                <strong>缺乏</strong><br>報修派工<br>生命週期管理
+              </div>
+            </div>
+            <div style="flex:1 1 45%; background:rgba(255,59,59,0.06); border-radius:6px; padding:12px; min-width:100px">
+              <div style="font-size:1.8em; text-align:center; margin-bottom:6px; color:var(--red)">✗</div>
+              <div style="font-size:0.42em; color:var(--red); text-align:center; line-height:1.6">
+                <strong>缺乏</strong><br>決策分析<br>管理層儀表板
+              </div>
+            </div>
           </div>
         </div>
-        <div style="flex:1; background:rgba(255,179,0,0.06); border-radius:6px; padding:16px">
-          <div style="font-size:2em; text-align:center; margin-bottom:8px; color:var(--amber)">✗</div>
-          <div style="font-size:0.45em; color:var(--amber); text-align:center; line-height:1.7">
-            <strong>缺乏</strong><br>設備履歷<br>巡檢排程
-          </div>
-        </div>
-        <div style="flex:1; background:rgba(255,179,0,0.06); border-radius:6px; padding:16px">
-          <div style="font-size:2em; text-align:center; margin-bottom:8px; color:var(--amber)">✗</div>
-          <div style="font-size:0.45em; color:var(--amber); text-align:center; line-height:1.7">
-            <strong>缺乏</strong><br>報修派工<br>生命週期管理
-          </div>
-        </div>
-        <div style="flex:1; background:rgba(255,59,59,0.06); border-radius:6px; padding:16px">
-          <div style="font-size:2em; text-align:center; margin-bottom:8px; color:var(--red)">✗</div>
-          <div style="font-size:0.45em; color:var(--red); text-align:center; line-height:1.7">
-            <strong>缺乏</strong><br>決策分析<br>管理層儀表板
-          </div>
+        <div style="text-align:center">
+          <img src="assets/img/gap-analysis.png" alt="功能缺口"
+               style="max-width:100%; max-height:65vh; border-radius:12px;
+                      box-shadow:0 0 30px rgba(0,212,255,0.2);">
         </div>
       </div>
     </section>
