@@ -695,6 +695,13 @@ window.addEventListener('keydown',e=>{
 });
 
 buildSources();
+// 確保初始化時只顯示 B1 樓層
+setTimeout(()=>{ 
+  FLOORS.forEach(fl=>{ 
+    const it=item(fl.idx); 
+    if(it) it.setOpacity(fl.id==='B1'?1:0); 
+  }); 
+}, 500);
 loadData();
 </script>
 <script src="assets/global-ui.js?v=20260704-userdisplay"></script>
