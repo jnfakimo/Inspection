@@ -8,9 +8,9 @@
 /* 確保 body 有足夠的頂部空間 */
 body {
   --navbar-height: 40px;
-  --topbar-height: 36px;
+  --topbar-height: 50px;
   --userbar-height: 30px;
-  --total-header-height: 106px;
+  --total-header-height: calc(var(--userbar-height) + var(--topbar-height));
 
   /* 給頁面頭部留出空間 */
   padding-top: var(--total-header-height) !important;
@@ -25,8 +25,10 @@ body {
   left: 0 !important;
   right: 0 !important;
   z-index: 1000 !important;
-  height: var(--userbar-height) !important;
+  height: auto !important;
   min-height: var(--userbar-height) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
 }
 
 /* ========== 頂部導航欄修復 ========== */
@@ -55,7 +57,7 @@ body {
 .topbar,
 #topbar {
   top: var(--userbar-height) !important;
-  height: var(--topbar-height) !important;
+  min-height: var(--topbar-height) !important;
 }
 
 .header,
@@ -235,8 +237,32 @@ main {
 .navbar,
 .topbar,
 .global-userbar {
-  overflow: hidden !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
   white-space: nowrap !important;
+}
+
+/* Fullscreen map/model pages use fixed overlays that must move with the shared userbar. */
+body.global-userbar-ready #osd {
+  inset: calc(var(--userbar-height) + var(--topbar-height)) 0 0 0 !important;
+}
+
+body.global-userbar-ready #panel {
+  top: calc(var(--userbar-height) + var(--topbar-height)) !important;
+}
+
+body.global-userbar-ready #panelToggle,
+body.global-userbar-ready #placehint,
+body.global-userbar-ready #floors {
+  top: calc(var(--userbar-height) + var(--topbar-height) + 12px) !important;
+}
+
+body.global-userbar-ready #tools {
+  top: calc(var(--userbar-height) + var(--topbar-height) + 160px) !important;
+}
+
+body.global-userbar-ready #detail {
+  max-height: calc(100vh - var(--userbar-height) - var(--topbar-height) - 24px);
 }
 
 /* ========== 邊框修復 ========== */
