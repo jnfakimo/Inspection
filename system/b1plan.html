@@ -222,6 +222,13 @@ function applyTheme() {
 new MutationObserver(() => applyTheme())
   .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+// Keep an embedded plan synchronized when the parent page changes theme.
+window.addEventListener('storage', event => {
+  if(event.key !== 'siteTheme') return;
+  document.documentElement.setAttribute('data-theme', event.newValue || 'tech');
+  applyTheme();
+});
+
 // use updated models from Storage if available; else the high-performance local PNG files
 async function buildSources(){
   try{

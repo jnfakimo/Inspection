@@ -635,10 +635,25 @@ async function applyCustomModels(){
 // ── 3D 模型更新偵測：定期比對 floor_models，有新版本時亮起頂欄按鈕，點擊才套用 ──
 let pendingModelUpdates=new Map();                 // floor_id -> floor_models row（尚未套用的新版本）
 function flatModelUrl(){return `b1plan.html?embed=1&patrol=1&modelv=${Date.now()}`;}
+function syncFlatTheme(){
+  const frame=document.getElementById('flatFrame');
+  const theme=document.documentElement.getAttribute('data-theme')||'tech';
+  try{
+    const root=frame.contentDocument&&frame.contentDocument.documentElement;
+    if(root) root.setAttribute('data-theme',theme);
+  }catch(e){}
+}
 function loadFlatModel(force=false){
   const frame=document.getElementById('flatFrame');
+  if(!frame.dataset.themeSync){
+    frame.dataset.themeSync='1';
+    frame.addEventListener('load',syncFlatTheme);
+  }
   if(force||!frame.getAttribute('src')) frame.src=flatModelUrl();
+  else syncFlatTheme();
 }
+new MutationObserver(syncFlatTheme)
+  .observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 function switchPatrolView(view){
   if(view==='3d'&&!renderer){location.reload();return;}
   currentPatrolView=view==='flat'?'flat':'3d';
