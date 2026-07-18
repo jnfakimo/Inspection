@@ -15,7 +15,17 @@ html,body{overflow-x:hidden;max-width:100%}
 body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;zoom:70%}
 .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 16px;min-height:48px;flex-shrink:0}
 .page{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-stack{width:100%;max-width:400px;display:grid;gap:16px}
 .card{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 25px 50px rgba(0,0,0,.5)}
+.release-notes{width:100%;background:#1e293b;border:1px solid #334155;border-radius:14px;color:#e2e8f0;box-shadow:0 16px 34px rgba(0,0,0,.28);overflow:hidden}
+.release-notes summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;cursor:pointer;color:#f8fafc;font-weight:700;list-style:none}
+.release-notes summary::-webkit-details-marker{display:none}
+.release-notes summary::after{content:'＋';color:#818cf8;font-size:1.2rem;line-height:1}
+.release-notes[open] summary::after{content:'－'}
+.release-body{padding:0 18px 17px;border-top:1px solid #334155}
+.release-item{padding-top:14px}
+.release-date{color:#818cf8;font-size:.78rem;font-weight:700;letter-spacing:.04em}
+.release-item ul{margin:8px 0 0;padding-left:20px;color:#94a3b8;font-size:.82rem;line-height:1.7}
 h1{font-size:1.5rem;font-weight:700;color:#f8fafc;margin-bottom:6px;text-align:center}
 .subtitle{font-size:.85rem;color:#64748b;text-align:center;margin-bottom:32px}
 .field{margin-bottom:18px}
@@ -37,6 +47,10 @@ input:focus{border-color:#6366f1}
 
 :root[data-theme="light"] body{background:#f4f6fa;color:#1e293b}
 :root[data-theme="light"] .card{background:#ffffff;border-color:#e2e8f0;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+:root[data-theme="light"] .release-notes{background:#ffffff;border-color:#e2e8f0;color:#1e293b;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+:root[data-theme="light"] .release-notes summary{color:#0f172a}
+:root[data-theme="light"] .release-body{border-color:#e2e8f0}
+:root[data-theme="light"] .release-item ul{color:#64748b}
 :root[data-theme="light"] h1{color:#0f172a}
 :root[data-theme="light"] .subtitle{color:#64748b}
 :root[data-theme="light"] label{color:#64748b}
@@ -53,22 +67,45 @@ input:focus{border-color:#6366f1}
 <body>
 <header class="topbar"></header>
 <div class="page">
-<div class="card" id="loginCard">
-  <img class="brand-logo" src="assets/logo-title.png" width="416" height="280" alt="北農 BEINONG MARKET">
-  <h1>臺北農產公司</h1>
-  <div class="subtitle" style="font-size:.95rem;color:#94a3b8;margin-bottom:4px">第一果菜市場 設備巡檢維修系統</div>
-  <div class="subtitle">請使用帳號登入</div>
-  <div class="field">
-    <label>帳號（英數字）</label>
-    <input id="username" type="text" placeholder="例：tcfm_admin" autocomplete="username">
+<div class="login-stack">
+  <div class="card" id="loginCard">
+    <img class="brand-logo" src="assets/logo-title.png" width="416" height="280" alt="北農 BEINONG MARKET">
+    <h1>臺北農產公司</h1>
+    <div class="subtitle" style="font-size:.95rem;color:#94a3b8;margin-bottom:4px">第一果菜市場 設備巡檢維修系統</div>
+    <div class="subtitle">請使用帳號登入</div>
+    <div class="field">
+      <label>帳號（英數字）</label>
+      <input id="username" type="text" placeholder="例：tcfm_admin" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>密碼</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" id="loginBtn">登入</button>
+    <a class="forgot-link" id="forgotLink">忘記密碼？</a>
+    <div class="err" id="errMsg"></div>
   </div>
-  <div class="field">
-    <label>密碼</label>
-    <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
-  </div>
-  <button class="btn" id="loginBtn">登入</button>
-  <a class="forgot-link" id="forgotLink">忘記密碼？</a>
-  <div class="err" id="errMsg"></div>
+  <details class="release-notes">
+    <summary><span>版本更新公告</span><span class="release-date">更新至 2026-07-18</span></summary>
+    <div class="release-body">
+      <section class="release-item">
+        <div class="release-date">2026-07-18</div>
+        <ul>
+          <li>降低手機巡檢模型記憶體用量。</li>
+          <li>修正手機平面巡檢主題同步與 3D 顯示黑線。</li>
+          <li>統一公開網頁至 system 路徑。</li>
+        </ul>
+      </section>
+      <section class="release-item">
+        <div class="release-date">2026-07-17</div>
+        <ul>
+          <li>新增巡檢離線打卡與連線恢復後自動補傳。</li>
+          <li>改善手機 3D 模型相容性及載入穩定性。</li>
+          <li>新增互動式專案關係地圖並優化手機版面。</li>
+        </ul>
+      </section>
+    </div>
+  </details>
 </div>
 </div>
 
