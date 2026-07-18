@@ -212,7 +212,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
 </div>
 
 <script src="vendor/three-r128.min.js?v=128" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'"></script>
-<script src="model-theme.js?v=20260718-1"></script>
+<script src="model-theme.js?v=20260718-2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="patrolstatus.js"></script>
 <script>
@@ -233,11 +233,13 @@ const YPAN_MIN = -160, YPAN_MAX = 160;
 let yOffset = 0;                // model target Y-axis offset (m)
 
 // floor definitions (bottom → up)
+const MOBILE_MODEL=matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+const modelTexture=name=>`plans/tex/${MOBILE_MODEL?'mobile/':''}${name}_tex.png`;
 const FLOORS = [
-  { id:'B1', label:'B1 地下一層', tex:'plans/tex/b1_tex.png', level:0, mesh:null, frame:null, visible:true },
-  { id:'1F', label:'1F 一樓',     tex:'plans/tex/f1_tex.png', level:1, mesh:null, frame:null, visible:true },
-  { id:'2F', label:'2F 二樓',     tex:'plans/tex/f2_tex.png', level:2, mesh:null, frame:null, visible:true },
-  { id:'3F', label:'3F 三樓',     tex:'plans/tex/f3_tex.png', level:3, mesh:null, frame:null, visible:true },
+  { id:'B1', label:'B1 地下一層', tex:modelTexture('b1'), level:0, mesh:null, frame:null, visible:true },
+  { id:'1F', label:'1F 一樓',     tex:modelTexture('f1'), level:1, mesh:null, frame:null, visible:true },
+  { id:'2F', label:'2F 二樓',     tex:modelTexture('f2'), level:2, mesh:null, frame:null, visible:true },
+  { id:'3F', label:'3F 三樓',     tex:modelTexture('f3'), level:3, mesh:null, frame:null, visible:true },
 ];
 
 let scene,camera,renderer;
@@ -248,8 +250,8 @@ function init(){
   scene.fog=new THREE.FogExp2(ModelTheme.isLight()?0xffffff:0x020b18,0.0009);
   const W=innerWidth,H=innerHeight-50;
   camera=new THREE.PerspectiveCamera(42,W/H,0.5,6000);
-  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer=new THREE.WebGLRenderer({antialias:!MOBILE_MODEL,alpha:!MOBILE_MODEL,powerPreference:MOBILE_MODEL?'low-power':'high-performance'});
+  renderer.setPixelRatio(MOBILE_MODEL?1:Math.min(devicePixelRatio,2));
   renderer.setSize(W,H);
   document.getElementById('c3d').appendChild(renderer.domElement);
   scene.add(new THREE.AmbientLight(0xffffff,1.0));
@@ -565,7 +567,7 @@ async function applyCustomModels(){
     if(data&&data.length){
       data.forEach(m=>{
         const fl=FLOORS.find(f=>f.id===m.floor_id);
-        if(fl&&m.image_path){
+        if(!MOBILE_MODEL&&fl&&m.image_path){
           const t=encodeURIComponent(m.updated_at||'');
           fl.tex=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
         }

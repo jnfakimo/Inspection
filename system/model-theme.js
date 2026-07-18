@@ -14,7 +14,7 @@
       // Mobile Safari has a tight GPU/canvas budget. A 1024px light-theme
       // copy keeps the plan legible while using only 1/16 of a 4K canvas.
       // The original texture remains untouched for the technology theme.
-      const maxSide=mobile?1024:2048;
+      const maxSide=mobile?768:2048;
       const scale=Math.min(1,maxSide/Math.max(sourceW,sourceH));
       const w=Math.max(1,Math.round(sourceW*scale)),h=Math.max(1,Math.round(sourceH*scale));
       const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;

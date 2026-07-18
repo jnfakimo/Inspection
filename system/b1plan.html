@@ -231,9 +231,10 @@ window.addEventListener('storage', event => {
 
 // use updated models from Storage if available; else the high-performance local PNG files
 async function buildSources(){
+  const mobileModel=matchMedia('(max-width: 768px), (pointer: coarse)').matches;
   try{
     const {data}=await db.from('floor_models').select('*');
-    if(data&&data.length){
+    if(!mobileModel&&data&&data.length){
       data.forEach(m=>{ const fl=FLOORS.find(f=>f.id===m.floor_id);
         if(fl&&m.image_path){ const t=encodeURIComponent(m.updated_at||'');
           fl.src={type:'image', url:versionedModelUrl(`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`)}; } });
@@ -243,7 +244,8 @@ async function buildSources(){
   // Set fallback high-performance single PNG for each floor to load instantly on mobile
   FLOORS.forEach(fl=>{
     if(!fl.src){
-      fl.src = { type: 'image', url: versionedModelUrl('plans/tex/' + fl.id.toLowerCase() + '_tex.png') };
+      const dir=mobileModel?'plans/tex/mobile/':'plans/tex/';
+      fl.src = { type: 'image', url: versionedModelUrl(dir + fl.id.toLowerCase() + '_tex.png') };
     }
   });
 
