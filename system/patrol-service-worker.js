@@ -1,6 +1,6 @@
-const CACHE='patrol-checkin-v2';
+const CACHE='patrol-checkin-v3';
 const SHELL=[
-  './patrolcheckin.html','./patrol-offline.js','./patrolcheckin-app.js','./theme.js?v=20260717-3',
+  './patrolcheckin.html','./patrol-offline.js?v=20260717-1','./patrolcheckin-app.js?v=20260717-1','./theme.js?v=20260717-3',
   './light-mode-fix.css','./mobile-unified.css?v=20260717-1',
   './vendor/supabase-js-2.min.js'
 ];
@@ -19,7 +19,7 @@ self.addEventListener('fetch',event=>{
     return;
   }
   if(url.origin===location.origin){
-    event.respondWith(caches.match(event.request,{ignoreSearch:true}).then(hit=>hit||fetch(event.request).then(response=>{
+    event.respondWith(caches.match(event.request).then(hit=>hit||fetch(event.request).then(response=>{
       if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}
       return response;
     })));
