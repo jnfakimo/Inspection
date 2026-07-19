@@ -1,11 +1,10 @@
 (function(){
   'use strict';
-  let rules=[],users=[],departments=[];
+  let rules=[];
   const days=['日','一','二','三','四','五','六'];
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const id=()=>globalThis.crypto?.randomUUID?.()||('rule_'+Date.now()+'_'+Math.random().toString(36).slice(2));
-  function defaultRule(){return {id:id(),label:'早班巡邏',start:'08:00',end:'09:00',grace:0,days:[0,1,2,3,4,5,6],user_ids:[],enabled:true,only_incomplete:true,include_points:true};}
-  function selected(rule,userId){return (rule.user_ids||[]).includes(userId);}
+  function defaultRule(){return {id:id(),label:'早班巡邏',start:'08:00',end:'09:00',grace:0,days:[0,1,2,3,4,5,6],enabled:true,only_incomplete:true,include_points:true};}
   function render(){
     const host=document.getElementById('patrol-timeout-settings');if(!host)return;
     host.innerHTML=`<div style="border-top:1px solid rgba(180,138,255,.25);padding-top:16px">
@@ -19,25 +18,22 @@
     host.querySelectorAll('[data-rule]').forEach(el=>bindRule(el,Number(el.dataset.rule)));
   }
   function ruleHtml(r,i){
-    const options=users.map(u=>`<option value="${esc(u.user_id)}" ${selected(r,u.user_id)?'selected':''}>${esc(u.department||departments.find(d=>d.dept_id===u.dept_id)?.name||'未設定單位')}｜${esc(u.name)}</option>`).join('');
     return `<div data-rule="${i}" style="padding:12px;margin-bottom:10px;border:1px solid rgba(180,138,255,.25);border-radius:4px;background:rgba(180,138,255,.04)">
       <div style="display:grid;grid-template-columns:2fr 1fr 1fr 90px;gap:8px"><input data-k="label" value="${esc(r.label)}" placeholder="時段名稱"><input data-k="start" type="time" value="${esc(r.start)}"><input data-k="end" type="time" value="${esc(r.end)}"><input data-k="grace" type="number" min="0" max="120" value="${Number(r.grace)||0}" title="寬限分鐘"></div>
       <div style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">適用星期：${days.map((d,n)=>`<label style="margin-right:7px"><input data-day="${n}" type="checkbox" ${(r.days||[]).includes(n)?'checked':''}>${d}</label>`).join('')}</div>
-      <div style="margin-top:8px"><label style="font-size:.75rem;color:var(--text-dim)">當班巡檢人員（可複選）</label><select data-users multiple size="${Math.min(5,Math.max(2,users.length))}" style="width:100%;margin-top:4px">${options}</select></div>
+      <div style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">當班部門與巡檢人員由「駐衛警巡檢系統 → 巡檢排班」自動讀取。</div>
       <div style="display:flex;gap:14px;align-items:center;margin-top:8px;font-size:.75rem"><label><input data-k="enabled" type="checkbox" ${r.enabled!==false?'checked':''}>啟用</label><label><input data-k="only_incomplete" type="checkbox" ${r.only_incomplete!==false?'checked':''}>僅未完成時推播</label><label><input data-k="include_points" type="checkbox" ${r.include_points?'checked':''}>列出未打卡點位</label><button type="button" data-delete class="btn btn-sm" style="margin-left:auto">刪除</button></div>
     </div>`;
   }
   function bindRule(el,i){
     el.querySelectorAll('[data-k]').forEach(input=>input.onchange=()=>{const k=input.dataset.k;rules[i][k]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;});
     el.querySelectorAll('[data-day]').forEach(input=>input.onchange=()=>{rules[i].days=[...el.querySelectorAll('[data-day]:checked')].map(x=>Number(x.dataset.day));});
-    el.querySelector('[data-users]').onchange=e=>rules[i].user_ids=[...e.target.selectedOptions].map(o=>o.value);
     el.querySelector('[data-delete]').onclick=()=>{rules.splice(i,1);render();};
   }
   async function load(){
     if(typeof db==='undefined'||typeof sysSettings==='undefined')return;
     try{rules=JSON.parse(sysSettings.patrol_timeout_rules||'[]');}catch(_e){rules=[];}
-    const [u,d]=await Promise.all([db.from('users').select('user_id,name,department,dept_id').eq('status','active').order('name'),db.from('departments').select('dept_id,name').eq('status','active')]);
-    users=u.data||[];departments=d.data||[];render();
+    render();
   }
   async function save(){
     const enabled=document.getElementById('line-notify-patrol-timeout')?.checked||false;

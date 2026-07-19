@@ -18,6 +18,7 @@ create table if not exists patrol_shift_template (
 );
 
 alter table patrol_shift_template add column if not exists status text not null default 'active';
+alter table patrol_shift_template add column if not exists assigned_user_ids uuid[] not null default '{}';
 
 create table if not exists patrol_shifts (
   shift_id    uuid primary key default gen_random_uuid(),
@@ -30,6 +31,7 @@ create table if not exists patrol_shifts (
 );
 create unique index if not exists idx_patrol_shifts_date_name on patrol_shifts(shift_date, name);
 create index if not exists idx_patrol_shifts_date on patrol_shifts(shift_date);
+alter table patrol_shifts add column if not exists assigned_user_ids uuid[] not null default '{}';
 
 -- ── RLS ────────────────────────────────────────────────────
 alter table patrol_shift_template enable row level security;

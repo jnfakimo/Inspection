@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
-type Rule={id:string;label:string;start:string;end:string;grace?:number;days?:number[];user_ids?:string[];department_ids?:string[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
+type Rule={id:string;label:string;start:string;end:string;grace?:number;days?:number[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
 const mins=(s:string)=>{const [h,m]=(s||"00:00").split(":").map(Number);return h*60+m;};
 const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",weekday:"short",hourCycle:"h23"}).formatToParts(d).forEach(x=>p[x.type]=x.value);return p;};
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
@@ -25,7 +25,11 @@ Deno.serve(async req=>{
     const results=[];
     for(const rule of rules){
       if(rule.enabled===false||!rule.id||!rule.start||!rule.end)continue;
-      const startMin=mins(rule.start),endMin=mins(rule.end),grace=Math.max(0,Number(rule.grace)||0),overnight=endMin<=startMin;
+      const {data:todayShift}=await db.from("patrol_shifts").select("start_time,end_time,assigned_user_ids").eq("shift_date",today).eq("name",rule.label).maybeSingle();
+      const {data:shiftTemplate}=await db.from("patrol_shift_template").select("start_time,end_time,assigned_user_ids").eq("name",rule.label).eq("status","active").maybeSingle();
+      const effectiveStart=(todayShift?.start_time||shiftTemplate?.start_time||rule.start).slice(0,5);
+      const effectiveEnd=(todayShift?.end_time||shiftTemplate?.end_time||rule.end).slice(0,5);
+      const startMin=mins(effectiveStart),endMin=mins(effectiveEnd),grace=Math.max(0,Number(rule.grace)||0),overnight=endMin<=startMin;
       let shiftDate=today,notifyMin=endMin+grace;
       if(overnight&&nowMin<=notifyMin+15)shiftDate=previousDate(today);
       const shiftWeekday=new Date(`${shiftDate}T12:00:00+08:00`).getDay();
@@ -34,7 +38,7 @@ Deno.serve(async req=>{
       if(!body.force&&!due)continue;
       const endDate=overnight?localParts(new Date(new Date(`${shiftDate}T12:00:00+08:00`).getTime()+86400000)):null;
       const endDay=endDate?`${endDate.year}-${endDate.month}-${endDate.day}`:shiftDate;
-      const startIso=iso(shiftDate,rule.start),endIso=iso(endDay,rule.end);
+      const startIso=iso(shiftDate,effectiveStart),endIso=iso(endDay,effectiveEnd);
       const {data:existing}=await db.from("patrol_timeout_notifications").select("notification_id,status").eq("rule_id",rule.id).eq("shift_date",shiftDate).maybeSingle();
       if(existing&&!body.force){results.push({rule:rule.id,msg:"already processed"});continue;}
       const {data:markers,error:markerError}=await db.from("plan_markers").select("marker_id,floor_id,label").eq("kind","patrol").eq("status","active");
@@ -45,8 +49,10 @@ Deno.serve(async req=>{
       const unchecked=(markers||[]).filter((m:{marker_id:string})=>!checkedIds.has(m.marker_id));
       const actual=[...new Set((logs||[]).map((x:{user_name:string})=>x.user_name).filter(Boolean))] as string[];
       let assignedNames:string[]=[],assignedDepartments:string[]=[];
-      if(rule.user_ids?.length){
-        const {data:users}=await db.from("users").select("user_id,name,department,dept_id").in("user_id",rule.user_ids);
+      const {data:dailyShift}=shiftDate===today?{data:todayShift}:await db.from("patrol_shifts").select("assigned_user_ids").eq("shift_date",shiftDate).eq("name",rule.label).maybeSingle();
+      const assignedIds=(dailyShift?.assigned_user_ids?.length?dailyShift.assigned_user_ids:shiftTemplate?.assigned_user_ids)||[];
+      if(assignedIds.length){
+        const {data:users}=await db.from("users").select("user_id,name,department,dept_id").in("user_id",assignedIds);
         assignedNames=(users||[]).map((u:{name:string})=>u.name).filter(Boolean);
         assignedDepartments=(users||[]).map((u:{department:string})=>u.department).filter(Boolean);
         const deptIds=[...new Set((users||[]).map((u:{dept_id:string})=>u.dept_id).filter(Boolean))];
@@ -57,7 +63,7 @@ Deno.serve(async req=>{
       const floorCount:Record<string,number>={};unchecked.forEach((m:{floor_id:string})=>floorCount[m.floor_id||"未設定"]=(floorCount[m.floor_id||"未設定"]||0)+1);
       const floorText=Object.entries(floorCount).map(([f,n])=>`${f}：${n} 點`).join("\n")||"無";
       const pointText=rule.include_points&&unchecked.length?"\n\n未完成點位：\n"+unchecked.slice(0,20).map((m:{floor_id:string;label:string})=>`${m.floor_id||""}－${m.label||"未命名"}`).join("\n")+(unchecked.length>20?`\n另有 ${unchecked.length-20} 點`:""):"";
-      const text=`⚠️ 駐衛警巡檢逾時通知\n\n日期：${shiftDate}\n巡邏時段：${rule.label}\n巡邏時間：${rule.start}～${rule.end}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
+      const text=`⚠️ 駐衛警巡檢逾時通知\n\n日期：${shiftDate}\n巡邏時段：${rule.label}\n巡邏時間：${effectiveStart}～${effectiveEnd}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
       const record={rule_id:rule.id,shift_date:shiftDate,shift_name:rule.label,scheduled_end:endIso,expected_count:expected,checked_count:checked,unchecked_count:unchecked.length,assigned_departments:assignedDepartments,assigned_names:assignedNames,actual_names:actual,status:"pending"};
       await db.from("patrol_timeout_notifications").upsert(record,{onConflict:"rule_id,shift_date"});
       if(rule.only_incomplete!==false&&unchecked.length===0){await db.from("patrol_timeout_notifications").update({status:"skipped",line_response:"全部完成"}).eq("rule_id",rule.id).eq("shift_date",shiftDate);results.push({rule:rule.id,msg:"complete"});continue;}
