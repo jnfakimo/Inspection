@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
+<script src="theme.js?v=20260719-4"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LINE 推播紀錄 — 駐衛警巡檢系統</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#020b18;--surface:#041428;--panel:#06182c;--border:#0a3a5a;--text:#b0d8f0;--text-hi:#d4eeff;--text-dim:#5a8ab0;--cyan:#00d4ff;--green:#00ff9d;--red:#ff5470;--amber:#ffb300;--patrol:#c77dff}
+:root[data-theme="light"]{--bg:#f4f6fa;--surface:#fff;--panel:#fff;--border:#cbd5e1;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b;--cyan:#0284c7;--green:#059669;--red:#dc2626;--amber:#b45309;--patrol:#7e22ce}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:'Noto Sans TC',system-ui,sans-serif;min-height:100vh}
+.navbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(3,10,22,.97);border-bottom:1px solid var(--border)}
+:root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}
+.nav-title{font-size:1.08rem;font-weight:700;color:var(--patrol)}.nav-sub{font-size:.7rem;color:var(--text-dim)}.nav-space{flex:1}.nav-back{font-size:.72rem;color:var(--text-dim);border:1px solid var(--border);padding:6px 10px;border-radius:3px;background:transparent;cursor:pointer}.nav-back:hover{color:var(--cyan);border-color:var(--cyan)}
+.wrap{max-width:1320px;margin:0 auto;padding:18px}.filters,.summary,.panel{background:var(--panel);border:1px solid var(--border);border-radius:7px}.filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap;padding:14px;margin-bottom:14px}.field{min-width:150px}.field label{display:block;font-size:.72rem;color:var(--text-dim);margin-bottom:5px}.field select{width:100%;min-height:36px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text-hi)}
+.btn{min-height:36px;padding:6px 14px;border:1px solid var(--patrol);border-radius:4px;background:rgba(199,125,255,.08);color:var(--patrol);cursor:pointer}.btn:hover{background:rgba(199,125,255,.16)}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;overflow:hidden;margin-bottom:14px;background:var(--border)}.stat{background:var(--panel);padding:13px;text-align:center}.stat b{display:block;font-size:1.25rem;color:var(--text-hi)}.stat span{font-size:.72rem;color:var(--text-dim)}
+.panel{overflow:hidden}.table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:1040px}th,td{padding:10px 9px;border-bottom:1px solid var(--border);font-size:.76rem;text-align:left;vertical-align:top}th{color:var(--text-dim);font-weight:600;background:rgba(90,138,176,.06)}td{color:var(--text)}.empty{text-align:center;padding:36px;color:var(--text-dim)}
+.status{display:inline-block;padding:3px 8px;border-radius:999px;border:1px solid currentColor;font-size:.68rem;white-space:nowrap}.sent{color:var(--green)}.failed{color:var(--red)}.skipped{color:var(--amber)}.pending{color:var(--text-dim)}.response{max-width:280px;white-space:pre-wrap;word-break:break-word;color:var(--text-dim)}
+.pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:13px}.page-btn{min-width:84px;min-height:36px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text);cursor:pointer}.page-btn:disabled{opacity:.35;cursor:not-allowed}.page-info{min-width:150px;text-align:center;font-size:.76rem;color:var(--text-dim)}
+@media(max-width:720px){.wrap{padding:10px}.filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field{min-width:0}.filters .btn{grid-column:1/-1}.summary{grid-template-columns:repeat(2,1fr)}.navbar{flex-wrap:wrap}.nav-space{display:none}.navbar>a{flex:1}.nav-back{width:100%;min-height:40px}.pager{gap:7px}.page-info{min-width:110px;font-size:.68rem}.page-btn{min-width:70px}}
+</style>
+<link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
+</head>
+<body>
+<nav class="navbar">
+  <div><div class="nav-title">駐衛警巡檢 LINE 推播紀錄</div><div class="nav-sub">逾時未打卡通知查詢</div></div>
+  <div class="nav-space"></div>
+  <a href="admin.html#settings"><button class="nav-back">返回通知設定</button></a>
+  <a href="guardpatrol.html"><button class="nav-back">巡檢稽核總覽</button></a>
+</nav>
+<main class="wrap">
+  <section class="filters" aria-label="查詢條件">
+    <div class="field"><label for="periodFilter">查詢期間</label><select id="periodFilter"><option value="7">最近 7 天</option><option value="30" selected>最近 30 天</option><option value="90">最近 90 天</option><option value="all">全部紀錄</option></select></div>
+    <div class="field"><label for="shiftFilter">班別</label><select id="shiftFilter"><option value="all">全部班別</option><option value="早班">早班</option><option value="午班">午班</option><option value="晚班">晚班</option><option value="夜班">夜班</option></select></div>
+    <div class="field"><label for="statusFilter">推播狀態</label><select id="statusFilter"><option value="all">全部狀態</option><option value="sent">發送成功</option><option value="failed">發送失敗</option><option value="skipped">無須發送</option><option value="pending">處理中</option></select></div>
+    <button class="btn" id="queryBtn" type="button">查詢紀錄</button>
+  </section>
+  <section class="summary"><div class="stat"><b id="totalCount">0</b><span>查詢筆數</span></div><div class="stat"><b id="sentCount">0</b><span>發送成功</span></div><div class="stat"><b id="failedCount">0</b><span>發送失敗</span></div><div class="stat"><b id="uncheckedCount">0</b><span>未打卡點次</span></div></section>
+  <section class="panel"><div class="table-scroll"><table><thead><tr><th>巡檢日期</th><th>班別／時段</th><th>完成狀況</th><th>排定人員</th><th>實際打卡</th><th>推播狀態</th><th>發送時間</th><th>LINE 回應／失敗原因</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="empty">載入中…</td></tr></tbody></table></div><div class="pager"><button class="page-btn" id="prevBtn">上一頁</button><span class="page-info" id="pageInfo">第 1 / 1 頁</span><button class="page-btn" id="nextBtn">下一頁</button></div></section>
+</main>
+<script>
+const SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJxenRmZnJvbnVzZGhneGhqamVidCIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const PAGE_SIZE=10;let rows=[],page=1;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=t=>t?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t)):'—';
+const statusText={sent:'發送成功',failed:'發送失敗',skipped:'無須發送',pending:'處理中'};
+async function load(){
+  document.getElementById('rows').innerHTML='<tr><td colspan="8" class="empty">載入中…</td></tr>';page=1;
+  const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html?redirect='+encodeURIComponent('patrol-notifications.html');return;}
+  let q=db.from('patrol_timeout_notifications').select('*').order('shift_date',{ascending:false}).order('scheduled_end',{ascending:false}).limit(500);
+  const period=document.getElementById('periodFilter').value;if(period!=='all'){const d=new Date();d.setDate(d.getDate()-Number(period));q=q.gte('shift_date',d.toISOString().slice(0,10));}
+  const shift=document.getElementById('shiftFilter').value;if(shift!=='all')q=q.eq('shift_name',shift);
+  const status=document.getElementById('statusFilter').value;if(status!=='all')q=q.eq('status',status);
+  const {data,error}=await q;if(error){document.getElementById('rows').innerHTML=`<tr><td colspan="8" class="empty">讀取失敗：${esc(error.message)}</td></tr>`;rows=[];renderSummary();renderPager();return;}
+  rows=data||[];renderSummary();render();
+}
+function renderSummary(){document.getElementById('totalCount').textContent=rows.length;document.getElementById('sentCount').textContent=rows.filter(x=>x.status==='sent').length;document.getElementById('failedCount').textContent=rows.filter(x=>x.status==='failed').length;document.getElementById('uncheckedCount').textContent=rows.reduce((n,x)=>n+(Number(x.unchecked_count)||0),0);}
+function render(){const start=(page-1)*PAGE_SIZE,view=rows.slice(start,start+PAGE_SIZE),body=document.getElementById('rows');body.innerHTML=view.length?view.map(x=>`<tr><td>${esc(x.shift_date)}</td><td><b>${esc(x.shift_name)}</b><br><span style="color:var(--text-dim)">${fmt(x.scheduled_end)}</span></td><td>${Number(x.checked_count)||0} / ${Number(x.expected_count)||0}<br><span style="color:var(--red)">未打卡 ${Number(x.unchecked_count)||0}</span></td><td>${esc((x.assigned_names||[]).join('、')||'尚未指派')}</td><td>${esc((x.actual_names||[]).join('、')||'尚無人員')}</td><td><span class="status ${esc(x.status)}">${esc(statusText[x.status]||x.status)}</span></td><td>${fmt(x.sent_at)}</td><td class="response">${esc(x.line_response||'—')}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">查無符合條件的推播紀錄</td></tr>';renderPager();}
+function renderPager(){const pages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE));if(page>pages)page=pages;document.getElementById('pageInfo').textContent=`第 ${page} / ${pages} 頁｜每頁 10 筆`;document.getElementById('prevBtn').disabled=page<=1;document.getElementById('nextBtn').disabled=page>=pages;}
+document.getElementById('queryBtn').onclick=load;document.getElementById('prevBtn').onclick=()=>{if(page>1){page--;render();scrollTo({top:0,behavior:'smooth'});}};document.getElementById('nextBtn').onclick=()=>{if(page<Math.ceil(rows.length/PAGE_SIZE)){page++;render();scrollTo({top:0,behavior:'smooth'});}};load();
+</script>
+</body>
+</html>
