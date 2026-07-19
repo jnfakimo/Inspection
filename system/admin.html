@@ -1293,6 +1293,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
                 </label>
               </div>
             </div>
+            <div id="patrol-timeout-settings" style="margin-bottom:16px"></div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="saveLineSettings()">儲存 LINE 設定</button>
               <button class="btn" style="background:rgba(180,138,255,.08);border:1px solid rgba(180,138,255,.35);color:#b48aff" onclick="testLinePush()">傳送測試訊息</button>
@@ -3100,6 +3101,7 @@ async function loadSettings() {
   document.getElementById('line-notify-inspect').checked = sysSettings.line_notify_inspect === 'true';
   document.getElementById('line-notify-repair').checked  = sysSettings.line_notify_repair  === 'true';
   document.getElementById('line-notify-case').checked    = sysSettings.line_notify_case    === 'true';
+  window.dispatchEvent(new Event('system-settings-loaded'));
 }
 
 function renderShiftList() {
@@ -3667,5 +3669,6 @@ function showToast(msg, isErr = false) {
   setTimeout(() => { t.className = 'toast'; }, 2500);
 }
 </script>
+<script src="patrol-timeout-settings.js?v=20260719-1"></script>
 </body>
 </html>
