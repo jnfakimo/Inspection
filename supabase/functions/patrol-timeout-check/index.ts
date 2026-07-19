@@ -20,13 +20,15 @@ Deno.serve(async req=>{
     const token=s.line_channel_token,groupId=s.line_group_id;
     if(!token||!groupId)return reply({ok:false,msg:"LINE 尚未設定"},400);
     let rules:Rule[]=[];try{rules=JSON.parse(s.patrol_timeout_rules||"[]");}catch(_e){}
+    let staffAssignments:{templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>}={templates:{},dates:{}};
+    try{staffAssignments=JSON.parse(s.patrol_shift_staff||"{}");staffAssignments.templates||={};staffAssignments.dates||={};}catch(_e){}
     const now=new Date(),p=localParts(now),today=`${p.year}-${p.month}-${p.day}`,nowMin=Number(p.hour)*60+Number(p.minute);
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
     const results=[];
     for(const rule of rules){
       if(rule.enabled===false||!rule.id||!rule.start||!rule.end)continue;
-      const {data:todayShift}=await db.from("patrol_shifts").select("start_time,end_time,assigned_user_ids").eq("shift_date",today).eq("name",rule.label).maybeSingle();
-      const {data:shiftTemplate}=await db.from("patrol_shift_template").select("start_time,end_time,assigned_user_ids").eq("name",rule.label).eq("status","active").maybeSingle();
+      const {data:todayShift}=await db.from("patrol_shifts").select("start_time,end_time").eq("shift_date",today).eq("name",rule.label).maybeSingle();
+      const {data:shiftTemplate}=await db.from("patrol_shift_template").select("start_time,end_time").eq("name",rule.label).eq("status","active").maybeSingle();
       const effectiveStart=(todayShift?.start_time||shiftTemplate?.start_time||rule.start).slice(0,5);
       const effectiveEnd=(todayShift?.end_time||shiftTemplate?.end_time||rule.end).slice(0,5);
       const startMin=mins(effectiveStart),endMin=mins(effectiveEnd),grace=Math.max(0,Number(rule.grace)||0),overnight=endMin<=startMin;
@@ -49,8 +51,7 @@ Deno.serve(async req=>{
       const unchecked=(markers||[]).filter((m:{marker_id:string})=>!checkedIds.has(m.marker_id));
       const actual=[...new Set((logs||[]).map((x:{user_name:string})=>x.user_name).filter(Boolean))] as string[];
       let assignedNames:string[]=[],assignedDepartments:string[]=[];
-      const {data:dailyShift}=shiftDate===today?{data:todayShift}:await db.from("patrol_shifts").select("assigned_user_ids").eq("shift_date",shiftDate).eq("name",rule.label).maybeSingle();
-      const assignedIds=(dailyShift?.assigned_user_ids?.length?dailyShift.assigned_user_ids:shiftTemplate?.assigned_user_ids)||[];
+      const assignedIds=staffAssignments.dates?.[shiftDate]?.[rule.label]||staffAssignments.templates?.[rule.label]||[];
       if(assignedIds.length){
         const {data:users}=await db.from("users").select("user_id,name,department,dept_id").in("user_id",assignedIds);
         assignedNames=(users||[]).map((u:{name:string})=>u.name).filter(Boolean);

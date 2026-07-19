@@ -1,4 +1,4 @@
-const CACHE='patrol-checkin-v3';
+const CACHE='patrol-checkin-v4';
 const SHELL=[
   './patrolcheckin.html','./patrol-offline.js?v=20260717-1','./patrolcheckin-app.js?v=20260717-1','./theme.js?v=20260717-3',
   './light-mode-fix.css','./mobile-unified.css?v=20260717-1',
@@ -18,6 +18,9 @@ self.addEventListener('fetch',event=>{
     }).catch(()=>caches.match('./patrolcheckin.html')));
     return;
   }
+  // Other system pages must remain network-first so deployments are not hidden
+  // behind the patrol offline cache.
+  if(event.request.mode==='navigate')return;
   if(url.origin===location.origin){
     event.respondWith(caches.match(event.request).then(hit=>hit||fetch(event.request).then(response=>{
       if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}

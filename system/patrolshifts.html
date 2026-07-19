@@ -180,13 +180,17 @@ function translateError(msg){
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(m,err){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2200);}
 function fmtHM(t){return String(t||'').slice(0,5);}
-let staffRows=[],deptNames={};
+let staffRows=[],deptNames={},staffAssignments={templates:{},dates:{}};
 async function loadStaff(){
-  const [u,d]=await Promise.all([
+  const [u,d,setting]=await Promise.all([
     db.from('users').select('user_id,name,department,dept_id').eq('status','active').order('name'),
-    db.from('departments').select('dept_id,name').eq('status','active')
+    db.from('departments').select('dept_id,name').eq('status','active'),
+    db.from('system_settings').select('value').eq('key','patrol_shift_staff').maybeSingle()
   ]);
-  staffRows=u.data||[];(d.data||[]).forEach(x=>deptNames[x.dept_id]=x.name);
+  (d.data||[]).forEach(x=>deptNames[x.dept_id]=x.name);
+  staffRows=(u.data||[]).filter(x=>String(x.department||deptNames[x.dept_id]||'').includes('駐衛'));
+  try{staffAssignments=JSON.parse(setting.data?.value||'null')||{templates:{},dates:{}};}catch(e){staffAssignments={templates:{},dates:{}};}
+  staffAssignments.templates||={};staffAssignments.dates||={};
 }
 function staffName(id){const u=staffRows.find(x=>x.user_id===id);return u?`${u.department||deptNames[u.dept_id]||'未設定單位'}｜${u.name}`:'未知人員';}
 function staffText(ids){return (ids||[]).length?(ids||[]).map(staffName).join('、'):'尚未指派';}
@@ -195,6 +199,10 @@ function fillStaffSelect(selectId,ids){
   el.innerHTML=staffRows.map(u=>`<option value="${esc(u.user_id)}" ${selected.has(u.user_id)?'selected':''}>${esc(staffName(u.user_id))}</option>`).join('');
 }
 function selectedStaff(selectId){return [...document.getElementById(selectId).selectedOptions].map(o=>o.value);}
+async function saveStaffAssignments(){
+  const {error}=await db.from('system_settings').upsert({key:'patrol_shift_staff',value:JSON.stringify(staffAssignments)},{onConflict:'key'});
+  return error;
+}
 
 function todayStr(){const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
 function goToday(){document.getElementById('datePick').value=todayStr();load();}
@@ -219,8 +227,9 @@ async function load(){
   // 班別名稱／數量固定來自範本；當天若有客製時段就用客製的，否則用範本預設時段
   shiftRows=tplRows.map(t=>{
     const ov=overrides.get(t.name);
+    const dateStaff=staffAssignments.dates?.[dateStr]?.[t.name];
     return {name:t.name, start_time:ov?ov.start_time:t.start_time, end_time:ov?ov.end_time:t.end_time,
-      assigned_user_ids:ov?.assigned_user_ids?.length?ov.assigned_user_ids:(t.assigned_user_ids||[]),sort_order:t.sort_order, customized:!!ov};
+      assigned_user_ids:dateStaff||staffAssignments.templates?.[t.name]||[],sort_order:t.sort_order, customized:!!ov};
   });
   renderShifts();
 }
@@ -252,7 +261,7 @@ function renderTpl(){
     tplRows.map(s=>`<tr>
       <td>${esc(s.name)}</td>
       <td class="time">${fmtHM(s.start_time)} – ${fmtHM(s.end_time)}</td>
-      <td class="staff-list">${esc(staffText(s.assigned_user_ids))}</td>
+      <td class="staff-list">${esc(staffText(staffAssignments.templates?.[s.name]||[]))}</td>
       <td><div class="acts">
         <button class="mini" onclick="openTplModal('${s.template_id}')">編輯</button>
         <span class="mini" title="班別範本永久保存">永久保留</span>
@@ -279,9 +288,11 @@ async function saveShift(){
   if(!start||!end){msg.textContent='請完整填寫開始與結束時間';return;}
   const dateStr=document.getElementById('datePick').value;
   const s=shiftRows.find(x=>x.name===editShiftName);
-  const payload={shift_date:dateStr,name:editShiftName,start_time:start,end_time:end,assigned_user_ids:selectedStaff('f-users'),sort_order:s?s.sort_order:0};
+  const payload={shift_date:dateStr,name:editShiftName,start_time:start,end_time:end,sort_order:s?s.sort_order:0};
   const {error}=await db.from('patrol_shifts').upsert(payload,{onConflict:'shift_date,name'});
   if(error){msg.textContent=translateError(error.message);return;}
+  staffAssignments.dates[dateStr]||={};staffAssignments.dates[dateStr][editShiftName]=selectedStaff('f-users');
+  const staffError=await saveStaffAssignments();if(staffError){msg.textContent=translateError(staffError.message);return;}
   closeModal('m-shift');toast('已更新');await load();
 }
 
@@ -294,7 +305,7 @@ function openTplModal(id){
     document.getElementById('tf-name').value=s.name;
     document.getElementById('tf-start').value=fmtHM(s.start_time);
     document.getElementById('tf-end').value=fmtHM(s.end_time);
-    fillStaffSelect('tf-users',s.assigned_user_ids);
+    fillStaffSelect('tf-users',staffAssignments.templates?.[s.name]||[]);
   }else{
     document.getElementById('tf-name').value='';
     document.getElementById('tf-start').value='';
@@ -310,11 +321,13 @@ async function saveTpl(){
   const msg=document.getElementById('tplMsg');
   if(!name||!start||!end){msg.textContent='請完整填寫班別名稱與時間';return;}
   const sortOrder=editTplId?tplRows.find(x=>x.template_id===editTplId).sort_order:(tplRows.length?Math.max(...tplRows.map(s=>s.sort_order))+1:1);
-  const payload={name,start_time:start,end_time:end,assigned_user_ids:selectedStaff('tf-users'),sort_order:sortOrder};
+  const payload={name,start_time:start,end_time:end,sort_order:sortOrder};
   let error;
   if(editTplId){({error}=await db.from('patrol_shift_template').update(payload).eq('template_id',editTplId));}
   else{({error}=await db.from('patrol_shift_template').insert(payload));}
   if(error){msg.textContent=translateError(error.message);return;}
+  staffAssignments.templates[name]=selectedStaff('tf-users');
+  const staffError=await saveStaffAssignments();if(staffError){msg.textContent=translateError(staffError.message);return;}
   closeModal('m-tpl');toast(editTplId?'已更新':'已新增');await loadTpl();await load();
 }
 async function delTpl(id){
