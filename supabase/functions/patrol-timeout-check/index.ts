@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
 type Rule={id:string;label:string;start:string;end:string;grace?:number;days?:number[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
+type Shift={name:string;start_time:string;end_time:string;sort_order?:number};
 const mins=(s:string)=>{const [h,m]=(s||"00:00").split(":").map(Number);return h*60+m;};
 const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",weekday:"short",hourCycle:"h23"}).formatToParts(d).forEach(x=>p[x.type]=x.value);return p;};
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
@@ -19,21 +20,37 @@ Deno.serve(async req=>{
     if(s.line_notify_patrol_timeout!=="true"&&!body.force)return reply({ok:true,msg:"disabled"});
     const token=s.line_channel_token,groupId=s.line_group_id;
     if(!token||!groupId)return reply({ok:false,msg:"LINE 尚未設定"},400);
-    let rules:Rule[]=[];try{rules=JSON.parse(s.patrol_timeout_rules||"[]");}catch(_e){}
+    let configuredRules:Rule[]=[];try{configuredRules=JSON.parse(s.patrol_timeout_rules||"[]");}catch(_e){}
     let staffAssignments:{templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>}={templates:{},dates:{}};
     try{staffAssignments=JSON.parse(s.patrol_shift_staff||"{}");staffAssignments.templates||={};staffAssignments.dates||={};}catch(_e){}
     const now=new Date(),p=localParts(now),today=`${p.year}-${p.month}-${p.day}`,nowMin=Number(p.hour)*60+Number(p.minute);
+    const yesterday=previousDate(today);
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
+    const {data:templates,error:templateError}=await db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").order("sort_order");
+    if(templateError)throw templateError;
+    const {data:shiftOverrides,error:shiftError}=await db.from("patrol_shifts").select("shift_date,name,start_time,end_time").in("shift_date",[yesterday,today]);
+    if(shiftError)throw shiftError;
+    const overrideMap=new Map((shiftOverrides||[]).map((x:{shift_date:string;name:string;start_time:string;end_time:string})=>[`${x.shift_date}|${x.name}`,x]));
+    const rules:Rule[]=(templates||[]).map((shift:Shift)=>{
+      const configured=configuredRules.find(r=>r.label===shift.name||r.label.replace(/巡邏$/,'')===shift.name);
+      return {id:`shift:${shift.name}`,label:shift.name,start:shift.start_time.slice(0,5),end:shift.end_time.slice(0,5),grace:configured?.grace||0,enabled:configured?.enabled!==false,only_incomplete:configured?.only_incomplete!==false,include_points:configured?.include_points!==false};
+    });
     const results=[];
     for(const rule of rules){
       if(rule.enabled===false||!rule.id||!rule.start||!rule.end)continue;
-      const {data:todayShift}=await db.from("patrol_shifts").select("start_time,end_time").eq("shift_date",today).eq("name",rule.label).maybeSingle();
-      const {data:shiftTemplate}=await db.from("patrol_shift_template").select("start_time,end_time").eq("name",rule.label).eq("status","active").maybeSingle();
-      const effectiveStart=(todayShift?.start_time||shiftTemplate?.start_time||rule.start).slice(0,5);
-      const effectiveEnd=(todayShift?.end_time||shiftTemplate?.end_time||rule.end).slice(0,5);
-      const startMin=mins(effectiveStart),endMin=mins(effectiveEnd),grace=Math.max(0,Number(rule.grace)||0),overnight=endMin<=startMin;
+      const grace=Math.max(0,Number(rule.grace)||0);
+      const todayOverride=overrideMap.get(`${today}|${rule.label}`);
+      let effectiveStart=(todayOverride?.start_time||rule.start).slice(0,5);
+      let effectiveEnd=(todayOverride?.end_time||rule.end).slice(0,5);
+      let startMin=mins(effectiveStart),endMin=mins(effectiveEnd),overnight=endMin<=startMin;
       let shiftDate=today,notifyMin=endMin+grace;
-      if(overnight&&nowMin<=notifyMin+15)shiftDate=previousDate(today);
+      if(overnight&&nowMin<=notifyMin+15){
+        shiftDate=yesterday;
+        const previousOverride=overrideMap.get(`${yesterday}|${rule.label}`);
+        effectiveStart=(previousOverride?.start_time||rule.start).slice(0,5);
+        effectiveEnd=(previousOverride?.end_time||rule.end).slice(0,5);
+        startMin=mins(effectiveStart);endMin=mins(effectiveEnd);overnight=endMin<=startMin;notifyMin=endMin+grace;
+      }
       const shiftWeekday=new Date(`${shiftDate}T12:00:00+08:00`).getDay();
       if(rule.days?.length&&!rule.days.includes(shiftWeekday))continue;
       const due=overnight&&shiftDate!==today?nowMin>=notifyMin&&nowMin<notifyMin+10:nowMin>=notifyMin&&nowMin<notifyMin+10;
@@ -74,5 +91,8 @@ Deno.serve(async req=>{
       results.push({rule:rule.id,ok:lineRes.ok,expected,checked,unchecked:unchecked.length});
     }
     return reply({ok:true,weekday,results});
-  }catch(e){return reply({ok:false,msg:e instanceof Error?e.message:String(e)},500);}
+  }catch(e){
+    const msg=e instanceof Error?e.message:typeof e==="object"&&e?JSON.stringify(e):String(e);
+    return reply({ok:false,msg},500);
+  }
 });

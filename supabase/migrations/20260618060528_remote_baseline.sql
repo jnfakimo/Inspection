@@ -1,0 +1,1 @@
+-- Remote baseline migration already applied before this repository began tracking migrations.
