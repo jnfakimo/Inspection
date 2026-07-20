@@ -53,6 +53,12 @@ a{color:inherit;text-decoration:none}
 .btn-add:hover{background:rgba(199,125,255,.2)}
 
 table{width:100%;border-collapse:collapse;font-size:.82rem}
+.schedule-table{table-layout:fixed;min-width:760px}
+.schedule-table col:nth-child(1){width:10%}
+.schedule-table col:nth-child(2),.schedule-table col:nth-child(3){width:21%}
+.schedule-table col:nth-child(4){width:27%}
+.schedule-table col:nth-child(5){width:21%}
+#shiftList,#tplList{overflow-x:auto}
 th{text-align:left;color:var(--text-dim);font-size:.68rem;letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--border)}
 td{padding:8px;border-bottom:1px solid rgba(12,40,64,.4)}
 tr:last-child td{border-bottom:none}
@@ -247,7 +253,7 @@ async function load(){
 function renderShifts(){
   const box=document.getElementById('shiftList');
   if(!shiftRows.length){box.innerHTML='<div class="empty">尚未設定範本班別，請先在下方「預設範本」新增。</div>';return;}
-  box.innerHTML=`<table><tr><th>班別</th><th>上班時段</th><th>通報時段</th><th>當班部門／巡檢人員</th><th></th></tr>`+
+  box.innerHTML=`<table class="schedule-table"><colgroup><col><col><col><col><col></colgroup><tr><th>班別</th><th>上班時段</th><th>通報時段</th><th>當班部門／巡檢人員</th><th></th></tr>`+
     shiftRows.map(s=>`<tr>
       <td>${esc(s.name)}${s.customized?' <small style="color:var(--patrol)">（已調整）</small>':''}</td>
       <td class='time'>${fmtHM(s.work_start_time)} – ${fmtHM(s.work_end_time)}</td>
@@ -268,7 +274,7 @@ async function loadTpl(){
 function renderTpl(){
   const box=document.getElementById('tplList');
   if(!tplRows.length){box.innerHTML='<div class="empty">尚無範本班別。</div>';return;}
-  box.innerHTML=`<table><tr><th>班別</th><th>上班時段</th><th>通報時段</th><th>預設巡檢人員</th><th></th></tr>`+
+  box.innerHTML=`<table class="schedule-table"><colgroup><col><col><col><col><col></colgroup><tr><th>班別</th><th>上班時段</th><th>通報時段</th><th>預設巡檢人員</th><th></th></tr>`+
     tplRows.map(s=>`<tr>
       <td>${esc(s.name)}</td>
       <td class='time'>${fmtHM(staffAssignments.workTimes.templates?.[s.name]?.start||s.start_time)} – ${fmtHM(staffAssignments.workTimes.templates?.[s.name]?.end||s.end_time)}</td>
