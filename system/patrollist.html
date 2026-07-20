@@ -128,8 +128,8 @@ a{color:inherit;text-decoration:none}
   </div>
 
   <div class="stats-row">
-    <div class="stat-card"><div class="n" id="s-floors">0</div><div class="l">涵蓋樓層數</div></div>
-    <div class="stat-card"><div class="n" id="s-total">0</div><div class="l">巡邏點總數</div></div>
+    <div class="stat-card"><div class="n" id="s-floors">—</div><div class="l">涵蓋樓層數</div></div>
+    <div class="stat-card"><div class="n" id="s-total">—</div><div class="l">巡邏點總數</div></div>
   </div>
 
   <div class="toolbar">
@@ -189,20 +189,22 @@ function fmtTime(t){
   return `${d.getMonth()+1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-async function load(){
-  document.getElementById('list').innerHTML='<div class="empty">巡邏點資料載入中…</div>';
+const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function load(attempt=0){
+  document.getElementById('s-floors').textContent='—';
+  document.getElementById('s-total').textContent='—';
+  document.getElementById('list').innerHTML='<div class="empty">'+(attempt?'網路連線不穩定，正在重新載入…':'巡邏點資料載入中…')+'</div>';
   const [{data,error},{data:ck,error:checkinError}]=await Promise.all([
     db.from('plan_markers').select('marker_id,floor_id,label,note,x,y')
       .eq('kind','patrol').eq('status','active').order('floor_id').order('label'),
     db.from('checkin_logs').select('target_id,checkin_at')
       .eq('target_type','marker').order('checkin_at',{ascending:false}).limit(1000)
   ]);
-  if(error){
-    document.getElementById('list').innerHTML='<div class="empty">讀取失敗：'+esc(translateError(error.message))+'</div>';
-    return;
-  }
-  if(checkinError){
-    document.getElementById('list').innerHTML='<div class="empty">簽到紀錄讀取失敗：'+esc(translateError(checkinError.message))+'</div>';
+  const queryError=error||checkinError;
+  if(queryError){
+    const networkError=/Failed to fetch|NetworkError|Load failed/i.test(queryError.message||'');
+    if(networkError&&attempt<2){await wait(1500);return load(attempt+1);}
+    document.getElementById('list').innerHTML='<div class="empty">讀取失敗：'+esc(translateError(queryError.message))+'<br><button class="mini" onclick="load()" style="margin-top:12px">重新載入</button></div>';
     return;
   }
   rows=data||[];
