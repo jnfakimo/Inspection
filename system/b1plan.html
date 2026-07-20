@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script>if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embed-mode');</script>
+<script>{const p=new URLSearchParams(location.search);if(p.get('embed')==='1')document.documentElement.classList.add('embed-mode');if(p.get('patrol')==='1')document.documentElement.classList.add('patrol-only');}</script>
 <script src="theme.js?v=20260720-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -41,6 +41,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .embed-mode #topbar{display:none}
 .embed-mode #osd{inset:0}
 .embed-mode #floors,.embed-mode #mkToggle,.embed-mode #mkpanel{transform:translateY(-50px)}
+.patrol-only #mkpanel [data-marker-kind]:not([data-marker-kind="patrol"]){display:none}
 
 /* Floor switch (right) — 樓層下拉式選單 */
 #floors{position:fixed;right:14px;top:62px;z-index:150}
@@ -147,11 +148,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
       <button class="panel-close" onclick="toggleMkPanel(false)">隱藏</button>
     </span>
   </div>
-  <label><input type="checkbox" id="mk-equipment" checked onchange="toggleMkKind('equipment',this.checked)"><span style="color:#00d4ff">●</span> 設備</label>
-  <label><input type="checkbox" id="mk-space" checked onchange="toggleMkKind('space',this.checked)"><span style="color:#00ff9d">●</span> 空間</label>
-  <label><input type="checkbox" id="mk-patrol" checked onchange="toggleMkKind('patrol',this.checked)"><span style="color:#c77dff">●</span> 巡邏點</label>
-  <label><input type="checkbox" id="mk-repair" checked onchange="toggleMkKind('repair',this.checked)"><span style="color:#ff5470">●</span> 報修點</label>
-  <label><input type="checkbox" id="mk-note" checked onchange="toggleMkKind('note',this.checked)"><span style="color:#ffb300">●</span> 一般</label>
+  <label data-marker-kind="equipment"><input type="checkbox" id="mk-equipment" checked onchange="toggleMkKind('equipment',this.checked)"><span style="color:#00d4ff">●</span> 設備</label>
+  <label data-marker-kind="space"><input type="checkbox" id="mk-space" checked onchange="toggleMkKind('space',this.checked)"><span style="color:#00ff9d">●</span> 空間</label>
+  <label data-marker-kind="patrol"><input type="checkbox" id="mk-patrol" checked onchange="toggleMkKind('patrol',this.checked)"><span style="color:#c77dff">●</span> 巡邏點</label>
+  <label data-marker-kind="repair"><input type="checkbox" id="mk-repair" checked onchange="toggleMkKind('repair',this.checked)"><span style="color:#ff5470">●</span> 報修點</label>
+  <label data-marker-kind="note"><input type="checkbox" id="mk-note" checked onchange="toggleMkKind('note',this.checked)"><span style="color:#ffb300">●</span> 一般</label>
   <label style="border-top:1px solid var(--border);margin-top:4px;padding-top:6px"><input type="checkbox" onchange="toggleMkLabels(this.checked)"> 顯示標記名稱</label>
   <div style="color:var(--text2);margin-top:3px">標記數：<span style="color:var(--text)" id="mkNum">—</span></div>
 </div>
@@ -175,6 +176,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
 const PAGE_PARAMS=new URLSearchParams(location.search);
 const MODEL_VERSION=PAGE_PARAMS.get('modelv')||'';
+const PATROL_ONLY=PAGE_PARAMS.get('patrol')==='1';
 (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol3d.html');}})();
 function versionedModelUrl(url){
   if(!MODEL_VERSION||!url) return url;
@@ -286,13 +288,17 @@ function showFloor(f){
 
 // ── 整合標記（唯讀，與整合標記系統 / 3D 同步）──────────────
 const MK_COL={equipment:'#00d4ff',space:'#00ff9d',patrol:'#c77dff',repair:'#ff5470',note:'#ffb300'};
-const KV={equipment:true,space:true,patrol:true,repair:true,note:true};
+const KV=PATROL_ONLY
+  ? {equipment:false,space:false,patrol:true,repair:false,note:false}
+  : {equipment:true,space:true,patrol:true,repair:true,note:true};
 let planMarkers=[], showLab=false;
 function escB(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 let patrolStatusMap=new Map();
 async function loadPlanMarkers(){
   try{
-    const {data,error}=await db.from('plan_markers').select('marker_id,floor_id,x,y,kind,label').eq('status','active');
+    let query=db.from('plan_markers').select('marker_id,floor_id,x,y,kind,label').eq('status','active');
+    if(PATROL_ONLY) query=query.eq('kind','patrol');
+    const {data,error}=await query;
     if(!error) planMarkers=data||[];
   }catch(e){}
   drawPlanMarkers();
