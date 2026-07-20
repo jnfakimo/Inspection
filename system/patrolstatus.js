@@ -19,6 +19,14 @@ window.PatrolStatus = (function () {
     return { start, end };
   }
 
+  // 打卡狀態統計專用：使用通報時段，不影響畫面顯示的上班時段。
+  function notificationRange(shift, dayBase) {
+    const start = timeToDate(dayBase, shift.notify_start_time || shift.start_time);
+    let end = timeToDate(dayBase, shift.notify_end_time || shift.end_time);
+    if (end <= start) end = new Date(end.getTime() + 24 * 3600 * 1000);
+    return { start, end };
+  }
+
   function dateStrOf(d) {
     const p = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -56,8 +64,8 @@ window.PatrolStatus = (function () {
     });
   }
 
-  // 取得「當前最相關」的一個班別：正在進行中的班別，否則最近剛結束的班別
-  // （含昨天跨夜班別仍在進行中的情況）。用於地圖圖釘即時上色。
+  // 當班顯示以「上班時段」判定；三色打卡狀態則以該班的「通報時段」計算。
+  // 兩組時間皆支援昨天開始、今天結束的跨夜班。
   async function compute(db, dateStr) {
     const now = new Date();
     dateStr = dateStr || dateStrOf(now);
@@ -92,18 +100,20 @@ window.PatrolStatus = (function () {
     const map = new Map();
     if (!relevant) return { map, shift: null, range: null };
 
+    const statusRange = notificationRange(relevant, relevant._base);
+
     const { data: checkins } = await db.from('checkin_logs').select('target_id,checkin_at')
       .eq('target_type', 'marker')
-      .gte('checkin_at', relevantRange.start.toISOString())
-      .lte('checkin_at', relevantRange.end.toISOString());
+      .gte('checkin_at', statusRange.start.toISOString())
+      .lte('checkin_at', statusRange.end.toISOString());
 
     const checkedIds = new Set((checkins || []).map(c => c.target_id));
     (markers || []).forEach(m => {
       if (checkedIds.has(m.marker_id)) map.set(m.marker_id, 'ok');
-      else if (now <= relevantRange.end) map.set(m.marker_id, 'pending');
+      else if (now <= statusRange.end) map.set(m.marker_id, 'pending');
       else map.set(m.marker_id, 'overdue');
     });
-    return { map, shift: relevant, range: relevantRange };
+    return { map, shift: relevant, range: relevantRange, statusRange };
   }
 
   // 取得「指定日期」全部班別 × 全部巡檢點的完整矩陣。用於稽核總覽頁。
@@ -117,7 +127,7 @@ window.PatrolStatus = (function () {
       db.from('plan_markers').select('marker_id,floor_id,label').eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label'),
     ]);
 
-    const ranges = (shifts || []).map(s => ({ ...s, range: shiftRange(s, dayBase) }));
+    const ranges = (shifts || []).map(s => ({ ...s, range: notificationRange(s, dayBase) }));
     const matrix = new Map(); // key: shift_id|marker_id -> 'ok'|'pending'|'overdue'
     if (!ranges.length) return { shifts: ranges, markers: markers || [], matrix };
 
