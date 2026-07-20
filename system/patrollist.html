@@ -158,7 +158,6 @@ a{color:inherit;text-decoration:none}
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
 function translateError(msg) {
   if (!msg) return '未知錯誤';
   if (msg.includes('relation') && msg.includes('does not exist')) return '資料表不存在，請確認資料庫設定';
@@ -191,6 +190,7 @@ function fmtTime(t){
 }
 
 async function load(){
+  document.getElementById('list').innerHTML='<div class="empty">巡邏點資料載入中…</div>';
   const {data,error}=await db.from('plan_markers').select('marker_id,floor_id,label,note,x,y')
     .eq('kind','patrol').eq('status','active').order('floor_id').order('label');
   if(error){
@@ -319,7 +319,12 @@ function printAllQr(){
   win.focus();
 }
 
-load();
+async function init(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html';return;}
+  await load();
+}
+init();
 </script>
 </body>
 </html>

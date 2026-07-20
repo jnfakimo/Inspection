@@ -184,7 +184,6 @@ td.pointcol .fl{color:var(--text-dim);font-size:.68rem;margin-right:4px}
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol.html');}})();
 function translateError(msg){
   if(!msg) return '未知錯誤';
   if((msg.includes('relation') && msg.includes('does not exist'))||msg.includes('schema cache')||msg.includes('Could not find the table')) return '資料表不存在，請先於 Supabase SQL Editor 執行 system/sql/patrol_shifts.sql';
@@ -474,8 +473,13 @@ document.getElementById('m-detail').addEventListener('click',e=>{if(e.target.id=
 document.getElementById('datePick').value=todayStr();
 document.getElementById('exportFrom').value=todayStr();
 document.getElementById('exportTo').value=todayStr();
-load();
-setInterval(load,60000);
+async function init(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol.html');return;}
+  await load();
+  setInterval(load,60000);
+}
+init();
 </script>
 </body>
 </html>
