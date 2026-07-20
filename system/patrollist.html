@@ -191,10 +191,18 @@ function fmtTime(t){
 
 async function load(){
   document.getElementById('list').innerHTML='<div class="empty">巡邏點資料載入中…</div>';
-  const {data,error}=await db.from('plan_markers').select('marker_id,floor_id,label,note,x,y')
-    .eq('kind','patrol').eq('status','active').order('floor_id').order('label');
+  const [{data,error},{data:ck,error:checkinError}]=await Promise.all([
+    db.from('plan_markers').select('marker_id,floor_id,label,note,x,y')
+      .eq('kind','patrol').eq('status','active').order('floor_id').order('label'),
+    db.from('checkin_logs').select('target_id,checkin_at')
+      .eq('target_type','marker').order('checkin_at',{ascending:false}).limit(1000)
+  ]);
   if(error){
     document.getElementById('list').innerHTML='<div class="empty">讀取失敗：'+esc(translateError(error.message))+'</div>';
+    return;
+  }
+  if(checkinError){
+    document.getElementById('list').innerHTML='<div class="empty">簽到紀錄讀取失敗：'+esc(translateError(checkinError.message))+'</div>';
     return;
   }
   rows=data||[];
@@ -204,8 +212,6 @@ async function load(){
   if(!collapsedReady){ collapsedReady=true; } // 預設全部展開
 
   lastCheckin=new Map();
-  const {data:ck}=await db.from('checkin_logs').select('target_id,checkin_at')
-    .eq('target_type','marker').order('checkin_at',{ascending:false}).limit(1000);
   (ck||[]).forEach(r=>{ if(!lastCheckin.has(r.target_id)) lastCheckin.set(r.target_id,r.checkin_at); });
 
   render();
