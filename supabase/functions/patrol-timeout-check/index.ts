@@ -8,6 +8,7 @@ const mins=(s:string)=>{const [h,m]=(s||"00:00").split(":").map(Number);return h
 const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",weekday:"short",hourCycle:"h23"}).formatToParts(d).forEach(x=>p[x.type]=x.value);return p;};
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
 const previousDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()-1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
+const nextDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()+1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
 
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
@@ -23,7 +24,7 @@ Deno.serve(async req=>{
     let configuredRules:Rule[]=[];try{configuredRules=JSON.parse(s.patrol_timeout_rules||"[]");}catch(_e){}
     let staffAssignments:{templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>}={templates:{},dates:{}};
     try{staffAssignments=JSON.parse(s.patrol_shift_staff||"{}");staffAssignments.templates||={};staffAssignments.dates||={};}catch(_e){}
-    const now=new Date(),p=localParts(now),today=`${p.year}-${p.month}-${p.day}`,nowMin=Number(p.hour)*60+Number(p.minute);
+    const now=new Date(),p=localParts(now),today=`${p.year}-${p.month}-${p.day}`;
     const yesterday=previousDate(today);
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
     const {data:templates,error:templateError}=await db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").order("sort_order");
@@ -39,27 +40,24 @@ Deno.serve(async req=>{
     for(const rule of rules){
       if(rule.enabled===false||!rule.id||!rule.start||!rule.end)continue;
       const grace=Math.max(0,Number(rule.grace)||0);
-      const todayOverride=overrideMap.get(`${today}|${rule.label}`);
-      let effectiveStart=(todayOverride?.start_time||rule.start).slice(0,5);
-      let effectiveEnd=(todayOverride?.end_time||rule.end).slice(0,5);
-      let startMin=mins(effectiveStart),endMin=mins(effectiveEnd),overnight=endMin<=startMin;
-      let shiftDate=today,notifyMin=endMin+grace;
-      if(overnight&&nowMin<=notifyMin+15){
-        shiftDate=yesterday;
-        const previousOverride=overrideMap.get(`${yesterday}|${rule.label}`);
-        effectiveStart=(previousOverride?.start_time||rule.start).slice(0,5);
-        effectiveEnd=(previousOverride?.end_time||rule.end).slice(0,5);
-        startMin=mins(effectiveStart);endMin=mins(effectiveEnd);overnight=endMin<=startMin;notifyMin=endMin+grace;
-      }
+      // 從今天與昨天找出「最近一個已超過通報結束時間」的班別。
+      // 這能正確處理跨夜班，並避免 force/手動測試把尚未到期的未來班別提前送出。
+      const candidates=[yesterday,today].map(shiftDate=>{
+        const override=overrideMap.get(`${shiftDate}|${rule.label}`);
+        const effectiveStart=(override?.start_time||rule.start).slice(0,5);
+        const effectiveEnd=(override?.end_time||rule.end).slice(0,5);
+        const overnight=mins(effectiveEnd)<=mins(effectiveStart);
+        const endDay=overnight?nextDate(shiftDate):shiftDate;
+        const notifyAt=new Date(new Date(iso(endDay,effectiveEnd)).getTime()+grace*60000);
+        return {shiftDate,effectiveStart,effectiveEnd,overnight,endDay,notifyAt};
+      }).filter(x=>x.notifyAt<=now).sort((a,b)=>b.notifyAt.getTime()-a.notifyAt.getTime());
+      if(!candidates.length)continue;
+      const {shiftDate,effectiveStart,effectiveEnd,overnight,endDay}=candidates[0];
       const shiftWeekday=new Date(`${shiftDate}T12:00:00+08:00`).getDay();
       if(rule.days?.length&&!rule.days.includes(shiftWeekday))continue;
-      const due=overnight&&shiftDate!==today?nowMin>=notifyMin&&nowMin<notifyMin+10:nowMin>=notifyMin&&nowMin<notifyMin+10;
-      if(!body.force&&!due)continue;
-      const endDate=overnight?localParts(new Date(new Date(`${shiftDate}T12:00:00+08:00`).getTime()+86400000)):null;
-      const endDay=endDate?`${endDate.year}-${endDate.month}-${endDate.day}`:shiftDate;
       const startIso=iso(shiftDate,effectiveStart),endIso=iso(endDay,effectiveEnd);
       const {data:existing}=await db.from("patrol_timeout_notifications").select("notification_id,status").eq("rule_id",rule.id).eq("shift_date",shiftDate).maybeSingle();
-      if(existing&&!body.force){results.push({rule:rule.id,msg:"already processed"});continue;}
+      if(existing){results.push({rule:rule.id,msg:"already processed"});continue;}
       const {data:markers,error:markerError}=await db.from("plan_markers").select("marker_id,floor_id,label").eq("kind","patrol").eq("status","active");
       if(markerError)throw markerError;
       const {data:logs,error:logError}=await db.from("checkin_logs").select("target_id,user_id,user_name,checkin_at").eq("target_type","marker").gte("checkin_at",startIso).lte("checkin_at",endIso);
