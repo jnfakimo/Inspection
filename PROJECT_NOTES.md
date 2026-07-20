@@ -1,0 +1,25 @@
+# 專案筆記
+
+## 2026-07-20 收工
+
+### 完成事項
+
+- 修正並部署駐衛警巡檢逾時 LINE 推播：建立通知紀錄表、每 5 分鐘 cron、同步四班制排班資料。
+- 新增 LINE 推播紀錄查詢頁，提供期間、班別、狀態選單與每頁 10 筆分頁。
+- 修正查詢頁與 cron 的 Supabase anon key，REST 與 Edge Function 均驗證為 HTTP 200。
+- 全系統頂部導覽補回首頁捷徑，支援桌面版與手機版。
+- 調整 3D 駐警巡檢手機版控制按鈕對齊。
+- 更新登入頁下部資訊列與維修流程三張圖塊圖示。
+
+### 下一步
+
+- 觀察下一個班別結束後 0–5 分鐘內是否產生 LINE 推播與 `patrol_timeout_notifications` 紀錄。
+- 若 LINE 回傳失敗，從推播紀錄頁確認 `line_response`，再檢查 Channel access token、Group ID 與 Bot 群組權限。
+- 後續可將 cron 授權資料改由 Supabase Vault／Secret 管理，避免在 migration 內重複維護公開 anon key。
+
+### 踩坑
+
+- Edge Function 部署完成不代表 cron 已建立；資料庫 migration 必須實際套用。
+- 排班通知應直接讀取 `patrol_shift_template` 與當日 `patrol_shifts`，不可另維護不同名稱與時間的通知班別。
+- 複製 JWT 時曾產生格式錯誤；部署前需比對長度與實際呼叫結果。
+- Supabase CLI 會建立 `supabase/.temp/`，已加入 `.gitignore`。

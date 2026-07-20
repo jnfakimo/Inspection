@@ -16,6 +16,7 @@ Thumbs.db
 
 # temp
 *.tmp
+supabase/.temp/
 
 # Python .venv (ai-agent-ep03)
 .venv/
