@@ -24,21 +24,33 @@ window.PatrolStatus = (function () {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
-  // 班別名稱/數量固定來自 patrol_shift_template；patrol_shifts 儲存當日調整後的「通報時段」。
-  // 巡檢表的班別判定與已打卡／待打卡／逾期未打卡統計均以通報時段計算。
+  // 班別名稱/數量固定來自 patrol_shift_template；patrol_shifts 的時段專供逾時通報。
+  // 巡檢表的班別判定與打卡統計改讀 patrol_shift_staff 內獨立設定的「上班時段」。
   async function getShiftsForDate(db, dateStr) {
-    const [{ data: tpl }, { data: overrides }] = await Promise.all([
+    const [{ data: tpl }, { data: overrides }, { data: setting }] = await Promise.all([
       db.from('patrol_shift_template').select('*').order('sort_order'),
       db.from('patrol_shifts').select('*').eq('shift_date', dateStr),
+      db.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
     ]);
     const ovMap = new Map((overrides || []).map(o => [o.name, o]));
+    let workTimes = { templates: {}, dates: {} };
+    try {
+      const saved = JSON.parse(setting?.value || '{}').workTimes || {};
+      workTimes = { templates: saved.templates || {}, dates: saved.dates || {} };
+    } catch (_e) {}
     return (tpl || []).map(t => {
       const ov = ovMap.get(t.name);
+      const templateWork = workTimes.templates[t.name] || {};
+      const dateWork = (workTimes.dates[dateStr] || {})[t.name] || {};
+      const notifyStart = ov ? ov.start_time : t.start_time;
+      const notifyEnd = ov ? ov.end_time : t.end_time;
       return {
         shift_id: ov ? ov.shift_id : ('tpl:' + t.template_id),
         name: t.name,
-        start_time: ov ? ov.start_time : t.start_time,
-        end_time: ov ? ov.end_time : t.end_time,
+        start_time: dateWork.start || templateWork.start || notifyStart,
+        end_time: dateWork.end || templateWork.end || notifyEnd,
+        notify_start_time: notifyStart,
+        notify_end_time: notifyEnd,
         sort_order: t.sort_order,
       };
     });
