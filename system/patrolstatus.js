@@ -3,6 +3,9 @@
 window.PatrolStatus = (function () {
   const COLORS = { ok: '#00ff9d', pending: '#c77dff', overdue: '#ff5470' };
   const LABELS = { ok: '已打卡', pending: '待打卡', overdue: '逾期未打卡' };
+  let baseDataPromise = null;
+  let markerPromise = null;
+  const overridePromises = new Map();
 
   function timeToDate(dayBase, t) {
     const [h, m, s] = String(t).split(':').map(Number);
@@ -32,14 +35,39 @@ window.PatrolStatus = (function () {
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
+  function getBaseData(db) {
+    if (!baseDataPromise) {
+      baseDataPromise = Promise.all([
+        db.from('patrol_shift_template').select('*').order('sort_order'),
+        db.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
+      ]).then(([templateResult, settingResult]) => ({
+        templates: templateResult.data || [],
+        setting: settingResult.data,
+      }));
+    }
+    return baseDataPromise;
+  }
+
+  function getOverrides(db, dateStr) {
+    if (!overridePromises.has(dateStr)) {
+      overridePromises.set(dateStr, db.from('patrol_shifts').select('*').eq('shift_date', dateStr).then(r => r.data || []));
+    }
+    return overridePromises.get(dateStr);
+  }
+
+  function getMarkers(db) {
+    if (!markerPromise) {
+      markerPromise = db.from('plan_markers').select('marker_id,floor_id,label')
+        .eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label')
+        .then(r => r.data || []);
+    }
+    return markerPromise;
+  }
+
   // 班別名稱/數量固定來自 patrol_shift_template；patrol_shifts 的時段專供逾時通報。
   // 巡檢表的班別判定與打卡統計改讀 patrol_shift_staff 內獨立設定的「上班時段」。
   async function getShiftsForDate(db, dateStr) {
-    const [{ data: tpl }, { data: overrides }, { data: setting }] = await Promise.all([
-      db.from('patrol_shift_template').select('*').order('sort_order'),
-      db.from('patrol_shifts').select('*').eq('shift_date', dateStr),
-      db.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
-    ]);
+    const [{ templates: tpl, setting }, overrides] = await Promise.all([getBaseData(db), getOverrides(db, dateStr)]);
     const ovMap = new Map((overrides || []).map(o => [o.name, o]));
     let workTimes = { templates: {}, dates: {} };
     try {
@@ -76,7 +104,7 @@ window.PatrolStatus = (function () {
     const [shiftsToday, shiftsYesterday, { data: markers }] = await Promise.all([
       getShiftsForDate(db, dateStr),
       getShiftsForDate(db, yStr),
-      db.from('plan_markers').select('marker_id').eq('kind', 'patrol').eq('status', 'active'),
+      getMarkers(db).then(data => ({ data })),
     ]);
 
     const allShifts = [
@@ -124,7 +152,7 @@ window.PatrolStatus = (function () {
 
     const [shifts, { data: markers }] = await Promise.all([
       getShiftsForDate(db, dateStr),
-      db.from('plan_markers').select('marker_id,floor_id,label').eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label'),
+      getMarkers(db).then(data => ({ data })),
     ]);
 
     const ranges = (shifts || []).map(s => ({ ...s, range: notificationRange(s, dayBase) }));
