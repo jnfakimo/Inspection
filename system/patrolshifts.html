@@ -147,8 +147,8 @@ tr:last-child td{border-bottom:none}
   <div class="modal">
     <div class="modal-head"><span class="mt" id="shiftTitle">調整班別</span><span class="x" onclick="closeModal('m-shift')">✕</span></div>
     <div class="modal-body">
-      <div class="field time-range-field"><label>上班時段</label><input id="f-work-start" type="time" aria-label="上班開始時間"><span class="time-range-sep">～</span><input id="f-work-end" type="time" aria-label="上班結束時間"></div>
-      <div class="field time-range-field"><label>通報時段</label><input id="f-start" type="time" aria-label="通報開始時間"><span class="time-range-sep">～</span><input id="f-end" type="time" aria-label="通報結束時間"></div>
+      <div class="field time-range-field"><label>上班時段</label><input id="f-work-start" type="time" step="1800" aria-label="上班開始時間"><span class="time-range-sep">～</span><input id="f-work-end" type="time" step="1800" aria-label="上班結束時間"></div>
+      <div class="field time-range-field"><label>通報時段</label><input id="f-start" type="time" step="1800" aria-label="通報開始時間"><span class="time-range-sep">～</span><input id="f-end" type="time" step="1800" aria-label="通報結束時間"></div>
       <div class="field"><label>當班巡檢人員（可複選）</label><select id="f-users" multiple size="6"></select></div>
       <div class="msg" id="shiftMsg"></div>
       <button class="btn-primary" onclick="saveShift()">儲存</button>
@@ -162,8 +162,8 @@ tr:last-child td{border-bottom:none}
     <div class="modal-head"><span class="mt" id="tplTitle">新增範本班別</span><span class="x" onclick="closeModal('m-tpl')">✕</span></div>
     <div class="modal-body">
       <div class="field"><label>班別名稱</label><input id="tf-name" placeholder="例：早班"></div>
-      <div class="field time-range-field"><label>上班時段</label><input id="tf-work-start" type="time" aria-label="上班開始時間"><span class="time-range-sep">～</span><input id="tf-work-end" type="time" aria-label="上班結束時間"></div>
-      <div class="field time-range-field"><label>通報時段</label><input id="tf-start" type="time" aria-label="通報開始時間"><span class="time-range-sep">～</span><input id="tf-end" type="time" aria-label="通報結束時間"></div>
+      <div class="field time-range-field"><label>上班時段</label><input id="tf-work-start" type="time" step="1800" aria-label="上班開始時間"><span class="time-range-sep">～</span><input id="tf-work-end" type="time" step="1800" aria-label="上班結束時間"></div>
+      <div class="field time-range-field"><label>通報時段</label><input id="tf-start" type="time" step="1800" aria-label="通報開始時間"><span class="time-range-sep">～</span><input id="tf-end" type="time" step="1800" aria-label="通報結束時間"></div>
       <div class="field"><label>預設巡檢人員（可複選）</label><select id="tf-users" multiple size="6"></select></div>
       <div class="msg" id="tplMsg"></div>
       <button class="btn-primary" onclick="saveTpl()">儲存</button>
@@ -190,6 +190,7 @@ function translateError(msg){
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(m,err){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2200);}
 function fmtHM(t){return String(t||'').slice(0,5);}
+function isHalfHour(t){return /^\d{2}:(00|30)$/.test(String(t||''));}
 let staffRows=[],deptNames={},staffAssignments={templates:{},dates:{},workTimes:{templates:{},dates:{}}};
 async function loadStaff(){
   const [u,d,setting]=await Promise.all([
@@ -308,6 +309,7 @@ async function saveShift(){
   const end=document.getElementById('f-end').value;
   const msg=document.getElementById('shiftMsg');
   if(!workStart||!workEnd||!start||!end){msg.textContent='請完整填寫上班與通報時段';return;}
+  if(![workStart,workEnd,start,end].every(isHalfHour)){msg.textContent='時間請以半小時為單位（00 或 30 分）';return;}
   const dateStr=document.getElementById('datePick').value;
   const s=shiftRows.find(x=>x.name===editShiftName);
   const payload={shift_date:dateStr,name:editShiftName,start_time:start,end_time:end,sort_order:s?s.sort_order:0};
@@ -350,6 +352,7 @@ async function saveTpl(){
   const end=document.getElementById('tf-end').value;
   const msg=document.getElementById('tplMsg');
   if(!name||!workStart||!workEnd||!start||!end){msg.textContent='請完整填寫班別名稱、上班時段與通報時段';return;}
+  if(![workStart,workEnd,start,end].every(isHalfHour)){msg.textContent='時間請以半小時為單位（00 或 30 分）';return;}
   const sortOrder=editTplId?tplRows.find(x=>x.template_id===editTplId).sort_order:(tplRows.length?Math.max(...tplRows.map(s=>s.sort_order))+1:1);
   const payload={name,start_time:start,end_time:end,sort_order:sortOrder};
   let error;
