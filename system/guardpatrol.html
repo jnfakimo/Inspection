@@ -59,6 +59,7 @@ a{color:inherit;text-decoration:none}
 .duty-info{font-family:var(--font-head);font-size:.72rem;color:var(--patrol);letter-spacing:.05em;margin:2px 0 8px}
 .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:10px 16px;min-width:110px}
 .stat-card .n{font-family:var(--font-head);font-size:1.5rem;font-weight:700}
+.stat-card.shift .n{color:var(--cyan);font-size:1.12rem;line-height:1.75;white-space:nowrap}
 .stat-card.ok .n{color:var(--green)}
 .stat-card.pending .n{color:var(--patrol)}
 .stat-card.overdue .n{color:var(--red)}
@@ -108,7 +109,7 @@ td.pointcol .fl{color:var(--text-dim);font-size:.68rem;margin-right:4px}
   .toolbar .tool-field{min-width:0;width:100%}
   .toolbar .tool-field select{width:100%;height:42px}
   .filter-floor{order:1}.filter-status{order:2}.filter-shift{order:3;grid-column:1/-1}
-  .stats-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+  .stats-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-bottom:10px}
   .stat-card{min-width:0;padding:8px 6px;text-align:center}
   .stat-card .n{font-size:1.25rem}.stat-card .l{font-size:.62rem;letter-spacing:0}
   .grid-wrap{border-radius:3px}
@@ -157,6 +158,7 @@ td.pointcol .fl{color:var(--text-dim);font-size:.68rem;margin-right:4px}
 
   <div class="duty-info" id="dutyInfo">當班即時統計｜載入中…</div>
   <div class="stats-row" aria-describedby="dutyInfo">
+    <div class="stat-card shift"><div class="n" id="s-shift">—</div><div class="l">班別</div></div>
     <div class="stat-card ok"><div class="n" id="s-ok">0</div><div class="l">已打卡</div></div>
     <div class="stat-card pending"><div class="n" id="s-pending">0</div><div class="l">待打卡</div></div>
     <div class="stat-card overdue"><div class="n" id="s-overdue">0</div><div class="l">逾期未打卡</div></div>
@@ -271,11 +273,12 @@ function renderDutyStats(markers,filters,dutyResult){
   const active=Boolean(dutyResult&&dutyResult.shift&&dutyResult.range&&now>=dutyResult.range.start&&now<=dutyResult.range.end);
   if(!active){
     info.textContent='當班即時統計｜目前無進行中班別';
-    ['s-ok','s-pending','s-overdue'].forEach(id=>{document.getElementById(id).textContent='—';});
+    ['s-shift','s-ok','s-pending','s-overdue'].forEach(id=>{document.getElementById(id).textContent='—';});
     return;
   }
   const shift=dutyResult.shift;
   info.textContent=`當班即時統計｜${shift.name} ${fmtHM(shift.start_time)}–${fmtHM(shift.end_time)}`;
+  document.getElementById('s-shift').textContent=shift.name;
   const dutyMarkers=filters.floor?markers.filter(m=>canonicalFloor(m.floor_id)===filters.floor):markers;
   const counts={ok:0,pending:0,overdue:0};
   dutyMarkers.forEach(m=>{const state=dutyResult.map.get(m.marker_id)||'pending';counts[state]++;});
