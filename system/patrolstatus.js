@@ -30,6 +30,18 @@ window.PatrolStatus = (function () {
     return { start, end };
   }
 
+  // The notification end is the deadline, not the last moment at which a
+  // completed patrol may be recorded.  A late check-in during the duty shift
+  // must still change the point from overdue to checked.
+  function checkinRange(shift, dayBase) {
+    const notice = notificationRange(shift, dayBase);
+    const work = shiftRange(shift, dayBase);
+    return {
+      start: notice.start,
+      end: work.end > notice.end ? work.end : notice.end,
+    };
+  }
+
   function dateStrOf(d) {
     const p = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
@@ -130,10 +142,11 @@ window.PatrolStatus = (function () {
 
     const statusRange = notificationRange(relevant, relevant._base);
 
+    const acceptedRange = checkinRange(relevant, relevant._base);
     const { data: checkins } = await db.from('checkin_logs').select('target_id,checkin_at')
       .eq('target_type', 'marker')
-      .gte('checkin_at', statusRange.start.toISOString())
-      .lte('checkin_at', statusRange.end.toISOString());
+      .gte('checkin_at', acceptedRange.start.toISOString())
+      .lte('checkin_at', acceptedRange.end.toISOString());
 
     const checkedIds = new Set((checkins || []).map(c => c.target_id));
     (markers || []).forEach(m => {
@@ -141,7 +154,7 @@ window.PatrolStatus = (function () {
       else if (now <= statusRange.end) map.set(m.marker_id, 'pending');
       else map.set(m.marker_id, 'overdue');
     });
-    return { map, shift: relevant, range: relevantRange, statusRange };
+    return { map, shift: relevant, range: relevantRange, statusRange, checkinRange: acceptedRange };
   }
 
   // 取得「指定日期」全部班別 × 全部巡檢點的完整矩陣。用於稽核總覽頁。
@@ -155,12 +168,16 @@ window.PatrolStatus = (function () {
       getMarkers(db).then(data => ({ data })),
     ]);
 
-    const ranges = (shifts || []).map(s => ({ ...s, range: notificationRange(s, dayBase) }));
+    const ranges = (shifts || []).map(s => ({
+      ...s,
+      range: notificationRange(s, dayBase),
+      checkinRange: checkinRange(s, dayBase),
+    }));
     const matrix = new Map(); // key: shift_id|marker_id -> 'ok'|'pending'|'overdue'
     if (!ranges.length) return { shifts: ranges, markers: markers || [], matrix };
 
     const minStart = ranges.reduce((a, s) => (s.range.start < a ? s.range.start : a), ranges[0].range.start);
-    const maxEnd = ranges.reduce((a, s) => (s.range.end > a ? s.range.end : a), ranges[0].range.end);
+    const maxEnd = ranges.reduce((a, s) => (s.checkinRange.end > a ? s.checkinRange.end : a), ranges[0].checkinRange.end);
 
     const { data: checkins } = await db.from('checkin_logs').select('target_id,checkin_at')
       .eq('target_type', 'marker')
@@ -170,7 +187,7 @@ window.PatrolStatus = (function () {
     ranges.forEach(s => {
       (markers || []).forEach(m => {
         const hit = (checkins || []).some(c => c.target_id === m.marker_id &&
-          new Date(c.checkin_at) >= s.range.start && new Date(c.checkin_at) <= s.range.end);
+          new Date(c.checkin_at) >= s.checkinRange.start && new Date(c.checkin_at) <= s.checkinRange.end);
         let state;
         if (hit) state = 'ok';
         else if (now <= s.range.end) state = 'pending';

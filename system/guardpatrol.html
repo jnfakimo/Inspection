@@ -11,7 +11,7 @@
 <title>駐衛警巡檢系統 — 臺北農產公司巡檢系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="patrolstatus.js?v=20260720-fastload1"></script>
+<script src="patrolstatus.js?v=20260720-late-checkin1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--patrol:#c77dff;--green:#00ff9d;--red:#ff5470;
@@ -477,8 +477,13 @@ async function init(){
   const {data:{session}}=await db.auth.getSession();
   if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol.html');return;}
   await load();
-  setInterval(load,60000);
+  setInterval(()=>{
+    if(document.visibilityState==='visible')load();
+  },30000);
 }
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')load();
+});
 init();
 </script>
 </body>
