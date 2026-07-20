@@ -34,7 +34,7 @@
   function installSharedHeaderActions(host,meta){
     if(!host||!meta.classList||meta.classList.contains('system-meta-fallback'))return;
     var page=(location.pathname.split('/').pop()||'').toLowerCase();
-    if(/^(?:index|login|app|inspection-archived|materials|materials-archived)\.html$/.test(page))return;
+    if(/^(?:index|login|app|materials)\.html$/.test(page))return;
 
     var style=document.createElement('style');
     style.setAttribute('data-system-actions-style','');
@@ -45,7 +45,8 @@
     Array.prototype.slice.call(host.children).forEach(function(child){
       if(child===meta)return;
       if(child.tagName==='A'){
-        var href=(child.getAttribute('href')||'').split('#')[0].split('?')[0].toLowerCase();
+        var href='';
+        try{href=(new URL(child.getAttribute('href')||'',location.href).pathname.split('/').pop()||'').toLowerCase();}catch(e){}
         if(replaceTargets[href])child.remove();
       }else if(child.tagName==='SPAN'&&(child.textContent||'').trim()==='後台'){
         child.remove();
@@ -59,8 +60,7 @@
     var defs=[
       {href:'index.html',label:'首頁',icon:'<img class="system-action-icon" src="../assets/system-icons/home-icon.svg" alt="">'},
       {href:'dashboard.html',label:'戰情儀表板',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">'},
-      {href:'admin.html#repairs',label:'報修系統',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">'},
-      {href:'repair.html',label:'完工回報',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">'},
+      {href:'https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs',label:'維修/派完工',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">'},
       {href:'guardpatrol.html',label:'駐衛警巡檢',icon:'<img class="system-action-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">'},
       {href:'admin.html',label:'後台',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">'}
     ];
@@ -69,7 +69,11 @@
       link.className='system-action-unified';
       link.href=def.href;
       link.innerHTML=def.icon+'<span>'+def.label+'</span>';
-      if(page===def.href){link.classList.add('is-current');link.setAttribute('aria-current','page');}
+      var targetPage='';
+      try{targetPage=(new URL(def.href,location.href).pathname.split('/').pop()||'').toLowerCase();}catch(e){}
+      var targetHash='';
+      try{targetHash=(new URL(def.href,location.href).hash||'').toLowerCase();}catch(e){}
+      if(page===targetPage&&(!targetHash||location.hash.toLowerCase()===targetHash)){link.classList.add('is-current');link.setAttribute('aria-current','page');}
       actions.appendChild(link);
     });
     host.insertBefore(actions,meta);

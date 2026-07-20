@@ -81,11 +81,13 @@ RLS is currently open (`allow_all_for_now`) for development. Storage buckets:
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
 - **Shared header actions**: `system/theme.js` owns the global action group. Every
-  application page must use the same four actions in this order: 首頁 → 戰情儀表板 →
-  報修系統 → 後台. Use `assets/system-icons/home-icon.svg` for 首頁,
+  application page must use the same five actions in this order: 首頁 → 戰情儀表板 →
+  維修/派完工 → 駐衛警巡檢 → 後台. Use `assets/system-icons/home-icon.svg` for 首頁,
   `assets/system-icons/admin-icon.png` for 戰情儀表板 and 後台, and
-  `assets/system-icons/maintenance-icon.png` for 報修系統. Do not use the
-  `system/icons/nav-*` set for these four shared actions.
+  `assets/system-icons/maintenance-icon.png` for 維修/派完工. The 維修/派完工 action
+  must link to `https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs`.
+  Do not show a separate 完工回報 action. Do not use the `system/icons/nav-*`
+  set for these five shared actions.
   Do not add page-specific emoji or text-symbol versions. Page-specific actions
   may remain immediately to the left.
   This icon style, order, and shared-component implementation are locked; do not
@@ -105,6 +107,9 @@ RLS is currently open (`allow_all_for_now`) for development. Storage buckets:
 ## Git workflow
 - Default branch `main` is what GitHub Pages deploys. Commit/push only what you
   intend to ship.
+- After completing and verifying a requested fix, commit only the files related
+  to that fix and push them to `origin/main` without waiting for a separate push
+  instruction. Preserve unrelated working-tree changes and never include them.
 - Multiple agents may push concurrently; if a push is rejected, do
   `git fetch origin main && git rebase origin/main` then push again.
 - Don't open a PR unless asked.
