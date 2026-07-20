@@ -56,6 +56,7 @@ a{color:inherit;text-decoration:none}
 .export-status{font-size:.68rem;color:var(--text-dim);min-height:1em}
 
 .stats-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.duty-info{font-family:var(--font-head);font-size:.72rem;color:var(--patrol);letter-spacing:.05em;margin:2px 0 8px}
 .stat-card{background:var(--panel);border:1px solid var(--border);border-radius:2px;padding:10px 16px;min-width:110px}
 .stat-card .n{font-family:var(--font-head);font-size:1.5rem;font-weight:700}
 .stat-card.ok .n{color:var(--green)}
@@ -154,7 +155,8 @@ td.pointcol .fl{color:var(--text-dim);font-size:.68rem;margin-right:4px}
     <span class="export-status mobile-hide" id="exportStatus"></span>
   </div>
 
-  <div class="stats-row">
+  <div class="duty-info" id="dutyInfo">當班即時統計｜載入中…</div>
+  <div class="stats-row" aria-describedby="dutyInfo">
     <div class="stat-card ok"><div class="n" id="s-ok">0</div><div class="l">已打卡</div></div>
     <div class="stat-card pending"><div class="n" id="s-pending">0</div><div class="l">待打卡</div></div>
     <div class="stat-card overdue"><div class="n" id="s-overdue">0</div><div class="l">逾期未打卡</div></div>
@@ -202,7 +204,7 @@ function shiftDate(delta){
   load();
 }
 
-let lastResult=null;
+let lastResult=null,lastDutyResult=null;
 let floorKeys=[];
 const expandedFloors=new Set();
 
@@ -241,15 +243,21 @@ function syncFilters(result){
 async function load(){
   const dateStr=document.getElementById('datePick').value;
   document.getElementById('grid').innerHTML='<div class="empty">載入中…</div>';
-  let result;
-  try{ result=await PatrolStatus.computeMatrix(db,dateStr); }
+  let result,dutyResult;
+  try{
+    [result,dutyResult]=await Promise.all([
+      PatrolStatus.computeMatrix(db,dateStr),
+      PatrolStatus.compute(db).catch(()=>({map:new Map(),shift:null,range:null}))
+    ]);
+  }
   catch(e){ document.getElementById('grid').innerHTML='<div class="empty">讀取失敗：'+esc(translateError(e.message))+'</div>'; return; }
   lastResult=result;
+  lastDutyResult=dutyResult;
   syncFilters(result);
-  render(result);
+  render(result,dutyResult);
 }
 
-function renderCurrent(){if(lastResult)render(lastResult);}
+function renderCurrent(){if(lastResult)render(lastResult,lastDutyResult);}
 function toggleFloorAt(index){
   const floor=floorKeys[index];
   if(!floor)return;
@@ -257,20 +265,35 @@ function toggleFloorAt(index){
   renderCurrent();
 }
 
-function render(result){
+function renderDutyStats(markers,filters,dutyResult){
+  const info=document.getElementById('dutyInfo');
+  const now=new Date();
+  const active=Boolean(dutyResult&&dutyResult.shift&&dutyResult.range&&now>=dutyResult.range.start&&now<=dutyResult.range.end);
+  if(!active){
+    info.textContent='當班即時統計｜目前無進行中班別';
+    ['s-ok','s-pending','s-overdue'].forEach(id=>{document.getElementById(id).textContent='—';});
+    return;
+  }
+  const shift=dutyResult.shift;
+  info.textContent=`當班即時統計｜${shift.name} ${fmtHM(shift.start_time)}–${fmtHM(shift.end_time)}`;
+  const dutyMarkers=filters.floor?markers.filter(m=>canonicalFloor(m.floor_id)===filters.floor):markers;
+  const counts={ok:0,pending:0,overdue:0};
+  dutyMarkers.forEach(m=>{const state=dutyResult.map.get(m.marker_id)||'pending';counts[state]++;});
+  document.getElementById('s-ok').textContent=counts.ok;
+  document.getElementById('s-pending').textContent=counts.pending;
+  document.getElementById('s-overdue').textContent=counts.overdue;
+}
+
+function render(result,dutyResult){
   const {shifts,markers,matrix}=result;
   const grid=document.getElementById('grid');
-  if(!shifts.length){grid.innerHTML='<div class="empty">尚未設定任何班別範本。請至「班別排程管理」新增範本班別後再回來查看。</div>';document.getElementById('s-ok').textContent='0';document.getElementById('s-pending').textContent='0';document.getElementById('s-overdue').textContent='0';return;}
+  const filters=currentFilters();
+  renderDutyStats(markers,filters,dutyResult);
+  if(!shifts.length){grid.innerHTML='<div class="empty">尚未設定任何班別範本。請至「班別排程管理」新增範本班別後再回來查看。</div>';return;}
   if(!markers.length){grid.innerHTML='<div class="empty">目前沒有巡邏點資料。請至「整合標記系統」平面圖新增巡邏點標示。</div>';return;}
 
-  const filters=currentFilters();
   const selectedShifts=filters.shift?shifts.filter(s=>s.shift_id===filters.shift):shifts;
   const floorMarkers=filters.floor?markers.filter(m=>canonicalFloor(m.floor_id)===filters.floor):markers;
-  let ok=0,pending=0,overdue=0;
-  floorMarkers.forEach(m=>selectedShifts.forEach(s=>{const v=matrix.get(s.shift_id+'|'+m.marker_id)||'pending';if(v==='ok')ok++;else if(v==='pending')pending++;else overdue++;}));
-  document.getElementById('s-ok').textContent=ok;
-  document.getElementById('s-pending').textContent=pending;
-  document.getElementById('s-overdue').textContent=overdue;
 
   const STATE_LABEL={ok:'✓',pending:'…',overdue:'✕'};
   const visibleMarkers=floorMarkers.filter(m=>!filters.status||selectedShifts.some(s=>(matrix.get(s.shift_id+'|'+m.marker_id)||'pending')===filters.status));
