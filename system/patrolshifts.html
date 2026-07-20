@@ -104,7 +104,7 @@ tr:last-child td{border-bottom:none}
 
 <div class="content">
   <div class="hint">
-    班別名稱與數量固定來自下方「預設範本」，每天只能個別調整這幾個班別的時段（幾點到幾點），不能單日新增或刪除班別本身；
+    班別名稱與數量固定來自下方「預設範本」，每天可個別調整這幾個班別的上班時段與通報時段，不能單日新增或刪除班別本身；
     要增減班別請到下方「預設範本」設定。所有班別巡守同一組巡檢點（即「巡邏點清單」內的巡邏點），不需另外指定。
   </div>
 
@@ -132,13 +132,15 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<!-- 當日班別 modal（只能調整時段，班別名稱固定來自範本） -->
+<!-- 當日班別 modal（班別名稱固定來自範本） -->
 <div class="modal-bg" id="m-shift">
   <div class="modal">
-    <div class="modal-head"><span class="mt" id="shiftTitle">調整時段</span><span class="x" onclick="closeModal('m-shift')">✕</span></div>
+    <div class="modal-head"><span class="mt" id="shiftTitle">調整班別</span><span class="x" onclick="closeModal('m-shift')">✕</span></div>
     <div class="modal-body">
-      <div class="field"><label>開始時間</label><input id="f-start" type="time"></div>
-      <div class="field"><label>結束時間（若跨夜，結束時間可小於開始時間）</label><input id="f-end" type="time"></div>
+      <div class="field"><label>上班開始時間</label><input id="f-work-start" type="time"></div>
+      <div class="field"><label>上班結束時間（若跨夜，結束時間可小於開始時間）</label><input id="f-work-end" type="time"></div>
+      <div class="field"><label>通報開始時間</label><input id="f-start" type="time"></div>
+      <div class="field"><label>通報結束時間（若跨夜，結束時間可小於開始時間）</label><input id="f-end" type="time"></div>
       <div class="field"><label>當班巡檢人員（可複選）</label><select id="f-users" multiple size="6"></select></div>
       <div class="msg" id="shiftMsg"></div>
       <button class="btn-primary" onclick="saveShift()">儲存</button>
@@ -152,8 +154,10 @@ tr:last-child td{border-bottom:none}
     <div class="modal-head"><span class="mt" id="tplTitle">新增範本班別</span><span class="x" onclick="closeModal('m-tpl')">✕</span></div>
     <div class="modal-body">
       <div class="field"><label>班別名稱</label><input id="tf-name" placeholder="例：早班"></div>
-      <div class="field"><label>開始時間</label><input id="tf-start" type="time"></div>
-      <div class="field"><label>結束時間（若跨夜，結束時間可小於開始時間）</label><input id="tf-end" type="time"></div>
+      <div class="field"><label>上班開始時間</label><input id="tf-work-start" type="time"></div>
+      <div class="field"><label>上班結束時間（若跨夜，結束時間可小於開始時間）</label><input id="tf-work-end" type="time"></div>
+      <div class="field"><label>通報開始時間</label><input id="tf-start" type="time"></div>
+      <div class="field"><label>通報結束時間（若跨夜，結束時間可小於開始時間）</label><input id="tf-end" type="time"></div>
       <div class="field"><label>預設巡檢人員（可複選）</label><select id="tf-users" multiple size="6"></select></div>
       <div class="msg" id="tplMsg"></div>
       <button class="btn-primary" onclick="saveTpl()">儲存</button>
@@ -180,7 +184,7 @@ function translateError(msg){
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(m,err){const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2200);}
 function fmtHM(t){return String(t||'').slice(0,5);}
-let staffRows=[],deptNames={},staffAssignments={templates:{},dates:{}};
+let staffRows=[],deptNames={},staffAssignments={templates:{},dates:{},workTimes:{templates:{},dates:{}}};
 async function loadStaff(){
   const [u,d,setting]=await Promise.all([
     db.from('users').select('user_id,name,department,dept_id').eq('status','active').order('name'),
@@ -189,8 +193,9 @@ async function loadStaff(){
   ]);
   (d.data||[]).forEach(x=>deptNames[x.dept_id]=x.name);
   staffRows=(u.data||[]).filter(x=>String(x.department||deptNames[x.dept_id]||'').includes('駐衛'));
-  try{staffAssignments=JSON.parse(setting.data?.value||'null')||{templates:{},dates:{}};}catch(e){staffAssignments={templates:{},dates:{}};}
+  try{staffAssignments=JSON.parse(setting.data?.value||'null')||{templates:{},dates:{},workTimes:{templates:{},dates:{}}};}catch(e){staffAssignments={templates:{},dates:{},workTimes:{templates:{},dates:{}}};}
   staffAssignments.templates||={};staffAssignments.dates||={};
+  staffAssignments.workTimes||={};staffAssignments.workTimes.templates||={};staffAssignments.workTimes.dates||={};
 }
 function staffName(id){const u=staffRows.find(x=>x.user_id===id);return u?`${u.department||deptNames[u.dept_id]||'未設定單位'}｜${u.name}`:'未知人員';}
 function staffText(ids){return (ids||[]).length?(ids||[]).map(staffName).join('、'):'尚未指派';}
@@ -228,8 +233,13 @@ async function load(){
   shiftRows=tplRows.map(t=>{
     const ov=overrides.get(t.name);
     const dateStaff=staffAssignments.dates?.[dateStr]?.[t.name];
+    const tplWork=staffAssignments.workTimes.templates?.[t.name]||{};
+    const dateWork=staffAssignments.workTimes.dates?.[dateStr]?.[t.name]||{};
     return {name:t.name, start_time:ov?ov.start_time:t.start_time, end_time:ov?ov.end_time:t.end_time,
-      assigned_user_ids:dateStaff||staffAssignments.templates?.[t.name]||[],sort_order:t.sort_order, customized:!!ov};
+      work_start_time:dateWork.start||tplWork.start||t.start_time,
+      work_end_time:dateWork.end||tplWork.end||t.end_time,
+      assigned_user_ids:dateStaff||staffAssignments.templates?.[t.name]||[],sort_order:t.sort_order,
+      customized:!!ov||Boolean(staffAssignments.workTimes.dates?.[dateStr]?.[t.name])};
   });
   renderShifts();
 }
@@ -237,13 +247,14 @@ async function load(){
 function renderShifts(){
   const box=document.getElementById('shiftList');
   if(!shiftRows.length){box.innerHTML='<div class="empty">尚未設定範本班別，請先在下方「預設範本」新增。</div>';return;}
-  box.innerHTML=`<table><tr><th>班別</th><th>時段</th><th>當班部門／巡檢人員</th><th></th></tr>`+
+  box.innerHTML=`<table><tr><th>班別</th><th>上班時段</th><th>通報時段</th><th>當班部門／巡檢人員</th><th></th></tr>`+
     shiftRows.map(s=>`<tr>
       <td>${esc(s.name)}${s.customized?' <small style="color:var(--patrol)">（已調整）</small>':''}</td>
+      <td class='time'>${fmtHM(s.work_start_time)} – ${fmtHM(s.work_end_time)}</td>
       <td class="time">${fmtHM(s.start_time)} – ${fmtHM(s.end_time)}</td>
       <td class="staff-list">${esc(staffText(s.assigned_user_ids))}</td>
       <td><div class="acts">
-        <button class="mini" onclick="openShiftModal('${esc(s.name)}')">調整時段</button>
+        <button class="mini" onclick="openShiftModal('${esc(s.name)}')">調整班別</button>
       </div></td>
     </tr>`).join('')+`</table>`;
 }
@@ -257,9 +268,10 @@ async function loadTpl(){
 function renderTpl(){
   const box=document.getElementById('tplList');
   if(!tplRows.length){box.innerHTML='<div class="empty">尚無範本班別。</div>';return;}
-  box.innerHTML=`<table><tr><th>班別</th><th>時段</th><th>預設巡檢人員</th><th></th></tr>`+
+  box.innerHTML=`<table><tr><th>班別</th><th>上班時段</th><th>通報時段</th><th>預設巡檢人員</th><th></th></tr>`+
     tplRows.map(s=>`<tr>
       <td>${esc(s.name)}</td>
+      <td class='time'>${fmtHM(staffAssignments.workTimes.templates?.[s.name]?.start||s.start_time)} – ${fmtHM(staffAssignments.workTimes.templates?.[s.name]?.end||s.end_time)}</td>
       <td class="time">${fmtHM(s.start_time)} – ${fmtHM(s.end_time)}</td>
       <td class="staff-list">${esc(staffText(staffAssignments.templates?.[s.name]||[]))}</td>
       <td><div class="acts">
@@ -274,24 +286,29 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openShiftModal(name){
   editShiftName=name;
   const s=shiftRows.find(x=>x.name===name);if(!s)return;
-  document.getElementById('shiftTitle').textContent=name+'　調整時段';
+  document.getElementById('shiftTitle').textContent=name+'　調整班別';
   document.getElementById('shiftMsg').textContent='';
+  document.getElementById('f-work-start').value=fmtHM(s.work_start_time);
+  document.getElementById('f-work-end').value=fmtHM(s.work_end_time);
   document.getElementById('f-start').value=fmtHM(s.start_time);
   document.getElementById('f-end').value=fmtHM(s.end_time);
   fillStaffSelect('f-users',s.assigned_user_ids);
   document.getElementById('m-shift').classList.add('show');
 }
 async function saveShift(){
+  const workStart=document.getElementById('f-work-start').value;
+  const workEnd=document.getElementById('f-work-end').value;
   const start=document.getElementById('f-start').value;
   const end=document.getElementById('f-end').value;
   const msg=document.getElementById('shiftMsg');
-  if(!start||!end){msg.textContent='請完整填寫開始與結束時間';return;}
+  if(!workStart||!workEnd||!start||!end){msg.textContent='請完整填寫上班與通報時段';return;}
   const dateStr=document.getElementById('datePick').value;
   const s=shiftRows.find(x=>x.name===editShiftName);
   const payload={shift_date:dateStr,name:editShiftName,start_time:start,end_time:end,sort_order:s?s.sort_order:0};
   const {error}=await db.from('patrol_shifts').upsert(payload,{onConflict:'shift_date,name'});
   if(error){msg.textContent=translateError(error.message);return;}
   staffAssignments.dates[dateStr]||={};staffAssignments.dates[dateStr][editShiftName]=selectedStaff('f-users');
+  staffAssignments.workTimes.dates[dateStr]||={};staffAssignments.workTimes.dates[dateStr][editShiftName]={start:workStart,end:workEnd};
   const staffError=await saveStaffAssignments();if(staffError){msg.textContent=translateError(staffError.message);return;}
   closeModal('m-shift');toast('已更新');await load();
 }
@@ -302,12 +319,17 @@ function openTplModal(id){
   document.getElementById('tplMsg').textContent='';
   if(id){
     const s=tplRows.find(x=>x.template_id===id);
+    const work=staffAssignments.workTimes.templates?.[s.name]||{};
     document.getElementById('tf-name').value=s.name;
+    document.getElementById('tf-work-start').value=fmtHM(work.start||s.start_time);
+    document.getElementById('tf-work-end').value=fmtHM(work.end||s.end_time);
     document.getElementById('tf-start').value=fmtHM(s.start_time);
     document.getElementById('tf-end').value=fmtHM(s.end_time);
     fillStaffSelect('tf-users',staffAssignments.templates?.[s.name]||[]);
   }else{
     document.getElementById('tf-name').value='';
+    document.getElementById('tf-work-start').value='';
+    document.getElementById('tf-work-end').value='';
     document.getElementById('tf-start').value='';
     document.getElementById('tf-end').value='';
     fillStaffSelect('tf-users',[]);
@@ -316,10 +338,12 @@ function openTplModal(id){
 }
 async function saveTpl(){
   const name=document.getElementById('tf-name').value.trim();
+  const workStart=document.getElementById('tf-work-start').value;
+  const workEnd=document.getElementById('tf-work-end').value;
   const start=document.getElementById('tf-start').value;
   const end=document.getElementById('tf-end').value;
   const msg=document.getElementById('tplMsg');
-  if(!name||!start||!end){msg.textContent='請完整填寫班別名稱與時間';return;}
+  if(!name||!workStart||!workEnd||!start||!end){msg.textContent='請完整填寫班別名稱、上班時段與通報時段';return;}
   const sortOrder=editTplId?tplRows.find(x=>x.template_id===editTplId).sort_order:(tplRows.length?Math.max(...tplRows.map(s=>s.sort_order))+1:1);
   const payload={name,start_time:start,end_time:end,sort_order:sortOrder};
   let error;
@@ -327,6 +351,7 @@ async function saveTpl(){
   else{({error}=await db.from('patrol_shift_template').insert(payload));}
   if(error){msg.textContent=translateError(error.message);return;}
   staffAssignments.templates[name]=selectedStaff('tf-users');
+  staffAssignments.workTimes.templates[name]={start:workStart,end:workEnd};
   const staffError=await saveStaffAssignments();if(staffError){msg.textContent=translateError(staffError.message);return;}
   closeModal('m-tpl');toast(editTplId?'已更新':'已新增');await loadTpl();await load();
 }
