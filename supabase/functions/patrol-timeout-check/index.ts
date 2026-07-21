@@ -5,6 +5,7 @@ const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status
 type Rule={id:string;label:string;start:string;end:string;grace?:number;days?:number[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
 type Shift={name:string;start_time:string;end_time:string;sort_order?:number};
 const mins=(s:string)=>{const [h,m]=(s||"00:00").split(":").map(Number);return h*60+m;};
+const normalizeShiftName=(name:string)=>String(name||"").trim().replace(/\s*巡邏\s*$/u,"");
 const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",weekday:"short",hourCycle:"h23"}).formatToParts(d).forEach(x=>p[x.type]=x.value);return p;};
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
 const previousDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()-1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
@@ -29,12 +30,19 @@ Deno.serve(async req=>{
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
     const {data:templates,error:templateError}=await db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").order("sort_order");
     if(templateError)throw templateError;
-    const {data:shiftOverrides,error:shiftError}=await db.from("patrol_shifts").select("shift_date,name,start_time,end_time").in("shift_date",[yesterday,today]);
-    if(shiftError)throw shiftError;
-    const overrideMap=new Map((shiftOverrides||[]).map((x:{shift_date:string;name:string;start_time:string;end_time:string})=>[`${x.shift_date}|${x.name}`,x]));
     const rules:Rule[]=(templates||[]).map((shift:Shift)=>{
-      const configured=configuredRules.find(r=>r.label===shift.name||r.label.replace(/巡邏$/,'')===shift.name);
-      return {id:`shift:${shift.name}`,label:shift.name,start:shift.start_time.slice(0,5),end:shift.end_time.slice(0,5),grace:configured?.grace||0,enabled:configured?.enabled!==false,only_incomplete:configured?.only_incomplete!==false,include_points:configured?.include_points!==false};
+      const configured=configuredRules.find(r=>normalizeShiftName(r.label)===normalizeShiftName(shift.name));
+      return {
+        id:`shift:${shift.name}`,
+        label:shift.name,
+        start:(configured?.start||shift.start_time).slice(0,5),
+        end:(configured?.end||shift.end_time).slice(0,5),
+        grace:configured?.grace||0,
+        days:configured?.days,
+        enabled:configured?.enabled!==false,
+        only_incomplete:configured?.only_incomplete!==false,
+        include_points:configured?.include_points!==false,
+      };
     });
     const results=[];
     for(const rule of rules){
@@ -43,9 +51,8 @@ Deno.serve(async req=>{
       // 從今天與昨天找出「最近一個已超過通報結束時間」的班別。
       // 這能正確處理跨夜班，並避免 force/手動測試把尚未到期的未來班別提前送出。
       const candidates=[yesterday,today].map(shiftDate=>{
-        const override=overrideMap.get(`${shiftDate}|${rule.label}`);
-        const effectiveStart=(override?.start_time||rule.start).slice(0,5);
-        const effectiveEnd=(override?.end_time||rule.end).slice(0,5);
+        const effectiveStart=rule.start.slice(0,5);
+        const effectiveEnd=rule.end.slice(0,5);
         const overnight=mins(effectiveEnd)<=mins(effectiveStart);
         const endDay=overnight?nextDate(shiftDate):shiftDate;
         const notifyAt=new Date(new Date(iso(endDay,effectiveEnd)).getTime()+grace*60000);

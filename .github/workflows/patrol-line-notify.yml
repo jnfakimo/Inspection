@@ -1,0 +1,28 @@
+name: Patrol LINE timeout notification
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: patrol-line-timeout-notification
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger patrol timeout check
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$SUPABASE_ANON_KEY"
+          curl --fail-with-body --retry 2 --retry-all-errors \
+            --max-time 45 \
+            -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/patrol-timeout-check
