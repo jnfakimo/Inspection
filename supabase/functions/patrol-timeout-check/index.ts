@@ -10,6 +10,47 @@ const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFo
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
 const previousDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()-1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
 const nextDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()+1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
+const base64url=(input:Uint8Array|string)=>{
+  const bytes=typeof input==="string"?new TextEncoder().encode(input):input;
+  let binary="";bytes.forEach(byte=>binary+=String.fromCharCode(byte));
+  return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+};
+let cachedGoogleToken:{value:string;expiresAt:number}|null=null;
+async function googleAccessToken(){
+  if(cachedGoogleToken&&cachedGoogleToken.expiresAt>Date.now()+60000)return cachedGoogleToken.value;
+  const encoded=Deno.env.get("FIREBASE_SERVICE_ACCOUNT_B64");
+  if(!encoded)throw new Error("FCM 服務帳戶尚未設定");
+  const service=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))));
+  const now=Math.floor(Date.now()/1000);
+  const header=base64url(JSON.stringify({alg:"RS256",typ:"JWT"}));
+  const claims=base64url(JSON.stringify({iss:service.client_email,scope:"https://www.googleapis.com/auth/firebase.messaging",aud:"https://oauth2.googleapis.com/token",iat:now,exp:now+3600}));
+  const signingInput=`${header}.${claims}`;
+  const pem=String(service.private_key).replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g,"");
+  const keyBytes=Uint8Array.from(atob(pem),c=>c.charCodeAt(0));
+  const key=await crypto.subtle.importKey("pkcs8",keyBytes,{name:"RSASSA-PKCS1-v1_5",hash:"SHA-256"},false,["sign"]);
+  const signature=new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5",key,new TextEncoder().encode(signingInput)));
+  const assertion=`${signingInput}.${base64url(signature)}`;
+  const tokenRes=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"urn:ietf:params:oauth:grant-type:jwt-bearer",assertion})});
+  const tokenBody=await tokenRes.json();
+  if(!tokenRes.ok||!tokenBody.access_token)throw new Error(`FCM OAuth 失敗：${tokenBody.error_description||tokenBody.error||tokenRes.status}`);
+  cachedGoogleToken={value:tokenBody.access_token,expiresAt:Date.now()+(Number(tokenBody.expires_in)||3600)*1000};
+  return cachedGoogleToken.value;
+}
+async function sendFcm(db:ReturnType<typeof createClient>,title:string,body:string,tag:string){
+  const {data:subscriptions,error}=await db.from("fcm_subscriptions").select("subscription_id,token").eq("enabled",true);
+  if(error)throw error;
+  if(!subscriptions?.length)return {status:"skipped",success:0,failure:0,response:"尚無已啟用的 FCM 裝置"};
+  const accessToken=await googleAccessToken(),projectId=Deno.env.get("FIREBASE_PROJECT_ID")||"jnfa-4064f";
+  let success=0,failure=0;const errors:string[]=[];
+  await Promise.all(subscriptions.map(async sub=>{
+    const res=await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,{method:"POST",headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":"application/json"},body:JSON.stringify({message:{token:sub.token,data:{title,body,tag,url:"./guardpatrol.html"},webpush:{headers:{Urgency:"high"},fcm_options:{link:"https://jnfakimo.github.io/word-cloud/system/guardpatrol.html"}}}})});
+    const response=await res.text();
+    if(res.ok){success++;return;}
+    failure++;errors.push(response.slice(0,300));
+    if(res.status===404||/UNREGISTERED|registration-token-not-registered/i.test(response))await db.from("fcm_subscriptions").update({enabled:false,updated_at:new Date().toISOString()}).eq("subscription_id",sub.subscription_id);
+  }));
+  return {status:success?"sent":"failed",success,failure,response:errors.length?errors.join("\n"):"發送成功"};
+}
 
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
@@ -19,9 +60,12 @@ Deno.serve(async req=>{
     const {data:rows,error:settingsError}=await db.from("system_settings").select("key,value");
     if(settingsError)throw settingsError;
     const s:Record<string,string>={};(rows||[]).forEach((r:{key:string;value:string})=>s[r.key]=r.value);
-    if(s.line_notify_patrol_timeout!=="true"&&!body.force)return reply({ok:true,msg:"disabled"});
+    if(body.verifyFcmAuth===true){await googleAccessToken();return reply({ok:true,msg:"FCM OAuth 驗證成功"});}
+    const lineEnabled=s.line_notify_patrol_timeout==="true";
+    const fcmEnabled=s.fcm_notify_patrol_timeout==="true";
+    if(!lineEnabled&&!fcmEnabled&&!body.force)return reply({ok:true,msg:"disabled"});
     const token=s.line_channel_token,groupId=s.line_group_id;
-    if(!token||!groupId)return reply({ok:false,msg:"LINE 尚未設定"},400);
+    if(lineEnabled&&(!token||!groupId))return reply({ok:false,msg:"LINE 尚未設定"},400);
     let configuredRules:Rule[]=[];try{configuredRules=JSON.parse(s.patrol_timeout_rules||"[]");}catch(_e){}
     let staffAssignments:{templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>}={templates:{},dates:{}};
     try{staffAssignments=JSON.parse(s.patrol_shift_staff||"{}");staffAssignments.templates||={};staffAssignments.dates||={};}catch(_e){}
@@ -90,11 +134,20 @@ Deno.serve(async req=>{
       if(body.dryRun){results.push({rule:rule.id,shift:rule.label,shiftDate,start:effectiveStart,end:effectiveEnd,expected,checked,unchecked:unchecked.length,dryRun:true});continue;}
       const record={rule_id:rule.id,shift_date:shiftDate,shift_name:rule.label,scheduled_end:endIso,expected_count:expected,checked_count:checked,unchecked_count:unchecked.length,assigned_departments:assignedDepartments,assigned_names:assignedNames,actual_names:actual,status:"pending"};
       await db.from("patrol_timeout_notifications").upsert(record,{onConflict:"rule_id,shift_date"});
-      if(rule.only_incomplete!==false&&unchecked.length===0){await db.from("patrol_timeout_notifications").update({status:"skipped",line_response:"全部完成"}).eq("rule_id",rule.id).eq("shift_date",shiftDate);results.push({rule:rule.id,msg:"complete"});continue;}
-      const lineRes=await fetch("https://api.line.me/v2/bot/message/push",{method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},body:JSON.stringify({to:groupId,messages:[{type:"text",text}]})});
-      const responseText=await lineRes.text();
-      await db.from("patrol_timeout_notifications").update({status:lineRes.ok?"sent":"failed",line_response:responseText,sent_at:lineRes.ok?new Date().toISOString():null}).eq("rule_id",rule.id).eq("shift_date",shiftDate);
-      results.push({rule:rule.id,ok:lineRes.ok,expected,checked,unchecked:unchecked.length});
+      if(rule.only_incomplete!==false&&unchecked.length===0){await db.from("patrol_timeout_notifications").update({status:"skipped",line_response:"全部完成",fcm_status:"skipped",fcm_response:"全部完成"}).eq("rule_id",rule.id).eq("shift_date",shiftDate);results.push({rule:rule.id,msg:"complete"});continue;}
+      let lineResult={status:"skipped",ok:false,response:"LINE 未啟用"};
+      if(lineEnabled){
+        const lineRes=await fetch("https://api.line.me/v2/bot/message/push",{method:"POST",headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({to:groupId,messages:[{type:"text",text}]})});
+        lineResult={status:lineRes.ok?"sent":"failed",ok:lineRes.ok,response:await lineRes.text()};
+      }
+      let fcmResult={status:"skipped",success:0,failure:0,response:"FCM 未啟用"};
+      if(fcmEnabled){
+        const fcmBody=`${shiftDate} ${rule.label}｜未打卡 ${unchecked.length} 點｜完成率 ${rate}%`;
+        try{fcmResult=await sendFcm(db,"駐衛警巡檢逾時通知",fcmBody,`${rule.id}:${shiftDate}`);}catch(e){fcmResult={status:"failed",success:0,failure:1,response:e instanceof Error?e.message:String(e)};}
+      }
+      const anySent=lineResult.ok||fcmResult.success>0;
+      await db.from("patrol_timeout_notifications").update({status:lineResult.status,line_response:lineResult.response,fcm_status:fcmResult.status,fcm_success_count:fcmResult.success,fcm_failure_count:fcmResult.failure,fcm_response:fcmResult.response,sent_at:anySent?new Date().toISOString():null}).eq("rule_id",rule.id).eq("shift_date",shiftDate);
+      results.push({rule:rule.id,line:lineResult.status,fcm:fcmResult.status,fcmSuccess:fcmResult.success,expected,checked,unchecked:unchecked.length});
     }
     return reply({ok:true,weekday,ruleCount:rules.length,dryRun:body.dryRun===true,results});
   }catch(e){

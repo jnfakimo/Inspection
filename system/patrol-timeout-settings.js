@@ -24,6 +24,13 @@
     const host=document.getElementById('patrol-timeout-settings');if(!host)return;
     host.innerHTML=`<style>.patrol-timeout-settings,.patrol-timeout-settings input,.patrol-timeout-settings select,.patrol-timeout-settings button{font-family:'Noto Sans TC',system-ui,sans-serif}.patrol-timeout-title,.patrol-timeout-summary{font-size:.85rem;font-weight:400;line-height:1.5}.patrol-timeout-grid{display:grid;grid-template-columns:2fr 1fr 1fr 90px;gap:8px;padding-top:10px}.patrol-push-table{border:1px solid rgba(180,138,255,.25);border-radius:4px;overflow:hidden}.patrol-push-head,.patrol-push-row{display:grid;grid-template-columns:1.2fr 1fr 1.5fr 70px;gap:12px;padding:10px 12px;align-items:center;font-size:.78rem}.patrol-push-head{background:rgba(180,138,255,.1);color:var(--text-dim);font-weight:600}.patrol-push-row{border-top:1px solid rgba(180,138,255,.16);color:var(--text-hi)}.patrol-push-row strong{color:var(--cyan);font-weight:600}@media(max-width:720px){.patrol-timeout-grid{grid-template-columns:1fr 1fr}.patrol-timeout-grid input:first-child{grid-column:1/-1}.patrol-push-head{display:none}.patrol-push-row{grid-template-columns:1fr 1fr}.patrol-push-row strong{grid-column:1/-1}}</style><div class="patrol-timeout-settings" style="border-top:1px solid rgba(180,138,255,.25);padding-top:16px">
       <label style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span class="patrol-timeout-title" style="display:inline-flex;align-items:center;gap:6px;color:var(--text-hi)"><img src="../assets/system-icons/guardpatrol-icon.png" alt="" style="width:18px;height:18px;object-fit:contain">駐衛警巡檢逾時通知</span><label class="line-toggle"><input type="checkbox" id="line-notify-patrol-timeout" ${sysSettings.line_notify_patrol_timeout==='true'?'checked':''}><span class="line-toggle-slider"></span></label></label>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px;border:1px solid rgba(0,212,255,.24);background:rgba(0,212,255,.035);border-radius:4px">
+        <span style="font-size:.82rem;color:var(--text-hi);font-weight:600">Google Firebase Cloud Messaging</span>
+        <label class="line-toggle" title="通報時間到時同步發送 FCM"><input type="checkbox" id="fcm-notify-patrol-timeout" ${sysSettings.fcm_notify_patrol_timeout==='true'?'checked':''}><span class="line-toggle-slider"></span></label>
+        <span id="fcmDeviceStatus" style="font-size:.75rem;color:var(--text-dim)">檢查裝置中…</span>
+        <button type="button" class="btn btn-sm" id="enableFcmDevice" style="margin-left:auto">啟用此裝置推播</button>
+        <button type="button" class="btn btn-sm" id="disableFcmDevice">停用此裝置</button>
+      </div>
       <div id="patrolTimeoutRules">${rules.map((r,i)=>ruleHtml(r,i)).join('')||'<div style="color:var(--text-dim);font-size:.8rem">尚未設定巡邏時段</div>'}</div>
       <div style="margin:14px 0 8px;font-size:.82rem;color:var(--text-hi);font-weight:600">LINE 自動推播時間表</div>
       <div id="patrolPushSchedule">${scheduleHtml()}</div>
@@ -32,7 +39,10 @@
     </div>`;
     host.querySelector('#addPatrolTimeoutRule').onclick=()=>{rules.push(defaultRule());render();};
     host.querySelector('#testPatrolTimeout').onclick=testNow;
+    host.querySelector('#enableFcmDevice').onclick=enableFcmDevice;
+    host.querySelector('#disableFcmDevice').onclick=disableFcmDevice;
     host.querySelectorAll('[data-rule]').forEach(el=>bindRule(el,Number(el.dataset.rule)));
+    refreshFcmStatus();
   }
   function ruleHtml(r,i){
     return `<details data-rule="${i}" ${r._open?'open':''} style="margin-bottom:10px;border:1px solid rgba(180,138,255,.25);border-radius:4px;background:rgba(180,138,255,.04)">
@@ -59,11 +69,26 @@
   }
   async function save(){
     const enabled=document.getElementById('line-notify-patrol-timeout')?.checked||false;
+    const fcmEnabled=document.getElementById('fcm-notify-patrol-timeout')?.checked||false;
     if(rules.some(r=>!r.label||!r.start||!r.end)){showToast('請完整填寫巡邏時段',true);return false;}
     const cleanRules=rules.map(({_open,...r})=>r);
-    const rows=[{key:'line_notify_patrol_timeout',value:String(enabled)},{key:'patrol_timeout_rules',value:JSON.stringify(cleanRules)}];
+    const rows=[{key:'line_notify_patrol_timeout',value:String(enabled)},{key:'fcm_notify_patrol_timeout',value:String(fcmEnabled)},{key:'patrol_timeout_rules',value:JSON.stringify(cleanRules)}];
     const {error}=await db.from('system_settings').upsert(rows,{onConflict:'key'});if(error){showToast('巡檢逾時設定儲存失敗：'+error.message,true);return false;}
-    sysSettings.line_notify_patrol_timeout=String(enabled);sysSettings.patrol_timeout_rules=JSON.stringify(cleanRules);return true;
+    sysSettings.line_notify_patrol_timeout=String(enabled);sysSettings.fcm_notify_patrol_timeout=String(fcmEnabled);sysSettings.patrol_timeout_rules=JSON.stringify(cleanRules);return true;
+  }
+  async function refreshFcmStatus(){
+    const el=document.getElementById('fcmDeviceStatus');if(!el)return;
+    if(!window.PatrolFCM){el.textContent='FCM 程式尚未載入';return;}
+    try{const s=await PatrolFCM.status();el.textContent=!s.supported?'此瀏覽器不支援推播':s.permission==='denied'?`通知已封鎖｜已登記 ${s.count} 台`:`通知權限：${s.permission==='granted'?'已允許':'尚未允許'}｜已登記 ${s.count} 台`;}
+    catch(e){el.textContent='狀態讀取失敗：'+e.message;}
+  }
+  async function enableFcmDevice(){
+    try{showToast('正在啟用此裝置推播…');await PatrolFCM.subscribe();showToast('此裝置已啟用 Firebase 推播');await refreshFcmStatus();}
+    catch(e){showToast('FCM 啟用失敗：'+e.message,true);}
+  }
+  async function disableFcmDevice(){
+    try{await PatrolFCM.unsubscribe();showToast('此裝置的 Firebase 推播已停用');await refreshFcmStatus();}
+    catch(e){showToast('FCM 停用失敗：'+e.message,true);}
   }
   async function testNow(){
     if(!await save())return;showToast('正在執行巡檢統計測試…');
