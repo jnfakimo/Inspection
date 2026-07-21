@@ -29,9 +29,13 @@
     return session.user;
   }
   async function subscribe(){
-    const user=await currentUser(),registration=await init();
+    if(!('serviceWorker' in navigator)||!('Notification' in window))throw new Error('此瀏覽器不支援網頁推播');
+    if(Notification.permission==='denied')throw new Error('瀏覽器已封鎖通知，請先在網址列左側的網站權限中允許「通知」');
+    // Permission must be requested immediately from the button click. Awaiting
+    // authentication or SDK loading first can consume the browser user gesture.
     const permission=await Notification.requestPermission();
-    if(permission!=='granted')throw new Error('您尚未允許瀏覽器通知');
+    if(permission!=='granted')throw new Error('尚未啟用通知，請在瀏覽器提示中選擇「允許」');
+    const [user,registration]=await Promise.all([currentUser(),init()]);
     const token=await messaging.getToken({vapidKey,serviceWorkerRegistration:registration});
     if(!token)throw new Error('無法取得此裝置的推播識別碼');
     const deviceName=[navigator.platform,navigator.userAgent.includes('Edg/')?'Edge':navigator.userAgent.includes('Chrome/')?'Chrome':navigator.userAgent.includes('Safari/')?'Safari':'瀏覽器'].filter(Boolean).join(' / ');
