@@ -11,7 +11,7 @@
 <title>駐衛警巡檢系統 — 臺北農產公司巡檢系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-<script src="patrolstatus.js?v=20260720-late-checkin1"></script>
+<script src="patrolstatus.js?v=20260721-rolling-checkin1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--patrol:#c77dff;--green:#00ff9d;--red:#ff5470;
@@ -456,7 +456,7 @@ async function showDetail(shiftId,markerId){
 
   const {data,error}=await db.from('checkin_logs').select('user_name,checkin_at')
     .eq('target_type','marker').eq('target_id',markerId)
-    .gte('checkin_at',shift.range.start.toISOString()).lte('checkin_at',shift.range.end.toISOString())
+    .gte('checkin_at',shift.checkinRange.start.toISOString()).lte('checkin_at',shift.checkinRange.end.toISOString())
     .order('checkin_at',{ascending:false});
   if(error){document.getElementById('dtBody').innerHTML='讀取失敗：'+esc(translateError(error.message));return;}
   if(!data||!data.length){
@@ -477,9 +477,19 @@ async function init(){
   const {data:{session}}=await db.auth.getSession();
   if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol.html');return;}
   await load();
+  let refreshTimer=null;
+  db.channel('guardpatrol-live-checkins')
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'checkin_logs'},payload=>{
+      if(payload.new&&payload.new.target_type!=='marker')return;
+      clearTimeout(refreshTimer);
+      refreshTimer=setTimeout(()=>{
+        if(document.visibilityState==='visible')load();
+      },500);
+    })
+    .subscribe();
   setInterval(()=>{
     if(document.visibilityState==='visible')load();
-  },30000);
+  },15000);
 }
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible')load();

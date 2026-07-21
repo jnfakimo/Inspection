@@ -37,7 +37,10 @@ window.PatrolStatus = (function () {
     const notice = notificationRange(shift, dayBase);
     const work = shiftRange(shift, dayBase);
     return {
-      start: notice.start,
+      // A patrol completed before the notification window opens is still a
+      // valid duty-shift check-in. Late check-ins remain valid until the later
+      // of the duty end and notification end.
+      start: work.start < notice.start ? work.start : notice.start,
       end: work.end > notice.end ? work.end : notice.end,
     };
   }
