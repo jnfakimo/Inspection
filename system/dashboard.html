@@ -60,13 +60,13 @@ a{color:inherit;text-decoration:none}
 .ipcam-note{font-size:.68rem;color:var(--text-dim)}
 .ipcam-reload{font-size:.72rem;color:var(--cyan);border:1px solid var(--border-hi);padding:6px 12px;border-radius:4px;background:rgba(0,212,255,.06);cursor:pointer}
 .ipcam-reload:hover{border-color:var(--cyan);background:rgba(0,212,255,.12)}
-.ipcam-frame-wrap{position:relative;background:#000;min-height:294px;height:38vh}
+.ipcam-frame-wrap{position:relative;background:transparent;min-height:0;height:auto;display:flex;align-items:center;justify-content:center;padding:0;overflow:visible}
 .ipcam-image{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
-.ipcam-video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+.ipcam-video{display:block;width:auto;height:38vh;max-width:100%;aspect-ratio:4/3;border:0;background:#000;object-fit:contain}
 .ipcam-status{font-size:.68rem;color:var(--text-dim)}
 .ipcam-status.ok{color:var(--green)}
 .ipcam-status.err{color:var(--red)}
-.ipcam-error{position:absolute;inset:auto 18px 18px 18px;padding:12px 14px;border:1px solid rgba(255,68,85,.45);border-radius:4px;background:rgba(8,18,32,.92);color:var(--text);font-size:.78rem;line-height:1.6}
+.ipcam-error{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(92%,560px);padding:10px 12px;border:1px solid rgba(255,68,85,.45);border-radius:4px;background:rgba(8,18,32,.92);color:var(--text);font-size:.78rem;line-height:1.6}
 
 /* ── alert bar ── */
 .alert-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
@@ -153,7 +153,7 @@ a{color:inherit;text-decoration:none}
   .wrap{padding:12px 10px 28px}.dashboard-head h1{font-size:1.35rem}.dashboard-head p{font-size:.72rem}
   .toolbar{align-items:stretch;padding:10px}.toolbar-group,.toolbar-range{width:100%}.toolbar-range input{flex:1;min-width:0}
   .qbtn{flex:1}.toolbar-label{width:100%}
-.ipcam-head{align-items:flex-start;flex-direction:column}.ipcam-frame-wrap{height:252px;min-height:210px}.ipcam-actions{width:100%}.ipcam-reload{width:100%;text-align:center}
+.ipcam-head{align-items:flex-start;flex-direction:column}.ipcam-video{height:252px}.ipcam-actions{width:100%}.ipcam-reload{width:100%;text-align:center}
   .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ks{min-height:78px;padding:11px}.ks .ks-icon{display:none}.ks .ks-n{font-size:1.45rem}
   .section-title{margin-top:16px}.dash-main,.rank-grid{gap:10px}.rank-grid{grid-template-columns:1fr}
   .pcard,.ccard,.rcard,.tcard{padding:13px}.ps{gap:6px}.pc{padding:8px 6px}.pc .n{font-size:1.35rem}
@@ -287,13 +287,26 @@ function reloadIpcam(){
     ipcamHls.loadSource(IPCAM_HLS_URL+'?ts='+Date.now());
     ipcamHls.attachMedia(video);
     ipcamHls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
-    ipcamHls.on(Hls.Events.ERROR,(_event,data)=>{if(data?.fatal)markIpcamError();});
+    ipcamHls.on(Hls.Events.ERROR,(_event,data)=>{
+      if(!data?.fatal)return;
+      if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
+        ipcamHls.startLoad();
+        return;
+      }
+      if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
+        ipcamHls.recoverMediaError();
+        return;
+      }
+      markIpcamError();
+    });
   }else{
     markIpcamError();
     return;
   }
+  video.onloadeddata=()=>markIpcamLoaded();
   video.onplaying=()=>markIpcamLoaded();
-  video.onerror=()=>markIpcamError();
+  video.onerror=()=>{if(video.readyState===0)markIpcamError();};
+  video.onstalled=()=>{if(video.readyState===0)markIpcamError();};
   video.play().catch(()=>{});
 }
 
