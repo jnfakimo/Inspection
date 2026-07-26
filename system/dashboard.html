@@ -61,6 +61,10 @@ a{color:inherit;text-decoration:none}
 .ipcam-reload:hover{border-color:var(--cyan);background:rgba(0,212,255,.12)}
 .ipcam-frame-wrap{position:relative;background:#000;min-height:420px;height:54vh}
 .ipcam-image{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+.ipcam-status{font-size:.68rem;color:var(--text-dim)}
+.ipcam-status.ok{color:var(--green)}
+.ipcam-status.err{color:var(--red)}
+.ipcam-error{position:absolute;inset:auto 18px 18px 18px;padding:12px 14px;border:1px solid rgba(255,68,85,.45);border-radius:4px;background:rgba(8,18,32,.92);color:var(--text);font-size:.78rem;line-height:1.6}
 
 /* ── alert bar ── */
 .alert-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
@@ -189,12 +193,14 @@ a{color:inherit;text-decoration:none}
     <div class="ipcam-head">
       <div class="ipcam-title">即時影像</div>
       <div class="ipcam-actions">
-        <span class="ipcam-note">直接抓取 IPCAM JPEG 影像，每秒自動更新</span>
+        <span class="ipcam-note">透過 HTTPS 代理抓取 IPCAM JPEG 影像，每秒自動更新</span>
+        <span id="ipcamStatus" class="ipcam-status">連線中</span>
         <button class="ipcam-reload" type="button" onclick="reloadIpcam()">重新載入影像</button>
       </div>
     </div>
     <div class="ipcam-frame-wrap">
-      <img id="ipcamImage" class="ipcam-image" src="http://1.34.250.22:8085/ipcam/jpegcif" alt="IPCAM 即時影像">
+      <img id="ipcamImage" class="ipcam-image" alt="IPCAM 即時影像" onload="markIpcamLoaded()" onerror="markIpcamError()">
+      <div id="ipcamError" class="ipcam-error" hidden>影像尚未載入。若持續黑畫面，請確認 Supabase IPCAM 代理已部署，且 IPCAM 帳密 Secret 已設定。</div>
     </div>
   </div>
 
@@ -258,12 +264,31 @@ a{color:inherit;text-decoration:none}
 </div>
 
 <script>
+const IPCAM_PROXY_URL='https://qztffronusdhgxhjjubt.supabase.co/functions/v1/ipcam-proxy';
+
 function reloadIpcam(){
   const img=document.getElementById('ipcamImage');
   if(!img)return;
-  img.src='http://1.34.250.22:8085/ipcam/jpegcif?ts='+Date.now();
+  const status=document.getElementById('ipcamStatus');
+  if(status){status.textContent='更新中';status.className='ipcam-status';}
+  img.src=IPCAM_PROXY_URL+'?ts='+Date.now();
 }
 
+function markIpcamLoaded(){
+  const status=document.getElementById('ipcamStatus');
+  const error=document.getElementById('ipcamError');
+  if(status){status.textContent='已連線';status.className='ipcam-status ok';}
+  if(error)error.hidden=true;
+}
+
+function markIpcamError(){
+  const status=document.getElementById('ipcamStatus');
+  const error=document.getElementById('ipcamError');
+  if(status){status.textContent='連線失敗';status.className='ipcam-status err';}
+  if(error)error.hidden=false;
+}
+
+reloadIpcam();
 setInterval(reloadIpcam,1000);
 
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';

@@ -1,0 +1,4 @@
+project_id = "qztffronusdhgxhjjubt"
+
+[functions.ipcam-proxy]
+verify_jwt = false
