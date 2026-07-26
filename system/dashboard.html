@@ -195,14 +195,14 @@ a{color:inherit;text-decoration:none}
     <div class="ipcam-head">
       <div class="ipcam-title">即時影像</div>
       <div class="ipcam-actions">
-        <span class="ipcam-note">RTSP 來源轉為本機 HLS 播放</span>
+        <span class="ipcam-note">RTSP 來源轉為 HLS 播放，手機自動使用 HTTPS tunnel</span>
         <span id="ipcamStatus" class="ipcam-status">連線中</span>
         <button class="ipcam-reload" type="button" onclick="reloadIpcam()">重新連線</button>
       </div>
     </div>
     <div class="ipcam-frame-wrap">
       <video id="ipcamVideo" class="ipcam-video" muted autoplay playsinline controls></video>
-      <div id="ipcamError" class="ipcam-error" hidden>影像尚未載入。請先在本機啟動 RTSP 轉 HLS 腳本，再按重新連線。</div>
+      <div id="ipcamError" class="ipcam-error" hidden>影像尚未載入。請確認 RTSP 轉 HLS 與手機 HTTPS tunnel 已啟動，再按重新連線。</div>
     </div>
   </div>
 
@@ -266,8 +266,22 @@ a{color:inherit;text-decoration:none}
 </div>
 
 <script>
-const IPCAM_HLS_URL='http://127.0.0.1:8091/ipcam/index.m3u8';
+const IPCAM_LOCAL_HLS_URL='http://127.0.0.1:8091/ipcam/index.m3u8';
+const IPCAM_TUNNEL_HLS_URL='https://affairs-pts-occur-notre.trycloudflare.com/ipcam/index.m3u8';
 let ipcamHls=null;
+
+function getIpcamHlsUrl(){
+  const params=new URLSearchParams(location.search);
+  const queryHls=params.get('hls');
+  if(queryHls){
+    localStorage.setItem('ipcamHlsUrl',queryHls);
+    return queryHls;
+  }
+  const saved=localStorage.getItem('ipcamHlsUrl');
+  if(saved)return saved;
+  const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  return mobile?IPCAM_TUNNEL_HLS_URL:IPCAM_LOCAL_HLS_URL;
+}
 
 function reloadIpcam(){
   const video=document.getElementById('ipcamVideo');
@@ -281,10 +295,10 @@ function reloadIpcam(){
   video.removeAttribute('src');
   video.load();
   if(video.canPlayType('application/vnd.apple.mpegurl')){
-    video.src=IPCAM_HLS_URL+'?ts='+Date.now();
+    video.src=getIpcamHlsUrl()+'?ts='+Date.now();
   }else if(window.Hls&&Hls.isSupported()){
     ipcamHls=new Hls({liveSyncDurationCount:2,liveMaxLatencyDurationCount:4});
-    ipcamHls.loadSource(IPCAM_HLS_URL+'?ts='+Date.now());
+    ipcamHls.loadSource(getIpcamHlsUrl()+'?ts='+Date.now());
     ipcamHls.attachMedia(video);
     ipcamHls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
     ipcamHls.on(Hls.Events.ERROR,(_event,data)=>{
