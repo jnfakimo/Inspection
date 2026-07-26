@@ -321,13 +321,13 @@ function reloadIpcam(){
     video.src=getIpcamHlsUrl()+'?ts='+Date.now();
   }else if(window.Hls&&Hls.isSupported()){
     ipcamHls=new Hls({
-      lowLatencyMode:true,
-      liveSyncDurationCount:1,
-      liveMaxLatencyDurationCount:3,
-      maxLiveSyncPlaybackRate:1.25,
-      backBufferLength:15,
-      maxBufferLength:8,
-      maxMaxBufferLength:12
+      lowLatencyMode:false,
+      liveSyncDurationCount:3,
+      liveMaxLatencyDurationCount:8,
+      maxLiveSyncPlaybackRate:1.1,
+      backBufferLength:20,
+      maxBufferLength:16,
+      maxMaxBufferLength:24
     });
     ipcamHls.loadSource(getIpcamHlsUrl()+'?ts='+Date.now());
     ipcamHls.attachMedia(video);
@@ -358,14 +358,14 @@ function reloadIpcam(){
   video.onstalled=()=>keepIpcamLive();
   video.onwaiting=()=>keepIpcamLive();
   video.play().catch(()=>{});
-  ipcamWatchTimer=setInterval(keepIpcamLive,3000);
+  ipcamWatchTimer=setInterval(keepIpcamLive,5000);
   scheduleIpcamRetry(6000);
 }
 
 function seekIpcamToLiveEdge(video){
   if(!video?.seekable?.length)return;
   const liveEdge=video.seekable.end(video.seekable.length-1);
-  const target=Math.max(video.seekable.start(video.seekable.length-1),liveEdge-1);
+  const target=Math.max(video.seekable.start(video.seekable.length-1),liveEdge-4);
   if(Number.isFinite(target)&&Math.abs(video.currentTime-target)>2){
     video.currentTime=target;
   }
@@ -382,14 +382,14 @@ function keepIpcamLive(){
   }
   if(video.seekable?.length){
     const liveEdge=video.seekable.end(video.seekable.length-1);
-    if(Number.isFinite(liveEdge)&&liveEdge-video.currentTime>4){
+    if(Number.isFinite(liveEdge)&&liveEdge-video.currentTime>10){
       seekIpcamToLiveEdge(video);
       video.play().catch(()=>{});
     }
   }
   if(video.readyState>=2&&Math.abs(video.currentTime-ipcamLastTime)<0.05){
     ipcamStillTicks++;
-    if(ipcamStillTicks>=3){
+    if(ipcamStillTicks>=4){
       seekIpcamToLiveEdge(video);
       video.play().catch(()=>{});
       ipcamStillTicks=0;

@@ -1,6 +1,9 @@
 param(
   [string]$RtspUrl = $env:IPCAM_RTSP_URL,
-  [int]$Port = 8091
+  [int]$Port = 8091,
+  [int]$Width = 480,
+  [int]$Fps = 10,
+  [string]$VideoBitrate = "450k"
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,6 +48,10 @@ function Clear-HlsOutput {
 }
 
 function New-FfmpegArgs {
+  $gop = [Math]::Max(1, $Fps * 2)
+  $maxRateNumber = [int]([regex]::Match($VideoBitrate, "\d+").Value)
+  $maxRate = "$([int]($maxRateNumber * 1.2))k"
+  $bufSize = "$([int]($maxRateNumber * 2))k"
   @(
     "-hide_banner",
     "-loglevel", "warning",
@@ -56,16 +63,21 @@ function New-FfmpegArgs {
     "-i", $RtspUrl,
     "-an",
     "-c:v", "libx264",
-    "-preset", "veryfast",
+    "-preset", "ultrafast",
     "-tune", "zerolatency",
+    "-profile:v", "baseline",
+    "-level", "3.0",
     "-pix_fmt", "yuv420p",
-    "-r", "15",
-    "-g", "30",
-    "-keyint_min", "30",
+    "-vf", "scale=${Width}:-2:flags=fast_bilinear,fps=${Fps}",
+    "-b:v", $VideoBitrate,
+    "-maxrate", $maxRate,
+    "-bufsize", $bufSize,
+    "-g", "$gop",
+    "-keyint_min", "$gop",
     "-sc_threshold", "0",
     "-f", "hls",
     "-hls_time", "2",
-    "-hls_list_size", "6",
+    "-hls_list_size", "8",
     "-hls_flags", "delete_segments+omit_endlist+program_date_time+independent_segments",
     "-hls_segment_filename", (Join-Path $out "seg_%05d.ts"),
     (Join-Path $out "index.m3u8")
