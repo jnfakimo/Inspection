@@ -14,9 +14,18 @@ if (-not $ffmpeg) {
   throw "ffmpeg was not found in PATH."
 }
 
-$python = Get-Command python -ErrorAction SilentlyContinue
+$python = Get-Command py -ErrorAction SilentlyContinue
 if (-not $python) {
-  throw "python was not found in PATH."
+  $python = Get-Command python -ErrorAction SilentlyContinue
+}
+if (-not $python -or $python.Source -match "\\WindowsApps\\|\\system32\\python(?:\\.exe)?$") {
+  $localPython = Get-ChildItem "$env:LOCALAPPDATA\Programs\Python" -Recurse -Filter python.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($localPython) {
+    $python = [PSCustomObject]@{ Source = $localPython.FullName }
+  }
+}
+if (-not $python) {
+  throw "python or py launcher was not found."
 }
 
 $root = Join-Path $env:TEMP "word-cloud-ipcam-hls"
@@ -28,6 +37,8 @@ $ffmpegArgs = @(
   "-hide_banner",
   "-loglevel", "warning",
   "-rtsp_transport", "tcp",
+  "-analyzeduration", "20000000",
+  "-probesize", "20000000",
   "-i", $RtspUrl,
   "-an",
   "-c:v", "copy",
@@ -45,11 +56,9 @@ Write-Host "Dashboard: https://jnfakimo.github.io/word-cloud/system/dashboard.ht
 
 $ffmpegProcess = Start-Process -FilePath $ffmpeg.Source -ArgumentList $ffmpegArgs -PassThru -WindowStyle Hidden
 try {
-  Push-Location $root
-  python -m http.server $Port --bind 127.0.0.1
+  & $python.Source (Join-Path $PSScriptRoot "cors-hls-server.py") --root $root --port $Port
 }
 finally {
-  Pop-Location
   if ($ffmpegProcess -and -not $ffmpegProcess.HasExited) {
     Stop-Process -Id $ffmpegProcess.Id -Force
   }
