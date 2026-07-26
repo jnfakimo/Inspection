@@ -12,6 +12,23 @@ function textResponse(message: string, status = 500) {
   });
 }
 
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+async function fetchWithTimeout(url: URL, init: RequestInit = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function parseDigestHeader(header: string) {
   const value = header.replace(/^Digest\s+/i, "");
   const parts: Record<string, string> = {};
@@ -59,14 +76,14 @@ function digestAuthorization(params: Record<string, string>, method: string, url
 }
 
 async function fetchIpcamFrame(targetUrl: URL, username: string, password: string) {
-  const first = await fetch(targetUrl, { headers: { "Cache-Control": "no-cache" } });
+  const first = await fetchWithTimeout(targetUrl, { headers: { "Cache-Control": "no-cache" } });
   if (first.status !== 401) return first;
 
   const challenge = first.headers.get("www-authenticate") || "";
   if (!/^Digest/i.test(challenge)) return first;
 
   const auth = digestAuthorization(parseDigestHeader(challenge), "GET", targetUrl, username, password);
-  return fetch(targetUrl, {
+  return fetchWithTimeout(targetUrl, {
     headers: {
       Authorization: auth,
       "Cache-Control": "no-cache",
@@ -80,6 +97,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const requestUrl = new URL(req.url);
+    if (requestUrl.searchParams.get("health") === "1") {
+      return jsonResponse({ ok: true, fn: "ipcam-proxy", time: new Date().toISOString() });
+    }
+
     const target = new URL(Deno.env.get("IPCAM_JPEG_URL") || "http://1.34.250.22:8085/ipcam/jpegcif");
     target.searchParams.set("ts", Date.now().toString());
 
