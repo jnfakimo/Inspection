@@ -269,18 +269,34 @@ a{color:inherit;text-decoration:none}
 const IPCAM_LOCAL_HLS_URL='http://127.0.0.1:8091/ipcam/index.m3u8';
 const IPCAM_TUNNEL_HLS_URL='https://affairs-pts-occur-notre.trycloudflare.com/ipcam/index.m3u8';
 let ipcamHls=null;
+let ipcamSourceIndex=0;
+let ipcamRetryTimer=null;
+let ipcamLoaded=false;
 
-function getIpcamHlsUrl(){
+function getIpcamSources(){
   const params=new URLSearchParams(location.search);
   const queryHls=params.get('hls');
   if(queryHls){
     localStorage.setItem('ipcamHlsUrl',queryHls);
-    return queryHls;
+    return [queryHls,IPCAM_TUNNEL_HLS_URL,IPCAM_LOCAL_HLS_URL];
   }
-  const saved=localStorage.getItem('ipcamHlsUrl');
-  if(saved)return saved;
   const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  return mobile?IPCAM_TUNNEL_HLS_URL:IPCAM_LOCAL_HLS_URL;
+  return mobile?[IPCAM_TUNNEL_HLS_URL,IPCAM_LOCAL_HLS_URL]:[IPCAM_LOCAL_HLS_URL,IPCAM_TUNNEL_HLS_URL];
+}
+
+function getIpcamHlsUrl(){
+  const sources=getIpcamSources();
+  return sources[ipcamSourceIndex%sources.length];
+}
+
+function scheduleIpcamRetry(delay=5000){
+  clearTimeout(ipcamRetryTimer);
+  ipcamRetryTimer=setTimeout(()=>{
+    if(!ipcamLoaded){
+      ipcamSourceIndex++;
+      reloadIpcam();
+    }
+  },delay);
 }
 
 function reloadIpcam(){
@@ -289,6 +305,7 @@ function reloadIpcam(){
   const error=document.getElementById('ipcamError');
   if(!video)return;
   if(ipcamHls){ipcamHls.destroy();ipcamHls=null;}
+  ipcamLoaded=false;
   if(status){status.textContent='connecting';status.className='ipcam-status';}
   if(error)error.hidden=true;
   video.pause();
@@ -306,6 +323,7 @@ function reloadIpcam(){
       if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
         markIpcamRecovering();
         ipcamHls.startLoad();
+        scheduleIpcamRetry(7000);
         return;
       }
       if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
@@ -325,9 +343,12 @@ function reloadIpcam(){
   video.onstalled=()=>markIpcamRecovering();
   video.onwaiting=()=>markIpcamRecovering();
   video.play().catch(()=>{});
+  scheduleIpcamRetry(6000);
 }
 
 function markIpcamLoaded(){
+  ipcamLoaded=true;
+  clearTimeout(ipcamRetryTimer);
   const status=document.getElementById('ipcamStatus');
   const error=document.getElementById('ipcamError');
   if(status){status.textContent='online';status.className='ipcam-status ok';}
@@ -335,10 +356,12 @@ function markIpcamLoaded(){
 }
 
 function markIpcamError(){
+  ipcamLoaded=false;
   const status=document.getElementById('ipcamStatus');
   const error=document.getElementById('ipcamError');
   if(status){status.textContent='offline';status.className='ipcam-status err';}
   if(error)error.hidden=false;
+  scheduleIpcamRetry(5000);
 }
 
 function markIpcamRecovering(){
