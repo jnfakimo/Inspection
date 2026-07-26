@@ -290,10 +290,12 @@ function reloadIpcam(){
     ipcamHls.on(Hls.Events.ERROR,(_event,data)=>{
       if(!data?.fatal)return;
       if(data.type===Hls.ErrorTypes.NETWORK_ERROR){
+        markIpcamRecovering();
         ipcamHls.startLoad();
         return;
       }
       if(data.type===Hls.ErrorTypes.MEDIA_ERROR){
+        markIpcamRecovering();
         ipcamHls.recoverMediaError();
         return;
       }
@@ -305,8 +307,9 @@ function reloadIpcam(){
   }
   video.onloadeddata=()=>markIpcamLoaded();
   video.onplaying=()=>markIpcamLoaded();
-  video.onerror=()=>{if(video.readyState===0)markIpcamError();};
-  video.onstalled=()=>{if(video.readyState===0)markIpcamError();};
+  video.onerror=()=>{if(video.readyState===0)markIpcamError();else markIpcamRecovering();};
+  video.onstalled=()=>markIpcamRecovering();
+  video.onwaiting=()=>markIpcamRecovering();
   video.play().catch(()=>{});
 }
 
@@ -322,6 +325,13 @@ function markIpcamError(){
   const error=document.getElementById('ipcamError');
   if(status){status.textContent='offline';status.className='ipcam-status err';}
   if(error)error.hidden=false;
+}
+
+function markIpcamRecovering(){
+  const status=document.getElementById('ipcamStatus');
+  const error=document.getElementById('ipcamError');
+  if(status){status.textContent='buffering';status.className='ipcam-status';}
+  if(error)error.hidden=true;
 }
 
 reloadIpcam();
