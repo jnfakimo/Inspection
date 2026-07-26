@@ -39,35 +39,88 @@ if (-not $python) {
 $root = Join-Path $env:TEMP "word-cloud-ipcam-hls"
 $out = Join-Path $root "ipcam"
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $out "*.m3u8"), (Join-Path $out "*.ts")
 
-$ffmpegArgs = @(
-  "-hide_banner",
-  "-loglevel", "warning",
-  "-rtsp_transport", "tcp",
-  "-analyzeduration", "20000000",
-  "-probesize", "20000000",
-  "-i", $RtspUrl,
-  "-an",
-  "-c:v", "copy",
-  "-f", "hls",
-  "-hls_time", "1",
-  "-hls_list_size", "6",
-  "-hls_flags", "delete_segments+append_list+omit_endlist",
-  "-hls_segment_filename", (Join-Path $out "seg_%05d.ts"),
-  (Join-Path $out "index.m3u8")
-)
+function Clear-HlsOutput {
+  Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $out "*.m3u8"), (Join-Path $out "*.ts")
+}
+
+function New-FfmpegArgs {
+  @(
+    "-hide_banner",
+    "-loglevel", "warning",
+    "-fflags", "+genpts",
+    "-use_wallclock_as_timestamps", "1",
+    "-rtsp_transport", "tcp",
+    "-analyzeduration", "20000000",
+    "-probesize", "20000000",
+    "-i", $RtspUrl,
+    "-an",
+    "-c:v", "libx264",
+    "-preset", "veryfast",
+    "-tune", "zerolatency",
+    "-pix_fmt", "yuv420p",
+    "-r", "15",
+    "-g", "30",
+    "-keyint_min", "30",
+    "-sc_threshold", "0",
+    "-f", "hls",
+    "-hls_time", "2",
+    "-hls_list_size", "6",
+    "-hls_flags", "delete_segments+append_list+omit_endlist+program_date_time",
+    "-hls_segment_filename", (Join-Path $out "seg_%05d.ts"),
+    (Join-Path $out "index.m3u8")
+  )
+}
+
+function Start-FfmpegBridge {
+  Clear-HlsOutput
+  Start-Process -FilePath $ffmpeg.Source -ArgumentList (New-FfmpegArgs) -PassThru -WindowStyle Hidden
+}
 
 Write-Host "Starting RTSP to HLS bridge..."
 Write-Host "HLS URL: http://127.0.0.1:$Port/ipcam/index.m3u8"
 Write-Host "Dashboard: https://jnfakimo.github.io/word-cloud/system/dashboard.html"
+Write-Host "The bridge will restart ffmpeg automatically if the stream stops updating."
 
-$ffmpegProcess = Start-Process -FilePath $ffmpeg.Source -ArgumentList $ffmpegArgs -PassThru -WindowStyle Hidden
+$serverArgs = @((Join-Path $PSScriptRoot "cors-hls-server.py"), "--root", $root, "--port", "$Port")
+$serverProcess = Start-Process -FilePath $python.Source -ArgumentList $serverArgs -PassThru -WindowStyle Hidden
+$ffmpegProcess = $null
 try {
-  & $python.Source (Join-Path $PSScriptRoot "cors-hls-server.py") --root $root --port $Port
+  while ($true) {
+    $ffmpegProcess = Start-FfmpegBridge
+    $startedAt = Get-Date
+    $playlist = Join-Path $out "index.m3u8"
+    Write-Host "ffmpeg started. PID: $($ffmpegProcess.Id)"
+
+    while (-not $ffmpegProcess.HasExited) {
+      Start-Sleep -Seconds 5
+
+      if (Test-Path $playlist) {
+        $ageSeconds = ((Get-Date) - (Get-Item $playlist).LastWriteTime).TotalSeconds
+        if ($ageSeconds -gt 25) {
+          Write-Warning "HLS playlist has not updated for $([int]$ageSeconds) seconds. Restarting ffmpeg..."
+          Stop-Process -Id $ffmpegProcess.Id -Force -ErrorAction SilentlyContinue
+          break
+        }
+      }
+      elseif (((Get-Date) - $startedAt).TotalSeconds -gt 45) {
+        Write-Warning "HLS playlist was not created after 45 seconds. Restarting ffmpeg..."
+        Stop-Process -Id $ffmpegProcess.Id -Force -ErrorAction SilentlyContinue
+        break
+      }
+    }
+
+    if ($ffmpegProcess.HasExited) {
+      Write-Warning "ffmpeg exited with code $($ffmpegProcess.ExitCode). Restarting in 3 seconds..."
+    }
+    Start-Sleep -Seconds 3
+  }
 }
 finally {
   if ($ffmpegProcess -and -not $ffmpegProcess.HasExited) {
     Stop-Process -Id $ffmpegProcess.Id -Force
+  }
+  if ($serverProcess -and -not $serverProcess.HasExited) {
+    Stop-Process -Id $serverProcess.Id -Force
   }
 }
