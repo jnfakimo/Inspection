@@ -5,8 +5,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-if (-not $RtspUrl) {
+while ([string]::IsNullOrWhiteSpace($RtspUrl)) {
   $RtspUrl = Read-Host "RTSP URL, for example rtsp://admin:password@1.34.250.22:10273/channel1"
+}
+
+$RtspUrl = $RtspUrl.Trim()
+if (($RtspUrl.ToCharArray() | Where-Object { $_ -eq "@" } | Measure-Object).Count -gt 1) {
+  throw "RTSP URL has more than one @. If the password contains @, replace it with %40 before running this script."
+}
+if ($RtspUrl -notmatch "^rtsp://") {
+  throw "RTSP URL must start with rtsp://"
 }
 
 $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
