@@ -60,7 +60,7 @@ a{color:inherit;text-decoration:none}
 .ipcam-reload{font-size:.72rem;color:var(--cyan);border:1px solid var(--border-hi);padding:6px 12px;border-radius:4px;background:rgba(0,212,255,.06);cursor:pointer}
 .ipcam-reload:hover{border-color:var(--cyan);background:rgba(0,212,255,.12)}
 .ipcam-frame-wrap{position:relative;background:#000;min-height:420px;height:54vh}
-.ipcam-video{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
+.ipcam-image{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
 
 /* ── alert bar ── */
 .alert-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
@@ -189,12 +189,12 @@ a{color:inherit;text-decoration:none}
     <div class="ipcam-head">
       <div class="ipcam-title">即時影像</div>
       <div class="ipcam-actions">
-        <span class="ipcam-note">直接讀取 IPCAM 影像串流</span>
+        <span class="ipcam-note">直接抓取 IPCAM JPEG 影像，每秒自動更新</span>
         <button class="ipcam-reload" type="button" onclick="reloadIpcam()">重新載入影像</button>
       </div>
     </div>
     <div class="ipcam-frame-wrap">
-      <video id="ipcamVideo" class="ipcam-video" src="http://1.34.250.22:8085/video1.mp4" autoplay muted playsinline controls loop preload="none"></video>
+      <img id="ipcamImage" class="ipcam-image" src="http://1.34.250.22:8085/ipcam/jpegcif" alt="IPCAM 即時影像">
     </div>
   </div>
 
@@ -259,13 +259,12 @@ a{color:inherit;text-decoration:none}
 
 <script>
 function reloadIpcam(){
-  const video=document.getElementById('ipcamVideo');
-  if(!video)return;
-  video.pause();
-  video.src='http://1.34.250.22:8085/video1.mp4?ts='+Date.now();
-  video.load();
-  video.play().catch(()=>{});
+  const img=document.getElementById('ipcamImage');
+  if(!img)return;
+  img.src='http://1.34.250.22:8085/ipcam/jpegcif?ts='+Date.now();
 }
+
+setInterval(reloadIpcam,1000);
 
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
