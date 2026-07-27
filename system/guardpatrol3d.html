@@ -252,7 +252,7 @@ const FLOORS = [
   { id:'3F', label:'3F 三樓',     tex:modelTexture('f3'), level:3, mesh:null, frame:null, visible:true },
 ];
 
-let scene,camera,renderer;
+let scene,camera,renderer,animationStarted=false;
 prog(10,'建立場景…');
 function createRenderer(mobile){
   const attempts=mobile?[
@@ -274,7 +274,7 @@ function init(){
   camera=new THREE.PerspectiveCamera(42,W/H,0.5,6000);
   const mobile=matchMedia('(max-width: 768px), (pointer: coarse)').matches;
   renderer=createRenderer(mobile);
-  renderer.setPixelRatio(mobile?1:Math.min(devicePixelRatio,2));
+  renderer.setPixelRatio(mobile?1:Math.min(devicePixelRatio,1.5));
   renderer.setSize(W,H);
   document.getElementById('c3d').appendChild(renderer.domElement);
   scene.add(new THREE.AmbientLight(0xffffff,1.0));
@@ -315,7 +315,7 @@ function buildFloors(){
     loader.load(fl.tex, tex=>{
       clearTimeout(timer);
       tex.minFilter=THREE.LinearFilter; tex.magFilter=THREE.LinearFilter;
-      tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+      tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
       const mat=new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
       const geo=new THREE.PlaneGeometry(FRAME_W,FRAME_H);
       const m=new THREE.Mesh(geo,mat);
@@ -345,17 +345,39 @@ const MARK_COL={equipment:0x00d4ff,space:0x00ff9d,patrol:PATROL_BASE,repair:0xff
 const kindVis={equipment:true,space:true,patrol:true,repair:true,note:true};
 const patrolStatusVisible={ok:true,pending:true,overdue:true};
 let markerObjs=[];                               // {group,fl,kind,label,markerId,name,head,stem}
+let markerLoadPromise=null;                      // 避免圖面與載入完成事件重複抓取標記
+let markersLoaded=false;
 let showLabels3D=false;                          // 顯示標記名稱
 let showShiftTime3D=false;                       // 顯示巡邏點時間（班別時段＋打卡人員）
-async function loadMarkers(){
-  try{
-    const {data,error}=await db.from('plan_markers').select('marker_id,floor_id,x,y,kind,label').eq('status','active').eq('kind','patrol');
-    if(error) return;
-    (data||[]).forEach(addMarker3D);
-    document.getElementById('mkCount').textContent=markerObjs.length;
-    layoutMarkers();
-    refreshPatrolStatus();
-  }catch(e){}
+function loadMarkers(){
+  if(markersLoaded) return Promise.resolve(markerObjs);
+  if(markerLoadPromise) return markerLoadPromise;
+  markerLoadPromise=(async()=>{
+    try{
+      const {data,error}=await db.from('plan_markers').select('marker_id,floor_id,x,y,kind,label').eq('status','active').eq('kind','patrol');
+      if(error) throw error;
+      // 分批加入場景，資料量增加時仍讓瀏覽器可以先完成第一幀繪製。
+      await addMarkersInBatches(data||[]);
+      markersLoaded=true;
+      document.getElementById('mkCount').textContent=markerObjs.length;
+      layoutMarkers();
+      void refreshPatrolStatus();
+      return markerObjs;
+    }catch(e){
+      console.warn('巡邏標記載入失敗',e);
+      return [];
+    }finally{
+      markerLoadPromise=null;
+    }
+  })();
+  return markerLoadPromise;
+}
+async function addMarkersInBatches(rows){
+  const batchSize=50;
+  for(let i=0;i<rows.length;i+=batchSize){
+    rows.slice(i,i+batchSize).forEach(addMarker3D);
+    if(i+batchSize<rows.length) await new Promise(resolve=>requestAnimationFrame(resolve));
+  }
 }
 let patrolStatusMap=new Map();
 let currentShift=null;                           // {name, start:Date, end:Date}
@@ -367,13 +389,19 @@ async function refreshPatrolStatus(){
     patrolStatusMap=r.map;
     if(r.shift){
       currentShift={name:r.shift.name,start:r.range.start,end:r.range.end};
-      const {data:checkins}=await db.from('checkin_logs').select('target_id,user_name,checkin_at')
-        .eq('target_type','marker')
-        .gte('checkin_at', r.range.start.toISOString())
-        .lte('checkin_at', r.range.end.toISOString())
-        .order('checkin_at',{ascending:true});               // 升冪，後面覆寫留下每點「最近一次」打卡
+      const patrolMarkerIds=markerObjs.filter(mk=>mk.kind==='patrol'&&mk.markerId).map(mk=>mk.markerId);
+      let checkins=[];
+      if(patrolMarkerIds.length){
+        const {data}=await db.from('checkin_logs').select('target_id,user_name,checkin_at')
+          .eq('target_type','marker')
+          .in('target_id',patrolMarkerIds)
+          .gte('checkin_at', r.range.start.toISOString())
+          .lte('checkin_at', r.range.end.toISOString())
+          .order('checkin_at',{ascending:true});             // 升冪，後面覆寫留下每點「最近一次」打卡
+        checkins=data||[];
+      }
       checkinInfoMap=new Map();
-      (checkins||[]).forEach(c=>checkinInfoMap.set(c.target_id,{user_name:c.user_name,checkin_at:new Date(c.checkin_at)}));
+      checkins.forEach(c=>checkinInfoMap.set(c.target_id,{user_name:c.user_name,checkin_at:new Date(c.checkin_at)}));
     }else{
       currentShift=null; checkinInfoMap=new Map();
     }
@@ -443,11 +471,25 @@ function syncMarkerLabelSizes(){
 }
 // 重建（或首次建立）某巡邏點的浮動標籤，套用目前開關與最新資料
 function rebuildMarkerLabel(mk){
+  const shouldShow=showLabels3D||showShiftTime3D;
+  if(!shouldShow){
+    if(mk.label){
+      mk.group.remove(mk.label);
+      if(mk.label.material.map) mk.label.material.map.dispose();
+      mk.label.material.dispose();
+      mk.label=null;
+    }
+    return;
+  }
   const colorHex='#'+mk.head.material.color.getHex().toString(16).padStart(6,'0');
-  if(mk.label){ mk.group.remove(mk.label); mk.label.material.map.dispose(); mk.label.material.dispose(); }
+  if(mk.label){
+    mk.group.remove(mk.label);
+    if(mk.label.material.map) mk.label.material.map.dispose();
+    mk.label.material.dispose();
+  }
   const lab=makeLabelSprite(labelLinesFor(mk),colorHex);
   lab.position.y=MARK_H+5;
-  lab.visible=showLabels3D||showShiftTime3D;
+  lab.visible=true;
   mk.group.add(lab);
   mk.label=lab;
 }
@@ -468,7 +510,7 @@ function addMarker3D(m){
   scene.add(g);
   const mk={group:g,fl,kind:m.kind||'note',label:null,markerId:m.marker_id,name:m.label,head,stem};
   markerObjs.push(mk);
-  rebuildMarkerLabel(mk);
+  // 預設不顯示名稱；不建立 canvas 貼圖可大幅縮短首次標記顯示時間。
 }
 function layoutMarkers(){
   markerObjs.forEach(mk=>{
@@ -515,8 +557,7 @@ function updateHud(){}
 function finishLoad(){
   prog(100,'完成');
   setTimeout(()=>{const l=document.getElementById('loading');l.style.transition='opacity .4s';l.style.opacity='0';setTimeout(()=>l.style.display='none',400);},150);
-  resetView(); animate();
-  loadMarkers();
+  resetView(); startAnimation();
   setInterval(refreshPatrolStatus,30000);
   setInterval(checkModelUpdates,60000);
   const img=document.getElementById('planThumbImg');
@@ -584,6 +625,11 @@ function setupOrbit(){
   el.addEventListener('touchend',()=>{orb.down=false;pm=null;});
 }
 
+function startAnimation(){
+  if(animationStarted) return;
+  animationStarted=true;
+  animate();
+}
 function animate(){ requestAnimationFrame(animate); updateCam(); syncMarkerLabelSizes(); renderer.render(scene,camera); }
 
 // ── UI ──
@@ -721,7 +767,7 @@ async function applyModelUpdates(){
     await new Promise(resolve=>{
       loader.load(url, tex=>{
         tex.minFilter=THREE.LinearFilter; tex.magFilter=THREE.LinearFilter;
-        tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+        tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
         if(fl.mesh) ModelTheme.registerFloor(THREE,fl,tex,renderer);
         fl.tex=url; fl.modelUpdatedAt=m.updated_at||null;
         if(fl===FLOORS[0]){ const img=document.getElementById('planThumbImg'); if(img) img.src=url; }
@@ -733,7 +779,10 @@ async function applyModelUpdates(){
 
 (async()=>{
   try{
-    init();setupOrbit();await applyCustomModels();prog(30,'載入樓層貼圖…');buildFloors();
+    init();setupOrbit();startAnimation();
+    // 先抓巡邏標記，與模型設定、四張樓層貼圖完全並行，避免標記等所有圖檔載完才出現。
+    void loadMarkers();
+    await applyCustomModels();prog(30,'載入樓層貼圖…');buildFloors();
   }catch(e){
     console.error('3D patrol initialization failed',e);
     prog(100,'3D 模式無法啟動，切換平面巡檢…');
