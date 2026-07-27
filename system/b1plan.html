@@ -206,10 +206,10 @@ const viewer = OpenSeadragon({
 let rot=0, curFloor='B1';
 // all four floors share the same world frame & pixel grid (aligned)
 const FLOORS=[
-  {id:'B1', label:'B1 地下一層', src:null},
-  {id:'1F', label:'1F 一樓',     src:null},
-  {id:'2F', label:'2F 二樓',     src:null},
-  {id:'3F', label:'3F 三樓',     src:null},
+  {id:'B1', label:'B1 地下一層', file:'b1', src:null},
+  {id:'1F', label:'1F 一樓',     file:'f1', src:null},
+  {id:'2F', label:'2F 二樓',     file:'f2', src:null},
+  {id:'3F', label:'3F 三樓',     file:'f3', src:null},
 ];
 
 // Apply theme-specific background color to OpenSeadragon dynamically
@@ -243,7 +243,7 @@ async function buildSources(){
   // model (deleted/renamed Storage file) can be recovered from automatically.
   FLOORS.forEach(fl=>{
     const dir=mobileModel?'plans/tex/mobile/':'plans/tex/';
-    fl.fallbackSrc = { type: 'image', url: versionedModelUrl(dir + fl.id.toLowerCase() + '_tex.png') };
+    fl.fallbackSrc = { type: 'image', url: versionedModelUrl(dir + fl.file + '_tex.png') };
   });
 
   try{
