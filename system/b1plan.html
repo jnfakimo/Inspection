@@ -261,6 +261,7 @@ viewer.addHandler('open', () => {
   prog(100,'完成');
   setTimeout(()=>{ const l=document.getElementById('loading'); l.style.transition='opacity .4s'; l.style.opacity='0'; setTimeout(()=>l.style.display='none',400); },150);
   applyTheme();
+  resetMarkerOverlayAttachments();
   drawPlanMarkers();
 });
 
@@ -292,6 +293,8 @@ const KV=PATROL_ONLY
   ? {equipment:false,space:false,patrol:true,repair:false,note:false}
   : {equipment:true,space:true,patrol:true,repair:true,note:true};
 let planMarkers=[], showLab=false;
+let markerOverlayCache=new Map();
+let markerRenderQueued=false;
 function escB(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 let patrolStatusMap=new Map();
 async function loadPlanMarkers(){
@@ -324,6 +327,73 @@ function drawPlanMarkers(){
     viewer.addOverlay({element:el, location:new OpenSeadragon.Point(m.x,m.y), placement:OpenSeadragon.Placement.CENTER, checkResize:false});
   });
   const n=document.getElementById('mkNum'); if(n) n.textContent=list.length+' 個';
+}
+function drawPlanMarkers(){
+  if(markerRenderQueued) return;
+  markerRenderQueued=true;
+  requestAnimationFrame(renderPlanMarkers);
+}
+function markerKey(m,i){
+  return m.marker_id||`${m.floor_id}:${m.kind||'note'}:${m.x}:${m.y}:${i}`;
+}
+function makeMarkerOverlay(m){
+  const el=document.createElement('div');
+  el.className='pin';
+  el.innerHTML='<div class="pdot"></div><div class="plab"></div>';
+  return {el,dot:el.querySelector('.pdot'),lab:el.querySelector('.plab'),added:false,marker:m};
+}
+function syncMarkerOverlay(cached,m){
+  cached.marker=m;
+  cached.el.classList.toggle('show-lab',showLab);
+  cached.dot.style.background=markerColor(m);
+  cached.lab.textContent=m.label||'';
+}
+function resetMarkerOverlayAttachments(){
+  markerOverlayCache.forEach(cached=>{
+    if(cached.added){
+      viewer.removeOverlay(cached.el);
+      cached.added=false;
+    }
+  });
+}
+function renderPlanMarkers(){
+  markerRenderQueued=false;
+  if(!viewer.viewport) return;
+  const activeKeys=new Set();
+  let visibleCount=0;
+  planMarkers.forEach((m,i)=>{
+    const key=markerKey(m,i);
+    const shouldShow=m.floor_id===curFloor && KV[m.kind]!==false;
+    let cached=markerOverlayCache.get(key);
+    if(!cached){
+      cached=makeMarkerOverlay(m);
+      markerOverlayCache.set(key,cached);
+    }
+    syncMarkerOverlay(cached,m);
+    if(shouldShow){
+      activeKeys.add(key);
+      visibleCount++;
+      if(!cached.added){
+        viewer.addOverlay({
+          element:cached.el,
+          location:new OpenSeadragon.Point(m.x,m.y),
+          placement:OpenSeadragon.Placement.CENTER,
+          checkResize:false
+        });
+        cached.added=true;
+      }
+    }else if(cached.added){
+      viewer.removeOverlay(cached.el);
+      cached.added=false;
+    }
+  });
+  markerOverlayCache.forEach((cached,key)=>{
+    if(!activeKeys.has(key)&&cached.added){
+      viewer.removeOverlay(cached.el);
+      cached.added=false;
+    }
+  });
+  const n=document.getElementById('mkNum'); if(n) n.textContent=visibleCount+' 點';
 }
 function toggleMkKind(k,on){ KV[k]=on; drawPlanMarkers(); }
 function toggleMkLabels(on){ showLab=on; drawPlanMarkers(); }
