@@ -267,7 +267,8 @@ a{color:inherit;text-decoration:none}
 
 <script>
 const IPCAM_LOCAL_HLS_URL='http://127.0.0.1:8091/ipcam/index.m3u8';
-const IPCAM_TUNNEL_HLS_URL='https://affairs-pts-occur-notre.trycloudflare.com/ipcam/index.m3u8';
+const IPCAM_TUNNEL_HLS_URL='https://newport-iso-description-inquiries.trycloudflare.com/ipcam/index.m3u8';
+let ipcamConfiguredTunnelUrl=IPCAM_TUNNEL_HLS_URL;
 let ipcamHls=null;
 let ipcamSourceIndex=0;
 let ipcamRetryTimer=null;
@@ -281,10 +282,19 @@ function getIpcamSources(){
   const queryHls=params.get('hls');
   if(queryHls){
     localStorage.setItem('ipcamHlsUrl',queryHls);
-    return [queryHls,IPCAM_TUNNEL_HLS_URL,IPCAM_LOCAL_HLS_URL];
+    return [queryHls,ipcamConfiguredTunnelUrl,IPCAM_LOCAL_HLS_URL];
   }
   const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  return [IPCAM_LOCAL_HLS_URL,IPCAM_TUNNEL_HLS_URL];
+  return mobile?[ipcamConfiguredTunnelUrl,IPCAM_LOCAL_HLS_URL]:[IPCAM_LOCAL_HLS_URL,ipcamConfiguredTunnelUrl];
+}
+
+async function loadIpcamConfig(){
+  try{
+    const res=await fetch(`ipcam-config.json?v=${Date.now()}`,{cache:'no-store'});
+    if(!res.ok)return;
+    const cfg=await res.json();
+    if(cfg?.hlsUrl) ipcamConfiguredTunnelUrl=cfg.hlsUrl;
+  }catch(e){}
 }
 
 function getIpcamHlsUrl(){
@@ -425,7 +435,7 @@ function markIpcamRecovering(){
   if(error)error.hidden=true;
 }
 
-reloadIpcam();
+loadIpcamConfig().finally(reloadIpcam);
 
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
