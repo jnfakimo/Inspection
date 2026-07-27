@@ -195,7 +195,7 @@ a{color:inherit;text-decoration:none}
     <div class="ipcam-head">
       <div class="ipcam-title">即時影像</div>
       <div class="ipcam-actions">
-        <span class="ipcam-note">RTSP 來源轉為 HLS 播放，手機自動使用 HTTPS tunnel</span>
+        <span class="ipcam-note">RTSP 來源已壓縮為低頻寬 HLS 播放</span>
         <span id="ipcamStatus" class="ipcam-status">連線中</span>
         <button class="ipcam-reload" type="button" onclick="reloadIpcam()">重新連線</button>
       </div>
@@ -284,7 +284,7 @@ function getIpcamSources(){
     return [queryHls,IPCAM_TUNNEL_HLS_URL,IPCAM_LOCAL_HLS_URL];
   }
   const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-  return mobile?[IPCAM_TUNNEL_HLS_URL,IPCAM_LOCAL_HLS_URL]:[IPCAM_LOCAL_HLS_URL,IPCAM_TUNNEL_HLS_URL];
+  return [IPCAM_LOCAL_HLS_URL,IPCAM_TUNNEL_HLS_URL];
 }
 
 function getIpcamHlsUrl(){

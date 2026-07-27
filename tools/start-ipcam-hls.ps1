@@ -1,9 +1,9 @@
 param(
   [string]$RtspUrl = $env:IPCAM_RTSP_URL,
   [int]$Port = 8091,
-  [int]$Width = 480,
-  [int]$Fps = 10,
-  [string]$VideoBitrate = "450k"
+  [int]$Width = 360,
+  [int]$Fps = 8,
+  [string]$VideoBitrate = "250k"
 )
 
 $ErrorActionPreference = "Stop"
