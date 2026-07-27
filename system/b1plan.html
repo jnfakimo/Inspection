@@ -238,6 +238,14 @@ window.addEventListener('storage', event => {
 // use updated models from Storage if available; else the high-performance local PNG files
 async function buildSources(){
   const mobileModel=matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+
+  // Always compute the known-good static fallback first, so a broken custom
+  // model (deleted/renamed Storage file) can be recovered from automatically.
+  FLOORS.forEach(fl=>{
+    const dir=mobileModel?'plans/tex/mobile/':'plans/tex/';
+    fl.fallbackSrc = { type: 'image', url: versionedModelUrl(dir + fl.id.toLowerCase() + '_tex.png') };
+  });
+
   try{
     const {data}=await db.from('floor_models').select('*');
     if(!mobileModel&&data&&data.length){
@@ -246,14 +254,8 @@ async function buildSources(){
           fl.src={type:'image', url:versionedModelUrl(`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`)}; } });
     }
   }catch(e){}
-  
-  // Set fallback high-performance single PNG for each floor to load instantly on mobile
-  FLOORS.forEach(fl=>{
-    if(!fl.src){
-      const dir=mobileModel?'plans/tex/mobile/':'plans/tex/';
-      fl.src = { type: 'image', url: versionedModelUrl(dir + fl.id.toLowerCase() + '_tex.png') };
-    }
-  });
+
+  FLOORS.forEach(fl=>{ if(!fl.src) fl.src=fl.fallbackSrc; });
 
   showFloor('B1');
   loadPlanMarkers();
@@ -270,6 +272,14 @@ viewer.addHandler('open', () => {
 });
 
 viewer.addHandler('open-failed', () => {
+  // A custom Storage model can go stale (renamed/deleted); fall back to the
+  // known-good static texture instead of leaving the viewer stuck on failure.
+  const cur=FLOORS.find(fl=>fl.id===curFloor);
+  if(cur&&cur.fallbackSrc&&cur.src!==cur.fallbackSrc){
+    cur.src=cur.fallbackSrc;
+    viewer.open(cur.src);
+    return;
+  }
   prog(100,'載入失敗');
   setTimeout(()=>{ const l=document.getElementById('loading'); l.style.display='none'; },1000);
 });

@@ -250,10 +250,10 @@ let yOffset = 0;                // model target Y-axis offset (m)
 const MOBILE_MODEL=matchMedia('(max-width: 768px), (pointer: coarse)').matches;
 const modelTexture=name=>`plans/tex/${MOBILE_MODEL?'mobile/':''}${name}_tex.png`;
 const FLOORS = [
-  { id:'B1', label:'B1 地下一層', tex:modelTexture('b1'), level:0, mesh:null, frame:null, visible:true },
-  { id:'1F', label:'1F 一樓',     tex:modelTexture('f1'), level:1, mesh:null, frame:null, visible:true },
-  { id:'2F', label:'2F 二樓',     tex:modelTexture('f2'), level:2, mesh:null, frame:null, visible:true },
-  { id:'3F', label:'3F 三樓',     tex:modelTexture('f3'), level:3, mesh:null, frame:null, visible:true },
+  { id:'B1', label:'B1 地下一層', tex:modelTexture('b1'), fallbackTex:modelTexture('b1'), level:0, mesh:null, frame:null, visible:true },
+  { id:'1F', label:'1F 一樓',     tex:modelTexture('f1'), fallbackTex:modelTexture('f1'), level:1, mesh:null, frame:null, visible:true },
+  { id:'2F', label:'2F 二樓',     tex:modelTexture('f2'), fallbackTex:modelTexture('f2'), level:2, mesh:null, frame:null, visible:true },
+  { id:'3F', label:'3F 三樓',     tex:modelTexture('f3'), fallbackTex:modelTexture('f3'), level:3, mesh:null, frame:null, visible:true },
 ];
 
 let scene,camera,renderer,animationStarted=false;
@@ -313,9 +313,7 @@ function buildFloors(){
     if(done===FLOORS.length&&!finished){finished=true;layoutFloors();finishLoad();}
     return true;
   };
-  FLOORS.forEach(fl=>{
-    const fr=floorFrame(0); fr.userData.fl=fl; scene.add(fr); fl.frame=fr;
-    const timer=setTimeout(()=>markDone(fl,'部分貼圖載入較慢，先開啟場景…'),12000);
+  const loadFloorTex=(fl,timer)=>{
     loader.load(fl.tex, tex=>{
       clearTimeout(timer);
       tex.minFilter=THREE.LinearFilter; tex.magFilter=THREE.LinearFilter;
@@ -329,7 +327,17 @@ function buildFloors(){
       ModelTheme.apply3D(scene,[fl]);
       const first=markDone(fl,'載入樓層貼圖…');
       if(!first)layoutFloors();
-    }, undefined, ()=>{clearTimeout(timer);markDone(fl,'部分貼圖無法載入，先開啟場景…');});
+    }, undefined, ()=>{
+      // A custom Storage model can go stale (renamed/deleted); fall back to
+      // the known-good static texture instead of leaving the floor blank.
+      if(fl.tex!==fl.fallbackTex){ fl.tex=fl.fallbackTex; loadFloorTex(fl,timer); return; }
+      clearTimeout(timer);markDone(fl,'部分貼圖無法載入，先開啟場景…');
+    });
+  };
+  FLOORS.forEach(fl=>{
+    const fr=floorFrame(0); fr.userData.fl=fl; scene.add(fr); fl.frame=fr;
+    const timer=setTimeout(()=>markDone(fl,'部分貼圖載入較慢，先開啟場景…'),12000);
+    loadFloorTex(fl,timer);
   });
 }
 
