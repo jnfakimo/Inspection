@@ -37,7 +37,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 .tb-back{color:var(--text2);text-decoration:none;display:inline-flex;align-items:center;padding:4px 10px;border:1px solid var(--border);border-radius:3px;font-size:11px;transition:all .2s;white-space:nowrap;flex:0 0 auto}
 .tb-back:hover{border-color:var(--cyan);color:var(--cyan)}
 
-#osd{position:fixed;inset:50px 0 0 0;background:#04101f}
+#osd{position:fixed;inset:50px 0 0 0;background:#04101f;touch-action:none}
 .embed-mode #topbar{display:none}
 .embed-mode #osd{inset:0}
 .embed-mode #floors,.embed-mode #mkToggle,.embed-mode #mkpanel{transform:translateY(-50px)}
@@ -174,6 +174,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+// 巡邏點打卡即時反映：不必等 30 秒輪詢，有新打卡就馬上重繪
+db.channel('checkin_logs_realtime_plan')
+  .on('postgres_changes',{event:'*',schema:'public',table:'checkin_logs'},()=>refreshPatrolStatus())
+  .subscribe();
 const PAGE_PARAMS=new URLSearchParams(location.search);
 const MODEL_VERSION=PAGE_PARAMS.get('modelv')||'';
 const PATROL_ONLY=PAGE_PARAMS.get('patrol')==='1';
