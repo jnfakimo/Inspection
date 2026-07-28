@@ -640,24 +640,33 @@ async function ld(){
   if(typeof PatrolStatus==='undefined'){document.getElementById('pg').innerHTML='<div class="empty">\u8f09\u5165\u4e2d</div>';return;}
   try{
     const d=PatrolStatus.dateStrOf(new Date());
-    const r=await PatrolStatus.computeMatrix(db,d);
-    const {shifts,markers,matrix}=r;
+    const [full,duty]=await Promise.all([
+      PatrolStatus.computeMatrix(db,d),
+      PatrolStatus.compute(db).catch(()=>({map:new Map(),shift:null,range:null}))
+    ]);
+    const markers=full.markers||[];
+    const now=new Date();
+    const active=Boolean(duty.shift&&duty.range&&now>=duty.range.start&&now<=duty.range.end);
+    if(!active){
+      document.getElementById('p1').textContent='\u2014';
+      document.getElementById('p2').textContent='\u2014';
+      document.getElementById('p3').textContent='\u2014';
+      document.getElementById('pi').innerHTML='<span style="color:var(--text-dim)">\u7576\u73ed\u5373\u6642\u7d71\u8a08\uff5c\u76ee\u524d\u7121\u9032\u884c\u4e2d\u73ed\u5225</span>';
+      document.getElementById('pg').innerHTML='<div class="empty">\u76ee\u524d\u7121\u9032\u884c\u4e2d\u73ed\u5225</div>';
+      return;
+    }
+    const shift=duty.shift;
     let a=0,b=0,c=0;
-    matrix.forEach(v=>{if(v==='ok')a++;else if(v==='pending')b++;else c++;});
+    markers.forEach(m=>{const st=duty.map.get(m.marker_id)||'pending';if(st==='ok')a++;else if(st==='pending')b++;else c++;});
     document.getElementById('p1').textContent=a;
     document.getElementById('p2').textContent=b;
     document.getElementById('p3').textContent=c;
-    const n=new Date();
-    const s=shifts.find(x=>n>=x.range.start&&n<=x.range.end);
-    if(s) document.getElementById('pi').innerHTML='\u73ed\u5225\uff1a<b style="color:var(--cyan)">'+s.name+'</b> ('+fh(s.start_time)+'-'+fh(s.end_time)+')';
-    else if(shifts.length) document.getElementById('pi').innerHTML='<span style="color:var(--text-dim)">\u76ee\u524d\u7121\u9032\u884c\u4e2d\u73ed\u5225</span>';
-    else document.getElementById('pi').innerHTML='<span style="color:var(--text-dim)">\u5c1a\u672a\u8a2d\u5b9a\u73ed\u5225\u6392\u7a0b</span>';
+    document.getElementById('pi').innerHTML='\u7576\u73ed\u5373\u6642\u7d71\u8a08\uff5c<b style="color:var(--cyan)">'+shift.name+'</b> ('+fh(shift.start_time)+'-'+fh(shift.end_time)+')';
     const g=document.getElementById('pg');
-    if(!shifts.length||!markers.length){g.innerHTML='<div class="empty">'+(!shifts.length?'\u5c1a\u672a\u8a2d\u5b9a\u73ed\u5225\u6392\u7a0b':'\u5c1a\u7121\u5de1\u908f\u9ede')+'</div>';return;}
+    if(!markers.length){g.innerHTML='<div class="empty">\u5c1a\u7121\u5de1\u908f\u9ede</div>';return;}
     const ic={ok:'\u2713',pending:'\u2026',overdue:'\u2715'};
-    g.innerHTML='<table class="pt"><tr><th class="pl">\u5de1\u6aa2\u9ede</th>'+shifts.map(x=>'<th>'+x.name+'<br>'+fh(x.start_time)+'-'+fh(x.end_time)+'</th>').join('')+'</tr>'
-      +markers.map(m=>'<tr><td class="pl">'+(m.floor_id||'')+' '+(m.label||'')+'</td>'
-        +shifts.map(x=>{const st=matrix.get(x.shift_id+'|'+m.marker_id)||'pending';return '<td><span class="pd '+st+'">'+ic[st]+'</span></td>';}).join('')+'</tr>').join('')+'</table>';
+    g.innerHTML='<table class="pt"><tr><th class="pl">\u5de1\u6aa2\u9ede</th><th>'+shift.name+'<br>'+fh(shift.start_time)+'-'+fh(shift.end_time)+'</th></tr>'
+      +markers.map(m=>{const st=duty.map.get(m.marker_id)||'pending';return '<tr><td class="pl">'+(m.floor_id||'')+' '+(m.label||'')+'</td><td><span class="pd '+st+'">'+ic[st]+'</span></td></tr>';}).join('')+'</table>';
   }catch(e){document.getElementById('pg').innerHTML='<div class="empty">\u8f09\u5165\u5931\u6557</div>';}
 }
 function sr(){ld();if(_pt)clearInterval(_pt);_pt=setInterval(ld,P_MS);}
