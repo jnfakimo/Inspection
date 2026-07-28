@@ -273,6 +273,8 @@ let ipcamHls=null;
 let ipcamSourceIndex=0;
 let ipcamRetryTimer=null;
 let ipcamWatchTimer=null;
+let ipcamManifestWatchTimer=null;
+let ipcamRestarting=false;
 let ipcamLoaded=false;
 let ipcamLastTime=0;
 let ipcamStillTicks=0;
@@ -302,6 +304,10 @@ function getIpcamHlsUrl(){
   const sources=getIpcamSources();
   return sources[ipcamSourceIndex%sources.length];
 }
+function freshIpcamUrl(){
+  const url=getIpcamHlsUrl();
+  return url+(url.includes('?')?'&':'?')+'ts='+Date.now();
+}
 
 function scheduleIpcamRetry(delay=5000){
   clearTimeout(ipcamRetryTimer);
@@ -318,8 +324,12 @@ function reloadIpcam(){
   const status=document.getElementById('ipcamStatus');
   const error=document.getElementById('ipcamError');
   if(!video)return;
+  clearTimeout(ipcamRetryTimer);
+  ipcamRetryTimer=null;
   if(ipcamHls){ipcamHls.destroy();ipcamHls=null;}
   clearInterval(ipcamWatchTimer);
+  clearInterval(ipcamManifestWatchTimer);
+  ipcamRestarting=false;
   ipcamLoaded=false;
   ipcamLastTime=0;
   ipcamStillTicks=0;
@@ -329,18 +339,21 @@ function reloadIpcam(){
   video.removeAttribute('src');
   video.load();
   if(video.canPlayType('application/vnd.apple.mpegurl')){
-    video.src=getIpcamHlsUrl()+'?ts='+Date.now();
+    video.src=freshIpcamUrl();
   }else if(window.Hls&&Hls.isSupported()){
     ipcamHls=new Hls({
-      lowLatencyMode:false,
-      liveSyncDurationCount:3,
-      liveMaxLatencyDurationCount:8,
-      maxLiveSyncPlaybackRate:1.1,
-      backBufferLength:20,
-      maxBufferLength:16,
-      maxMaxBufferLength:24
+      lowLatencyMode:true,
+      liveSyncDurationCount:2,
+      liveMaxLatencyDurationCount:6,
+      maxLiveSyncPlaybackRate:1.2,
+      backBufferLength:12,
+      maxBufferLength:10,
+      maxMaxBufferLength:18,
+      manifestLoadingTimeOut:8000,
+      levelLoadingTimeOut:8000,
+      fragLoadingTimeOut:8000
     });
-    ipcamHls.loadSource(getIpcamHlsUrl()+'?ts='+Date.now());
+    ipcamHls.loadSource(freshIpcamUrl());
     ipcamHls.attachMedia(video);
     ipcamHls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>{}));
     ipcamHls.on(Hls.Events.ERROR,(_event,data)=>{
@@ -364,12 +377,17 @@ function reloadIpcam(){
   }
   video.onloadeddata=()=>markIpcamLoaded();
   video.onplaying=()=>markIpcamLoaded();
-  video.onerror=()=>{if(video.readyState===0)markIpcamError();else markIpcamRecovering();};
+  video.onerror=()=>{
+    if(video.readyState===0)markIpcamError();
+    else{markIpcamRecovering();scheduleIpcamRetry(3500);}
+  };
   video.onpause=()=>video.play().catch(()=>{});
-  video.onstalled=()=>keepIpcamLive();
-  video.onwaiting=()=>keepIpcamLive();
+  video.onstalled=()=>{markIpcamRecovering();scheduleIpcamRetry(3500);};
+  video.onwaiting=()=>{markIpcamRecovering();scheduleIpcamRetry(3500);};
   video.play().catch(()=>{});
   ipcamWatchTimer=setInterval(keepIpcamLive,5000);
+  ipcamManifestWatchTimer=setInterval(checkIpcamManifest,15000);
+  void checkIpcamManifest();
   scheduleIpcamRetry(6000);
 }
 
@@ -379,6 +397,31 @@ function seekIpcamToLiveEdge(video){
   const target=Math.max(video.seekable.start(video.seekable.length-1),liveEdge-4);
   if(Number.isFinite(target)&&Math.abs(video.currentTime-target)>2){
     video.currentTime=target;
+  }
+}
+function restartIpcam(delay=750){
+  if(ipcamRestarting)return;
+  ipcamRestarting=true;
+  ipcamLoaded=false;
+  clearTimeout(ipcamRetryTimer);
+  ipcamRetryTimer=setTimeout(()=>{
+    ipcamRetryTimer=null;
+    reloadIpcam();
+  },delay);
+}
+async function checkIpcamManifest(){
+  try{
+    const res=await fetch(freshIpcamUrl(),{cache:'no-store'});
+    if(!res.ok)throw new Error('playlist unavailable');
+    const playlist=await res.text();
+    const times=Array.from(playlist.matchAll(/#EXT-X-PROGRAM-DATE-TIME:([^\r\n]+)/g));
+    const lastTime=times.length?Date.parse(times[times.length-1][1]):NaN;
+    if(Number.isFinite(lastTime)&&Date.now()-lastTime>120000){
+      markIpcamError();
+    }
+  }catch(e){
+    markIpcamRecovering();
+    scheduleIpcamRetry(4000);
   }
 }
 
@@ -400,10 +443,10 @@ function keepIpcamLive(){
   }
   if(video.readyState>=2&&Math.abs(video.currentTime-ipcamLastTime)<0.05){
     ipcamStillTicks++;
-    if(ipcamStillTicks>=4){
-      seekIpcamToLiveEdge(video);
-      video.play().catch(()=>{});
-      ipcamStillTicks=0;
+    if(ipcamStillTicks>=2){
+      markIpcamRecovering();
+      restartIpcam();
+      return;
     }
   }else{
     ipcamStillTicks=0;
@@ -430,6 +473,7 @@ function markIpcamError(){
 }
 
 function markIpcamRecovering(){
+  ipcamLoaded=false;
   const status=document.getElementById('ipcamStatus');
   const error=document.getElementById('ipcamError');
   if(status){status.textContent='buffering';status.className='ipcam-status';}
