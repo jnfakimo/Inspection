@@ -45,6 +45,13 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .topbar-right a:hover,.topbar-right button:hover{color:var(--cyan);border-color:var(--cyan)}
 .nav-user{color:var(--cyan);font-size:.78rem}
 .clock{color:var(--cyan);font-size:.72rem;letter-spacing:.1em;margin-left:6px}
+body.handover-only .topbar{justify-content:flex-start}
+body.handover-only .topbar-right a,
+body.handover-only .topbar-right button{display:none!important}
+body.handover-only .topbar-right{margin-left:auto}
+body.handover-only #tab-cases,
+body.handover-only #panel-cases,
+body.handover-only .repair-handover-head a{display:none!important}
 
 .tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:rgba(2,8,20,.7);flex-shrink:0;padding:0 20px}
 .tab-btn{padding:10px 20px;cursor:pointer;font-family:var(--font-head);font-size:.88rem;font-weight:700;letter-spacing:.08em;color:var(--text-dim);border:none;background:transparent;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
@@ -211,7 +218,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <link rel="stylesheet" href="light-mode-fix.css">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
-<body>
+<body class="handover-only">
 
 <div class="topbar">
   <div class="topbar-left">
@@ -747,6 +754,7 @@ let editingId = null;
 let pendingAttachments = [];
 let currentCaseId = null;
 const HANDOVER_STATE_KEY = 'tcfm.handover.state';
+const HANDOVER_ONLY_MODE = document.body.classList.contains('handover-only');
 
 const LEGACY_TO_RBAC = { admin:'sysadmin', supervisor:'unit_supervisor', maintenance:'technician', inspector:'reporter' };
 const RBAC_PRESETS = {
@@ -1759,6 +1767,7 @@ async function addAttachmentToCase(caseId) {
 
 // ── TAB SWITCH ─────────────────────────────────────
 function switchTab(name, opts = {}) {
+  if (HANDOVER_ONLY_MODE && name === 'cases') name = 'new';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
@@ -1794,6 +1803,7 @@ function saveHandoverState() {
 function restoreHandoverState() {
   let state = {};
   try { state = JSON.parse(sessionStorage.getItem(HANDOVER_STATE_KEY) || '{}'); } catch(e) {}
+  if (HANDOVER_ONLY_MODE && state.tab === 'cases') state.tab = 'new';
   if (state.hShift) document.getElementById('hShift').value = state.hShift;
   if (state.hDate) DTP.setValue('hDate-dtp', state.hDate);
   if (state.cfStatus) document.getElementById('cfStatus').value = state.cfStatus;
