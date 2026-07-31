@@ -225,13 +225,8 @@ body.handover-only .repair-handover-head a{display:none!important}
     <span class="topbar-title">電子交接簿</span>
   </div>
   <div class="topbar-right">
-    <a href="dashboard.html"><span class="ic ic-dashboard"></span> 戰情儀表板</a>
-    <a href="admin.html#repairs"><span class="ic ic-dispatch"></span> 報修系統</a>
-    <a href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7"><img src="../assets/system-icons/guardpatrol-icon.png" alt="" style="width:16px;height:16px;vertical-align:-3px;object-fit:contain"> 駐衛警巡檢</a>
-    <a href="admin.html"><span class="ic ic-equipment"></span> 後台</a>
     <span class="nav-user" id="navUser">載入中…</span>
     <span class="clock" id="topClock">--:--:--</span>
-    <button type="button" onclick="goBackPage()">↩ 返回</button>
   </div>
 </div>
 
@@ -348,7 +343,6 @@ body.handover-only .repair-handover-head a{display:none!important}
         <div class="repair-handover-list">
           <div class="repair-handover-head">
             <span>進行中交接項目</span>
-            <a href="workorder.html" style="color:var(--cyan);text-decoration:none">查看報修系統 →</a>
           </div>
           <div id="repairHandoverItems"><div class="repair-empty">選擇日期後自動載入報修與維修資料</div></div>
           <div id="repairStatusNote" style="margin-top:10px;font-size:.72rem;color:var(--text-dim)">—</div>
@@ -672,7 +666,7 @@ const DTP=(()=>{
 const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
+(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='handover-login.html';}})();
 
 // 全系統統一日期格式：西元 YYYY-MM-DD
 function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -775,14 +769,9 @@ function hasPagePerm(key) {
 
 function applyPerms() {
   if (_handoverHasSession && !hasPagePerm('handover')) {
-    const dest = hasPagePerm('inspector') ? 'guardpatrol.html'
-               : hasPagePerm('maintenance') ? 'workorder.html'
-               : 'login.html';
-    window.location.replace(dest);
+    showToast('此帳號未開通電子交接簿權限', true);
     return;
   }
-  if (!hasPagePerm('maintenance'))
-    document.querySelectorAll('a[href="workorder.html"],a[href="admin.html#repairs"]').forEach(el => el.style.display = 'none');
 }
 
 // ── CLOCK ──────────────────────────────────────────
@@ -1822,7 +1811,7 @@ function restoreHandoverState() {
 function goBackPage() {
   saveHandoverState();
   if (history.length > 1) history.back();
-  else location.href = 'admin.html';
+  else location.href = 'handover.html';
 }
 
 window.addEventListener('pagehide', saveHandoverState);
