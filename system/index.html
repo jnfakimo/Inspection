@@ -323,7 +323,7 @@
   <!-- CARDS -->
   <div class="cards-area">
 
-    <a class="sys-card card-admin" href="admin.html">
+    <a class="sys-card card-admin" href="admin.html" data-system-key="admin">
       <span class="card-icon" aria-hidden="true">
         <img src="../assets/system-icons/admin-icon.png" alt="">
       </span>
@@ -333,7 +333,7 @@
       <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
     </a>
 
-    <a class="sys-card card-maint" href="admin.html?v=8f9d41c#repairs">
+    <a class="sys-card card-maint" href="admin.html?v=8f9d41c#repairs" data-system-key="workorder">
       <span class="card-icon" aria-hidden="true">
         <img src="../assets/system-icons/maintenance-icon.png" alt="">
       </span>
@@ -343,7 +343,7 @@
       <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
     </a>
 
-    <a class="sys-card card-inspect" href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7">
+    <a class="sys-card card-inspect" href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7" data-system-key="guardpatrol">
       <span class="card-icon" aria-hidden="true">
         <img src="../assets/system-icons/guardpatrol-icon.png" alt="">
       </span>
@@ -353,7 +353,7 @@
       <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
     </a>
 
-    <a class="sys-card card-handover" href="handover.html">
+    <a class="sys-card card-handover" href="handover.html" data-system-key="handover">
       <span class="card-icon" aria-hidden="true">
         <img src="../assets/system-icons/handover-icon.png" alt="">
       </span>
@@ -363,7 +363,7 @@
       <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
     </a>
 
-    <a class="sys-card card-asset" href="equipment.html">
+    <a class="sys-card card-asset" href="equipment.html" data-system-key="equipment">
       <span class="card-icon" aria-hidden="true"><img src="../assets/system-icons/equipment-icon.png" alt=""></span>
       <div class="card-sys-id">SYS-05 ｜ ASSET LIFECYCLE</div>
       <div class="card-title">設備建置系統</div>
@@ -371,7 +371,7 @@
       <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
     </a>
 
-    <a class="sys-card card-handover" href="structure_map.html">
+    <a class="sys-card card-handover" href="structure_map.html" data-system-key="structuremap">
       <span class="card-icon" aria-hidden="true"><img src="../assets/system-icons/settings-icon.png" alt=""></span>
       <div class="card-sys-id">SYS-06 ｜ STRUCTURE MAP</div>
       <div class="card-title">專案關係地圖</div>
@@ -386,11 +386,39 @@
     臺北農產運銷股份有限公司 第一果菜市場 ｜ 整合管理系統 ｜ v2.0
   </div>
 
+  <div class="portal-toast" id="portalToast" role="status" aria-live="polite"></div>
+  <style>
+    .portal-toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface,#04111f);border:1px solid var(--red,#ff3b3b);color:var(--text,#a8d8f0);padding:9px 18px;border-radius:4px;font-size:.8rem;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s}
+    .portal-toast.show{opacity:1}
+  </style>
+
 <script>
   const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
   const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
+  (async()=>{
+    const {data:{session}}=await db.auth.getSession();
+    if(!session){location.href='login.html';return;}
+    applySystemAccess();
+  })();
+  const SYSTEM_LABELS={admin:'後台管理系統',workorder:'報修/派工/完工系統',guardpatrol:'駐衛警巡檢系統',handover:'電子交接簿',equipment:'設備建置系統',structuremap:'專案核心樹狀關係圖'};
+  function applySystemAccess(){
+    const params=new URLSearchParams(location.search);
+    const denied=params.get('denied');
+    if(denied){
+      const el=document.getElementById('portalToast');
+      el.textContent='您沒有「'+(SYSTEM_LABELS[denied]||denied)+'」的存取權限';
+      el.classList.add('show');
+      setTimeout(()=>el.classList.remove('show'),3200);
+    }
+    if(!window.SystemAccess||typeof window.SystemAccess.allowedSystems!=='function')return;
+    window.SystemAccess.allowedSystems().then((allowed)=>{
+      document.querySelectorAll('.sys-card[data-system-key]').forEach((card)=>{
+        const key=card.getAttribute('data-system-key');
+        if(allowed!==null&&!allowed.has(key))card.style.display='none';
+      });
+    });
+  }
   db.from('system_settings').select('key,value').then(({ data }) => {
     if (!data) return;
     const s = Object.fromEntries(data.map(r => [r.key, r.value]));

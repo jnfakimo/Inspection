@@ -666,7 +666,13 @@ const DTP=(()=>{
 const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='handover-login.html';}})();
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='handover-login.html';return;}
+  if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
+    await window.SystemAccess.enforce('handover');
+  }
+})();
 
 // 全系統統一日期格式：西元 YYYY-MM-DD
 function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}

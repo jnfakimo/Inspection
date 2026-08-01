@@ -136,7 +136,14 @@
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session&&!['127.0.0.1','localhost'].includes(location.hostname))location.href='login.html';})();
+(async()=>{
+  const isLocalDev=['127.0.0.1','localhost'].includes(location.hostname);
+  const {data:{session}}=await db.auth.getSession();
+  if(!session&&!isLocalDev){location.href='login.html';return;}
+  if(!isLocalDev&&window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
+    await window.SystemAccess.enforce('equipment');
+  }
+})();
 
 const PER=20;
 let state={assets:[],plans:[],records:[],contracts:[],documents:[],costs:[],links:[],points:[],inspections:[],repairs:[],orders:[],costRecords:[],materials:[],markers:[]};

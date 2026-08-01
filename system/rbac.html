@@ -61,7 +61,8 @@ select:focus{border-color:var(--cyan)}
 <div class="wrap">
   <div class="tabs">
     <button class="tab on" onclick="tab(0)"><span class="ic ic-handover"></span> 角色權限矩陣</button>
-    <button class="tab" onclick="tab(1)"><span class="ic ic-user"></span> 使用者角色</button>
+    <button class="tab" onclick="tab(1)"><span class="ic ic-dispatch"></span> 系統存取權限</button>
+    <button class="tab" onclick="tab(2)"><span class="ic ic-user"></span> 使用者角色</button>
   </div>
   <div class="pane on" id="p0">
     <div class="card"><h3>角色 × 權限（勾選即時儲存）</h3>
@@ -70,6 +71,12 @@ select:focus{border-color:var(--cyan)}
     </div>
   </div>
   <div class="pane" id="p1">
+    <div class="card"><h3>角色 × 6 大系統（勾選即時儲存，決定系統入口是否開放）</h3>
+      <div id="sysMatrix"><div class="empty">載入中…</div></div>
+      <div class="hint">未勾選的系統：該角色在系統入口頁看不到該卡片，直接輸入網址也會被導回入口頁。<br>sysadmin 一律視為全部允許（程式邏輯寫死，不受此表設定影響），故該列固定打勾且無法取消。</div>
+    </div>
+  </div>
+  <div class="pane" id="p2">
     <div class="card"><h3>使用者角色指派</h3>
       <div id="userTbl"><div class="empty">載入中…</div></div>
     </div>
@@ -80,7 +87,13 @@ select:focus{border-color:var(--cyan)}
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html';return;}
+  if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
+    await window.SystemAccess.enforce('admin');
+  }
+})();
 function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function translateError(msg) {
   if (!msg) return '未知錯誤';
@@ -93,6 +106,7 @@ function translateError(msg) {
   return '操作失敗，請稍後再試或聯絡系統管理員';
 }
 const PERMS=[['create','新增'],['update','修改'],['delete','刪除'],['read','查詢'],['dispatch','派工'],['close','結案'],['sign','簽核'],['export','匯出'],['admin','後台管理']];
+const SYS_KEYS=[['sys_admin','後台管理系統'],['sys_workorder','報修/派工/完工系統'],['sys_guardpatrol','駐衛警巡檢系統'],['sys_handover','電子交接簿'],['sys_equipment','設備建置系統'],['sys_structuremap','專案核心樹狀關係圖']];
 const LEGACY_ROLE_BY_RBAC={reporter:'inspector',duty:'maintenance',dispatcher:'maintenance',technician:'maintenance',unit_supervisor:'supervisor',mgmt_supervisor:'supervisor',sysadmin:'admin'};
 const MENU_PRESETS={
   reporter:{maintenance:true,repair:true},
@@ -119,18 +133,25 @@ async function init(){
   ]);
   if(re){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">尚未建立 roles 表，請先執行 work_order_schema.sql</div>';return;}
   roles=r||[]; perms={}; (rp||[]).forEach(x=>{perms[x.role_id+'|'+x.perm]=x.allowed;});
-  renderMatrix(); renderUsers();
+  renderMatrix(); renderSysMatrix(); renderUsers();
 }
-function renderMatrix(){
-  let h='<table><tr><th class="rolename" style="text-align:left">角色＼權限</th>'+PERMS.map(p=>`<th>${p[1]}</th>`).join('')+'</tr>';
+function buildMatrixHtml(list,opts){
+  opts=opts||{};
+  let h='<table><tr><th class="rolename" style="text-align:left">角色＼'+(opts.colHeader||'權限')+'</th>'+list.map(p=>`<th>${p[1]}</th>`).join('')+'</tr>';
   roles.forEach(r=>{
-    h+=`<tr><td class="rolename">${escHtml(r.name)}</td>`+PERMS.map(p=>{
+    h+=`<tr><td class="rolename">${escHtml(r.name)}</td>`+list.map(p=>{
+      if(opts.forceRoleId&&r.role_id===opts.forceRoleId){
+        return `<td><input type="checkbox" checked disabled title="sysadmin 永遠允許"></td>`;
+      }
       const on=perms[r.role_id+'|'+p[0]]===true;
       return `<td><input type="checkbox" ${on?'checked':''} onchange="togglePerm('${r.role_id}','${p[0]}',this.checked)"></td>`;
     }).join('')+'</tr>';
   });
-  h+='</table>';document.getElementById('matrix').innerHTML=h;
+  h+='</table>';
+  return h;
 }
+function renderMatrix(){document.getElementById('matrix').innerHTML=buildMatrixHtml(PERMS);}
+function renderSysMatrix(){document.getElementById('sysMatrix').innerHTML=buildMatrixHtml(SYS_KEYS,{colHeader:'系統',forceRoleId:'sysadmin'});}
 async function togglePerm(role,perm,val){
   perms[role+'|'+perm]=val;
   const {error}=await db.from('role_permissions').upsert({role_id:role,perm,allowed:val},{onConflict:'role_id,perm'});

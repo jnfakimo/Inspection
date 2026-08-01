@@ -6,7 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('siteTheme') || 'tech');</script>
   <script src="theme.js?v=20260720-2"></script>
-  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <!-- Vis.js Network CDN -->
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   
@@ -301,6 +302,18 @@
   </style>
 </head>
 <body>
+<script>
+  const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+  const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  (async()=>{
+    const {data:{session}}=await db.auth.getSession();
+    if(!session){location.href='login.html?redirect='+encodeURIComponent('structure_map.html');return;}
+    if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
+      await window.SystemAccess.enforce('structuremap');
+    }
+  })();
+</script>
 
   <!-- Navbar -->
   <nav class="navbar">

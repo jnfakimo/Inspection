@@ -24,6 +24,87 @@
     ['user_id','user_username','user_name','user_role','user_rbac_role','user_dept_id','user_department','user_phone'].forEach(function(key){sessionStorage.removeItem(key);});
   }
   window.SystemUserProfile={read:readProfile,save:saveProfile,clear:clearProfile};
+  var LEGACY_TO_RBAC={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
+  function resolveRbacRole(profile){
+    return (profile&&(profile.rbac_role||LEGACY_TO_RBAC[profile.role]))||null;
+  }
+  function storedAuthSessionForAccess(){
+    try{
+      var raw=localStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
+      if(!raw)return null;
+      if(raw.indexOf('base64-')===0)raw=decodeURIComponent(escape(atob(raw.slice(7))));
+      return JSON.parse(raw);
+    }catch(e){return null;}
+  }
+  function fetchUserRowForAccess(authId,token){
+    var url=SUPABASE_URL+'/rest/v1/users?select=user_id,name,role,rbac_role,department&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
+    return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}})
+      .then(function(r){return r.ok?r.json():[];})
+      .then(function(rows){return rows&&rows[0]?rows[0]:null;})
+      .catch(function(){return null;});
+  }
+  function resolveCurrentProfileForAccess(){
+    var cached=readProfile();
+    if(cached&&(cached.rbac_role||cached.role))return Promise.resolve(cached);
+    var auth=storedAuthSessionForAccess();
+    var token=auth&&auth.access_token;
+    var authId=auth&&auth.user&&auth.user.id;
+    if(!token||!authId)return Promise.resolve(cached);
+    return fetchUserRowForAccess(authId,token).then(function(row){
+      if(row){saveProfile(row);return row;}
+      return cached;
+    });
+  }
+  function denyAccess(systemKey){
+    location.replace('index.html?denied='+encodeURIComponent(systemKey));
+    return false;
+  }
+  var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap'];
+  window.SystemAccess={
+    ALL_SYSTEM_KEYS:ALL_SYSTEM_KEYS,
+    // 回傳 Promise<Set<string>|null>；null 代表 sysadmin，視為全部允許。
+    // 給 portal 頁一次批次查詢用，不逐一呼叫 enforce()。
+    allowedSystems:function(){
+      return resolveCurrentProfileForAccess().then(function(profile){
+        var roleId=resolveRbacRole(profile);
+        if(roleId==='sysadmin')return null;
+        if(!roleId)return new Set();
+        var auth=storedAuthSessionForAccess();
+        var bearer=(auth&&auth.access_token)||SUPABASE_ANON_KEY;
+        var perms=ALL_SYSTEM_KEYS.map(function(k){return 'sys_'+k;}).join(',');
+        var url=SUPABASE_URL+'/rest/v1/role_permissions?select=perm,allowed&role_id=eq.'+encodeURIComponent(roleId)+'&perm=in.('+perms+')';
+        return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer}})
+          .then(function(r){return r.ok?r.json():[];})
+          .then(function(rows){
+            var out=new Set();
+            (rows||[]).forEach(function(row){
+              if(row.allowed===true&&row.perm&&row.perm.indexOf('sys_')===0)out.add(row.perm.slice(4));
+            });
+            return out;
+          })
+          .catch(function(){return new Set();});
+      });
+    },
+    // systemKey: 'admin' / 'workorder' / 'guardpatrol' / 'handover' / 'equipment' / 'structuremap'
+    // 回傳 Promise<boolean>；false 時已經處理好導頁，呼叫端只需 `if(!(await SystemAccess.enforce('admin')))return;`
+    enforce:function(systemKey){
+      return resolveCurrentProfileForAccess().then(function(profile){
+        var roleId=resolveRbacRole(profile);
+        if(roleId==='sysadmin')return true;
+        if(!roleId)return denyAccess(systemKey);
+        var auth=storedAuthSessionForAccess();
+        var bearer=(auth&&auth.access_token)||SUPABASE_ANON_KEY;
+        var url=SUPABASE_URL+'/rest/v1/role_permissions?select=allowed&role_id=eq.'+encodeURIComponent(roleId)+'&perm=eq.sys_'+encodeURIComponent(systemKey);
+        return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer}})
+          .then(function(r){return r.ok?r.json():[];})
+          .then(function(rows){
+            var allowed=Array.isArray(rows)&&rows[0]&&rows[0].allowed===true;
+            return allowed?true:denyAccess(systemKey);
+          })
+          .catch(function(){return denyAccess(systemKey);});
+      });
+    }
+  };
   function current(){ return document.documentElement.getAttribute('data-theme')||'tech'; }
   function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded',fn); }
   function taipeiNow(){
