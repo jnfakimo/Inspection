@@ -486,6 +486,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 .audit-action-insert{color:var(--green)}
 .audit-action-update{color:#60a5fa}
 .audit-action-status_change{color:var(--amber)}
+.audit-action-login{color:var(--green)}
+.audit-action-logout{color:var(--text-dim)}
 
 /* ===== SEARCH BAR ===== */
 .search-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -958,12 +960,15 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
             <option value="repair_requests">報修單</option>
             <option value="maintenance_orders">維修單</option>
             <option value="cost_records">費用</option>
+            <option value="auth">登入/登出</option>
           </select>
           <select id="auditActionFilter" onchange="loadAudit()">
             <option value="">全部動作</option>
             <option value="insert">新增</option>
             <option value="update">修改</option>
             <option value="status_change">狀態變更</option>
+            <option value="login">登入</option>
+            <option value="logout">登出</option>
           </select>
         </div>
         <div id="auditList"><div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">載入中…</div></div>
@@ -2852,7 +2857,7 @@ function exportCostCsv() {   // 統一標準：匯出 XLSX
   XLSX.writeFile(wb, `費用報表_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除' };
+const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除', login:'登入', logout:'登出' };
 const AUDIT_TABLE_LABEL = {
   users:'帳號',
   equipment:'設備',
@@ -2860,8 +2865,25 @@ const AUDIT_TABLE_LABEL = {
   inspection_cycles:'巡檢週期',
   cost_records:'費用紀錄',
   repair_requests:'報修單',
-  maintenance_orders:'維修單'
+  maintenance_orders:'維修單',
+  auth:'登入/登出'
 };
+// 把冗長的瀏覽器 User-Agent 字串簡化成好讀的「作業系統 · 瀏覽器」
+function summarizeUserAgent(ua) {
+  if (!ua) return '';
+  let os = '未知裝置';
+  if (/iPhone|iPad/.test(ua)) os = 'iOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Macintosh|Mac OS/.test(ua)) os = 'Mac';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  let browser = '瀏覽器';
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  return `${os} · ${browser}`;
+}
 const AUDIT_FIELD_LABEL = {
   name:'名稱',
   username:'帳號',
@@ -2999,11 +3021,20 @@ function auditInsertHighlights(table, after) {
 }
 
 function formatAuditRecord(row) {
+  const tableLabel = AUDIT_TABLE_LABEL[row.table_name] || row.table_name;
+  const actionLabel = AUDIT_ACTION_LABEL[row.action] || row.action;
+
+  if (row.table_name === 'auth' && (row.action === 'login' || row.action === 'logout')) {
+    const opName = row.users?.name || '未知使用者';
+    const chips = [];
+    if (row.ip_address) chips.push(`IP：${row.ip_address}`);
+    if (row.user_agent) chips.push(`裝置：${summarizeUserAgent(row.user_agent)}`);
+    return { tableLabel, actionLabel, summary: `${opName} ${actionLabel}。`, chips };
+  }
+
   const changes = auditParseChanges(row.changes);
   const before = changes.before || null;
   const after = changes.after || null;
-  const tableLabel = AUDIT_TABLE_LABEL[row.table_name] || row.table_name;
-  const actionLabel = AUDIT_ACTION_LABEL[row.action] || row.action;
   const recordName = auditRecordName(row.table_name, before, after, row.record_id);
   let summary = `${actionLabel}${tableLabel}${recordName ? ` ${recordName}` : ''}`;
   let chips = [];
@@ -3419,6 +3450,22 @@ async function writeAudit(table, recordId, action, before, after) {
   await db.from('audit_logs').insert({ table_name: table, record_id: String(recordId), action, changes: { before, after }, operator_id: currentUser.user_id });
 }
 
+// 記錄登入/登出事件到系統紀錄（含 IP、裝置資訊）；失敗不影響登出流程本身
+async function logAuthEvent(action, userId) {
+  try {
+    let ip = null;
+    try {
+      const r = await fetch('https://api.ipify.org?format=json');
+      if (r.ok) { const j = await r.json(); ip = j.ip || null; }
+    } catch (e) {}
+    await db.from('audit_logs').insert({
+      table_name: 'auth', record_id: String(userId), action,
+      changes: { event: action }, operator_id: userId,
+      ip_address: ip, user_agent: navigator.userAgent
+    });
+  } catch (e) {}
+}
+
 // ── 3D Model Hub ────────────────────────────────────────────────────────────
 async function loadModelHub() {
   const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
@@ -3637,6 +3684,7 @@ function laToggle(key) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function logout() {
+  if (currentUser) await logAuthEvent('logout', currentUser.user_id);
   if (window.SystemUserProfile) window.SystemUserProfile.clear();
   await db.auth.signOut();
   window.location.href = 'login.html';

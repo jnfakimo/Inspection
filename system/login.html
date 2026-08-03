@@ -202,6 +202,22 @@ function getLoginRoute(profile) {
   return ROLE_ROUTES[profile.role] || 'workorder.html?v=reporter-20260701';
 }
 
+// 記錄登入/登出事件到系統紀錄（含 IP、裝置資訊）；失敗不影響登入流程本身
+async function logAuthEvent(action, userId) {
+  try {
+    let ip = null;
+    try {
+      const r = await fetch('https://api.ipify.org?format=json');
+      if (r.ok) { const j = await r.json(); ip = j.ip || null; }
+    } catch (e) {}
+    await db.from('audit_logs').insert({
+      table_name: 'auth', record_id: String(userId), action,
+      changes: { event: action }, operator_id: userId,
+      ip_address: ip, user_agent: navigator.userAgent
+    });
+  } catch (e) {}
+}
+
 function translateError(msg) {
   if (!msg) return '未知錯誤';
   if (msg.includes('User already registered')) return '此 Email 已被註冊';
@@ -297,6 +313,7 @@ async function doLogin() {
     if (profile.department) sessionStorage.setItem('user_department', profile.department);
     if (profile.phone) sessionStorage.setItem('user_phone', profile.phone);
   }
+  logAuthEvent('login', profile.user_id);
   window.location.href = getRedirectTarget(profile);
 }
 
