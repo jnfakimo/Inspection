@@ -150,9 +150,9 @@ body.controls-hidden #panelToggle{display:inline-flex}
 
 <div id="c3d"></div>
 <div id="focusNotice" role="status"><strong id="focusTitle">3D 點位</strong><span id="focusCoordinate"></span><button onclick="clearFocusNotice()" aria-label="關閉定位提示">✕</button></div>
-<button id="panelToggle" onclick="togglePanel(true)" aria-controls="panel" aria-expanded="false"><span class="ic ic-3d"></span> 立體控制</button>
+<button id="panelToggle" onclick="togglePanel(true)" aria-controls="panel" aria-expanded="false">立體控制</button>
 
-<button id="floorsToggle" onclick="toggleFloorsMenu()"><span class="ic ic-template"></span> 樓層顯示 <span class="cv">▾</span></button>
+<button id="floorsToggle" onclick="toggleFloorsMenu()">樓層顯示 <span class="cv">▾</span></button>
 <div id="floors">
   <button class="fbtn on" id="t-3F" onclick="toggleFloor('3F')"><span class="dot"></span>3F 三樓</button>
   <button class="fbtn on" id="t-2F" onclick="toggleFloor('2F')"><span class="dot"></span>2F 二樓</button>
@@ -162,7 +162,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
 
 <div id="panel">
   <div class="panel-head">
-    <div class="p-t"><span class="ic ic-3d"></span> 立體控制</div>
+    <div class="p-t">立體控制</div>
     <button class="panel-close" onclick="togglePanel(false)">隱藏</button>
   </div>
   <label>樓層間距（視覺）</label>
@@ -183,10 +183,10 @@ body.controls-hidden #panelToggle{display:inline-flex}
 </div>
 
 <!-- 標記顯示（獨立面板，左下，預設隱藏）-->
-<button id="mkToggle" onclick="toggleMkPanel(true)"><span class="ic ic-handover"></span> 標記顯示</button>
+<button id="mkToggle" onclick="toggleMkPanel(true)">標記顯示</button>
 <div id="mkpanel">
   <div class="panel-head">
-    <div class="p-t"><span class="ic ic-handover"></span> 標記顯示</div>
+    <div class="p-t">標記顯示</div>
     <span style="display:flex;gap:6px">
       <button class="panel-close" id="mkPinBtn" onclick="toggleMkPin()" title="釘住後點空白處不會自動收合">📌 釘住</button>
       <button class="panel-close" onclick="toggleMkPanel(false)">隱藏</button>
@@ -206,7 +206,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
 <div id="bottomRightRow" class="mobile-hide">
   <div id="hint">左鍵拖曳：水平 / 垂直移動 &nbsp;|&nbsp; 右鍵拖曳：旋轉環繞 &nbsp;|&nbsp; 滾輪/雙指：縮放</div>
   <div id="hud">
-    <div class="h-t"><span class="ic ic-3d"></span> 3D 模型圖</div>
+    <div class="h-t">3D 模型圖</div>
     <div class="h-r">顯示樓層：<span id="h-floors">—</span></div>
   </div>
 </div>
