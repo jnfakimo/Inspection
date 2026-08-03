@@ -560,13 +560,16 @@ function setExplode(v){ EXPLODE=parseFloat(v); document.getElementById('explode'
 function resetView(){ yOffset=0;orb.theta=-0.6;orb.phi=1.02;orb.r=640;orb.tx=0;orb.ty=viewY();orb.tz=0;syncXPanUI();syncYPanUI(); }
 function topView(){ orb.theta=0;orb.phi=0.06;orb.r=560;orb.tx=0;orb.ty=viewY();orb.tz=0;syncXPanUI();syncYPanUI(); }
 
-// floor_id like "4F"/"B2" -> stacking level, consistent with the static B1=0,1F=1,2F=2,3F=3 scheme
+// floor_id like "4F"/"B2" -> stacking level, consistent with the static B1=0,1F=1,2F=2,3F=3 scheme.
+// Unrecognized codes (e.g. "RF") have no numeric position, so they stack one
+// level above whatever is currently the highest floor, instead of jumping to
+// a fixed placeholder height that would render far outside the camera view.
 function floorLevelOf(id){
   let m=/^B(\d+)$/i.exec(id);
   if(m) return -(parseInt(m[1],10)-1);
   m=/^(\d+)F$/i.exec(id);
   if(m) return parseInt(m[1],10);
-  return 100;
+  return Math.max(...FLOORS.map(f=>f.level))+1;
 }
 function renderFloorButtons(){
   const host=document.getElementById('floors');
