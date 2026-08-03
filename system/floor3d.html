@@ -560,18 +560,41 @@ function setExplode(v){ EXPLODE=parseFloat(v); document.getElementById('explode'
 function resetView(){ yOffset=0;orb.theta=-0.6;orb.phi=1.02;orb.r=640;orb.tx=0;orb.ty=viewY();orb.tz=0;syncXPanUI();syncYPanUI(); }
 function topView(){ orb.theta=0;orb.phi=0.06;orb.r=560;orb.tx=0;orb.ty=viewY();orb.tz=0;syncXPanUI();syncYPanUI(); }
 
-// fetch any updated floor models from Storage (override static textures)
+// floor_id like "4F"/"B2" -> stacking level, consistent with the static B1=0,1F=1,2F=2,3F=3 scheme
+function floorLevelOf(id){
+  let m=/^B(\d+)$/i.exec(id);
+  if(m) return -(parseInt(m[1],10)-1);
+  m=/^(\d+)F$/i.exec(id);
+  if(m) return parseInt(m[1],10);
+  return 100;
+}
+function renderFloorButtons(){
+  const host=document.getElementById('floors');
+  if(!host) return;
+  const sorted=[...FLOORS].sort((a,b)=>b.level-a.level);
+  host.innerHTML=sorted.map(fl=>
+    `<button class="fbtn on" id="t-${fl.id}" onclick="toggleFloor('${fl.id}')"><span class="dot"></span>${fl.label}</button>`
+  ).join('');
+}
+
+// fetch any updated floor models from Storage (override static textures);
+// floor_ids not already in the static FLOORS list are added dynamically so a
+// newly uploaded floor (via modeler.html) shows up automatically here, and a
+// floor whose custom model row was deleted simply won't be re-added on the
+// next page load (FLOORS is rebuilt from scratch every load).
 async function applyCustomModels(){
   try{
     const {data}=await db.from('floor_models').select('*');
-    if(data&&data.length){
+    if(data&&data.length&&!MOBILE_MODEL){
       data.forEach(m=>{
+        if(!m.image_path) return;
+        const t=encodeURIComponent(m.updated_at||'');
+        const url=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
         const fl=FLOORS.find(f=>f.id===m.floor_id);
-        if(!MOBILE_MODEL&&fl&&m.image_path){
-          const t=encodeURIComponent(m.updated_at||'');
-          fl.tex=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
-        }
+        if(fl){ fl.tex=url; }
+        else{ FLOORS.push({ id:m.floor_id, label:m.name||m.floor_id, tex:url, level:floorLevelOf(m.floor_id), mesh:null, frame:null, visible:true }); }
       });
+      renderFloorButtons();
     }
   }catch(e){ /* fall back to static textures */ }
 }

@@ -113,7 +113,8 @@ select:focus,input:focus{border-color:var(--cyan)}
     </div>
     <div class="hintbox">
       ※ DXF 在瀏覽器即時解析渲染，更新後 3D 模型與平面圖會自動載入新版本。<br>
-      ※ 建議各樓層使用<b>相同座標系</b>的 DXF，立體疊合才會對齊。
+      ※ 建議各樓層使用<b>相同座標系</b>的 DXF，立體疊合才會對齊。<br>
+      ※ 標準繪圖框：<b id="refFrameText">尚未設定（將以 B1 為準）</b>
     </div>
   </div>
 
@@ -144,8 +145,23 @@ function translateError(msg) {
 }
 function getParser(){ return window.DxfParser?.default || window.DxfParser || null; }
 
-let lastBlob=null, lastBBox=null;
+let lastBlob=null, lastBBox=null, refBBox=null;
 const TEX=2400; // texture long-side px
+
+// 所有樓層共用同一張「標準繪圖框」（以 B1 的範圍為準），確保各樓層疊合對齊；
+// 不使用每層各自的範圍自動縮放，避免樓層之間比例不一致。
+function updateRefFrameText(){
+  const el=document.getElementById('refFrameText');
+  if(!el) return;
+  el.textContent = refBBox ? `${Math.round(refBBox.w)} × ${Math.round(refBBox.h)} mm（來自 B1）` : '尚未設定（將以 B1 為準）';
+}
+async function loadRefBBox(){
+  try{
+    const {data}=await db.from('floor_models').select('bbox').eq('floor_id','B1').maybeSingle();
+    if(data&&data.bbox&&typeof data.bbox.mnx==='number') refBBox=data.bbox;
+  }catch(e){}
+  updateRefFrameText();
+}
 
 // ─── floor select custom ───
 document.getElementById('floorSel').onchange=e=>{
@@ -178,13 +194,17 @@ async function handleFile(f){
     collect(dxf.entities||[], dxf.blocks||{}, p=>p, polylines, 0);
     if(!polylines.length){setMsg('找不到可繪製的幾何（線/弧/聚合線）','err');return;}
     const bbox=computeBBox(polylines);
-    renderNeon(polylines,bbox);
-    lastBBox=bbox;
+    const floor=currentFloor();
+    const usingRef = !!refBBox && floor!=='B1';
+    const drawBBox = usingRef ? refBBox : bbox;
+    renderNeon(polylines,drawBBox);
+    lastBBox=bbox; // 保留該檔案真實範圍：供統計顯示，且若這次上傳的是 B1，之後會成為新的標準框
     const npts=polylines.reduce((s,p)=>s+p.length,0);
     document.getElementById('stat').style.display='block';
     document.getElementById('stat').innerHTML=
       `檔名：<b>${escHtml(f.name)}</b><br>線段群組：<b>${polylines.length}</b>　頂點：<b>${npts}</b><br>`+
-      `範圍：<b>${Math.round(bbox.w)}</b> × <b>${Math.round(bbox.h)}</b> mm`;
+      `範圍：<b>${Math.round(bbox.w)}</b> × <b>${Math.round(bbox.h)}</b> mm`+
+      (usingRef ? `<br><span style="color:var(--amber)">已依標準框（B1）繪製，非本檔案原始比例</span>` : '');
     document.getElementById('cv').toBlob(b=>{lastBlob=b;document.getElementById('saveBtn').disabled=false;setMsg('解析完成，可按「更新模型」','ok');},'image/png');
   }catch(err){ setMsg('解析失敗：'+translateError(err.message),'err'); }
 }
@@ -278,6 +298,7 @@ async function saveModel(){
     const rec={floor_id:floor, name:label, image_path:path, bbox:lastBBox, updated_at:new Date().toISOString()};
     const ins=await db.from('floor_models').upsert(rec,{onConflict:'floor_id'});
     if(ins.error) throw ins.error;
+    if(floor==='B1'){ refBBox=lastBBox; updateRefFrameText(); }
     setMsg('✓ 已更新 '+floor+' 模型，平面圖與 3D 已同步','ok');
     loadSaved();
   }catch(err){
@@ -297,6 +318,7 @@ async function loadSaved(){
 }
 
 loadSaved();
+loadRefBBox();
 
 // warn if the DXF parser library failed to load from CDN
 setTimeout(()=>{
