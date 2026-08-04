@@ -71,6 +71,7 @@ begin
     'cost_records','audit_logs','handover_records','handover_cases',
     'handover_case_logs','handover_case_attachments','checkin_logs',
     'patrol_shift_template','patrol_shifts',
+    'dashboard_layouts','dashboard_layout_versions','dashboard_layout_items',
     'equipment_maintenance_plans','equipment_maintenance_records','equipment_contracts',
     'equipment_documents','equipment_annual_costs','equipment_external_links',
     'equipment_monitor_points','equipment_monitor_events'

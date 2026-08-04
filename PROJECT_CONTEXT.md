@@ -91,7 +91,8 @@
 10. `patrol_shifts.sql` / `checkin_logs.sql` — 駐衛警班別與簽到紀錄
 11. `rls_hardening.sql` / `rls_hardening_login_fix.sql` — 正式環境權限
 12. `auth_profile_recovery.sql` — 修復 Auth 已註冊但 `users` 清單缺資料的帳戶同步
-13. `permanent_data_protection.sql` — **最後執行**；禁止實體刪除/清空並建立人員異動快照
+13. `dashboard_layouts.sql` — 動態戰情儀表板版面、不可變版本、發布／還原 RPC 與預設版面
+14. `permanent_data_protection.sql` — **最後執行**；禁止實體刪除/清空並建立人員異動快照
 
 輔助 / 修補：`dept_rebuild.sql`、`org_update.sql`、`repair_request_timeout_fix.sql`。
 `dept_rebuild.sql` 現為安全增量同步，不會清空人員部門或刪除既有部門。
@@ -100,6 +101,13 @@
 `TRUNCATE` 或實體 `DELETE` 人員與業務歷程。所有人員異動會寫入 `users_history`。
 
 **⚠️ 新增/改欄位時**：若表已存在，`create table if not exists` 不會補欄位 → 必須另外寫 `alter table ... add column if not exists`（見 `plan_markers.sql` 的 `repair_id` 範例）。
+
+### 動態戰情儀表板擴充規則
+
+- `dashboard-builder.html` 提供拖拉、縮放、顯示／隱藏、草稿、發布與歷史版本還原。
+- `dashboard-layout.js` 是圖塊註冊表與預設版面的唯一來源；日後新增圖塊時，在此註冊一次，後台元件庫與前台會同步識別。
+- 舊版面缺少新註冊圖塊時，`DashboardLayout.normalize()` 會自動以預設位置補入，無須重建資料表；管理員下次發布時即寫入新版本。
+- 資料庫只保存允許的 `widget_key`、標題、位置、尺寸及設定，不保存或執行任意 HTML、JavaScript 或 SQL。
 
 ---
 

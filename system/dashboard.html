@@ -8,8 +8,11 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>戰情儀表板 — 報修派工管理系統</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack-all.js"></script>
+<script src="dashboard-layout.js?v=20260804-1"></script>
 <script src="patrolstatus.js"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
@@ -36,6 +39,7 @@ a{color:inherit;text-decoration:none}
 .head-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding:8px 12px;border-left:2px solid var(--cyan);font-size:.72rem;color:var(--text-dim)}
 .section-title{display:flex;align-items:center;gap:10px;margin:20px 0 10px;color:var(--text-hi);font-family:var(--font-head);font-size:.92rem;font-weight:700;letter-spacing:.08em}
 .section-title::before{content:'';width:4px;height:16px;border-radius:2px;background:var(--cyan);box-shadow:0 0 10px rgba(0,212,255,.4)}
+.section-title b{font:inherit;color:inherit}
 .section-title span{margin-left:auto;color:var(--text-dim);font-family:var(--font-mono);font-size:.62rem;font-weight:400;letter-spacing:.04em}
 
 /* ── toolbar ── */
@@ -50,6 +54,18 @@ a{color:inherit;text-decoration:none}
 .updated{font-size:.65rem;color:var(--text-dim);font-family:var(--font-mono)}
 .empty{color:var(--text-dim);font-size:.78rem;text-align:center;padding:20px}
 .loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;color:var(--cyan);font-family:var(--font-head);letter-spacing:.1em}
+
+/* ── dynamic dashboard layout ── */
+.dashboard-grid{margin:0 -8px;min-height:400px}.dashboard-grid>.grid-stack-item[hidden]{display:none!important}
+.dashboard-grid .grid-stack-item-content{inset:8px;background:transparent;border:0;overflow:hidden}
+.dashboard-widget{height:100%;min-height:0;overflow:auto}.dashboard-widget>.section-title{margin:0 0 10px}
+.dashboard-widget .pcard,.dashboard-widget .ccard,.dashboard-widget .rcard,.dashboard-widget .tcard{height:100%;min-height:0;margin:0}
+.dashboard-widget .pcard,.dashboard-widget .ccard,.dashboard-widget .tcard{display:flex;flex-direction:column}
+.dashboard-widget .chart-box,.dashboard-widget .trend-box{flex:1;height:auto;min-height:160px}
+.dashboard-widget .bars{overflow:auto}.dashboard-widget-alert{display:flex;align-items:stretch}.dashboard-widget-alert .alert-bar{width:100%;margin:0;align-content:stretch}
+.dashboard-widget-kpis .kpi-strip{height:calc(100% - 30px);align-items:stretch}.dashboard-widget-kpis .ks{min-height:0}
+.layout-fallback{display:none;padding:8px 12px;margin-bottom:10px;border:1px solid rgba(255,179,0,.45);border-radius:4px;background:rgba(255,179,0,.08);color:var(--amber);font-size:.7rem}
+.layout-fallback.show{display:block}
 
 /* ── alert bar ── */
 .alert-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
@@ -136,6 +152,7 @@ a{color:inherit;text-decoration:none}
   .wrap{padding:12px 10px 28px}.dashboard-head h1{font-size:1.35rem}.dashboard-head p{font-size:.72rem}
   .toolbar{align-items:stretch;padding:10px}.toolbar-group,.toolbar-range{width:100%}.toolbar-range input{flex:1;min-width:0}
   .qbtn{flex:1}.toolbar-label{width:100%}
+  .dashboard-grid{margin:0 -4px}.dashboard-grid .grid-stack-item-content{inset:4px}.dashboard-widget>.section-title{font-size:.78rem}
   .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ks{min-height:78px;padding:11px}.ks .ks-icon{display:none}.ks .ks-n{font-size:1.45rem}
   .section-title{margin-top:16px}.dash-main,.rank-grid{gap:10px}.rank-grid{grid-template-columns:1fr}
   .pcard,.ccard,.rcard,.tcard{padding:13px}.ps{gap:6px}.pc{padding:8px 6px}.pc .n{font-size:1.35rem}
@@ -154,6 +171,7 @@ a{color:inherit;text-decoration:none}
   </div>
   <div class="nav-space"></div>
 <a href="dashboard.html"><button class="nav-back"><span class="ic ic-dashboard"></span> 戰情儀表板</button></a>
+<a id="layoutBuilderLink" href="dashboard-builder.html" hidden><button class="nav-back">版面設定</button></a>
 <a href="admin.html#repairs"><button class="nav-back"><span class="ic ic-dispatch"></span> 報修系統</button></a>
 <a href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7"><button class="nav-back"><img src="../assets/system-icons/guardpatrol-icon.png" alt="" style="width:16px;height:16px;vertical-align:-3px;object-fit:contain"> 駐衛警巡檢</button></a>
 <a href="dispatch.html"><button class="nav-back"><span class="ic ic-dispatch"></span> 派工系統</button></a>
@@ -189,16 +207,18 @@ a{color:inherit;text-decoration:none}
     </div>
   </div>
 
-  <!-- alert bar -->
-  <div class="alert-bar" id="alertBar"></div>
+  <div id="layoutFallback" class="layout-fallback"></div>
+  <div id="dashboardGrid" class="grid-stack dashboard-grid">
+    <div class="grid-stack-item" gs-id="alerts" data-widget-key="alerts" gs-x="0" gs-y="0" gs-w="12" gs-h="1" gs-min-w="3" gs-min-h="1"><div class="grid-stack-item-content"><section class="dashboard-widget dashboard-widget-alert">
+      <div class="alert-bar" id="alertBar"></div>
+    </section></div></div>
 
-  <!-- KPI strip -->
-  <div class="section-title">營運關鍵指標<span>MAINTENANCE KPI</span></div>
-  <div class="kpi-strip" id="kpiStrip"></div>
+    <div class="grid-stack-item" gs-id="kpis" data-widget-key="kpis" gs-x="0" gs-y="1" gs-w="12" gs-h="2" gs-min-w="4" gs-min-h="2"><div class="grid-stack-item-content"><section class="dashboard-widget dashboard-widget-kpis">
+      <div class="section-title"><b data-widget-title>營運關鍵指標</b><span>MAINTENANCE KPI</span></div>
+      <div class="kpi-strip" id="kpiStrip"></div>
+    </section></div></div>
 
-  <!-- patrol + status doughnut -->
-  <div class="section-title">即時監控<span>LIVE OPERATIONS</span></div>
-  <div class="dash-main">
+    <div class="grid-stack-item" gs-id="patrol" data-widget-key="patrol" gs-x="0" gs-y="3" gs-w="8" gs-h="6" gs-min-w="4" gs-min-h="4"><div class="grid-stack-item-content"><section class="dashboard-widget">
     <div class="pcard">
       <h3>駐衛警巡檢即時 <span class="tag" id="pt">12s</span></h3>
       <div class="ps">
@@ -209,26 +229,26 @@ a{color:inherit;text-decoration:none}
       <div id="pi"></div>
       <div id="pg"></div>
     </div>
+    </section></div></div>
+
+    <div class="grid-stack-item" gs-id="status" data-widget-key="status" gs-x="8" gs-y="3" gs-w="4" gs-h="6" gs-min-w="3" gs-min-h="4"><div class="grid-stack-item-content"><section class="dashboard-widget">
     <div class="ccard">
-      <h3>◐ 案件狀態分佈</h3>
+      <h3>◐ <span data-widget-title>案件狀態分佈</span></h3>
       <div class="chart-box"><canvas id="statusChart"></canvas></div>
     </div>
-  </div>
+    </section></div></div>
 
-  <!-- rankings 2x2 -->
-  <div class="section-title">報修與維修分析<span>RANKING ANALYSIS</span></div>
-  <div class="rank-grid">
-    <div class="rcard"><h3>各單位報修排行<span class="tag">前 8</span></h3><div class="bars" id="rkDept"></div></div>
-    <div class="rcard"><h3>各設備故障排行<span class="tag">前 8</span></h3><div class="bars" id="rkEqp"></div></div>
-    <div class="rcard"><h3>維修人員案件數<span class="tag">前 8</span></h3><div class="bars" id="rkTech"></div></div>
-    <div class="rcard"><h3>⚑ 故障類型分析</h3><div class="bars" id="rkFault"></div></div>
-  </div>
+    <div class="grid-stack-item" gs-id="rank_dept" data-widget-key="rank_dept" gs-x="0" gs-y="9" gs-w="6" gs-h="4" gs-min-w="3" gs-min-h="3"><div class="grid-stack-item-content"><section class="dashboard-widget"><div class="rcard"><h3><span data-widget-title>各單位報修排行</span><span class="tag">前 8</span></h3><div class="bars" id="rkDept"></div></div></section></div></div>
+    <div class="grid-stack-item" gs-id="rank_equipment" data-widget-key="rank_equipment" gs-x="6" gs-y="9" gs-w="6" gs-h="4" gs-min-w="3" gs-min-h="3"><div class="grid-stack-item-content"><section class="dashboard-widget"><div class="rcard"><h3><span data-widget-title>各設備故障排行</span><span class="tag">前 8</span></h3><div class="bars" id="rkEqp"></div></div></section></div></div>
+    <div class="grid-stack-item" gs-id="rank_technician" data-widget-key="rank_technician" gs-x="0" gs-y="13" gs-w="6" gs-h="4" gs-min-w="3" gs-min-h="3"><div class="grid-stack-item-content"><section class="dashboard-widget"><div class="rcard"><h3><span data-widget-title>維修人員案件數</span><span class="tag">前 8</span></h3><div class="bars" id="rkTech"></div></div></section></div></div>
+    <div class="grid-stack-item" gs-id="rank_fault" data-widget-key="rank_fault" gs-x="6" gs-y="13" gs-w="6" gs-h="4" gs-min-w="3" gs-min-h="3"><div class="grid-stack-item-content"><section class="dashboard-widget"><div class="rcard"><h3>⚑ <span data-widget-title>故障類型分析</span></h3><div class="bars" id="rkFault"></div></div></section></div></div>
 
-  <!-- trend full width -->
-  <div class="section-title">長期趨勢<span>12-MONTH TREND</span></div>
-  <div class="tcard">
-    <h3>📈 各月份報修趨勢<span class="tag">12 月</span></h3>
-    <div class="trend-box"><canvas id="trendChart"></canvas></div>
+    <div class="grid-stack-item" gs-id="trend" data-widget-key="trend" gs-x="0" gs-y="17" gs-w="12" gs-h="5" gs-min-w="4" gs-min-h="4"><div class="grid-stack-item-content"><section class="dashboard-widget">
+    <div class="tcard">
+      <h3>📈 <span data-widget-title>各月份報修趨勢</span><span class="tag">12 月</span></h3>
+      <div class="trend-box"><canvas id="trendChart"></canvas></div>
+    </div>
+    </section></div></div>
   </div>
 </div>
 
@@ -456,6 +476,36 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
 (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
 
+let dashboardGrid=null;
+async function initDashboardLayout(){
+  dashboardGrid=GridStack.init({
+    column:12,cellHeight:80,margin:0,staticGrid:true,float:false,animate:false,
+    columnOpts:{breakpoints:[{w:720,c:1},{w:1100,c:6}]}
+  },'#dashboardGrid');
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    if(session){
+      const {data:profile}=await db.from('users').select('role,rbac_role').eq('auth_id',session.user.id).eq('status','active').maybeSingle();
+      if(profile&&(profile.rbac_role==='sysadmin'||profile.role==='admin'))document.getElementById('layoutBuilderLink').hidden=false;
+    }
+    const previewId=new URLSearchParams(location.search).get('layoutPreview');
+    let versionId=previewId;
+    if(!versionId){
+      const {data:layout,error}=await db.from('dashboard_layouts').select('layout_id,published_version_id').eq('layout_code','operations_main').eq('status','active').maybeSingle();
+      if(error)throw error;
+      versionId=layout&&layout.published_version_id;
+    }
+    if(!versionId){DashboardLayout.applyToGrid(dashboardGrid,DashboardLayout.defaults());return;}
+    const {data:items,error}=await db.from('dashboard_layout_items').select('*').eq('version_id',versionId).order('sort_order');
+    if(error)throw error;
+    DashboardLayout.applyToGrid(dashboardGrid,items);
+  }catch(error){
+    DashboardLayout.applyToGrid(dashboardGrid,DashboardLayout.defaults());
+    console.warn('Dashboard layout fallback:',error);
+  }
+  setTimeout(()=>{if(statusChart)statusChart.resize();if(trendChart)trendChart.resize();},80);
+}
+
 const OPEN_REQ=['pending','transferred','assigned','in_progress','waiting_parts','waiting_vendor','pending_review'];
 const DONE_ORD=['completed','closed'];
 let trendChart=null, statusChart=null;
@@ -599,8 +649,8 @@ async function drawTrend(){
     options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},plugins:{legend:{labels:{color:cssVar('--text'),boxWidth:14,usePointStyle:true}},tooltip:{padding:10}},scales:{x:{ticks:{color:cssVar('--text-dim')},grid:{color:cssVar('--border')}},y:{ticks:{color:cssVar('--text-dim'),precision:0},grid:{color:cssVar('--border')},beginAtZero:true}}}});
 }
 
-// init
-quick('month');
+// init：版面資料表尚未套用或暫時無法連線時，仍使用程式內建預設版面。
+initDashboardLayout().finally(()=>quick('month'));
 </script>
 <script>
 const P_MS=12000;let _pt;
