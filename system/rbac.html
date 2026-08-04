@@ -158,12 +158,28 @@ async function togglePerm(role,perm,val){
   const {error}=await db.from('role_permissions').upsert({role_id:role,perm,allowed:val},{onConflict:'role_id,perm'});
   toast(error?('儲存失敗：'+translateError(error.message)):'已更新',!!error);
 }
+let allRbacUsers=[], rbacUserPage=1;
+const RBAC_USER_PAGE_SIZE=20;
 async function renderUsers(){
   const {data:users}=await db.from('users').select('user_id,name,role,rbac_role,department').eq('status','active').order('name');
+  allRbacUsers=users||[];
+  rbacUserPage=1;
+  renderUsersPage();
+}
+function changeUsersPage(delta){
+  rbacUserPage+=delta;
+  renderUsersPage();
+}
+function renderUsersPage(){
   const box=document.getElementById('userTbl');
+  const users=allRbacUsers;
   if(!users||!users.length){box.innerHTML='<div class="empty">無使用者</div>';return;}
-  box.innerHTML='<table><tr><th style="text-align:left">姓名</th><th style="text-align:left">單位</th><th style="text-align:left">系統角色(RBAC)</th></tr>'+
-    users.map(u=>{
+  const totalPages=Math.max(1,Math.ceil(users.length/RBAC_USER_PAGE_SIZE));
+  if(rbacUserPage>totalPages)rbacUserPage=totalPages;
+  if(rbacUserPage<1)rbacUserPage=1;
+  const pageUsers=users.slice((rbacUserPage-1)*RBAC_USER_PAGE_SIZE,rbacUserPage*RBAC_USER_PAGE_SIZE);
+  const table='<table><tr><th style="text-align:left">姓名</th><th style="text-align:left">單位</th><th style="text-align:left">系統角色(RBAC)</th></tr>'+
+    pageUsers.map(u=>{
       // 管理部主管已從選單移除；若有人現有指派仍是這個角色，保留一個唯讀顯示用選項，避免下拉選單顯示錯誤
       const stale = u.rbac_role==='mgmt_supervisor' ? `<option value="mgmt_supervisor" selected>管理部主管（已停用）</option>` : '';
       return `<tr><td class="rolename">${escHtml(u.name)}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(u.department||'—')}</td>
@@ -171,6 +187,12 @@ async function renderUsers(){
         <option value="">（未指定）</option>${stale}${roles.map(r=>`<option value="${r.role_id}" ${u.rbac_role===r.role_id?'selected':''}>${escHtml(r.name)}</option>`).join('')}
       </select></td></tr>`;
     }).join('')+'</table>';
+  const pager=`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;color:var(--text-dim);font-family:var(--font-mono);font-size:.78rem">
+    <button onclick="changeUsersPage(-1)" ${rbacUserPage<=1?'disabled':''} style="padding:4px 12px;background:rgba(12,40,64,.5);border:1px solid var(--border);color:${rbacUserPage<=1?'var(--text-dim)':'var(--cyan)'};cursor:${rbacUserPage<=1?'default':'pointer'};border-radius:2px;font-family:var(--font-mono)">◀</button>
+    <span>第 ${rbacUserPage} / ${totalPages} 頁（共 ${users.length} 筆，每頁 ${RBAC_USER_PAGE_SIZE} 筆）</span>
+    <button onclick="changeUsersPage(1)" ${rbacUserPage>=totalPages?'disabled':''} style="padding:4px 12px;background:rgba(12,40,64,.5);border:1px solid var(--border);color:${rbacUserPage>=totalPages?'var(--text-dim)':'var(--cyan)'};cursor:${rbacUserPage>=totalPages?'default':'pointer'};border-radius:2px;font-family:var(--font-mono)">▶</button>
+  </div>`;
+  box.innerHTML=table+pager;
 }
 async function setUserRole(uid,role){
   const updates = role ? { rbac_role:role, role:LEGACY_ROLE_BY_RBAC[role] || 'inspector', permissions:permissionsForRole(role) } : { rbac_role:null };
