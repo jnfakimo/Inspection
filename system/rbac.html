@@ -132,7 +132,8 @@ async function init(){
     db.from('role_permissions').select('*')
   ]);
   if(re){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">尚未建立 roles 表，請先執行 work_order_schema.sql</div>';return;}
-  roles=r||[]; perms={}; (rp||[]).forEach(x=>{perms[x.role_id+'|'+x.perm]=x.allowed;});
+  // 管理部主管已停用，不再於角色權限矩陣／系統存取權限／使用者角色指派中出現
+  roles=(r||[]).filter(x=>x.role_id!=='mgmt_supervisor'); perms={}; (rp||[]).forEach(x=>{perms[x.role_id+'|'+x.perm]=x.allowed;});
   renderMatrix(); renderSysMatrix(); renderUsers();
 }
 function buildMatrixHtml(list,opts){
@@ -162,10 +163,14 @@ async function renderUsers(){
   const box=document.getElementById('userTbl');
   if(!users||!users.length){box.innerHTML='<div class="empty">無使用者</div>';return;}
   box.innerHTML='<table><tr><th style="text-align:left">姓名</th><th style="text-align:left">單位</th><th style="text-align:left">系統角色(RBAC)</th></tr>'+
-    users.map(u=>`<tr><td class="rolename">${escHtml(u.name)}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(u.department||'—')}</td>
+    users.map(u=>{
+      // 管理部主管已從選單移除；若有人現有指派仍是這個角色，保留一個唯讀顯示用選項，避免下拉選單顯示錯誤
+      const stale = u.rbac_role==='mgmt_supervisor' ? `<option value="mgmt_supervisor" selected>管理部主管（已停用）</option>` : '';
+      return `<tr><td class="rolename">${escHtml(u.name)}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(u.department||'—')}</td>
       <td style="text-align:left"><select onchange="setUserRole('${u.user_id}',this.value)">
-        <option value="">（未指定）</option>${roles.map(r=>`<option value="${r.role_id}" ${u.rbac_role===r.role_id?'selected':''}>${escHtml(r.name)}</option>`).join('')}
-      </select></td></tr>`).join('')+'</table>';
+        <option value="">（未指定）</option>${stale}${roles.map(r=>`<option value="${r.role_id}" ${u.rbac_role===r.role_id?'selected':''}>${escHtml(r.name)}</option>`).join('')}
+      </select></td></tr>`;
+    }).join('')+'</table>';
 }
 async function setUserRole(uid,role){
   const updates = role ? { rbac_role:role, role:LEGACY_ROLE_BY_RBAC[role] || 'inspector', permissions:permissionsForRole(role) } : { rbac_role:null };
