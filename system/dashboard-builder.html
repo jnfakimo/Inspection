@@ -107,7 +107,12 @@ function buildGrid(items){
   const normalized=DashboardLayout.normalize(items);
   normalized.forEach(item=>{
     const c=DashboardLayout.byKey[item.widget_key];titles[item.widget_key]=item.title;visibility[item.widget_key]=item.visible;
-    const el=grid.addWidget({id:item.widget_key,x:item.x,y:item.y,w:item.width,h:item.height,minW:item.min_width,minH:item.min_height,content:previewMarkup(c)});
+    const el=grid.addWidget({id:item.widget_key,x:item.x,y:item.y,w:item.width,h:item.height,minW:item.min_width,minH:item.min_height});
+    // GridStack 12 intentionally renders the `content` option as plain text.
+    // Our preview is built from an allow-listed local catalog, so attach its escaped
+    // markup to the generated content element after GridStack creates the widget.
+    const content=el.querySelector('.grid-stack-item-content');
+    if(content)content.innerHTML=previewMarkup(c);
     el.dataset.widgetKey=item.widget_key;el.classList.toggle('is-hidden',!item.visible);
     el.addEventListener('click',()=>selectWidget(item.widget_key));
   });
