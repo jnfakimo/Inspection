@@ -95,6 +95,7 @@
   function addMapMarkers(svg){
     const layer=svg.querySelector('.weather-marker-layer');if(!layer)return;
     layer.textContent='';
+    if(!state.summary)return;
     svg.querySelectorAll('.county').forEach(path=>{
       const data=countyData(path.dataset.county),x=Number(path.dataset.cx),y=Number(path.dataset.cy);
       if(!Number.isFinite(x)||!Number.isFinite(y))return;
@@ -178,10 +179,17 @@
 
   async function refresh(){
     try{
+      await Promise.all([hydrateMap('weatherMiniMap',false),hydrateMap('weatherFullMap',true)]);
+    }catch(error){
+      console.error(error);
+      ['weatherMiniMap','weatherFullMap'].forEach(id=>{const box=byId(id);if(box)box.textContent='臺灣縣市地圖載入失敗';});
+    }
+    try{
       state.summary=await api('summary');
       const updated=byId('weatherUpdated');if(updated)updated.textContent=(state.summary.stale?'快取資料 ':'更新 ')+localTime(state.summary.updatedAt);
       renderAlerts();renderSummary();renderCountyPanel();
-      await Promise.all([hydrateMap('weatherMiniMap',false),hydrateMap('weatherFullMap',true)]);
+      document.querySelectorAll('.weather-map-shell svg').forEach(addMapMarkers);
+      updateMapStates();
     }catch(error){showError(error.message||'中央氣象署資料載入失敗');}
   }
 
