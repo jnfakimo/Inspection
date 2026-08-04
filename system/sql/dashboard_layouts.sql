@@ -270,3 +270,7 @@ where l.layout_code='operations_main'
   and l.published_version_id is null;
 
 commit;
+
+-- 讓 Supabase PostgREST 立即辨識本檔新增的 RPC，避免短時間仍回報
+-- "Could not find the function ... in the schema cache"。
+notify pgrst, 'reload schema';

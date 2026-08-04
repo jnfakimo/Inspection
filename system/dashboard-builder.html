@@ -30,7 +30,7 @@ body{background-image:linear-gradient(rgba(0,212,255,.014) 1px,transparent 1px),
 .inspector{padding:12px}.field{margin-bottom:12px}.field label{display:block;font-size:.67rem;color:var(--text-dim);margin-bottom:5px}.field input,.field select{width:100%;padding:8px 9px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px}.field input:focus,.field select:focus{outline:none;border-color:var(--cyan)}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check{display:flex;align-items:center;gap:7px;font-size:.74rem;color:var(--text-hi)}.check input{accent-color:var(--cyan)}
 .version-list{border-top:1px solid var(--border);padding:12px}.version-list h3{font-size:.76rem;color:var(--text-hi);margin:0 0 8px}.version-list select{width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;margin-bottom:8px}.version-meta{font-size:.62rem;color:var(--text-dim);line-height:1.55}
 .notice{padding:9px 12px;border:1px solid rgba(255,179,0,.45);background:rgba(255,179,0,.08);color:var(--amber);border-radius:4px;font-size:.7rem;margin-bottom:12px;display:none}.notice.show{display:block}
-.loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:9999;color:var(--cyan);letter-spacing:.08em}.fatal{max-width:620px;padding:24px;border:1px solid var(--red);border-radius:6px;background:var(--panel);color:var(--text);line-height:1.7}.fatal strong{color:var(--red)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:9999;color:var(--cyan);letter-spacing:.08em}.fatal{max-width:680px;padding:24px;border:1px solid var(--red);border-radius:6px;background:var(--panel);color:var(--text);line-height:1.7}.fatal strong{color:var(--red)}.fatal-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.fatal-actions a,.fatal-actions button{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border:1px solid var(--border-hi);border-radius:4px;background:rgba(0,212,255,.06);color:var(--cyan);font:inherit;font-size:.72rem;text-decoration:none;cursor:pointer}.fatal-actions a:hover,.fatal-actions button:hover{border-color:var(--cyan)}
 @media(max-width:1180px){.app{grid-template-columns:220px minmax(0,1fr)}.right-panel{grid-column:1/-1}.right-panel .inspector{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}.right-panel .field{margin:0}.version-list{grid-column:1/-1}}
 @media(max-width:760px){.app{display:block;padding:10px}.panel,.workspace{margin-bottom:10px}.catalog{grid-template-columns:1fr 1fr}.right-panel .inspector{display:block}.right-panel .field{margin-bottom:10px}.toolbar .title{width:100%;margin:0}.btn{flex:1}.canvas{min-height:520px}}
 </style>
@@ -93,7 +93,7 @@ function setState(message,type=''){
 }
 function showNotice(message){const el=document.getElementById('notice');el.textContent=message;el.classList.add('show');}
 function fatal(message){
-  document.getElementById('loading').innerHTML='<div class="fatal"><strong>無法開啟戰情版面設定</strong><br>'+DashboardLayout.escapeHTML(message)+'</div>';
+  document.getElementById('loading').innerHTML='<div class="fatal"><strong>無法開啟戰情版面設定</strong><br>'+DashboardLayout.escapeHTML(message)+'<div class="fatal-actions"><button type="button" onclick="location.reload()">重新檢查</button><a href="https://raw.githubusercontent.com/jnfakimo/word-cloud/main/system/sql/dashboard_layouts.sql" target="_blank" rel="noopener">開啟安裝 SQL</a><a href="dashboard.html">返回戰情儀表板</a></div></div>';
 }
 function markDirty(){dirty=true;setState('版面有尚未儲存的修改。');}
 function previewMarkup(c){
@@ -170,7 +170,7 @@ function toggleButtons(disabled){['saveBtn','publishBtn','previewBtn','restoreBt
 async function init(){
   const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html?redirect=dashboard-builder.html';return;}
   const {data:allowed,error:accessError}=await db.rpc('can_manage_dashboard_layout');
-  if(accessError){fatal('請先在 Supabase SQL Editor 執行 system/sql/dashboard_layouts.sql。詳細訊息：'+accessError.message);return;}
+  if(accessError){fatal('請先在 Supabase SQL Editor 執行 system/sql/dashboard_layouts.sql；若剛執行完成，請稍候數秒後按「重新檢查」。詳細訊息：'+accessError.message);return;}
   if(!allowed){fatal('目前帳號沒有編輯戰情儀表板版面的權限。');return;}
   const {data,error}=await db.from('dashboard_layouts').select('*').eq('layout_code','operations_main').single();
   if(error||!data){fatal('找不到儀表板版面主檔，請重新執行 system/sql/dashboard_layouts.sql。');return;}
