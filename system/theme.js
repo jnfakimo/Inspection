@@ -189,13 +189,21 @@
     style.textContent='.system-actions-unified{display:inline-flex;align-items:center;justify-content:flex-end;gap:10px;margin-left:0;white-space:nowrap;order:900}.system-action-unified{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:5px 11px;border:1px solid var(--border,#dbe4ee);border-radius:3px;background:transparent;color:var(--text-dim,#64748b);font-size:.72rem;line-height:1;text-decoration:none;white-space:nowrap;transition:border-color .2s,color .2s,background .2s}.system-action-unified:hover,.system-action-unified:focus-visible{border-color:var(--cyan,#0284c7);color:var(--cyan,#0284c7);outline:none}.system-action-unified.is-current{border-color:var(--cyan,#0284c7);color:var(--cyan,#0284c7);background:rgba(0,212,255,.08);font-weight:700}.system-action-icon{display:inline-block;width:15px;height:15px;object-fit:contain;flex:0 0 15px}.system-action-unified.is-current .system-action-icon{filter:drop-shadow(0 0 4px rgba(0,132,199,.3))}@media(max-width:1100px){.system-actions-unified{gap:6px;flex-wrap:wrap}.system-action-unified{padding:5px 8px}}@media(max-width:720px){.system-actions-unified{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));order:998}.system-action-unified{min-width:0;min-height:44px;padding:6px 3px;font-size:.62rem;gap:3px}.system-action-icon{width:13px;height:13px;flex-basis:13px}}';
     document.head.appendChild(style);
 
-    var replaceTargets={'dashboard.html':1,'workorder.html':1,'repair.html':1,'admin.html':1,'dispatch.html':1,'equipment.html':1,'guardpatrol.html':1,'guardpatrol-index.html':1,'handover.html':1};
+    // href 對到其中一把 key 就是舊版「共用導覽」連結，理當被下面新插入的統一版取代而移除；
+    // guardpatrol.html/guardpatrol-index.html 這兩把多加了 label 檢查，因為 guardpatrol.html
+    // 同時也是少數頁面（guardpatrol3d.html、patrolshifts.html、patrol-notifications.html）
+    // 「巡檢稽核總覽」這個頁面專屬捷徑的目的地——純比對 href 會誤刪掉那個不相關的連結，
+    // 所以這兩把才需要連 label 文字也符合「駐衛警巡檢」才真的移除。
+    var replaceTargets={'dashboard.html':'','workorder.html':'','repair.html':'','admin.html':'','dispatch.html':'','equipment.html':'','guardpatrol.html':'駐衛警巡檢','guardpatrol-index.html':'駐衛警巡檢','handover.html':''};
     Array.prototype.slice.call(host.children).forEach(function(child){
       if(child===meta)return;
       if(child.tagName==='A'){
         var href='';
         try{href=(new URL(child.getAttribute('href')||'',location.href).pathname.split('/').pop()||'').toLowerCase();}catch(e){}
-        if(replaceTargets[href])child.remove();
+        if(href in replaceTargets){
+          var expectLabel=replaceTargets[href];
+          if(!expectLabel||(child.textContent||'').indexOf(expectLabel)!==-1)child.remove();
+        }
       }else if(child.tagName==='SPAN'&&(child.textContent||'').trim()==='後台'){
         child.remove();
       }

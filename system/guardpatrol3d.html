@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-1"></script>
+<script src="theme.js?v=20260804-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -151,7 +151,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
   <div class="tb-space"></div>
   <div class="view-switch" role="group" aria-label="巡檢模型切換">
     <button id="view3dBtn" class="view-btn active" type="button" onclick="switchPatrolView('3d')">3D 駐警巡檢</button>
-    <button id="viewFlatBtn" class="view-btn" type="button" onclick="switchPatrolView('flat')">平面駐警巡檢</button>
+    <button id="viewFlatBtn" class="view-btn" type="button" onclick="switchPatrolView('flat')">電子地圖巡檢</button>
   </div>
   <button id="modelUpdateBtn" class="tb-back mobile-hide" type="button" style="display:none" onclick="manualRefreshCurrentModel()"><span class="ic ic-refresh"></span> 更新目前模型</button>
   <a href="guardpatrol.html" class="tb-back">巡檢稽核總覽</a>
@@ -160,7 +160,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
 </div>
 
 <div id="c3d"></div>
-<div id="flatView" aria-hidden="true"><iframe id="flatFrame" title="平面駐警巡檢模型圖" loading="lazy"></iframe></div>
+<div id="flatView" aria-hidden="true"><iframe id="flatFrame" title="電子地圖巡檢模型圖" loading="lazy"></iframe></div>
 <button id="panelToggle" onclick="togglePanel(true)" aria-controls="panel" aria-expanded="false">立體控制</button>
 
 <button id="floorsToggle" onclick="toggleFloorsMenu()">樓層顯示 <span class="cv">▾</span></button>
