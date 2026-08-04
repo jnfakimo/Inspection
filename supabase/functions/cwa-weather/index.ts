@@ -21,6 +21,31 @@ const COUNTIES = [
   "高雄市", "屏東縣", "宜蘭縣", "花蓮縣", "臺東縣", "澎湖縣", "金門縣", "連江縣",
 ];
 
+const TOWN_DATASET_BY_COUNTY: Record<string, string> = {
+  "宜蘭縣": "F-D0047-001",
+  "桃園市": "F-D0047-005",
+  "新竹縣": "F-D0047-009",
+  "苗栗縣": "F-D0047-013",
+  "彰化縣": "F-D0047-017",
+  "南投縣": "F-D0047-021",
+  "雲林縣": "F-D0047-025",
+  "嘉義縣": "F-D0047-029",
+  "屏東縣": "F-D0047-033",
+  "臺東縣": "F-D0047-037",
+  "花蓮縣": "F-D0047-041",
+  "澎湖縣": "F-D0047-045",
+  "基隆市": "F-D0047-049",
+  "新竹市": "F-D0047-053",
+  "嘉義市": "F-D0047-057",
+  "臺北市": "F-D0047-061",
+  "高雄市": "F-D0047-065",
+  "新北市": "F-D0047-069",
+  "臺中市": "F-D0047-073",
+  "臺南市": "F-D0047-077",
+  "連江縣": "F-D0047-081",
+  "金門縣": "F-D0047-085",
+};
+
 type JsonObject = Record<string, unknown>;
 type CountyWeather = {
   county: string;
@@ -362,7 +387,7 @@ function parseTownForecast(data: unknown, county: string) {
       maxTemperature: numberValue(get("最高溫度", "MaxT").value),
       rainProbability: numberValue(get("12小時降雨機率", "降雨機率", "PoP12h", "PoP").value),
       humidity: numberValue(get("平均相對濕度", "相對濕度", "RH").value),
-      windSpeed: get("風速", "WS").value,
+      windSpeed: get("風向風速", "風速", "WS").value,
       description: get("天氣預報綜合描述", "WeatherDescription").value,
       startsAt: textValue(pick(firstTime(array(pick(town, ["WeatherElement", "weatherElement"]))[0]), ["StartTime", "startTime", "DataTime"])),
     };
@@ -488,13 +513,15 @@ Deno.serve(async (request) => {
     if (view === "town") {
       const county = canonicalCounty(url.searchParams.get("county"));
       if (!COUNTIES.includes(county)) return json({ ok: false, message: "請指定正確縣市" }, 400);
-      const payload = await cachedResponse(`town:v1:${county}`, 1800, async () => ({
+      const dataset = TOWN_DATASET_BY_COUNTY[county];
+      const payload = await cachedResponse(`town:v2:${county}`, 1800, async () => ({
         ok: true,
         configured: true,
         view,
         county,
         updatedAt: new Date().toISOString(),
-        towns: parseTownForecast(await fetchCwa("F-D0047-091", { locationName: county }), county),
+        dataset,
+        towns: parseTownForecast(await fetchCwa(dataset), county),
       }));
       return json(payload);
     }
