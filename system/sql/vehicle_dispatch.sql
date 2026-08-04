@@ -169,6 +169,11 @@ alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_time_check
   check (planned_return_time > planned_departure_time and
     (actual_departure_at is null or actual_return_at is null or actual_return_at >= actual_departure_at));
+alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_no_time_overlap;
+alter table vehicle_dispatch_requests add constraint vehicle_dispatch_no_time_overlap
+  exclude using gist (
+    tsrange(trip_date + planned_departure_time,trip_date + planned_return_time,'[)') with &&
+  ) where (status in ('pending_approval','approved','assigned','completed'));
 alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_mileage_check;
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_mileage_check
   check ((odometer_start is null or odometer_start >= 0) and
@@ -249,6 +254,38 @@ drop trigger if exists trg_vehicle_dispatch_updated_at on vehicle_dispatch_reque
 create trigger trg_vehicle_dispatch_updated_at
   before update on vehicle_dispatch_requests
   for each row execute function touch_vehicle_updated_at();
+
+create or replace function guard_vehicle_dispatch_approval()
+returns trigger
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  actor_id uuid;
+  actor_role text;
+  actor_department text;
+begin
+  if old.status='pending_approval' and new.status in ('approved','returned') then
+    if auth.uid() is null then return new; end if;
+    select u.user_id,
+      coalesce(u.rbac_role,case u.role when 'admin' then 'sysadmin' when 'supervisor' then 'unit_supervisor' when 'maintenance' then 'technician' else 'reporter' end),
+      u.department
+    into actor_id,actor_role,actor_department
+    from users u where u.auth_id=auth.uid() and u.status='active' limit 1;
+    if actor_id is null then raise exception using errcode='42501',message='找不到有效的核可人員帳號'; end if;
+    if actor_id=old.applicant_id then raise exception using errcode='42501',message='申請人不得核准或退回自己的派車申請'; end if;
+    if actor_role not in ('unit_supervisor','mgmt_supervisor','sysadmin') then raise exception using errcode='42501',message='目前帳號沒有單位主管核可權限'; end if;
+    if actor_role<>'sysadmin' and trim(coalesce(actor_department,''))<>trim(coalesce(old.applicant_department,'')) then raise exception using errcode='42501',message='僅限申請人所屬單位主管核可'; end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_vehicle_dispatch_approval on vehicle_dispatch_requests;
+create trigger trg_guard_vehicle_dispatch_approval
+  before update on vehicle_dispatch_requests
+  for each row execute function guard_vehicle_dispatch_approval();
 
 alter table official_vehicles enable row level security;
 alter table vehicle_dispatch_requests enable row level security;
