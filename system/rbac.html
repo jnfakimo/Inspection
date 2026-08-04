@@ -139,7 +139,7 @@ function departmentPath(deptId){
   while(current&&guard++<10&&!seen.has(current.dept_id)){seen.add(current.dept_id);names.unshift(current.name);current=departmentMap.get(current.parent_id);}
   return names.join(' / ');
 }
-function departmentForUser(user){return departmentPath(user?.dept_id)||String(user?.department||'').trim()||'—';}
+function departmentForUser(user){return departmentPath(user?.dept_id)||String(user?.department||'').trim()||'未設定單位';}
 function permissionsForRole(role){
   const out={inspector:false,maintenance:false,handover:false,repair:false};
   Object.assign(out,MENU_PRESETS[role]||{});

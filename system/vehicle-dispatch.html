@@ -213,7 +213,7 @@ function departmentPathForId(deptId){
   while(current&&guard++<10&&!seen.has(current.dept_id)){seen.add(current.dept_id);names.unshift(current.name);current=map.get(current.parent_id);}
   return names.join(' / ');
 }
-function departmentForUser(user){return departmentPathForId(user?.dept_id)||String(user?.department||'').trim()||'—';}
+function departmentForUser(user){return departmentPathForId(user?.dept_id)||String(user?.department||'').trim()||'未設定單位';}
 function sameDepartment(request){
   const applicant=state.users.find(x=>x.user_id===request.applicant_id);
   if(currentUser?.dept_id&&applicant?.dept_id)return currentUser.dept_id===applicant.dept_id;
@@ -275,7 +275,7 @@ async function loadAll(silent=false){
   if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
   schemaReady=true;byId('setupBanner').className='setup-banner';
   state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],departments:departments.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[],drivers:drivers.data||[]};
-  const resolvedDepartment=departmentForUser(currentUser);if(resolvedDepartment!=='—'){currentUser.department=resolvedDepartment;if(window.SystemUserProfile?.save)window.SystemUserProfile.save(currentUser);}
+  const resolvedDepartment=departmentForUser(currentUser);if(resolvedDepartment!=='未設定單位'){currentUser.department=resolvedDepartment;if(window.SystemUserProfile?.save)window.SystemUserProfile.save(currentUser);}
   updateRoleText();byId('vehicleBtn').hidden=!isManager();byId('reportBtn').hidden=!canReport();
   byId('driverTodayTab').hidden=!isVehicleDriver();
   if(isVehicleDriver()&&tab==='mine'&&state.requests.some(r=>isAssignedDriver(r)&&r.trip_date===todayISO()&&['assigned','completed'].includes(r.status)))tab='driverToday';
