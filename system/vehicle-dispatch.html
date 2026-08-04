@@ -24,6 +24,7 @@
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}.panel-head{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:.72rem;color:var(--text-hi)}.panel-head strong{color:var(--cyan)}.panel-head .spacer{flex:1}.table-wrap{overflow:auto;max-height:64vh}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.72rem}th{position:sticky;top:0;z-index:2;text-align:left;background:var(--surface);color:var(--cyan);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--border)}td{padding:9px 10px;border-bottom:1px solid rgba(12,40,64,.55);vertical-align:middle}tbody tr{cursor:pointer}tbody tr:hover td{background:rgba(0,212,255,.035)}.code{font-family:var(--font-mono);color:var(--text-hi)}.muted{color:var(--text-dim)}.route{max-width:310px;overflow:hidden;text-overflow:ellipsis}.empty{text-align:center;padding:48px 16px;color:var(--text-dim);white-space:normal;line-height:1.8}.pill{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:10px;font-size:.62rem}.pill.draft{color:var(--text-dim)}.pill.pending{color:var(--amber);border-color:rgba(255,179,0,.45)}.pill.approved{color:var(--blue);border-color:rgba(26,127,255,.45)}.pill.assigned{color:var(--purple);border-color:rgba(180,138,255,.5)}.pill.completed{color:var(--green);border-color:rgba(0,255,157,.45)}.pill.returned,.pill.cancelled{color:var(--red);border-color:rgba(255,59,59,.45)}
 .modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(1,6,14,.88);padding:22px 12px;overflow:auto;align-items:flex-start;justify-content:center}.modal-bg.show{display:flex}.modal{width:100%;max-width:980px;background:var(--panel);border:1px solid var(--border-hi);border-radius:6px;box-shadow:0 0 46px rgba(0,212,255,.16)}.modal.sm{max-width:760px}.modal-head{display:flex;align-items:center;padding:13px 17px;border-bottom:1px solid var(--border)}.modal-title{font-family:var(--font-head);font-weight:800;color:var(--cyan)}.modal-close{margin-left:auto;border:0;background:none;color:var(--text-dim);font-size:1.15rem;cursor:pointer}.modal-body{padding:15px 17px}.modal-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:13px 17px;border-top:1px solid var(--border)}.modal-foot .msg{font-size:.7rem;color:var(--red);margin-right:auto;min-width:130px}
 .form-section{border:1px solid var(--border);border-radius:4px;margin-bottom:12px;overflow:hidden}.form-section h3{display:flex;align-items:center;gap:7px;background:var(--surface);color:var(--cyan);padding:8px 10px;font-size:.73rem}.form-section h3 .tag{margin-left:auto;color:var(--text-dim);font-size:.62rem;font-weight:400}.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:11px}.field{display:flex;flex-direction:column;gap:4px;min-width:0}.field.wide{grid-column:1/-1}.field.span2{grid-column:span 2}.field label{font-size:.65rem;color:var(--text-dim)}.field label.req::after{content:' *';color:var(--red)}.field input,.field select,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 9px;border-radius:3px;font-size:.75rem;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan)}.field input[readonly],.field input:disabled,.field select:disabled,.field textarea:disabled{opacity:.72;color:var(--text-hi)}.field textarea{min-height:64px;resize:vertical}.check-row{display:flex;align-items:center;gap:8px;min-height:36px;font-size:.74rem}.check-row input{width:17px;height:17px}.computed{color:var(--green)!important;font-family:var(--font-mono);font-size:.9rem!important}.hint{font-size:.63rem;color:var(--text-dim);line-height:1.6}
+.location-other[hidden]{display:none}.file-input{border-style:dashed!important}.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:8px}.photo-card{display:block;padding:6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden}.photo-card:hover{border-color:var(--cyan)}.photo-card img{display:block;width:100%;height:92px;object-fit:cover;border-radius:2px;background:var(--bg)}.photo-card span{display:block;margin-top:5px;color:var(--text-dim);font-size:.59rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.photo-note{margin-top:5px;color:var(--text-dim);font-size:.61rem}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:11px}.summary-item{padding:8px 9px;background:rgba(0,212,255,.035);border:1px solid var(--border);border-radius:3px}.summary-item span{display:block;color:var(--text-dim);font-size:.61rem}.summary-item b{display:block;color:var(--text-hi);font-size:.73rem;margin-top:3px;white-space:normal;word-break:break-word}.timeline{padding:12px}.timeline-item{position:relative;padding:0 0 14px 18px;border-left:1px solid var(--border-hi);font-size:.68rem;line-height:1.55}.timeline-item:last-child{padding-bottom:0}.timeline-item::before{content:'';position:absolute;left:-4px;top:3px;width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 7px rgba(0,212,255,.55)}.timeline-item b{color:var(--text-hi)}.timeline-item time{color:var(--text-dim);margin-left:6px}.timeline-item p{color:var(--text-dim);margin-top:2px}
 .vehicle-list{max-height:300px;overflow:auto;border:1px solid var(--border);margin-bottom:12px}.vehicle-list table{font-size:.7rem}.act{border:1px solid var(--border);background:none;color:var(--cyan);padding:4px 7px;border-radius:3px;cursor:pointer}.toast{position:fixed;left:50%;bottom:22px;z-index:400;transform:translate(-50%,90px);background:var(--panel);border:1px solid var(--cyan);color:var(--text-hi);padding:10px 17px;border-radius:4px;font-size:.76rem;transition:transform .25s}.toast.show{transform:translate(-50%,0)}.toast.err{border-color:var(--red)}
 @media(max-width:1000px){.flow{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}.summary-grid{grid-template-columns:repeat(2,1fr)}}
@@ -115,18 +116,51 @@ const STATUS={draft:'草稿',pending_approval:'待主管核可',returned:'主管
 const STATUS_CLASS={draft:'draft',pending_approval:'pending',returned:'returned',approved:'approved',assigned:'assigned',completed:'completed',cancelled:'cancelled'};
 const ROLE_NAME={reporter:'申請人',duty:'值班人員',dispatcher:'公務車管理人員',technician:'司機／技術人員',unit_supervisor:'單位主管',mgmt_supervisor:'管理主管',sysadmin:'系統管理員'};
 const LEGACY_ROLE={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
+const PHOTO_BUCKET='vehicle-dispatch-files';
+const MARKET_LOCATIONS=['第一果菜市場','第二果菜市場'];
 let currentUser=null,currentRole='',tab='mine',currentRequestId=null,vehicleEditId=null,schemaReady=true;
-let state={requests:[],vehicles:[],users:[],logs:[]};
+let state={requests:[],vehicles:[],users:[],logs:[],attachments:[]};
 
 const byId=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const val=id=>(byId(id)?.value||'').trim();
 const todayISO=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
-const nowLocalInput=()=>{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const p={};parts.forEach(x=>p[x.type]=x.value);return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;};
+const nowLocalInput=()=>{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const p={};parts.forEach(x=>p[x.type]=x.value);const minute=Number(p.minute)<30?'00':'30';return `${p.year}-${p.month}-${p.day}T${p.hour}:${minute}`;};
 const fmtDate=v=>v?String(v).slice(0,10):'—';
 function fmtDateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ').slice(0,16);return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replaceAll('/','-');}
 function toIso(v){return v?new Date(v).toISOString():null;}
 function timeText(v){return v?String(v).slice(0,5):'—';}
+function timeOptions(selected=''){let html='<option value="">請選擇</option>';for(let hour=0;hour<24;hour++){for(const minute of ['00','30']){const value=`${String(hour).padStart(2,'0')}:${minute}`;html+=`<option value="${value}" ${value===selected?'selected':''}>${value}</option>`;}}return html;}
+function isHalfHour(value){return /^\d{2}:(00|30)$/.test(String(value||'').slice(0,5));}
+function isHalfHourDateTime(value){return /^\d{4}-\d{2}-\d{2}T\d{2}:(00|30)$/.test(String(value||'').slice(0,16));}
+function locationSelector(prefix,label,value,editable,defaultValue=''){
+  const current=value||defaultValue,known=MARKET_LOCATIONS.includes(current),custom=!!current&&!known,selected=known?current:(custom?'other':'');
+  const disabled=editable?'':' disabled';
+  return `<div class="field"><label class="req">${esc(label)}</label><select id="f${prefix}Preset" onchange="toggleCustomLocation('${prefix}')"${disabled}><option value="" ${!selected?'selected':''}>請選擇地點</option>${MARKET_LOCATIONS.map(x=>`<option value="${x}" ${selected===x?'selected':''}>${x}</option>`).join('')}<option value="other" ${selected==='other'?'selected':''}>其他地點（自行填寫）</option></select><input class="location-other" id="f${prefix}Other" value="${esc(custom?current:'')}" placeholder="請輸入其他地點" ${custom?'':'hidden'}${disabled}></div>`;
+}
+function toggleCustomLocation(prefix){const select=byId(`f${prefix}Preset`),input=byId(`f${prefix}Other`);if(!select||!input)return;const custom=select.value==='other';input.hidden=!custom;input.disabled=!custom;if(custom)input.focus();else input.value='';}
+function locationValue(prefix){const selected=val(`f${prefix}Preset`);return selected==='other'?val(`f${prefix}Other`):selected;}
+function attachmentsFor(requestId,stages){const accepted=Array.isArray(stages)?stages:[stages];return state.attachments.filter(x=>x.request_id===requestId&&(!stages||accepted.includes(x.stage)));}
+function attachmentUrl(path){return db.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;}
+function photoGallery(requestId,stages,title='已上傳照片'){
+  const photos=attachmentsFor(requestId,stages);if(!photos.length)return '';
+  return `<section class="form-section"><h3>${esc(title)} <span class="tag">${photos.length} 張</span></h3><div class="form-grid"><div class="field wide"><div class="photo-grid">${photos.map(x=>`<a class="photo-card" href="${esc(attachmentUrl(x.file_path))}" target="_blank" rel="noopener"><img src="${esc(attachmentUrl(x.file_path))}" alt="${esc(x.file_name)}" loading="lazy"><span title="${esc(x.file_name)}">${esc(x.file_name)}</span></a>`).join('')}</div></div></div></section>`;
+}
+async function uploadPhotos(requestId,files,stage){
+  const errors=[];
+  for(const file of files){
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)){errors.push(`${file.name}：僅接受 JPG、PNG、WebP`);continue;}
+    if(file.size>10*1024*1024){errors.push(`${file.name}：檔案超過 10MB`);continue;}
+    const ext={"image/jpeg":'jpg',"image/png":'png',"image/webp":'webp'}[file.type];
+    const token=globalThis.crypto?.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const path=`${requestId}/${stage}/${Date.now()}-${token}.${ext}`;
+    const uploaded=await db.storage.from(PHOTO_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+    if(uploaded.error){errors.push(`${file.name}：${uploaded.error.message}`);continue;}
+    const saved=await db.from('vehicle_dispatch_attachments').insert({request_id:requestId,stage,file_path:path,file_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:currentUser.user_id,uploaded_by_name:currentUser.name});
+    if(saved.error)errors.push(`${file.name}：${saved.error.message}`);
+  }
+  return errors;
+}
 function schemaError(e){return e&&(e.code==='42P01'||e.code==='42703'||/does not exist|schema cache|could not find/i.test(e.message||''));}
 function toast(msg,err=false){const t=byId('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2600);}
 function openModal(id){byId(id).classList.add('show');}
@@ -155,6 +189,7 @@ async function init(){
   if(error||!user){showFatal('找不到登入者的人員資料，請先由管理員完成帳號與人員綁定。');return;}
   const sharedProfile=window.SystemUserProfile&&typeof window.SystemUserProfile.read==='function'?window.SystemUserProfile.read():null;
   if(!user.department&&sharedProfile?.department)user.department=sharedProfile.department;
+  if(!user.phone&&sharedProfile?.phone)user.phone=sharedProfile.phone;
   currentUser=user;currentRole=user.rbac_role||LEGACY_ROLE[user.role]||'reporter';
   byId('roleText').textContent=`${user.department||'未設定單位'}｜${user.name}｜${ROLE_NAME[currentRole]||currentRole}`;
   byId('vehicleBtn').hidden=!isManager();
@@ -169,16 +204,17 @@ function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner
 async function loadAll(silent=false){
   if(!currentUser)return;
   if(!silent)byId('syncText').textContent='讀取資料中…';
-  const [requests,vehicles,users,logs]=await Promise.all([
+  const [requests,vehicles,users,logs,attachments]=await Promise.all([
     db.from('vehicle_dispatch_requests').select('*').order('created_at',{ascending:false}).limit(3000),
     db.from('official_vehicles').select('*').order('plate_no').limit(500),
     db.from('users').select('user_id,name,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
-    db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000)
+    db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000),
+    db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(10000)
   ]);
-  const firstError=[requests,vehicles,users,logs].find(x=>x.error)?.error;
+  const firstError=[requests,vehicles,users,logs,attachments].find(x=>x.error)?.error;
   if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
   schemaReady=true;byId('setupBanner').className='setup-banner';
-  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[]};
+  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[],attachments:attachments.data||[]};
   updateDashboard();renderTable();
   byId('syncText').textContent=`最後更新 ${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`;
 }
@@ -210,20 +246,22 @@ function renderTable(){
 }
 
 function applicationFields(r={},editable=true){
-  const disabled=editable?'':' disabled',tripMin=editable?' min="'+todayISO()+'"':'';
+  const disabled=editable?'':' disabled',tripMin=editable?' min="'+todayISO()+'"':'',departure=timeText(r.planned_departure_time)==='—'?'':timeText(r.planned_departure_time),returned=timeText(r.planned_return_time)==='—'?'':timeText(r.planned_return_time);
   return `<section class="form-section"><h3>申請資料 <span class="tag">${r.request_no?esc(r.request_no):'尚未產生單號'}</span></h3><div class="form-grid">
     <div class="field"><label>申請日期</label><input id="fApplicationDate" value="${esc(r.application_date||todayISO())}" readonly></div>
     <div class="field"><label>申請人</label><input value="${esc(r.applicant_name||currentUser.name)}" readonly></div>
     <div class="field"><label>申請單位</label><input value="${esc(r.applicant_department||currentUser.department||'')}" readonly></div>
+    <div class="field"><label class="req">聯絡電話／手機</label><input type="tel" id="fApplicantPhone" autocomplete="tel" value="${esc(r.applicant_phone||currentUser.phone||'')}" placeholder="請輸入可聯絡電話"${disabled}></div>
     <div class="field"><label class="req">用車日期</label><input type="date" id="fTripDate" value="${esc(r.trip_date||'')}"${tripMin}${disabled}></div>
-    <div class="field"><label class="req">預計出發時間</label><input type="time" id="fDepartureTime" value="${esc(timeText(r.planned_departure_time)==='—'?'':timeText(r.planned_departure_time))}"${disabled}></div>
-    <div class="field"><label class="req">預計回程時間</label><input type="time" id="fReturnTime" value="${esc(timeText(r.planned_return_time)==='—'?'':timeText(r.planned_return_time))}"${disabled}></div>
-    <div class="field"><label class="req">起點</label><input id="fOrigin" value="${esc(r.origin_location||'第一果菜市場')}" placeholder="例：第一果菜市場"${disabled}></div>
-    <div class="field"><label class="req">迄點</label><input id="fDestination" value="${esc(r.destination_location||'')}" placeholder="例：臺北市政府"${disabled}></div>
+    <div class="field"><label class="req">預計出發時間（30 分鐘）</label><select id="fDepartureTime"${disabled}>${timeOptions(departure)}</select></div>
+    <div class="field"><label class="req">預計回程時間（30 分鐘）</label><select id="fReturnTime"${disabled}>${timeOptions(returned)}</select></div>
+    ${locationSelector('Origin','起點',r.origin_location,editable,'第一果菜市場')}
+    ${locationSelector('Destination','迄點',r.destination_location,editable,'')}
     <div class="field"><label class="req">預計乘車人數</label><input type="number" min="1" id="fPassengers" value="${esc(r.passenger_count||1)}"${disabled}></div>
     <div class="field wide"><label class="req">用車事由</label><input id="fPurpose" value="${esc(r.trip_purpose||'')}" placeholder="請說明公務行程用途"${disabled}></div>
     <div class="field wide"><label>申請備註</label><textarea id="fApplicantNote"${disabled}>${esc(r.applicant_note||'')}</textarea></div>
-  </div></section>`;
+    ${editable?'<div class="field wide"><label>申請照片（可複選）</label><input class="file-input" type="file" id="fApplicationPhotos" accept="image/jpeg,image/png,image/webp" multiple><div class="photo-note">支援 JPG、PNG、WebP；每張上限 10MB。可上傳集合地點、行程或相關佐證照片。</div></div>':''}
+  </div></section>${r.request_id?photoGallery(r.request_id,'application','申請附件照片'):''}`;
 }
 
 function assignmentSummary(r){return `<section class="form-section"><h3>核可與派車資訊</h3><div class="summary-grid">
@@ -244,18 +282,26 @@ function dispatchForm(r){
 }
 function driverForm(r){
   const start=r.odometer_start==null?(state.vehicles.find(v=>v.vehicle_id===r.vehicle_id)?.current_odometer||''):r.odometer_start;
+  const previous=state.requests.filter(x=>x.request_id!==r.request_id&&x.vehicle_id===r.vehicle_id&&x.status==='completed'&&x.refueled&&x.refuel_odometer!=null).sort((a,b)=>new Date(b.completed_at||b.actual_return_at||0)-new Date(a.completed_at||a.actual_return_at||0))[0];
+  const lastRefuelOdometer=r.last_refuel_odometer??previous?.refuel_odometer??'',lastRefuelCost=r.last_refuel_cost??previous?.refuel_cost??'';
   return `<section class="form-section"><h3>司機行車回報 <span class="tag">系統自動核算里程</span></h3><div class="form-grid">
     <div class="field"><label class="req">實際乘車人數</label><input type="number" min="0" id="fActualPassengers" value="${esc(r.actual_passenger_count??r.passenger_count??'')}"></div>
-    <div class="field"><label class="req">實際出發時間</label><input type="datetime-local" id="fActualDeparture" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
-    <div class="field"><label class="req">實際回程時間</label><input type="datetime-local" id="fActualReturn" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
+    <div class="field"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
+    <div class="field"><label class="req">實際回程時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualReturn" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
     <div class="field"><label class="req">汽車起始里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerStart" value="${esc(start)}" oninput="updateMileage()"></div>
     <div class="field"><label class="req">汽車回程里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerEnd" value="${esc(r.odometer_end??'')}" oninput="updateMileage()"></div>
     <div class="field"><label>本次行駛里程</label><input class="computed" id="fTotalMileage" value="${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}" readonly></div>
+    <div class="field"><label>上次加油公里數（km）</label><input type="number" id="fLastRefuelOdometer" value="${esc(lastRefuelOdometer)}" readonly></div>
+    <div class="field"><label>上次加油費用（元）</label><input type="number" id="fLastRefuelCost" value="${esc(lastRefuelCost)}" readonly></div>
+    <div class="field"><label>加油紀錄來源</label><input value="${previous?esc(`${previous.request_no}｜${fmtDate(previous.trip_date)}`):'尚無前次紀錄'}" readonly></div>
     <div class="field"><label>是否加油</label><div class="check-row"><input type="checkbox" id="fRefueled" ${r.refueled?'checked':''} onchange="toggleRefuel()"><span>本次行程有加油</span></div></div>
-    <div class="field"><label id="refuelLabel">加油時里程（km）</label><input type="number" min="0" step="0.1" id="fRefuelOdometer" value="${esc(r.refuel_odometer??'')}" ${r.refueled?'':'disabled'}></div>
-    <div class="field"></div>
+    <div class="field"><label>本次加油公里數（km）</label><input type="number" min="0" step="0.1" id="fRefuelOdometer" value="${esc(r.refuel_odometer??'')}" ${r.refueled?'':'disabled'}></div>
+    <div class="field"><label>本次加油費用（元）</label><input type="number" min="0" step="1" id="fRefuelCost" value="${esc(r.refuel_cost??'')}" ${r.refueled?'':'disabled'}></div>
+    <div class="field"><label>是否有異常通報</label><div class="check-row"><input type="checkbox" id="fHasAbnormality" ${r.has_abnormality?'checked':''} onchange="toggleAbnormality()"><span>本次行程有異常</span></div></div>
+    <div class="field span2"><label>異常通報內容</label><textarea id="fAbnormalityNote" placeholder="請說明車況、事故、延誤或其他異常" ${r.has_abnormality?'':'disabled'}>${esc(r.abnormality_note||'')}</textarea></div>
     <div class="field wide"><label>司機備註</label><textarea id="fDriverNote" placeholder="車況、加油或行程異常說明">${esc(r.driver_note||'')}</textarea></div>
-  </div></section>`;
+    <div class="field wide"><label>行車／異常照片（可複選）</label><input class="file-input" type="file" id="fDriverPhotos" accept="image/jpeg,image/png,image/webp" multiple><div class="photo-note">支援 JPG、PNG、WebP；每張上限 10MB。異常通報時建議附現場照片。</div></div>
+  </div></section>${photoGallery(r.request_id,['driver','abnormality'],'行車與異常附件照片')}`;
 }
 function localDateTimeValue(v){if(!v)return '';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).slice(0,16);const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);const p={};parts.forEach(x=>p[x.type]=x.value);return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;}
 function vehicleLabel(id,plate){const v=state.vehicles.find(x=>x.vehicle_id===id);return v?`${v.plate_no}｜${v.vehicle_name||v.brand||'公務車'}`:(plate||'—');}
@@ -288,29 +334,33 @@ function openRequest(id){
   if(canDispatch(r)){actions.push('<button class="btn btn-primary" onclick="dispatchRequest()">確認派車</button>');}
   if(canDrive(r)){actions.push('<button class="btn btn-green" onclick="completeTrip()">完成行車回報</button>');}
   if((isApplicant(r)&&['draft','returned','pending_approval'].includes(r.status))||(isAdmin()&&!['completed','cancelled'].includes(r.status)))actions.push('<button class="btn btn-red" onclick="cancelRequest()">取消申請</button>');
-  byId('requestActions').innerHTML=actions.join('');openModal('requestModal');if(canDrive(r)){toggleRefuel();updateMileage();}
+  byId('requestActions').innerHTML=actions.join('');openModal('requestModal');if(canDrive(r)){toggleRefuel();toggleAbnormality();updateMileage();}
 }
 
 function completedSummary(r){return `<section class="form-section"><h3>行車完成紀錄</h3><div class="summary-grid">
   <div class="summary-item"><span>實際乘車人數</span><b>${esc(r.actual_passenger_count??'—')} 人</b></div><div class="summary-item"><span>實際出發／回程</span><b>${esc(fmtDateTime(r.actual_departure_at))}<br>${esc(fmtDateTime(r.actual_return_at))}</b></div><div class="summary-item"><span>起始／回程里程</span><b>${esc(r.odometer_start)} → ${esc(r.odometer_end)} km</b></div><div class="summary-item"><span>本次里程</span><b>${esc(Number(r.total_mileage||0).toFixed(1))} km</b></div>
-  <div class="summary-item"><span>是否加油</span><b>${r.refueled?'是｜'+esc(r.refuel_odometer)+' km':'否'}</b></div><div class="summary-item" style="grid-column:span 3"><span>司機備註</span><b>${esc(r.driver_note||'—')}</b></div></div></section>`;}
+  <div class="summary-item"><span>上次加油</span><b>${r.last_refuel_odometer==null?'無紀錄':esc(r.last_refuel_odometer)+' km｜'+esc(r.last_refuel_cost??'—')+' 元'}</b></div><div class="summary-item"><span>本次加油</span><b>${r.refueled?'是｜'+esc(r.refuel_odometer)+' km｜'+esc(r.refuel_cost)+' 元':'否'}</b></div><div class="summary-item"><span>異常通報</span><b>${r.has_abnormality?'有｜'+esc(r.abnormality_note||'—'):'無'}</b></div><div class="summary-item"><span>司機備註</span><b>${esc(r.driver_note||'—')}</b></div></div></section>${photoGallery(r.request_id,['driver','abnormality'],'行車與異常附件照片')}`;}
 
 function applicationPayload(){
-  const payload={application_date:val('fApplicationDate')||todayISO(),trip_date:val('fTripDate'),planned_departure_time:val('fDepartureTime'),planned_return_time:val('fReturnTime'),origin_location:val('fOrigin'),destination_location:val('fDestination'),passenger_count:Number(val('fPassengers')),trip_purpose:val('fPurpose'),applicant_note:val('fApplicantNote')||null};
-  if(!payload.trip_date||!payload.planned_departure_time||!payload.planned_return_time||!payload.origin_location||!payload.destination_location||!payload.trip_purpose||!Number.isInteger(payload.passenger_count)||payload.passenger_count<1)throw new Error('請完整填寫所有必填欄位');
+  const payload={application_date:val('fApplicationDate')||todayISO(),applicant_phone:val('fApplicantPhone'),trip_date:val('fTripDate'),planned_departure_time:val('fDepartureTime'),planned_return_time:val('fReturnTime'),origin_location:locationValue('Origin'),destination_location:locationValue('Destination'),passenger_count:Number(val('fPassengers')),trip_purpose:val('fPurpose'),applicant_note:val('fApplicantNote')||null};
+  if(!payload.applicant_phone||!payload.trip_date||!payload.planned_departure_time||!payload.planned_return_time||!payload.origin_location||!payload.destination_location||!payload.trip_purpose||!Number.isInteger(payload.passenger_count)||payload.passenger_count<1)throw new Error('請完整填寫所有必填欄位');
+  if(payload.applicant_phone.length<6)throw new Error('請填寫可聯絡的電話或手機號碼');
+  if(!isHalfHour(payload.planned_departure_time)||!isHalfHour(payload.planned_return_time))throw new Error('預計時間請使用每 30 分鐘的時段');
   if(payload.planned_return_time<=payload.planned_departure_time)throw new Error('預計回程時間必須晚於出發時間');
   return payload;
 }
 function setMsg(message){const el=byId('requestMsg');if(el)el.textContent=message||'';}
 async function saveApplication(submit){
   try{
+    const photos=Array.from(byId('fApplicationPhotos')?.files||[]);
     const payload=applicationPayload(),next=submit?'pending_approval':'draft';payload.status=next;
     let result,from=null;
     if(currentRequestId){const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canEditApplication(r))throw new Error('此申請單目前不可修改');from=r.status;result=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',currentRequestId).in('status',['draft','returned']).select().single();}
     else{payload.applicant_id=currentUser.user_id;payload.applicant_name=currentUser.name;payload.applicant_department=currentUser.department||null;result=await db.from('vehicle_dispatch_requests').insert(payload).select().single();}
     if(result.error)throw result.error;currentRequestId=result.data.request_id;
     await addLog(result.data.request_id,from,next,submit?'送出主管核可':'儲存申請草稿',submit?'申請人已完成填寫並送出':'');
-    closeModal('requestModal');await loadAll();toast(submit?'已送出單位主管核可':'草稿已儲存');
+    const photoErrors=await uploadPhotos(result.data.request_id,photos,'application');
+    closeModal('requestModal');await loadAll();toast(photoErrors.length?`申請已儲存；${photoErrors.length} 張照片上傳失敗`:(submit?'已送出單位主管核可':'草稿已儲存'),photoErrors.length>0);
   }catch(e){setMsg(e.message||'儲存失敗');}
 }
 
@@ -333,20 +383,25 @@ async function dispatchRequest(){
   await addLog(r.request_id,r.status,'assigned','公務車管理人員完成派車',`${vehicle.plate_no}｜司機 ${driver.name}${payload.dispatch_note?'｜'+payload.dispatch_note:''}`);closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
 }
 
-function toggleRefuel(){const checked=byId('fRefueled')?.checked,input=byId('fRefuelOdometer');if(input){input.disabled=!checked;if(!checked)input.value='';}}
+function toggleRefuel(){const checked=byId('fRefueled')?.checked;['fRefuelOdometer','fRefuelCost'].forEach(id=>{const input=byId(id);if(input){input.disabled=!checked;if(!checked)input.value='';}});}
+function toggleAbnormality(){const checked=byId('fHasAbnormality')?.checked,input=byId('fAbnormalityNote');if(input){input.disabled=!checked;if(!checked)input.value='';}}
 function updateMileage(){const start=Number(val('fOdometerStart')),end=Number(val('fOdometerEnd')),el=byId('fTotalMileage');if(!el)return;el.value=Number.isFinite(start)&&Number.isFinite(end)&&end>=start?`${(end-start).toFixed(1)} km`:'—';}
 async function completeTrip(){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canDrive(r))return;
-  const passengers=Number(val('fActualPassengers')),departure=val('fActualDeparture'),returned=val('fActualReturn'),start=Number(val('fOdometerStart')),end=Number(val('fOdometerEnd')),refueled=byId('fRefueled').checked,refuel=refueled?Number(val('fRefuelOdometer')):null;
+  const photos=Array.from(byId('fDriverPhotos')?.files||[]),passengers=Number(val('fActualPassengers')),departure=val('fActualDeparture'),returned=val('fActualReturn'),start=Number(val('fOdometerStart')),end=Number(val('fOdometerEnd')),refueled=byId('fRefueled').checked,refuel=refueled?Number(val('fRefuelOdometer')):null,refuelCost=refueled?Number(val('fRefuelCost')):null,hasAbnormality=byId('fHasAbnormality').checked,abnormalityNote=val('fAbnormalityNote'),lastRefuelOdometer=val('fLastRefuelOdometer')===''?null:Number(val('fLastRefuelOdometer')),lastRefuelCost=val('fLastRefuelCost')===''?null:Number(val('fLastRefuelCost'));
   if(!Number.isInteger(passengers)||passengers<0||!departure||!returned||!Number.isFinite(start)||!Number.isFinite(end)){setMsg('請完整填寫實際人數、時間及里程');return;}
+  if(!isHalfHourDateTime(departure)||!isHalfHourDateTime(returned)){setMsg('實際出發與回程時間請使用每 30 分鐘的時段');return;}
   if(new Date(returned)<new Date(departure)){setMsg('實際回程時間不得早於出發時間');return;}
   if(end<start){setMsg('汽車回程里程不得小於起始里程');return;}
   if(refueled&&(!Number.isFinite(refuel)||refuel<start||refuel>end)){setMsg('加油里程必須介於起始與回程里程之間');return;}
-  const payload={status:'completed',actual_passenger_count:passengers,actual_departure_at:toIso(departure),actual_return_at:toIso(returned),odometer_start:start,odometer_end:end,refueled,refuel_odometer:refueled?refuel:null,driver_note:val('fDriverNote')||null,completed_at:new Date().toISOString()};
+  if(refueled&&(!Number.isFinite(refuelCost)||refuelCost<0)){setMsg('請填寫正確的本次加油費用');return;}
+  if(hasAbnormality&&!abnormalityNote){setMsg('勾選異常通報時，請填寫異常內容');return;}
+  const payload={status:'completed',actual_passenger_count:passengers,actual_departure_at:toIso(departure),actual_return_at:toIso(returned),odometer_start:start,odometer_end:end,last_refuel_odometer:lastRefuelOdometer,last_refuel_cost:lastRefuelCost,refueled,refuel_odometer:refueled?refuel:null,refuel_cost:refueled?refuelCost:null,has_abnormality:hasAbnormality,abnormality_note:hasAbnormality?abnormalityNote:null,driver_note:val('fDriverNote')||null,completed_at:new Date().toISOString()};
   const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','assigned').select().maybeSingle();
   if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
   const vehicle=state.vehicles.find(v=>v.vehicle_id===r.vehicle_id);if(vehicle&&end>Number(vehicle.current_odometer||0))await db.from('official_vehicles').update({current_odometer:end}).eq('vehicle_id',vehicle.vehicle_id);
-  await addLog(r.request_id,r.status,'completed','司機完成行車回報',`實際 ${passengers} 人｜${(end-start).toFixed(1)} km${refueled?'｜有加油':''}`);closeModal('requestModal');await loadAll();toast('行車回報完成，里程已自動核算');
+  const photoErrors=await uploadPhotos(r.request_id,photos,hasAbnormality?'abnormality':'driver');
+  await addLog(r.request_id,r.status,'completed','司機完成行車回報',`實際 ${passengers} 人｜${(end-start).toFixed(1)} km${refueled?`｜加油 ${refuelCost} 元`:''}${hasAbnormality?'｜有異常通報':''}`);closeModal('requestModal');await loadAll();toast(photoErrors.length?`行車回報已完成；${photoErrors.length} 張照片上傳失敗`:'行車回報完成，里程已自動核算',photoErrors.length>0);
 }
 
 async function cancelRequest(){

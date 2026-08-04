@@ -57,6 +57,7 @@ create table if not exists vehicle_dispatch_requests (
   applicant_id uuid not null references users(user_id),
   applicant_name text not null,
   applicant_department text,
+  applicant_phone text,
   application_date date not null default current_date,
   trip_date date not null,
   planned_departure_time time not null,
@@ -88,7 +89,12 @@ create table if not exists vehicle_dispatch_requests (
     (case when odometer_start is not null and odometer_end is not null
       then odometer_end - odometer_start else null end) stored,
   refueled boolean not null default false,
+  last_refuel_odometer numeric(12,1),
+  last_refuel_cost numeric(12,2),
   refuel_odometer numeric(12,1),
+  refuel_cost numeric(12,2),
+  has_abnormality boolean not null default false,
+  abnormality_note text,
   driver_note text,
   completed_at timestamptz,
   cancelled_at timestamptz,
@@ -101,6 +107,7 @@ alter table vehicle_dispatch_requests add column if not exists request_no text d
 alter table vehicle_dispatch_requests add column if not exists applicant_id uuid references users(user_id);
 alter table vehicle_dispatch_requests add column if not exists applicant_name text;
 alter table vehicle_dispatch_requests add column if not exists applicant_department text;
+alter table vehicle_dispatch_requests add column if not exists applicant_phone text;
 alter table vehicle_dispatch_requests add column if not exists application_date date default current_date;
 alter table vehicle_dispatch_requests add column if not exists trip_date date;
 alter table vehicle_dispatch_requests add column if not exists planned_departure_time time;
@@ -131,13 +138,21 @@ alter table vehicle_dispatch_requests add column if not exists odometer_end nume
 alter table vehicle_dispatch_requests add column if not exists total_mileage numeric(12,1) generated always as
   (case when odometer_start is not null and odometer_end is not null then odometer_end - odometer_start else null end) stored;
 alter table vehicle_dispatch_requests add column if not exists refueled boolean default false;
+alter table vehicle_dispatch_requests add column if not exists last_refuel_odometer numeric(12,1);
+alter table vehicle_dispatch_requests add column if not exists last_refuel_cost numeric(12,2);
 alter table vehicle_dispatch_requests add column if not exists refuel_odometer numeric(12,1);
+alter table vehicle_dispatch_requests add column if not exists refuel_cost numeric(12,2);
+alter table vehicle_dispatch_requests add column if not exists has_abnormality boolean default false;
+alter table vehicle_dispatch_requests add column if not exists abnormality_note text;
 alter table vehicle_dispatch_requests add column if not exists driver_note text;
 alter table vehicle_dispatch_requests add column if not exists completed_at timestamptz;
 alter table vehicle_dispatch_requests add column if not exists cancelled_at timestamptz;
 alter table vehicle_dispatch_requests add column if not exists cancel_reason text;
 alter table vehicle_dispatch_requests add column if not exists created_at timestamptz default now();
 alter table vehicle_dispatch_requests add column if not exists updated_at timestamptz default now();
+
+-- 舊版「有加油」資料沒有費用欄，保留為歷史未記錄值；新版前端會強制填寫。
+update vehicle_dispatch_requests set refuel_cost=0 where refueled and refuel_cost is null;
 
 update vehicle_dispatch_requests set request_no=gen_vehicle_dispatch_no() where request_no is null;
 create unique index if not exists idx_vehicle_dispatch_no on vehicle_dispatch_requests(request_no);
@@ -158,9 +173,15 @@ alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_mileage_check
   check ((odometer_start is null or odometer_start >= 0) and
     (odometer_end is null or odometer_end >= odometer_start) and
-    (not refueled or refuel_odometer is not null) and
+    (last_refuel_odometer is null or last_refuel_odometer >= 0) and
+    (last_refuel_cost is null or last_refuel_cost >= 0) and
+    (not refueled or (refuel_odometer is not null and refuel_cost is not null)) and
     (refuel_odometer is null or odometer_start is null or refuel_odometer >= odometer_start) and
-    (refuel_odometer is null or odometer_end is null or refuel_odometer <= odometer_end));
+    (refuel_odometer is null or odometer_end is null or refuel_odometer <= odometer_end) and
+    (refuel_cost is null or refuel_cost >= 0));
+alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_abnormality_check;
+alter table vehicle_dispatch_requests add constraint vehicle_dispatch_abnormality_check
+  check (not has_abnormality or nullif(trim(abnormality_note),'') is not null);
 
 create table if not exists vehicle_dispatch_logs (
   log_id uuid primary key default gen_random_uuid(),
@@ -182,6 +203,32 @@ alter table vehicle_dispatch_logs add column if not exists operator_id uuid refe
 alter table vehicle_dispatch_logs add column if not exists operator_name text;
 alter table vehicle_dispatch_logs add column if not exists created_at timestamptz default now();
 create index if not exists idx_vehicle_dispatch_logs_request on vehicle_dispatch_logs(request_id,created_at);
+
+create table if not exists vehicle_dispatch_attachments (
+  attachment_id uuid primary key default gen_random_uuid(),
+  request_id uuid not null references vehicle_dispatch_requests(request_id),
+  stage text not null default 'application',
+  file_path text not null,
+  file_name text not null,
+  mime_type text,
+  file_size bigint,
+  uploaded_by uuid references users(user_id),
+  uploaded_by_name text,
+  created_at timestamptz not null default now()
+);
+alter table vehicle_dispatch_attachments add column if not exists request_id uuid references vehicle_dispatch_requests(request_id);
+alter table vehicle_dispatch_attachments add column if not exists stage text default 'application';
+alter table vehicle_dispatch_attachments add column if not exists file_path text;
+alter table vehicle_dispatch_attachments add column if not exists file_name text;
+alter table vehicle_dispatch_attachments add column if not exists mime_type text;
+alter table vehicle_dispatch_attachments add column if not exists file_size bigint;
+alter table vehicle_dispatch_attachments add column if not exists uploaded_by uuid references users(user_id);
+alter table vehicle_dispatch_attachments add column if not exists uploaded_by_name text;
+alter table vehicle_dispatch_attachments add column if not exists created_at timestamptz default now();
+alter table vehicle_dispatch_attachments drop constraint if exists vehicle_dispatch_attachment_stage_check;
+alter table vehicle_dispatch_attachments add constraint vehicle_dispatch_attachment_stage_check
+  check (stage in ('application','driver','abnormality'));
+create index if not exists idx_vehicle_dispatch_attachments_request on vehicle_dispatch_attachments(request_id,created_at);
 
 create or replace function touch_vehicle_updated_at()
 returns trigger
@@ -206,15 +253,29 @@ create trigger trg_vehicle_dispatch_updated_at
 alter table official_vehicles enable row level security;
 alter table vehicle_dispatch_requests enable row level security;
 alter table vehicle_dispatch_logs enable row level security;
+alter table vehicle_dispatch_attachments enable row level security;
 drop policy if exists "vehicle_authenticated" on official_vehicles;
 drop policy if exists "vehicle_dispatch_authenticated" on vehicle_dispatch_requests;
 drop policy if exists "vehicle_dispatch_logs_authenticated" on vehicle_dispatch_logs;
+drop policy if exists "vehicle_dispatch_attachments_authenticated" on vehicle_dispatch_attachments;
 create policy "vehicle_authenticated" on official_vehicles
   for all to authenticated using (true) with check (true);
 create policy "vehicle_dispatch_authenticated" on vehicle_dispatch_requests
   for all to authenticated using (true) with check (true);
 create policy "vehicle_dispatch_logs_authenticated" on vehicle_dispatch_logs
   for all to authenticated using (true) with check (true);
+create policy "vehicle_dispatch_attachments_authenticated" on vehicle_dispatch_attachments
+  for all to authenticated using (true) with check (true);
+
+insert into storage.buckets(id,name,public)
+values ('vehicle-dispatch-files','vehicle-dispatch-files',true)
+on conflict (id) do update set public=true;
+drop policy if exists "vehicle_dispatch_files_read" on storage.objects;
+drop policy if exists "vehicle_dispatch_files_insert" on storage.objects;
+create policy "vehicle_dispatch_files_read" on storage.objects
+  for select to authenticated using (bucket_id='vehicle-dispatch-files');
+create policy "vehicle_dispatch_files_insert" on storage.objects
+  for insert to authenticated with check (bucket_id='vehicle-dispatch-files');
 
 insert into role_permissions(role_id,perm,allowed)
 select role_id,'sys_vehicle',true from roles
@@ -225,7 +286,7 @@ do $$
 declare table_name text;
 begin
   if to_regprocedure('public.reject_physical_data_removal()') is not null then
-    foreach table_name in array array['official_vehicles','vehicle_dispatch_requests','vehicle_dispatch_logs'] loop
+    foreach table_name in array array['official_vehicles','vehicle_dispatch_requests','vehicle_dispatch_logs','vehicle_dispatch_attachments'] loop
       execute format('drop trigger if exists trg_prevent_removal on public.%I',table_name);
       execute format('create trigger trg_prevent_removal before delete or truncate on public.%I for each statement execute function public.reject_physical_data_removal()',table_name);
     end loop;
