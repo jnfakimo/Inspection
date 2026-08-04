@@ -10,7 +10,6 @@
 <title>戰情儀表板 — 報修派工管理系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
 <script src="patrolstatus.js"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
@@ -51,22 +50,6 @@ a{color:inherit;text-decoration:none}
 .updated{font-size:.65rem;color:var(--text-dim);font-family:var(--font-mono)}
 .empty{color:var(--text-dim);font-size:.78rem;text-align:center;padding:20px}
 .loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;color:var(--cyan);font-family:var(--font-head);letter-spacing:.1em}
-
-/* IPCAM live view */
-.ipcam-card{background:var(--panel);border:1px solid var(--border);border-radius:6px;margin-bottom:16px;overflow:hidden}
-.ipcam-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border)}
-.ipcam-title{font-family:var(--font-head);font-size:1rem;color:var(--cyan);font-weight:700;letter-spacing:.06em}
-.ipcam-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ipcam-note{font-size:.68rem;color:var(--text-dim)}
-.ipcam-reload{font-size:.72rem;color:var(--cyan);border:1px solid var(--border-hi);padding:6px 12px;border-radius:4px;background:rgba(0,212,255,.06);cursor:pointer}
-.ipcam-reload:hover{border-color:var(--cyan);background:rgba(0,212,255,.12)}
-.ipcam-frame-wrap{position:relative;background:transparent;min-height:0;height:auto;display:flex;align-items:center;justify-content:center;padding:0;overflow:visible}
-.ipcam-image{display:block;width:100%;height:100%;border:0;background:#000;object-fit:contain}
-.ipcam-video{display:block;width:auto;height:38vh;max-width:100%;aspect-ratio:4/3;border:0;background:#000;object-fit:contain}
-.ipcam-status{font-size:.68rem;color:var(--text-dim)}
-.ipcam-status.ok{color:var(--green)}
-.ipcam-status.err{color:var(--red)}
-.ipcam-error{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(92%,560px);padding:10px 12px;border:1px solid rgba(255,68,85,.45);border-radius:4px;background:rgba(8,18,32,.92);color:var(--text);font-size:.78rem;line-height:1.6}
 
 /* ── alert bar ── */
 .alert-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
@@ -153,7 +136,6 @@ a{color:inherit;text-decoration:none}
   .wrap{padding:12px 10px 28px}.dashboard-head h1{font-size:1.35rem}.dashboard-head p{font-size:.72rem}
   .toolbar{align-items:stretch;padding:10px}.toolbar-group,.toolbar-range{width:100%}.toolbar-range input{flex:1;min-width:0}
   .qbtn{flex:1}.toolbar-label{width:100%}
-.ipcam-head{align-items:flex-start;flex-direction:column}.ipcam-video{height:252px}.ipcam-actions{width:100%}.ipcam-reload{width:100%;text-align:center}
   .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ks{min-height:78px;padding:11px}.ks .ks-icon{display:none}.ks .ks-n{font-size:1.45rem}
   .section-title{margin-top:16px}.dash-main,.rank-grid{gap:10px}.rank-grid{grid-template-columns:1fr}
   .pcard,.ccard,.rcard,.tcard{padding:13px}.ps{gap:6px}.pc{padding:8px 6px}.pc .n{font-size:1.35rem}
@@ -188,21 +170,6 @@ a{color:inherit;text-decoration:none}
     <div class="head-meta">
       <span id="rangeLbl">統計區間載入中</span>
       <span class="updated" id="updatedLbl"></span>
-    </div>
-  </div>
-
-  <div class="ipcam-card">
-    <div class="ipcam-head">
-      <div class="ipcam-title">即時影像</div>
-      <div class="ipcam-actions">
-        <span class="ipcam-note">RTSP 來源已壓縮為低頻寬 HLS 播放</span>
-        <span id="ipcamStatus" class="ipcam-status">連線中</span>
-        <button class="ipcam-reload" type="button" onclick="reloadIpcam()">重新連線</button>
-      </div>
-    </div>
-    <div class="ipcam-frame-wrap">
-      <video id="ipcamVideo" class="ipcam-video" muted autoplay playsinline></video>
-      <div id="ipcamError" class="ipcam-error" hidden>影像尚未載入。請確認 RTSP 轉 HLS 與手機 HTTPS tunnel 已啟動，再按重新連線。</div>
     </div>
   </div>
 
@@ -266,6 +233,7 @@ a{color:inherit;text-decoration:none}
 </div>
 
 <script>
+/* 即時影像暫停啟用；保留串流實作，方便日後恢復。
 const IPCAM_LOCAL_HLS_URL='http://127.0.0.1:8091/ipcam/index.m3u8';
 const IPCAM_TUNNEL_HLS_URL='https://tray-wax-pace-tampa.trycloudflare.com/ipcam/index.m3u8';
 let ipcamConfiguredTunnelUrl=IPCAM_TUNNEL_HLS_URL;
@@ -481,6 +449,7 @@ function markIpcamRecovering(){
 }
 
 loadIpcamConfig().finally(reloadIpcam);
+*/
 
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
