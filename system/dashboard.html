@@ -152,7 +152,7 @@ a{color:inherit;text-decoration:none}
 .weather-open,.weather-close{border:1px solid var(--border-hi);border-radius:4px;background:rgba(0,212,255,.08);color:var(--cyan);font:inherit;font-size:.7rem;padding:7px 11px;cursor:pointer}.weather-open:hover,.weather-close:hover{border-color:var(--cyan);background:rgba(0,212,255,.15)}
 .weather-alerts{display:flex;align-items:center;min-height:43px;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(255,59,59,.045);overflow:hidden}
 .weather-alert-label{flex:0 0 auto;color:var(--red);font-weight:700;font-size:.7rem;margin-right:12px}.weather-alert-track{display:flex;gap:22px;min-width:0;overflow:auto;scrollbar-width:none}.weather-alert-track::-webkit-scrollbar{display:none}
-.weather-alert-item{color:var(--text-hi);font-size:.7rem;white-space:nowrap}.weather-alert-item b{color:var(--red);margin-right:6px}.weather-alert-clear{color:var(--green);font-size:.7rem}
+.weather-alert-item{color:var(--text-hi);font-size:.7rem;white-space:nowrap}.weather-alert-item b{color:var(--red);margin-right:6px}.weather-alert-item.is-clear b{color:var(--green)}.weather-alert-item:hover b{text-decoration:underline}.weather-alert-clear{color:var(--green);font-size:.7rem}
 .weather-body{display:grid;grid-template-columns:minmax(250px,.85fr) minmax(360px,1.4fr);gap:18px;flex:1;min-height:0;padding:14px}
 .weather-map-button{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;border:1px solid var(--border);border-radius:7px;background:radial-gradient(circle at 50% 42%,rgba(0,127,190,.18),rgba(2,11,24,.55));cursor:pointer;overflow:hidden;color:inherit}
 .weather-map-button:hover{border-color:var(--cyan);box-shadow:inset 0 0 25px rgba(0,212,255,.08)}.weather-map-button .weather-map-shell{height:100%;max-height:440px;aspect-ratio:620/820;padding:8px}
@@ -796,7 +796,7 @@ async function ld(){
 function sr(){ld();if(_pt)clearInterval(_pt);_pt=setInterval(ld,P_MS);}
 sr();
 </script>
-<script src="weather-widget.js?v=20260804-2"></script>
+<script src="weather-widget.js?v=20260804-3"></script>
 <script>CwaWeatherWidget.init({endpoint:SUPA_URL+'/functions/v1/cwa-weather',anonKey:SUPA_KEY});</script>
 </body>
 </html>

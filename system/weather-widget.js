@@ -2,6 +2,8 @@
   'use strict';
 
   const COUNTIES=['基隆市','臺北市','新北市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','臺南市','高雄市','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
+  const MAIN_ISLAND_COUNTIES=COUNTIES.filter(county=>!['澎湖縣','金門縣','連江縣'].includes(county));
+  const MAIN_ISLAND_VIEWBOX='270 210 340 560';
   const state={endpoint:'',anonKey:'',summary:null,selected:'臺北市',towns:[],svgText:'',refreshTimer:null,townRequest:0};
   const byId=id=>document.getElementById(id);
   const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,6 +50,11 @@
 
   function renderAlerts(){
     const box=byId('weatherAlertTrack');if(!box)return;
+    const bulletins=state.summary?.bulletins||[];
+    if(bulletins.length){
+      box.innerHTML=bulletins.map(item=>`<a class="weather-alert-item ${item.status==='clear'?'is-clear':'is-current'}" href="${esc(item.sourceUrl||'#')}" target="_blank" rel="noopener" title="${esc(item.content||item.title||item.label)}"><b>● ${esc(item.title||item.label)}</b>${item.status==='clear'?'':'　'+esc(localTime(item.issuedAt))}</a>`).join('');
+      return;
+    }
     const alerts=state.summary?.alerts||[];
     if(!alerts.length){box.innerHTML='<span class="weather-alert-clear">目前無生效中的氣象警特報</span>';return;}
     box.innerHTML=alerts.map(alert=>{
@@ -66,7 +73,7 @@
     const range=low==='—'&&high==='—'?'—':`${low}°–${high}°`;
     return `<div class="weather-place-row"><div class="weather-main-icon" aria-hidden="true">${weatherIcon(data.weather,data.weatherCode)}</div><div><div class="weather-place">${esc(data.county||state.selected)}</div><div class="weather-desc">${esc(data.weather||'天氣資料待更新')}</div></div><div class="weather-temp">${current}${current==='—'?'':'°'}<small>${current==='—'?'':'C'}</small></div></div>
       <div class="weather-metrics">${metric('預報溫度',range)}${metric('降雨機率',numberText(data.rainProbability),'%')}${metric('相對濕度',numberText(data.humidity),'%')}${metric('風速',numberText(data.windSpeed,1),' m/s')}</div>
-      ${compact?`<div class="weather-hint">觀測站：${esc(data.stationName||'暫無即時觀測站資料')}｜觀測時間：${esc(localTime(data.observedAt))}<br>點擊左側臺灣地圖，可查看 22 縣市與鄉鎮市區預報。</div>`:''}`;
+      ${compact?`<div class="weather-hint">觀測站：${esc(data.stationName||'暫無即時觀測站資料')}｜觀測時間：${esc(localTime(data.observedAt))}<br>點擊左側臺灣本島地圖，可查看 19 縣市與鄉鎮市區預報。</div>`:''}`;
   }
 
   function renderSummary(){
@@ -118,6 +125,11 @@
     const box=byId(id);if(!box)return;
     box.innerHTML=await loadSvg();
     const svg=box.querySelector('svg');if(!svg)return;
+    svg.setAttribute('viewBox',MAIN_ISLAND_VIEWBOX);
+    svg.setAttribute('aria-label','臺灣本島十九縣市互動氣象地圖');
+    svg.querySelectorAll('.county').forEach(path=>{
+      if(!MAIN_ISLAND_COUNTIES.includes(canonical(path.dataset.county)))path.remove();
+    });
     addMapMarkers(svg);
     svg.querySelectorAll('.county').forEach(path=>{
       const choose=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,true);if(!full)openModal();};
@@ -152,7 +164,7 @@
   }
 
   function selectCounty(name,withTowns=false){
-    const county=canonical(name);if(!COUNTIES.includes(county))return;
+    const county=canonical(name);if(!MAIN_ISLAND_COUNTIES.includes(county))return;
     state.selected=county;
     const select=byId('weatherCountySelect');if(select)select.value=county;
     renderSummary();renderCountyPanel();updateMapStates();
@@ -202,7 +214,7 @@
     byId('weatherModal')?.addEventListener('click',event=>{if(event.target===event.currentTarget)closeModal();});
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!byId('weatherModal')?.hidden)closeModal();});
     const countySelect=byId('weatherCountySelect');
-    if(countySelect){countySelect.innerHTML=COUNTIES.map(county=>`<option value="${county}">${county}</option>`).join('');countySelect.value=state.selected;countySelect.addEventListener('change',()=>selectCounty(countySelect.value,true));}
+    if(countySelect){countySelect.innerHTML=MAIN_ISLAND_COUNTIES.map(county=>`<option value="${county}">${county}</option>`).join('');countySelect.value=state.selected;countySelect.addEventListener('change',()=>selectCounty(countySelect.value,true));}
     byId('weatherTownSelect')?.addEventListener('change',renderTown);
   }
 

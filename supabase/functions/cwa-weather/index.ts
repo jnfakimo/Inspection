@@ -46,6 +46,20 @@ const TOWN_DATASET_BY_COUNTY: Record<string, string> = {
   "金門縣": "F-D0047-085",
 };
 
+const BULLETIN_DEFINITIONS = [
+  { key: "heat", label: "高溫資訊", dataset: "W-C0033-005", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Warning/W29.html" },
+  { key: "typhoon", label: "颱風消息", dataset: "W-C0034-001", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Typhoon/TY_NEWS.html" },
+  { key: "rain", label: "豪大雨特報", dataset: "W-C0033-003", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Warning/W26.html" },
+];
+
+const HOMEPAGE_BULLETIN_META: Record<string, { key: string; label: string; sourceUrl: string }> = {
+  W29: { key: "heat", label: "高溫資訊", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Warning/W29.html" },
+  W37: { key: "swell", label: "長浪即時訊息", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Warning/W37.html" },
+  W25: { key: "wind", label: "陸上強風特報", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Warning/W25.html" },
+  TY_NEWS: { key: "typhoon", label: "颱風消息", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Typhoon/TY_NEWS.html" },
+  W26: { key: "rain", label: "豪大雨特報", sourceUrl: "https://www.cwa.gov.tw/V8/C/P/Warning/W26.html" },
+};
+
 type JsonObject = Record<string, unknown>;
 type CountyWeather = {
   county: string;
@@ -327,6 +341,116 @@ function parseFlatAlerts(data: unknown) {
   return [...grouped.values()];
 }
 
+function findObjects(root: unknown, predicate: (item: JsonObject) => boolean, depth = 0): JsonObject[] {
+  if (depth > 10 || root == null) return [];
+  if (Array.isArray(root)) return root.flatMap((item) => findObjects(item, predicate, depth + 1));
+  if (typeof root !== "object") return [];
+  const source = root as JsonObject;
+  const found = predicate(source) ? [source] : [];
+  return found.concat(Object.values(source).flatMap((item) => findObjects(item, predicate, depth + 1)));
+}
+
+function cwaTime(value: unknown): string | null {
+  const raw = textValue(value);
+  if (!raw) return null;
+  if (/^\d{4}[-/]\d{2}[-/]\d{2} \d{2}:\d{2}/u.test(raw) && !/[+-]\d{2}:?\d{2}$/u.test(raw)) {
+    return raw.replaceAll("/", "-").replace(" ", "T") + "+08:00";
+  }
+  return raw;
+}
+
+function parseCapAlerts(data: unknown) {
+  const grouped = new Map<string, JsonObject>();
+  const candidates = findObjects(data, (item) => Boolean(
+    pick(item, ["headline", "Headline"]) &&
+    (pick(item, ["description", "Description"]) || pick(item, ["event", "Event"]))
+  ));
+  for (const item of candidates) {
+    const title = textValue(pick(item, ["headline", "Headline"])) || "氣象重要資訊";
+    const content = textValue(pick(item, ["description", "Description"])) || "";
+    const event = textValue(pick(item, ["event", "Event"])) || title;
+    const startsAt = cwaTime(pick(item, ["onset", "Onset", "effective", "Effective"]));
+    const endsAt = cwaTime(pick(item, ["expires", "Expires"]));
+    const issuedAt = cwaTime(pick(item, ["sent", "Sent", "effective", "Effective"]));
+    const urgency = textValue(pick(item, ["urgency", "Urgency"])) || "";
+    const endTime = endsAt ? Date.parse(endsAt) : Number.NaN;
+    const active = !/解除|取消/u.test(title) && urgency.toLowerCase() !== "past" &&
+      (!Number.isFinite(endTime) || endTime > Date.now());
+    const areas = findObjects(item, (area) => pick(area, ["areaDesc", "AreaDesc"]) !== undefined)
+      .map((area) => textValue(pick(area, ["areaDesc", "AreaDesc"]))).filter(Boolean) as string[];
+    const key = `${title}|${content}`;
+    const current = grouped.get(key) || {
+      title,
+      type: event,
+      areas: [],
+      content,
+      issuedAt,
+      startsAt,
+      endsAt,
+      active,
+      severity: textValue(pick(item, ["severity", "Severity"])),
+      sourceUrl: textValue(pick(item, ["web", "Web"])),
+    };
+    current.areas = [...new Set([...(current.areas as string[]), ...areas])];
+    grouped.set(key, current);
+  }
+  return [...grouped.values()].sort((a, b) => Date.parse(String(b.issuedAt || b.startsAt || 0)) - Date.parse(String(a.issuedAt || a.startsAt || 0)));
+}
+
+function decodeJsString(value: string) {
+  return value.replace(/\\u([0-9a-f]{4})/gi, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/\\r/g, "\r").replace(/\\n/g, "\n").replace(/\\t/g, "\t")
+    .replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+}
+
+async function fetchHomepageBulletins() {
+  const response = await fetch(`https://www.cwa.gov.tw/Data/js/warn/Warning_Content.js?v=${Date.now()}`, {
+    headers: { Accept: "text/javascript" },
+  });
+  if (!response.ok) throw new Error(`中央氣象署重要資訊回應 ${response.status}`);
+  const script = await response.text();
+  const listed = script.match(/var\s+WarnAll\s*=\s*\[([^\]]*)\]/u)?.[1]
+    .split(",").map((item) => item.trim().replace(/^['"]|['"]$/g, "")) || [];
+  return listed.filter((code) => HOMEPAGE_BULLETIN_META[code]).map((code) => {
+    const meta = HOMEPAGE_BULLETIN_META[code];
+    const section = script.match(new RegExp(`'${code}'\\s*:\\s*\\{\\s*'C'\\s*:\\s*\\{([\\s\\S]*?)\\n\\s*\\},\\s*\\n\\s*'E'`, "u"))?.[1] || "";
+    const field = (name: string) => {
+    const match = section.match(new RegExp(`'${name}'\\s*:\\s*'((?:\\\\.|[^'])*)'`, "u"));
+    return match ? decodeJsString(match[1]) : null;
+    };
+    const title = field("title") || meta.label;
+    const issuedAt = cwaTime(field("issued"));
+    return {
+      key: meta.key,
+      label: meta.label,
+      dataset: null,
+      sourceUrl: meta.sourceUrl,
+      status: /解除|取消/u.test(title) ? "ended" : "active",
+      title,
+      content: field("content") || (code === "TY_NEWS" ? "中央氣象署目前發布颱風消息，請點擊查看最新內容。" : null),
+      areas: [],
+      issuedAt,
+      endsAt: cwaTime(field("validto")),
+    };
+  });
+}
+
+function bulletin(definition: typeof BULLETIN_DEFINITIONS[number], data: unknown) {
+  const item = parseCapAlerts(data)[0] || null;
+  return {
+    key: definition.key,
+    label: definition.label,
+    dataset: definition.dataset,
+    sourceUrl: item?.sourceUrl || definition.sourceUrl,
+    status: item ? (item.active ? "active" : "ended") : "clear",
+    title: item?.title || `目前無${definition.label}`,
+    content: item?.content || null,
+    areas: item?.areas || [],
+    issuedAt: item?.issuedAt || null,
+    endsAt: item?.endsAt || null,
+  };
+}
+
 function mergeAlerts(eventAlerts: JsonObject[], countyAlerts: JsonObject[]) {
   const result: JsonObject[] = [];
   for (const alert of eventAlerts) {
@@ -452,14 +576,23 @@ async function loadSummary() {
     fetchCwa("O-A0003-001"),
     fetchCwa("W-C0033-001"),
     fetchCwa("W-C0033-002"),
+    ...BULLETIN_DEFINITIONS.map((item) => fetchCwa(item.dataset)),
+    fetchHomepageBulletins(),
   ]);
   const errors = settled.filter((item) => item.status === "rejected").map((item) => String((item as PromiseRejectedResult).reason));
   if (settled.every((item) => item.status === "rejected")) throw new Error(errors.join("；"));
   const value = (index: number) => settled[index].status === "fulfilled" ? (settled[index] as PromiseFulfilledResult<unknown>).value : {};
   const forecast = parseCountyForecast(value(0));
   const observations = parseObservations(value(1));
-  const eventAlerts = [...parseEventAlerts(value(3)), ...parseFlatAlerts(value(3))];
+  const capAlerts = BULLETIN_DEFINITIONS.flatMap((_, index) => parseCapAlerts(value(index + 4)));
+  const eventAlerts = [...parseEventAlerts(value(3)), ...parseFlatAlerts(value(3)), ...capAlerts.filter((item) => item.active)];
   const alerts = mergeAlerts(eventAlerts, parseCountyAlerts(value(2)));
+  const homepageBulletins = value(4 + BULLETIN_DEFINITIONS.length);
+  const bulletins = Array.isArray(homepageBulletins) && homepageBulletins.length ? homepageBulletins : [
+    bulletin(BULLETIN_DEFINITIONS[0], value(4)),
+    bulletin(BULLETIN_DEFINITIONS[1], value(5)),
+    bulletin(BULLETIN_DEFINITIONS[2], value(6)),
+  ];
   const counties = COUNTIES.map((county): CountyWeather => ({
     county,
     weather: null,
@@ -482,6 +615,7 @@ async function loadSummary() {
     view: "summary",
     updatedAt: new Date().toISOString(),
     sourceWarnings: errors,
+    bulletins,
     alerts,
     counties,
   };
@@ -501,11 +635,11 @@ Deno.serve(async (request) => {
   }
 
   try {
-    if (view === "summary") return json(await cachedResponse("summary:v1", 600, loadSummary));
+    if (view === "summary") return json(await cachedResponse("summary:v3", 600, loadSummary));
     if (view === "county") {
       const county = canonicalCounty(url.searchParams.get("county"));
       if (!COUNTIES.includes(county)) return json({ ok: false, message: "縣市名稱不正確" }, 400);
-      const summary = await cachedResponse("summary:v1", 600, loadSummary);
+      const summary = await cachedResponse("summary:v3", 600, loadSummary);
       const countyWeather = array(summary.counties).map(record).find((item) => canonicalCounty(item.county) === county) || null;
       const alerts = array(summary.alerts).map(record).filter((item) => array(item.areas).some((area) => String(area).includes(county.replace(/[市縣]$/u, ""))));
       return json({ ok: true, configured: true, view, updatedAt: summary.updatedAt, stale: summary.stale, county: countyWeather, alerts });
