@@ -81,19 +81,25 @@ RLS is currently open (`allow_all_for_now`) for development. Storage buckets:
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
 - **Shared header actions**: `system/theme.js` owns the global action group. Every
-  application page must use the same five actions in this order: 首頁 → 戰情儀表板 →
-  維修/派完工 → 駐衛警巡檢 → 後台. Use `assets/system-icons/home-icon.svg` for 首頁,
-  `assets/system-icons/admin-icon.png` for 戰情儀表板 and 後台, and
-  `assets/system-icons/maintenance-icon.png` for 維修/派完工. The 維修/派完工 action
+  application page must use the same six actions in this order: 首頁 → 戰情儀表板 →
+  維修/派完工 → 駐衛警巡檢 → 電子交接簿 → 後台. Use `assets/system-icons/home-icon.svg` for 首頁,
+  `assets/system-icons/admin-icon.png` for 戰情儀表板 and 後台,
+  `assets/system-icons/maintenance-icon.png` for 維修/派完工, and
+  `assets/system-icons/handover-icon.png` for 電子交接簿. The 維修/派完工 action
   must link to `https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs`.
   Do not show a separate 完工回報 action. Do not use the `system/icons/nav-*`
-  set for these five shared actions.
+  set for these shared actions.
   Do not add page-specific emoji or text-symbol versions. Page-specific actions
   may remain immediately to the left.
   This icon style, order, and shared-component implementation are locked; do not
   change them unless the user explicitly requests that specific standard to change.
-  Never regenerate, redraw, edit, or replace the two referenced PNG assets for this
+  Never regenerate, redraw, edit, or replace the referenced PNG assets for this
   shared header without an explicit user request.
+  Each action beyond 首頁/戰情儀表板 carries a `sysKey` (matching a `role_permissions`
+  `sys_*` row — see the RBAC section) so `installSharedHeaderActions` in theme.js can
+  hide it for roles without that system's access via `SystemAccess.allowedSystems()`;
+  sysadmin always sees every action. Adding a new sub-system's shared-nav shortcut
+  means adding one `defs` entry with its `sysKey` — no other page needs editing.
 
 ## Do NOT
 - Do **not** delete `system/plans/*` — those textures/DZI tiles are used live by

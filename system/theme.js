@@ -189,7 +189,7 @@
     style.textContent='.system-actions-unified{display:inline-flex;align-items:center;justify-content:flex-end;gap:10px;margin-left:0;white-space:nowrap;order:900}.system-action-unified{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:5px 11px;border:1px solid var(--border,#dbe4ee);border-radius:3px;background:transparent;color:var(--text-dim,#64748b);font-size:.72rem;line-height:1;text-decoration:none;white-space:nowrap;transition:border-color .2s,color .2s,background .2s}.system-action-unified:hover,.system-action-unified:focus-visible{border-color:var(--cyan,#0284c7);color:var(--cyan,#0284c7);outline:none}.system-action-unified.is-current{border-color:var(--cyan,#0284c7);color:var(--cyan,#0284c7);background:rgba(0,212,255,.08);font-weight:700}.system-action-icon{display:inline-block;width:15px;height:15px;object-fit:contain;flex:0 0 15px}.system-action-unified.is-current .system-action-icon{filter:drop-shadow(0 0 4px rgba(0,132,199,.3))}@media(max-width:1100px){.system-actions-unified{gap:6px;flex-wrap:wrap}.system-action-unified{padding:5px 8px}}@media(max-width:720px){.system-actions-unified{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));order:998}.system-action-unified{min-width:0;min-height:44px;padding:6px 3px;font-size:.62rem;gap:3px}.system-action-icon{width:13px;height:13px;flex-basis:13px}}';
     document.head.appendChild(style);
 
-    var replaceTargets={'dashboard.html':1,'workorder.html':1,'repair.html':1,'admin.html':1,'dispatch.html':1,'equipment.html':1,'guardpatrol.html':1,'guardpatrol-index.html':1};
+    var replaceTargets={'dashboard.html':1,'workorder.html':1,'repair.html':1,'admin.html':1,'dispatch.html':1,'equipment.html':1,'guardpatrol.html':1,'guardpatrol-index.html':1,'handover.html':1};
     Array.prototype.slice.call(host.children).forEach(function(child){
       if(child===meta)return;
       if(child.tagName==='A'){
@@ -205,14 +205,17 @@
     actions.className='system-actions-unified';
     actions.setAttribute('data-system-actions','');
     actions.setAttribute('aria-label','共用系統導覽');
+    // sysKey 對應 SystemAccess 的系統代碼；之後新增子系統只要在這裡多加一筆並填 sysKey，
+    // 就會自動依角色的「系統存取權限」設定顯示/隱藏，不用再逐頁修改。
     var defs=[
       {href:'index.html',label:'首頁',icon:'<img class="system-action-icon" src="../assets/system-icons/home-icon.svg" alt="">'},
       {href:'dashboard.html',label:'戰情儀表板',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">'},
-      {href:'https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs',label:'維修/派完工',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">'},
-      {href:'https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7',label:'駐衛警巡檢',icon:'<img class="system-action-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">'},
+      {href:'https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs',label:'維修/派完工',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">',sysKey:'workorder'},
+      {href:'https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7',label:'駐衛警巡檢',icon:'<img class="system-action-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">',sysKey:'guardpatrol'},
+      {href:'handover.html',label:'電子交接簿',icon:'<img class="system-action-icon" src="../assets/system-icons/handover-icon.png" alt="">',sysKey:'handover'},
       {href:'admin.html',label:'後台',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">',sysKey:'admin'}
     ];
-    var adminLink=null;
+    var sysLinks=[];
     defs.forEach(function(def){
       var link=document.createElement('a');
       link.className='system-action-unified';
@@ -223,14 +226,15 @@
       var targetHash='';
       try{targetHash=(new URL(def.href,location.href).hash||'').toLowerCase();}catch(e){}
       if(page===targetPage&&(!targetHash||location.hash.toLowerCase()===targetHash)){link.classList.add('is-current');link.setAttribute('aria-current','page');}
-      if(def.sysKey==='admin')adminLink=link;
+      if(def.sysKey)sysLinks.push({key:def.sysKey,link:link});
       actions.appendChild(link);
     });
     host.insertBefore(actions,meta);
-    // 沒有「後台管理系統」權限的角色，隱藏頂部導覽列的「後台」捷徑
-    if(adminLink&&window.SystemAccess&&typeof window.SystemAccess.allowedSystems==='function'){
+    // 依角色的「系統存取權限」設定，隱藏沒有權限的捷徑（sysadmin 一律全部顯示）
+    if(sysLinks.length&&window.SystemAccess&&typeof window.SystemAccess.allowedSystems==='function'){
       window.SystemAccess.allowedSystems().then(function(allowed){
-        if(allowed!==null&&!allowed.has('admin'))adminLink.style.display='none';
+        if(allowed===null)return;
+        sysLinks.forEach(function(sl){ if(!allowed.has(sl.key))sl.link.style.display='none'; });
       });
     }
   }
