@@ -238,6 +238,51 @@
       });
     }
   }
+  // 全站共用左側品牌列：■ TAIPEC-MKT-1 <頁面名稱> 臺北農產公司／第一果菜市場
+  // 頁面名稱優先讀取頁面既有的 .nav-title / .topbar-title 文字（大多數頁面已有，不用改頁面），
+  // 新增頁面若沒有這兩者，預設會顯示空白頁面名稱，屆時只要在頁面既有的 .navbar/.topbar 容器內
+  // 加一個 <div class="nav-title">頁面名稱</div> 即可自動套用，不需要改 theme.js。
+  function pageBrandLabel(){
+    var titleEl=document.querySelector('.nav-title')||document.querySelector('.topbar-title');
+    if(titleEl){var t=(titleEl.textContent||'').trim();if(t)return t;}
+    var page=(location.pathname.split('/').pop()||'').toLowerCase();
+    if(page==='admin.html')return '後台';
+    return (document.title||'').split(/[—–-]/)[0].trim();
+  }
+  function installBrandBar(){
+    var page=(location.pathname.split('/').pop()||'').toLowerCase();
+    if(/^(?:index|login|app|materials)\.html$/.test(page))return; // 入口/登入/已封存頁不套用
+    var container=document.querySelector('.topbar')||document.querySelector('.navbar');
+    if(!container)return; // #topbar 這類固定式圖示工具列（平面圖/3D）版面較窄，不強加品牌列
+
+    var style=document.createElement('style');
+    style.textContent='.brand-bar-unified{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.72rem;letter-spacing:.05em;line-height:1.3}.brand-bar-unified .sys-tag-unified{color:var(--cyan,#0284c7);font-weight:700;white-space:nowrap}.brand-bar-unified .brand-org-unified,.brand-bar-unified .brand-site-unified,.brand-bar-unified .brand-sep-unified{color:var(--text-dim,#64748b)}@media(max-width:720px){.brand-bar-unified{font-size:.62rem;gap:4px}}';
+    document.head.appendChild(style);
+
+    var label=pageBrandLabel();
+    var target=container.querySelector('.nav-title')||container.querySelector('.topbar-title')||container.querySelector('.topbar-left');
+    if(!target){
+      target=document.createElement('div');
+      container.insertBefore(target,container.firstChild);
+    }
+    target.className=(target.className?target.className+' ':'')+'brand-bar-unified';
+    target.innerHTML='<span class="sys-tag-unified">■ TAIPEC-MKT-1'+(label?(' '+label):'')+'</span>'+
+      '<span class="brand-org-unified" data-sysname="org">臺北農產公司</span>'+
+      '<span class="brand-sep-unified">／</span>'+
+      '<span class="brand-site-unified" data-sysname="site">第一果菜市場</span>';
+  }
+  // 機構／場所名稱可在後台「系統設定」修改；全站沿用 data-sysname 屬性作為統一掛勾點，
+  // 抓一次 system_settings 就能同步套用到品牌列與其他既有沿用同一屬性的頁面內容。
+  function applyBrandNames(){
+    fetch(SUPABASE_URL+'/rest/v1/system_settings?select=key,value&key=in.(org_name,site_name)',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY}})
+      .then(function(r){return r.ok?r.json():[];})
+      .then(function(rows){
+        var s={};(rows||[]).forEach(function(row){s[row.key]=row.value;});
+        if(s.org_name)document.querySelectorAll('[data-sysname="org"]').forEach(function(el){el.textContent=s.org_name;});
+        if(s.site_name)document.querySelectorAll('[data-sysname="site"]').forEach(function(el){el.textContent=s.site_name;});
+      })
+      .catch(function(){});
+  }
   function installSystemMeta(){
     var style=document.createElement('style');
     style.textContent='.system-meta-unified{display:inline-flex;align-items:center;justify-content:flex-end;gap:12px;margin-left:0;white-space:nowrap;font-family:var(--font-mono,monospace);font-size:.72rem;letter-spacing:.05em;color:var(--text-dim,#64748b);order:999}.system-connectivity-unified{display:inline-flex;align-items:center;gap:7px}.system-meta-unified .system-dot{width:7px;height:7px;border-radius:50%;background:var(--green,#00b87a);box-shadow:0 0 8px var(--green,#00b87a);flex:0 0 auto}.system-meta-unified.is-offline .system-dot{background:var(--red,#dc2626);box-shadow:0 0 8px var(--red,#dc2626)}.system-user-unified{max-width:240px;overflow:hidden;text-overflow:ellipsis;color:var(--text,#334155)}.system-clock-unified{color:var(--cyan,#0284c7);font-family:var(--font-mono,monospace);font-size:.72rem;letter-spacing:.08em}.system-user-unified,.system-connectivity-unified,.system-clock-unified,.system-changepw-unified,.system-logout-unified{padding-left:11px;border-left:1px solid var(--border,#dbe4ee)}.system-changepw-unified,.system-logout-unified{cursor:pointer;text-decoration:none;color:var(--text-dim,#64748b);background:none;border-top:none;border-right:none;border-bottom:none;margin:0;padding-top:0;padding-right:0;padding-bottom:0;font:inherit;font-size:inherit;letter-spacing:inherit;transition:color .2s}.system-changepw-unified:hover,.system-changepw-unified:focus-visible{color:var(--cyan,#0284c7)}.system-logout-unified:hover,.system-logout-unified:focus-visible{color:var(--red,#dc2626)}.system-meta-fallback{position:fixed;top:10px;right:12px;z-index:99998;padding:7px 10px;border:1px solid var(--border,#dbe4ee);background:var(--surface,#fff)}@media(max-width:1100px){.system-meta-unified{justify-content:flex-end}.topbar-right,.nav-right,.navbar,.topbar,#topbar{flex-wrap:wrap}}@media(max-width:720px){.system-meta-unified{gap:6px;font-size:.61rem;letter-spacing:0}.system-user-unified{max-width:145px}.system-clock-unified{font-size:.61rem;letter-spacing:0}.system-user-unified,.system-connectivity-unified,.system-clock-unified,.system-changepw-unified,.system-logout-unified{padding-left:6px}}';
@@ -335,6 +380,8 @@
   }
   ready(function(){
     installSystemMeta();
+    installBrandBar();
+    applyBrandNames();
     var btn=document.createElement('button');
     btn.id='themeToggleBtn';
     btn.type='button';

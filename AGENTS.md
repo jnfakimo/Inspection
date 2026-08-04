@@ -100,6 +100,28 @@ RLS is currently open (`allow_all_for_now`) for development. Storage buckets:
   hide it for roles without that system's access via `SystemAccess.allowedSystems()`;
   sysadmin always sees every action. Adding a new sub-system's shared-nav shortcut
   means adding one `defs` entry with its `sysKey` — no other page needs editing.
+- **Shared brand bar** (added 2026-08-04, unified per owner request): the far-left
+  of the header must read `■ TAIPEC-MKT-1 <頁面名稱> 臺北農產公司／第一果菜市場`. This is
+  built automatically by `installBrandBar()`/`applyBrandNames()` in `theme.js` — do
+  **not** hand-write it into new pages. To get the page name right:
+  - If the page already has `<div class="nav-title">頁面名稱</div>` inside its
+    `.navbar`/`.topbar` (the existing convention on most pages), theme.js reuses that
+    text automatically — nothing else to do.
+  - Pages without a `.nav-title` (currently only `admin.html`) fall back to a
+    hardcoded `'後台'` in `pageBrandLabel()`; any other page without `.nav-title` falls
+    back to the text before the first `—`/`-` in `<title>`.
+  - `admin.html`/`handover.html` still ship their own literal `.topbar-left` markup
+    from before this change — theme.js finds and overwrites it at runtime, so the two
+    versions can look out of sync only if you read the HTML source, not in the browser.
+  - Org/site name (`臺北農產公司`／`第一果菜市場`) comes from `system_settings`
+    (`org_name`/`site_name`) via `applyBrandNames()`, applied to every
+    `[data-sysname="org"]`/`[data-sysname="site"]` element on the page — reuse those
+    same `data-sysname` attributes if a page needs to show the org/site name elsewhere.
+  - Pages using a fixed `#topbar` icon-only toolbar (`b1plan.html`, `floor3d.html`,
+    `b1_integrated_marker_system.html`, `guardpatrol3d.html`) and the entry pages
+    (`index.html`, `login.html`, `app.html`, `materials.html`) intentionally do **not**
+    get the brand bar — the toolbar is too narrow and the entry pages have their own
+    branding. Don't force it onto these without an explicit request.
 
 ## Do NOT
 - Do **not** delete `system/plans/*` — those textures/DZI tiles are used live by
