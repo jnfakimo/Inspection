@@ -101,6 +101,7 @@ a{color:inherit;text-decoration:none}
 .pc.ok .n{color:var(--green)}.pc.pending .n{color:var(--purple)}.pc.overdue .n{color:var(--red)}
 .pc .l{font-size:.6rem;color:var(--text-dim);margin-top:1px}
 #pi{font-size:.74rem;color:var(--text-dim);margin:2px 0 8px}
+.patrol-floor-filter{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:-2px 0 8px}.patrol-floor-filter label{font-size:.68rem;color:var(--text-dim);white-space:nowrap}.patrol-floor-filter select{min-width:140px;padding:6px 28px 6px 9px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font:inherit;font-size:.7rem;cursor:pointer}.patrol-floor-filter select:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(0,212,255,.08)}
 #pg{overflow:auto;height:336px;border-top:1px solid var(--border)}
 .pt{border-collapse:collapse;width:100%;font-size:.74rem}
 .pt th{text-align:center;color:var(--text-dim);font-size:.65rem;padding:7px 6px;border-bottom:1px solid var(--border);font-weight:400;white-space:nowrap;position:sticky;top:0;background:var(--panel);z-index:2}
@@ -153,6 +154,7 @@ a{color:inherit;text-decoration:none}
   .toolbar{align-items:stretch;padding:10px}.toolbar-group,.toolbar-range{width:100%}.toolbar-range input{flex:1;min-width:0}
   .qbtn{flex:1}.toolbar-label{width:100%}
   .dashboard-grid{margin:0 -4px}.dashboard-grid .grid-stack-item-content{inset:4px}.dashboard-widget>.section-title{font-size:.78rem}
+  .patrol-floor-filter{justify-content:stretch}.patrol-floor-filter select{flex:1;min-width:0}
   .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.ks{min-height:78px;padding:11px}.ks .ks-icon{display:none}.ks .ks-n{font-size:1.45rem}
   .section-title{margin-top:16px}.dash-main,.rank-grid{gap:10px}.rank-grid{grid-template-columns:1fr}
   .pcard,.ccard,.rcard,.tcard{padding:13px}.ps{gap:6px}.pc{padding:8px 6px}.pc .n{font-size:1.35rem}
@@ -227,6 +229,7 @@ a{color:inherit;text-decoration:none}
         <div class="pc overdue"><div class="n" id="p3">-</div><div class="l">逾期未打卡</div></div>
       </div>
       <div id="pi"></div>
+      <div class="patrol-floor-filter"><label for="patrolFloorFilter">依樓層分類</label><select id="patrolFloorFilter" onchange="changePatrolFloor(this.value)"><option value="">全部樓層</option></select></div>
       <div id="pg"></div>
     </div>
     </section></div></div>
@@ -653,8 +656,31 @@ async function drawTrend(){
 initDashboardLayout().finally(()=>quick('month'));
 </script>
 <script>
-const P_MS=12000;let _pt;
+const P_MS=12000;let _pt;let _patrolFloor='';
 function fh(t){return String(t||'').slice(0,5);}
+function canonicalPatrolFloor(value){
+  const floor=String(value||'未分類').trim().toUpperCase().replace(/\s+/g,'');
+  const basement=floor.match(/^B(\d+)F?$/);if(basement)return 'B'+basement[1];
+  const normal=floor.match(/^(\d+)F?$/);if(normal)return normal[1]+'F';
+  if(floor==='RF'||floor==='R'||floor==='頂樓')return 'RF';
+  return floor||'未分類';
+}
+function patrolFloorOrder(value){
+  const floor=canonicalPatrolFloor(value),basement=floor.match(/^B(\d+)$/),normal=floor.match(/^(\d+)F$/);
+  if(basement)return 100-Number(basement[1]);
+  if(normal)return 100+Number(normal[1]);
+  if(floor==='RF')return 1000;
+  return 500;
+}
+function escapePatrolText(value){return String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function syncPatrolFloorFilter(markers){
+  const select=document.getElementById('patrolFloorFilter');if(!select)return;
+  const floors=[...new Set(markers.map(m=>canonicalPatrolFloor(m.floor_id)))].sort((a,b)=>patrolFloorOrder(a)-patrolFloorOrder(b)||a.localeCompare(b,'zh-Hant'));
+  if(_patrolFloor&&!floors.includes(_patrolFloor))_patrolFloor='';
+  select.innerHTML='<option value="">全部樓層</option>'+floors.map(f=>'<option value="'+escapePatrolText(f)+'">'+escapePatrolText(f)+'</option>').join('');
+  select.value=_patrolFloor;
+}
+function changePatrolFloor(value){_patrolFloor=value?canonicalPatrolFloor(value):'';ld();}
 async function ld(){
   if(typeof PatrolStatus==='undefined'){document.getElementById('pg').innerHTML='<div class="empty">\u8f09\u5165\u4e2d</div>';return;}
   try{
@@ -664,6 +690,8 @@ async function ld(){
       PatrolStatus.compute(db).catch(()=>({map:new Map(),shift:null,range:null}))
     ]);
     const markers=full.markers||[];
+    syncPatrolFloorFilter(markers);
+    const visibleMarkers=(_patrolFloor?markers.filter(m=>canonicalPatrolFloor(m.floor_id)===_patrolFloor):markers).slice().sort((a,b)=>patrolFloorOrder(a.floor_id)-patrolFloorOrder(b.floor_id)||(a.label||'').localeCompare(b.label||'','zh-Hant'));
     const now=new Date();
     const active=Boolean(duty.shift&&duty.range&&now>=duty.range.start&&now<=duty.range.end);
     if(!active){
@@ -676,16 +704,16 @@ async function ld(){
     }
     const shift=duty.shift;
     let a=0,b=0,c=0;
-    markers.forEach(m=>{const st=duty.map.get(m.marker_id)||'pending';if(st==='ok')a++;else if(st==='pending')b++;else c++;});
+    visibleMarkers.forEach(m=>{const st=duty.map.get(m.marker_id)||'pending';if(st==='ok')a++;else if(st==='pending')b++;else c++;});
     document.getElementById('p1').textContent=a;
     document.getElementById('p2').textContent=b;
     document.getElementById('p3').textContent=c;
-    document.getElementById('pi').innerHTML='\u7576\u73ed\u5373\u6642\u7d71\u8a08\uff5c<b style="color:var(--cyan)">'+shift.name+'</b> ('+fh(shift.start_time)+'-'+fh(shift.end_time)+')';
+    document.getElementById('pi').innerHTML='\u7576\u73ed\u5373\u6642\u7d71\u8a08\uff5c<b style="color:var(--cyan)">'+shift.name+'</b> ('+fh(shift.start_time)+'-'+fh(shift.end_time)+')'+(_patrolFloor?'\uff5c樓層 <b style="color:var(--cyan)">'+escapePatrolText(_patrolFloor)+'</b>':'');
     const g=document.getElementById('pg');
-    if(!markers.length){g.innerHTML='<div class="empty">\u5c1a\u7121\u5de1\u908f\u9ede</div>';return;}
+    if(!visibleMarkers.length){g.innerHTML='<div class="empty">'+(_patrolFloor?'此樓層尚無巡邏點':'\u5c1a\u7121\u5de1\u908f\u9ede')+'</div>';return;}
     const ic={ok:'\u2713',pending:'\u2026',overdue:'\u2715'};
     g.innerHTML='<table class="pt"><tr><th class="pl">\u5de1\u6aa2\u9ede</th><th>'+shift.name+'<br>'+fh(shift.start_time)+'-'+fh(shift.end_time)+'</th></tr>'
-      +markers.map(m=>{const st=duty.map.get(m.marker_id)||'pending';return '<tr><td class="pl">'+(m.floor_id||'')+' '+(m.label||'')+'</td><td><span class="pd '+st+'">'+ic[st]+'</span></td></tr>';}).join('')+'</table>';
+      +visibleMarkers.map(m=>{const st=duty.map.get(m.marker_id)||'pending';return '<tr><td class="pl">'+escapePatrolText(canonicalPatrolFloor(m.floor_id))+' '+escapePatrolText(m.label||'')+'</td><td><span class="pd '+st+'">'+ic[st]+'</span></td></tr>';}).join('')+'</table>';
   }catch(e){document.getElementById('pg').innerHTML='<div class="empty">\u8f09\u5165\u5931\u6557</div>';}
 }
 function sr(){ld();if(_pt)clearInterval(_pt);_pt=setInterval(ld,P_MS);}
