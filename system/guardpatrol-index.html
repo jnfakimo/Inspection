@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="駐衛警巡檢系統入口，整合巡檢表、3D 巡檢雲台、巡檢排班與 LINE 推播紀錄。">
+  <meta name="description" content="駐衛警巡檢系統入口，整合巡檢表與 3D 巡檢雲台；管理功能依權限顯示。">
   <title>駐衛警巡檢系統</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&amp;family=Rajdhani:wght@500;600;700&amp;display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('siteTheme') || 'tech');</script>
-  <script src="theme.js?v=20260804-2"></script>
+  <script src="theme.js?v=20260804-7"></script>
   <style>
     :root {
       --bg: #020b18;
@@ -124,7 +124,8 @@
     .workflow-note { margin: 0 0 15px; color: var(--text-dim); font: 600 .69rem var(--font-head); letter-spacing: .12em; }
     .workflow-note::before { content: '■'; margin-right: 9px; color: var(--cyan); }
 
-    .portal-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+    .portal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    html.is-sysadmin .portal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .portal-card {
       --accent: var(--cyan);
       --accent-rgb: 0, 212, 255;
@@ -169,7 +170,7 @@
     @media (max-width: 1100px) {
       .navbar { align-items: flex-start; flex-wrap: wrap; }
       .brand { min-height: 38px; }
-      .portal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .portal-grid, html.is-sysadmin .portal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 720px) {
       body { overflow-x: hidden; }
@@ -191,7 +192,7 @@
       h1 { font-size: 1.3rem; gap: 8px; }
       .title-icon { width: 38px; height: 38px; }
       .hero p { margin-left: 47px; font-size: .75rem; }
-      .portal-grid { grid-template-columns: 1fr; }
+      .portal-grid, html.is-sysadmin .portal-grid { grid-template-columns: 1fr; }
       .portal-card { min-height: 272px; grid-column: auto; padding: 22px; }
       .card-icon { width: 58px; height: 58px; margin: 24px 0 14px; }
     }
@@ -210,7 +211,7 @@
   <main>
     <section class="hero" aria-labelledby="page-title">
       <h1 id="page-title"><img class="title-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">駐衛警巡檢系統</h1>
-      <p>巡檢紀錄、3D 場域雲台、人員排班及 LINE 推播紀錄入口</p>
+      <p>巡檢紀錄與 3D 場域雲台入口；管理功能僅供系統管理員使用。</p>
     </section>
 
     <div class="workflow-note">GUARD PATROL WORKFLOW · 點選圖卡進入功能系統</div>
@@ -231,7 +232,7 @@
         <span class="enter">OPEN 3D VIEW <span aria-hidden="true">→</span></span>
       </a>
 
-      <a class="portal-card" href="patrolshifts.html?v=20260719-2">
+      <a class="portal-card" href="patrolshifts.html?v=20260719-2" data-sysadmin-only hidden>
         <div class="card-top"><span class="card-number">MODULE 03</span><span class="card-status">系統連線</span></div>
         <div class="card-icon"><img src="../assets/system-icons/guardpatrol-schedule-icon.png" alt=""></div>
         <h2>巡檢排班系統</h2>
@@ -239,7 +240,7 @@
         <span class="enter">MANAGE SHIFTS <span aria-hidden="true">→</span></span>
       </a>
 
-      <a class="portal-card" href="patrol-notifications.html">
+      <a class="portal-card" href="patrol-notifications.html" data-sysadmin-only hidden>
         <div class="card-top"><span class="card-number">MODULE 04</span><span class="card-status">系統連線</span></div>
         <div class="card-icon"><img src="../assets/system-icons/guardpatrol-line-push-icon.png" alt=""></div>
         <h2>LINE推播紀錄</h2>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-2"></script>
+<script src="theme.js?v=20260804-7"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -177,7 +177,13 @@ tr:last-child td{border-bottom:none}
 const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html?redirect='+encodeURIComponent('patrolshifts.html');}})();
+async function initPatrolShiftPage(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html?redirect='+encodeURIComponent('patrolshifts.html');return;}
+  if(!window.SystemAccess||typeof window.SystemAccess.enforceSysadmin!=='function'){location.replace('guardpatrol-index.html?denied=sysadmin');return;}
+  if(!(await window.SystemAccess.enforceSysadmin('guardpatrol-index.html')))return;
+  await load();
+}
 function translateError(msg){
   if(!msg) return '未知錯誤';
   if(msg.includes('duplicate key value')) return '同一天已有相同名稱的班別';
@@ -373,7 +379,7 @@ document.getElementById('m-shift').addEventListener('click',e=>{if(e.target.id==
 document.getElementById('m-tpl').addEventListener('click',e=>{if(e.target.id==='m-tpl')closeModal('m-tpl');});
 
 document.getElementById('datePick').value=todayStr();
-load();
+initPatrolShiftPage();
 </script>
 </body>
 </html>

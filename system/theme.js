@@ -73,6 +73,22 @@
       hasVehicleAssignment(profile,bearer,'vehicle_dispatch_drivers')
     ]).then(function(result){return result[0]||result[1];});
   }
+  function isSysadminAccess(){
+    var auth=storedAuthSessionForAccess();
+    var token=auth&&auth.access_token;
+    var authId=auth&&auth.user&&auth.user.id;
+    if(!token||!authId)return Promise.resolve(resolveRbacRole(readProfile())==='sysadmin');
+    return fetchUserRowForAccess(authId,token).then(function(profile){
+      if(!profile)return false;
+      saveProfile(profile);
+      return resolveRbacRole(profile)==='sysadmin';
+    });
+  }
+  function denySysadminAccess(redirectPage){
+    var target=redirectPage||'index.html';
+    location.replace(target+(target.indexOf('?')>=0?'&':'?')+'denied=sysadmin');
+    return false;
+  }
   var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap','vehicle'];
   window.SystemAccess={
     ALL_SYSTEM_KEYS:ALL_SYSTEM_KEYS,
@@ -116,8 +132,25 @@
         var personnelAccess=systemKey==='vehicle'?hasVehiclePersonnelAccess(profile,bearer):Promise.resolve(false);
         return Promise.all([roleAccess,personnelAccess]).then(function(result){return result[0]||result[1]?true:denyAccess(systemKey);});
       });
+    },
+    isSysadmin:isSysadminAccess,
+    enforceSysadmin:function(redirectPage){
+      return isSysadminAccess().then(function(allowed){return allowed?true:denySysadminAccess(redirectPage);});
     }
   };
+
+  function installSysadminOnlyAccess(){
+    var selector='[data-sysadmin-only],a[href*="patrolshifts.html"],a[href*="patrol-notifications.html"]';
+    var resolved=false,allowed=false;
+    function sync(){
+      document.querySelectorAll(selector).forEach(function(node){node.hidden=!resolved||!allowed;});
+      document.documentElement.classList.toggle('is-sysadmin',resolved&&allowed);
+    }
+    sync();
+    var observer=new MutationObserver(sync);
+    observer.observe(document.body,{childList:true,subtree:true});
+    isSysadminAccess().then(function(result){resolved=true;allowed=result;sync();}).catch(function(){resolved=true;allowed=false;sync();});
+  }
 
   // 共用「登出」／「更改密碼」動作，供頂部導覽列的按鈕使用（全站共用元件）
   function performLogout(){
@@ -400,6 +433,7 @@
     window.addEventListener('system-user-profile-updated',updateUser);
   }
   ready(function(){
+    installSysadminOnlyAccess();
     installSystemMeta();
     installBrandBar();
     applyBrandNames();

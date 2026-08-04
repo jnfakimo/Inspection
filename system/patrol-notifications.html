@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-2"></script>
+<script src="theme.js?v=20260804-7"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>LINE／FCM 推播紀錄 — 駐衛警巡檢系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -82,7 +82,14 @@ async function load(){
 function renderSummary(){document.getElementById('totalCount').textContent=rows.length;document.getElementById('sentCount').textContent=rows.filter(x=>x.status==='sent').length;document.getElementById('failedCount').textContent=rows.filter(x=>x.status==='failed').length;document.getElementById('uncheckedCount').textContent=rows.reduce((n,x)=>n+(Number(x.unchecked_count)||0),0);}
 function render(){const start=(page-1)*PAGE_SIZE,view=rows.slice(start,start+PAGE_SIZE),body=document.getElementById('rows');body.innerHTML=view.length?view.map(x=>`<tr><td>${esc(x.shift_date)}</td><td><b>${esc(x.shift_name)}</b><br><span style="color:var(--text-dim)">${fmt(x.scheduled_end)}</span></td><td>${Number(x.checked_count)||0} / ${Number(x.expected_count)||0}<br><span style="color:var(--red)">未打卡 ${Number(x.unchecked_count)||0}</span></td><td>${esc((x.assigned_names||[]).join('、')||'尚未指派')}</td><td>${esc((x.actual_names||[]).join('、')||'尚無人員')}</td><td><span class="status ${esc(x.status)}">${esc(statusText[x.status]||x.status)}</span></td><td><span class="status ${esc(x.fcm_status||'pending')}">${esc(statusText[x.fcm_status]||statusText.pending)}</span><br><span style="color:var(--text-dim)">成功 ${Number(x.fcm_success_count)||0}／失敗 ${Number(x.fcm_failure_count)||0}</span></td><td>${fmt(x.sent_at)}</td><td class="response">${esc(formatLineResponse(x.line_response,x.status))}</td><td class="response">${esc(x.fcm_response||'尚無 FCM 回應')}</td></tr>`).join(''):'<tr><td colspan="10" class="empty">查無符合條件的推播紀錄</td></tr>';renderPager();}
 function renderPager(){const pages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE));if(page>pages)page=pages;document.getElementById('pageInfo').textContent=`第 ${page} / ${pages} 頁｜每頁 10 筆`;document.getElementById('prevBtn').disabled=page<=1;document.getElementById('nextBtn').disabled=page>=pages;}
-document.getElementById('queryBtn').onclick=load;document.getElementById('prevBtn').onclick=()=>{if(page>1){page--;render();scrollTo({top:0,behavior:'smooth'});}};document.getElementById('nextBtn').onclick=()=>{if(page<Math.ceil(rows.length/PAGE_SIZE)){page++;render();scrollTo({top:0,behavior:'smooth'});}};load();
+async function initPatrolNotificationPage(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html?redirect='+encodeURIComponent('patrol-notifications.html');return;}
+  if(!window.SystemAccess||typeof window.SystemAccess.enforceSysadmin!=='function'){location.replace('guardpatrol-index.html?denied=sysadmin');return;}
+  if(!(await window.SystemAccess.enforceSysadmin('guardpatrol-index.html')))return;
+  await load();
+}
+document.getElementById('queryBtn').onclick=load;document.getElementById('prevBtn').onclick=()=>{if(page>1){page--;render();scrollTo({top:0,behavior:'smooth'});}};document.getElementById('nextBtn').onclick=()=>{if(page<Math.ceil(rows.length/PAGE_SIZE)){page++;render();scrollTo({top:0,behavior:'smooth'});}};initPatrolNotificationPage();
 </script>
 </body>
 </html>
