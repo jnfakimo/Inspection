@@ -154,7 +154,9 @@ window.PatrolStatus = (function () {
     const checkedIds = new Set((checkins || []).map(c => c.target_id));
     (markers || []).forEach(m => {
       if (checkedIds.has(m.marker_id)) map.set(m.marker_id, 'ok');
-      else if (now <= statusRange.end) map.set(m.marker_id, 'pending');
+      // Once the notification window starts, every unchecked point is overdue.
+      // It may still turn green later when a valid late check-in arrives.
+      else if (now < statusRange.start) map.set(m.marker_id, 'pending');
       else map.set(m.marker_id, 'overdue');
     });
     return { map, shift: relevant, range: relevantRange, statusRange, checkinRange: acceptedRange };
@@ -193,7 +195,7 @@ window.PatrolStatus = (function () {
           new Date(c.checkin_at) >= s.checkinRange.start && new Date(c.checkin_at) <= s.checkinRange.end);
         let state;
         if (hit) state = 'ok';
-        else if (now <= s.range.end) state = 'pending';
+        else if (now < s.range.start) state = 'pending';
         else state = 'overdue';
         matrix.set(s.shift_id + '|' + m.marker_id, state);
       });
