@@ -132,8 +132,10 @@
     });
     addMapMarkers(svg);
     svg.querySelectorAll('.county').forEach(path=>{
-      const choose=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,true);if(!full)openModal();};
+      const choose=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,full);};
+      const showTowns=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,false);openModal();};
       path.addEventListener('click',choose);
+      if(!full)path.addEventListener('dblclick',showTowns);
       path.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ' )choose(event);});
     });
     updateMapStates();
@@ -207,7 +209,7 @@
 
   function bind(){
     document.querySelectorAll('[data-weather-open]').forEach(button=>{
-      button.addEventListener('click',openModal);
+      button.addEventListener(button.classList.contains('weather-map-button')?'dblclick':'click',openModal);
       button.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openModal();}});
     });
     document.querySelectorAll('[data-weather-close]').forEach(button=>button.addEventListener('click',closeModal));
