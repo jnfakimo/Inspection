@@ -52,7 +52,10 @@
     const box=byId('weatherAlertTrack');if(!box)return;
     const bulletins=state.summary?.bulletins||[];
     if(bulletins.length){
-      box.innerHTML=bulletins.map(item=>`<a class="weather-alert-item ${item.status==='clear'?'is-clear':'is-current'}" href="${esc(item.sourceUrl||'#')}" target="_blank" rel="noopener" title="${esc(item.content||item.title||item.label)}"><b>● ${esc(item.title||item.label)}</b>${item.status==='clear'?'':'　'+esc(localTime(item.issuedAt))}</a>`).join('');
+      box.innerHTML=bulletins.map(item=>{
+        const issuedAt=item.status==='clear'||!item.issuedAt?'':'　'+esc(localTime(item.issuedAt));
+        return `<a class="weather-alert-item ${item.status==='clear'?'is-clear':'is-current'}" href="${esc(item.sourceUrl||'#')}" target="_blank" rel="noopener" title="${esc(item.content||item.title||item.label)}"><b>● ${esc(item.title||item.label)}</b>${issuedAt}</a>`;
+      }).join('');
       return;
     }
     const alerts=state.summary?.alerts||[];
