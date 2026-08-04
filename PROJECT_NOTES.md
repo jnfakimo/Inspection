@@ -1,5 +1,25 @@
 # 專案筆記
 
+## 2026-08-04 收工（第二次｜Claude Sonnet 5 @ DESKTOP-0CFB6UK）
+
+### 完成事項
+
+- 補齊 `PROJECT_CONTEXT.md` 的 V0020（07-15）～08-04 版本紀錄斷層（回填 173 個 commit，依主題整理成一節，交叉參照 `PROJECT_NOTES.md` 已有的兩段詳細紀錄，未重複）。
+- 統一全站頂部左側品牌列：`theme.js` 新增 `installBrandBar()`/`applyBrandNames()`，自動組出「■ TAIPEC-MKT-1 <頁面名稱> 臺北農產公司／第一果菜市場」，頁面名稱沿用各頁既有的 `.nav-title`/`.topbar-title` 文字，新頁面不用額外設定就會自動套用；平面圖/3D 建模等窄版圖示工具列（`#topbar` id 版型）與登入/首頁刻意排除。已寫進 `AGENTS.md` 的 Conventions。
+- 修正 `patrolstatus.js` 的巡邏點逾期判定：原本要等整個班別時段結束才變逾期，改成一進入通報時段就標逾期（晚到打卡仍會補救成綠色）；順手清掉 12 個已無任何頁面引用的舊 icon 檔案（`system/icons/icon-*.png`、`nav-*.png`）。
+- 修掉 `theme.js` 共用導覽清理邏輯的一個誤刪 bug：舊版清理只比對 href 檔名，導致 `guardpatrol3d.html`／`patrolshifts.html`／`patrol-notifications.html` 上「巡檢稽核總覽」這個頁面專屬捷徑（剛好也連到 `guardpatrol.html`）被誤判成舊版「駐衛警巡檢」重複連結而遭清除。改成連結文字也要包含「駐衛警巡檢」才真的移除；`guardpatrol3d.html` 因此第一次真正套用到統一導覽（含依角色權限顯示/隱藏「後台」等捷徑）。
+- `guardpatrol3d.html`「平面駐警巡檢」按鈕與 iframe 標題改名為「電子地圖巡檢」。
+
+### 下一步
+
+- **`guardpatrol3d.html` 頂部導覽列鎖寬換行的修改還沒 commit**（工作目錄有未提交變動）：把 `#topbar` 從固定 50px 高、單行橫向捲動，改成 `flex-wrap` 自動換列 + 用 `--tb-h` CSS 變數即時量測實際高度，同步給 `#c3d`／`#panel`／`#floorsToggle` 等固定定位元素讓開。邏輯本身複查過沒問題，但這個 sandbox 環境的瀏覽器分頁沒有在合成畫面（screenshot 工具回報 "not compositing frames"），導致 `requestAnimationFrame`／`setTimeout`／`ResizeObserver` 疑似被當背景分頁節流，沒辦法在這裡驗證「換行後的實際高度」有沒有正確同步回 CSS 變數。**下次開工請先用真實瀏覽器（非本 agent 沙盒）實際打開 `guardpatrol3d.html`、縮小視窗寬度，確認頂部導覽換行後 3D 畫面／樓層面板沒有被蓋住，沒問題再 commit + push。**
+- 請業主確認 `guardpatrol3d.html` 的「巡檢稽核總覽」連結是否已經正常顯示（這是本次修的誤刪 bug）。
+
+### 已知注意事項／踩坑
+
+- `theme.js` 的舊版共用導覽清理邏輯是「href 對到目標檔名就整個移除」，沒有考慮同一個檔名可能被不同用途的連結指到——之後如果要新增 replaceTargets 項目，記得檢查有沒有頁面專屬連結剛好連到同一個檔案，不然會重演這次的誤刪。
+- 這個 repo 有兩個本地 clone（`AI\Claude\word-cloud` 與 `AI\Codex\北農人臉辨識系統\word-cloud-site`，本次工作都在後者），且已知同時有 Claude／Codex 兩個代理在用；每次開工務必先 `git fetch` 確認沒落後。
+
 ## 2026-08-04 收工（Claude Sonnet 5 @ DESKTOP-0CFB6UK）
 
 ### 完成事項
