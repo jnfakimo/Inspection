@@ -130,7 +130,7 @@ const fmtDate=v=>v?String(v).slice(0,10):'—';
 function fmtDateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ').slice(0,16);return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replaceAll('/','-');}
 function toIso(v){return v?new Date(v).toISOString():null;}
 function timeText(v){return v?String(v).slice(0,5):'—';}
-function timeOptions(selected=''){let html='<option value="">請選擇</option>';for(let hour=0;hour<24;hour++){for(const minute of ['00','30']){const value=`${String(hour).padStart(2,'0')}:${minute}`;html+=`<option value="${value}" ${value===selected?'selected':''}>${value}</option>`;}}return html;}
+function timeOptions(selected=''){let html='<option value="">請選擇</option>';if(selected&&!isHalfHour(selected))html+=`<option value="${esc(selected)}" selected>${esc(selected)}（舊紀錄）</option>`;for(let hour=0;hour<24;hour++){for(const minute of ['00','30']){const value=`${String(hour).padStart(2,'0')}:${minute}`;html+=`<option value="${value}" ${value===selected?'selected':''}>${value}</option>`;}}return html;}
 function isHalfHour(value){return /^\d{2}:(00|30)$/.test(String(value||'').slice(0,5));}
 function isHalfHourDateTime(value){return /^\d{4}-\d{2}-\d{2}T\d{2}:(00|30)$/.test(String(value||'').slice(0,16));}
 function locationSelector(prefix,label,value,editable,defaultValue=''){
@@ -344,7 +344,7 @@ function completedSummary(r){return `<section class="form-section"><h3>行車完
 function applicationPayload(){
   const payload={application_date:val('fApplicationDate')||todayISO(),applicant_phone:val('fApplicantPhone'),trip_date:val('fTripDate'),planned_departure_time:val('fDepartureTime'),planned_return_time:val('fReturnTime'),origin_location:locationValue('Origin'),destination_location:locationValue('Destination'),passenger_count:Number(val('fPassengers')),trip_purpose:val('fPurpose'),applicant_note:val('fApplicantNote')||null};
   if(!payload.applicant_phone||!payload.trip_date||!payload.planned_departure_time||!payload.planned_return_time||!payload.origin_location||!payload.destination_location||!payload.trip_purpose||!Number.isInteger(payload.passenger_count)||payload.passenger_count<1)throw new Error('請完整填寫所有必填欄位');
-  if(payload.applicant_phone.length<6)throw new Error('請填寫可聯絡的電話或手機號碼');
+  if(payload.applicant_phone.replace(/[^0-9#*]/g,'').length<4)throw new Error('請填寫至少 4 碼的分機、電話或手機號碼');
   if(!isHalfHour(payload.planned_departure_time)||!isHalfHour(payload.planned_return_time))throw new Error('預計時間請使用每 30 分鐘的時段');
   if(payload.planned_return_time<=payload.planned_departure_time)throw new Error('預計回程時間必須晚於出發時間');
   return payload;
