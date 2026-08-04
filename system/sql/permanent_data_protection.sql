@@ -76,7 +76,7 @@ begin
     'equipment_maintenance_plans','equipment_maintenance_records','equipment_contracts',
     'equipment_documents','equipment_annual_costs','equipment_external_links',
     'equipment_monitor_points','equipment_monitor_events',
-    'official_vehicles','vehicle_dispatch_managers','vehicle_dispatch_requests','vehicle_dispatch_logs','vehicle_dispatch_attachments'
+    'official_vehicles','vehicle_dispatch_managers','vehicle_dispatch_drivers','vehicle_dispatch_requests','vehicle_dispatch_logs','vehicle_dispatch_attachments'
   ] loop
     if to_regclass('public.' || table_name) is not null then
       execute format('drop trigger if exists trg_prevent_removal on public.%I', table_name);

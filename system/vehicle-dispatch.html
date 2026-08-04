@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-4"></script>
+<script src="theme.js?v=20260804-5"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
@@ -43,7 +43,7 @@
 
 <main class="content">
   <section class="hero">
-    <div><h1>公務車派車申請與行車紀錄</h1><p>線上申請、主管核可、車管派車、司機回報及里程自動核算。</p></div>
+    <div><h1>公務車派車申請與行車紀錄</h1><p>線上申請、主管核可、派車管理、司機接單回報及里程自動核算。</p></div>
     <div class="identity"><b id="roleText">確認登入身分中…</b><span class="dot"></span><span id="syncText">系統連線中</span></div>
   </section>
 
@@ -53,7 +53,7 @@
     <div class="flow-step" style="--step:var(--cyan)"><div class="flow-no">1</div><div><b>申請人填單</b><span>日期、時間、起訖地點與人數</span></div></div>
     <div class="flow-step" style="--step:var(--amber)"><div class="flow-no">2</div><div><b>單位主管核可</b><span>同單位主管審核或退回</span></div></div>
     <div class="flow-step" style="--step:var(--purple)"><div class="flow-no">3</div><div><b>派車管理員</b><span>指派公務車、車號與司機</span></div></div>
-    <div class="flow-step" style="--step:var(--green)"><div class="flow-no">4</div><div><b>司機行車回報</b><span>實際時間、里程與加油紀錄</span></div></div>
+    <div class="flow-step" style="--step:var(--green)"><div class="flow-no">4</div><div><b>司機接單與回報</b><span>當日接單、實際時間、里程與加油紀錄</span></div></div>
   </section>
 
   <section class="kpis">
@@ -65,6 +65,7 @@
 
   <div class="tabs">
     <button class="tab active" data-tab="mine" onclick="setTab('mine')">我的申請 <span class="cnt" id="cntMine">0</span></button>
+    <button class="tab" data-tab="driverToday" id="driverTodayTab" hidden onclick="setTab('driverToday')">今日派車 <span class="cnt" id="cntDriverToday">0</span></button>
     <button class="tab" data-tab="todo" onclick="setTab('todo')">待我處理 <span class="cnt" id="cntTodo">0</span></button>
     <button class="tab" data-tab="all" onclick="setTab('all')">派車總覽 <span class="cnt" id="cntAll">0</span></button>
   </div>
@@ -140,7 +141,7 @@ const PHOTO_BUCKET='vehicle-dispatch-files';
 const MARKET_LOCATIONS=['第一果菜市場','第二果菜市場'];
 const CONFLICT_STATUSES=['pending_approval','approved','assigned','completed'];
 let currentUser=null,currentRole='',tab='mine',currentRequestId=null,vehicleEditId=null,schemaReady=true;
-let state={requests:[],vehicles:[],users:[],logs:[],attachments:[],managers:[]};
+let state={requests:[],vehicles:[],users:[],logs:[],attachments:[],managers:[],drivers:[]};
 
 const byId=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -205,19 +206,22 @@ function toast(msg,err=false){const t=byId('toast');t.textContent=msg;t.classNam
 function openModal(id){byId(id).classList.add('show');}
 function closeModal(id){byId(id).classList.remove('show');}
 function statusPill(s){return `<span class="pill ${STATUS_CLASS[s]||'draft'}">${esc(STATUS[s]||s||'—')}</span>`;}
+function driverStageText(r){if(r.status!=='assigned')return '';return r.driver_accepted_at?`司機已接單 ${fmtDateTime(r.driver_accepted_at)}`:'待司機接單';}
 function normalizeDept(v){return String(v||'').replace(/\s+/g,'').replace('／','/');}
 function sameDepartment(request){return normalizeDept(request.applicant_department)===normalizeDept(currentUser?.department);}
 function isAdmin(){return currentRole==='sysadmin';}
 function isSupervisor(){return currentRole==='unit_supervisor'||currentRole==='mgmt_supervisor'||isAdmin();}
 function isManager(){return isAdmin()||state.managers.some(x=>x.user_id===currentUser?.user_id&&x.active);}
+function isVehicleDriver(){return state.drivers.some(x=>x.user_id===currentUser?.user_id&&x.active);}
 function canReport(){return isManager();}
-function updateRoleText(){if(!currentUser)return;let label=ROLE_NAME[currentRole]||currentRole;if(isManager()&&!isAdmin()&&currentRole!=='dispatcher')label+=`／派車管理員`;byId('roleText').textContent=`${currentUser.department||'未設定單位'}｜${currentUser.name}｜${label}`;}
+function updateRoleText(){if(!currentUser)return;let label=ROLE_NAME[currentRole]||currentRole;if(isManager()&&!isAdmin()&&currentRole!=='dispatcher')label+='／派車管理員';if(isVehicleDriver()&&!isAdmin())label+='／公務車司機';byId('roleText').textContent=`${currentUser.department||'未設定單位'}｜${currentUser.name}｜${label}`;}
 function isApplicant(r){return r?.applicant_id===currentUser?.user_id;}
-function isDriver(r){return r?.driver_id===currentUser?.user_id||isAdmin();}
+function isAssignedDriver(r){return r?.driver_id===currentUser?.user_id;}
 function canSee(r){return isAdmin()||isManager()||isApplicant(r)||r.driver_id===currentUser?.user_id||(isSupervisor()&&sameDepartment(r));}
 function canApprove(r){return r.status==='pending_approval'&&!isApplicant(r)&&isSupervisor()&&(sameDepartment(r)||isAdmin());}
 function canDispatch(r){return r.status==='approved'&&isManager();}
-function canDrive(r){return r.status==='assigned'&&isDriver(r);}
+function canAccept(r){return r.status==='assigned'&&!r.driver_accepted_at&&isAssignedDriver(r)&&isVehicleDriver()&&r.trip_date===todayISO();}
+function canDrive(r){return r.status==='assigned'&&!!r.driver_accepted_at&&((isAssignedDriver(r)&&isVehicleDriver())||isAdmin());}
 function canEditApplication(r){return isApplicant(r)&&['draft','returned'].includes(r.status);}
 
 async function init(){
@@ -241,31 +245,36 @@ async function init(){
 }
 
 function showFatal(message){schemaReady=false;const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML=esc(message);byId('requestRows').innerHTML=`<tr><td colspan="8" class="empty">${esc(message)}</td></tr>`;}
-function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML='公務車資料表尚未建立。請由管理員在 Supabase SQL Editor 執行 <code>system/sql/vehicle_dispatch.sql</code> 後重新整理。';}
+function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML='派車模組資料結構正在更新，請稍後重新整理；若持續發生，請通知系統管理員。請勿重建或清除既有資料。';}
 
 async function loadAll(silent=false){
   if(!currentUser)return;
   if(!silent)byId('syncText').textContent='讀取資料中…';
-  const [requests,vehicles,users,logs,attachments,managers]=await Promise.all([
+  const [requests,vehicles,users,logs,attachments,managers,drivers]=await Promise.all([
     db.from('vehicle_dispatch_requests').select('*').order('created_at',{ascending:false}).limit(3000),
     db.from('official_vehicles').select('*').order('plate_no').limit(500),
     db.from('users').select('user_id,name,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
     db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000),
     db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(10000),
-    db.from('vehicle_dispatch_managers').select('user_id,active').eq('active',true).limit(3000)
+    db.from('vehicle_dispatch_managers').select('user_id,active').eq('active',true).limit(3000),
+    db.from('vehicle_dispatch_drivers').select('user_id,active').eq('active',true).limit(3000)
   ]);
-  const firstError=[requests,vehicles,users,logs,attachments,managers].find(x=>x.error)?.error;
+  const firstError=[requests,vehicles,users,logs,attachments,managers,drivers].find(x=>x.error)?.error;
   if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
   schemaReady=true;byId('setupBanner').className='setup-banner';
-  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[]};
+  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[],drivers:drivers.data||[]};
   updateRoleText();byId('vehicleBtn').hidden=!isManager();byId('reportBtn').hidden=!canReport();
+  byId('driverTodayTab').hidden=!isVehicleDriver();
+  if(isVehicleDriver()&&tab==='mine'&&state.requests.some(r=>isAssignedDriver(r)&&r.trip_date===todayISO()&&['assigned','completed'].includes(r.status)))tab='driverToday';
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
   updateDashboard();renderTable();
   byId('syncText').textContent=`最後更新 ${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`;
 }
 
 function buildStatusFilter(){byId('statusFilter').innerHTML='<option value="">全部狀態</option>'+Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');}
 function visibleRequests(){return state.requests.filter(canSee);}
-function todoRequests(){return visibleRequests().filter(r=>canApprove(r)||canDispatch(r)||canDrive(r));}
+function driverTodayRequests(){return state.requests.filter(r=>isAssignedDriver(r)&&r.trip_date===todayISO()&&['assigned','completed'].includes(r.status));}
+function todoRequests(){return visibleRequests().filter(r=>canApprove(r)||canDispatch(r)||canAccept(r)||canDrive(r));}
 function updateDashboard(){
   const visible=visibleRequests(),today=todayISO();
   byId('kApproval').textContent=visible.filter(r=>r.status==='pending_approval').length;
@@ -273,20 +282,21 @@ function updateDashboard(){
   byId('kToday').textContent=visible.filter(r=>r.trip_date===today&&r.status==='assigned').length;
   byId('kDriver').textContent=visible.filter(r=>r.status==='assigned').length;
   byId('cntMine').textContent=state.requests.filter(isApplicant).length;
+  byId('cntDriverToday').textContent=driverTodayRequests().length;
   byId('cntTodo').textContent=todoRequests().length;
   byId('cntAll').textContent=visible.length;
 }
 
 function setTab(next){tab=next;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));renderTable();}
 function clearFilters(){byId('search').value='';byId('statusFilter').value='';byId('dateFilter').value='';renderTable();}
-function rowsForTab(){if(tab==='mine')return state.requests.filter(isApplicant);if(tab==='todo')return todoRequests();return visibleRequests();}
+function rowsForTab(){if(tab==='mine')return state.requests.filter(isApplicant);if(tab==='driverToday')return driverTodayRequests();if(tab==='todo')return todoRequests();return visibleRequests();}
 function renderTable(){
   if(!schemaReady)return;
   const q=val('search').toLowerCase(),status=val('statusFilter'),date=val('dateFilter');
   let rows=rowsForTab().filter(r=>!status||r.status===status).filter(r=>!date||r.trip_date===date);
   if(q)rows=rows.filter(r=>[r.request_no,r.applicant_name,r.applicant_department,r.origin_location,r.destination_location,r.trip_purpose,r.plate_no,r.driver_name].some(v=>String(v||'').toLowerCase().includes(q)));
-  byId('tableTitle').textContent=tab==='mine'?'我的申請':tab==='todo'?'待我處理':'派車總覽';byId('rowCount').textContent=`${rows.length} 筆`;
-  byId('requestRows').innerHTML=rows.length?rows.map(r=>`<tr onclick="openRequest('${r.request_id}')"><td class="code">${esc(r.request_no||'—')}</td><td>${statusPill(r.status)}</td><td>${esc(fmtDate(r.trip_date))}<br><span class="muted">${esc(timeText(r.planned_departure_time))}–${esc(timeText(r.planned_return_time))}</span></td><td class="route" title="${esc(r.origin_location)} → ${esc(r.destination_location)}">${esc(r.origin_location)} → ${esc(r.destination_location)}</td><td>${esc(r.applicant_name)}<br><span class="muted">${esc(r.applicant_department||'—')}</span></td><td class="hide-mobile">${esc(r.passenger_count)} 人</td><td>${esc(r.plate_no||'待派')}<br><span class="muted">${esc(r.driver_name||'—')}</span></td><td class="hide-mobile">${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">目前沒有符合條件的派車申請。</td></tr>';
+  byId('tableTitle').textContent=tab==='mine'?'我的申請':tab==='driverToday'?'今日派車任務':tab==='todo'?'待我處理':'派車總覽';byId('rowCount').textContent=`${rows.length} 筆`;
+  byId('requestRows').innerHTML=rows.length?rows.map(r=>`<tr onclick="openRequest('${r.request_id}')"><td class="code">${esc(r.request_no||'—')}</td><td>${statusPill(r.status)}${driverStageText(r)?`<br><span class="muted">${esc(driverStageText(r))}</span>`:''}</td><td>${esc(fmtDate(r.trip_date))}<br><span class="muted">${esc(timeText(r.planned_departure_time))}–${esc(timeText(r.planned_return_time))}</span></td><td class="route" title="${esc(r.origin_location)} → ${esc(r.destination_location)}">${esc(r.origin_location)} → ${esc(r.destination_location)}</td><td>${esc(r.applicant_name)}<br><span class="muted">${esc(r.applicant_department||'—')}</span></td><td class="hide-mobile">${esc(r.passenger_count)} 人</td><td>${esc(r.plate_no||'待派')}<br><span class="muted">${esc(r.driver_name||'—')}</span></td><td class="hide-mobile">${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">目前沒有符合條件的派車申請。</td></tr>';
 }
 
 function vehicleReportRows(){
@@ -301,7 +311,7 @@ function renderVehicleReport(){
   if(from&&to&&from>to){byId('reportKpis').innerHTML='';byId('reportRows').innerHTML='<tr><td colspan="10" class="report-empty">開始日期不得晚於結束日期。</td></tr>';byId('reportCount').textContent='請修正日期區間';return;}
   const rows=vehicleReportRows(),m=reportMetrics(rows);
   byId('reportKpis').innerHTML=`<div class="report-kpi"><span>申請單數</span><b>${m.count} 筆</b></div><div class="report-kpi"><span>乘車人次</span><b>${m.passengers} 人</b></div><div class="report-kpi"><span>完成里程</span><b>${m.mileage.toFixed(1)} km</b></div><div class="report-kpi"><span>加油費用</span><b>${m.fuel.toLocaleString('zh-TW')} 元</b></div><div class="report-kpi"><span>異常通報</span><b>${m.abnormal} 件</b></div>`;
-  byId('reportRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.trip_date))}<br><span class="muted">${esc(timeText(r.planned_departure_time))}–${esc(timeText(r.planned_return_time))}</span></td><td class="code">${esc(r.request_no)}<br>${statusPill(r.status)}</td><td>${esc(r.applicant_department||'—')}<br><span class="muted">${esc(r.applicant_name)}</span></td><td>${esc(r.origin_location)} → ${esc(r.destination_location)}</td><td>${esc(r.trip_purpose)}</td><td>${esc(r.actual_passenger_count??r.passenger_count)} 人</td><td>${esc(r.plate_no||'待派')}<br><span class="muted">${esc(r.driver_name||'—')}</span></td><td>${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}</td><td>${r.refueled?`${esc(r.refuel_odometer??'—')} km<br><span class="muted">${esc(Number(r.refuel_cost||0).toLocaleString('zh-TW'))} 元</span>`:'否'}</td><td>${r.has_abnormality?`<span style="color:var(--red)">有</span><br><span class="muted">${esc(r.abnormality_note||'—')}</span>`:'無'}</td></tr>`).join(''):'<tr><td colspan="10" class="report-empty">此條件目前沒有派車資料。</td></tr>';
+  byId('reportRows').innerHTML=rows.length?rows.map(r=>`<tr><td>${esc(fmtDate(r.trip_date))}<br><span class="muted">${esc(timeText(r.planned_departure_time))}–${esc(timeText(r.planned_return_time))}</span></td><td class="code">${esc(r.request_no)}<br>${statusPill(r.status)}</td><td>${esc(r.applicant_department||'—')}<br><span class="muted">${esc(r.applicant_name)}</span></td><td>${esc(r.origin_location)} → ${esc(r.destination_location)}</td><td>${esc(r.trip_purpose)}</td><td>${esc(r.actual_passenger_count??r.passenger_count)} 人</td><td>${esc(r.plate_no||'待派')}<br><span class="muted">${esc(r.driver_name||'—')}｜${r.driver_accepted_at?'已接單':'未接單'}</span></td><td>${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}</td><td>${r.refueled?`${esc(r.refuel_odometer??'—')} km<br><span class="muted">${esc(Number(r.refuel_cost||0).toLocaleString('zh-TW'))} 元</span>`:'否'}</td><td>${r.has_abnormality?`<span style="color:var(--red)">有</span><br><span class="muted">${esc(r.abnormality_note||'—')}</span>`:'無'}</td></tr>`).join(''):'<tr><td colspan="10" class="report-empty">此條件目前沒有派車資料。</td></tr>';
   byId('reportCount').textContent=`共 ${rows.length} 筆｜報表產出人：${currentUser.name}`;
 }
 function openReportModal(){
@@ -310,13 +320,13 @@ function openReportModal(){
   if(!byId('reportStatus').options.length)byId('reportStatus').innerHTML='<option value="">全部狀態</option>'+Object.entries(STATUS).map(([key,label])=>`<option value="${key}">${label}</option>`).join('');
   renderVehicleReport();openModal('reportModal');
 }
-function vehicleReportRecord(r){return {'用車日期':fmtDate(r.trip_date),'預計出發':timeText(r.planned_departure_time),'預計回程':timeText(r.planned_return_time),'申請單號':r.request_no||'','狀態':STATUS[r.status]||r.status,'申請單位':r.applicant_department||'','申請人':r.applicant_name||'','聯絡電話':r.applicant_phone||'','起點':r.origin_location||'','迄點':r.destination_location||'','用車事由':r.trip_purpose||'','預計人數':r.passenger_count??'','主管':r.supervisor_name||'','核可時間':fmtDateTime(r.approved_at),'車號':r.plate_no||'','司機':r.driver_name||'','實際人數':r.actual_passenger_count??'','實際出發':fmtDateTime(r.actual_departure_at),'實際回程':fmtDateTime(r.actual_return_at),'起始里程':r.odometer_start??'','回程里程':r.odometer_end??'','行駛里程':r.total_mileage??'','是否加油':r.refueled?'是':'否','上次加油公里':r.last_refuel_odometer??'','上次加油費用':r.last_refuel_cost??'','本次加油公里':r.refuel_odometer??'','本次加油費用':r.refuel_cost??'','異常通報':r.has_abnormality?'有':'無','異常內容':r.abnormality_note||'','申請備註':r.applicant_note||'','派車備註':r.dispatch_note||'','司機備註':r.driver_note||'','附件張數':attachmentsFor(r.request_id).length};}
+function vehicleReportRecord(r){return {'用車日期':fmtDate(r.trip_date),'預計出發':timeText(r.planned_departure_time),'預計回程':timeText(r.planned_return_time),'申請單號':r.request_no||'','狀態':STATUS[r.status]||r.status,'申請單位':r.applicant_department||'','申請人':r.applicant_name||'','聯絡電話':r.applicant_phone||'','起點':r.origin_location||'','迄點':r.destination_location||'','用車事由':r.trip_purpose||'','預計人數':r.passenger_count??'','主管':r.supervisor_name||'','核可時間':fmtDateTime(r.approved_at),'車號':r.plate_no||'','司機':r.driver_name||'','司機接單時間':fmtDateTime(r.driver_accepted_at),'實際人數':r.actual_passenger_count??'','實際出發':fmtDateTime(r.actual_departure_at),'實際回程':fmtDateTime(r.actual_return_at),'起始里程':r.odometer_start??'','回程里程':r.odometer_end??'','行駛里程':r.total_mileage??'','是否加油':r.refueled?'是':'否','上次加油公里':r.last_refuel_odometer??'','上次加油費用':r.last_refuel_cost??'','本次加油公里':r.refuel_odometer??'','本次加油費用':r.refuel_cost??'','異常通報':r.has_abnormality?'有':'無','異常內容':r.abnormality_note||'','申請備註':r.applicant_note||'','派車備註':r.dispatch_note||'','司機備註':r.driver_note||'','附件張數':attachmentsFor(r.request_id).length};}
 function exportVehicleReport(){
   if(!canReport()||!globalThis.XLSX){toast('Excel 報表元件尚未載入，請重新整理後再試',true);return;}
   const rows=vehicleReportRows();if(!rows.length){toast('目前條件沒有可匯出的資料',true);return;}
   const from=val('reportFrom')||'不限',to=val('reportTo')||'不限',m=reportMetrics(rows),records=rows.map(vehicleReportRecord);
   const detail=XLSX.utils.aoa_to_sheet([['臺北農產公司／第一果菜市場'],['公務車派車報表'],[`報表區間：${from} 至 ${to}`],[`產出時間：${fmtDateTime(new Date().toISOString())}　產出人：${currentUser.name}`],[]]);
-  XLSX.utils.sheet_add_json(detail,records,{origin:'A6'});detail['!merges']=[XLSX.utils.decode_range('A1:AG1'),XLSX.utils.decode_range('A2:AG2'),XLSX.utils.decode_range('A3:AG3'),XLSX.utils.decode_range('A4:AG4')];detail['!cols']=Object.keys(records[0]).map(key=>({wch:Math.max(10,Math.min(26,key.length*2+4))}));
+  XLSX.utils.sheet_add_json(detail,records,{origin:'A6'});const lastCol=XLSX.utils.encode_col(Object.keys(records[0]).length-1);detail['!merges']=[1,2,3,4].map(row=>XLSX.utils.decode_range(`A${row}:${lastCol}${row}`));detail['!cols']=Object.keys(records[0]).map(key=>({wch:Math.max(10,Math.min(26,key.length*2+4))}));
   const summary=XLSX.utils.json_to_sheet([{'報表期間':`${from} 至 ${to}`,'申請單數':m.count,'乘車人次':m.passengers,'完成里程(km)':Number(m.mileage.toFixed(1)),'加油費用(元)':m.fuel,'異常通報(件)':m.abnormal,'產出人':currentUser.name,'產出時間':fmtDateTime(new Date().toISOString())}]);summary['!cols']=[{wch:25},{wch:12},{wch:12},{wch:16},{wch:16},{wch:16},{wch:14},{wch:20}];
   const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,detail,'派車明細');XLSX.utils.book_append_sheet(workbook,summary,'統計摘要');XLSX.writeFile(workbook,`公務車派車報表_${from}_${to}.xlsx`);toast(`已匯出 ${rows.length} 筆派車資料`);
 }
@@ -350,16 +360,24 @@ function applicationFields(r={},editable=true){
 function assignmentSummary(r){return `<section class="form-section"><h3>核可與派車資訊</h3><div class="summary-grid">
   <div class="summary-item"><span>主管核可</span><b>${esc(r.supervisor_name||'—')}<br>${esc(fmtDateTime(r.approved_at))}</b></div>
   <div class="summary-item"><span>公務車／車號</span><b>${esc(vehicleLabel(r.vehicle_id,r.plate_no))}</b></div>
-  <div class="summary-item"><span>駕駛</span><b>${esc(r.driver_name||'—')}</b></div>
+  <div class="summary-item"><span>司機人員</span><b>${esc(r.driver_name||'—')}</b></div>
   <div class="summary-item"><span>派車時間</span><b>${esc(fmtDateTime(r.dispatched_at))}</b></div>
+  <div class="summary-item"><span>司機接單</span><b>${r.driver_accepted_at?esc(fmtDateTime(r.driver_accepted_at)):'尚未接單'}</b></div>
   </div>${r.supervisor_note||r.dispatch_note?`<div class="summary-grid"><div class="summary-item" style="grid-column:span 2"><span>主管意見</span><b>${esc(r.supervisor_note||'—')}</b></div><div class="summary-item" style="grid-column:span 2"><span>派車備註</span><b>${esc(r.dispatch_note||'—')}</b></div></div>`:''}</section>`;}
+
+function driverAcceptanceNotice(r){
+  if(r.status!=='assigned'||r.driver_accepted_at)return '';
+  const own=isAssignedDriver(r),today=todayISO(),message=r.trip_date===today?'此為今日派車任務，請確認車號與行程後按「司機接單」。':r.trip_date>today?'此任務尚未到用車日期，請於用車當日接單。':'此任務已超過用車日期，請聯絡派車管理員或系統管理員處理。';
+  return `<section class="form-section"><h3>司機接單狀態</h3><div class="setup-banner show" style="margin:0">${own?esc(message):`等待 ${esc(r.driver_name||'司機')} 於用車當日接單。`}</div></section>`;
+}
 
 function approvalForm(r){return `<section class="form-section"><h3>單位主管核可</h3><div class="form-grid"><div class="field wide"><label>核可意見／退回原因</label><textarea id="fSupervisorNote" placeholder="核可可留白；退回時請填寫原因">${esc(r.supervisor_note||'')}</textarea></div></div></section>`;}
 function dispatchForm(r){
   const active=state.vehicles.filter(v=>v.status==='active'||v.vehicle_id===r.vehicle_id);
+  const drivers=state.users.filter(u=>state.drivers.some(d=>d.user_id===u.user_id&&d.active));
   return `<section class="form-section"><h3>派車管理員指派</h3><div class="form-grid">
     <div class="field span2"><label class="req">公務車／車號</label><select id="fVehicle"><option value="">請選擇公務車</option>${active.map(v=>`<option value="${v.vehicle_id}" ${v.vehicle_id===r.vehicle_id?'selected':''}>${esc(v.plate_no)}｜${esc(v.vehicle_name||v.brand||'公務車')}｜${esc(v.seats)} 人座｜里程 ${esc(v.current_odometer)} km</option>`).join('')}</select></div>
-    <div class="field"><label class="req">司機</label><select id="fDriver"><option value="">請選擇司機</option>${state.users.map(u=>`<option value="${u.user_id}" ${u.user_id===r.driver_id?'selected':''}>${esc(u.name)}｜${esc(u.department||'—')}${(u.rbac_role||LEGACY_ROLE[u.role])==='technician'?'｜司機':''}</option>`).join('')}</select></div>
+    <div class="field"><label class="req">司機人員</label><select id="fDriver"><option value="">${drivers.length?'請選擇司機':'尚未指派司機人員'}</option>${drivers.map(u=>`<option value="${u.user_id}" ${u.user_id===r.driver_id?'selected':''}>${esc(u.name)}｜${esc(u.department||'—')}</option>`).join('')}</select>${drivers.length?'':'<div class="photo-note" style="color:var(--amber)">請先到後台「系統存取權限」指派司機人員。</div>'}</div>
     <div class="field wide"><label>派車備註</label><textarea id="fDispatchNote" placeholder="集合位置、聯絡事項或其他說明">${esc(r.dispatch_note||'')}</textarea></div>
   </div></section>`;
 }
@@ -369,8 +387,8 @@ function driverForm(r){
   const lastRefuelOdometer=r.last_refuel_odometer??previous?.refuel_odometer??'',lastRefuelCost=r.last_refuel_cost??previous?.refuel_cost??'';
   return `<section class="form-section"><h3>司機行車回報 <span class="tag">系統自動核算里程</span></h3><div class="form-grid">
     <div class="field"><label class="req">實際乘車人數</label><input type="number" min="0" id="fActualPassengers" value="${esc(r.actual_passenger_count??r.passenger_count??'')}"></div>
-    <div class="field"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
-    <div class="field"><label class="req">實際回程時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualReturn" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
+    <div class="field"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" min="${esc(r.trip_date)}T00:00" max="${esc(r.trip_date)}T23:30" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
+    <div class="field"><label class="req">實際回程時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualReturn" min="${esc(r.trip_date)}T00:00" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
     <div class="field"><label class="req">汽車起始里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerStart" value="${esc(start)}" oninput="updateMileage()"></div>
     <div class="field"><label class="req">汽車回程里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerEnd" value="${esc(r.odometer_end??'')}" oninput="updateMileage()"></div>
     <div class="field"><label>本次行駛里程</label><input class="computed" id="fTotalMileage" value="${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}" readonly></div>
@@ -405,16 +423,18 @@ function openRequest(id){
   currentRequestId=id;const editable=canEditApplication(r);
   let html=applicationFields(r,editable);
   if(['approved','assigned','completed'].includes(r.status))html+=assignmentSummary(r);
+  html+=driverAcceptanceNotice(r);
   if(canApprove(r))html+=approvalForm(r);
   if(canDispatch(r))html+=dispatchForm(r);
   if(canDrive(r))html+=driverForm(r);
   if(r.status==='completed')html+=completedSummary(r);
   html+=timeline(r);byId('requestBody').innerHTML=html;
-  byId('requestModalTitle').innerHTML=`${esc(r.request_no)}　${statusPill(r.status)}`;
+  byId('requestModalTitle').innerHTML=`${esc(r.request_no)}　${statusPill(r.status)}${driverStageText(r)?`　<span class="muted">${esc(driverStageText(r))}</span>`:''}`;
   const actions=['<span class="msg" id="requestMsg"></span>','<button class="btn" onclick="closeModal(\'requestModal\')">關閉</button>'];
   if(editable){actions.push('<button class="btn" data-application-save onclick="saveApplication(false)">儲存草稿</button>','<button class="btn btn-primary" data-application-save onclick="saveApplication(true)">重新送出核可</button>');}
   if(canApprove(r)){actions.push('<button class="btn btn-red" onclick="reviewRequest(false)">退回申請人</button>','<button class="btn btn-green" onclick="reviewRequest(true)">主管核可</button>');}
   if(canDispatch(r)){actions.push('<button class="btn btn-primary" onclick="dispatchRequest()">確認派車</button>');}
+  if(canAccept(r)){actions.push('<button class="btn btn-primary" onclick="acceptTrip()">司機接單</button>');}
   if(canDrive(r)){actions.push('<button class="btn btn-green" onclick="completeTrip()">完成行車回報</button>');}
   if((isApplicant(r)&&['draft','returned','pending_approval'].includes(r.status))||(isAdmin()&&!['completed','cancelled'].includes(r.status)))actions.push('<button class="btn btn-red" onclick="cancelRequest()">取消申請</button>');
   byId('requestActions').innerHTML=actions.join('');openModal('requestModal');if(editable)auditScheduleConflict(false);if(canDrive(r)){toggleRefuel();toggleAbnormality();updateMileage();}
@@ -470,10 +490,20 @@ async function dispatchRequest(){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canDispatch(r))return;
   const vehicle=state.vehicles.find(x=>x.vehicle_id===val('fVehicle')),driver=state.users.find(x=>x.user_id===val('fDriver'));
   if(!vehicle||!driver){setMsg('請選擇公務車及司機');return;}
-  const payload={status:'assigned',vehicle_manager_id:currentUser.user_id,vehicle_manager_name:currentUser.name,vehicle_id:vehicle.vehicle_id,plate_no:vehicle.plate_no,driver_id:driver.user_id,driver_name:driver.name,dispatch_note:val('fDispatchNote')||null,dispatched_at:new Date().toISOString()};
+  if(!state.drivers.some(x=>x.user_id===driver.user_id&&x.active)){setMsg('所選人員尚未被指派為公務車司機');return;}
+  const payload={status:'assigned',vehicle_manager_id:currentUser.user_id,vehicle_manager_name:currentUser.name,vehicle_id:vehicle.vehicle_id,plate_no:vehicle.plate_no,driver_id:driver.user_id,driver_name:driver.name,dispatch_note:val('fDispatchNote')||null,dispatched_at:new Date().toISOString(),driver_accepted_at:null,driver_accepted_by:null};
   const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','approved').select().maybeSingle();
   if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
   await addLog(r.request_id,r.status,'assigned','派車管理員完成派車',`${vehicle.plate_no}｜司機 ${driver.name}${payload.dispatch_note?'｜'+payload.dispatch_note:''}`);closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
+}
+
+async function acceptTrip(){
+  const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canAccept(r))return;
+  const acceptedAt=new Date().toISOString();
+  const {data,error}=await db.from('vehicle_dispatch_requests').update({driver_accepted_at:acceptedAt,driver_accepted_by:currentUser.user_id}).eq('request_id',r.request_id).eq('status','assigned').eq('driver_id',currentUser.user_id).is('driver_accepted_at',null).select().maybeSingle();
+  if(error||!data){setMsg(error?.message||'此派車單已被處理，請重新整理');return;}
+  await addLog(r.request_id,'assigned','assigned','司機接單',`${r.plate_no||'公務車'}｜${r.origin_location} → ${r.destination_location}`);
+  await loadAll(true);openRequest(r.request_id);toast('接單完成，請於行程結束後填寫行車回報');
 }
 
 function toggleRefuel(){const checked=byId('fRefueled')?.checked;['fRefuelOdometer','fRefuelCost'].forEach(id=>{const input=byId(id);if(input){input.disabled=!checked;if(!checked)input.value='';}});}
@@ -484,6 +514,7 @@ async function completeTrip(){
   const photos=Array.from(byId('fDriverPhotos')?.files||[]),passengers=Number(val('fActualPassengers')),departure=val('fActualDeparture'),returned=val('fActualReturn'),start=Number(val('fOdometerStart')),end=Number(val('fOdometerEnd')),refueled=byId('fRefueled').checked,refuel=refueled?Number(val('fRefuelOdometer')):null,refuelCost=refueled?Number(val('fRefuelCost')):null,hasAbnormality=byId('fHasAbnormality').checked,abnormalityNote=val('fAbnormalityNote'),lastRefuelOdometer=val('fLastRefuelOdometer')===''?null:Number(val('fLastRefuelOdometer')),lastRefuelCost=val('fLastRefuelCost')===''?null:Number(val('fLastRefuelCost'));
   if(!Number.isInteger(passengers)||passengers<0||!departure||!returned||!Number.isFinite(start)||!Number.isFinite(end)){setMsg('請完整填寫實際人數、時間及里程');return;}
   if(!isHalfHourDateTime(departure)||!isHalfHourDateTime(returned)){setMsg('實際出發與回程時間請使用每 30 分鐘的時段');return;}
+  if(departure.slice(0,10)!==r.trip_date){setMsg('實際出發日期必須與派車單的用車日期相同');return;}
   if(new Date(returned)<new Date(departure)){setMsg('實際回程時間不得早於出發時間');return;}
   if(end<start){setMsg('汽車回程里程不得小於起始里程');return;}
   if(refueled&&(!Number.isFinite(refuel)||refuel<start||refuel>end)){setMsg('加油里程必須介於起始與回程里程之間');return;}

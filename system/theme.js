@@ -59,13 +59,19 @@
     location.replace('index.html?denied='+encodeURIComponent(systemKey));
     return false;
   }
-  function hasVehicleManagerAccess(profile,bearer){
+  function hasVehicleAssignment(profile,bearer,table){
     if(!profile||!profile.user_id)return Promise.resolve(false);
-    var url=SUPABASE_URL+'/rest/v1/vehicle_dispatch_managers?select=active&user_id=eq.'+encodeURIComponent(profile.user_id)+'&active=eq.true&limit=1';
+    var url=SUPABASE_URL+'/rest/v1/'+table+'?select=active&user_id=eq.'+encodeURIComponent(profile.user_id)+'&active=eq.true&limit=1';
     return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer}})
       .then(function(r){return r.ok?r.json():[];})
       .then(function(rows){return Array.isArray(rows)&&rows[0]&&rows[0].active===true;})
       .catch(function(){return false;});
+  }
+  function hasVehiclePersonnelAccess(profile,bearer){
+    return Promise.all([
+      hasVehicleAssignment(profile,bearer,'vehicle_dispatch_managers'),
+      hasVehicleAssignment(profile,bearer,'vehicle_dispatch_drivers')
+    ]).then(function(result){return result[0]||result[1];});
   }
   var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap','vehicle'];
   window.SystemAccess={
@@ -88,7 +94,7 @@
             (rows||[]).forEach(function(row){
               if(row.allowed===true&&row.perm&&row.perm.indexOf('sys_')===0)out.add(row.perm.slice(4));
             });
-            return hasVehicleManagerAccess(profile,bearer).then(function(isManager){if(isManager)out.add('vehicle');return out;});
+            return hasVehiclePersonnelAccess(profile,bearer).then(function(hasAccess){if(hasAccess)out.add('vehicle');return out;});
           })
           .catch(function(){return new Set();});
       });
@@ -107,8 +113,8 @@
           .then(function(r){return r.ok?r.json():[];})
           .then(function(rows){return Array.isArray(rows)&&rows[0]&&rows[0].allowed===true;})
           .catch(function(){return false;});
-        var managerAccess=systemKey==='vehicle'?hasVehicleManagerAccess(profile,bearer):Promise.resolve(false);
-        return Promise.all([roleAccess,managerAccess]).then(function(result){return result[0]||result[1]?true:denyAccess(systemKey);});
+        var personnelAccess=systemKey==='vehicle'?hasVehiclePersonnelAccess(profile,bearer):Promise.resolve(false);
+        return Promise.all([roleAccess,personnelAccess]).then(function(result){return result[0]||result[1]?true:denyAccess(systemKey);});
       });
     }
   };
