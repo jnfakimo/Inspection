@@ -105,6 +105,73 @@
       });
     }
   };
+
+  // 共用「登出」／「更改密碼」動作，供頂部導覽列的按鈕使用（全站共用元件）
+  function performLogout(){
+    try{
+      var auth=storedAuthSessionForAccess();
+      var token=auth&&auth.access_token;
+      if(token){
+        fetch(SUPABASE_URL+'/auth/v1/logout?scope=global',{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}}).catch(function(){});
+      }
+    }catch(e){}
+    clearProfile();
+    try{localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');}catch(e){}
+    location.href='login.html';
+  }
+  function ensureChangePwModal(){
+    if(document.getElementById('sharedChangePwModal'))return;
+    var style=document.createElement('style');
+    style.textContent='#sharedChangePwModal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99997;display:none;align-items:center;justify-content:center;padding:20px}#sharedChangePwModal.show{display:flex}#sharedChangePwModal .spw-box{background:var(--surface,#fff);border:1px solid var(--border,#dbe4ee);border-radius:8px;padding:20px;width:100%;max-width:360px;color:var(--text,#334155);font-family:"Noto Sans TC",system-ui,sans-serif}#sharedChangePwModal h3{margin:0 0 14px;font-size:1rem;color:var(--text-hi,var(--text,#334155))}#sharedChangePwModal label{display:block;font-size:.78rem;color:var(--text-dim,#64748b);margin:10px 0 4px}#sharedChangePwModal input{width:100%;padding:9px 10px;border:1px solid var(--border,#dbe4ee);border-radius:4px;background:var(--bg,#f4f6fa);color:var(--text,#334155);font-size:.9rem;box-sizing:border-box}#sharedChangePwModal .spw-actions{display:flex;gap:8px;margin-top:16px}#sharedChangePwModal button{flex:1;padding:9px;border-radius:4px;border:1px solid var(--border,#dbe4ee);background:transparent;color:var(--text-dim,#64748b);font-size:.85rem;cursor:pointer}#sharedChangePwModal button.spw-primary{background:var(--cyan,#0284c7);border-color:var(--cyan,#0284c7);color:#fff}#sharedChangePwModal .spw-msg{font-size:.76rem;margin-top:8px;min-height:16px}';
+    document.head.appendChild(style);
+    var modal=document.createElement('div');
+    modal.id='sharedChangePwModal';
+    modal.innerHTML='<div class="spw-box"><h3>更改密碼</h3><label>新密碼</label><input type="password" id="spwNew" autocomplete="new-password" placeholder="至少 8 個字元"><label>確認新密碼</label><input type="password" id="spwNew2" autocomplete="new-password" placeholder="再輸入一次"><div class="spw-msg" id="spwMsg"></div><div class="spw-actions"><button type="button" id="spwCancel">取消</button><button type="button" class="spw-primary" id="spwSubmit">確認更改</button></div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click',function(e){ if(e.target===modal)closeChangePwModal(); });
+    document.getElementById('spwCancel').addEventListener('click',closeChangePwModal);
+    document.getElementById('spwSubmit').addEventListener('click',performChangePassword);
+  }
+  function openChangePwModal(){
+    ensureChangePwModal();
+    document.getElementById('spwNew').value='';
+    document.getElementById('spwNew2').value='';
+    var msg=document.getElementById('spwMsg');
+    msg.textContent='';
+    document.getElementById('sharedChangePwModal').classList.add('show');
+  }
+  function closeChangePwModal(){
+    var m=document.getElementById('sharedChangePwModal');
+    if(m)m.classList.remove('show');
+  }
+  function performChangePassword(){
+    var pw=document.getElementById('spwNew').value;
+    var pw2=document.getElementById('spwNew2').value;
+    var msg=document.getElementById('spwMsg');
+    if(pw.length<8){msg.style.color='var(--red,#dc2626)';msg.textContent='密碼至少需要 8 個字元';return;}
+    if(pw!==pw2){msg.style.color='var(--red,#dc2626)';msg.textContent='兩次密碼不一致';return;}
+    var auth=storedAuthSessionForAccess();
+    var token=auth&&auth.access_token;
+    if(!token){msg.style.color='var(--red,#dc2626)';msg.textContent='請先登入後再更改密碼';return;}
+    msg.style.color='var(--text-dim,#64748b)';
+    msg.textContent='處理中…';
+    fetch(SUPABASE_URL+'/auth/v1/user',{method:'PUT',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+      .then(function(r){return r.json().then(function(j){return {ok:r.ok,body:j};}).catch(function(){return {ok:r.ok,body:null};});})
+      .then(function(res){
+        if(!res.ok){
+          msg.style.color='var(--red,#dc2626)';
+          var m=(res.body&&(res.body.msg||res.body.error_description||res.body.message))||'';
+          msg.textContent='更改失敗：'+(m.indexOf('Password should be at least')===0||/at least/.test(m)?'密碼長度不足':(m||'請稍後再試'));
+          return;
+        }
+        msg.style.color='var(--green,#059669)';
+        msg.textContent='密碼已更改';
+        setTimeout(closeChangePwModal,1200);
+      })
+      .catch(function(){msg.style.color='var(--red,#dc2626)';msg.textContent='網路連線失敗，請稍後再試';});
+  }
+  window.SystemAccountActions={logout:performLogout,openChangePassword:openChangePwModal};
+
   function current(){ return document.documentElement.getAttribute('data-theme')||'tech'; }
   function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded',fn); }
   function taipeiNow(){
@@ -161,16 +228,20 @@
   }
   function installSystemMeta(){
     var style=document.createElement('style');
-    style.textContent='.system-meta-unified{display:inline-flex;align-items:center;justify-content:flex-end;gap:12px;margin-left:0;white-space:nowrap;font-family:var(--font-mono,monospace);font-size:.72rem;letter-spacing:.05em;color:var(--text-dim,#64748b);order:999}.system-connectivity-unified{display:inline-flex;align-items:center;gap:7px}.system-meta-unified .system-dot{width:7px;height:7px;border-radius:50%;background:var(--green,#00b87a);box-shadow:0 0 8px var(--green,#00b87a);flex:0 0 auto}.system-meta-unified.is-offline .system-dot{background:var(--red,#dc2626);box-shadow:0 0 8px var(--red,#dc2626)}.system-user-unified{max-width:240px;overflow:hidden;text-overflow:ellipsis;color:var(--text,#334155)}.system-clock-unified{color:var(--cyan,#0284c7);font-family:var(--font-mono,monospace);font-size:.72rem;letter-spacing:.08em}.system-user-unified,.system-connectivity-unified,.system-clock-unified{padding-left:11px;border-left:1px solid var(--border,#dbe4ee)}.system-meta-fallback{position:fixed;top:10px;right:12px;z-index:99998;padding:7px 10px;border:1px solid var(--border,#dbe4ee);background:var(--surface,#fff)}@media(max-width:1100px){.system-meta-unified{justify-content:flex-end}.topbar-right,.nav-right,.navbar,.topbar,#topbar{flex-wrap:wrap}}@media(max-width:720px){.system-meta-unified{gap:6px;font-size:.61rem;letter-spacing:0}.system-user-unified{max-width:145px}.system-clock-unified{font-size:.61rem;letter-spacing:0}.system-user-unified,.system-connectivity-unified,.system-clock-unified{padding-left:6px}}';
+    style.textContent='.system-meta-unified{display:inline-flex;align-items:center;justify-content:flex-end;gap:12px;margin-left:0;white-space:nowrap;font-family:var(--font-mono,monospace);font-size:.72rem;letter-spacing:.05em;color:var(--text-dim,#64748b);order:999}.system-connectivity-unified{display:inline-flex;align-items:center;gap:7px}.system-meta-unified .system-dot{width:7px;height:7px;border-radius:50%;background:var(--green,#00b87a);box-shadow:0 0 8px var(--green,#00b87a);flex:0 0 auto}.system-meta-unified.is-offline .system-dot{background:var(--red,#dc2626);box-shadow:0 0 8px var(--red,#dc2626)}.system-user-unified{max-width:240px;overflow:hidden;text-overflow:ellipsis;color:var(--text,#334155)}.system-clock-unified{color:var(--cyan,#0284c7);font-family:var(--font-mono,monospace);font-size:.72rem;letter-spacing:.08em}.system-user-unified,.system-connectivity-unified,.system-clock-unified,.system-changepw-unified,.system-logout-unified{padding-left:11px;border-left:1px solid var(--border,#dbe4ee)}.system-changepw-unified,.system-logout-unified{cursor:pointer;text-decoration:none;color:var(--text-dim,#64748b);background:none;border-top:none;border-right:none;border-bottom:none;margin:0;padding-top:0;padding-right:0;padding-bottom:0;font:inherit;font-size:inherit;letter-spacing:inherit;transition:color .2s}.system-changepw-unified:hover,.system-changepw-unified:focus-visible{color:var(--cyan,#0284c7)}.system-logout-unified:hover,.system-logout-unified:focus-visible{color:var(--red,#dc2626)}.system-meta-fallback{position:fixed;top:10px;right:12px;z-index:99998;padding:7px 10px;border:1px solid var(--border,#dbe4ee);background:var(--surface,#fff)}@media(max-width:1100px){.system-meta-unified{justify-content:flex-end}.topbar-right,.nav-right,.navbar,.topbar,#topbar{flex-wrap:wrap}}@media(max-width:720px){.system-meta-unified{gap:6px;font-size:.61rem;letter-spacing:0}.system-user-unified{max-width:145px}.system-clock-unified{font-size:.61rem;letter-spacing:0}.system-user-unified,.system-connectivity-unified,.system-clock-unified,.system-changepw-unified,.system-logout-unified{padding-left:6px}}';
     document.head.appendChild(style);
 
     var meta=document.createElement('div');
     meta.className='system-meta-unified';
     meta.setAttribute('data-system-meta','');
-    meta.innerHTML='<span class="system-user-unified" data-system-user>尚未登入</span><span class="system-connectivity-unified"><span class="system-dot" aria-hidden="true"></span><span class="system-connectivity-label">系統連線中</span></span><span class="system-clock-unified" data-system-clock>----</span>';
+    meta.innerHTML='<span class="system-user-unified" data-system-user>尚未登入</span><span class="system-connectivity-unified"><span class="system-dot" aria-hidden="true"></span><span class="system-connectivity-label">系統連線中</span></span><span class="system-clock-unified" data-system-clock>----</span><button type="button" class="system-changepw-unified" data-system-changepw style="display:none">改密碼</button><button type="button" class="system-logout-unified" data-system-logout style="display:none">登出</button>';
     var userMeta=meta.querySelector('[data-system-user]');
     var clock=meta.querySelector('[data-system-clock]');
     var label=meta.querySelector('.system-connectivity-label');
+    var changepwBtn=meta.querySelector('[data-system-changepw]');
+    var logoutBtn=meta.querySelector('[data-system-logout]');
+    changepwBtn.addEventListener('click',function(){ if(window.SystemAccountActions)window.SystemAccountActions.openChangePassword(); });
+    logoutBtn.addEventListener('click',function(){ if(window.SystemAccountActions)window.SystemAccountActions.logout(); });
     document.querySelectorAll('#navUser,#topClock,#clock,.online-dot,.dot-online').forEach(function(el){el.style.display='none';});
     document.querySelectorAll('span,div').forEach(function(el){
       if(!el.closest('[data-system-meta]')&&(el.textContent||'').trim()==='系統連線中'){
@@ -212,6 +283,8 @@
       var dept=sessionStorage.getItem('user_department')||cached.department||'';
       if(name&&!sessionStorage.getItem('user_name'))saveProfile(cached);
       userMeta.textContent=name?(dept||'未設定單位')+'｜'+name:'尚未登入';
+      changepwBtn.style.display=name?'':'none';
+      logoutBtn.style.display=name?'':'none';
       var deptId=sessionStorage.getItem('user_dept_id')||cached.dept_id||'';
       if(!name||(!dept&&!deptId))recoverProfileFromAuth();
       if(name&&!dept&&deptId&&!deptLookupStarted){
