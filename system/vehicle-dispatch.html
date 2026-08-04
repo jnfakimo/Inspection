@@ -153,6 +153,8 @@ async function init(){
   }
   const {data:user,error}=await db.from('users').select('*').eq('auth_id',session.user.id).eq('status','active').maybeSingle();
   if(error||!user){showFatal('找不到登入者的人員資料，請先由管理員完成帳號與人員綁定。');return;}
+  const sharedProfile=window.SystemUserProfile&&typeof window.SystemUserProfile.read==='function'?window.SystemUserProfile.read():null;
+  if(!user.department&&sharedProfile?.department)user.department=sharedProfile.department;
   currentUser=user;currentRole=user.rbac_role||LEGACY_ROLE[user.role]||'reporter';
   byId('roleText').textContent=`${user.department||'未設定單位'}｜${user.name}｜${ROLE_NAME[currentRole]||currentRole}`;
   byId('vehicleBtn').hidden=!isManager();
