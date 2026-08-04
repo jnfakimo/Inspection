@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-5"></script>
+<script src="theme.js?v=20260804-6"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
@@ -131,9 +131,15 @@ const MENU_PRESETS={
   mgmt_supervisor:{maintenance:true,handover:true},
   sysadmin:{inspector:true,maintenance:true,handover:true,repair:true}
 };
-let roles=[],perms={};
+let roles=[],perms={},departments=[],departmentMap=new Map();
 function tab(i){document.querySelectorAll('.tab').forEach((t,n)=>t.classList.toggle('on',n===i));document.querySelectorAll('.pane').forEach((p,n)=>p.classList.toggle('on',n===i));}
 function toggleVehicleRoster(details){if(!details.open)return;document.querySelectorAll('.personnel-card[open]').forEach(item=>{if(item!==details)item.open=false;});}
+function departmentPath(deptId){
+  const names=[],seen=new Set();let current=departmentMap.get(deptId),guard=0;
+  while(current&&guard++<10&&!seen.has(current.dept_id)){seen.add(current.dept_id);names.unshift(current.name);current=departmentMap.get(current.parent_id);}
+  return names.join(' / ');
+}
+function departmentForUser(user){return departmentPath(user?.dept_id)||String(user?.department||'').trim()||'—';}
 function permissionsForRole(role){
   const out={inspector:false,maintenance:false,handover:false,repair:false};
   Object.assign(out,MENU_PRESETS[role]||{});
@@ -142,13 +148,15 @@ function permissionsForRole(role){
 }
 
 async function init(){
-  const [{data:r,error:re},{data:rp}]=await Promise.all([
+  const [{data:r,error:re},{data:rp},{data:d,error:de}]=await Promise.all([
     db.from('roles').select('*').order('sort_order'),
-    db.from('role_permissions').select('*')
+    db.from('role_permissions').select('*'),
+    db.from('departments').select('dept_id,parent_id,name,status').eq('status','active').order('sort_order').limit(5000)
   ]);
-  if(re){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">尚未建立 roles 表，請先執行 work_order_schema.sql</div>';return;}
+  if(re||de){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">角色或部門主檔讀取失敗，請通知系統管理員。</div>';return;}
   // 管理部主管已停用，不再於角色權限矩陣／系統存取權限／使用者角色指派中出現
   roles=(r||[]).filter(x=>x.role_id!=='mgmt_supervisor'); perms={}; (rp||[]).forEach(x=>{perms[x.role_id+'|'+x.perm]=x.allowed;});
+  departments=d||[];departmentMap=new Map(departments.map(x=>[x.dept_id,x]));
   renderMatrix(); renderSysMatrix(); renderUsers(); renderVehiclePersonnel();
 }
 function buildMatrixHtml(list,opts){
@@ -176,7 +184,7 @@ async function togglePerm(role,perm,val){
 let allRbacUsers=[], rbacUserPage=1;
 const RBAC_USER_PAGE_SIZE=20;
 async function renderUsers(){
-  const {data:users}=await db.from('users').select('user_id,name,role,rbac_role,department').eq('status','active').order('name');
+  const {data:users}=await db.from('users').select('user_id,name,role,rbac_role,dept_id,department').eq('status','active').order('name');
   allRbacUsers=users||[];
   rbacUserPage=1;
   renderUsersPage();
@@ -197,7 +205,7 @@ function renderUsersPage(){
     pageUsers.map(u=>{
       // 管理部主管已從選單移除；若有人現有指派仍是這個角色，保留一個唯讀顯示用選項，避免下拉選單顯示錯誤
       const stale = u.rbac_role==='mgmt_supervisor' ? `<option value="mgmt_supervisor" selected>管理部主管（已停用）</option>` : '';
-      return `<tr><td class="rolename">${escHtml(u.name)}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(u.department||'—')}</td>
+      return `<tr><td class="rolename">${escHtml(u.name)}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(departmentForUser(u))}</td>
       <td style="text-align:left"><select onchange="setUserRole('${u.user_id}',this.value)">
         <option value="">（未指定）</option>${stale}${roles.map(r=>`<option value="${r.role_id}" ${u.rbac_role===r.role_id?'selected':''}>${escHtml(r.name)}</option>`).join('')}
       </select></td></tr>`;
@@ -217,7 +225,7 @@ async function setUserRole(uid,role){
 let vehiclePersonnelUsers=[],vehicleManagerAssignments=new Map(),vehicleDriverAssignments=new Map();
 async function renderVehiclePersonnel(){
   const [usersResult,managersResult,driversResult]=await Promise.all([
-    db.from('users').select('user_id,name,department,rbac_role,role').eq('status','active').order('department').order('name').limit(5000),
+    db.from('users').select('user_id,name,dept_id,department,rbac_role,role').eq('status','active').order('name').limit(5000),
     db.from('vehicle_dispatch_managers').select('user_id,active').limit(5000),
     db.from('vehicle_dispatch_drivers').select('user_id,active').limit(5000)
   ]);
@@ -225,7 +233,7 @@ async function renderVehiclePersonnel(){
     const message='<div class="empty" style="color:var(--amber)">派車人員資料尚未建立，請先套用最新資料庫 migration。</div>';
     document.getElementById('vehicleManagerTbl').innerHTML=message;document.getElementById('vehicleDriverTbl').innerHTML=message;return;
   }
-  vehiclePersonnelUsers=usersResult.data||[];
+  vehiclePersonnelUsers=(usersResult.data||[]).sort((a,b)=>departmentForUser(a).localeCompare(departmentForUser(b),'zh-Hant')||String(a.name||'').localeCompare(String(b.name||''),'zh-Hant'));
   vehicleManagerAssignments=new Map((managersResult.data||[]).map(x=>[x.user_id,x.active===true]));
   vehicleDriverAssignments=new Map((driversResult.data||[]).map(x=>[x.user_id,x.active===true]));
   renderVehicleManagerList();renderVehicleDriverList();
@@ -241,11 +249,11 @@ function renderVehicleDriverList(){
 }
 function renderVehicleAssignmentList(options){
   const box=document.getElementById(options.boxId),q=String(document.getElementById(options.searchId)?.value||'').trim().toLowerCase();
-  const users=vehiclePersonnelUsers.filter(u=>!q||[u.name,u.department,vehicleManagerRoleName(u)].some(v=>String(v||'').toLowerCase().includes(q)));
+  const users=vehiclePersonnelUsers.filter(u=>!q||[u.name,departmentForUser(u),vehicleManagerRoleName(u)].some(v=>String(v||'').toLowerCase().includes(q)));
   if(!users.length){box.innerHTML='<div class="empty">沒有符合條件的人員</div>';return;}
   box.innerHTML=`<table><tr><th>${options.label}</th><th style="text-align:left">姓名</th><th style="text-align:left">單位</th><th style="text-align:left">目前系統角色</th></tr>`+users.map(u=>{
     const sysadmin=u.rbac_role==='sysadmin'||u.role==='admin',automatic=options.sysadminAutomatic&&sysadmin,assigned=automatic||options.assignments.get(u.user_id)===true;
-    return `<tr><td><input type="checkbox" ${assigned?'checked':''} ${automatic?'disabled title="系統管理員自動具備派車管理權限"':''} onchange="${options.toggleName}('${u.user_id}',this.checked,this)"></td><td class="rolename">${escHtml(u.name)}${assigned&&!automatic?'<span class="manager-badge">已指派</span>':''}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(u.department||'—')}</td><td style="text-align:left">${escHtml(vehicleManagerRoleName(u))}${automatic?'<span class="manager-badge">自動授權</span>':''}</td></tr>`;
+    return `<tr><td><input type="checkbox" ${assigned?'checked':''} ${automatic?'disabled title="系統管理員自動具備派車管理權限"':''} onchange="${options.toggleName}('${u.user_id}',this.checked,this)"></td><td class="rolename">${escHtml(u.name)}${assigned&&!automatic?'<span class="manager-badge">已指派</span>':''}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(departmentForUser(u))}</td><td style="text-align:left">${escHtml(vehicleManagerRoleName(u))}${automatic?'<span class="manager-badge">自動授權</span>':''}</td></tr>`;
   }).join('')+'</table>';
 }
 async function toggleVehicleManager(userId,active,checkbox){

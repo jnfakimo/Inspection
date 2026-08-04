@@ -37,7 +37,7 @@
     }catch(e){return null;}
   }
   function fetchUserRowForAccess(authId,token){
-    var url=SUPABASE_URL+'/rest/v1/users?select=user_id,name,role,rbac_role,department&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
+    var url=SUPABASE_URL+'/rest/v1/users?select=user_id,name,role,rbac_role,dept_id,department&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
     return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}})
       .then(function(r){return r.ok?r.json():[];})
       .then(function(rows){return rows&&rows[0]?rows[0]:null;})
@@ -365,7 +365,7 @@
       logoutBtn.style.display=name?'':'none';
       var deptId=sessionStorage.getItem('user_dept_id')||cached.dept_id||'';
       if(!name||(!dept&&!deptId))recoverProfileFromAuth();
-      if(name&&!dept&&deptId&&!deptLookupStarted){
+      if(name&&deptId&&!deptLookupStarted){
         deptLookupStarted=true;
         var auth=storedAuthSession();
         var bearer=auth&&auth.access_token||SUPABASE_ANON_KEY;

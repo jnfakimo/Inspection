@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-5"></script>
+<script src="theme.js?v=20260804-6"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
@@ -141,7 +141,7 @@ const PHOTO_BUCKET='vehicle-dispatch-files';
 const MARKET_LOCATIONS=['第一果菜市場','第二果菜市場'];
 const CONFLICT_STATUSES=['pending_approval','approved','assigned','completed'];
 let currentUser=null,currentRole='',tab='mine',currentRequestId=null,vehicleEditId=null,schemaReady=true;
-let state={requests:[],vehicles:[],users:[],logs:[],attachments:[],managers:[],drivers:[]};
+let state={requests:[],vehicles:[],users:[],departments:[],logs:[],attachments:[],managers:[],drivers:[]};
 
 const byId=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -208,7 +208,17 @@ function closeModal(id){byId(id).classList.remove('show');}
 function statusPill(s){return `<span class="pill ${STATUS_CLASS[s]||'draft'}">${esc(STATUS[s]||s||'—')}</span>`;}
 function driverStageText(r){if(r.status!=='assigned')return '';return r.driver_accepted_at?`司機已接單 ${fmtDateTime(r.driver_accepted_at)}`:'待司機接單';}
 function normalizeDept(v){return String(v||'').replace(/\s+/g,'').replace('／','/');}
-function sameDepartment(request){return normalizeDept(request.applicant_department)===normalizeDept(currentUser?.department);}
+function departmentPathForId(deptId){
+  const map=new Map(state.departments.map(x=>[x.dept_id,x])),names=[],seen=new Set();let current=map.get(deptId),guard=0;
+  while(current&&guard++<10&&!seen.has(current.dept_id)){seen.add(current.dept_id);names.unshift(current.name);current=map.get(current.parent_id);}
+  return names.join(' / ');
+}
+function departmentForUser(user){return departmentPathForId(user?.dept_id)||String(user?.department||'').trim()||'—';}
+function sameDepartment(request){
+  const applicant=state.users.find(x=>x.user_id===request.applicant_id);
+  if(currentUser?.dept_id&&applicant?.dept_id)return currentUser.dept_id===applicant.dept_id;
+  return normalizeDept(request.applicant_department)===normalizeDept(currentUser?.department);
+}
 function isAdmin(){return currentRole==='sysadmin';}
 function isSupervisor(){return currentRole==='unit_supervisor'||currentRole==='mgmt_supervisor'||isAdmin();}
 function isManager(){return isAdmin()||state.managers.some(x=>x.user_id===currentUser?.user_id&&x.active);}
@@ -233,6 +243,7 @@ async function init(){
   const {data:user,error}=await db.from('users').select('*').eq('auth_id',session.user.id).eq('status','active').maybeSingle();
   if(error||!user){showFatal('找不到登入者的人員資料，請先由管理員完成帳號與人員綁定。');return;}
   const sharedProfile=window.SystemUserProfile&&typeof window.SystemUserProfile.read==='function'?window.SystemUserProfile.read():null;
+  if(!user.dept_id&&sharedProfile?.dept_id)user.dept_id=sharedProfile.dept_id;
   if(!user.department&&sharedProfile?.department)user.department=sharedProfile.department;
   if(!user.phone&&sharedProfile?.phone)user.phone=sharedProfile.phone;
   currentUser=user;currentRole=user.rbac_role||LEGACY_ROLE[user.role]||'reporter';
@@ -250,19 +261,21 @@ function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner
 async function loadAll(silent=false){
   if(!currentUser)return;
   if(!silent)byId('syncText').textContent='讀取資料中…';
-  const [requests,vehicles,users,logs,attachments,managers,drivers]=await Promise.all([
+  const [requests,vehicles,users,departments,logs,attachments,managers,drivers]=await Promise.all([
     db.from('vehicle_dispatch_requests').select('*').order('created_at',{ascending:false}).limit(3000),
     db.from('official_vehicles').select('*').order('plate_no').limit(500),
-    db.from('users').select('user_id,name,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
+    db.from('users').select('user_id,name,dept_id,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
+    db.from('departments').select('dept_id,parent_id,name,status').eq('status','active').order('sort_order').limit(5000),
     db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000),
     db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(10000),
     db.from('vehicle_dispatch_managers').select('user_id,active').eq('active',true).limit(3000),
     db.from('vehicle_dispatch_drivers').select('user_id,active').eq('active',true).limit(3000)
   ]);
-  const firstError=[requests,vehicles,users,logs,attachments,managers,drivers].find(x=>x.error)?.error;
+  const firstError=[requests,vehicles,users,departments,logs,attachments,managers,drivers].find(x=>x.error)?.error;
   if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
   schemaReady=true;byId('setupBanner').className='setup-banner';
-  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[],drivers:drivers.data||[]};
+  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],departments:departments.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[],drivers:drivers.data||[]};
+  const resolvedDepartment=departmentForUser(currentUser);if(resolvedDepartment!=='—'){currentUser.department=resolvedDepartment;if(window.SystemUserProfile?.save)window.SystemUserProfile.save(currentUser);}
   updateRoleText();byId('vehicleBtn').hidden=!isManager();byId('reportBtn').hidden=!canReport();
   byId('driverTodayTab').hidden=!isVehicleDriver();
   if(isVehicleDriver()&&tab==='mine'&&state.requests.some(r=>isAssignedDriver(r)&&r.trip_date===todayISO()&&['assigned','completed'].includes(r.status)))tab='driverToday';
@@ -377,7 +390,7 @@ function dispatchForm(r){
   const drivers=state.users.filter(u=>state.drivers.some(d=>d.user_id===u.user_id&&d.active));
   return `<section class="form-section"><h3>派車管理員指派</h3><div class="form-grid">
     <div class="field span2"><label class="req">公務車／車號</label><select id="fVehicle"><option value="">請選擇公務車</option>${active.map(v=>`<option value="${v.vehicle_id}" ${v.vehicle_id===r.vehicle_id?'selected':''}>${esc(v.plate_no)}｜${esc(v.vehicle_name||v.brand||'公務車')}｜${esc(v.seats)} 人座｜里程 ${esc(v.current_odometer)} km</option>`).join('')}</select></div>
-    <div class="field"><label class="req">司機人員</label><select id="fDriver"><option value="">${drivers.length?'請選擇司機':'尚未指派司機人員'}</option>${drivers.map(u=>`<option value="${u.user_id}" ${u.user_id===r.driver_id?'selected':''}>${esc(u.name)}｜${esc(u.department||'—')}</option>`).join('')}</select>${drivers.length?'':'<div class="photo-note" style="color:var(--amber)">請先到後台「系統存取權限」指派司機人員。</div>'}</div>
+    <div class="field"><label class="req">司機人員</label><select id="fDriver"><option value="">${drivers.length?'請選擇司機':'尚未指派司機人員'}</option>${drivers.map(u=>`<option value="${u.user_id}" ${u.user_id===r.driver_id?'selected':''}>${esc(u.name)}｜${esc(departmentForUser(u))}</option>`).join('')}</select>${drivers.length?'':'<div class="photo-note" style="color:var(--amber)">請先到後台「系統存取權限」指派司機人員。</div>'}</div>
     <div class="field wide"><label>派車備註</label><textarea id="fDispatchNote" placeholder="集合位置、聯絡事項或其他說明">${esc(r.dispatch_note||'')}</textarea></div>
   </div></section>`;
 }
