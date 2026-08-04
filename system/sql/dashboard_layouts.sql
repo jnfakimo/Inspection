@@ -256,7 +256,8 @@ cross join (values
   ('rank_equipment','各設備故障排行',6,9,6,4,3,3,60),
   ('rank_technician','維修人員案件數',0,13,6,4,3,3,70),
   ('rank_fault','故障類型分析',6,13,6,4,3,3,80),
-  ('trend','各月份報修趨勢',0,17,12,5,4,4,90)
+  ('trend','各月份報修趨勢',0,17,12,5,4,4,90),
+  ('weather_taiwan','臺灣即時氣象',0,22,12,7,6,5,100)
 ) as x(widget_key,title,x,y,w,h,min_w,min_h,ord)
 where v.layout_id=(select layout_id from dashboard_layouts where layout_code='operations_main')
   and v.version_no=1

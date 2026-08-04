@@ -27,7 +27,7 @@
   - 前端用 **anon key** 直連（各 HTML 內硬編 `SUPA_URL` / `SUPA_KEY`）。
   - RLS 目前多為 `allow_all_for_now`（開發階段全開）。
 - **Storage buckets**：`floorplans`（樓層平面圖 PNG）、`repair-files`（報修附件）。
-- **Edge Function**：`supabase/functions/line-notify/`（LINE 通知）。
+- **Edge Function**：`supabase/functions/line-notify/`（LINE 通知）、`supabase/functions/cwa-weather/`（中央氣象署資料代理與快取）。
 - **驗證限制**：本開發環境的外連 proxy 會擋 CDN / github.io 的直接 curl（回 000/403）。
   **無法用 curl 驗證線上頁面**，改用：`node --check` 語法檢查 ＋ GitHub Actions 部署狀態（`mcp__github__actions_list`）。
 
@@ -92,7 +92,8 @@
 11. `rls_hardening.sql` / `rls_hardening_login_fix.sql` — 正式環境權限
 12. `auth_profile_recovery.sql` — 修復 Auth 已註冊但 `users` 清單缺資料的帳戶同步
 13. `dashboard_layouts.sql` — 動態戰情儀表板版面、不可變版本、發布／還原 RPC 與預設版面
-14. `permanent_data_protection.sql` — **最後執行**；禁止實體刪除/清空並建立人員異動快照
+14. `weather_integration.sql` — 中央氣象署 API 快取（API 金鑰只放 Edge Function Secret）
+15. `permanent_data_protection.sql` — **最後執行**；禁止實體刪除/清空並建立人員異動快照
 
 輔助 / 修補：`dept_rebuild.sql`、`org_update.sql`、`repair_request_timeout_fix.sql`。
 `dept_rebuild.sql` 現為安全增量同步，不會清空人員部門或刪除既有部門。
@@ -108,6 +109,7 @@
 - `dashboard-layout.js` 是圖塊註冊表與預設版面的唯一來源；日後新增圖塊時，在此註冊一次，後台元件庫與前台會同步識別。
 - 舊版面缺少新註冊圖塊時，`DashboardLayout.normalize()` 會自動以預設位置補入，無須重建資料表；管理員下次發布時即寫入新版本。
 - 資料庫只保存允許的 `widget_key`、標題、位置、尺寸及設定，不保存或執行任意 HTML、JavaScript 或 SQL。
+- `weather_taiwan` 圖塊透過 `cwa-weather` Edge Function 讀取中央氣象署資料；完整啟用步驟見 `system/WEATHER_SETUP.md`。
 
 ---
 

@@ -9,7 +9,8 @@
     {key:'rank_equipment',title:'各設備故障排行',description:'設備故障件數排行',x:6,y:9,w:6,h:4,minW:3,minH:3},
     {key:'rank_technician',title:'維修人員案件數',description:'維修人員承辦案件排行',x:0,y:13,w:6,h:4,minW:3,minH:3},
     {key:'rank_fault',title:'故障類型分析',description:'故障類型件數排行',x:6,y:13,w:6,h:4,minW:3,minH:3},
-    {key:'trend',title:'各月份報修趨勢',description:'最近十二個月報修趨勢',x:0,y:17,w:12,h:5,minW:4,minH:4}
+    {key:'trend',title:'各月份報修趨勢',description:'最近十二個月報修趨勢',x:0,y:17,w:12,h:5,minW:4,minH:4},
+    {key:'weather_taiwan',title:'臺灣即時氣象',description:'中央氣象署警特報、縣市觀測與鄉鎮預報',x:0,y:22,w:12,h:7,minW:6,minH:5}
   ];
   var BY_KEY={};CATALOG.forEach(function(x){BY_KEY[x.key]=x;});
 

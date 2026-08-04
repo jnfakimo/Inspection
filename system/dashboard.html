@@ -145,6 +145,29 @@ a{color:inherit;text-decoration:none}
 .tcard h3 .tag{font-size:.6rem;color:var(--text-dim);font-family:var(--font-mono);border:1px solid var(--border);padding:1px 6px;border-radius:2px;margin-left:auto}
 .trend-box{position:relative;height:300px}
 
+/* ── CWA Taiwan weather ── */
+.weather-card{height:100%;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.weather-head{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border);background:linear-gradient(90deg,rgba(0,212,255,.07),transparent)}
+.weather-head h3{font-family:var(--font-head);font-size:1rem;color:var(--cyan);letter-spacing:.05em}.weather-head .weather-source{font-size:.6rem;color:var(--text-dim);font-family:var(--font-mono)}
+.weather-head .weather-spacer{flex:1}.weather-update{font-size:.62rem;color:var(--text-dim);font-family:var(--font-mono)}
+.weather-open,.weather-close{border:1px solid var(--border-hi);border-radius:4px;background:rgba(0,212,255,.08);color:var(--cyan);font:inherit;font-size:.7rem;padding:7px 11px;cursor:pointer}.weather-open:hover,.weather-close:hover{border-color:var(--cyan);background:rgba(0,212,255,.15)}
+.weather-alerts{display:flex;align-items:center;min-height:43px;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(255,59,59,.045);overflow:hidden}
+.weather-alert-label{flex:0 0 auto;color:var(--red);font-weight:700;font-size:.7rem;margin-right:12px}.weather-alert-track{display:flex;gap:22px;min-width:0;overflow:auto;scrollbar-width:none}.weather-alert-track::-webkit-scrollbar{display:none}
+.weather-alert-item{color:var(--text-hi);font-size:.7rem;white-space:nowrap}.weather-alert-item b{color:var(--red);margin-right:6px}.weather-alert-clear{color:var(--green);font-size:.7rem}
+.weather-body{display:grid;grid-template-columns:minmax(250px,.85fr) minmax(360px,1.4fr);gap:18px;flex:1;min-height:0;padding:14px}
+.weather-map-button{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;border:1px solid var(--border);border-radius:7px;background:radial-gradient(circle at 50% 42%,rgba(0,127,190,.18),rgba(2,11,24,.55));cursor:pointer;overflow:hidden;color:inherit}
+.weather-map-button:hover{border-color:var(--cyan);box-shadow:inset 0 0 25px rgba(0,212,255,.08)}.weather-map-button .weather-map-shell{height:100%;max-height:440px;aspect-ratio:620/820;padding:8px}
+.weather-map-button .weather-map-caption{position:absolute;left:12px;bottom:10px;padding:5px 9px;border-radius:4px;background:rgba(2,11,24,.83);border:1px solid var(--border);color:var(--cyan);font-size:.68rem;pointer-events:none}
+.weather-summary{display:flex;flex-direction:column;gap:12px;min-width:0;overflow:auto}.weather-place-row{display:flex;align-items:flex-start;gap:14px;padding:5px 3px}.weather-main-icon{font-size:3rem;line-height:1;filter:drop-shadow(0 0 10px rgba(0,212,255,.25))}.weather-place{font-family:var(--font-head);font-size:1.4rem;color:var(--text-hi);font-weight:700}.weather-desc{font-size:.82rem;color:var(--cyan);margin-top:3px}.weather-temp{margin-left:auto;font-family:var(--font-head);font-size:2.15rem;color:var(--text-hi);white-space:nowrap}.weather-temp small{font-size:.7rem;color:var(--text-dim)}
+.weather-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.weather-metric{padding:10px;border:1px solid var(--border);border-radius:5px;background:rgba(12,40,64,.22);min-width:0}.weather-metric .label{font-size:.62rem;color:var(--text-dim)}.weather-metric .value{margin-top:3px;color:var(--text-hi);font-family:var(--font-head);font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weather-hint{margin-top:auto;padding:10px 12px;border-left:3px solid var(--cyan);background:rgba(0,212,255,.05);color:var(--text-dim);font-size:.7rem;line-height:1.7}.weather-error{display:flex;align-items:center;justify-content:center;min-height:130px;padding:24px;text-align:center;color:var(--amber);font-size:.75rem;line-height:1.8}
+.weather-map-shell svg{display:block;width:100%;height:100%;overflow:visible}.weather-map-shell .county{fill:rgba(0,212,255,.13);stroke:var(--cyan);stroke-width:2;vector-effect:non-scaling-stroke;cursor:pointer;transition:fill .15s,filter .15s}.weather-map-shell .county:hover,.weather-map-shell .county.selected{fill:rgba(0,255,157,.38);filter:drop-shadow(0 0 5px rgba(0,255,157,.7))}.weather-map-shell .county.alerting{fill:rgba(255,59,59,.3);stroke:var(--red)}
+.weather-map-shell .weather-marker{pointer-events:none}.weather-map-shell .weather-marker circle{fill:rgba(4,17,31,.9);stroke:rgba(212,238,255,.8);stroke-width:1.5}.weather-map-shell .weather-marker text{font-family:'Segoe UI Emoji','Noto Sans TC',sans-serif;font-size:26px;text-anchor:middle;dominant-baseline:central}.weather-map-shell .weather-marker .marker-temp{font-family:var(--font-head);font-size:13px;font-weight:700;fill:#fff;paint-order:stroke;stroke:#02101d;stroke-width:3px}
+.weather-modal[hidden]{display:none}.weather-modal{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,4,10,.86);backdrop-filter:blur(5px)}.weather-dialog{width:min(1180px,100%);height:min(850px,calc(100vh - 40px));display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border-hi);border-radius:9px;box-shadow:0 18px 80px rgba(0,0,0,.6);overflow:hidden}.weather-dialog-head{display:flex;align-items:center;gap:12px;padding:13px 17px;border-bottom:1px solid var(--border);background:var(--panel)}.weather-dialog-head h2{font-family:var(--font-head);font-size:1.15rem;color:var(--cyan)}.weather-dialog-head p{font-size:.66rem;color:var(--text-dim)}.weather-dialog-head .weather-close{margin-left:auto}
+.weather-dialog-body{display:grid;grid-template-columns:minmax(360px,.9fr) minmax(420px,1.2fr);gap:0;flex:1;min-height:0}.weather-full-map{min-height:0;padding:16px;background:radial-gradient(circle at 50% 42%,rgba(0,127,190,.22),var(--bg));border-right:1px solid var(--border)}.weather-full-map .weather-map-shell{height:100%;display:flex;align-items:center;justify-content:center}.weather-full-map svg{max-height:100%;max-width:100%}
+.weather-detail{min-height:0;overflow:auto;padding:18px}.weather-controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px}.weather-controls label{display:flex;flex-direction:column;gap:5px;color:var(--text-dim);font-size:.65rem}.weather-controls select{width:100%;padding:9px 30px 9px 10px;background:var(--bg);color:var(--text-hi);border:1px solid var(--border);border-radius:4px;font:inherit}.weather-controls select:focus{outline:none;border-color:var(--cyan)}
+.weather-county-panel{padding:16px;border:1px solid var(--border);border-radius:7px;background:rgba(12,40,64,.18)}.weather-county-panel .weather-place-row{padding:0}.weather-detail-title{margin:18px 0 9px;color:var(--cyan);font-family:var(--font-head);font-size:.9rem}.weather-town-panel{padding:12px;border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:.72rem;line-height:1.8}.weather-town-panel strong{color:var(--text-hi)}.weather-county-alerts{display:flex;flex-direction:column;gap:7px}.weather-county-alert{padding:9px 10px;border-left:3px solid var(--red);background:rgba(255,59,59,.06);font-size:.68rem;line-height:1.65}.weather-county-alert b{color:var(--red)}
+
 @media(max-width:1200px){
   .kpi-strip{grid-template-columns:repeat(4,minmax(0,1fr))}
   .dash-main{grid-template-columns:minmax(0,1.55fr) minmax(320px,1fr)}
@@ -155,6 +178,8 @@ a{color:inherit;text-decoration:none}
   .toolbar-range{margin-left:0}
   .kpi-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
   .dash-main{grid-template-columns:1fr}.pcard,.ccard{min-height:auto}.chart-box{height:320px;min-height:320px}
+  .weather-body{grid-template-columns:minmax(220px,.75fr) 1.25fr}.weather-metrics{grid-template-columns:repeat(2,1fr)}
+  .weather-dialog-body{grid-template-columns:minmax(300px,.75fr) 1.25fr}
 }
 @media(max-width:640px){
   .wrap{padding:12px 10px 28px}.dashboard-head h1{font-size:1.35rem}.dashboard-head p{font-size:.72rem}
@@ -167,6 +192,8 @@ a{color:inherit;text-decoration:none}
   .pcard,.ccard,.rcard,.tcard{padding:13px}.ps{gap:6px}.pc{padding:8px 6px}.pc .n{font-size:1.35rem}
   #pg{height:360px}.chart-box{height:280px;min-height:280px}.trend-box{height:240px}
   .bar-row{grid-template-columns:90px 1fr 28px}
+  .weather-head{padding:10px}.weather-head .weather-source,.weather-update{display:none}.weather-body{grid-template-columns:1fr;padding:9px;overflow:auto}.weather-map-button{min-height:260px}.weather-place{font-size:1.15rem}.weather-temp{font-size:1.7rem}.weather-main-icon{font-size:2.3rem}
+  .weather-modal{padding:0}.weather-dialog{height:100vh;border-radius:0;border-width:0}.weather-dialog-body{display:block;overflow:auto}.weather-full-map{height:55vh;min-height:390px;border-right:0;border-bottom:1px solid var(--border)}.weather-detail{overflow:visible}.weather-controls{grid-template-columns:1fr}
 }
 </style>
 <link rel="stylesheet" href="light-mode-fix.css">
@@ -261,6 +288,35 @@ a{color:inherit;text-decoration:none}
       <div class="trend-box"><canvas id="trendChart"></canvas></div>
     </div>
     </section></div></div>
+
+    <div class="grid-stack-item" gs-id="weather_taiwan" data-widget-key="weather_taiwan" gs-x="0" gs-y="22" gs-w="12" gs-h="7" gs-min-w="6" gs-min-h="5"><div class="grid-stack-item-content"><section class="dashboard-widget">
+      <div class="weather-card" id="weatherCard">
+        <div class="weather-head"><h3 data-widget-title>臺灣即時氣象</h3><span class="weather-source">CENTRAL WEATHER ADMINISTRATION</span><span class="weather-spacer"></span><span class="weather-update" id="weatherUpdated">資料載入中</span><button class="weather-open" type="button" data-weather-open>展開臺灣地圖</button></div>
+        <div class="weather-alerts"><span class="weather-alert-label">氣象重要資訊</span><div class="weather-alert-track" id="weatherAlertTrack"><span class="weather-alert-clear">正在讀取中央氣象署資料…</span></div></div>
+        <div class="weather-body">
+          <div class="weather-map-button" data-weather-open role="button" tabindex="0" aria-label="開啟臺灣各縣市即時氣象"><span class="weather-map-shell" id="weatherMiniMap"></span><span class="weather-map-caption">點擊臺灣查看各縣市</span></div>
+          <div class="weather-summary" id="weatherSummary"><div class="weather-error">中央氣象署資料載入中…</div></div>
+        </div>
+      </div>
+    </section></div></div>
+  </div>
+</div>
+
+<div class="weather-modal" id="weatherModal" hidden role="dialog" aria-modal="true" aria-labelledby="weatherModalTitle">
+  <div class="weather-dialog">
+    <div class="weather-dialog-head"><div><h2 id="weatherModalTitle">臺灣各縣市即時氣象</h2><p>資料來源：交通部中央氣象署開放資料平臺</p></div><button class="weather-close" type="button" data-weather-close>關閉</button></div>
+    <div class="weather-dialog-body">
+      <div class="weather-full-map"><div class="weather-map-shell" id="weatherFullMap"></div></div>
+      <div class="weather-detail">
+        <div class="weather-controls">
+          <label>縣市<select id="weatherCountySelect" aria-label="選擇縣市"></select></label>
+          <label>鄉鎮市區<select id="weatherTownSelect" aria-label="選擇鄉鎮市區"><option value="">請先選擇縣市</option></select></label>
+        </div>
+        <div class="weather-county-panel" id="weatherCountyPanel"></div>
+        <h3 class="weather-detail-title">鄉鎮預報</h3><div class="weather-town-panel" id="weatherTownPanel">點選縣市後載入鄉鎮預報。</div>
+        <h3 class="weather-detail-title">該縣市氣象重要資訊</h3><div class="weather-county-alerts" id="weatherCountyAlerts"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -762,5 +818,7 @@ async function ld(){
 function sr(){ld();if(_pt)clearInterval(_pt);_pt=setInterval(ld,P_MS);}
 sr();
 </script>
+<script src="weather-widget.js?v=20260804-1"></script>
+<script>CwaWeatherWidget.init({endpoint:SUPA_URL+'/functions/v1/cwa-weather',anonKey:SUPA_KEY});</script>
 </body>
 </html>
