@@ -3,7 +3,28 @@
 
   const COUNTIES=['基隆市','臺北市','新北市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','臺南市','高雄市','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
   const MAIN_ISLAND_COUNTIES=COUNTIES.filter(county=>!['澎湖縣','金門縣','連江縣'].includes(county));
-  const MAIN_ISLAND_VIEWBOX='270 210 340 560';
+  const MAIN_ISLAND_VIEWBOX='220 185 450 610';
+  const MARKER_POSITIONS={
+    '基隆市':[540,230],
+    '臺北市':[485,215],
+    '新北市':[430,225],
+    '桃園市':[375,245],
+    '新竹市':[325,280],
+    '新竹縣':[285,325],
+    '苗栗縣':[270,385],
+    '臺中市':[260,450],
+    '彰化縣':[255,515],
+    '雲林縣':[260,580],
+    '嘉義市':[275,640],
+    '嘉義縣':[310,690],
+    '臺南市':[365,730],
+    '高雄市':[430,745],
+    '屏東縣':[495,725],
+    '臺東縣':[565,675],
+    '花蓮縣':[620,555],
+    '宜蘭縣':[625,390],
+    '南投縣':[455,465]
+  };
   const state={endpoint:'',anonKey:'',summary:null,selected:'臺北市',towns:[],townCounty:'',svgText:'',refreshTimer:null,townRequest:0};
   const byId=id=>document.getElementById(id);
   const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -107,9 +128,11 @@
     layer.textContent='';
     if(!state.summary)return;
     svg.querySelectorAll('.county').forEach(path=>{
-      const data=countyData(path.dataset.county),x=Number(path.dataset.cx),y=Number(path.dataset.cy);
-      if(!Number.isFinite(x)||!Number.isFinite(y))return;
-      const group=document.createElementNS('http://www.w3.org/2000/svg','g');group.setAttribute('class','weather-marker');group.setAttribute('transform',`translate(${x} ${y})`);
+      const county=canonical(path.dataset.county),data=countyData(county),countyX=Number(path.dataset.cx),countyY=Number(path.dataset.cy);
+      const [x,y]=MARKER_POSITIONS[county]||[countyX,countyY];
+      if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(countyX)||!Number.isFinite(countyY))return;
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','weather-marker-line');line.setAttribute('x1',countyX);line.setAttribute('y1',countyY);line.setAttribute('x2',x);line.setAttribute('y2',y);layer.appendChild(line);
+      const group=document.createElementNS('http://www.w3.org/2000/svg','g');group.setAttribute('class','weather-marker');group.setAttribute('data-county',county);group.setAttribute('transform',`translate(${x} ${y})`);
       const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('r','27');
       const icon=document.createElementNS('http://www.w3.org/2000/svg','text');icon.setAttribute('y','-1');icon.textContent=weatherIcon(data.weather,data.weatherCode);
       const temp=document.createElementNS('http://www.w3.org/2000/svg','text');temp.setAttribute('class','marker-temp');temp.setAttribute('y','36');temp.textContent=present(data.temperature)?Math.round(Number(data.temperature))+'°':'';
