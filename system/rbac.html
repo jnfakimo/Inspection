@@ -106,7 +106,7 @@ function translateError(msg) {
   return '操作失敗，請稍後再試或聯絡系統管理員';
 }
 const PERMS=[['create','新增'],['update','修改'],['delete','刪除'],['read','查詢'],['dispatch','派工'],['close','結案'],['sign','簽核'],['export','匯出'],['admin','後台管理']];
-const SYS_KEYS=[['sys_admin','後台管理系統'],['sys_workorder','報修/派工/完工系統'],['sys_guardpatrol','駐衛警巡檢系統'],['sys_handover','電子交接簿'],['sys_equipment','設備建置系統'],['sys_structuremap','專案核心樹狀關係圖']];
+const SYS_KEYS=[['sys_admin','後台管理系統'],['sys_workorder','報修/派工/完工系統'],['sys_guardpatrol','駐衛警巡檢系統'],['sys_handover','電子交接簿'],['sys_equipment','設備建置系統'],['sys_structuremap','專案核心樹狀關係圖'],['sys_vehicle','公務車派車管理']];
 const LEGACY_ROLE_BY_RBAC={reporter:'inspector',duty:'maintenance',dispatcher:'maintenance',technician:'maintenance',unit_supervisor:'supervisor',mgmt_supervisor:'supervisor',sysadmin:'admin'};
 const MENU_PRESETS={
   reporter:{maintenance:true,repair:true},

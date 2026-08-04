@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-2"></script>
+<script src="theme.js?v=20260804-3"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>臺北農產運銷股份有限公司 ｜ 系統入口</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -242,6 +242,7 @@
   .card-inspect { --card-color:var(--red);   --card-rgb:255,59,59  }
   .card-handover{ --card-color:#b48aff; --card-rgb:180,138,255 }
   .card-asset{ --card-color:var(--cyan); --card-rgb:0,212,255 }
+  .card-vehicle{ --card-color:#38bdf8; --card-rgb:56,189,248 }
 
   /* ── FOOTER ── */
   .footer {
@@ -379,6 +380,14 @@
       <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
     </a>
 
+    <a class="sys-card card-vehicle" href="vehicle-dispatch.html" data-system-key="vehicle">
+      <span class="card-icon" aria-hidden="true"><img src="../assets/system-icons/dispatch-icon.png" alt=""></span>
+      <div class="card-sys-id">SYS-07 ｜ OFFICIAL VEHICLE</div>
+      <div class="card-title">公務車派車管理</div>
+      <div class="card-desc">派車申請、單位主管核可、公務車與司機指派，以及行車時間、里程與加油回報。</div>
+      <div class="card-enter">進入 <span class="card-enter-arrow">▶</span></div>
+    </a>
+
   </div>
 
   <!-- FOOTER -->
@@ -401,7 +410,7 @@
     if(!session){location.href='login.html';return;}
     applySystemAccess();
   })();
-  const SYSTEM_LABELS={admin:'後台管理系統',workorder:'報修/派工/完工系統',guardpatrol:'駐衛警巡檢系統',handover:'電子交接簿',equipment:'設備建置系統',structuremap:'專案核心樹狀關係圖'};
+  const SYSTEM_LABELS={admin:'後台管理系統',workorder:'報修/派工/完工系統',guardpatrol:'駐衛警巡檢系統',handover:'電子交接簿',equipment:'設備建置系統',structuremap:'專案核心樹狀關係圖',vehicle:'公務車派車管理'};
   function applySystemAccess(){
     const params=new URLSearchParams(location.search);
     const denied=params.get('denied');

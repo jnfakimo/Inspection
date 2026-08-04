@@ -59,6 +59,7 @@
 - `workorder.html` — 報修系統（新增報修、派工、案件流程）
 - `dashboard.html` — 戰情儀表板　`analytics.html` — 統計分析
 - `equipment.html` — 設備建置與生命週期（XLSX 匯入匯出、保養、履歷、合約、文件、成本、中央監控介接）　`rbac.html` — 權限管理 RBAC
+- `vehicle-dispatch.html` — 公務車派車管理（申請、主管核可、車管派車、司機行車與里程／加油回報）
 - `notices.html` — 通知中心　`api.html` — 整合 API 文件
 - `maintenance.html` — 舊維修管理（已被 `workorder.html` 取代，導覽一律指向報修系統）
 
@@ -93,7 +94,8 @@
 12. `auth_profile_recovery.sql` — 修復 Auth 已註冊但 `users` 清單缺資料的帳戶同步
 13. `dashboard_layouts.sql` — 動態戰情儀表板版面、不可變版本、發布／還原 RPC 與預設版面
 14. `weather_integration.sql` — 中央氣象署 API 快取（API 金鑰只放 Edge Function Secret）
-15. `permanent_data_protection.sql` — **最後執行**；禁止實體刪除/清空並建立人員異動快照
+15. `vehicle_dispatch.sql` — 公務車主檔、派車申請、四階段流程與不可覆寫歷程
+16. `permanent_data_protection.sql` — **最後執行**；禁止實體刪除/清空並建立人員異動快照
 
 輔助 / 修補：`dept_rebuild.sql`、`org_update.sql`、`repair_request_timeout_fix.sql`。
 `dept_rebuild.sql` 現為安全增量同步，不會清空人員部門或刪除既有部門。

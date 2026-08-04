@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
+<script src="theme.js?v=20260804-3"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>公務車派車管理 — 臺北農產公司</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--font-head:'Rajdhani','Noto Sans TC',sans-serif;--font-mono:'Share Tech Mono',monospace}
+:root[data-theme="light"]{--bg:#f4f6fa;--surface:#f8fafc;--panel:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:44px;background-image:linear-gradient(rgba(0,212,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.018) 1px,transparent 1px);background-size:40px 40px}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}
+.navbar{position:sticky;top:0;z-index:80;display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);overflow-x:auto}.navbar::after{content:'';position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,var(--cyan),var(--blue) 45%,transparent)}:root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}.nav-title{font-family:var(--font-head);font-size:1.08rem;font-weight:800;color:var(--cyan);white-space:nowrap}.nav-space{flex:1}.nav-btn{white-space:nowrap;border:1px solid var(--border);background:transparent;color:var(--text-dim);padding:6px 10px;border-radius:3px;font-size:.72rem;cursor:pointer}.nav-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.content{max-width:1500px;margin:0 auto;padding:17px}.hero{display:flex;align-items:flex-end;gap:16px;margin-bottom:14px}.hero h1{font-family:var(--font-head);font-size:1.32rem;color:var(--text-hi)}.hero p{font-size:.72rem;color:var(--text-dim);margin-top:4px}.identity{margin-left:auto;text-align:right;font-size:.68rem;color:var(--text-dim)}.identity b{display:block;color:var(--cyan);font-size:.78rem}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);margin-right:6px}
+.setup-banner{display:none;border:1px solid rgba(255,179,0,.45);background:rgba(255,179,0,.08);color:var(--amber);padding:11px 13px;border-radius:4px;margin-bottom:13px;font-size:.73rem;line-height:1.7}.setup-banner.show{display:block}.setup-banner code{color:var(--text-hi)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:13px}.flow-step{position:relative;display:flex;align-items:center;gap:10px;min-height:62px;padding:10px 13px;background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}.flow-step::after{content:'›';position:absolute;right:9px;color:var(--border-hi);font-size:1.4rem}.flow-step:last-child::after{display:none}.flow-no{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--step,var(--cyan));border-radius:50%;color:var(--step,var(--cyan));font-family:var(--font-head);font-weight:800}.flow-step b{display:block;color:var(--text-hi);font-size:.76rem}.flow-step span{display:block;color:var(--text-dim);font-size:.62rem;margin-top:2px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:9px;margin-bottom:14px}.kpi{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:11px 13px;overflow:hidden}.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--k,var(--cyan))}.kpi .n{font-family:var(--font-head);font-size:1.5rem;font-weight:800;color:var(--k,var(--cyan));line-height:1}.kpi .l{font-size:.65rem;color:var(--text-dim);margin-top:6px}
+.tabs{display:flex;gap:3px;overflow:auto;border-bottom:1px solid var(--border);margin-bottom:11px}.tab{border:1px solid transparent;border-bottom:0;background:none;color:var(--text-dim);padding:9px 14px;cursor:pointer;font-size:.75rem;border-radius:4px 4px 0 0;white-space:nowrap}.tab.active{border-color:var(--border);background:var(--panel);color:var(--cyan);font-weight:700}.tab .cnt{display:inline-block;min-width:18px;padding:1px 5px;margin-left:4px;border-radius:8px;background:rgba(0,212,255,.12);font-size:.6rem;text-align:center}
+.toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:10px}.toolbar input,.toolbar select{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:3px;font-size:.73rem;outline:none}.toolbar input:focus,.toolbar select:focus{border-color:var(--cyan)}.toolbar .grow{flex:1;min-width:210px}.btn{border:1px solid var(--border);background:transparent;color:var(--text-dim);padding:7px 11px;border-radius:3px;cursor:pointer;font-size:.72rem;white-space:nowrap}.btn:hover{border-color:var(--cyan);color:var(--cyan)}.btn:disabled{opacity:.38;cursor:not-allowed}.btn-primary{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.1)}.btn-green{border-color:rgba(0,255,157,.45);color:var(--green)}.btn-amber{border-color:rgba(255,179,0,.5);color:var(--amber)}.btn-red{border-color:rgba(255,59,59,.5);color:var(--red)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;overflow:hidden}.panel-head{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:.72rem;color:var(--text-hi)}.panel-head strong{color:var(--cyan)}.panel-head .spacer{flex:1}.table-wrap{overflow:auto;max-height:64vh}table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:.72rem}th{position:sticky;top:0;z-index:2;text-align:left;background:var(--surface);color:var(--cyan);font-weight:700;padding:9px 10px;border-bottom:1px solid var(--border)}td{padding:9px 10px;border-bottom:1px solid rgba(12,40,64,.55);vertical-align:middle}tbody tr{cursor:pointer}tbody tr:hover td{background:rgba(0,212,255,.035)}.code{font-family:var(--font-mono);color:var(--text-hi)}.muted{color:var(--text-dim)}.route{max-width:310px;overflow:hidden;text-overflow:ellipsis}.empty{text-align:center;padding:48px 16px;color:var(--text-dim);white-space:normal;line-height:1.8}.pill{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:10px;font-size:.62rem}.pill.draft{color:var(--text-dim)}.pill.pending{color:var(--amber);border-color:rgba(255,179,0,.45)}.pill.approved{color:var(--blue);border-color:rgba(26,127,255,.45)}.pill.assigned{color:var(--purple);border-color:rgba(180,138,255,.5)}.pill.completed{color:var(--green);border-color:rgba(0,255,157,.45)}.pill.returned,.pill.cancelled{color:var(--red);border-color:rgba(255,59,59,.45)}
+.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(1,6,14,.88);padding:22px 12px;overflow:auto;align-items:flex-start;justify-content:center}.modal-bg.show{display:flex}.modal{width:100%;max-width:980px;background:var(--panel);border:1px solid var(--border-hi);border-radius:6px;box-shadow:0 0 46px rgba(0,212,255,.16)}.modal.sm{max-width:760px}.modal-head{display:flex;align-items:center;padding:13px 17px;border-bottom:1px solid var(--border)}.modal-title{font-family:var(--font-head);font-weight:800;color:var(--cyan)}.modal-close{margin-left:auto;border:0;background:none;color:var(--text-dim);font-size:1.15rem;cursor:pointer}.modal-body{padding:15px 17px}.modal-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:13px 17px;border-top:1px solid var(--border)}.modal-foot .msg{font-size:.7rem;color:var(--red);margin-right:auto;min-width:130px}
+.form-section{border:1px solid var(--border);border-radius:4px;margin-bottom:12px;overflow:hidden}.form-section h3{display:flex;align-items:center;gap:7px;background:var(--surface);color:var(--cyan);padding:8px 10px;font-size:.73rem}.form-section h3 .tag{margin-left:auto;color:var(--text-dim);font-size:.62rem;font-weight:400}.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:11px}.field{display:flex;flex-direction:column;gap:4px;min-width:0}.field.wide{grid-column:1/-1}.field.span2{grid-column:span 2}.field label{font-size:.65rem;color:var(--text-dim)}.field label.req::after{content:' *';color:var(--red)}.field input,.field select,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 9px;border-radius:3px;font-size:.75rem;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan)}.field input[readonly],.field input:disabled,.field select:disabled,.field textarea:disabled{opacity:.72;color:var(--text-hi)}.field textarea{min-height:64px;resize:vertical}.check-row{display:flex;align-items:center;gap:8px;min-height:36px;font-size:.74rem}.check-row input{width:17px;height:17px}.computed{color:var(--green)!important;font-family:var(--font-mono);font-size:.9rem!important}.hint{font-size:.63rem;color:var(--text-dim);line-height:1.6}
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:11px}.summary-item{padding:8px 9px;background:rgba(0,212,255,.035);border:1px solid var(--border);border-radius:3px}.summary-item span{display:block;color:var(--text-dim);font-size:.61rem}.summary-item b{display:block;color:var(--text-hi);font-size:.73rem;margin-top:3px;white-space:normal;word-break:break-word}.timeline{padding:12px}.timeline-item{position:relative;padding:0 0 14px 18px;border-left:1px solid var(--border-hi);font-size:.68rem;line-height:1.55}.timeline-item:last-child{padding-bottom:0}.timeline-item::before{content:'';position:absolute;left:-4px;top:3px;width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 7px rgba(0,212,255,.55)}.timeline-item b{color:var(--text-hi)}.timeline-item time{color:var(--text-dim);margin-left:6px}.timeline-item p{color:var(--text-dim);margin-top:2px}
+.vehicle-list{max-height:300px;overflow:auto;border:1px solid var(--border);margin-bottom:12px}.vehicle-list table{font-size:.7rem}.act{border:1px solid var(--border);background:none;color:var(--cyan);padding:4px 7px;border-radius:3px;cursor:pointer}.toast{position:fixed;left:50%;bottom:22px;z-index:400;transform:translate(-50%,90px);background:var(--panel);border:1px solid var(--cyan);color:var(--text-hi);padding:10px 17px;border-radius:4px;font-size:.76rem;transition:transform .25s}.toast.show{transform:translate(-50%,0)}.toast.err{border-color:var(--red)}
+@media(max-width:1000px){.flow{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}.summary-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.content{padding:10px}.hero{align-items:flex-start}.identity{display:none}.flow{grid-template-columns:1fr 1fr}.flow-step{min-height:54px;padding:8px}.flow-step span{display:none}.kpis{gap:6px}.toolbar .grow{flex-basis:100%;order:-1}.form-grid,.summary-grid{grid-template-columns:1fr}.field.span2,.field.wide{grid-column:auto}.modal-bg{padding:7px}.modal{max-height:calc(100vh - 14px);overflow:auto}table{font-size:.68rem}th,td{padding:8px 7px}.hide-mobile{display:none}.route{max-width:180px}}
+</style>
+<link rel="stylesheet" href="light-mode-fix.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="nav-title">公務車派車管理</div>
+  <div class="nav-space"></div>
+  <button class="nav-btn" onclick="loadAll()">重新整理</button>
+</nav>
+
+<main class="content">
+  <section class="hero">
+    <div><h1>公務車派車申請與行車紀錄</h1><p>線上申請、主管核可、車管派車、司機回報及里程自動核算。</p></div>
+    <div class="identity"><b id="roleText">確認登入身分中…</b><span class="dot"></span><span id="syncText">系統連線中</span></div>
+  </section>
+
+  <div class="setup-banner" id="setupBanner"></div>
+
+  <section class="flow" aria-label="派車申請流程">
+    <div class="flow-step" style="--step:var(--cyan)"><div class="flow-no">1</div><div><b>申請人填單</b><span>日期、時間、起訖地點與人數</span></div></div>
+    <div class="flow-step" style="--step:var(--amber)"><div class="flow-no">2</div><div><b>單位主管核可</b><span>同單位主管審核或退回</span></div></div>
+    <div class="flow-step" style="--step:var(--purple)"><div class="flow-no">3</div><div><b>車管人員派車</b><span>指派公務車、車號與司機</span></div></div>
+    <div class="flow-step" style="--step:var(--green)"><div class="flow-no">4</div><div><b>司機行車回報</b><span>實際時間、里程與加油紀錄</span></div></div>
+  </section>
+
+  <section class="kpis">
+    <div class="kpi" style="--k:var(--amber)"><div class="n" id="kApproval">0</div><div class="l">待主管核可</div></div>
+    <div class="kpi" style="--k:var(--blue)"><div class="n" id="kDispatch">0</div><div class="l">待車管派車</div></div>
+    <div class="kpi" style="--k:var(--purple)"><div class="n" id="kToday">0</div><div class="l">今日已派行程</div></div>
+    <div class="kpi" style="--k:var(--green)"><div class="n" id="kDriver">0</div><div class="l">待司機回報</div></div>
+  </section>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="mine" onclick="setTab('mine')">我的申請 <span class="cnt" id="cntMine">0</span></button>
+    <button class="tab" data-tab="todo" onclick="setTab('todo')">待我處理 <span class="cnt" id="cntTodo">0</span></button>
+    <button class="tab" data-tab="all" onclick="setTab('all')">派車總覽 <span class="cnt" id="cntAll">0</span></button>
+  </div>
+
+  <div class="toolbar">
+    <input class="grow" id="search" placeholder="搜尋申請單號、申請人、地點、車號或司機…" oninput="renderTable()">
+    <select id="statusFilter" onchange="renderTable()"><option value="">全部狀態</option></select>
+    <input type="date" id="dateFilter" onchange="renderTable()" title="用車日期">
+    <button class="btn" onclick="clearFilters()">清除篩選</button>
+    <button class="btn btn-amber" id="vehicleBtn" hidden onclick="openVehicleModal()">公務車主檔</button>
+    <button class="btn btn-primary" onclick="openNewRequest()">＋ 新增派車申請</button>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><strong id="tableTitle">我的申請</strong><span id="tableHint">點擊資料列查看完整流程</span><span class="spacer"></span><span id="rowCount">0 筆</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>申請單號</th><th>狀態</th><th>用車日期／時間</th><th>起訖地點</th><th>申請人／單位</th><th class="hide-mobile">人數</th><th>車號／司機</th><th class="hide-mobile">里程</th></tr></thead>
+        <tbody id="requestRows"><tr><td colspan="8" class="empty">讀取中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div class="modal-bg" id="requestModal" role="dialog" aria-modal="true" aria-labelledby="requestModalTitle">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="requestModalTitle">新增派車申請</div><button class="modal-close" onclick="closeModal('requestModal')">✕</button></div>
+    <div class="modal-body" id="requestBody"></div>
+    <div class="modal-foot" id="requestActions"><span class="msg" id="requestMsg"></span></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="vehicleModal" role="dialog" aria-modal="true" aria-labelledby="vehicleModalTitle">
+  <div class="modal sm">
+    <div class="modal-head"><div class="modal-title" id="vehicleModalTitle">公務車主檔</div><button class="modal-close" onclick="closeModal('vehicleModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="vehicle-list" id="vehicleList"></div>
+      <section class="form-section"><h3 id="vehicleFormTitle">新增公務車</h3><div class="form-grid" id="vehicleForm"></div></section>
+    </div>
+    <div class="modal-foot"><span class="msg" id="vehicleMsg"></span><button class="btn" onclick="resetVehicleForm()">清除</button><button class="btn" onclick="closeModal('vehicleModal')">關閉</button><button class="btn btn-primary" onclick="saveVehicle()">儲存公務車</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+const STATUS={draft:'草稿',pending_approval:'待主管核可',returned:'主管退回',approved:'主管已核可',assigned:'已派車',completed:'行車完成',cancelled:'已取消'};
+const STATUS_CLASS={draft:'draft',pending_approval:'pending',returned:'returned',approved:'approved',assigned:'assigned',completed:'completed',cancelled:'cancelled'};
+const ROLE_NAME={reporter:'申請人',duty:'值班人員',dispatcher:'公務車管理人員',technician:'司機／技術人員',unit_supervisor:'單位主管',mgmt_supervisor:'管理主管',sysadmin:'系統管理員'};
+const LEGACY_ROLE={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
+let currentUser=null,currentRole='',tab='mine',currentRequestId=null,vehicleEditId=null,schemaReady=true;
+let state={requests:[],vehicles:[],users:[],logs:[]};
+
+const byId=id=>document.getElementById(id);
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const val=id=>(byId(id)?.value||'').trim();
+const todayISO=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
+const nowLocalInput=()=>{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const p={};parts.forEach(x=>p[x.type]=x.value);return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;};
+const fmtDate=v=>v?String(v).slice(0,10):'—';
+function fmtDateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ').slice(0,16);return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replaceAll('/','-');}
+function toIso(v){return v?new Date(v).toISOString():null;}
+function timeText(v){return v?String(v).slice(0,5):'—';}
+function schemaError(e){return e&&(e.code==='42P01'||e.code==='42703'||/does not exist|schema cache|could not find/i.test(e.message||''));}
+function toast(msg,err=false){const t=byId('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.className='toast',2600);}
+function openModal(id){byId(id).classList.add('show');}
+function closeModal(id){byId(id).classList.remove('show');}
+function statusPill(s){return `<span class="pill ${STATUS_CLASS[s]||'draft'}">${esc(STATUS[s]||s||'—')}</span>`;}
+function normalizeDept(v){return String(v||'').replace(/\s+/g,'').replace('／','/');}
+function sameDepartment(request){return normalizeDept(request.applicant_department)===normalizeDept(currentUser?.department);}
+function isAdmin(){return currentRole==='sysadmin';}
+function isSupervisor(){return currentRole==='unit_supervisor'||currentRole==='mgmt_supervisor'||isAdmin();}
+function isManager(){return currentRole==='dispatcher'||isAdmin();}
+function isApplicant(r){return r?.applicant_id===currentUser?.user_id;}
+function isDriver(r){return r?.driver_id===currentUser?.user_id||isAdmin();}
+function canSee(r){return isAdmin()||isManager()||isApplicant(r)||r.driver_id===currentUser?.user_id||(isSupervisor()&&sameDepartment(r));}
+function canApprove(r){return r.status==='pending_approval'&&isSupervisor()&&(sameDepartment(r)||isAdmin());}
+function canDispatch(r){return r.status==='approved'&&isManager();}
+function canDrive(r){return r.status==='assigned'&&isDriver(r);}
+function canEditApplication(r){return isApplicant(r)&&['draft','returned'].includes(r.status);}
+
+async function init(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html?redirect='+encodeURIComponent('vehicle-dispatch.html');return;}
+  if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
+    const allowed=await window.SystemAccess.enforce('vehicle');if(!allowed)return;
+  }
+  const {data:user,error}=await db.from('users').select('*').eq('auth_id',session.user.id).eq('status','active').maybeSingle();
+  if(error||!user){showFatal('找不到登入者的人員資料，請先由管理員完成帳號與人員綁定。');return;}
+  currentUser=user;currentRole=user.rbac_role||LEGACY_ROLE[user.role]||'reporter';
+  byId('roleText').textContent=`${user.department||'未設定單位'}｜${user.name}｜${ROLE_NAME[currentRole]||currentRole}`;
+  byId('vehicleBtn').hidden=!isManager();
+  buildStatusFilter();
+  await loadAll();
+  db.channel('vehicle-dispatch-live').on('postgres_changes',{event:'*',schema:'public',table:'vehicle_dispatch_requests'},()=>loadAll(true)).subscribe();
+}
+
+function showFatal(message){schemaReady=false;const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML=esc(message);byId('requestRows').innerHTML=`<tr><td colspan="8" class="empty">${esc(message)}</td></tr>`;}
+function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML='公務車資料表尚未建立。請由管理員在 Supabase SQL Editor 執行 <code>system/sql/vehicle_dispatch.sql</code> 後重新整理。';}
+
+async function loadAll(silent=false){
+  if(!currentUser)return;
+  if(!silent)byId('syncText').textContent='讀取資料中…';
+  const [requests,vehicles,users,logs]=await Promise.all([
+    db.from('vehicle_dispatch_requests').select('*').order('created_at',{ascending:false}).limit(3000),
+    db.from('official_vehicles').select('*').order('plate_no').limit(500),
+    db.from('users').select('user_id,name,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
+    db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000)
+  ]);
+  const firstError=[requests,vehicles,users,logs].find(x=>x.error)?.error;
+  if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
+  schemaReady=true;byId('setupBanner').className='setup-banner';
+  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[]};
+  updateDashboard();renderTable();
+  byId('syncText').textContent=`最後更新 ${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`;
+}
+
+function buildStatusFilter(){byId('statusFilter').innerHTML='<option value="">全部狀態</option>'+Object.entries(STATUS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');}
+function visibleRequests(){return state.requests.filter(canSee);}
+function todoRequests(){return visibleRequests().filter(r=>canApprove(r)||canDispatch(r)||canDrive(r));}
+function updateDashboard(){
+  const visible=visibleRequests(),today=todayISO();
+  byId('kApproval').textContent=visible.filter(r=>r.status==='pending_approval').length;
+  byId('kDispatch').textContent=visible.filter(r=>r.status==='approved').length;
+  byId('kToday').textContent=visible.filter(r=>r.trip_date===today&&r.status==='assigned').length;
+  byId('kDriver').textContent=visible.filter(r=>r.status==='assigned').length;
+  byId('cntMine').textContent=state.requests.filter(isApplicant).length;
+  byId('cntTodo').textContent=todoRequests().length;
+  byId('cntAll').textContent=visible.length;
+}
+
+function setTab(next){tab=next;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));renderTable();}
+function clearFilters(){byId('search').value='';byId('statusFilter').value='';byId('dateFilter').value='';renderTable();}
+function rowsForTab(){if(tab==='mine')return state.requests.filter(isApplicant);if(tab==='todo')return todoRequests();return visibleRequests();}
+function renderTable(){
+  if(!schemaReady)return;
+  const q=val('search').toLowerCase(),status=val('statusFilter'),date=val('dateFilter');
+  let rows=rowsForTab().filter(r=>!status||r.status===status).filter(r=>!date||r.trip_date===date);
+  if(q)rows=rows.filter(r=>[r.request_no,r.applicant_name,r.applicant_department,r.origin_location,r.destination_location,r.trip_purpose,r.plate_no,r.driver_name].some(v=>String(v||'').toLowerCase().includes(q)));
+  byId('tableTitle').textContent=tab==='mine'?'我的申請':tab==='todo'?'待我處理':'派車總覽';byId('rowCount').textContent=`${rows.length} 筆`;
+  byId('requestRows').innerHTML=rows.length?rows.map(r=>`<tr onclick="openRequest('${r.request_id}')"><td class="code">${esc(r.request_no||'—')}</td><td>${statusPill(r.status)}</td><td>${esc(fmtDate(r.trip_date))}<br><span class="muted">${esc(timeText(r.planned_departure_time))}–${esc(timeText(r.planned_return_time))}</span></td><td class="route" title="${esc(r.origin_location)} → ${esc(r.destination_location)}">${esc(r.origin_location)} → ${esc(r.destination_location)}</td><td>${esc(r.applicant_name)}<br><span class="muted">${esc(r.applicant_department||'—')}</span></td><td class="hide-mobile">${esc(r.passenger_count)} 人</td><td>${esc(r.plate_no||'待派')}<br><span class="muted">${esc(r.driver_name||'—')}</span></td><td class="hide-mobile">${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">目前沒有符合條件的派車申請。</td></tr>';
+}
+
+function applicationFields(r={},editable=true){
+  const disabled=editable?'':' disabled',tripMin=editable?' min="'+todayISO()+'"':'';
+  return `<section class="form-section"><h3>申請資料 <span class="tag">${r.request_no?esc(r.request_no):'尚未產生單號'}</span></h3><div class="form-grid">
+    <div class="field"><label>申請日期</label><input id="fApplicationDate" value="${esc(r.application_date||todayISO())}" readonly></div>
+    <div class="field"><label>申請人</label><input value="${esc(r.applicant_name||currentUser.name)}" readonly></div>
+    <div class="field"><label>申請單位</label><input value="${esc(r.applicant_department||currentUser.department||'')}" readonly></div>
+    <div class="field"><label class="req">用車日期</label><input type="date" id="fTripDate" value="${esc(r.trip_date||'')}"${tripMin}${disabled}></div>
+    <div class="field"><label class="req">預計出發時間</label><input type="time" id="fDepartureTime" value="${esc(timeText(r.planned_departure_time)==='—'?'':timeText(r.planned_departure_time))}"${disabled}></div>
+    <div class="field"><label class="req">預計回程時間</label><input type="time" id="fReturnTime" value="${esc(timeText(r.planned_return_time)==='—'?'':timeText(r.planned_return_time))}"${disabled}></div>
+    <div class="field"><label class="req">起點</label><input id="fOrigin" value="${esc(r.origin_location||'第一果菜市場')}" placeholder="例：第一果菜市場"${disabled}></div>
+    <div class="field"><label class="req">迄點</label><input id="fDestination" value="${esc(r.destination_location||'')}" placeholder="例：臺北市政府"${disabled}></div>
+    <div class="field"><label class="req">預計乘車人數</label><input type="number" min="1" id="fPassengers" value="${esc(r.passenger_count||1)}"${disabled}></div>
+    <div class="field wide"><label class="req">用車事由</label><input id="fPurpose" value="${esc(r.trip_purpose||'')}" placeholder="請說明公務行程用途"${disabled}></div>
+    <div class="field wide"><label>申請備註</label><textarea id="fApplicantNote"${disabled}>${esc(r.applicant_note||'')}</textarea></div>
+  </div></section>`;
+}
+
+function assignmentSummary(r){return `<section class="form-section"><h3>核可與派車資訊</h3><div class="summary-grid">
+  <div class="summary-item"><span>主管核可</span><b>${esc(r.supervisor_name||'—')}<br>${esc(fmtDateTime(r.approved_at))}</b></div>
+  <div class="summary-item"><span>公務車／車號</span><b>${esc(vehicleLabel(r.vehicle_id,r.plate_no))}</b></div>
+  <div class="summary-item"><span>駕駛</span><b>${esc(r.driver_name||'—')}</b></div>
+  <div class="summary-item"><span>派車時間</span><b>${esc(fmtDateTime(r.dispatched_at))}</b></div>
+  </div>${r.supervisor_note||r.dispatch_note?`<div class="summary-grid"><div class="summary-item" style="grid-column:span 2"><span>主管意見</span><b>${esc(r.supervisor_note||'—')}</b></div><div class="summary-item" style="grid-column:span 2"><span>派車備註</span><b>${esc(r.dispatch_note||'—')}</b></div></div>`:''}</section>`;}
+
+function approvalForm(r){return `<section class="form-section"><h3>單位主管核可</h3><div class="form-grid"><div class="field wide"><label>核可意見／退回原因</label><textarea id="fSupervisorNote" placeholder="核可可留白；退回時請填寫原因">${esc(r.supervisor_note||'')}</textarea></div></div></section>`;}
+function dispatchForm(r){
+  const active=state.vehicles.filter(v=>v.status==='active'||v.vehicle_id===r.vehicle_id);
+  return `<section class="form-section"><h3>公務車管理人員派車</h3><div class="form-grid">
+    <div class="field span2"><label class="req">公務車／車號</label><select id="fVehicle"><option value="">請選擇公務車</option>${active.map(v=>`<option value="${v.vehicle_id}" ${v.vehicle_id===r.vehicle_id?'selected':''}>${esc(v.plate_no)}｜${esc(v.vehicle_name||v.brand||'公務車')}｜${esc(v.seats)} 人座｜里程 ${esc(v.current_odometer)} km</option>`).join('')}</select></div>
+    <div class="field"><label class="req">司機</label><select id="fDriver"><option value="">請選擇司機</option>${state.users.map(u=>`<option value="${u.user_id}" ${u.user_id===r.driver_id?'selected':''}>${esc(u.name)}｜${esc(u.department||'—')}${(u.rbac_role||LEGACY_ROLE[u.role])==='technician'?'｜司機':''}</option>`).join('')}</select></div>
+    <div class="field wide"><label>派車備註</label><textarea id="fDispatchNote" placeholder="集合位置、聯絡事項或其他說明">${esc(r.dispatch_note||'')}</textarea></div>
+  </div></section>`;
+}
+function driverForm(r){
+  const start=r.odometer_start==null?(state.vehicles.find(v=>v.vehicle_id===r.vehicle_id)?.current_odometer||''):r.odometer_start;
+  return `<section class="form-section"><h3>司機行車回報 <span class="tag">系統自動核算里程</span></h3><div class="form-grid">
+    <div class="field"><label class="req">實際乘車人數</label><input type="number" min="0" id="fActualPassengers" value="${esc(r.actual_passenger_count??r.passenger_count??'')}"></div>
+    <div class="field"><label class="req">實際出發時間</label><input type="datetime-local" id="fActualDeparture" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
+    <div class="field"><label class="req">實際回程時間</label><input type="datetime-local" id="fActualReturn" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
+    <div class="field"><label class="req">汽車起始里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerStart" value="${esc(start)}" oninput="updateMileage()"></div>
+    <div class="field"><label class="req">汽車回程里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerEnd" value="${esc(r.odometer_end??'')}" oninput="updateMileage()"></div>
+    <div class="field"><label>本次行駛里程</label><input class="computed" id="fTotalMileage" value="${r.total_mileage==null?'—':esc(Number(r.total_mileage).toFixed(1))+' km'}" readonly></div>
+    <div class="field"><label>是否加油</label><div class="check-row"><input type="checkbox" id="fRefueled" ${r.refueled?'checked':''} onchange="toggleRefuel()"><span>本次行程有加油</span></div></div>
+    <div class="field"><label id="refuelLabel">加油時里程（km）</label><input type="number" min="0" step="0.1" id="fRefuelOdometer" value="${esc(r.refuel_odometer??'')}" ${r.refueled?'':'disabled'}></div>
+    <div class="field"></div>
+    <div class="field wide"><label>司機備註</label><textarea id="fDriverNote" placeholder="車況、加油或行程異常說明">${esc(r.driver_note||'')}</textarea></div>
+  </div></section>`;
+}
+function localDateTimeValue(v){if(!v)return '';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).slice(0,16);const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);const p={};parts.forEach(x=>p[x.type]=x.value);return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;}
+function vehicleLabel(id,plate){const v=state.vehicles.find(x=>x.vehicle_id===id);return v?`${v.plate_no}｜${v.vehicle_name||v.brand||'公務車'}`:(plate||'—');}
+function timeline(r){
+  const logs=state.logs.filter(x=>x.request_id===r.request_id);
+  return `<section class="form-section"><h3>流程歷程</h3><div class="timeline">${logs.length?logs.map(x=>`<div class="timeline-item"><b>${esc(x.action)}</b><time>${esc(fmtDateTime(x.created_at))}</time><div>${esc(x.operator_name||'系統')}｜${esc(STATUS[x.to_status]||x.to_status)}</div>${x.note?`<p>${esc(x.note)}</p>`:''}</div>`).join(''):'<div class="hint">尚無歷程紀錄</div>'}</div></section>`;
+}
+
+function openNewRequest(){
+  if(!schemaReady){toast('請先建立公務車資料表',true);return;}
+  currentRequestId=null;byId('requestModalTitle').textContent='新增派車申請';byId('requestBody').innerHTML=applicationFields({},true);
+  byId('requestActions').innerHTML='<span class="msg" id="requestMsg"></span><button class="btn" onclick="closeModal(\'requestModal\')">取消</button><button class="btn" onclick="saveApplication(false)">儲存草稿</button><button class="btn btn-primary" onclick="saveApplication(true)">送出主管核可</button>';
+  openModal('requestModal');
+}
+
+function openRequest(id){
+  const r=state.requests.find(x=>x.request_id===id);if(!r||!canSee(r))return;
+  currentRequestId=id;const editable=canEditApplication(r);
+  let html=applicationFields(r,editable);
+  if(['approved','assigned','completed'].includes(r.status))html+=assignmentSummary(r);
+  if(canApprove(r))html+=approvalForm(r);
+  if(canDispatch(r))html+=dispatchForm(r);
+  if(canDrive(r))html+=driverForm(r);
+  if(r.status==='completed')html+=completedSummary(r);
+  html+=timeline(r);byId('requestBody').innerHTML=html;
+  byId('requestModalTitle').innerHTML=`${esc(r.request_no)}　${statusPill(r.status)}`;
+  const actions=['<span class="msg" id="requestMsg"></span>','<button class="btn" onclick="closeModal(\'requestModal\')">關閉</button>'];
+  if(editable){actions.push('<button class="btn" onclick="saveApplication(false)">儲存草稿</button>','<button class="btn btn-primary" onclick="saveApplication(true)">重新送出核可</button>');}
+  if(canApprove(r)){actions.push('<button class="btn btn-red" onclick="reviewRequest(false)">退回申請人</button>','<button class="btn btn-green" onclick="reviewRequest(true)">主管核可</button>');}
+  if(canDispatch(r)){actions.push('<button class="btn btn-primary" onclick="dispatchRequest()">確認派車</button>');}
+  if(canDrive(r)){actions.push('<button class="btn btn-green" onclick="completeTrip()">完成行車回報</button>');}
+  if((isApplicant(r)&&['draft','returned','pending_approval'].includes(r.status))||(isAdmin()&&!['completed','cancelled'].includes(r.status)))actions.push('<button class="btn btn-red" onclick="cancelRequest()">取消申請</button>');
+  byId('requestActions').innerHTML=actions.join('');openModal('requestModal');if(canDrive(r)){toggleRefuel();updateMileage();}
+}
+
+function completedSummary(r){return `<section class="form-section"><h3>行車完成紀錄</h3><div class="summary-grid">
+  <div class="summary-item"><span>實際乘車人數</span><b>${esc(r.actual_passenger_count??'—')} 人</b></div><div class="summary-item"><span>實際出發／回程</span><b>${esc(fmtDateTime(r.actual_departure_at))}<br>${esc(fmtDateTime(r.actual_return_at))}</b></div><div class="summary-item"><span>起始／回程里程</span><b>${esc(r.odometer_start)} → ${esc(r.odometer_end)} km</b></div><div class="summary-item"><span>本次里程</span><b>${esc(Number(r.total_mileage||0).toFixed(1))} km</b></div>
+  <div class="summary-item"><span>是否加油</span><b>${r.refueled?'是｜'+esc(r.refuel_odometer)+' km':'否'}</b></div><div class="summary-item" style="grid-column:span 3"><span>司機備註</span><b>${esc(r.driver_note||'—')}</b></div></div></section>`;}
+
+function applicationPayload(){
+  const payload={application_date:val('fApplicationDate')||todayISO(),trip_date:val('fTripDate'),planned_departure_time:val('fDepartureTime'),planned_return_time:val('fReturnTime'),origin_location:val('fOrigin'),destination_location:val('fDestination'),passenger_count:Number(val('fPassengers')),trip_purpose:val('fPurpose'),applicant_note:val('fApplicantNote')||null};
+  if(!payload.trip_date||!payload.planned_departure_time||!payload.planned_return_time||!payload.origin_location||!payload.destination_location||!payload.trip_purpose||!Number.isInteger(payload.passenger_count)||payload.passenger_count<1)throw new Error('請完整填寫所有必填欄位');
+  if(payload.planned_return_time<=payload.planned_departure_time)throw new Error('預計回程時間必須晚於出發時間');
+  return payload;
+}
+function setMsg(message){const el=byId('requestMsg');if(el)el.textContent=message||'';}
+async function saveApplication(submit){
+  try{
+    const payload=applicationPayload(),next=submit?'pending_approval':'draft';payload.status=next;
+    let result,from=null;
+    if(currentRequestId){const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canEditApplication(r))throw new Error('此申請單目前不可修改');from=r.status;result=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',currentRequestId).in('status',['draft','returned']).select().single();}
+    else{payload.applicant_id=currentUser.user_id;payload.applicant_name=currentUser.name;payload.applicant_department=currentUser.department||null;result=await db.from('vehicle_dispatch_requests').insert(payload).select().single();}
+    if(result.error)throw result.error;currentRequestId=result.data.request_id;
+    await addLog(result.data.request_id,from,next,submit?'送出主管核可':'儲存申請草稿',submit?'申請人已完成填寫並送出':'');
+    closeModal('requestModal');await loadAll();toast(submit?'已送出單位主管核可':'草稿已儲存');
+  }catch(e){setMsg(e.message||'儲存失敗');}
+}
+
+async function reviewRequest(approve){
+  const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canApprove(r))return;
+  const note=val('fSupervisorNote');if(!approve&&!note){setMsg('退回時請填寫原因');return;}
+  const next=approve?'approved':'returned',payload={status:next,supervisor_id:currentUser.user_id,supervisor_name:currentUser.name,supervisor_note:note||null,approved_at:approve?new Date().toISOString():null};
+  const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','pending_approval').select().maybeSingle();
+  if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
+  await addLog(r.request_id,r.status,next,approve?'單位主管核可':'單位主管退回',note);closeModal('requestModal');await loadAll();toast(approve?'已核可並送交公務車管理人員':'已退回申請人');
+}
+
+async function dispatchRequest(){
+  const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canDispatch(r))return;
+  const vehicle=state.vehicles.find(x=>x.vehicle_id===val('fVehicle')),driver=state.users.find(x=>x.user_id===val('fDriver'));
+  if(!vehicle||!driver){setMsg('請選擇公務車及司機');return;}
+  const payload={status:'assigned',vehicle_manager_id:currentUser.user_id,vehicle_manager_name:currentUser.name,vehicle_id:vehicle.vehicle_id,plate_no:vehicle.plate_no,driver_id:driver.user_id,driver_name:driver.name,dispatch_note:val('fDispatchNote')||null,dispatched_at:new Date().toISOString()};
+  const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','approved').select().maybeSingle();
+  if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
+  await addLog(r.request_id,r.status,'assigned','公務車管理人員完成派車',`${vehicle.plate_no}｜司機 ${driver.name}${payload.dispatch_note?'｜'+payload.dispatch_note:''}`);closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
+}
+
+function toggleRefuel(){const checked=byId('fRefueled')?.checked,input=byId('fRefuelOdometer');if(input){input.disabled=!checked;if(!checked)input.value='';}}
+function updateMileage(){const start=Number(val('fOdometerStart')),end=Number(val('fOdometerEnd')),el=byId('fTotalMileage');if(!el)return;el.value=Number.isFinite(start)&&Number.isFinite(end)&&end>=start?`${(end-start).toFixed(1)} km`:'—';}
+async function completeTrip(){
+  const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canDrive(r))return;
+  const passengers=Number(val('fActualPassengers')),departure=val('fActualDeparture'),returned=val('fActualReturn'),start=Number(val('fOdometerStart')),end=Number(val('fOdometerEnd')),refueled=byId('fRefueled').checked,refuel=refueled?Number(val('fRefuelOdometer')):null;
+  if(!Number.isInteger(passengers)||passengers<0||!departure||!returned||!Number.isFinite(start)||!Number.isFinite(end)){setMsg('請完整填寫實際人數、時間及里程');return;}
+  if(new Date(returned)<new Date(departure)){setMsg('實際回程時間不得早於出發時間');return;}
+  if(end<start){setMsg('汽車回程里程不得小於起始里程');return;}
+  if(refueled&&(!Number.isFinite(refuel)||refuel<start||refuel>end)){setMsg('加油里程必須介於起始與回程里程之間');return;}
+  const payload={status:'completed',actual_passenger_count:passengers,actual_departure_at:toIso(departure),actual_return_at:toIso(returned),odometer_start:start,odometer_end:end,refueled,refuel_odometer:refueled?refuel:null,driver_note:val('fDriverNote')||null,completed_at:new Date().toISOString()};
+  const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','assigned').select().maybeSingle();
+  if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
+  const vehicle=state.vehicles.find(v=>v.vehicle_id===r.vehicle_id);if(vehicle&&end>Number(vehicle.current_odometer||0))await db.from('official_vehicles').update({current_odometer:end}).eq('vehicle_id',vehicle.vehicle_id);
+  await addLog(r.request_id,r.status,'completed','司機完成行車回報',`實際 ${passengers} 人｜${(end-start).toFixed(1)} km${refueled?'｜有加油':''}`);closeModal('requestModal');await loadAll();toast('行車回報完成，里程已自動核算');
+}
+
+async function cancelRequest(){
+  const r=state.requests.find(x=>x.request_id===currentRequestId);if(!r)return;const reason=prompt('請輸入取消原因：');if(reason===null)return;if(!reason.trim()){setMsg('請填寫取消原因');return;}
+  const {data,error}=await db.from('vehicle_dispatch_requests').update({status:'cancelled',cancel_reason:reason.trim(),cancelled_at:new Date().toISOString()}).eq('request_id',r.request_id).eq('status',r.status).select().maybeSingle();
+  if(error||!data){setMsg(error?.message||'取消失敗，請重新整理');return;}await addLog(r.request_id,r.status,'cancelled','取消派車申請',reason.trim());closeModal('requestModal');await loadAll();toast('申請已取消');
+}
+async function addLog(requestId,fromStatus,toStatus,action,note){const {error}=await db.from('vehicle_dispatch_logs').insert({request_id:requestId,from_status:fromStatus,to_status:toStatus,action,note:note||null,operator_id:currentUser.user_id,operator_name:currentUser.name});if(error)console.warn('vehicle_dispatch_logs',error);}
+
+function openVehicleModal(){if(!isManager())return;renderVehicleList();resetVehicleForm();openModal('vehicleModal');}
+function renderVehicleList(){byId('vehicleList').innerHTML=state.vehicles.length?`<table><thead><tr><th>車號</th><th>名稱</th><th>座位</th><th>目前里程</th><th>狀態</th><th></th></tr></thead><tbody>${state.vehicles.map(v=>`<tr><td class="code">${esc(v.plate_no)}</td><td>${esc(v.vehicle_name||v.brand||'—')}</td><td>${esc(v.seats)}</td><td>${esc(v.current_odometer)} km</td><td>${esc(v.status==='active'?'可派車':v.status==='maintenance'?'保養中':'停用')}</td><td><button class="act" onclick="event.stopPropagation();editVehicle('${v.vehicle_id}')">編輯</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">尚未建立公務車，請在下方新增。</div>';}
+function vehicleFormHtml(v={}){return `<div class="field"><label class="req">車牌號碼</label><input id="vPlate" value="${esc(v.plate_no||'')}" placeholder="例：ABC-1234"></div><div class="field"><label>車輛名稱</label><input id="vName" value="${esc(v.vehicle_name||'')}" placeholder="例：五人座轎車"></div><div class="field"><label class="req">座位數</label><input type="number" min="1" id="vSeats" value="${esc(v.seats||5)}"></div><div class="field"><label>廠牌</label><input id="vBrand" value="${esc(v.brand||'')}"></div><div class="field"><label>型號</label><input id="vModel" value="${esc(v.model||'')}"></div><div class="field"><label class="req">目前里程（km）</label><input type="number" min="0" step="0.1" id="vOdometer" value="${esc(v.current_odometer??0)}"></div><div class="field"><label>狀態</label><select id="vStatus"><option value="active" ${v.status==='active'||!v.status?'selected':''}>可派車</option><option value="maintenance" ${v.status==='maintenance'?'selected':''}>保養中</option><option value="inactive" ${v.status==='inactive'?'selected':''}>停用</option></select></div><div class="field span2"><label>備註</label><input id="vNote" value="${esc(v.note||'')}"></div>`;}
+function resetVehicleForm(){vehicleEditId=null;byId('vehicleFormTitle').textContent='新增公務車';byId('vehicleForm').innerHTML=vehicleFormHtml();byId('vehicleMsg').textContent='';}
+function editVehicle(id){const v=state.vehicles.find(x=>x.vehicle_id===id);if(!v)return;vehicleEditId=id;byId('vehicleFormTitle').textContent='編輯公務車';byId('vehicleForm').innerHTML=vehicleFormHtml(v);}
+async function saveVehicle(){
+  if(!isManager())return;const plate=val('vPlate').toUpperCase(),seats=Number(val('vSeats')),odometer=Number(val('vOdometer'));if(!plate||!Number.isInteger(seats)||seats<1||!Number.isFinite(odometer)||odometer<0){byId('vehicleMsg').textContent='請正確填寫車牌、座位數及目前里程';return;}
+  const payload={plate_no:plate,vehicle_name:val('vName')||null,brand:val('vBrand')||null,model:val('vModel')||null,seats,current_odometer:odometer,status:val('vStatus'),note:val('vNote')||null};if(!vehicleEditId)payload.created_by=currentUser.user_id;
+  const result=vehicleEditId?await db.from('official_vehicles').update(payload).eq('vehicle_id',vehicleEditId):await db.from('official_vehicles').insert(payload);if(result.error){byId('vehicleMsg').textContent=result.error.code==='23505'?'此車牌已存在':result.error.message;return;}await loadAll(true);renderVehicleList();resetVehicleForm();toast('公務車資料已儲存');
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-bg.show').forEach(x=>x.classList.remove('show'));});
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
+init();
+</script>
+</body>
+</html>

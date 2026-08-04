@@ -59,7 +59,7 @@
     location.replace('index.html?denied='+encodeURIComponent(systemKey));
     return false;
   }
-  var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap'];
+  var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap','vehicle'];
   window.SystemAccess={
     ALL_SYSTEM_KEYS:ALL_SYSTEM_KEYS,
     // 回傳 Promise<Set<string>|null>；null 代表 sysadmin，視為全部允許。
@@ -85,7 +85,7 @@
           .catch(function(){return new Set();});
       });
     },
-    // systemKey: 'admin' / 'workorder' / 'guardpatrol' / 'handover' / 'equipment' / 'structuremap'
+    // systemKey: 'admin' / 'workorder' / 'guardpatrol' / 'handover' / 'equipment' / 'structuremap' / 'vehicle'
     // 回傳 Promise<boolean>；false 時已經處理好導頁，呼叫端只需 `if(!(await SystemAccess.enforce('admin')))return;`
     enforce:function(systemKey){
       return resolveCurrentProfileForAccess().then(function(profile){
