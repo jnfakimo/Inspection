@@ -234,7 +234,7 @@
     var meta=document.createElement('div');
     meta.className='system-meta-unified';
     meta.setAttribute('data-system-meta','');
-    meta.innerHTML='<span class="system-user-unified" data-system-user>尚未登入</span><span class="system-connectivity-unified"><span class="system-dot" aria-hidden="true"></span><span class="system-connectivity-label">系統連線中</span></span><span class="system-clock-unified" data-system-clock>----</span><button type="button" class="system-changepw-unified" data-system-changepw style="display:none">改密碼</button><button type="button" class="system-logout-unified" data-system-logout style="display:none">登出</button>';
+    meta.innerHTML='<span class="system-user-unified" data-system-user>尚未登入</span><span class="system-connectivity-unified"><span class="system-dot" aria-hidden="true"></span><span class="system-connectivity-label">系統連線中</span></span><span class="system-clock-unified" data-system-clock>----</span><button type="button" class="system-changepw-unified" data-system-changepw style="display:none">更改密碼</button><button type="button" class="system-logout-unified" data-system-logout style="display:none">登出</button>';
     var userMeta=meta.querySelector('[data-system-user]');
     var clock=meta.querySelector('[data-system-clock]');
     var label=meta.querySelector('.system-connectivity-label');
