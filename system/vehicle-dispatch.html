@@ -8,7 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -334,14 +334,70 @@ function openReportModal(){
   renderVehicleReport();openModal('reportModal');
 }
 function vehicleReportRecord(r){return {'用車日期':fmtDate(r.trip_date),'預計出發':timeText(r.planned_departure_time),'預計回程':timeText(r.planned_return_time),'申請單號':r.request_no||'','狀態':STATUS[r.status]||r.status,'申請單位':r.applicant_department||'','申請人':r.applicant_name||'','聯絡電話':r.applicant_phone||'','起點':r.origin_location||'','迄點':r.destination_location||'','用車事由':r.trip_purpose||'','預計人數':r.passenger_count??'','主管':r.supervisor_name||'','核可時間':fmtDateTime(r.approved_at),'車號':r.plate_no||'','司機':r.driver_name||'','司機接單時間':fmtDateTime(r.driver_accepted_at),'實際人數':r.actual_passenger_count??'','實際出發':fmtDateTime(r.actual_departure_at),'實際回程':fmtDateTime(r.actual_return_at),'起始里程':r.odometer_start??'','回程里程':r.odometer_end??'','行駛里程':r.total_mileage??'','是否加油':r.refueled?'是':'否','上次加油公里':r.last_refuel_odometer??'','上次加油費用':r.last_refuel_cost??'','本次加油公里':r.refuel_odometer??'','本次加油費用':r.refuel_cost??'','異常通報':r.has_abnormality?'有':'無','異常內容':r.abnormality_note||'','申請備註':r.applicant_note||'','派車備註':r.dispatch_note||'','司機備註':r.driver_note||'','附件張數':attachmentsFor(r.request_id).length};}
+const REPORT_XLSX_COL_WIDTHS=[12,10,10,19,12,22,12,16,18,18,30,11,12,18,12,12,19,11,18,18,12,12,12,10,14,14,14,14,10,28,28,28,28,10];
+const REPORT_XLSX_COL_ALIGN=['center','center','center','center','center','left','center','center','left','left','left','right','center','center','center','center','center','right','center','center','right','right','right','center','right','right','right','right','center','left','left','left','left','right'];
+function reportXlsxBorder(color='D5E2EF'){return {top:{style:'thin',color:{rgb:color}},bottom:{style:'thin',color:{rgb:color}},left:{style:'thin',color:{rgb:color}},right:{style:'thin',color:{rgb:color}}};}
+function reportXlsxStyleSheet(sheet,rowCount,colCount){
+  const lastCol=XLSX.utils.encode_col(colCount-1),lastRow=6+rowCount,bodyBorder=reportXlsxBorder('D7E3EF');
+  const titleStyle={font:{name:'Microsoft JhengHei',sz:18,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'0959A8'}},alignment:{horizontal:'center',vertical:'center'}};
+  const subtitleStyle={font:{name:'Microsoft JhengHei',sz:16,bold:true,color:{rgb:'0959A8'}},fill:{patternType:'solid',fgColor:{rgb:'E6F8FC'}},alignment:{horizontal:'center',vertical:'center'}};
+  const metaStyle={font:{name:'Microsoft JhengHei',sz:10,color:{rgb:'475569'}},alignment:{horizontal:'left',vertical:'center'}};
+  const headerStyle={font:{name:'Microsoft JhengHei',sz:10,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'0959A8'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:reportXlsxBorder('FFFFFF')};
+  for(let col=0;col<colCount;col++){
+    [[0,titleStyle],[1,subtitleStyle]].forEach(([row,style])=>{const ref=XLSX.utils.encode_cell({r:row,c:col});sheet[ref]=sheet[ref]||{t:'s',v:''};sheet[ref].s=style;});
+    const header=sheet[XLSX.utils.encode_cell({r:5,c:col})];if(header)header.s=headerStyle;
+    for(let row=6;row<lastRow;row++){
+      const cell=sheet[XLSX.utils.encode_cell({r:row,c:col})];if(!cell)continue;
+      cell.s={font:{name:'Microsoft JhengHei',sz:9,color:{rgb:'1E293B'}},fill:{patternType:'solid',fgColor:{rgb:row%2?'F5FAFD':'FFFFFF'}},alignment:{horizontal:REPORT_XLSX_COL_ALIGN[col]||'left',vertical:'top',wrapText:col>=5},border:bodyBorder};
+      if([11,17,20,21,22,24,26,33].includes(col))cell.s.numFmt='#,##0';
+      if([25,27].includes(col))cell.s.numFmt='#,##0';
+      if(col===4&&cell.v==='已完成'){cell.s.fill={patternType:'solid',fgColor:{rgb:'DCFCE7'}};cell.s.font={name:'Microsoft JhengHei',sz:9,bold:true,color:{rgb:'166534'}};}
+      if(col===28&&cell.v==='有'){cell.s.fill={patternType:'solid',fgColor:{rgb:'FEE2E2'}};cell.s.font={name:'Microsoft JhengHei',sz:9,bold:true,color:{rgb:'B91C1C'}};}
+    }
+  }
+  ['A3','A4'].forEach(ref=>{if(sheet[ref])sheet[ref].s=metaStyle;});
+  sheet['!merges']=[1,2,3,4].map(row=>XLSX.utils.decode_range(`A${row}:${lastCol}${row}`));
+  sheet['!cols']=REPORT_XLSX_COL_WIDTHS.map(wch=>({wch}));
+  sheet['!rows']=[{hpt:30},{hpt:26},{hpt:20},{hpt:20},{hpt:8},{hpt:32},...Array.from({length:rowCount},()=>({hpt:30}))];
+  sheet['!autofilter']={ref:`A6:${lastCol}${lastRow}`};
+  sheet['!margins']={left:.25,right:.25,top:.5,bottom:.5,header:.2,footer:.2};
+}
+function reportXlsxSummarySheet(sheet,from,to,m,rows,exportedAt){
+  const statusCounts=Object.entries(STATUS).map(([key,label])=>[label,rows.filter(r=>r.status===key).length]).filter(([,count])=>count);
+  const lastStatusRow=10+Math.max(statusCounts.length,1),border=reportXlsxBorder('CBD5E1');
+  sheet['!merges']=[XLSX.utils.decode_range('A1:H1'),XLSX.utils.decode_range('A2:H2'),XLSX.utils.decode_range('A3:H3'),XLSX.utils.decode_range('A8:C8')];
+  sheet['A1']={v:'臺北農產運銷股份有限公司',t:'s'};sheet['A2']={v:'派車報表',t:'s'};sheet['A3']={v:`報表期間：${from} 至 ${to}`,t:'s'};
+  XLSX.utils.sheet_add_aoa(sheet,[['申請單數','乘車人次','完成里程 (km)','加油費用 (元)','異常通報 (件)','產出人','產出時間','資料範圍'],[m.count,m.passengers,Number(m.mileage.toFixed(1)),m.fuel,m.abnormal,currentUser.name,exportedAt,`${from} 至 ${to}`]],{origin:'A5'});
+  XLSX.utils.sheet_add_aoa(sheet,[['狀態分布'],['狀態','件數','占全部申請比例'],...(statusCounts.length?statusCounts.map(([label,count])=>[label,count,m.count?count/m.count:0]):[['無資料',0,0]])],{origin:'A8'});
+  const title={font:{name:'Microsoft JhengHei',sz:18,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'0959A8'}},alignment:{horizontal:'center',vertical:'center'}};
+  const subtitle={font:{name:'Microsoft JhengHei',sz:16,bold:true,color:{rgb:'0959A8'}},fill:{patternType:'solid',fgColor:{rgb:'E6F8FC'}},alignment:{horizontal:'center',vertical:'center'}};
+  for(let col=0;col<8;col++)[[0,title],[1,subtitle]].forEach(([row,style])=>{const ref=XLSX.utils.encode_cell({r:row,c:col});sheet[ref]=sheet[ref]||{t:'s',v:''};sheet[ref].s=style;});
+  sheet['A3'].s={font:{name:'Microsoft JhengHei',sz:10,color:{rgb:'475569'}},alignment:{horizontal:'center',vertical:'center'}};
+  for(let col=0;col<8;col++){
+    const heading=sheet[XLSX.utils.encode_cell({r:4,c:col})],value=sheet[XLSX.utils.encode_cell({r:5,c:col})];
+    heading.s={font:{name:'Microsoft JhengHei',sz:10,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'377FB8'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border};
+    value.s={font:{name:'Microsoft JhengHei',sz:13,bold:col<5,color:{rgb:col===4&&m.abnormal?'B91C1C':'0F172A'}},fill:{patternType:'solid',fgColor:{rgb:col===4&&m.abnormal?'FEE2E2':'F8FAFC'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border};
+  }
+  sheet['A8'].s={font:{name:'Microsoft JhengHei',sz:11,bold:true,color:{rgb:'FFFFFF'}},fill:{patternType:'solid',fgColor:{rgb:'0959A8'}},alignment:{horizontal:'left',vertical:'center'}};
+  for(let row=8;row<lastStatusRow;row++)for(let col=0;col<3;col++){
+    const cell=sheet[XLSX.utils.encode_cell({r:row,c:col})];if(!cell)continue;
+    cell.s={font:{name:'Microsoft JhengHei',sz:10,bold:row===8,color:{rgb:row===8?'FFFFFF':'1E293B'}},fill:{patternType:'solid',fgColor:{rgb:row===8?'377FB8':row%2?'F5FAFD':'FFFFFF'}},alignment:{horizontal:col?'right':'left',vertical:'center'},border};
+    if(row>8&&col===2)cell.s.numFmt='0.0%';
+  }
+  sheet['D6'].s.numFmt='#,##0';sheet['C6'].s.numFmt='#,##0.0';
+  sheet['!cols']=[{wch:18},{wch:18},{wch:20},{wch:18},{wch:18},{wch:16},{wch:21},{wch:25}];
+  sheet['!rows']=[{hpt:30},{hpt:26},{hpt:20},{hpt:8},{hpt:28},{hpt:38},{hpt:10},{hpt:25},{hpt:25}];
+  sheet['!margins']={left:.4,right:.4,top:.5,bottom:.5,header:.2,footer:.2};
+}
 function exportVehicleReport(){
   if(!canReport()||!globalThis.XLSX){toast('Excel 報表元件尚未載入，請重新整理後再試',true);return;}
   const rows=vehicleReportRows();if(!rows.length){toast('目前條件沒有可匯出的資料',true);return;}
-  const from=val('reportFrom')||'不限',to=val('reportTo')||'不限',m=reportMetrics(rows),records=rows.map(vehicleReportRecord);
-  const detail=XLSX.utils.aoa_to_sheet([['臺北農產公司／第一果菜市場'],['公務車派車報表'],[`報表區間：${from} 至 ${to}`],[`產出時間：${fmtDateTime(new Date().toISOString())}　產出人：${currentUser.name}`],[]]);
-  XLSX.utils.sheet_add_json(detail,records,{origin:'A6'});const lastCol=XLSX.utils.encode_col(Object.keys(records[0]).length-1);detail['!merges']=[1,2,3,4].map(row=>XLSX.utils.decode_range(`A${row}:${lastCol}${row}`));detail['!cols']=Object.keys(records[0]).map(key=>({wch:Math.max(10,Math.min(26,key.length*2+4))}));
-  const summary=XLSX.utils.json_to_sheet([{'報表期間':`${from} 至 ${to}`,'申請單數':m.count,'乘車人次':m.passengers,'完成里程(km)':Number(m.mileage.toFixed(1)),'加油費用(元)':m.fuel,'異常通報(件)':m.abnormal,'產出人':currentUser.name,'產出時間':fmtDateTime(new Date().toISOString())}]);summary['!cols']=[{wch:25},{wch:12},{wch:12},{wch:16},{wch:16},{wch:16},{wch:14},{wch:20}];
-  const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,detail,'派車明細');XLSX.utils.book_append_sheet(workbook,summary,'統計摘要');XLSX.writeFile(workbook,`公務車派車報表_${from}_${to}.xlsx`);toast(`已匯出 ${rows.length} 筆派車資料`);
+  const from=val('reportFrom')||'不限',to=val('reportTo')||'不限',m=reportMetrics(rows),records=rows.map(vehicleReportRecord),exportedAt=fmtDateTime(new Date().toISOString()),headers=Object.keys(records[0]);
+  const detail=XLSX.utils.aoa_to_sheet([['臺北農產運銷股份有限公司'],['派車報表'],[`報表期間：${from} 至 ${to}`],[`產出時間：${exportedAt}　產出人：${currentUser.name}`],[]]);
+  XLSX.utils.sheet_add_json(detail,records,{origin:'A6'});reportXlsxStyleSheet(detail,records.length,headers.length);
+  const summary=XLSX.utils.aoa_to_sheet([[]]);reportXlsxSummarySheet(summary,from,to,m,rows,exportedAt);
+  const workbook=XLSX.utils.book_new();workbook.Props={Title:'派車報表',Subject:`${from} 至 ${to} 派車資料`,Author:currentUser.name,Company:'臺北農產運銷股份有限公司',CreatedDate:new Date()};
+  XLSX.utils.book_append_sheet(workbook,detail,'派車明細');XLSX.utils.book_append_sheet(workbook,summary,'統計摘要');XLSX.writeFile(workbook,`派車報表_${from}_${to}.xlsx`,{compression:true,cellStyles:true});toast(`已匯出 ${rows.length} 筆派車資料`);
 }
 function printVehicleReport(){
   if(!canReport())return;const rows=vehicleReportRows();if(!rows.length){toast('目前條件沒有可列印的資料',true);return;}
