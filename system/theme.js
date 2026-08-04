@@ -210,8 +210,9 @@
       {href:'dashboard.html',label:'戰情儀表板',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">'},
       {href:'https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs',label:'維修/派完工',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">'},
       {href:'https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7',label:'駐衛警巡檢',icon:'<img class="system-action-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">'},
-      {href:'admin.html',label:'後台',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">'}
+      {href:'admin.html',label:'後台',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">',sysKey:'admin'}
     ];
+    var adminLink=null;
     defs.forEach(function(def){
       var link=document.createElement('a');
       link.className='system-action-unified';
@@ -222,9 +223,16 @@
       var targetHash='';
       try{targetHash=(new URL(def.href,location.href).hash||'').toLowerCase();}catch(e){}
       if(page===targetPage&&(!targetHash||location.hash.toLowerCase()===targetHash)){link.classList.add('is-current');link.setAttribute('aria-current','page');}
+      if(def.sysKey==='admin')adminLink=link;
       actions.appendChild(link);
     });
     host.insertBefore(actions,meta);
+    // 沒有「後台管理系統」權限的角色，隱藏頂部導覽列的「後台」捷徑
+    if(adminLink&&window.SystemAccess&&typeof window.SystemAccess.allowedSystems==='function'){
+      window.SystemAccess.allowedSystems().then(function(allowed){
+        if(allowed!==null&&!allowed.has('admin'))adminLink.style.display='none';
+      });
+    }
   }
   function installSystemMeta(){
     var style=document.createElement('style');
