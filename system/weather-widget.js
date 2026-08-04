@@ -4,7 +4,7 @@
   const COUNTIES=['基隆市','臺北市','新北市','桃園市','新竹市','新竹縣','苗栗縣','臺中市','彰化縣','南投縣','雲林縣','嘉義市','嘉義縣','臺南市','高雄市','屏東縣','宜蘭縣','花蓮縣','臺東縣','澎湖縣','金門縣','連江縣'];
   const MAIN_ISLAND_COUNTIES=COUNTIES.filter(county=>!['澎湖縣','金門縣','連江縣'].includes(county));
   const MAIN_ISLAND_VIEWBOX='270 210 340 560';
-  const state={endpoint:'',anonKey:'',summary:null,selected:'臺北市',towns:[],svgText:'',refreshTimer:null,townRequest:0};
+  const state={endpoint:'',anonKey:'',summary:null,selected:'臺北市',towns:[],townCounty:'',svgText:'',refreshTimer:null,townRequest:0};
   const byId=id=>document.getElementById(id);
   const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const canonical=value=>String(value||'').trim().replaceAll('台','臺');
@@ -135,7 +135,7 @@
     });
     addMapMarkers(svg);
     svg.querySelectorAll('.county').forEach(path=>{
-      const choose=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,full);};
+      const choose=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,true);};
       const showTowns=event=>{event.preventDefault();event.stopPropagation();selectCounty(path.dataset.county,false);openModal();};
       path.addEventListener('click',choose);
       if(!full)path.addEventListener('dblclick',showTowns);
@@ -153,27 +153,33 @@
   }
 
   async function loadTowns(county){
-    const request=++state.townRequest,select=byId('weatherTownSelect'),panel=byId('weatherTownPanel');
-    if(select){select.disabled=true;select.innerHTML='<option value="">鄉鎮預報載入中…</option>';}
+    const request=++state.townRequest,selects=[...document.querySelectorAll('[data-weather-town-select]')],panel=byId('weatherTownPanel');
+    selects.forEach(select=>{select.disabled=true;select.innerHTML='<option value="">鄉鎮預報載入中…</option>';});
     if(panel)panel.textContent='正在讀取中央氣象署鄉鎮預報…';
     try{
       const payload=await api('town',{county});if(request!==state.townRequest)return;
-      state.towns=payload.towns||[];
-      if(select){select.disabled=false;select.innerHTML=state.towns.length?state.towns.map((item,index)=>`<option value="${esc(item.town)}"${index===0?' selected':''}>${esc(item.town)}</option>`).join(''):'<option value="">目前無鄉鎮資料</option>';}
+      state.towns=payload.towns||[];state.townCounty=county;
+      const options=state.towns.length?state.towns.map((item,index)=>`<option value="${esc(item.town)}"${index===0?' selected':''}>${esc(item.town)}</option>`).join(''):'<option value="">目前無鄉鎮資料</option>';
+      selects.forEach(select=>{select.disabled=false;select.innerHTML=options;});
       renderTown();
     }catch(error){
-      if(request!==state.townRequest)return;state.towns=[];
-      if(select){select.disabled=false;select.innerHTML='<option value="">鄉鎮預報載入失敗</option>';}
+      if(request!==state.townRequest)return;state.towns=[];state.townCounty='';
+      selects.forEach(select=>{select.disabled=false;select.innerHTML='<option value="">鄉鎮預報載入失敗</option>';});
       if(panel)panel.textContent=error.message||'鄉鎮預報載入失敗';
     }
+  }
+
+  function selectTown(name){
+    document.querySelectorAll('[data-weather-town-select]').forEach(select=>{select.value=name;});
+    renderTown();
   }
 
   function selectCounty(name,withTowns=false){
     const county=canonical(name);if(!MAIN_ISLAND_COUNTIES.includes(county))return;
     state.selected=county;
-    const select=byId('weatherCountySelect');if(select)select.value=county;
+    document.querySelectorAll('[data-weather-county-select]').forEach(select=>{select.value=county;});
     renderSummary();renderCountyPanel();updateMapStates();
-    if(withTowns)loadTowns(county);
+    if(withTowns&&state.townCounty!==county)loadTowns(county);
   }
 
   function openModal(){
@@ -207,6 +213,7 @@
       renderAlerts();renderSummary();renderCountyPanel();
       document.querySelectorAll('.weather-map-shell svg').forEach(addMapMarkers);
       updateMapStates();
+      if(state.townCounty!==state.selected)loadTowns(state.selected);
     }catch(error){showError(error.message||'中央氣象署資料載入失敗');}
   }
 
@@ -218,9 +225,9 @@
     document.querySelectorAll('[data-weather-close]').forEach(button=>button.addEventListener('click',closeModal));
     byId('weatherModal')?.addEventListener('click',event=>{if(event.target===event.currentTarget)closeModal();});
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!byId('weatherModal')?.hidden)closeModal();});
-    const countySelect=byId('weatherCountySelect');
-    if(countySelect){countySelect.innerHTML=MAIN_ISLAND_COUNTIES.map(county=>`<option value="${county}">${county}</option>`).join('');countySelect.value=state.selected;countySelect.addEventListener('change',()=>selectCounty(countySelect.value,true));}
-    byId('weatherTownSelect')?.addEventListener('change',renderTown);
+    const countyOptions=MAIN_ISLAND_COUNTIES.map(county=>`<option value="${county}">${county}</option>`).join('');
+    document.querySelectorAll('[data-weather-county-select]').forEach(select=>{select.innerHTML=countyOptions;select.value=state.selected;select.addEventListener('change',()=>selectCounty(select.value,true));});
+    document.querySelectorAll('[data-weather-town-select]').forEach(select=>select.addEventListener('change',()=>selectTown(select.value)));
   }
 
   window.CwaWeatherWidget={
