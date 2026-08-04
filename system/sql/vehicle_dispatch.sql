@@ -51,6 +51,18 @@ alter table official_vehicles drop constraint if exists official_vehicles_odomet
 alter table official_vehicles add constraint official_vehicles_odometer_check check (current_odometer >= 0);
 create unique index if not exists idx_official_vehicles_plate on official_vehicles(plate_no);
 
+create table if not exists vehicle_dispatch_managers (
+  user_id uuid primary key references users(user_id),
+  active boolean not null default true,
+  assigned_by uuid references users(user_id),
+  assigned_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into vehicle_dispatch_managers(user_id,active)
+select user_id,true from users where status='active' and rbac_role='dispatcher'
+on conflict (user_id) do nothing;
+
 create table if not exists vehicle_dispatch_requests (
   request_id uuid primary key default gen_random_uuid(),
   request_no text not null default gen_vehicle_dispatch_no(),
@@ -255,6 +267,11 @@ create trigger trg_vehicle_dispatch_updated_at
   before update on vehicle_dispatch_requests
   for each row execute function touch_vehicle_updated_at();
 
+drop trigger if exists trg_vehicle_dispatch_managers_updated_at on vehicle_dispatch_managers;
+create trigger trg_vehicle_dispatch_managers_updated_at
+  before update on vehicle_dispatch_managers
+  for each row execute function touch_vehicle_updated_at();
+
 create or replace function guard_vehicle_dispatch_approval()
 returns trigger
 language plpgsql
@@ -288,15 +305,31 @@ create trigger trg_guard_vehicle_dispatch_approval
   for each row execute function guard_vehicle_dispatch_approval();
 
 alter table official_vehicles enable row level security;
+alter table vehicle_dispatch_managers enable row level security;
 alter table vehicle_dispatch_requests enable row level security;
 alter table vehicle_dispatch_logs enable row level security;
 alter table vehicle_dispatch_attachments enable row level security;
 drop policy if exists "vehicle_authenticated" on official_vehicles;
+drop policy if exists "vehicle_dispatch_managers_read" on vehicle_dispatch_managers;
+drop policy if exists "vehicle_dispatch_managers_admin_insert" on vehicle_dispatch_managers;
+drop policy if exists "vehicle_dispatch_managers_admin_update" on vehicle_dispatch_managers;
 drop policy if exists "vehicle_dispatch_authenticated" on vehicle_dispatch_requests;
 drop policy if exists "vehicle_dispatch_logs_authenticated" on vehicle_dispatch_logs;
 drop policy if exists "vehicle_dispatch_attachments_authenticated" on vehicle_dispatch_attachments;
 create policy "vehicle_authenticated" on official_vehicles
   for all to authenticated using (true) with check (true);
+create policy "vehicle_dispatch_managers_read" on vehicle_dispatch_managers
+  for select to authenticated using (true);
+create policy "vehicle_dispatch_managers_admin_insert" on vehicle_dispatch_managers
+  for insert to authenticated with check (
+    exists(select 1 from users u where u.auth_id=auth.uid() and u.status='active' and coalesce(u.rbac_role,case when u.role='admin' then 'sysadmin' else '' end)='sysadmin')
+  );
+create policy "vehicle_dispatch_managers_admin_update" on vehicle_dispatch_managers
+  for update to authenticated using (
+    exists(select 1 from users u where u.auth_id=auth.uid() and u.status='active' and coalesce(u.rbac_role,case when u.role='admin' then 'sysadmin' else '' end)='sysadmin')
+  ) with check (
+    exists(select 1 from users u where u.auth_id=auth.uid() and u.status='active' and coalesce(u.rbac_role,case when u.role='admin' then 'sysadmin' else '' end)='sysadmin')
+  );
 create policy "vehicle_dispatch_authenticated" on vehicle_dispatch_requests
   for all to authenticated using (true) with check (true);
 create policy "vehicle_dispatch_logs_authenticated" on vehicle_dispatch_logs
@@ -323,7 +356,7 @@ do $$
 declare table_name text;
 begin
   if to_regprocedure('public.reject_physical_data_removal()') is not null then
-    foreach table_name in array array['official_vehicles','vehicle_dispatch_requests','vehicle_dispatch_logs','vehicle_dispatch_attachments'] loop
+    foreach table_name in array array['official_vehicles','vehicle_dispatch_managers','vehicle_dispatch_requests','vehicle_dispatch_logs','vehicle_dispatch_attachments'] loop
       execute format('drop trigger if exists trg_prevent_removal on public.%I',table_name);
       execute format('create trigger trg_prevent_removal before delete or truncate on public.%I for each statement execute function public.reject_physical_data_removal()',table_name);
     end loop;

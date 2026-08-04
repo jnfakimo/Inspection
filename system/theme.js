@@ -59,6 +59,14 @@
     location.replace('index.html?denied='+encodeURIComponent(systemKey));
     return false;
   }
+  function hasVehicleManagerAccess(profile,bearer){
+    if(!profile||!profile.user_id)return Promise.resolve(false);
+    var url=SUPABASE_URL+'/rest/v1/vehicle_dispatch_managers?select=active&user_id=eq.'+encodeURIComponent(profile.user_id)+'&active=eq.true&limit=1';
+    return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer}})
+      .then(function(r){return r.ok?r.json():[];})
+      .then(function(rows){return Array.isArray(rows)&&rows[0]&&rows[0].active===true;})
+      .catch(function(){return false;});
+  }
   var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap','vehicle'];
   window.SystemAccess={
     ALL_SYSTEM_KEYS:ALL_SYSTEM_KEYS,
@@ -80,7 +88,7 @@
             (rows||[]).forEach(function(row){
               if(row.allowed===true&&row.perm&&row.perm.indexOf('sys_')===0)out.add(row.perm.slice(4));
             });
-            return out;
+            return hasVehicleManagerAccess(profile,bearer).then(function(isManager){if(isManager)out.add('vehicle');return out;});
           })
           .catch(function(){return new Set();});
       });
@@ -95,13 +103,12 @@
         var auth=storedAuthSessionForAccess();
         var bearer=(auth&&auth.access_token)||SUPABASE_ANON_KEY;
         var url=SUPABASE_URL+'/rest/v1/role_permissions?select=allowed&role_id=eq.'+encodeURIComponent(roleId)+'&perm=eq.sys_'+encodeURIComponent(systemKey);
-        return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer}})
+        var roleAccess=fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+bearer}})
           .then(function(r){return r.ok?r.json():[];})
-          .then(function(rows){
-            var allowed=Array.isArray(rows)&&rows[0]&&rows[0].allowed===true;
-            return allowed?true:denyAccess(systemKey);
-          })
-          .catch(function(){return denyAccess(systemKey);});
+          .then(function(rows){return Array.isArray(rows)&&rows[0]&&rows[0].allowed===true;})
+          .catch(function(){return false;});
+        var managerAccess=systemKey==='vehicle'?hasVehicleManagerAccess(profile,bearer):Promise.resolve(false);
+        return Promise.all([roleAccess,managerAccess]).then(function(result){return result[0]||result[1]?true:denyAccess(systemKey);});
       });
     }
   };

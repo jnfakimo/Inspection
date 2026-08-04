@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260804-3"></script>
+<script src="theme.js?v=20260804-4"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
@@ -52,7 +52,7 @@
   <section class="flow" aria-label="派車申請流程">
     <div class="flow-step" style="--step:var(--cyan)"><div class="flow-no">1</div><div><b>申請人填單</b><span>日期、時間、起訖地點與人數</span></div></div>
     <div class="flow-step" style="--step:var(--amber)"><div class="flow-no">2</div><div><b>單位主管核可</b><span>同單位主管審核或退回</span></div></div>
-    <div class="flow-step" style="--step:var(--purple)"><div class="flow-no">3</div><div><b>車管人員派車</b><span>指派公務車、車號與司機</span></div></div>
+    <div class="flow-step" style="--step:var(--purple)"><div class="flow-no">3</div><div><b>派車管理員</b><span>指派公務車、車號與司機</span></div></div>
     <div class="flow-step" style="--step:var(--green)"><div class="flow-no">4</div><div><b>司機行車回報</b><span>實際時間、里程與加油紀錄</span></div></div>
   </section>
 
@@ -134,13 +134,13 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const db=supabase.createClient(SUPA_URL,SUPA_KEY);
 const STATUS={draft:'草稿',pending_approval:'待主管核可',returned:'主管退回',approved:'主管已核可',assigned:'已派車',completed:'行車完成',cancelled:'已取消'};
 const STATUS_CLASS={draft:'draft',pending_approval:'pending',returned:'returned',approved:'approved',assigned:'assigned',completed:'completed',cancelled:'cancelled'};
-const ROLE_NAME={reporter:'申請人',duty:'值班人員',dispatcher:'公務車管理人員',technician:'司機／技術人員',unit_supervisor:'單位主管',mgmt_supervisor:'管理主管',sysadmin:'系統管理員'};
+const ROLE_NAME={reporter:'申請人',duty:'值班人員',dispatcher:'派車管理員',technician:'司機／技術人員',unit_supervisor:'單位主管',mgmt_supervisor:'管理主管',sysadmin:'系統管理員'};
 const LEGACY_ROLE={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
 const PHOTO_BUCKET='vehicle-dispatch-files';
 const MARKET_LOCATIONS=['第一果菜市場','第二果菜市場'];
 const CONFLICT_STATUSES=['pending_approval','approved','assigned','completed'];
 let currentUser=null,currentRole='',tab='mine',currentRequestId=null,vehicleEditId=null,schemaReady=true;
-let state={requests:[],vehicles:[],users:[],logs:[],attachments:[]};
+let state={requests:[],vehicles:[],users:[],logs:[],attachments:[],managers:[]};
 
 const byId=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -209,8 +209,9 @@ function normalizeDept(v){return String(v||'').replace(/\s+/g,'').replace('／',
 function sameDepartment(request){return normalizeDept(request.applicant_department)===normalizeDept(currentUser?.department);}
 function isAdmin(){return currentRole==='sysadmin';}
 function isSupervisor(){return currentRole==='unit_supervisor'||currentRole==='mgmt_supervisor'||isAdmin();}
-function isManager(){return currentRole==='dispatcher'||isAdmin();}
-function canReport(){return isSupervisor()||isManager();}
+function isManager(){return isAdmin()||state.managers.some(x=>x.user_id===currentUser?.user_id&&x.active);}
+function canReport(){return isManager();}
+function updateRoleText(){if(!currentUser)return;let label=ROLE_NAME[currentRole]||currentRole;if(isManager()&&!isAdmin()&&currentRole!=='dispatcher')label+=`／派車管理員`;byId('roleText').textContent=`${currentUser.department||'未設定單位'}｜${currentUser.name}｜${label}`;}
 function isApplicant(r){return r?.applicant_id===currentUser?.user_id;}
 function isDriver(r){return r?.driver_id===currentUser?.user_id||isAdmin();}
 function canSee(r){return isAdmin()||isManager()||isApplicant(r)||r.driver_id===currentUser?.user_id||(isSupervisor()&&sameDepartment(r));}
@@ -231,7 +232,7 @@ async function init(){
   if(!user.department&&sharedProfile?.department)user.department=sharedProfile.department;
   if(!user.phone&&sharedProfile?.phone)user.phone=sharedProfile.phone;
   currentUser=user;currentRole=user.rbac_role||LEGACY_ROLE[user.role]||'reporter';
-  byId('roleText').textContent=`${user.department||'未設定單位'}｜${user.name}｜${ROLE_NAME[currentRole]||currentRole}`;
+  updateRoleText();
   byId('vehicleBtn').hidden=!isManager();
   byId('reportBtn').hidden=!canReport();
   buildStatusFilter();
@@ -245,17 +246,19 @@ function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner
 async function loadAll(silent=false){
   if(!currentUser)return;
   if(!silent)byId('syncText').textContent='讀取資料中…';
-  const [requests,vehicles,users,logs,attachments]=await Promise.all([
+  const [requests,vehicles,users,logs,attachments,managers]=await Promise.all([
     db.from('vehicle_dispatch_requests').select('*').order('created_at',{ascending:false}).limit(3000),
     db.from('official_vehicles').select('*').order('plate_no').limit(500),
     db.from('users').select('user_id,name,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
     db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000),
-    db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(10000)
+    db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(10000),
+    db.from('vehicle_dispatch_managers').select('user_id,active').eq('active',true).limit(3000)
   ]);
-  const firstError=[requests,vehicles,users,logs,attachments].find(x=>x.error)?.error;
+  const firstError=[requests,vehicles,users,logs,attachments,managers].find(x=>x.error)?.error;
   if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
   schemaReady=true;byId('setupBanner').className='setup-banner';
-  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[],attachments:attachments.data||[]};
+  state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[]};
+  updateRoleText();byId('vehicleBtn').hidden=!isManager();byId('reportBtn').hidden=!canReport();
   updateDashboard();renderTable();
   byId('syncText').textContent=`最後更新 ${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`;
 }
@@ -354,7 +357,7 @@ function assignmentSummary(r){return `<section class="form-section"><h3>核可�
 function approvalForm(r){return `<section class="form-section"><h3>單位主管核可</h3><div class="form-grid"><div class="field wide"><label>核可意見／退回原因</label><textarea id="fSupervisorNote" placeholder="核可可留白；退回時請填寫原因">${esc(r.supervisor_note||'')}</textarea></div></div></section>`;}
 function dispatchForm(r){
   const active=state.vehicles.filter(v=>v.status==='active'||v.vehicle_id===r.vehicle_id);
-  return `<section class="form-section"><h3>公務車管理人員派車</h3><div class="form-grid">
+  return `<section class="form-section"><h3>派車管理員指派</h3><div class="form-grid">
     <div class="field span2"><label class="req">公務車／車號</label><select id="fVehicle"><option value="">請選擇公務車</option>${active.map(v=>`<option value="${v.vehicle_id}" ${v.vehicle_id===r.vehicle_id?'selected':''}>${esc(v.plate_no)}｜${esc(v.vehicle_name||v.brand||'公務車')}｜${esc(v.seats)} 人座｜里程 ${esc(v.current_odometer)} km</option>`).join('')}</select></div>
     <div class="field"><label class="req">司機</label><select id="fDriver"><option value="">請選擇司機</option>${state.users.map(u=>`<option value="${u.user_id}" ${u.user_id===r.driver_id?'selected':''}>${esc(u.name)}｜${esc(u.department||'—')}${(u.rbac_role||LEGACY_ROLE[u.role])==='technician'?'｜司機':''}</option>`).join('')}</select></div>
     <div class="field wide"><label>派車備註</label><textarea id="fDispatchNote" placeholder="集合位置、聯絡事項或其他說明">${esc(r.dispatch_note||'')}</textarea></div>
@@ -460,7 +463,7 @@ async function reviewRequest(approve){
   const next=approve?'approved':'returned',payload={status:next,supervisor_id:currentUser.user_id,supervisor_name:currentUser.name,supervisor_note:note||null,approved_at:approve?new Date().toISOString():null};
   const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','pending_approval').select().maybeSingle();
   if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
-  await addLog(r.request_id,r.status,next,approve?'單位主管核可':'單位主管退回',note);closeModal('requestModal');await loadAll();toast(approve?'已核可並送交公務車管理人員':'已退回申請人');
+  await addLog(r.request_id,r.status,next,approve?'單位主管核可':'單位主管退回',note);closeModal('requestModal');await loadAll();toast(approve?'已核可並送交派車管理員':'已退回申請人');
 }
 
 async function dispatchRequest(){
@@ -470,7 +473,7 @@ async function dispatchRequest(){
   const payload={status:'assigned',vehicle_manager_id:currentUser.user_id,vehicle_manager_name:currentUser.name,vehicle_id:vehicle.vehicle_id,plate_no:vehicle.plate_no,driver_id:driver.user_id,driver_name:driver.name,dispatch_note:val('fDispatchNote')||null,dispatched_at:new Date().toISOString()};
   const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','approved').select().maybeSingle();
   if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
-  await addLog(r.request_id,r.status,'assigned','公務車管理人員完成派車',`${vehicle.plate_no}｜司機 ${driver.name}${payload.dispatch_note?'｜'+payload.dispatch_note:''}`);closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
+  await addLog(r.request_id,r.status,'assigned','派車管理員完成派車',`${vehicle.plate_no}｜司機 ${driver.name}${payload.dispatch_note?'｜'+payload.dispatch_note:''}`);closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
 }
 
 function toggleRefuel(){const checked=byId('fRefueled')?.checked;['fRefuelOdometer','fRefuelCost'].forEach(id=>{const input=byId(id);if(input){input.disabled=!checked;if(!checked)input.value='';}});}
