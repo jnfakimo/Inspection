@@ -259,3 +259,27 @@
 - 統計摘要集中呈現帳號啟用率、角色分布、第一層部門分布及各功能授權人數；權限矩陣以綠色「是」與灰色「否」提高辨識度。
 - 初始密碼仍依資安規範保持空白；批次匯入改為依欄位名稱定位資料，因此可同時讀取新版排版報表、舊版匯出檔與既有匯入範本。
 - XLSX 引擎改為與 SheetJS 0.18.5 API 相容的 `xlsx-js-style@1.2.0`，以支援字型、底色、框線、對齊及數字格式輸出；其他 XLSX 匯入、範本及費用報表流程維持相容。
+
+### 2026-07-28｜login.html 版面修正、dashboard.html 巡檢即時統計對齊
+
+**注意：本篇與上一篇（V0020）之間有 13 天、約 200 個 commit 的落差未記錄**（IPCAM 即時監控、駐衛警排班/LINE 推播、巡邏點清單等大量功能都是在這段期間加入的，本次收工前才第一次同步到）。往後接手者請以 `git log` 為準，不要假設本檔案的版本號是連續的。
+
+**本次完成**
+
+- `system/login.html`：狀態列（尚未登入／連線狀態／時間）原本用 `position:fixed` 浮動定位，未定義 `--surface`/`--border` 等主題變數，導致淺色/深色主題切換時顯示成脫節的白色浮框，且在瀏覽器非 100% 縮放（實測 150%）時會造成版面橫向溢出。改為新增 `<header class="topbar">`，讓狀態列改走一般文件流，跟後台/戰情儀表板等其他頁面的做法一致，從機制上排除 fixed 定位在縮放下的量測誤差類問題。
+- `system/dashboard.html`：「駐衛警巡檢即時」卡片原本用 `PatrolStatus.computeMatrix()` 加總當天*所有班別*的巡邏點狀態，跟 `guardpatrol.html`「當班即時統計」用 `PatrolStatus.compute()` 只算*當班*的邏輯不一致，數字對不上。已改成呼叫 `PatrolStatus.compute()`，只統計目前進行中的班別，無進行中班別時顯示「目前無進行中班別」，文字格式與 `guardpatrol.html` 統一為「當班即時統計｜班別 起訖時間」。
+
+**驗證結果**
+
+- `login.html`：本機起靜態伺服器，程式量測 `document.documentElement.scrollWidth` vs `innerWidth`，在 375px（手機）、1280px、1880px、1917px 寬度下皆無橫向溢出；深色/淺色主題下狀態列色彩與卡片一致。無法在本環境重現使用者回報的 150% 縮放場景，已改走一般文件流從機制上排除該類問題，待業主實機於 150% 縮放下複驗。
+- `dashboard.html`：以 Node `vm.Script` 對三段內嵌 `<script>` 做語法檢查通過；邏輯以 `git diff` 逐行比對 `guardpatrol.html` 的 `renderDutyStats()` 確認欄位語意一致。因需要真實登入憑證與 Supabase 資料，未能在本環境用真實資料驗證畫面數字，待業主於線上比對兩頁數字是否一致。
+
+**已知注意事項／踩坑**
+
+- 本專案常有多個 AI/人工同時對 `main` 推送（本次收工前 `git fetch` 就發現本機落後 origin/main 約 200 個 commit）——**下次開工務必先 `git fetch origin main` 比對，不要假設本機是最新的**。
+- `dashboard.html` 目前已內嵌 IPCAM 即時監視器（HLS 直播），有長串卡頓修復歷史，最新一次是同日稍早的 `c7e574f fix: recover stalled dashboard camera stream`；本次未再改動 IPCAM 相關程式碼，如果之後還有「影像卡住」回報，先確認是不是這次強化後的新狀況。
+
+**下一步**
+
+- 請業主實機確認 `login.html` 在 150% 瀏覽器縮放下不再跑版、`dashboard.html` 的「駐衛警巡檢即時」數字與 `guardpatrol.html`「當班即時統計」一致。
+- 補齊 V0020 之後這段時間的重大功能（IPCAM、駐衛警排班/LINE 推播等）到本檔案，避免版本紀錄持續斷層。
