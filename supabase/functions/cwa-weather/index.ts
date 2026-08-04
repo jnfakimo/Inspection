@@ -403,6 +403,36 @@ function decodeJsString(value: string) {
     .replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
+function rocTyphoonTime(value: string | null) {
+  const match = String(value || "").match(/民國(\d{3})年(\d{2})月(\d{2})日(\d{2})時/u);
+  if (!match) return null;
+  const year = Number(match[1]) + 1911;
+  return `${year}-${match[2]}-${match[3]}T${match[4]}:00:00+08:00`;
+}
+
+async function fetchTyphoonHomepageStatus() {
+  const response = await fetch(`https://www.cwa.gov.tw/Data/js/typhoon/TY_NEWS-Data.js?T=${Date.now()}`, {
+    headers: { Accept: "text/javascript" },
+  });
+  if (!response.ok) throw new Error(`中央氣象署颱風消息回應 ${response.status}`);
+  const script = await response.text();
+  const timeText = script.match(/var\s+TY_TIME\s*=\s*\{[\s\S]*?'C'\s*:\s*'((?:\\.|[^'])*)'/u)?.[1] || null;
+  const counts = script.match(/var\s+TY_COUNT\s*=\s*\[\s*(\d+)\s*,\s*(\d+)\s*\]/u);
+  const tropicalDepressionCount = Number(counts?.[1] || 0);
+  const typhoonCount = Number(counts?.[2] || 0);
+  const countParts = [];
+  if (typhoonCount > 0) countParts.push(`有 ${typhoonCount} 個颱風`);
+  if (tropicalDepressionCount > 0) countParts.push(`有 ${tropicalDepressionCount} 個熱帶性低氣壓`);
+  const decodedTime = timeText ? decodeJsString(timeText) : null;
+  return {
+    active: typhoonCount + tropicalDepressionCount > 0,
+    issuedAt: rocTyphoonTime(decodedTime),
+    content: decodedTime && countParts.length
+      ? `目前 (${decodedTime}) 太平洋地區${countParts.join("，")}。`
+      : "中央氣象署目前發布颱風消息，請點擊查看最新內容。",
+  };
+}
+
 async function fetchHomepageBulletins() {
   const response = await fetch(`https://www.cwa.gov.tw/Data/js/warn/Warning_Content.js?v=${Date.now()}`, {
     headers: { Accept: "text/javascript" },
@@ -411,6 +441,9 @@ async function fetchHomepageBulletins() {
   const script = await response.text();
   const listed = script.match(/var\s+WarnAll\s*=\s*\[([^\]]*)\]/u)?.[1]
     .split(",").map((item) => item.trim().replace(/^['"]|['"]$/g, "")) || [];
+  const typhoonStatus = listed.includes("TY_NEWS")
+    ? await fetchTyphoonHomepageStatus().catch(() => null)
+    : null;
   return listed.filter((code) => HOMEPAGE_BULLETIN_META[code]).map((code) => {
     const meta = HOMEPAGE_BULLETIN_META[code];
     const section = script.match(new RegExp(`'${code}'\\s*:\\s*\\{\\s*'C'\\s*:\\s*\\{([\\s\\S]*?)\\n\\s*\\},\\s*\\n\\s*'E'`, "u"))?.[1] || "";
@@ -419,15 +452,15 @@ async function fetchHomepageBulletins() {
     return match ? decodeJsString(match[1]) : null;
     };
     const title = field("title") || meta.label;
-    const issuedAt = cwaTime(field("issued"));
+    const issuedAt = code === "TY_NEWS" ? typhoonStatus?.issuedAt || null : cwaTime(field("issued"));
     return {
       key: meta.key,
       label: meta.label,
       dataset: null,
       sourceUrl: meta.sourceUrl,
-      status: /解除|取消/u.test(title) ? "ended" : "active",
+      status: code === "TY_NEWS" && typhoonStatus ? (typhoonStatus.active ? "active" : "clear") : (/解除|取消/u.test(title) ? "ended" : "active"),
       title,
-      content: field("content") || (code === "TY_NEWS" ? "中央氣象署目前發布颱風消息，請點擊查看最新內容。" : null),
+      content: code === "TY_NEWS" ? typhoonStatus?.content || "中央氣象署目前發布颱風消息，請點擊查看最新內容。" : field("content"),
       areas: [],
       issuedAt,
       endsAt: cwaTime(field("validto")),
@@ -635,11 +668,11 @@ Deno.serve(async (request) => {
   }
 
   try {
-    if (view === "summary") return json(await cachedResponse("summary:v3", 600, loadSummary));
+    if (view === "summary") return json(await cachedResponse("summary:v4", 600, loadSummary));
     if (view === "county") {
       const county = canonicalCounty(url.searchParams.get("county"));
       if (!COUNTIES.includes(county)) return json({ ok: false, message: "縣市名稱不正確" }, 400);
-      const summary = await cachedResponse("summary:v3", 600, loadSummary);
+      const summary = await cachedResponse("summary:v4", 600, loadSummary);
       const countyWeather = array(summary.counties).map(record).find((item) => canonicalCounty(item.county) === county) || null;
       const alerts = array(summary.alerts).map(record).filter((item) => array(item.areas).some((area) => String(area).includes(county.replace(/[市縣]$/u, ""))));
       return json({ ok: true, configured: true, view, updatedAt: summary.updatedAt, stale: summary.stale, county: countyWeather, alerts });
