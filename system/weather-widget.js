@@ -135,7 +135,7 @@
       const group=document.createElementNS('http://www.w3.org/2000/svg','g');group.setAttribute('class','weather-marker');group.setAttribute('data-county',county);group.setAttribute('transform',`translate(${x} ${y})`);
       const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('r','27');
       const icon=document.createElementNS('http://www.w3.org/2000/svg','text');icon.setAttribute('y','-1');icon.textContent=weatherIcon(data.weather,data.weatherCode);
-      const temp=document.createElementNS('http://www.w3.org/2000/svg','text');temp.setAttribute('class','marker-temp');temp.setAttribute('y','36');temp.textContent=present(data.temperature)?Math.round(Number(data.temperature))+'°':'';
+      const temp=document.createElementNS('http://www.w3.org/2000/svg','text');temp.setAttribute('class','marker-temp');temp.setAttribute('y','44');temp.textContent=present(data.temperature)?Math.round(Number(data.temperature))+'°':'';
       group.append(circle,icon,temp);layer.appendChild(group);
     });
   }
