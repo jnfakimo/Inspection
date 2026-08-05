@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260805-4"></script>
+<script src="floor-utils.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -281,13 +282,15 @@ const floorPages=new Map();
 
 // ── 樓層排序 ───────────────────────────────────────────────
 function floorOrder(f){
-  const s=String(f||'').trim().toUpperCase();
+  const s=window.FloorUtils.canonicalFloor(f);
   const b=s.match(/^B(\d+)$/);   if(b) return 100-parseInt(b[1],10); // B2=98,B1=99
-  if(s==='RF'||s==='R')          return 900;
-  const n=s.match(/^(\d+)F?$/);  if(n) return 100+parseInt(n[1],10);  // 1F=101,2F=102
+  if(s==='RF')                   return 900;
+  const n=s.match(/^(\d+)F$/);   if(n) return 100+parseInt(n[1],10);  // 1F=101,2F=102
   return 500;
 }
-function normFloor(f){ return String(f||'').trim().toUpperCase().replace(/\s+/g,''); }
+// 新寫入的資料一律正規化（B1F→B1、1→1F、頂樓→RF），既有歷史資料不動，
+// 避免大規模資料回填的風險；比對/排序時一致套用同一套規則即可。
+function normFloor(f){ return window.FloorUtils.canonicalFloor(f); }
 function fmtTime(t){
   const d=new Date(t);
   const p=n=>String(n).padStart(2,'0');
