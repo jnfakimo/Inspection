@@ -7,6 +7,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>LINE／FCM 推播紀錄 — 駐衛警巡檢系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <style>
 :root{--bg:#020b18;--surface:#041428;--panel:#06182c;--border:#0a3a5a;--text:#b0d8f0;--text-hi:#d4eeff;--text-dim:#5a8ab0;--cyan:#00d4ff;--green:#00ff9d;--red:#ff5470;--amber:#ffb300;--patrol:#c77dff}
 :root[data-theme="light"]{--bg:#f4f6fa;--surface:#fff;--panel:#fff;--border:#cbd5e1;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b;--cyan:#0284c7;--green:#059669;--red:#dc2626;--amber:#b45309;--patrol:#7e22ce}
@@ -42,9 +43,7 @@
   <section class="panel"><div class="table-scroll"><table><thead><tr><th>巡檢日期</th><th>班別／時段</th><th>完成狀況</th><th>排定人員</th><th>實際打卡</th><th>LINE 狀態</th><th>FCM 狀態</th><th>發送時間</th><th>LINE 回應／失敗原因</th><th>FCM 回應／失敗原因</th></tr></thead><tbody id="rows"><tr><td colspan="10" class="empty">載入中…</td></tr></tbody></table></div><div class="pager"><button class="page-btn" id="prevBtn">上一頁</button><span class="page-info" id="pageInfo">第 1 / 1 頁</span><button class="page-btn" id="nextBtn">下一頁</button></div></section>
 </main>
 <script>
-const SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
-const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const PAGE_SIZE=10;let rows=[],page=1;
+const db = createDb();const PAGE_SIZE=10;let rows=[],page=1;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function formatLineResponse(value,status){
   if(!value)return status==='pending'?'等待發送':'無回應資料';

@@ -8,6 +8,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
@@ -131,9 +132,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
-const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+const db = createDb();
 const STATUS={draft:'草稿',pending_approval:'待主管核可',returned:'主管退回',approved:'主管已核可',assigned:'已派車',completed:'行車完成',cancelled:'已取消'};
 const STATUS_CLASS={draft:'draft',pending_approval:'pending',returned:'returned',approved:'approved',assigned:'assigned',completed:'completed',cancelled:'cancelled'};
 const ROLE_NAME={reporter:'申請人',duty:'值班人員',dispatcher:'派車管理員',technician:'司機／技術人員',unit_supervisor:'單位主管',mgmt_supervisor:'管理主管',sysadmin:'系統管理員'};
