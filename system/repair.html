@@ -443,6 +443,7 @@ let me_=null;
 let allOrders=[];
 let currentTab='mine';
 let currentOrder=null;
+let detailRequestSeq=0;
 let uploadedFiles=[];   // {file, dataUrl, removed}
 let PAGE_SIZE=12;
 let currentPage=1;
@@ -711,7 +712,9 @@ function attachmentUrl(filePath){
   return db.storage.from('repair-files').getPublicUrl(filePath).data?.publicUrl||'';
 }
 async function openDetail(id){
-  currentOrder=allOrders.find(o=>o.id===id)||null;
+  const seq=++detailRequestSeq;
+  const order=allOrders.find(o=>o.id===id)||null;
+  currentOrder=order;
   if(!currentOrder)return;
   document.getElementById('d-title').textContent='工單詳情 ― '+(currentOrder.req_no||'');
   document.getElementById('d-badge').innerHTML=badge(currentOrder.status);
@@ -721,22 +724,23 @@ async function openDetail(id){
     db.from('case_status_log').select('*').eq('order_id',id).order('created_at',{ascending:true}),
     db.from('cost_records').select('*').eq('order_id',id).order('cost_date',{ascending:false})
   ]);
+  if(seq!==detailRequestSeq)return;
   if(attRes.error)console.warn('repair_attachments',attRes.error);
   if(timelineRes.error)console.warn('case_status_log',timelineRes.error);
   if(costRes.error)console.warn('cost_records',costRes.error);
   const photoUrls=(attRes.data||[]).filter(x=>x.kind==='photo').map(x=>attachmentUrl(x.file_path)).filter(Boolean);
   const totalCost=(costRes.data||[]).reduce((sum,x)=>sum+Number(x.amount||0),0);
-  const hasCompletion=!!(currentOrder.finish_time||currentOrder.result_desc||currentOrder.handle_method||photoUrls.length);
+  const hasCompletion=!!(order.finish_time||order.result_desc||order.handle_method||photoUrls.length);
   const repairLog=hasCompletion?{
-    technician_name:currentOrder.assigned_to_name||me_?.name||'—',
-    submitted_at:currentOrder.finish_time||currentOrder.created_at,
-    repair_desc:currentOrder.result_desc||currentOrder.handle_method||'—',
+    technician_name:order.assigned_to_name||me_?.name||'—',
+    submitted_at:order.finish_time||order.created_at,
+    repair_desc:order.result_desc||order.handle_method||'—',
     has_cost:totalCost>0,
     cost_amount:totalCost,
     photo_urls:photoUrls
   }:null;
 
-  document.getElementById('d-body').innerHTML=buildDetailBody(currentOrder,repairLog,timelineRes.data||[]);
+  document.getElementById('d-body').innerHTML=buildDetailBody(order,repairLog,timelineRes.data||[]);
   document.getElementById('m-detail').classList.add('show');
 }
 
@@ -1090,6 +1094,7 @@ function setMsg(el,msg,type=''){
 
 function closeModal(){
   document.getElementById('m-detail').classList.remove('show');
+  detailRequestSeq++;
   uploadedFiles=[];
   currentOrder=null;
 }
