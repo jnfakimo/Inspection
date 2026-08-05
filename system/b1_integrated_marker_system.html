@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260805-4"></script>
+<script src="floor-utils.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>臺北農產公司 第一果菜市場 — 整合標記系統</title>
@@ -338,14 +339,8 @@ function tryFocusDeepLink(){
 }
 
 // 樓層正規化，讓「B1 / B1F」、「1F / 1」等視為同一層（區域位置表與平面圖命名不一致時仍能對應）
-function canonicalFloor(f){
-  const s=String(f||'').trim().toUpperCase().replace(/\s+/g,'').replace(/樓|F$/g,m=>m==='F'?'':'');
-  const raw=String(f||'').trim().toUpperCase().replace(/\s+/g,'');
-  const b=raw.match(/^B(\d+)F?$/);   if(b) return 'B'+b[1];      // B1 / B1F → B1
-  if(raw==='RF'||raw==='R'||raw==='頂樓') return 'RF';
-  const n=raw.match(/^(\d+)F?$/);    if(n) return n[1]+'F';       // 1 / 1F → 1F
-  return raw;
-}
+// 正規化邏輯統一由 system/floor-utils.js 提供，避免各頁各自實作出現不相容結果。
+function canonicalFloor(f){ return window.FloorUtils.canonicalFloor(f); }
 
 const FLOORS=[
   {id:'B1', label:'B1 地下一層', dzi:'plans/b1.dzi', idx:null},
