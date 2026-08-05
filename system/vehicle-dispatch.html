@@ -142,6 +142,7 @@ const PHOTO_BUCKET='vehicle-dispatch-files';
 const MARKET_LOCATIONS=['第一果菜市場','第二果菜市場'];
 const CONFLICT_STATUSES=['pending_approval','approved','assigned','completed'];
 let currentUser=null,currentRole='',tab='mine',currentRequestId=null,vehicleEditId=null,schemaReady=true;
+let applicationSubmitting=false;
 let state={requests:[],vehicles:[],users:[],departments:[],logs:[],attachments:[],managers:[],drivers:[]};
 
 const byId=id=>document.getElementById(id);
@@ -532,8 +533,9 @@ function completedSummary(r){return `<section class="form-section"><h3>行車完
   <div class="summary-item"><span>實際乘車人數</span><b>${esc(r.actual_passenger_count??'—')} 人</b></div><div class="summary-item"><span>實際出發／回程</span><b>${esc(fmtDateTime(r.actual_departure_at))}<br>${esc(fmtDateTime(r.actual_return_at))}</b></div><div class="summary-item"><span>起始／回程里程</span><b>${esc(r.odometer_start)} → ${esc(r.odometer_end)} km</b></div><div class="summary-item"><span>本次里程</span><b>${esc(Number(r.total_mileage||0).toFixed(1))} km</b></div>
   <div class="summary-item"><span>上次加油</span><b>${r.last_refuel_odometer==null?'無紀錄':esc(r.last_refuel_odometer)+' km｜'+esc(r.last_refuel_cost??'—')+' 元'}</b></div><div class="summary-item"><span>本次加油</span><b>${r.refueled?'是｜'+esc(r.refuel_odometer)+' km｜'+esc(r.refuel_cost)+' 元':'否'}</b></div><div class="summary-item"><span>異常通報</span><b>${r.has_abnormality?'有｜'+esc(r.abnormality_note||'—'):'無'}</b></div><div class="summary-item"><span>司機備註</span><b>${esc(r.driver_note||'—')}</b></div></div></section>${photoGallery(r.request_id,['driver','abnormality'],'行車與異常附件照片')}`;}
 
-function applicationPayload(){
+function applicationPayload(submit=false){
   const payload={application_date:val('fApplicationDate')||todayISO(),applicant_phone:val('fApplicantPhone'),trip_date:val('fTripDate'),planned_departure_time:val('fDepartureTime'),planned_return_time:val('fReturnTime'),origin_location:locationValue('Origin'),destination_location:locationValue('Destination'),passenger_count:Number(val('fPassengers')),trip_purpose:val('fPurpose'),applicant_note:val('fApplicantNote')||null};
+  if(!submit)return payload;
   if(!payload.applicant_phone||!payload.trip_date||!payload.planned_departure_time||!payload.planned_return_time||!payload.origin_location||!payload.destination_location||!payload.trip_purpose||!Number.isInteger(payload.passenger_count)||payload.passenger_count<1)throw new Error('請完整填寫所有必填欄位');
   if(payload.applicant_phone.replace(/[^0-9#*]/g,'').length<4)throw new Error('請填寫至少 4 碼的分機、電話或手機號碼');
   if(!isHalfHour(payload.planned_departure_time)||!isHalfHour(payload.planned_return_time))throw new Error('預計時間請使用每 30 分鐘的時段');
@@ -543,13 +545,15 @@ function applicationPayload(){
 }
 function setMsg(message){const el=byId('requestMsg');if(el)el.textContent=message||'';}
 async function saveApplication(submit){
+  if(applicationSubmitting)return;
+  applicationSubmitting=true;
   try{
     const photos=Array.from(byId('fApplicationPhotos')?.files||[]);
     const conflict=await auditScheduleConflict(false);
     if(conflict?.audit_error)throw new Error('派車時段稽核失敗，為避免重複派車，目前無法儲存');
     if(conflict?.validation_error)throw new Error(conflict.message);
     if(conflict)throw new Error(scheduleConflictText(conflict));
-    const payload=applicationPayload(),next=submit?'pending_approval':'draft';payload.status=next;
+    const payload=applicationPayload(submit),next=submit?'pending_approval':'draft';payload.status=next;
     let result,from=null;
     if(currentRequestId){const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canEditApplication(r))throw new Error('此申請單目前不可修改');from=r.status;result=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',currentRequestId).in('status',['draft','returned']).select().single();}
     else{payload.applicant_id=currentUser.user_id;payload.applicant_name=currentUser.name;payload.applicant_department=currentUser.department||null;result=await db.from('vehicle_dispatch_requests').insert(payload).select().single();}
@@ -564,6 +568,8 @@ async function saveApplication(submit){
       return;
     }
     setMsg(e.message||'儲存失敗');
+  }finally{
+    applicationSubmitting=false;
   }
 }
 
@@ -610,13 +616,16 @@ async function completeTrip(){
   if(isFutureActualTime(departure)||isFutureActualTime(returned)){setMsg('實際出發與回程時間不得晚於目前時間');return;}
   if(new Date(returned)<new Date(departure)){setMsg('實際回程時間不得早於出發時間');return;}
   if(end<start){setMsg('汽車回程里程不得小於起始里程');return;}
+  const assignedVehicle=state.vehicles.find(v=>v.vehicle_id===r.vehicle_id);
+  const currentOdometer=Number(assignedVehicle?.current_odometer);
+  if(Number.isFinite(currentOdometer)&&(start<currentOdometer||end<currentOdometer)){setMsg(`里程不得低於車輛目前里程 ${currentOdometer} km`);return;}
   if(refueled&&(!Number.isFinite(refuel)||refuel<start||refuel>end)){setMsg('加油里程必須介於起始與回程里程之間');return;}
   if(refueled&&(!Number.isFinite(refuelCost)||refuelCost<0)){setMsg('請填寫正確的本次加油費用');return;}
   if(hasAbnormality&&!abnormalityNote){setMsg('勾選異常通報時，請填寫異常內容');return;}
   const payload={status:'completed',actual_passenger_count:passengers,actual_departure_at:toIso(departure),actual_return_at:toIso(returned),odometer_start:start,odometer_end:end,last_refuel_odometer:lastRefuelOdometer,last_refuel_cost:lastRefuelCost,refueled,refuel_odometer:refueled?refuel:null,refuel_cost:refueled?refuelCost:null,has_abnormality:hasAbnormality,abnormality_note:hasAbnormality?abnormalityNote:null,driver_note:val('fDriverNote')||null,completed_at:new Date().toISOString()};
   const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','assigned').select().maybeSingle();
   if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
-  const vehicle=state.vehicles.find(v=>v.vehicle_id===r.vehicle_id);if(vehicle&&end>Number(vehicle.current_odometer||0))await db.from('official_vehicles').update({current_odometer:end}).eq('vehicle_id',vehicle.vehicle_id);
+  const vehicle=assignedVehicle;if(vehicle&&end>Number(vehicle.current_odometer||0))await db.from('official_vehicles').update({current_odometer:end}).eq('vehicle_id',vehicle.vehicle_id);
   const photoErrors=await uploadPhotos(r.request_id,photos,hasAbnormality?'abnormality':'driver');
   await addLog(r.request_id,r.status,'completed','司機完成行車回報',`實際 ${passengers} 人｜${(end-start).toFixed(1)} km${refueled?`｜加油 ${refuelCost} 元`:''}${hasAbnormality?'｜有異常通報':''}`);closeModal('requestModal');await loadAll();toast(photoErrors.length?`行車回報已完成；${photoErrors.length} 張照片上傳失敗`:'行車回報完成，里程已自動核算',photoErrors.length>0);
 }

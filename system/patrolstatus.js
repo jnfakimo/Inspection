@@ -79,6 +79,13 @@ window.PatrolStatus = (function () {
     return markerPromise;
   }
 
+  // Marker editors update plan_markers in place.  Clear the shared promise
+  // after a successful mutation so the next status refresh cannot use stale
+  // patrol points forever.
+  function invalidateMarkers() {
+    markerPromise = null;
+  }
+
   // 班別名稱/數量固定來自 patrol_shift_template；patrol_shifts 的時段專供逾時通報。
   // 巡檢表的班別判定與打卡統計改讀 patrol_shift_staff 內獨立設定的「上班時段」。
   async function getShiftsForDate(db, dateStr) {
@@ -203,5 +210,5 @@ window.PatrolStatus = (function () {
     return { shifts: ranges, markers: markers || [], matrix };
   }
 
-  return { compute, computeMatrix, COLORS, LABELS, dateStrOf };
+  return { compute, computeMatrix, invalidateMarkers, COLORS, LABELS, dateStrOf };
 })();

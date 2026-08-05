@@ -735,6 +735,7 @@ async function saveMk(){
   if(editId){({error}=await db.from('plan_markers').update(rec).eq('marker_id',editId));}
   else{({error}=await db.from('plan_markers').insert(rec));}
   if(error){msg.textContent='儲存失敗：'+translateError(error.message);return;}
+  if(typeof window.PatrolStatus?.invalidateMarkers==='function')window.PatrolStatus.invalidateMarkers();
   closeMk(); await loadData();
 }
 async function deleteMk(){
@@ -742,6 +743,7 @@ async function deleteMk(){
   if(!confirm('確定停用此標記？歷史資料會永久保留。'))return;
   const {error}=await db.from('plan_markers').update({status:'inactive'}).eq('marker_id',editId);
   if(error){document.getElementById('mkMsg').textContent='停用失敗：'+translateError(error.message);return;}
+  if(typeof window.PatrolStatus?.invalidateMarkers==='function')window.PatrolStatus.invalidateMarkers();
   closeMk(); detailId=null; await loadData();
 }
 
