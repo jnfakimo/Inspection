@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260805-4"></script>
+<script src="floor-utils.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -210,16 +211,13 @@ let floorKeys=[];
 const expandedFloors=new Set();
 
 function canonicalFloor(value){
-  const floor=String(value||'未分類').trim().toUpperCase();
-  if(floor==='B1F'||floor==='B1')return 'B1';
-  if(floor==='1F'||floor==='1')return '1F';
-  if(floor==='RF'||floor==='R'||floor==='頂樓')return '頂樓';
-  return floor;
+  if(value==null||String(value).trim()==='')return '未分類';
+  return window.FloorUtils.canonicalFloor(value);
 }
 function floorOrder(value){
   const floor=canonicalFloor(value);
   if(floor==='B1')return -100;
-  if(floor==='頂樓')return 1000;
+  if(floor==='RF')return 1000;
   const m=floor.match(/^(\d+)F?$/);
   return m?Number(m[1]):500;
 }
@@ -237,7 +235,7 @@ function fillSelect(id,items,placeholder){
 }
 function syncFilters(result){
   const floors=[...new Set(result.markers.map(m=>canonicalFloor(m.floor_id)))].sort((a,b)=>floorOrder(a)-floorOrder(b)||a.localeCompare(b,'zh-Hant'));
-  fillSelect('floorFilter',floors.map(f=>({value:f,label:f})),'全部樓層');
+  fillSelect('floorFilter',floors.map(f=>({value:f,label:window.FloorUtils.floorLabel(f)})),'全部樓層');
   fillSelect('shiftFilter',result.shifts.map(s=>({value:s.shift_id,label:`${s.name} ${fmtHM(s.start_time)}–${fmtHM(s.end_time)}`})),'全部班別');
 }
 
@@ -308,8 +306,8 @@ function render(result,dutyResult){
     <tr><th class="floorcol">樓層</th><th class="pointcol">巡檢點</th>${selectedShifts.map(s=>`<th>${esc(s.name)}<br>${fmtHM(s.start_time)}–${fmtHM(s.end_time)}</th>`).join('')}</tr>
     ${floorKeys.map((floor,index)=>{
       const group=groups.get(floor),open=expandedFloors.has(floor);
-      return `<tr class="floor-row" onclick="toggleFloorAt(${index})"><td colspan="${selectedShifts.length+2}"><span class="floor-arrow">${open?'▼':'▶'}</span>${esc(floor)}<span class="floor-count">${group.length} 個巡檢點</span></td></tr>`+
-        (open?group.map(m=>`<tr><td class="floor-cell">${esc(floor)}</td><td class="pointcol">${esc(m.label)}</td>${selectedShifts.map(s=>{const state=matrix.get(s.shift_id+'|'+m.marker_id)||'pending';return `<td><span class="cell ${state}" title="${PatrolStatus.LABELS[state]}" onclick="showDetail('${s.shift_id}','${m.marker_id}')">${STATE_LABEL[state]}</span></td>`;}).join('')}</tr>`).join(''):'');
+      return `<tr class="floor-row" onclick="toggleFloorAt(${index})"><td colspan="${selectedShifts.length+2}"><span class="floor-arrow">${open?'▼':'▶'}</span>${esc(window.FloorUtils.floorLabel(floor))}<span class="floor-count">${group.length} 個巡檢點</span></td></tr>`+
+        (open?group.map(m=>`<tr><td class="floor-cell">${esc(window.FloorUtils.floorLabel(floor))}</td><td class="pointcol">${esc(m.label)}</td>${selectedShifts.map(s=>{const state=matrix.get(s.shift_id+'|'+m.marker_id)||'pending';return `<td><span class="cell ${state}" title="${PatrolStatus.LABELS[state]}" onclick="showDetail('${s.shift_id}','${m.marker_id}')">${STATE_LABEL[state]}</span></td>`;}).join('')}</tr>`).join(''):'');
     }).join('')}
   </table>`;
 }
@@ -408,11 +406,11 @@ async function exportReport(from,to){
       const markers=filters.floor?result.markers.filter(m=>canonicalFloor(m.floor_id)===filters.floor):result.markers;
       markers.forEach(m=>shifts.forEach(s=>{
         const state=result.matrix.get(s.shift_id+'|'+m.marker_id)||'pending';
-        if(!filters.status||state===filters.status)rows.push([dates[i],canonicalFloor(m.floor_id),m.label,s.name,`${fmtHM(s.start_time)}–${fmtHM(s.end_time)}`,PatrolStatus.LABELS[state]]);
+        if(!filters.status||state===filters.status)rows.push([dates[i],window.FloorUtils.floorLabel(canonicalFloor(m.floor_id)),m.label,s.name,`${fmtHM(s.start_time)}–${fmtHM(s.end_time)}`,PatrolStatus.LABELS[state]]);
       }));
     }
     const title=`臺北農產公司 第一市場巡檢表 ${from}~${to}`;
-    const floorLabel=filters.floor||'全部樓層';
+    const floorLabel=filters.floor?window.FloorUtils.floorLabel(filters.floor):'全部樓層';
     const shiftLabel=selectedShiftName||'全部班別';
     const stateLabel=PatrolStatus.LABELS[filters.status]||'全部狀態';
     const data=[
