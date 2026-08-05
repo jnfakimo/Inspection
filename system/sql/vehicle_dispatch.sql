@@ -418,6 +418,31 @@ create trigger trg_guard_vehicle_dispatch_assignment_and_driver
   before update on vehicle_dispatch_requests
   for each row execute function guard_vehicle_dispatch_assignment_and_driver();
 
+-- 預計時段不得在過去；行車完成回報的實際時間不得晚於現在。
+create or replace function guard_vehicle_dispatch_time_window()
+returns trigger language plpgsql set search_path=public as $$
+declare schedule_changed boolean:=tg_op='INSERT';
+begin
+  if tg_op='UPDATE' then
+    schedule_changed:=new.trip_date is distinct from old.trip_date
+      or new.planned_departure_time is distinct from old.planned_departure_time
+      or new.planned_return_time is distinct from old.planned_return_time;
+  end if;
+  if (new.status in ('draft','pending_approval','approved','assigned') or (new.status='returned' and schedule_changed))
+    and ((new.trip_date+new.planned_departure_time) at time zone 'Asia/Taipei')<=now() then
+    raise exception using errcode='22023',message='預計出發時間已經過去，請選擇目前時間之後的時段';
+  end if;
+  if new.status='completed' and ((new.actual_departure_at is not null and new.actual_departure_at>now()) or (new.actual_return_at is not null and new.actual_return_at>now())) then
+    raise exception using errcode='22023',message='實際出發與回程時間不得晚於目前時間';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_guard_vehicle_dispatch_time_window on vehicle_dispatch_requests;
+create trigger trg_guard_vehicle_dispatch_time_window
+  before insert or update of trip_date,planned_departure_time,planned_return_time,status,actual_departure_at,actual_return_at
+  on vehicle_dispatch_requests for each row execute function guard_vehicle_dispatch_time_window();
+
 alter table official_vehicles enable row level security;
 alter table vehicle_dispatch_managers enable row level security;
 alter table vehicle_dispatch_drivers enable row level security;

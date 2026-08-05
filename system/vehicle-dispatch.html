@@ -149,6 +149,11 @@ const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const val=id=>(byId(id)?.value||'').trim();
 const todayISO=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
 const nowLocalInput=()=>{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const p={};parts.forEach(x=>p[x.type]=x.value);const minute=Number(p.minute)<30?'00':'30';return `${p.year}-${p.month}-${p.day}T${p.hour}:${minute}`;};
+function taipeiDateTime(date,time){return new Date(`${date}T${String(time||'').slice(0,5)}:00+08:00`);}
+function isPastPlannedSlot(date,time){return !date||!time||taipeiDateTime(date,time)<=new Date();}
+function localInputAt(value){return new Date(`${String(value||'').slice(0,16)}:00+08:00`);}
+function isFutureActualTime(value){return !!value&&localInputAt(value)>new Date();}
+function actualDateTimeMax(tripDate){return tripDate<todayISO()?`${tripDate}T23:30`:nowLocalInput();}
 const fmtDate=v=>v?String(v).slice(0,10):'—';
 function fmtDateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ').slice(0,16);return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replaceAll('/','-');}
 function toIso(v){return v?new Date(v).toISOString():null;}
@@ -168,6 +173,10 @@ function setScheduleConflict(conflict){
   const notice=byId('fScheduleConflict');if(notice){notice.hidden=!conflict;notice.innerHTML=conflict?`<b>時段衝突，無法申請</b><br>${esc(scheduleConflictText(conflict))}`:'';}
   document.querySelectorAll('#requestActions [data-application-save]').forEach(button=>button.disabled=!!conflict);
 }
+function setScheduleProblem(message){
+  const notice=byId('fScheduleConflict');if(notice){notice.hidden=!message;notice.innerHTML=message?`<b>時段不符，無法申請</b><br>${esc(message)}`:'';}
+  document.querySelectorAll('#requestActions [data-application-save]').forEach(button=>button.disabled=!!message);
+}
 async function findScheduleConflict(){
   const tripDate=val('fTripDate'),start=val('fDepartureTime'),end=val('fReturnTime');
   if(!tripDate||!start||!end||end<=start)return null;
@@ -178,6 +187,10 @@ async function findScheduleConflict(){
 async function auditScheduleConflict(notify=false){
   const tripDate=val('fTripDate'),start=val('fDepartureTime'),end=val('fReturnTime');
   if(!tripDate||!start||!end||end<=start){setScheduleConflict(null);return null;}
+  if(isPastPlannedSlot(tripDate,start)){
+    const message='預計出發時間已經過去，請選擇目前時間之後的時段。';
+    setScheduleProblem(message);if(notify)toast(message,true);return {validation_error:true,message};
+  }
   try{const conflict=await findScheduleConflict();setScheduleConflict(conflict);if(conflict&&notify)toast(scheduleConflictText(conflict),true);return conflict;}
   catch(e){setMsg('派車時段稽核失敗，請稍後重試');return {audit_error:true};}
 }
@@ -457,11 +470,12 @@ function driverForm(r){
   const start=r.odometer_start==null?(state.vehicles.find(v=>v.vehicle_id===r.vehicle_id)?.current_odometer||''):r.odometer_start;
   const previous=state.requests.filter(x=>x.request_id!==r.request_id&&x.vehicle_id===r.vehicle_id&&x.status==='completed'&&x.refueled&&x.refuel_odometer!=null).sort((a,b)=>new Date(b.completed_at||b.actual_return_at||0)-new Date(a.completed_at||a.actual_return_at||0))[0];
   const lastRefuelOdometer=r.last_refuel_odometer??previous?.refuel_odometer??'',lastRefuelCost=r.last_refuel_cost??previous?.refuel_cost??'';
+  const actualMax=actualDateTimeMax(r.trip_date);
   return `<section class="form-section"><h3>司機行車回報 <span class="tag">系統自動核算里程</span></h3><div class="form-grid">
     <div class="driver-time-grid">
       <div class="field driver-passengers"><label class="req">實際乘車人數</label><input type="number" min="0" id="fActualPassengers" value="${esc(r.actual_passenger_count??r.passenger_count??'')}"></div>
-      <div class="field driver-departure"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" data-time-end-id="fActualReturn" min="${esc(r.trip_date)}T00:00" max="${esc(r.trip_date)}T23:30" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
-      <div class="field driver-return"><label class="req">實際回程時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualReturn" min="${esc(r.trip_date)}T00:00" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
+      <div class="field driver-departure"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" data-time-end-id="fActualReturn" min="${esc(r.trip_date)}T00:00" max="${esc(actualMax)}" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
+      <div class="field driver-return"><label class="req">實際回程時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualReturn" min="${esc(r.trip_date)}T00:00" max="${esc(actualMax)}" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
     </div>
     <div class="field"><label class="req">汽車起始里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerStart" value="${esc(start)}" oninput="updateMileage()"></div>
     <div class="field"><label class="req">汽車回程里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerEnd" value="${esc(r.odometer_end??'')}" oninput="updateMileage()"></div>
@@ -524,6 +538,7 @@ function applicationPayload(){
   if(payload.applicant_phone.replace(/[^0-9#*]/g,'').length<4)throw new Error('請填寫至少 4 碼的分機、電話或手機號碼');
   if(!isHalfHour(payload.planned_departure_time)||!isHalfHour(payload.planned_return_time))throw new Error('預計時間請使用每 30 分鐘的時段');
   if(payload.planned_return_time<=payload.planned_departure_time)throw new Error('預計回程時間必須晚於出發時間');
+  if(isPastPlannedSlot(payload.trip_date,payload.planned_departure_time))throw new Error('預計出發時間已經過去，請選擇目前時間之後的時段');
   return payload;
 }
 function setMsg(message){const el=byId('requestMsg');if(el)el.textContent=message||'';}
@@ -532,6 +547,7 @@ async function saveApplication(submit){
     const photos=Array.from(byId('fApplicationPhotos')?.files||[]);
     const conflict=await auditScheduleConflict(false);
     if(conflict?.audit_error)throw new Error('派車時段稽核失敗，為避免重複派車，目前無法儲存');
+    if(conflict?.validation_error)throw new Error(conflict.message);
     if(conflict)throw new Error(scheduleConflictText(conflict));
     const payload=applicationPayload(),next=submit?'pending_approval':'draft';payload.status=next;
     let result,from=null;
@@ -553,6 +569,7 @@ async function saveApplication(submit){
 
 async function reviewRequest(approve){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canApprove(r))return;
+  if(approve&&isPastPlannedSlot(r.trip_date,timeText(r.planned_departure_time))){setMsg('預計出發時間已經過去，不能核可此派車申請');return;}
   const note=val('fSupervisorNote');if(!approve&&!note){setMsg('退回時請填寫原因');return;}
   const next=approve?'approved':'returned',payload={status:next,supervisor_id:currentUser.user_id,supervisor_name:currentUser.name,supervisor_note:note||null,approved_at:approve?new Date().toISOString():null};
   const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','pending_approval').select().maybeSingle();
@@ -562,6 +579,7 @@ async function reviewRequest(approve){
 
 async function dispatchRequest(){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canDispatch(r))return;
+  if(isPastPlannedSlot(r.trip_date,timeText(r.planned_departure_time))){setMsg('預計出發時間已經過去，不能進行派車');return;}
   const vehicle=state.vehicles.find(x=>x.vehicle_id===val('fVehicle')),driver=state.users.find(x=>x.user_id===val('fDriver'));
   if(!vehicle||!driver){setMsg('請選擇公務車及司機');return;}
   if(!state.drivers.some(x=>x.user_id===driver.user_id&&x.active)){setMsg('所選人員尚未被指派為公務車司機');return;}
@@ -589,6 +607,7 @@ async function completeTrip(){
   if(!Number.isInteger(passengers)||passengers<0||!departure||!returned||!Number.isFinite(start)||!Number.isFinite(end)){setMsg('請完整填寫實際人數、時間及里程');return;}
   if(!isHalfHourDateTime(departure)||!isHalfHourDateTime(returned)){setMsg('實際出發與回程時間請使用每 30 分鐘的時段');return;}
   if(departure.slice(0,10)!==r.trip_date){setMsg('實際出發日期必須與派車單的用車日期相同');return;}
+  if(isFutureActualTime(departure)||isFutureActualTime(returned)){setMsg('實際出發與回程時間不得晚於目前時間');return;}
   if(new Date(returned)<new Date(departure)){setMsg('實際回程時間不得早於出發時間');return;}
   if(end<start){setMsg('汽車回程里程不得小於起始里程');return;}
   if(refueled&&(!Number.isFinite(refuel)||refuel<start||refuel>end)){setMsg('加油里程必須介於起始與回程里程之間');return;}

@@ -646,16 +646,18 @@ body.handover-only .repair-handover-head a{display:none!important}
 const DTP=(()=>{
   const S={};const _p=n=>String(n).padStart(2,'0');
   function _days(y,m){return new Date(y,m,0).getDate();}
+  function _dateKey(y,m,d){return `${y}-${_p(m)}-${_p(d)}`;}
+  function _blocked(s,y,m,d){const key=_dateKey(y,m,d);return !!((s.min&&key<s.min.slice(0,10))||(s.max&&key>s.max.slice(0,10)));}
   function _fmt(s){if(!s||!s.d)return null;return s.mode==='datetime'?`${s.y}/${_p(s.m)}/${_p(s.d)} ${_p(s.H||0)}:${_p(s.M||0)}`:`${s.y}/${_p(s.m)}/${_p(s.d)}`;}
   function getValue(id){const s=S[id];if(!s||!s.d)return null;const b=`${s.y}-${_p(s.m)}-${_p(s.d)}`;return s.mode==='datetime'?`${b}T${_p(s.H||0)}:${_p(s.M||0)}:00`:b;}
   function setValue(id,val){const s=S[id];if(!s)return;if(!val){s.y=s.m=s.d=null;s.H=0;s.M=0;}else{const dt=new Date(typeof val==='string'&&!val.includes('T')?val+'T00:00:00':val);s.y=dt.getFullYear();s.m=dt.getMonth()+1;s.d=dt.getDate();s.H=dt.getHours();s.M=dt.getMinutes();s.vy=s.y;s.vm=s.m;}_rD(id);}
   function _rD(id){const s=S[id];const f=_fmt(s);const v=document.getElementById(id+'_v');const b=document.getElementById(id+'_b');const p=document.getElementById(id+'_p');if(v)v.textContent=f||'— 點選選擇 —';if(b)b.style.color=f?'var(--text-hi,#e0f0ff)':'var(--text-dim,#4a7a8a)';if(p){if(s._o){const r=b.getBoundingClientRect();p.style.top=(r.bottom+3)+'px';p.style.left=r.left+'px';p.style.display='block';}else p.style.display='none';}if(s._o)_rP(id);}
-  function _rP(id){const p=document.getElementById(id+'_p');if(!p)return;const s=S[id];const now=new Date();const vy=s.vy||s.y||now.getFullYear();const vm=s.vm||s.m||(now.getMonth()+1);const dim=_days(vy,vm);const fdow=new Date(vy,vm-1,1).getDay();let rows='<tr>';let col=0;for(let i=0;i<fdow;i++,col++)rows+='<td></td>';for(let d=1;d<=dim;d++,col++){if(col&&col%7===0)rows+='</tr><tr>';const sel=s.d===d&&s.m===vm&&s.y===vy;const tod=now.getDate()===d&&now.getMonth()+1===vm&&now.getFullYear()===vy;rows+=`<td onclick="DTP._pd('${id}',${vy},${vm},${d})" style="width:32px;height:26px;text-align:center;cursor:pointer;border-radius:2px;font-size:.76rem;${sel?'background:var(--cyan,#00d4ff);color:#000;font-weight:bold':tod?'color:var(--cyan,#00d4ff);outline:1px solid var(--cyan,#00d4ff)':''}">${d}</td>`;}rows+='</tr>';const th=['日','一','二','三','四','五','六'].map(d=>`<td style="color:var(--text-dim,#4a7a8a);font-size:.7rem;text-align:center;padding-bottom:3px">${d}</td>`).join('');const tH=s.mode==='datetime'?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#1a3a4a)"><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">時</span><select onchange="DTP._sh('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:24},(_,i)=>`<option value="${i}"${(s.H||0)===i?' selected':''}>${_p(i)}</option>`).join('')}</select><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">分</span><select onchange="DTP._sm('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:12},(_,i)=>`<option value="${i*5}"${(s.M||0)===i*5?' selected':''}>${_p(i*5)}</option>`).join('')}</select></div>`:'';p.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button type="button" onclick="DTP._pm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">◀</button><span style="font-size:.8rem;color:var(--text-hi,#e0f0ff);font-family:var(--font-head,monospace)">${vy} 年 ${vm} 月</span><button type="button" onclick="DTP._nm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">▶</button></div><table style="width:100%;border-collapse:collapse"><tr>${th}</tr>${rows}</table>${tH}<div style="display:flex;gap:8px;margin-top:10px"><button type="button" onclick="DTP._cl('${id}')" style="flex:1;background:none;border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);padding:5px;cursor:pointer;font-size:.75rem;border-radius:2px">清除</button><button type="button" onclick="DTP._ok('${id}')" style="flex:1;background:var(--cyan,#00d4ff);border:none;color:#000;padding:5px;cursor:pointer;font-size:.75rem;font-weight:bold;border-radius:2px">確認</button></div>`;}
-  function init(id,mode,cb){S[id]={mode:mode||'date',y:null,m:null,d:null,H:0,M:0,vy:null,vm:null,_o:false,_cb:cb||null};const el=document.getElementById(id);if(!el)return;el.innerHTML=`<button id="${id}_b" type="button" onclick="DTP._tog('${id}')" style="width:100%;text-align:left;padding:8px 10px;background:rgba(2,8,20,.8);border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);font-family:var(--font-mono,monospace);font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border-radius:2px"><span id="${id}_v">— 點選選擇 —</span><span style="color:var(--cyan,#00d4ff);font-size:.65rem">▾</span></button>`;const pop=document.createElement('div');pop.id=id+'_p';pop.style.cssText='display:none;position:fixed;z-index:9999;min-width:240px;background:#071220;border:1px solid #1a3a4a;padding:12px;box-shadow:0 6px 24px rgba(0,212,255,.18);box-sizing:border-box';document.body.appendChild(pop);if(!DTP._gl){document.addEventListener('click',e=>{const path=e.composedPath?e.composedPath():[];Object.keys(S).forEach(pid=>{if(!S[pid]._o)return;const btn=document.getElementById(pid+'_b');const pop=document.getElementById(pid+'_p');if((!btn||!path.includes(btn))&&(!pop||!path.includes(pop))){S[pid]._o=false;_rD(pid);}});});DTP._gl=true;}}
+  function _rP(id){const p=document.getElementById(id+'_p');if(!p)return;const s=S[id];const now=new Date();const vy=s.vy||s.y||now.getFullYear();const vm=s.vm||s.m||(now.getMonth()+1);const dim=_days(vy,vm);const fdow=new Date(vy,vm-1,1).getDay();let rows='<tr>';let col=0;for(let i=0;i<fdow;i++,col++)rows+='<td></td>';for(let d=1;d<=dim;d++,col++){if(col&&col%7===0)rows+='</tr><tr>';const sel=s.d===d&&s.m===vm&&s.y===vy;const tod=now.getDate()===d&&now.getMonth()+1===vm&&now.getFullYear()===vy;const blocked=_blocked(s,vy,vm,d);rows+=`<td${blocked?'':` onclick="DTP._pd('${id}',${vy},${vm},${d})"`} style="width:32px;height:26px;text-align:center;cursor:${blocked?'not-allowed':'pointer'};border-radius:2px;font-size:.76rem;${blocked?'opacity:.3;':sel?'background:var(--cyan,#00d4ff);color:#000;font-weight:bold':tod?'color:var(--cyan,#00d4ff);outline:1px solid var(--cyan,#00d4ff)':''}">${d}</td>`;}rows+='</tr>';const th=['日','一','二','三','四','五','六'].map(d=>`<td style="color:var(--text-dim,#4a7a8a);font-size:.7rem;text-align:center;padding-bottom:3px">${d}</td>`).join('');const tH=s.mode==='datetime'?`<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#1a3a4a)"><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">時</span><select onchange="DTP._sh('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${Array.from({length:24},(_,i)=>`<option value="${i}"${(s.H||0)===i?' selected':''}>${_p(i)}</option>`).join('')}</select><span style="color:var(--text-dim,#4a7a8a);font-size:.78rem">分</span><select onchange="DTP._sm('${id}',this.value)" style="flex:1;padding:4px;background:rgba(2,8,20,.9);border:1px solid var(--border,#1a3a4a);color:var(--text-hi,#e0f0ff);font-size:.78rem">${[0,30].map(m=>`<option value="${m}"${(s.M||0)===m?' selected':''}>${_p(m)}</option>`).join('')}</select></div>`:'';p.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><button type="button" onclick="DTP._pm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">◀</button><span style="font-size:.8rem;color:var(--text-hi,#e0f0ff);font-family:var(--font-head,monospace)">${vy} 年 ${vm} 月</span><button type="button" onclick="DTP._nm('${id}')" style="background:none;border:none;color:var(--cyan,#00d4ff);cursor:pointer;font-size:1rem;padding:2px 8px">▶</button></div><table style="width:100%;border-collapse:collapse"><tr>${th}</tr>${rows}</table>${tH}<div style="display:flex;gap:8px;margin-top:10px"><button type="button" onclick="DTP._cl('${id}')" style="flex:1;background:none;border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);padding:5px;cursor:pointer;font-size:.75rem;border-radius:2px">清除</button><button type="button" onclick="DTP._ok('${id}')" style="flex:1;background:var(--cyan,#00d4ff);border:none;color:#000;padding:5px;cursor:pointer;font-size:.75rem;font-weight:bold;border-radius:2px">確認</button></div>`;}
+  function init(id,mode,cb,limits={}){S[id]={mode:mode||'date',y:null,m:null,d:null,H:0,M:0,vy:null,vm:null,min:limits.min||'',max:limits.max||'',_o:false,_cb:cb||null};const el=document.getElementById(id);if(!el)return;el.innerHTML=`<button id="${id}_b" type="button" onclick="DTP._tog('${id}')" style="width:100%;text-align:left;padding:8px 10px;background:rgba(2,8,20,.8);border:1px solid var(--border,#1a3a4a);color:var(--text-dim,#4a7a8a);font-family:var(--font-mono,monospace);font-size:.82rem;cursor:pointer;display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;border-radius:2px"><span id="${id}_v">— 點選選擇 —</span><span style="color:var(--cyan,#00d4ff);font-size:.65rem">▾</span></button>`;const pop=document.createElement('div');pop.id=id+'_p';pop.style.cssText='display:none;position:fixed;z-index:9999;min-width:240px;background:#071220;border:1px solid #1a3a4a;padding:12px;box-shadow:0 6px 24px rgba(0,212,255,.18);box-sizing:border-box';document.body.appendChild(pop);if(!DTP._gl){document.addEventListener('click',e=>{const path=e.composedPath?e.composedPath():[];Object.keys(S).forEach(pid=>{if(!S[pid]._o)return;const btn=document.getElementById(pid+'_b');const pop=document.getElementById(pid+'_p');if((!btn||!path.includes(btn))&&(!pop||!path.includes(pop))){S[pid]._o=false;_rD(pid);}});});DTP._gl=true;}}
   function _tog(id){Object.keys(S).forEach(pid=>{if(pid!==id&&S[pid]._o){S[pid]._o=false;_rD(pid);}});S[id]._o=!S[id]._o;_rD(id);}
   function _pm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(--m<1){m=12;y--;}s.vy=y;s.vm=m;_rP(id);}
   function _nm(id){const s=S[id];const now=new Date();let y=s.vy||s.y||now.getFullYear();let m=s.vm||s.m||(now.getMonth()+1);if(++m>12){m=1;y++;}s.vy=y;s.vm=m;_rP(id);}
-  function _pd(id,y,m,d){const s=S[id];s.y=y;s.m=m;s.d=d;s.vy=y;s.vm=m;if(s.mode==='date'){s._o=false;_rD(id);if(s._cb)s._cb(getValue(id));}else _rP(id);}
+  function _pd(id,y,m,d){const s=S[id];if(_blocked(s,y,m,d))return;s.y=y;s.m=m;s.d=d;s.vy=y;s.vm=m;if(s.mode==='date'){s._o=false;_rD(id);if(s._cb)s._cb(getValue(id));}else _rP(id);}
   function _sh(id,h){S[id].H=parseInt(h);}
   function _sm(id,m){S[id].M=parseInt(m);}
   function _cl(id){const s=S[id];s.y=s.m=s.d=null;s.H=0;s.M=0;s._o=false;_rD(id);if(s._cb)s._cb(null);}
@@ -675,7 +677,8 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 })();
 
 // 全系統統一日期格式：西元 YYYY-MM-DD
-function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function todayISO(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());}
+function taipeiDateTime(value){return new Date(`${String(value||'').slice(0,16)}:00+08:00`);}
 function fmtDate(v){if(!v)return '—';const d=new Date(v);if(isNaN(d))return String(v).slice(0,10);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 window.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('hFiled');if(el)el.textContent=todayISO();});
 
@@ -826,10 +829,9 @@ function applyPerms() {
 
   buildDeptSelects();
   presetCurrentHandover();
-  DTP.init('caseIncidentPicker', 'datetime');
-
   const today = todayISO();
-  DTP.init('hDate-dtp', 'date', onShiftChange);
+  DTP.init('caseIncidentPicker', 'datetime', null, { max:today });
+  DTP.init('hDate-dtp', 'date', onShiftChange, { min:today });
   DTP.setValue('hDate-dtp', today);
   DTP.init('cfDateFrom-dtp', 'date', loadCases);
   DTP.init('cfDateTo-dtp', 'date', loadCases);
@@ -985,13 +987,18 @@ function onTakeoverDeptChange() {
 // ── SHIFT CHANGE ───────────────────────────────────
 function onShiftChange() { fetchEqStatus(); fetchRepairStatus(); }
 
+function shiftBounds(dateStr,type){
+  const shift=_shifts.find(s=>s.id===type);
+  if(!dateStr||!shift)return null;
+  const start=taipeiDateTime(`${dateStr}T${shift.start.slice(0,5)}`);
+  const end=taipeiDateTime(`${dateStr}T${shift.end.slice(0,5)}`);
+  if(end<=start)end.setUTCDate(end.getUTCDate()+1);
+  return {start,end};
+}
+function isPastHandoverShift(dateStr,type){const bounds=shiftBounds(dateStr,type);return !bounds||bounds.end<=new Date();}
 function shiftRange(dateStr, type) {
-  const [h1, h2] = SHIFT_HOURS[type];
-  const base = new Date(dateStr + 'T00:00:00');
-  return {
-    from: new Date(base.getTime() + h1 * 3600000).toISOString(),
-    to:   new Date(base.getTime() + h2 * 3600000).toISOString()
-  };
+  const bounds=shiftBounds(dateStr,type);
+  return {from:bounds.start.toISOString(),to:bounds.end.toISOString()};
 }
 
 // ── FETCH EQ STATUS ────────────────────────────────
@@ -1158,6 +1165,7 @@ async function doSave(mode) {
   const eqNormal  = parseInt(document.getElementById('eqNormal').textContent) || 0;
   const eqAbnormal= parseInt(document.getElementById('eqAbnormal').textContent) || 0;
   if (!date) { showToast('請選擇交接日期', true); return; }
+  if (isPastHandoverShift(date, shift)) { showToast('所選交接日期與班別已經結束，不能建立過去班次的交接單', true); return; }
   if (!handoverBy && !takeoverBy) { showToast('請至少填寫交接人或接班人', true); return; }
   const status = mode === 'submitted' ? 'confirmed' : 'draft';
   const record = {
@@ -1418,6 +1426,7 @@ async function submitCase() {
   const title    = document.getElementById('caseTitle').value.trim() ||
                    (cat + (sub ? ' – ' + sub : '') + (other ? ' – ' + other : ''));
   const incTime = DTP.getValue('caseIncidentPicker');
+  if (incTime && taipeiDateTime(incTime) > new Date()) { showToast('發生時間不得晚於目前時間', true); return; }
 
   const newCase = {
     case_no:          caseNo,

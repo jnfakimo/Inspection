@@ -68,6 +68,19 @@ CREATE POLICY "all_access_cases" ON handover_cases FOR ALL USING (true) WITH CHE
 CREATE POLICY "all_access_case_logs" ON handover_case_logs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "all_access_attachments" ON handover_case_attachments FOR ALL USING (true) WITH CHECK (true);
 
+-- 異常發生時間是實際紀錄，不得填寫尚未發生的未來時間。
+CREATE OR REPLACE FUNCTION guard_handover_incident_time()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path=public AS $$
+BEGIN
+  IF NEW.incident_time IS NOT NULL AND NEW.incident_time>NOW() THEN
+    RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='發生時間不得晚於目前時間';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_guard_handover_incident_time ON handover_cases;
+CREATE TRIGGER trg_guard_handover_incident_time BEFORE INSERT OR UPDATE OF incident_time ON handover_cases FOR EACH ROW EXECUTE FUNCTION guard_handover_incident_time();
+
 -- ============================================================
 -- 5. Supabase Storage 設定（需手動在 Dashboard 建立）
 --    Storage > New bucket > 名稱: handover-attachments
