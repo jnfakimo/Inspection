@@ -2092,6 +2092,7 @@ function renderUsers(users) {
       <button class="btn btn-sm" style="border:1px solid var(--amber);color:var(--amber);background:rgba(255,179,0,.08)" onclick="openResetPwModal('${u.user_id}','${escHtml(u.name)}','${escHtml(u.email||'')}')">🔑 重設密碼</button>
       ${u.status === 'active' && u.user_id !== currentUser.user_id ? `<button class="btn btn-warn btn-sm" onclick="toggleUserStatus('${u.user_id}','inactive')">停用</button>` : ''}
       ${u.status === 'inactive' ? `<button class="btn btn-primary btn-sm" onclick="toggleUserStatus('${u.user_id}','active')">啟用</button>` : ''}
+      ${u.status === 'inactive' && !String(u.username||'').startsWith('deidentified-') ? `<button class="btn btn-sm" style="border:1px solid var(--red);color:var(--red);background:rgba(255,59,59,.08)" onclick="deidentifyUser('${u.user_id}','${escHtml(u.name)}')">去識別化個資</button>` : ''}
     </td>
   </tr>`).join('');
 }
@@ -2664,6 +2665,13 @@ async function toggleUserStatus(userId, status) {
   await loadUsers();
 }
 
+async function deidentifyUser(userId, name) {
+  if (!confirm(`確定要清除「${name}」的姓名/電話/Email/登入帳號等直接識別資料嗎？\n\n這個動作無法復原（但不會刪除任何歷史稽核紀錄），僅適用於確定不再需要保留聯絡方式的離職人員。`)) return;
+  const { error } = await db.rpc('deidentify_departed_user', { p_user_id: userId });
+  if (error) { showToast('去識別化失敗：' + translateError(error.message), true); return; }
+  showToast('已完成個資去識別化');
+  await loadUsers();
+}
 async function loadEquipmentList() {
   await loadAll();
   renderEquipment(allEquipment);
