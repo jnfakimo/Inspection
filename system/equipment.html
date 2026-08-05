@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260805-4"></script>
+<script src="floor-utils.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>設備建置與生命週期管理 — 臺北農產公司</title>
@@ -168,7 +169,7 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openModal(id){document.getElementById(id).classList.add('show');}
 function schemaError(error){return error&&(error.code==='42P01'||error.code==='42703'||/does not exist|schema cache|column .* could not be found/i.test(error.message||''));}
 function floorRank(v){const s=String(v||'').toUpperCase();const b=s.match(/^B(\d+)F?$/);if(b)return 100-Number(b[1]);const n=s.match(/^(\d+)F?$/);if(n)return 100+Number(n[1]);if(s==='RF')return 999;return 500;}
-function canonicalFloor(v){const s=String(v||'').trim().toUpperCase();if(/^B\d+$/.test(s))return s;if(/^B\d+F$/.test(s))return s.slice(0,-1);if(/^\d+$/.test(s))return s+'F';return s;}
+function canonicalFloor(v){return window.FloorUtils.canonicalFloor(v);}
 function dueClass(v){if(!v)return '';const days=(new Date(v+'T00:00:00')-new Date(todayISO()+'T00:00:00'))/86400000;return days<0?'bad':days<=30?'warn':'ok';}
 function statusPill(s){const c=s==='active'?'ok':s==='retired'||s==='expired'?'bad':'warn';return `<span class="pill ${c}">${esc(STATUS[s]||s||'—')}</span>`;}
 
@@ -190,7 +191,7 @@ function renderSetup(){const b=document.getElementById('setupBanner');if(!missin
 function updateFilters(){
   const floors=[...new Set(state.assets.map(x=>canonicalFloor(x.floor||x.location)).filter(Boolean))].sort((a,b)=>floorRank(a)-floorRank(b));
   const cats=[...new Set(state.assets.map(x=>x.category).filter(Boolean))].sort();
-  document.getElementById('floorFilter').innerHTML='<option value="">全部樓層</option>'+floors.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  document.getElementById('floorFilter').innerHTML='<option value="">全部樓層</option>'+floors.map(v=>`<option value="${esc(v)}">${esc(window.FloorUtils.floorLabel(v))}</option>`).join('');
   document.getElementById('categoryFilter').innerHTML='<option value="">全部類別</option>'+cats.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
 }
 function updateKpis(){
@@ -220,7 +221,7 @@ function equipmentDisplayData(e){
   const plans=state.plans.filter(x=>x.equipment_id===e.equipment_id&&x.status==='active');
   const due=plans.map(x=>x.next_due_on).filter(Boolean).sort()[0]||e.next_maintenance_on;
   return {
-    code:e.asset_code||e.qr_code||'',floor:canonicalFloor(e.floor||e.location),due,
+    code:e.asset_code||e.qr_code||'',floor:window.FloorUtils.floorLabel(canonicalFloor(e.floor||e.location)),due,
     linked:state.links.some(x=>x.equipment_id===e.equipment_id&&x.status==='active'),
     marker:markerForEquipment(e.equipment_id)
   };
@@ -234,7 +235,7 @@ function renderAssets(){
 
 function markerForEquipment(equipmentId){return state.markers.filter(m=>m.equipment_id===equipmentId&&m.status!=='inactive').sort((a,b)=>new Date(b.updated_at||b.created_at||0)-new Date(a.updated_at||a.created_at||0))[0]||null;}
 function equipment3DUrl(equipmentId){const u=new URL('floor3d.html',location.href);u.searchParams.set('equipment',equipmentId);return u.href;}
-function markerCoordinate(marker){if(!marker)return '尚未設定 3D 點位';const x=Number(marker.x),y=Number(marker.y);return `${canonicalFloor(marker.floor_id)||marker.floor_id}｜X ${Number.isFinite(x)?x.toFixed(4):'—'}｜Y ${Number.isFinite(y)?y.toFixed(4):'—'}`;}
+function markerCoordinate(marker){if(!marker)return '尚未設定 3D 點位';const x=Number(marker.x),y=Number(marker.y);return `${window.FloorUtils.floorLabel(canonicalFloor(marker.floor_id))||marker.floor_id}｜X ${Number.isFinite(x)?x.toFixed(4):'—'}｜Y ${Number.isFinite(y)?y.toFixed(4):'—'}`;}
 function renderQrInto(el,text,size=190){el.innerHTML='';if(typeof QRCode!=='function'){el.textContent='QR 元件載入失敗，請重新整理頁面。';return null;}new QRCode(el,{text,width:size,height:size,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});return el.querySelector('canvas,img');}
 function openEquipmentQr(id){const e=eq(id);if(!e.equipment_id)return;const marker=markerForEquipment(id),url=equipment3DUrl(id);document.getElementById('qrModalTitle').textContent=`設備 3D 定位 QR｜${e.asset_code||e.qr_code||e.name}`;document.getElementById('qrModalBody').innerHTML=`<div class="qr-preview-box"><div id="equipmentQrCanvas"></div></div><div class="qr-meta"><div class="k">設備</div><div class="v"><strong>${esc(e.name)}</strong></div><div class="k">設備編號</div><div class="v code">${esc(e.asset_code||e.qr_code||'—')}</div><div class="k">3D 點位</div><div class="v qr-coordinate">${esc(markerCoordinate(marker))}</div><div class="k">掃描結果</div><div class="v">${marker?'開啟 3D 雲台並聚焦此設備':'開啟 3D 雲台；待設定點位後會自動定位'}</div></div>`;document.getElementById('qrModalMsg').textContent=marker?'':'此設備尚未在平面標記系統綁定 3D 點位。';document.getElementById('qr3dLink').href=url;document.getElementById('qrPrintOneBtn').onclick=()=>printEquipmentQR(id);openModal('qrModal');requestAnimationFrame(()=>renderQrInto(document.getElementById('equipmentQrCanvas'),url,190));}
 async function qrDataUrl(text,size=300){const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-9999px;top:-9999px;background:#fff;padding:4px';document.body.appendChild(holder);renderQrInto(holder,text,size);await new Promise(r=>setTimeout(r,40));const canvas=holder.querySelector('canvas'),img=holder.querySelector('img');const src=canvas?canvas.toDataURL('image/png'):(img?.src||'');holder.remove();return src;}
@@ -247,7 +248,7 @@ async function printEquipmentCards(assets,title){
   const cards=[];
   for(const e of assets){
     const marker=markerForEquipment(e.equipment_id),src=await qrDataUrl(equipment3DUrl(e.equipment_id),260);
-    cards.push(`<article><img src="${src}" alt="QR"><h2>${esc(e.asset_code||e.qr_code||'—')}</h2><h3>${esc(e.name||'')}</h3><p>${esc(canonicalFloor(e.floor||e.location)||'—')}｜${esc(e.location||'')}</p><p class="coord ${marker?'':'warn'}">${esc(markerCoordinate(marker))}</p></article>`);
+    cards.push(`<article><img src="${src}" alt="QR"><h2>${esc(e.asset_code||e.qr_code||'—')}</h2><h3>${esc(e.name||'')}</h3><p>${esc(window.FloorUtils.floorLabel(canonicalFloor(e.floor||e.location))||'—')}｜${esc(e.location||'')}</p><p class="coord ${marker?'':'warn'}">${esc(markerCoordinate(marker))}</p></article>`);
   }
   const mapped=assets.filter(e=>markerForEquipment(e.equipment_id)).length;
   const printScript='<scr'+'ipt>addEventListener("load",()=>setTimeout(()=>print(),300));</scr'+'ipt>';
@@ -391,7 +392,7 @@ function exportLastValue(v){if(v==null)return '';return typeof v==='object'?JSON
 
 function buildEquipmentExportRow(e){
   const d=equipmentDisplayData(e),m=d.marker;
-  return {'設備編號':d.code,'QR定位網址':equipment3DUrl(e.equipment_id),'3D點位狀態':m?'已設定':'未設定','3D樓層':m?canonicalFloor(m.floor_id):'',
+  return {'設備編號':d.code,'QR定位網址':equipment3DUrl(e.equipment_id),'3D點位狀態':m?'已設定':'未設定','3D樓層':m?window.FloorUtils.floorLabel(canonicalFloor(m.floor_id)):'',
     'X座標':m?exportNumber(m.x):null,'Y座標':m?exportNumber(m.y):null,'Z座標':m?exportNumber(m.z):null,'安裝樓層':d.floor,'位置說明':e.location||'',
     '設備名稱':e.name||'','設備類別':e.category||'','設備照片':e.photo_url||'','使用部門':e.department||'','廠牌':e.brand||'','型號':e.model||'','序號':e.serial_no||'',
     '製造年份':exportNumber(e.manufactured_year),'安裝日期':exportDate(e.installed_on),'驗收日期':exportDate(e.accepted_on),'設備壽命(年)':exportNumber(e.service_life_y),'電壓':e.voltage||'','功率(kW)':exportNumber(e.power_kw),
