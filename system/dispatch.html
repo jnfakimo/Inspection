@@ -594,9 +594,13 @@ function openCreate(){
 
 // ─── 待派工 ───
 let curReq=null;
+let dispatchSubmitting=false;
+let detailRequestSeq=0;
 async function openPendingDetail(id){
-  curReq=reqs.find(r=>r.request_id===id);
-  if(!curReq)return;
+  const seq=++detailRequestSeq;
+  const req=reqs.find(r=>r.request_id===id);
+  if(!req)return;
+  curReq=req;
   const o=ordersByReq[id];
   document.getElementById('d-title').textContent='待派工 — '+displayReqNo(curReq);
   document.getElementById('d-badge').outerHTML=`<span class="badge" id="d-badge">${(ST[curReq.status]||['',''])[0]}</span>`;
@@ -606,6 +610,7 @@ async function openPendingDetail(id){
     db.from('case_status_log').select('*').eq('request_id',id).order('created_at',{ascending:true}),
     db.from('repair_attachments').select('*').eq('request_id',id)
   ]);
+  if(seq!==detailRequestSeq)return;
   body.innerHTML=`
     <div class="d-info">
       <div><span class="k">報修單號：</span><span class="v">${escHtml(displayReqNo(curReq))}</span></div>
@@ -675,6 +680,9 @@ function dispatchForm(r){
   </div>`;
 }
 async function doDispatch(reqId){
+  if(dispatchSubmitting)return;
+  dispatchSubmitting=true;
+  try{
   if(!hasPerm('dispatch')){toast('沒有派工權限',true);return;}
   const r=reqs.find(x=>x.request_id===reqId);
   const tech=document.getElementById('x-tech').value, vendor=document.getElementById('x-vendor').value.trim();
@@ -690,6 +698,9 @@ async function doDispatch(reqId){
   if(tech){ try{ await db.from('notifications').insert({recipient_id:tech,event:'dispatch',title:'新派工通知',
     body:`${r.req_no||''}｜${r.fault_type||'設備'}｜${r.fault_desc||''}`,request_id:reqId,order_id:data.order_id}); }catch(e){} }
   await loadData(); renderChips(); renderList(); openPendingDetail(reqId); toast('已派工');
+  }finally{
+    dispatchSubmitting=false;
+  }
 }
 async function cancelCase(r){
   if(!hasPerm('delete')){toast('沒有刪除/取消權限',true);return;}
@@ -700,6 +711,7 @@ async function cancelCase(r){
 
 // ─── 工單詳情 ───
 async function openOrderDetail(ordId){
+  const seq=++detailRequestSeq;
   const o=orders.find(x=>x.order_id===ordId);
   if(!o)return;
   const r=reqs.find(x=>x.request_id===o.request_id)||o.repair_requests;
@@ -710,6 +722,7 @@ async function openOrderDetail(ordId){
   const [{data:logs}]=await Promise.all([
     db.from('case_status_log').select('*').eq('order_id',ordId).order('created_at',{ascending:true})
   ]);
+  if(seq!==detailRequestSeq)return;
   const tech=o.users?.name||'';
   const vendor=o.vendor||'';
   body.innerHTML=`
@@ -821,7 +834,7 @@ async function reopen(r,o){if(!hasPerm('update')){toast('沒有更新權限',tru
 async function reloadAndReopen(ordId){ await loadData(); renderChips(); renderList(); if(ordId)openOrderDetail(ordId); }
 
 function show(id){document.getElementById(id).classList.add('show');}
-function closeM(id){document.getElementById(id).classList.remove('show');}
+function closeM(id){document.getElementById(id).classList.remove('show');if(id==='m-detail')detailRequestSeq++;}
 let _tt;function toast(m,err){const el=document.getElementById('toast');el.textContent=m;el.style.borderColor=err?'var(--red)':'var(--border-hi)';el.style.color=err?'var(--red)':'var(--text)';el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2400);}
 
 init().catch(e=>{document.getElementById('list').innerHTML=`<tr><td colspan="7" class="empty" style="color:var(--red)">載入失敗：${escHtml(translateError(e.message))}<br><small>請確認已執行 work_order_schema.sql</small></td></tr>`;});
