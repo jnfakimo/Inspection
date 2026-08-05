@@ -15,6 +15,7 @@ if (location.hash === '#repairs') {
 <meta http-equiv="Expires" content="0">
 <title>臺北農產公司 第一果菜市場 後台管理系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1542,9 +1543,10 @@ const DTP=(()=>{
   return{init,getValue,setValue,_tog,_pm,_nm,_pd,_sh,_sm,_cl,_ok};
 })();
 // ─────────────────────────────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// 別名指向共用設定（system/supabase-config.js），保留本檔其餘處對這兩個
+// 名稱的既有引用（authClient 建立、LINE 通知 fetch 標頭）不必逐一修改。
+const SUPABASE_URL = window.SUPA_URL, SUPABASE_ANON_KEY = window.SUPA_KEY;
+const db = createDb();
 (async()=>{
   const {data:{session}}=await db.auth.getSession();
   if(!session){const target='admin.html'+location.search+location.hash;location.href='login.html?redirect='+encodeURIComponent(target);return;}
