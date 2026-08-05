@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260805-4"></script>
+<script src="floor-utils.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>場域位置管理 — 臺北農產公司巡檢系統</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -560,7 +561,9 @@ function lmAreaSel(){
 async function saveLocation(){
   const id=document.getElementById('lm-id').value;
   const market=document.getElementById('lm-market').value;
-  const floor=document.getElementById('lm-floor').value.trim();
+  // 正規化寫入值（B1F→B1、1→1F、頂樓→RF），避免與其他頁面的樓層比對再度分歧；
+  // 既有歷史資料不動，只影響之後新增/編輯的紀錄。
+  const floor=window.FloorUtils.canonicalFloor(document.getElementById('lm-floor').value.trim());
   const area=document.getElementById('lm-area').value.trim();
   const detail=document.getElementById('lm-detail').value.trim();
   const order=parseInt(document.getElementById('lm-order').value)||0;
