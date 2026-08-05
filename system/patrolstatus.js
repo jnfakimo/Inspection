@@ -79,6 +79,12 @@ window.PatrolStatus = (function () {
     return markerPromise;
   }
 
+  // 標記編輯頁在新增/停用巡邏點後呼叫，清掉快取讓下一次 compute()/computeMatrix()
+  // 重新查詢，否則同一個工作階段內新增或停用的巡邏點永遠不會反映在狀態計算裡。
+  function invalidateMarkers() {
+    markerPromise = null;
+  }
+
   // 班別名稱/數量固定來自 patrol_shift_template；patrol_shifts 的時段專供逾時通報。
   // 巡檢表的班別判定與打卡統計改讀 patrol_shift_staff 內獨立設定的「上班時段」。
   async function getShiftsForDate(db, dateStr) {
@@ -203,5 +209,5 @@ window.PatrolStatus = (function () {
     return { shifts: ranges, markers: markers || [], matrix };
   }
 
-  return { compute, computeMatrix, COLORS, LABELS, dateStrOf };
+  return { compute, computeMatrix, invalidateMarkers, COLORS, LABELS, dateStrOf };
 })();
