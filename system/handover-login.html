@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>電子交接簿登入</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <style>
 :root{
   --bg:#eef4fb;
@@ -149,10 +150,8 @@ button:disabled{opacity:.64;cursor:wait}
 </main>
 
 <script>
-const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const HANDOVER_TARGET = 'handover.html';
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = createDb();
 
 const form = document.getElementById('loginForm');
 const usernameEl = document.getElementById('username');

@@ -1,8 +1,6 @@
 (function(){
   'use strict';
-  const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
-  const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-  const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+  const db=createDb();
   const offline=window.PatrolOffline;
   const card=document.getElementById('card');
   const badge=document.getElementById('offlineQueueBadge');

@@ -7,6 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>系統初始化</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -88,11 +89,9 @@ h1{font-size:1.3rem;font-weight:700;color:#f8fafc;margin-bottom:6px}
 </div>
 
 <script>
-const SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 const ADMIN_AUTH_ID = 'eb771a87-aa4d-4066-b23d-9b810a5c00bd';
 
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = createDb();
 function translateError(msg) {
   if (!msg) return '未知錯誤';
   if (msg.includes('duplicate key value')) return '資料重複，請確認是否已存在';
