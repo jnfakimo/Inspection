@@ -491,8 +491,6 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 
 /* ===== SEARCH BAR ===== */
 .search-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
-.audit-date-filter{flex:1 1 170px;min-width:170px;max-width:220px}
-.audit-date-filter label{display:block;margin-bottom:5px;color:var(--text-dim);font-size:.72rem;font-family:var(--font-head);letter-spacing:.06em}
 .audit-filter-summary{margin:-4px 0 12px;color:var(--text-dim);font-size:.75rem;font-family:var(--font-mono)}
 .search-input{
   flex:1;min-width:160px;padding:9px 13px;
@@ -508,6 +506,43 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   border-radius:2px;color:var(--text-hi);font-size:0.88rem;outline:none;
 }
 .search-bar select:focus{border-color:var(--cyan)}
+.audit-filter-bar{
+  align-items:flex-end;gap:14px;padding:16px 18px;margin-bottom:14px;
+  background:rgba(2,132,199,.04);border:1px solid var(--border);border-radius:6px;
+}
+.audit-filter-control{
+  flex:1 1 190px;min-width:170px;max-width:260px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.audit-filter-control label{
+  display:block;margin:0;color:var(--text-dim);font-size:.72rem;
+  font-family:var(--font-head);font-weight:700;letter-spacing:.06em;
+}
+.audit-filter-control select,
+.audit-filter-control [id$="-dtp"]>button{
+  box-sizing:border-box!important;width:100%!important;height:50px!important;min-height:50px!important;
+  margin:0!important;padding:0 14px!important;background:var(--surface)!important;
+  border:1px solid var(--border)!important;border-radius:5px!important;
+  color:var(--text-hi)!important;font-size:.86rem!important;font-family:var(--font-mono)!important;
+}
+.audit-filter-control select:focus,
+.audit-filter-control [id$="-dtp"]>button:focus-visible{
+  border-color:var(--cyan)!important;box-shadow:0 0 0 2px rgba(2,132,199,.12)!important;outline:none!important;
+}
+.audit-filter-clear{
+  box-sizing:border-box;height:50px;min-height:50px;padding:0 16px!important;
+  align-self:flex-end;background:var(--surface)!important;border:1px solid var(--border)!important;
+  border-radius:5px!important;color:var(--text-dim)!important;white-space:nowrap;
+}
+.audit-filter-clear:hover{border-color:var(--cyan)!important;color:var(--cyan)!important}
+@media(max-width:900px){
+  .audit-filter-control{max-width:none}
+}
+@media(max-width:560px){
+  .audit-filter-bar{padding:12px;gap:10px}
+  .audit-filter-control{flex-basis:100%;width:100%;max-width:none}
+  .audit-filter-clear{width:100%}
+}
 
 /* ===== COST ===== */
 .cost-eq-row{
@@ -949,34 +984,40 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
     <div class="page-section" id="page-audit">
       <div class="page-header"><h2><span class="section-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統紀錄</h2><p>系統操作紀錄 — 永久保存 / 不可竄改</p></div>
       <div class="panel">
-        <div class="search-bar">
-          <select id="auditTableFilter" onchange="loadAudit()">
-            <option value="">全部資料表</option>
-            <option value="users">帳號</option>
-            <option value="equipment">設備</option>
-            <option value="inspection_records">巡檢記錄</option>
-            <option value="repair_requests">報修單</option>
-            <option value="maintenance_orders">維修單</option>
-            <option value="cost_records">費用</option>
-            <option value="auth">登入/登出</option>
-          </select>
-          <select id="auditActionFilter" onchange="loadAudit()">
-            <option value="">全部動作</option>
-            <option value="insert">新增</option>
-            <option value="update">修改</option>
-            <option value="status_change">狀態變更</option>
-            <option value="login">登入</option>
-            <option value="logout">登出</option>
-          </select>
-          <div class="audit-date-filter">
+        <div class="search-bar audit-filter-bar">
+          <div class="audit-filter-control">
+            <label for="auditTableFilter">資料類型</label>
+            <select id="auditTableFilter" onchange="loadAudit()">
+              <option value="">全部資料表</option>
+              <option value="users">帳號</option>
+              <option value="equipment">設備</option>
+              <option value="inspection_records">巡檢記錄</option>
+              <option value="repair_requests">報修單</option>
+              <option value="maintenance_orders">維修單</option>
+              <option value="cost_records">費用</option>
+              <option value="auth">登入/登出</option>
+            </select>
+          </div>
+          <div class="audit-filter-control">
+            <label for="auditActionFilter">操作類型</label>
+            <select id="auditActionFilter" onchange="loadAudit()">
+              <option value="">全部動作</option>
+              <option value="insert">新增</option>
+              <option value="update">修改</option>
+              <option value="status_change">狀態變更</option>
+              <option value="login">登入</option>
+              <option value="logout">登出</option>
+            </select>
+          </div>
+          <div class="audit-filter-control">
             <label>起始日期</label>
             <div id="auditDateFrom-dtp"></div>
           </div>
-          <div class="audit-date-filter">
+          <div class="audit-filter-control">
             <label>結束日期</label>
             <div id="auditDateTo-dtp"></div>
           </div>
-          <button type="button" class="btn btn-sm" style="align-self:flex-end;background:rgba(12,40,64,.5);border:1px solid var(--border);color:var(--text-dim);white-space:nowrap" onclick="clearAuditFilters()">✕ 清除篩選</button>
+          <button type="button" class="btn btn-sm audit-filter-clear" onclick="clearAuditFilters()">✕ 清除篩選</button>
         </div>
         <div id="auditFilterSummary" class="audit-filter-summary"></div>
         <div id="auditList"><div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">載入中…</div></div>
