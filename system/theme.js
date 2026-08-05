@@ -77,11 +77,12 @@
     var auth=storedAuthSessionForAccess();
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
-    if(!token||!authId)return Promise.resolve((readProfile()||{}).rbac_role==='sysadmin');
+    function isSysadminProfile(profile){return !!profile&&(profile.rbac_role==='sysadmin'||profile.role==='admin');}
+    if(!token||!authId)return Promise.resolve(isSysadminProfile(readProfile()));
     return fetchUserRowForAccess(authId,token).then(function(profile){
       if(!profile)return false;
       saveProfile(profile);
-      return profile.rbac_role==='sysadmin';
+      return isSysadminProfile(profile);
     });
   }
   function denySysadminAccess(redirectPage){
