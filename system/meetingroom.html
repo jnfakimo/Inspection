@@ -9,8 +9,8 @@
 <title>會議室預約系統 — 臺北農產公司</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#9b5cff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--font-head:'Rajdhani','Noto Sans TC',sans-serif}
-:root[data-theme="light"]{--bg:#f4f6fa;--surface:#f8fafc;--panel:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b}
+:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#9b5cff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--weekend-bg:rgba(255,128,168,.12);--weekend-head:rgba(255,128,168,.2);--font-head:'Rajdhani','Noto Sans TC',sans-serif}
+:root[data-theme="light"]{--bg:#f4f6fa;--surface:#f8fafc;--panel:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b;--weekend-bg:#fff1f5;--weekend-head:#ffe4ec}
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:42px}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}
 .navbar{position:sticky;top:0;z-index:80;display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);overflow-x:auto}
 :root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}
@@ -39,6 +39,8 @@
 table.roomgrid{width:100%;border-collapse:collapse;font-size:.72rem;min-width:900px}
 table.roomgrid th{background:var(--surface);color:var(--cyan);font-weight:700;padding:8px 6px;border:1px solid var(--border);text-align:center;white-space:nowrap}
 table.roomgrid td{border:1px solid var(--border);vertical-align:top;padding:5px;min-width:110px}
+table.roomgrid th.weekend{background:var(--weekend-head)}
+table.roomgrid td.weekend{background:var(--weekend-bg)}
 table.roomgrid td.roomname{background:var(--surface);color:var(--text-hi);font-weight:700;white-space:nowrap;text-align:left;padding:8px}
 .daycell{min-height:56px;display:flex;flex-direction:column;gap:3px}
 .bk-pill{background:rgba(0,212,255,.08);border:1px solid var(--border-hi);border-radius:3px;padding:3px 5px;font-size:.65rem;line-height:1.4;cursor:default}
@@ -48,6 +50,8 @@ table.roomgrid td.roomname{background:var(--surface);color:var(--text-hi);font-w
 .add-cell:hover{border-color:var(--cyan);color:var(--cyan)}
 .empty{text-align:center;padding:32px 16px;color:var(--text-dim);font-size:.78rem}
 table.mytable{width:100%;border-collapse:collapse;font-size:.75rem}
+#myBox{overflow-x:auto}
+#myBox table.mytable{min-width:900px}
 table.mytable th{text-align:left;background:var(--surface);color:var(--cyan);padding:8px;border-bottom:1px solid var(--border)}
 table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
 .pill{display:inline-block;padding:2px 7px;border:1px solid var(--border);border-radius:9px;font-size:.62rem;color:var(--text-dim)}
@@ -70,12 +74,14 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
 .field label{font-size:.68rem;color:var(--text-dim)}
 .field input,.field select,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 9px;border-radius:3px;font-size:.8rem;outline:none}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan)}
+.field input[readonly]{color:var(--text-dim);cursor:not-allowed}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .conflict-alert{display:none;border:1px solid rgba(255,59,59,.5);background:rgba(255,59,59,.08);color:var(--red);padding:9px 10px;border-radius:4px;font-size:.72rem;margin-bottom:10px;line-height:1.6}
 .conflict-alert.show{display:block}
 .toast{position:fixed;left:50%;bottom:22px;z-index:400;transform:translate(-50%,90px);background:var(--panel);border:1px solid var(--cyan);color:var(--text-hi);padding:10px 17px;border-radius:4px;font-size:.76rem;transition:transform .25s}
 .toast.show{transform:translate(-50%,0)}
 .toast.err{border-color:var(--red)}
+@media(max-width:600px){.row2{grid-template-columns:1fr}.modal-bg{padding:8px}.modal-body{padding:13px}.modal-foot{padding:12px 13px}}
 </style>
 <link rel="stylesheet" href="light-mode-fix.css">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
@@ -136,8 +142,12 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
         <div class="field"><label>用途</label><input type="text" id="bkPurpose" placeholder="例：週會、面談"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>開始時間</label><input type="time" id="bkStart" step="900" onchange="checkConflictSoon()"></div>
-        <div class="field"><label>結束時間</label><input type="time" id="bkEnd" step="900" onchange="checkConflictSoon()"></div>
+        <div class="field"><label>開始時間（每 30 分鐘）</label><select id="bkStart" onchange="onStartTimeChange()"></select></div>
+        <div class="field"><label>結束時間（每 30 分鐘）</label><select id="bkEnd" onchange="checkConflictSoon()"></select></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>系統登記電話</label><input type="tel" id="bkSystemPhone" readonly></div>
+        <div class="field"><label>本次聯繫電話</label><input type="tel" id="bkContactPhone" autocomplete="tel" placeholder="請輸入可聯繫的電話或分機"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -216,6 +226,35 @@ function isoDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,
 function fmtMD(d){return `${d.getMonth()+1}/${d.getDate()}`;}
 const DOW=['一','二','三','四','五','六','日'];
 
+function timeLabel(minutes){
+  const h=Math.floor(minutes/60),m=minutes%60,period=h<12?'上午':'下午';
+  const h12=h%12||12;
+  return `${period} ${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+function timeValue(minutes){return `${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;}
+function timeOptions(kind){
+  let html='<option value="">請選擇</option>';
+  const ranges=kind==='start'?[['上午',0,690],['下午',720,1380]]:[['上午',30,690],['下午',720,1410]];
+  ranges.forEach(([label,from,to])=>{
+    html+=`<optgroup label="${label}">`;
+    for(let min=from;min<=to;min+=30)html+=`<option value="${timeValue(min)}">${timeLabel(min)}</option>`;
+    html+='</optgroup>';
+  });
+  return html;
+}
+function installTimeOptions(){
+  document.getElementById('bkStart').innerHTML=timeOptions('start');
+  document.getElementById('bkEnd').innerHTML=timeOptions('end');
+}
+function onStartTimeChange(){
+  const start=document.getElementById('bkStart').value,end=document.getElementById('bkEnd');
+  if(start&&(!end.value||end.value<=start)){
+    const [h,m]=start.split(':').map(Number),next=h*60+m+30;
+    end.value=next<=1410?timeValue(next):'';
+  }
+  checkConflictSoon();
+}
+
 function isAdmin(){
   if(!currentUser) return false;
   return currentUser.rbac_role==='sysadmin'||currentUser.role==='admin';
@@ -232,6 +271,7 @@ function isAdmin(){
   if(!user){toast('找不到使用者資料',true);return;}
   currentUser=user;
   if(window.SystemUserProfile)window.SystemUserProfile.save(user);
+  installTimeOptions();
   document.getElementById('roomAdminBtn').style.display=isAdmin()?'inline-flex':'none';
   await loadRooms();
   await loadWeek();
@@ -265,7 +305,7 @@ function renderGrid(){
   const box=document.getElementById('gridBox');
   if(!rooms.length){box.innerHTML='<div class="empty">尚未建立會議室，請洽系統管理員於「會議室管理」新增。</div>';return;}
   const days=weekDays();
-  let h='<table class="roomgrid"><tr><th style="min-width:110px">會議室</th>'+days.map(d=>`<th>週${DOW[(d.getDay()+6)%7]}<br>${fmtMD(d)}</th>`).join('')+'</tr>';
+  let h='<table class="roomgrid"><tr><th style="min-width:110px">會議室</th>'+days.map(d=>`<th class="${d.getDay()===0||d.getDay()===6?'weekend':''}">週${DOW[(d.getDay()+6)%7]}<br>${fmtMD(d)}</th>`).join('')+'</tr>';
   rooms.forEach(r=>{
     h+=`<tr><td class="roomname">${esc(r.name)}${r.capacity?`<br><span style="color:var(--text-dim);font-weight:400">${esc(r.capacity)} 人</span>`:''}</td>`;
     days.forEach(d=>{
@@ -275,9 +315,10 @@ function renderGrid(){
         const mine=currentUser&&b.user_id===currentUser.user_id;
         const dead=b.status==='cancelled'||b.status==='expired';
         const who=mine?'我':(b.purpose||'已預約');
-        return `<div class="bk-pill${mine?' mine':''}${dead?' '+b.status:''}">${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}<br>${esc(who)}</div>`;
+        return `<div class="bk-pill${mine?' mine':''}${dead?' '+b.status:''}">${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}<br>${esc(who)}${b.booking_no?`<br>${esc(b.booking_no)}`:''}</div>`;
       }).join('');
-      h+=`<td><div class="daycell">${pills}<button class="add-cell" onclick="openBookingModal('${r.room_id}','${dateStr}')">+ 預約</button></div></td>`;
+      const weekend=d.getDay()===0||d.getDay()===6;
+      h+=`<td class="${weekend?'weekend':''}"><div class="daycell">${pills}<button class="add-cell" onclick="openBookingModal('${r.room_id}','${dateStr}')">+ 預約</button></div></td>`;
     });
     h+='</tr>';
   });
@@ -295,6 +336,9 @@ function openBookingModal(roomId,dateStr){
   document.getElementById('bkStart').value='';
   document.getElementById('bkEnd').value='';
   document.getElementById('bkPurpose').value='';
+  const systemPhone=(currentUser?.phone||sessionStorage.getItem('user_phone')||'').trim();
+  document.getElementById('bkSystemPhone').value=systemPhone;
+  document.getElementById('bkContactPhone').value=systemPhone;
   document.getElementById('bkMsg').textContent='';
   document.getElementById('conflictAlert').classList.remove('show');
   openModal('bookingModal');
@@ -304,7 +348,7 @@ let _conflictTimer=null;
 function checkConflictSoon(){clearTimeout(_conflictTimer);_conflictTimer=setTimeout(checkConflictNow,250);}
 async function findConflict(roomId,dateStr,start,end,excludeId){
   if(!roomId||!dateStr||!start||!end||end<=start)return null;
-  const {data,error}=await db.from('meeting_bookings').select('booking_id,start_time,end_time,purpose,user_id')
+  const {data,error}=await db.from('meeting_bookings').select('booking_id,booking_no,start_time,end_time,purpose,user_id')
     .eq('room_id',roomId).eq('booking_date',dateStr).in('status',['booked','checked_in']);
   if(error)throw error;
   return (data||[]).filter(b=>b.booking_id!==excludeId).find(b=>start<b.end_time.slice(0,5)&&end>b.start_time.slice(0,5))||null;
@@ -318,7 +362,7 @@ async function checkConflictNow(){
   try{
     const conflict=await findConflict(roomId,dateStr,start,end);
     if(conflict){
-      alertEl.textContent=`此時段已有一筆預約（${conflict.start_time.slice(0,5)}–${conflict.end_time.slice(0,5)}，${conflict.purpose||'無用途說明'}），請改選其他時段。`;
+      alertEl.textContent=`不能預約：此時段已有預約。已預約單號：${conflict.booking_no||'舊資料未編號'}（${conflict.start_time.slice(0,5)}–${conflict.end_time.slice(0,5)}，${conflict.purpose||'無用途說明'}）。`;
       alertEl.classList.add('show');
     }else{
       alertEl.classList.remove('show');
@@ -332,15 +376,18 @@ async function saveBooking(){
   const start=document.getElementById('bkStart').value;
   const end=document.getElementById('bkEnd').value;
   const purpose=document.getElementById('bkPurpose').value.trim();
+  const systemPhone=document.getElementById('bkSystemPhone').value.trim();
+  const contactPhone=document.getElementById('bkContactPhone').value.trim();
   const msg=document.getElementById('bkMsg');
   msg.textContent='';
   if(!roomId||!dateStr||!start||!end){msg.textContent='請填寫完整的會議室、日期與時段';return;}
   if(end<=start){msg.textContent='結束時間必須晚於開始時間';return;}
+  if(!contactPhone||contactPhone.replace(/[^0-9#*]/g,'').length<4){msg.textContent='請填寫至少 4 碼的本次聯繫電話或分機';return;}
   document.getElementById('bkSaveBtn').disabled=true;
   try{
     const conflict=await findConflict(roomId,dateStr,start,end);
-    if(conflict){msg.textContent='此時段已被預約，請改選其他時段';document.getElementById('bkSaveBtn').disabled=false;return;}
-    const payload={room_id:roomId,user_id:currentUser.user_id,purpose,booking_date:dateStr,start_time:start,end_time:end,status:'booked'};
+    if(conflict){msg.textContent=`不能預約，已預約單號：${conflict.booking_no||'舊資料未編號'}`;document.getElementById('bkSaveBtn').disabled=false;return;}
+    const payload={room_id:roomId,user_id:currentUser.user_id,purpose,booking_date:dateStr,start_time:start,end_time:end,booker_phone:systemPhone||null,contact_phone:contactPhone,status:'booked'};
     const {data,error}=await db.from('meeting_bookings').insert(payload).select().single();
     if(error)throw error;
     await writeAudit('meeting_bookings',data.booking_id,'insert',null,payload);
@@ -348,7 +395,12 @@ async function saveBooking(){
     closeModal('bookingModal');
     await loadWeek();await loadMyBookings();
   }catch(e){
-    msg.textContent=translateError(e.message||String(e));
+    if(String(e.message||e).includes('meeting_bookings_no_overlap')||String(e.message||e).includes('exclusion')){
+      try{
+        const conflict=await findConflict(roomId,dateStr,start,end);
+        msg.textContent=`不能預約，已預約單號：${conflict?.booking_no||'舊資料未編號'}`;
+      }catch(_){msg.textContent=translateError(e.message||String(e));}
+    }else msg.textContent=translateError(e.message||String(e));
   }finally{
     document.getElementById('bkSaveBtn').disabled=false;
   }
@@ -363,14 +415,14 @@ async function loadMyBookings(){
   if(!myBookings.length){box.innerHTML='<div class="empty">尚無預約紀錄</div>';return;}
   const STATUS_LABEL={booked:['待報到','warn'],checked_in:['已報到','ok'],cancelled:['已取消',''],expired:['已逾時取消','bad']};
   const now=new Date();
-  box.innerHTML=`<table class="mytable"><tr><th>日期</th><th>時段</th><th>會議室</th><th>用途</th><th>狀態</th><th>操作</th></tr>`+
+  box.innerHTML=`<table class="mytable"><tr><th>預約單號</th><th>日期</th><th>時段</th><th>會議室</th><th>用途</th><th>聯繫電話</th><th>狀態</th><th>操作</th></tr>`+
     myBookings.map(b=>{
       const [label,cls]=STATUS_LABEL[b.status]||[b.status,''];
       const startDt=new Date(`${b.booking_date}T${b.start_time}`);
       const endDt=new Date(`${b.booking_date}T${b.end_time}`);
       const canCheckIn=b.status==='booked'&&now>=startDt&&now<=endDt;
       const canCancel=b.status==='booked'&&now<startDt;
-      return `<tr><td>${esc(b.booking_date)}</td><td>${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}</td><td>${esc(b.meeting_rooms?.name||'—')}</td><td>${esc(b.purpose||'—')}</td>`+
+      return `<tr><td>${esc(b.booking_no||'—')}</td><td>${esc(b.booking_date)}</td><td>${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}</td><td>${esc(b.meeting_rooms?.name||'—')}</td><td>${esc(b.purpose||'—')}</td><td>${esc(b.contact_phone||b.booker_phone||'—')}</td>`+
         `<td><span class="pill ${cls}">${esc(label)}</span></td>`+
         `<td>${canCheckIn?`<button class="act" onclick="checkIn('${b.booking_id}')">✓ 報到</button>`:''}${canCancel?`<button class="act" onclick="cancelBooking('${b.booking_id}')">取消</button>`:''}${!canCheckIn&&!canCancel?'—':''}</td></tr>`;
     }).join('')+'</table>';

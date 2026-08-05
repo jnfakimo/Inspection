@@ -22,15 +22,45 @@ create table if not exists meeting_rooms (
 -- 2) 預約紀錄：送出即生效，不需審核
 create table if not exists meeting_bookings (
   booking_id    uuid primary key default gen_random_uuid(),
+  booking_no    text unique,
   room_id       uuid not null references meeting_rooms(room_id),
   user_id       uuid references users(user_id),
   purpose       text,
+  booker_phone  text,
+  contact_phone text,
   booking_date  date not null,
   start_time    time not null,
   end_time      time not null,
   status        text not null default 'booked' check (status in ('booked','checked_in','cancelled','expired')),
   checked_in_at timestamptz,
   created_at    timestamptz default now()
+);
+
+-- create table if not exists 不會替既有環境增加欄位，故同步補上 idempotent ALTER。
+alter table meeting_bookings add column if not exists booking_no text;
+alter table meeting_bookings add column if not exists booker_phone text;
+alter table meeting_bookings add column if not exists contact_phone text;
+
+create sequence if not exists meeting_booking_no_seq;
+grant usage, select on sequence meeting_booking_no_seq to anon, authenticated, service_role;
+create or replace function gen_meeting_booking_no()
+returns text language sql volatile as $$
+  select 'MR-' || to_char(current_date,'YYYYMMDD') || '-' || lpad(nextval('meeting_booking_no_seq')::text,6,'0')
+$$;
+
+update meeting_bookings
+set booking_no='MR-' || to_char(booking_date,'YYYYMMDD') || '-' || lpad(nextval('meeting_booking_no_seq')::text,6,'0')
+where booking_no is null;
+
+alter table meeting_bookings alter column booking_no set default gen_meeting_booking_no();
+create unique index if not exists uq_meeting_bookings_booking_no on meeting_bookings(booking_no);
+
+alter table meeting_bookings drop constraint if exists meeting_bookings_valid_time;
+alter table meeting_bookings add constraint meeting_bookings_valid_time check (end_time > start_time);
+alter table meeting_bookings drop constraint if exists meeting_bookings_half_hour_slots;
+alter table meeting_bookings add constraint meeting_bookings_half_hour_slots check (
+  extract(minute from start_time) in (0,30) and extract(second from start_time)=0 and
+  extract(minute from end_time) in (0,30) and extract(second from end_time)=0
 );
 
 create index if not exists idx_meeting_bookings_room_date on meeting_bookings(room_id, booking_date);
