@@ -3356,9 +3356,11 @@ async function saveLineSettings() {
 async function testLinePush() {
   showToast('傳送測試訊息中…');
   try {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session?.access_token) { showToast('登入已過期，請重新登入', true); return; }
     const res = await fetch(SUPABASE_URL + '/functions/v1/line-notify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
       body: JSON.stringify({ test: true }),
     });
     const body = await res.json().catch(() => ({}));
@@ -3577,18 +3579,13 @@ async function writeAudit(table, recordId, action, before, after) {
   await db.from('audit_logs').insert({ table_name: table, record_id: String(recordId), action, changes: { before, after }, operator_id: currentUser.user_id });
 }
 
-// 記錄登入/登出事件到系統紀錄（含 IP、裝置資訊）；失敗不影響登出流程本身
+// 記錄登入/登出事件與裝置資訊；IP 應由受控後端擷取，失敗不影響登出流程本身
 async function logAuthEvent(action, userId) {
   try {
-    let ip = null;
-    try {
-      const r = await fetch('https://api.ipify.org?format=json');
-      if (r.ok) { const j = await r.json(); ip = j.ip || null; }
-    } catch (e) {}
     await db.from('audit_logs').insert({
       table_name: 'auth', record_id: String(userId), action,
       changes: { event: action }, operator_id: userId,
-      ip_address: ip, user_agent: navigator.userAgent
+      ip_address: null, user_agent: navigator.userAgent
     });
   } catch (e) {}
 }

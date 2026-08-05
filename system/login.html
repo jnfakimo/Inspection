@@ -201,18 +201,14 @@ function getLoginRoute(profile) {
   return ROLE_ROUTES[profile.role] || 'workorder.html?v=reporter-20260701';
 }
 
-// 記錄登入/登出事件到系統紀錄（含 IP、裝置資訊）；失敗不影響登入流程本身
+// 記錄登入/登出事件到系統紀錄；IP 應由受控後端依請求取得，
+// 前端不可把使用者 IP 傳送給未列入系統契約的第三方服務。
 async function logAuthEvent(action, userId) {
   try {
-    let ip = null;
-    try {
-      const r = await fetch('https://api.ipify.org?format=json');
-      if (r.ok) { const j = await r.json(); ip = j.ip || null; }
-    } catch (e) {}
     await db.from('audit_logs').insert({
       table_name: 'auth', record_id: String(userId), action,
       changes: { event: action }, operator_id: userId,
-      ip_address: ip, user_agent: navigator.userAgent
+      ip_address: null, user_agent: navigator.userAgent
     });
   } catch (e) {}
 }

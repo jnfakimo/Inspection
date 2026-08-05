@@ -19,12 +19,15 @@ jobs:
       - name: Trigger meeting room booking check
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           test -n "$SUPABASE_ANON_KEY"
+          test -n "$CRON_SECRET"
           curl --fail-with-body --retry 2 --retry-all-errors \
             --max-time 45 \
             -X POST \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d '{"scheduled":true}' \
             https://qztffronusdhgxhjjubt.supabase.co/functions/v1/meeting-booking-check

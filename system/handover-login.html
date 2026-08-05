@@ -163,18 +163,13 @@ function setMessage(text) {
   messageEl.textContent = text || '';
 }
 
-// 記錄登入事件到系統紀錄（含 IP、裝置資訊）；失敗不影響登入流程本身
+// 記錄登入事件與裝置資訊；IP 應由受控後端擷取，失敗不影響登入流程本身
 async function logAuthEvent(action, userId) {
   try {
-    let ip = null;
-    try {
-      const r = await fetch('https://api.ipify.org?format=json');
-      if (r.ok) { const j = await r.json(); ip = j.ip || null; }
-    } catch (e) {}
     await db.from('audit_logs').insert({
       table_name: 'auth', record_id: String(userId), action,
       changes: { event: action }, operator_id: userId,
-      ip_address: ip, user_agent: navigator.userAgent
+      ip_address: null, user_agent: navigator.userAgent
     });
   } catch (e) {}
 }

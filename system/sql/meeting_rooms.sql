@@ -42,7 +42,8 @@ alter table meeting_bookings add column if not exists booker_phone text;
 alter table meeting_bookings add column if not exists contact_phone text;
 
 create sequence if not exists meeting_booking_no_seq;
-grant usage, select on sequence meeting_booking_no_seq to anon, authenticated, service_role;
+revoke usage, select on sequence meeting_booking_no_seq from anon;
+grant usage, select on sequence meeting_booking_no_seq to authenticated, service_role;
 create or replace function gen_meeting_booking_no()
 returns text language sql volatile as $$
   select 'MR-' || to_char(current_date,'YYYYMMDD') || '-' || lpad(nextval('meeting_booking_no_seq')::text,6,'0')
@@ -152,7 +153,11 @@ grant execute on function create_meeting_booking_series(uuid,text,date,time,time
 
 -- ── RLS：會議室資料僅供已登入人員使用 ───────────────────────
 alter table meeting_rooms enable row level security;
+alter table meeting_rooms force row level security;
 alter table meeting_bookings enable row level security;
+alter table meeting_bookings force row level security;
+revoke all on table meeting_rooms from anon;
+revoke all on table meeting_bookings from anon;
 drop policy if exists "allow_all_for_now" on meeting_rooms;
 drop policy if exists "allow_all_for_now" on meeting_bookings;
 drop policy if exists "authenticated_only" on meeting_rooms;

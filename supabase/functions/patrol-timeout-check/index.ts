@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type"};
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type, x-cron-secret"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
 type Rule={id:string;label:string;start:string;end:string;grace?:number;days?:number[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
 type Shift={name:string;start_time:string;end_time:string;sort_order?:number};
@@ -10,6 +10,22 @@ const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFo
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
 const previousDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()-1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
 const nextDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()+1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
+const safeEqual=(a:string,b:string)=>{
+  if(!a||!b||a.length!==b.length)return false;
+  let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);
+  return diff===0;
+};
+async function authorizedCaller(req:Request,db:any){
+  const cronSecret=Deno.env.get("CRON_SECRET")||"";
+  if(cronSecret&&safeEqual(req.headers.get("x-cron-secret")||"",cronSecret))return "cron";
+  const bearer=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!bearer)return null;
+  const {data:{user}}=await db.auth.getUser(bearer);
+  if(!user)return null;
+  const {data}=await db.from("users").select("role,rbac_role,status").eq("auth_id",user.id).maybeSingle();
+  const profile=data as {role:string|null;rbac_role:string|null;status:string|null}|null;
+  return profile?.status==="active"&&(profile.role==="admin"||["admin","sysadmin"].includes(profile.rbac_role||""))?"admin":null;
+}
 const base64url=(input:Uint8Array|string)=>{
   const bytes=typeof input==="string"?new TextEncoder().encode(input):input;
   let binary="";bytes.forEach(byte=>binary+=String.fromCharCode(byte));
@@ -36,13 +52,14 @@ async function googleAccessToken(){
   cachedGoogleToken={value:tokenBody.access_token,expiresAt:Date.now()+(Number(tokenBody.expires_in)||3600)*1000};
   return cachedGoogleToken.value;
 }
-async function sendFcm(db:ReturnType<typeof createClient>,title:string,body:string,tag:string){
+async function sendFcm(db:any,title:string,body:string,tag:string){
   const {data:subscriptions,error}=await db.from("fcm_subscriptions").select("subscription_id,token").eq("enabled",true);
   if(error)throw error;
-  if(!subscriptions?.length)return {status:"skipped",success:0,failure:0,response:"尚無已啟用的 FCM 裝置"};
+  const activeSubscriptions=(subscriptions||[]) as {subscription_id:string;token:string}[];
+  if(!activeSubscriptions.length)return {status:"skipped",success:0,failure:0,response:"尚無已啟用的 FCM 裝置"};
   const accessToken=await googleAccessToken(),projectId=Deno.env.get("FIREBASE_PROJECT_ID")||"jnfa-4064f";
   let success=0,failure=0;const errors:string[]=[];
-  await Promise.all(subscriptions.map(async sub=>{
+  await Promise.all(activeSubscriptions.map(async sub=>{
     const res=await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,{method:"POST",headers:{Authorization:`Bearer ${accessToken}`,"Content-Type":"application/json"},body:JSON.stringify({message:{token:sub.token,data:{title,body,tag,url:"./guardpatrol.html"},webpush:{headers:{Urgency:"high"},fcm_options:{link:"https://jnfakimo.github.io/word-cloud/system/guardpatrol.html"}}}})});
     const response=await res.text();
     if(res.ok){success++;return;}
@@ -56,6 +73,8 @@ Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
   try{
     const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const caller=await authorizedCaller(req,db);
+    if(!caller)return reply({ok:false,msg:"Unauthorized"},401);
     const body=await req.json().catch(()=>({}));
     const {data:rows,error:settingsError}=await db.from("system_settings").select("key,value");
     if(settingsError)throw settingsError;

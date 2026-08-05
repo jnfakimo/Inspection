@@ -1,0 +1,81 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+
+const root=path.resolve(process.cwd());
+const systemDir=path.join(root,'system');
+const findings=[];
+const add=(severity,rule,file,message)=>findings.push({severity,rule,file:path.relative(root,file).replaceAll('\\','/'),message});
+
+function walk(dir,predicate){
+  const out=[];
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+    if(['.git','plans','vendor','node_modules'].includes(entry.name))continue;
+    const full=path.join(dir,entry.name);
+    if(entry.isDirectory())out.push(...walk(full,predicate));
+    else if(predicate(full))out.push(full);
+  }
+  return out;
+}
+
+function stripScriptsAndStyles(html){
+  return html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,'');
+}
+
+function auditHtml(file){
+  const html=fs.readFileSync(file,'utf8');
+  if(!/<meta\s+charset=["']?utf-8/i.test(html))add('error','html-charset',file,'缺少 UTF-8 charset。');
+  if(!/<meta\s+name=["']viewport["']/i.test(html))add('error','html-viewport',file,'缺少 responsive viewport。');
+  if(!/<title>[^<]+<\/title>/i.test(html))add('error','html-title',file,'缺少頁面標題。');
+
+  const visibleMarkup=stripScriptsAndStyles(html);
+  const ids=[...visibleMarkup.matchAll(/\sid=["']([^"']+)["']/gi)].map(m=>m[1]);
+  const duplicates=[...new Set(ids.filter((id,index)=>ids.indexOf(id)!==index))];
+  duplicates.forEach(id=>add('error','duplicate-id',file,`重複 DOM id：${id}`));
+
+  for(const match of visibleMarkup.matchAll(/<a\b([^>]*\btarget=["']_blank["'][^>]*)>/gi)){
+    if(!/\brel=["'][^"']*\bnoopener\b/i.test(match[1]))add('error','noopener',file,'target="_blank" 連結缺少 rel="noopener"。');
+  }
+
+  for(const match of html.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi)){
+    const raw=match[1];
+    if(!raw||/^(?:[a-z]+:|\/\/|#|data:|javascript:|mailto:|tel:)/i.test(raw)||/[${}]/.test(raw))continue;
+    const clean=raw.split(/[?#]/,1)[0];
+    if(!clean)continue;
+    let decoded=clean;
+    try{decoded=decodeURIComponent(clean);}catch{}
+    const target=path.resolve(path.dirname(file),decoded);
+    if(!fs.existsSync(target))add('error','missing-asset',file,`找不到本機資源：${raw}`);
+  }
+
+  for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
+    const attrs=match[1],code=match[2].trim();
+    if(!code||/\bsrc\s*=/i.test(attrs)||/\btype=["']module["']/i.test(attrs))continue;
+    try{new vm.Script(code,{filename:path.relative(root,file)});}catch(error){add('error','inline-js-syntax',file,String(error.message).split('\n')[0]);}
+  }
+
+  if(/https?:\/\/api\.ipify\.org/i.test(html))add('error','third-party-ip',file,'前端將使用者 IP 傳送至未受控第三方。');
+  for(const match of html.matchAll(/http:\/\/([A-Za-z0-9.-]+(?::\d+)?)/gi)){
+    if(!/^(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(match[1]))add('warning','mixed-content',file,`非本機 HTTP 資源：${match[0]}`);
+  }
+}
+
+const htmlFiles=walk(systemDir,file=>file.endsWith('.html'));
+htmlFiles.forEach(auditHtml);
+
+const sourceFiles=walk(root,file=>/\.(?:html|js|mjs|ts|sql|ya?ml|toml|json)$/i.test(file));
+for(const file of sourceFiles){
+  const text=fs.readFileSync(file,'utf8');
+  if(/SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["']eyJ/i.test(text))add('error','service-key-literal',file,'偵測到硬編碼 service_role JWT。');
+  if(/-----BEGIN (?:RSA |EC |)PRIVATE KEY-----\s*\r?\n[A-Za-z0-9+/=\r\n]{100,}\r?\n-----END (?:RSA |EC |)PRIVATE KEY-----/.test(text))add('error','private-key',file,'偵測到私鑰內容。');
+}
+
+findings.sort((a,b)=>a.severity.localeCompare(b.severity)||a.file.localeCompare(b.file)||a.rule.localeCompare(b.rule));
+const counts={error:0,warning:0,info:0};
+for(const finding of findings)counts[finding.severity]=(counts[finding.severity]||0)+1;
+
+console.log(`Commercial readiness audit: ${htmlFiles.length} HTML files`);
+console.log(`Errors: ${counts.error} | Warnings: ${counts.warning} | Info: ${counts.info}`);
+for(const finding of findings)console.log(`[${finding.severity.toUpperCase()}] ${finding.file} (${finding.rule}) ${finding.message}`);
+if(counts.error)process.exitCode=1;

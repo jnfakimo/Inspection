@@ -1,7 +1,24 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type"};
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type, x-cron-secret"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
+
+const safeEqual=(a:string,b:string)=>{
+  if(!a||!b||a.length!==b.length)return false;
+  let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);
+  return diff===0;
+};
+async function authorizedCaller(req:Request,db:any){
+  const cronSecret=Deno.env.get("CRON_SECRET")||"";
+  if(cronSecret&&safeEqual(req.headers.get("x-cron-secret")||"",cronSecret))return "cron";
+  const bearer=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!bearer)return null;
+  const {data:{user}}=await db.auth.getUser(bearer);
+  if(!user)return null;
+  const {data}=await db.from("users").select("role,rbac_role,status").eq("auth_id",user.id).maybeSingle();
+  const profile=data as {role:string|null;rbac_role:string|null;status:string|null}|null;
+  return profile?.status==="active"&&(profile.role==="admin"||["admin","sysadmin"].includes(profile.rbac_role||""))?"admin":null;
+}
 
 const REMINDER_LEAD_MIN=15;   // 開始前 15 分鐘內送提醒
 const EXPIRE_GRACE_MIN=15;    // 開始後 15 分鐘未報到自動取消
@@ -29,6 +46,8 @@ Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
   try{
     const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const caller=await authorizedCaller(req,db);
+    if(!caller)return reply({ok:false,msg:"Unauthorized"},401);
     const body=await req.json().catch(()=>({}));
 
     const {data:settingsRows,error:settingsError}=await db.from("system_settings").select("key,value");

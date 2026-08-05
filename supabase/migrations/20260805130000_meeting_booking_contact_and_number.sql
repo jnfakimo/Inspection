@@ -5,7 +5,8 @@ alter table public.meeting_bookings add column if not exists booker_phone text;
 alter table public.meeting_bookings add column if not exists contact_phone text;
 
 create sequence if not exists public.meeting_booking_no_seq;
-grant usage, select on sequence public.meeting_booking_no_seq to anon, authenticated, service_role;
+revoke usage, select on sequence public.meeting_booking_no_seq from anon;
+grant usage, select on sequence public.meeting_booking_no_seq to authenticated, service_role;
 
 create or replace function public.gen_meeting_booking_no()
 returns text

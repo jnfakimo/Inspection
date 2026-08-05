@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, x-line-signature",
+  "Access-Control-Allow-Headers": "authorization, content-type, x-line-signature, x-webhook-secret",
 };
 
 function json(body: unknown, status = 200) {
@@ -10,6 +10,68 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
   });
+}
+
+function safeEqual(a: string, b: string) {
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+async function validLineSignature(rawBody: string, signature: string | null) {
+  const secret = Deno.env.get("LINE_CHANNEL_SECRET") || "";
+  if (!secret || !signature) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody)),
+  );
+  let binary = "";
+  digest.forEach((byte) => binary += String.fromCharCode(byte));
+  return safeEqual(btoa(binary), signature);
+}
+
+type ActiveProfile = {
+  role: string | null;
+  rbac_role: string | null;
+  status: string | null;
+};
+
+async function authenticatedProfile(req: Request, db: any): Promise<ActiveProfile | null> {
+  const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!bearer) return null;
+  const { data: { user } } = await db.auth.getUser(bearer);
+  if (!user) return null;
+  const { data } = await db.from("users")
+    .select("role,rbac_role,status")
+    .eq("auth_id", user.id)
+    .maybeSingle();
+  const profile = data as ActiveProfile | null;
+  return profile?.status === "active" ? profile : null;
+}
+
+async function loadCanonicalRecord(
+  db: any,
+  table: string,
+  record: Record<string, unknown> | undefined,
+) {
+  const keys: Record<string, string> = {
+    inspection_records: "record_id",
+    repair_requests: "request_id",
+    handover_cases: "case_id",
+  };
+  const key = keys[table];
+  const id = key && record?.[key];
+  if (!key || typeof id !== "string" || !id) return null;
+  const { data, error } = await db.from(table).select("*").eq(key, id).maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
 Deno.serve(async (req) => {
@@ -23,23 +85,40 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const payload = await req.json();
+    const rawBody = await req.text();
+    const payload = JSON.parse(rawBody || "{}");
 
     // ── Incoming LINE Webhook (from LINE → capture groupId) ───────────────────
     if (Array.isArray(payload.events)) {
+      if (!await validLineSignature(rawBody, req.headers.get("x-line-signature"))) {
+        return json({ ok: false, msg: "Invalid LINE signature" }, 401);
+      }
       for (const ev of payload.events) {
         const src = ev.source;
         if (src?.type === "group" && src.groupId) {
-          console.log("LINE groupId captured:", src.groupId);
           // Auto-save groupId to system_settings
           await db.from("system_settings").upsert(
             [{ key: "line_group_id", value: src.groupId }],
             { onConflict: "key" },
           );
-          console.log("groupId saved to system_settings:", src.groupId);
         }
       }
       return new Response("ok", { status: 200 });
+    }
+
+    const profile = await authenticatedProfile(req, db);
+    if (payload.test === true) {
+      if (!profile || !(profile.role === "admin" || ["admin", "sysadmin"].includes(profile.rbac_role || ""))) {
+        return json({ ok: false, msg: "Unauthorized" }, 401);
+      }
+    } else {
+      const expected = Deno.env.get("LINE_NOTIFY_WEBHOOK_SECRET") || "";
+      const supplied = req.headers.get("x-webhook-secret") || "";
+      const trustedWebhook = !!expected && safeEqual(expected, supplied);
+      if (!profile && !trustedWebhook) return json({ ok: false, msg: "Unauthorized" }, 401);
+      const canonical = await loadCanonicalRecord(db, payload.table, payload.record);
+      if (!canonical) return json({ ok: false, msg: "Notification record was not found" }, 404);
+      payload.record = canonical;
     }
 
     // ── Load system_settings ─────────────────────────────────────────────────

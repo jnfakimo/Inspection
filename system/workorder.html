@@ -258,9 +258,11 @@ function translateError(msg) {
 }
 async function notifyLineRepair(record) {
   try {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session?.access_token) return { ok: false, msg: '尚未登入' };
     const res = await fetch(`${SUPA_URL}/functions/v1/line-notify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
       body: JSON.stringify({ table: 'repair_requests', record }),
     });
     const body = await res.json().catch(() => ({}));

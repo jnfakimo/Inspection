@@ -92,7 +92,7 @@
   }
   async function testNow(){
     if(!await save())return;showToast('正在執行巡檢統計測試…');
-    try{const res=await fetch(SUPABASE_URL+'/functions/v1/patrol-timeout-check',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPABASE_ANON_KEY},body:JSON.stringify({force:true})});const body=await res.json();showToast(body.ok?'巡檢統計測試已執行':'測試失敗：'+(body.msg||''),!body.ok);}catch(e){showToast('測試失敗：'+e.message,true);}
+    try{const {data:{session}}=await db.auth.getSession();if(!session?.access_token)throw new Error('登入已過期，請重新登入');const res=await fetch(SUPABASE_URL+'/functions/v1/patrol-timeout-check',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({force:true})});const body=await res.json();showToast(body.ok?'巡檢統計測試已執行':'測試失敗：'+(body.msg||''),!body.ok);}catch(e){showToast('測試失敗：'+e.message,true);}
   }
   const original=window.saveLineSettings;
   window.saveLineSettings=async function(){if(original)await original();await save();};
