@@ -102,7 +102,7 @@
   <div class="modal sm">
     <div class="modal-head"><div class="modal-title" id="relatedModalTitle">新增資料</div><button class="modal-close" onclick="closeModal('relatedModal')">✕</button></div>
     <div class="modal-body"><div class="form-grid" id="relatedForm"></div></div>
-    <div class="modal-foot"><span class="msg" id="relatedMsg"></span><button class="btn" onclick="closeModal('relatedModal')">取消</button><button class="btn btn-primary" id="relatedSaveBtn" onclick="saveRelated()">儲存</button></div>
+    <div class="modal-foot"><span class="msg" id="relatedMsg"></span><button class="btn" onclick="closeModal('relatedModal')">取消</button><button class="btn btn-primary" onclick="saveRelated()">儲存</button></div>
   </div>
 </div>
 
@@ -174,22 +174,13 @@ function statusPill(s){const c=s==='active'?'ok':s==='retired'||s==='expired'?'b
 
 async function safeLoad(key){
   const {data,error}=await db.from(TABLES[key]).select('*').limit(5000);
-  if(error){if(schemaError(error)){missingTables.push(TABLES[key]);return [];}throw error;}return data||[];
+  if(error){if(schemaError(error))missingTables.push(TABLES[key]);else console.warn(TABLES[key],error);return [];}return data||[];
 }
-async function safeCoreLoad(table){const {data,error}=await db.from(table).select('*').limit(5000);if(error)throw error;return data||[];}
+async function safeCoreLoad(table){const {data,error}=await db.from(table).select('*').limit(5000);if(error){console.warn(table,error);return [];}return data||[];}
 async function loadAll(){
   document.getElementById('syncText').textContent='讀取資料中…';missingTables=[];
   const assetReq=db.from('equipment').select('*').eq('status','active').order('name').limit(5000);
-  let result;
-  try{
-    result=await Promise.all([assetReq,safeLoad('plans'),safeLoad('records'),safeLoad('contracts'),safeLoad('documents'),safeLoad('costs'),safeLoad('links'),safeLoad('points'),safeCoreLoad('inspection_records'),safeCoreLoad('repair_requests'),safeCoreLoad('maintenance_orders'),safeCoreLoad('cost_records'),safeCoreLoad('materials'),safeCoreLoad('plan_markers')]);
-  }catch(error){
-    document.getElementById('view').innerHTML=`<div class="panel"><div class="empty" style="color:var(--amber)">資料讀取失敗：${esc(error?.message||error)}<br>請重新整理或通知系統管理員。</div></div>`;
-    document.getElementById('syncText').textContent='讀取失敗';
-    toast('設備關聯資料讀取失敗',true);
-    return;
-  }
-  const [a,plans,records,contracts,documents,costs,links,points,inspections,repairs,orders,costRecords,materials,markers]=result;
+  const [a,plans,records,contracts,documents,costs,links,points,inspections,repairs,orders,costRecords,materials,markers]=await Promise.all([assetReq,safeLoad('plans'),safeLoad('records'),safeLoad('contracts'),safeLoad('documents'),safeLoad('costs'),safeLoad('links'),safeLoad('points'),safeCoreLoad('inspection_records'),safeCoreLoad('repair_requests'),safeCoreLoad('maintenance_orders'),safeCoreLoad('cost_records'),safeCoreLoad('materials'),safeCoreLoad('plan_markers')]);
   if(a.error){document.getElementById('view').innerHTML=`<div class="panel"><div class="empty">設備主檔讀取失敗：${esc(a.error.message)}</div></div>`;document.getElementById('syncText').textContent='讀取失敗';return;}
   state={assets:a.data||[],plans,records,contracts,documents,costs,links,points,inspections,repairs,orders,costRecords,materials,markers};
   updateFilters();updateKpis();updateCounts();renderSetup();renderCurrent();
@@ -331,25 +322,7 @@ const RELATED_DEFS={
 function relatedDef(type){return RELATED_DEFS[type];}
 function relatedFieldHtml(f,v){const [key,label,type,opt]=f;if(type==='equipment')return `<div class="field"><label>${label}</label><select data-field="${key}"><option value="">— 選擇設備 —</option>${state.assets.map(e=>`<option value="${e.equipment_id}" ${v===e.equipment_id?'selected':''}>${esc(eqText(e.equipment_id))}</option>`).join('')}</select></div>`;if(type==='link')return `<div class="field"><label>${label}</label><select data-field="${key}"><option value="">— 未指定 —</option>${state.links.map(x=>`<option value="${x.link_id}" ${v===x.link_id?'selected':''}>${esc(x.external_system+'｜'+x.external_equipment_key)}</option>`).join('')}</select></div>`;if(type==='select')return `<div class="field"><label>${label}</label><select data-field="${key}">${opt.split('|').map(x=>{const [val,txt]=x.split(':');return `<option value="${val}" ${String(v||'')===val?'selected':''}>${txt}</option>`;}).join('')}</select></div>`;if(type==='boolean')return `<div class="field"><label>${label}</label><select data-field="${key}"><option value="true" ${v!==false?'selected':''}>是</option><option value="false" ${v===false?'selected':''}>否</option></select></div>`;if(type==='textarea')return `<div class="field wide"><label>${label}</label><textarea data-field="${key}">${esc(v||'')}</textarea></div>`;return `<div class="field"><label>${label}</label><input data-field="${key}" type="${type}" value="${esc(type==='date'&&v?fmtDate(v):(v??''))}"></div>`;}
 function openRelated(type,id=null){relatedType=type;relatedEditId=id;const d=relatedDef(type),key=type==='plan'?'plans':type==='record'?'records':type==='contract'?'contracts':type==='document'?'documents':type==='cost'?'costs':type==='link'?'links':'points';const r=id?state[key].find(x=>x[d.pk]===id):{};if(!id&&type==='record')r.performed_on=todayISO();if(!id&&type==='cost'){r.fiscal_year=new Date().getFullYear();r.source='manual';}if(!id&&['plan','contract','link','point'].includes(type))r.status='active';document.getElementById('relatedModalTitle').textContent=`${id?'編輯':'新增'}${TYPE_LABEL[type]}`;document.getElementById('relatedMsg').textContent='';document.getElementById('relatedForm').innerHTML=d.fields.map(f=>relatedFieldHtml(f,r[f[0]])).join('');openModal('relatedModal');}
-async function saveRelated(){
-  const btn=document.getElementById('relatedSaveBtn');
-  if(saveRelated.inFlight)return;
-  saveRelated.inFlight=true;
-  if(btn){btn.disabled=true;btn.dataset.label=btn.textContent;btn.textContent='處理中…';}
-  try{
-    const d=relatedDef(relatedType),p=formData('relatedForm'),msg=document.getElementById('relatedMsg');msg.textContent='';
-    if(!p.equipment_id){msg.textContent='請選擇設備。';return;}
-    const required={plan:['item_name'],record:['performed_on'],contract:['vendor'],document:['document_type','title','file_url'],cost:['fiscal_year'],link:['external_system','external_equipment_key'],point:['point_code','point_name']}[relatedType];
-    if(required.some(k=>!p[k])){msg.textContent='請完成所有必填欄位。';return;}
-    if(relatedType==='document'&&!safeUrl(p.file_url)){msg.textContent='文件連結必須使用 https:// 或 http://。';return;}
-    const req=relatedEditId?db.from(d.table).update(p).eq(d.pk,relatedEditId):db.from(d.table).insert(p);const {error}=await req;
-    if(error){msg.textContent=error.code==='23505'?'相同資料已存在，請勿重複提交。':error.message;return;}
-    closeModal('relatedModal');toast(`${TYPE_LABEL[relatedType]}已儲存`);await loadAll();
-  }finally{
-    saveRelated.inFlight=false;
-    if(btn){btn.disabled=false;btn.textContent=btn.dataset.label||'儲存';delete btn.dataset.label;}
-  }
-}
+async function saveRelated(){const d=relatedDef(relatedType),p=formData('relatedForm'),msg=document.getElementById('relatedMsg');msg.textContent='';if(!p.equipment_id){msg.textContent='請選擇設備。';return;}const required={plan:['item_name'],record:['performed_on'],contract:['vendor'],document:['document_type','title','file_url'],cost:['fiscal_year'],link:['external_system','external_equipment_key'],point:['point_code','point_name']}[relatedType];if(required.some(k=>!p[k])){msg.textContent='請完成所有必填欄位。';return;}if(relatedType==='document'&&!safeUrl(p.file_url)){msg.textContent='文件連結必須使用 https:// 或 http://。';return;}const req=relatedEditId?db.from(d.table).update(p).eq(d.pk,relatedEditId):db.from(d.table).insert(p);const {error}=await req;if(error){msg.textContent=error.message;return;}closeModal('relatedModal');toast(`${TYPE_LABEL[relatedType]}已儲存`);await loadAll();}
 function addForCurrentTab(){if(tab==='assets')openEquipment();else if(tab==='integration')openRelated('link');else openRelated(tab.slice(0,-1));}
 
 const XLSX_HEADERS={

@@ -309,21 +309,17 @@ async function load(){
   if(error){toast('讀取失敗：'+translateError(error.message),true);
     document.getElementById('list').innerHTML='<div class="empty">無法讀取資料。請先於 Supabase 執行 sql/floor_spaces.sql 建表。</div>';
     return;}
-  if(markRes.error||ckRes.error){
-    const err=markRes.error||ckRes.error;
-    toast('關聯資料讀取失敗：'+translateError(err.message),true);
-    document.getElementById('list').innerHTML='<div class="empty" style="color:var(--amber)">關聯資料讀取失敗，為避免誤判使用狀態，請重新整理或通知系統管理員。</div>';
-    return;
-  }
   rows=data||[];
   usedSpaces=new Map();
   spaceMarker=new Map();
-  (markRes.data||[]).filter(m=>!m.status||m.status==='active').forEach(m=>{
+  if(!markRes.error){
+    (markRes.data||[]).filter(m=>!m.status||m.status==='active').forEach(m=>{
       if(!m.space_id)return;
       if(!usedSpaces.has(m.space_id))usedSpaces.set(m.space_id,new Set());
       if(m.floor_id)usedSpaces.get(m.space_id).add(m.floor_id);
       if(!spaceMarker.has(m.space_id))spaceMarker.set(m.space_id,m.marker_id);
-  });
+    });
+  }
   lastCheckin=new Map();
   (ckRes?.data||[]).forEach(r=>{ if(!lastCheckin.has(r.target_id)) lastCheckin.set(r.target_id,r.checkin_at); });
   buildFloorFilter();
@@ -499,15 +495,14 @@ async function saveSpace(){
 // 查詢某空間是否已於整合標記系統被標記 → 回傳被標記的樓層陣列（防呆用）
 async function markedFloorsOf(spaceId){
   const {data,error}=await db.from('plan_markers').select('floor_id').eq('space_id',spaceId).eq('status','active');
-  if(error) throw error;                     // 查詢失敗時保守阻擋停用，避免誤停用仍被引用的空間
+  if(error) return [];                       // 標記表不存在或查詢失敗 → 視為未被標記
   return [...new Set((data||[]).map(x=>x.floor_id))];
 }
 
 async function delSpace(id){
   const r=rows.find(x=>x.space_id===id);if(!r)return;
   // 防呆：已被整合標記系統標記者不可停用
-  let mf;
-  try{mf=await markedFloorsOf(id);}catch(e){toast('檢查標記引用失敗，已取消停用：'+translateError(e.message),true);return;}
+  const mf=await markedFloorsOf(id);
   if(mf.length){
     alert(`無法停用「${r.floor} · ${r.space_name}」\n\n此空間已於「整合標記系統」使用中（樓層：${mf.join('、')}）。\n請先停用該標記後再操作。`);
     return;
@@ -522,8 +517,7 @@ async function delSpace(id){
 async function clearAll(){
   if(!rows.length){toast('目前沒有資料');return;}
   // 找出被整合標記系統引用的空間及其樓層
-  const {data:mk,error:markerErr}=await db.from('plan_markers').select('space_id,floor_id').not('space_id','is',null).eq('status','active');
-  if(markerErr){toast('檢查標記引用失敗，已取消全部停用：'+translateError(markerErr.message),true);return;}
+  const {data:mk}=await db.from('plan_markers').select('space_id,floor_id').not('space_id','is',null).eq('status','active');
   const refFloors={};
   (mk||[]).forEach(x=>{(refFloors[x.space_id]=refFloors[x.space_id]||new Set()).add(x.floor_id);});
   const refIds=Object.keys(refFloors);

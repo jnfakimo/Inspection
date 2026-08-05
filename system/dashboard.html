@@ -596,31 +596,28 @@ function togglePatrolPoints(){
   body.hidden=!expanded;
 }
 
-const DASHBOARD_TZ='Asia/Taipei';
-function ymd(d){if(!d)return '';const date=new Date(d);return Number.isNaN(date.getTime())?'':new Intl.DateTimeFormat('en-CA',{timeZone:DASHBOARD_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(date);}
-function ym(d){return ymd(d).slice(0,7);}
-function taipeiMonthKey(value){return ymd(value).slice(0,7);}
+function ymd(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
+function ym(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}`;}
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 function quick(r){
-  const today=ymd(new Date());
-  const [year,month]=today.split('-');
-  const from=r==='today'?today:r==='month'?`${year}-${month}-01`:`${year}-01-01`;
-  document.getElementById('from').value=from;
-  document.getElementById('to').value=today;
+  const now=new Date(); let f;
+  if(r==='today') f=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  else if(r==='month') f=new Date(now.getFullYear(),now.getMonth(),1);
+  else f=new Date(now.getFullYear(),0,1);
+  document.getElementById('from').value=ymd(f);
+  document.getElementById('to').value=ymd(now);
   document.querySelectorAll('.qbtn[data-range]').forEach(b=>b.classList.toggle('active',b.dataset.range===r));
   load();
 }
 
 async function fetchReqs(from,toEnd){
-  const fromAt=from.includes('T')?from:`${from}T00:00:00+08:00`;
   let res=await db.from('repair_requests')
     .select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,hidden,equipment(name,category)')
-    .gte('created_at',fromAt).lte('created_at',toEnd).limit(5000);
+    .gte('created_at',from).lte('created_at',toEnd).limit(5000);
   if(res.error){
     schemaHint();
     res=await db.from('repair_requests').select('request_id,department,equipment_id,status,created_at,equipment(name)')
-      .gte('created_at',fromAt).lte('created_at',toEnd).limit(5000);
-    if(res.error)throw res.error;
+      .gte('created_at',from).lte('created_at',toEnd).limit(5000);
     return (res.data||[]).map(r=>({...r,fault_type:null,desired_finish:null,hidden:false}));
   }
   return (res.data||[]).filter(r=>!r.hidden);
@@ -630,7 +627,6 @@ async function fetchOrds(){
     .select('order_id,assignee_id,status,start_time,finish_time,expected_finish,created_at,hidden,users:assignee_id(name)').limit(5000);
   if(res.error){
     res=await db.from('maintenance_orders').select('order_id,assignee_id,status,start_time,finish_time,created_at,users:assignee_id(name)').limit(5000);
-    if(res.error)throw res.error;
     return (res.data||[]).map(o=>({...o,expected_finish:null,hidden:false}));
   }
   return (res.data||[]).filter(o=>!o.hidden);
@@ -645,34 +641,27 @@ function schemaHint(){
 
 async function load(){
   const from=document.getElementById('from').value, to=document.getElementById('to').value;
-  const toEnd=to+'T23:59:59.999+08:00';
+  const toEnd=to+'T23:59:59';
   document.getElementById('rangeLbl').textContent=`\u5340\u9593\uff1a${from} ~ ${to}`;
-  try{
-    const [R,O]=await Promise.all([fetchReqs(from,toEnd),fetchOrds()]);
-    render(R,O,from,to);
-  }catch(error){
-    const box=document.getElementById('dashboardOrders');
-    if(box)box.innerHTML='<div class="empty" style="color:var(--amber)">戰情資料讀取失敗，請重新整理或通知系統管理員。</div>';
-    schemaHint();
-    console.error('Dashboard data load failed',error);
-  }
+  const [R,O]=await Promise.all([fetchReqs(from,toEnd),fetchOrds()]);
+  render(R,O,from,to);
   document.getElementById('updatedLbl').textContent=`最後更新：${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`;
   document.getElementById('loading').style.display='none';
 }
 
-function inRange(ts,from,to){ if(!ts) return false; const d=ymd(ts); return d>=from && d<=to; }
+function inRange(ts,from,to){ if(!ts) return false; const d=ts.slice(0,10); return d>=from && d<=to; }
 
 function render(R,O,from,to){
   const today=ymd(new Date());
   const monthStart=today.slice(0,7);
-  const todayNew=R.filter(r=>ymd(r.created_at)===today).length;
-  const todayDone=O.filter(o=>DONE_ORD.includes(o.status)&&ymd(o.finish_time)===today).length;
+  const todayNew=R.filter(r=>r.created_at?.slice(0,10)===today).length;
+  const todayDone=O.filter(o=>DONE_ORD.includes(o.status)&&o.finish_time?.slice(0,10)===today).length;
   const inProg=O.filter(o=>['accepted','in_progress','waiting_parts','waiting_vendor','assigned'].includes(o.status)).length;
   const now=new Date();
   const overdue=O.filter(o=>!DONE_ORD.includes(o.status)&&o.expected_finish&&new Date(o.expected_finish)<now).length
               + R.filter(r=>OPEN_REQ.includes(r.status)&&r.desired_finish&&new Date(r.desired_finish)<now).length;
   const waitDispatch=R.filter(r=>r.status==='pending').length;
-  const monthCnt=R.filter(r=>taipeiMonthKey(r.created_at)===monthStart).length;
+  const monthCnt=R.filter(r=>r.created_at?.slice(0,7)===monthStart).length;
   const doneO=O.filter(o=>DONE_ORD.includes(o.status)&&o.finish_time);
   const onTime=doneO.filter(o=>o.expected_finish? new Date(o.finish_time)<=new Date(o.expected_finish):true).length;
   const sla=doneO.length? Math.round(onTime/doneO.length*100):null;
@@ -739,10 +728,9 @@ function drawDoughnut(id,entries){
 async function drawTrend(){
   const now=new Date(); const labels=[],keys=[];
   for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);labels.push((d.getMonth()+1)+'\u6708');keys.push(ym(d));}
-  const start=keys[0]+'-01T00:00:00+08:00';
-  const {data,error}=await db.from('repair_requests').select('created_at,hidden').gte('created_at',start).limit(20000);
-  if(error){schemaHint();return;}
-  const cnt={}; (data||[]).filter(r=>!r.hidden).forEach(r=>{const k=taipeiMonthKey(r.created_at);cnt[k]=(cnt[k]||0)+1;});
+  const start=keys[0]+'-01';
+  const {data}=await db.from('repair_requests').select('created_at,hidden').gte('created_at',start).limit(20000);
+  const cnt={}; (data||[]).filter(r=>!r.hidden).forEach(r=>{const k=r.created_at?.slice(0,7);cnt[k]=(cnt[k]||0)+1;});
   const vals=keys.map(k=>cnt[k]||0);
   const ctx=document.getElementById('trendChart');
   if(trendChart) trendChart.destroy();

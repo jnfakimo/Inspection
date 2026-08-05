@@ -324,24 +324,14 @@ const collapsedFloors=new Set(), collapsedAreas=new Set(), collapsedDepts=new Se
 
 // ─── Init ────────────────────────────────────────────────────
 async function init(){
-  try{
-    await Promise.all([loadMarkets(), loadLocations(), loadDepts()]);
-    buildMarketFilter();
-    renderTree();
-    renderDeptTree();
-  }catch(e){
-    const message='位置、市场或部門資料讀取失敗：'+translateError(e?.message);
-    toast(message,true);
-    const body=document.getElementById('tree-body');
-    if(body)body.innerHTML='<tr><td colspan="6" style="color:var(--amber);padding:24px">資料讀取失敗，請重新整理或通知系統管理員。</td></tr>';
-    const deptTree=document.getElementById('dept-tree');
-    if(deptTree)deptTree.innerHTML='<li style="padding:20px;color:var(--amber)">資料讀取失敗，請重新整理或通知系統管理員。</li>';
-  }
+  await Promise.all([loadMarkets(), loadLocations(), loadDepts()]);
+  buildMarketFilter();
+  renderTree();
+  renderDeptTree();
 }
 
 async function loadMarkets(){
   let {data,error}=await db.from('markets').select('*').eq('status','active').order('sort_order');
-  if(error)throw error;
   allMkts=data||[];
   // 自動建立「第一市場 / 第二市場」(僅在市場表存在且為空時)
   if(!error && allMkts.length===0){
@@ -358,13 +348,11 @@ async function loadMarkets(){
   }
 }
 async function loadLocations(){
-  const {data,error}=await db.from('locations').select('*').eq('status','active').order('floor_order').order('area_order').order('detail_order');
-  if(error)throw error;
+  const {data}=await db.from('locations').select('*').eq('status','active').order('floor_order').order('area_order').order('detail_order');
   allLocs=data||[];
 }
 async function loadDepts(){
-  const {data,error}=await db.from('departments').select('*').eq('status','active').order('sort_order');
-  if(error)throw error;
+  const {data}=await db.from('departments').select('*').eq('status','active').order('sort_order');
   allDepts=data||[];
 }
 
