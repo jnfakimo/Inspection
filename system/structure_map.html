@@ -236,6 +236,8 @@
       border-radius: 6px;
       padding: 12px;
       display: flex;
+      align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
       z-index: 5;
     }
@@ -259,6 +261,26 @@
       color: var(--green);
       background: rgba(0, 255, 157, 0.08);
     }
+    .sync-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      color: var(--text-dim);
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+    .sync-status::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px rgba(0, 255, 157, 0.7);
+    }
+    .sync-status[data-state="syncing"]::before { background: var(--cyan); box-shadow: 0 0 6px rgba(0, 212, 255, 0.7); }
+    .sync-status[data-state="error"] { color: var(--red); }
+    .sync-status[data-state="error"]::before { background: var(--red); box-shadow: 0 0 6px rgba(255, 59, 59, 0.7); }
 
     /* Tooltip styling override */
     div.vis-tooltip {
@@ -331,6 +353,8 @@
       <button class="ctrl-btn active" id="btn-physics" onclick="togglePhysics()">彈性物理模擬: ON</button>
       <button class="ctrl-btn" onclick="fitView()">適中檢視</button>
       <button class="ctrl-btn" onclick="resetRelationships()">重設關聯</button>
+      <button class="ctrl-btn" id="btn-sync-shortcuts" onclick="syncSystemShortcuts(true)">立即同步捷徑</button>
+      <span class="sync-status" id="shortcut-sync-status" aria-live="polite">每 60 秒自動同步</span>
     </div>
 
     <!-- Network map canvas -->
@@ -378,21 +402,20 @@
     let edgesDataset = null;
     let selectedNodeId = null;
     let isPhysicsOn = true;
+    let shortcutSyncTimer = null;
+    let shortcutSyncInFlight = false;
 
     // Define original raw nodes data representing our site structure
     const initialNodes = [
-      { id: "root", label: "OpenCod\n(專案根目錄)", group: "root", dir: "H:/我的雲端硬碟/AI/OpenCod", desc: "專案全域根目錄，包含首頁入口與設定。" },
-      { id: "root_index", label: "index.html\n(首頁入口)", group: "entry", dir: "H:/我的雲端硬碟/AI/OpenCod/index.html", desc: "系統全域的起始點入口卡片頁面。" },
-      { id: "assets", label: "assets/\n(首頁大卡片資源)", group: "folder", dir: "H:/我的雲端硬碟/AI/OpenCod/assets", desc: "存放首頁卡片入口所使用的圖示等資源。" },
-      { id: "system_icons", label: "system-icons/\n(首頁大卡片圖示)", group: "folder", dir: "H:/我的雲端硬碟/AI/OpenCod/assets/system-icons", desc: "包括已還原的電子交接簿 (handover-icon.png) 等原始大圖示。" },
-      { id: "system", label: "system/\n(核心網頁目錄)", group: "folder", dir: "H:/我的雲端硬碟/AI/OpenCod/system", desc: "核心程式碼目錄，包含5大子系統與後台模組網頁。" },
-      { id: "sys_index", label: "index.html\n(子入口選單)", group: "entry", dir: "H:/我的雲端硬碟/AI/OpenCod/system/index.html", desc: "5大子系統在登入後的子選單導引頁。" },
-      { id: "login", label: "login.html\n(登入面頁)", group: "entry", dir: "H:/我的雲端硬碟/AI/OpenCod/system/login.html", desc: "統一登入驗證介面，包含 Supabase 帳號查尋認證。" },
-      { id: "dashboard", label: "dashboard.html\n(戰情儀表板)", group: "system", dir: "H:/我的雲端硬碟/AI/OpenCod/system/dashboard.html", desc: "營運戰情總覽，動態計算與顯示巡檢簽到打卡、報修及派工統計。" },
-      { id: "equipment", label: "equipment.html\n(設備建置系統)", group: "system", dir: "H:/我的雲端硬碟/AI/OpenCod/system/equipment.html", desc: "設備資產生命週期紀錄與 QR Code 平面圖定位對接。" },
-      { id: "guardpatrol", label: "guardpatrol.html\n(駐衛警巡檢系統)", group: "system", dir: "H:/我的雲端硬碟/AI/OpenCod/system/guardpatrol.html", desc: "巡檢打卡點列表設定與班別排程管理。" },
-      { id: "handover", label: "handover.html\n(電子交接簿)", group: "system", dir: "H:/我的雲端硬碟/AI/OpenCod/system/handover.html", desc: "交接班人員事件紀錄簿，具備與後台連動的交接功能。" },
-      { id: "admin", label: "admin.html\n(後台總理系統)", group: "system", dir: "H:/我的雲端硬碟/AI/OpenCod/system/admin.html", desc: "核心後台管理頁，包含設定、帳號、工單派送等多功能錨點模組。" },
+      { id: "root", label: "word-cloud\n(專案根目錄)", group: "root", dir: "https://jnfakimo.github.io/word-cloud/", desc: "臺北農產整合網站專案根目錄。" },
+      { id: "assets", label: "assets/\n(首頁大卡片資源)", group: "folder", dir: "https://github.com/jnfakimo/word-cloud/tree/main/assets", desc: "存放首頁卡片入口所使用的圖示等資源。" },
+      { id: "system_icons", label: "system-icons/\n(首頁大卡片圖示)", group: "folder", dir: "https://github.com/jnfakimo/word-cloud/tree/main/assets/system-icons", desc: "各子系統首頁卡片圖示資源。" },
+      { id: "system", label: "system/\n(核心網頁目錄)", group: "folder", dir: "https://github.com/jnfakimo/word-cloud/tree/main/system", desc: "核心程式碼目錄，包含各業務子系統與後台模組網頁。" },
+      { id: "dashboard", label: "dashboard.html\n(戰情儀表板)", group: "system", dir: "https://jnfakimo.github.io/word-cloud/system/dashboard.html", desc: "營運戰情總覽，動態計算與顯示巡檢簽到打卡、報修及派工統計。" },
+      { id: "equipment", label: "equipment.html\n(設備建置系統)", group: "system", dir: "https://jnfakimo.github.io/word-cloud/system/equipment.html", desc: "設備資產生命週期紀錄與 QR Code 平面圖定位對接。" },
+      { id: "guardpatrol", label: "guardpatrol-index.html\n(駐衛警巡檢系統)", group: "system", dir: "https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html", desc: "巡檢打卡點列表設定與班別排程管理。" },
+      { id: "handover", label: "handover.html\n(電子交接簿)", group: "system", dir: "https://jnfakimo.github.io/word-cloud/system/handover.html", desc: "交接班人員事件紀錄簿，具備與後台連動的交接功能。" },
+      { id: "admin", label: "admin.html\n(後台管理系統)", group: "system", dir: "https://jnfakimo.github.io/word-cloud/system/admin.html", desc: "核心後台管理頁，包含設定、帳號、工單派送等多功能錨點模組。" },
       { id: "settings", label: "#settings\n(系統設定)", group: "anchor", dir: "admin.html#settings", desc: "設定市場及部門等全域變數設定模組。" },
       { id: "users", label: "#users\n(帳號管理)", group: "anchor", dir: "admin.html#users", desc: "帳號新增、密碼修改與角色權限設定 (RBAC) 模組。" },
       { id: "repairs", label: "#repairs\n(維修派工完工)", group: "anchor", dir: "admin.html#repairs", desc: "指派與完成報修工單，直接管理與指派維修人員的後台模組。" },
@@ -403,12 +426,9 @@
 
     // Define original raw edges data (connections)
     const initialEdges = [
-      { from: "root", to: "root_index", label: "包含" },
       { from: "root", to: "assets", label: "包含" },
       { from: "root", to: "system", label: "包含" },
       { from: "assets", to: "system_icons", label: "包含" },
-      { from: "system", to: "sys_index", label: "包含" },
-      { from: "system", to: "login", label: "包含" },
       { from: "system", to: "dashboard", label: "包含" },
       { from: "system", to: "equipment", label: "包含" },
       { from: "system", to: "guardpatrol", label: "包含" },
@@ -430,6 +450,18 @@
       { from: "handover", to: "database", label: "API 存取", color: {color: "var(--red)"} },
       { from: "admin", to: "database", label: "API 存取", color: {color: "var(--red)"} }
     ];
+    const SHORTCUT_SYNC_MS = 60000;
+    const SHORTCUT_NODE_IDS = {
+      admin: "admin",
+      workorder: "repairs",
+      guardpatrol: "guardpatrol",
+      handover: "handover",
+      equipment: "equipment",
+      structuremap: "structuremap",
+      vehicle: "vehicle",
+      meetingroom: "meetingroom"
+    };
+    const STATIC_NODE_IDS = new Set(initialNodes.map(node => node.id));
 
     // Node Visual Configurations based on groups
     const groupStyles = {
@@ -441,16 +473,18 @@
       database: { color: { background: "#991b1b", border: "#b91c1c", highlight: { background: "#dc2626", border: "#b91c1c" } }, shape: "database", font: { color: "#fff", size: 13, bold: true }, shadow: true }
     };
 
+    function formatNode(node) {
+      const style = groupStyles[node.group] || {};
+      return {
+        ...node,
+        ...style,
+        title: `連結／路徑: ${node.dir}<br>${node.desc}`
+      };
+    }
+
     function initNetwork() {
       // 1. Prepare node datasets with custom styles
-      const formattedNodes = initialNodes.map(node => {
-        const style = groupStyles[node.group] || {};
-        return {
-          ...node,
-          ...style,
-          title: `路徑: ${node.dir}<br>${node.desc}`
-        };
-      });
+      const formattedNodes = initialNodes.map(formatNode);
 
       nodesDataset = new vis.DataSet(formattedNodes);
       edgesDataset = new vis.DataSet(initialEdges);
@@ -529,6 +563,165 @@
       });
     }
 
+    function setShortcutSyncStatus(message, state = "ok") {
+      const status = document.getElementById("shortcut-sync-status");
+      if (!status) return;
+      status.textContent = message;
+      status.dataset.state = state;
+    }
+
+    async function validateInternalLink(rawLink, pageCache) {
+      if (!rawLink) return false;
+      let url;
+      try {
+        url = new URL(rawLink, location.href);
+      } catch (error) {
+        return false;
+      }
+      if (!/^https?:$/.test(url.protocol)) return false;
+      if (url.origin !== location.origin) return true;
+
+      const pageUrl = url.origin + url.pathname + url.search;
+      if (!url.hash) {
+        const cacheKey = "HEAD:" + pageUrl;
+        if (!pageCache.has(cacheKey)) {
+          pageCache.set(cacheKey, fetch(pageUrl, { method: "HEAD", cache: "no-store" })
+            .then(response => response.ok)
+            .catch(() => false));
+        }
+        return pageCache.get(cacheKey);
+      }
+
+      const cacheKey = "GET:" + pageUrl;
+      if (!pageCache.has(cacheKey)) {
+        pageCache.set(cacheKey, fetch(pageUrl, { cache: "no-store" })
+          .then(async response => response.ok ? await response.text() : "")
+          .catch(() => ""));
+      }
+      const html = await pageCache.get(cacheKey);
+      if (!html) return false;
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      const fragment = decodeURIComponent(url.hash.slice(1));
+      return Boolean(
+        doc.getElementById(fragment) ||
+        doc.getElementById("page-" + fragment) ||
+        Array.from(doc.querySelectorAll("[data-page]")).some(element => element.dataset.page === fragment)
+      );
+    }
+
+    function removeNodeAndRelations(nodeId) {
+      const relatedEdges = edgesDataset.get({
+        filter: edge => edge.from === nodeId || edge.to === nodeId
+      });
+      if (relatedEdges.length) edgesDataset.remove(relatedEdges.map(edge => edge.id));
+      nodesDataset.remove(nodeId);
+      if (selectedNodeId === nodeId) {
+        selectedNodeId = null;
+        resetHUDPanel();
+      }
+    }
+
+    async function pruneInvalidLinkedNodes(pageCache) {
+      const candidates = nodesDataset.get({
+        filter: node => (node.group === "system" || node.group === "anchor") && Boolean(node.dir)
+      });
+      const checks = await Promise.all(candidates.map(async node => ({
+        node,
+        valid: await validateInternalLink(node.dir, pageCache)
+      })));
+      const invalidNodes = checks.filter(result => !result.valid).map(result => result.node);
+      invalidNodes.forEach(node => removeNodeAndRelations(node.id));
+      return invalidNodes.length;
+    }
+
+    async function syncSystemShortcuts(manual = false) {
+      if (!nodesDataset || !edgesDataset || shortcutSyncInFlight) return;
+      shortcutSyncInFlight = true;
+      const syncButton = document.getElementById("btn-sync-shortcuts");
+      if (syncButton) syncButton.disabled = true;
+      setShortcutSyncStatus(manual ? "正在手動同步…" : "正在自動同步…", "syncing");
+
+      try {
+        const sourceResponse = await fetch(`index.html?structure-sync=${Date.now()}`, { cache: "no-store" });
+        if (!sourceResponse.ok) throw new Error("首頁捷徑資料讀取失敗");
+        const sourceHtml = await sourceResponse.text();
+        const sourceDoc = new DOMParser().parseFromString(sourceHtml, "text/html");
+        const cards = Array.from(sourceDoc.querySelectorAll(".sys-card[data-system-key]"));
+        if (!cards.length) throw new Error("首頁沒有可同步的系統捷徑");
+
+        const pageCache = new Map();
+        let removedCount = await pruneInvalidLinkedNodes(pageCache);
+        const checkedCards = await Promise.all(cards.map(async card => {
+          const key = String(card.dataset.systemKey || "").trim();
+          const href = card.getAttribute("href") || "";
+          return { card, key, href, valid: Boolean(key) && await validateInternalLink(href, pageCache) };
+        }));
+        const validCards = checkedCards.filter(item => item.valid);
+        removedCount += checkedCards.length - validCards.length;
+
+        const activeNodeIds = new Set();
+        const activeEdgeIds = new Set();
+        validCards.forEach(({ card, key, href }) => {
+          const safeKey = key.replace(/[^a-z0-9_-]/gi, "");
+          const nodeId = SHORTCUT_NODE_IDS[key] || `shortcut_${safeKey}`;
+          const edgeId = `system-shortcut-${safeKey}`;
+          const existingNode = nodesDataset.get(nodeId);
+          const title = card.querySelector(".card-title")?.textContent.trim() || key;
+          const description = card.querySelector(".card-desc")?.textContent.trim() || "首頁系統捷徑。";
+          const absoluteHref = new URL(href, location.href).href;
+          activeNodeIds.add(nodeId);
+          activeEdgeIds.add(edgeId);
+          nodesDataset.update(formatNode({
+            ...(existingNode || {}),
+            id: nodeId,
+            label: `${title}\n(${key})`,
+            group: existingNode?.group || "system",
+            dir: absoluteHref,
+            desc: description,
+            autoShortcut: existingNode?.autoShortcut || !STATIC_NODE_IDS.has(nodeId)
+          }));
+          edgesDataset.update({
+            id: edgeId,
+            from: "system",
+            to: nodeId,
+            label: "系統捷徑",
+            dashes: true,
+            color: { color: "#00d4ff" },
+            autoShortcut: true
+          });
+        });
+
+        const staleEdges = edgesDataset.get({
+          filter: edge => edge.autoShortcut && !activeEdgeIds.has(edge.id)
+        });
+        if (staleEdges.length) {
+          edgesDataset.remove(staleEdges.map(edge => edge.id));
+          removedCount += staleEdges.length;
+        }
+        const staleNodes = nodesDataset.get({
+          filter: node => node.autoShortcut && !activeNodeIds.has(node.id)
+        });
+        staleNodes.forEach(node => removeNodeAndRelations(node.id));
+        removedCount += staleNodes.length;
+
+        const timeText = new Intl.DateTimeFormat("zh-TW", {
+          timeZone: "Asia/Taipei",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false
+        }).format(new Date());
+        setShortcutSyncStatus(`已同步 ${validCards.length} 個捷徑${removedCount ? `，移除 ${removedCount} 個失效項目` : ""} · ${timeText}`);
+        network.stabilize(80);
+      } catch (error) {
+        console.error(error);
+        setShortcutSyncStatus(error.message || "捷徑同步失敗", "error");
+      } finally {
+        shortcutSyncInFlight = false;
+        if (syncButton) syncButton.disabled = false;
+      }
+    }
+
     // Update HUD panel with the selected node information
     function updateHUDPanel(nodeId) {
       const node = nodesDataset.get(nodeId);
@@ -553,7 +746,7 @@
           <span class="info-val">${typeLabels[node.group] || "未知"}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">磁碟絕對路徑</span>
+          <span class="info-label">系統連結／路徑</span>
           <span class="info-val" style="font-size: 0.8rem; word-break: break-all;">${node.dir}</span>
         </div>
         <div class="info-row">
@@ -663,18 +856,12 @@
     // Reset edges and positions back to default
     function resetRelationships() {
       if (confirm("是否要重置回初始的預設系統組織架構與關聯關係？")) {
+        nodesDataset.clear();
         edgesDataset.clear();
+        nodesDataset.add(initialNodes.map(formatNode));
         edgesDataset.add(initialEdges);
-        
-        initialNodes.forEach(node => {
-          nodesDataset.update({
-            id: node.id,
-            dir: node.dir
-          });
-        });
-        
         resetHUDPanel();
-        network.stabilize();
+        syncSystemShortcuts(true);
       }
     }
 
@@ -707,7 +894,9 @@
     // Start everything on load
     window.onload = function() {
       initNetwork();
-      setTimeout(fitView, 500);
+      syncSystemShortcuts(false).finally(() => setTimeout(fitView, 300));
+      if (shortcutSyncTimer) clearInterval(shortcutSyncTimer);
+      shortcutSyncTimer = setInterval(() => syncSystemShortcuts(false), SHORTCUT_SYNC_MS);
     };
   </script>
 </body>
