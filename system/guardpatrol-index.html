@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&amp;family=Rajdhani:wght@500;600;700&amp;display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('siteTheme') || 'tech');</script>
-  <script src="theme.js?v=20260804-7"></script>
+  <script src="theme.js?v=20260805-1"></script>
   <style>
     :root {
       --bg: #020b18;
@@ -126,6 +126,7 @@
 
     .portal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
     html.is-sysadmin .portal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .portal-card[data-sysadmin-only][hidden] { display: none !important; }
     .portal-card {
       --accent: var(--cyan);
       --accent-rgb: 0, 212, 255;

@@ -77,11 +77,11 @@
     var auth=storedAuthSessionForAccess();
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
-    if(!token||!authId)return Promise.resolve(resolveRbacRole(readProfile())==='sysadmin');
+    if(!token||!authId)return Promise.resolve((readProfile()||{}).rbac_role==='sysadmin');
     return fetchUserRowForAccess(authId,token).then(function(profile){
       if(!profile)return false;
       saveProfile(profile);
-      return resolveRbacRole(profile)==='sysadmin';
+      return profile.rbac_role==='sysadmin';
     });
   }
   function denySysadminAccess(redirectPage){
@@ -142,6 +142,10 @@
   function installSysadminOnlyAccess(){
     var selector='[data-sysadmin-only],a[href*="patrolshifts.html"],a[href*="patrol-notifications.html"]';
     var resolved=false,allowed=false;
+    var style=document.createElement('style');
+    style.id='sysadminOnlyAccessStyle';
+    style.textContent='[data-sysadmin-only][hidden],a[hidden][href*="patrolshifts.html"],a[hidden][href*="patrol-notifications.html"]{display:none!important}';
+    document.head.appendChild(style);
     function sync(){
       document.querySelectorAll(selector).forEach(function(node){node.hidden=!resolved||!allowed;});
       document.documentElement.classList.toggle('is-sysadmin',resolved&&allowed);
