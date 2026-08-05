@@ -308,11 +308,10 @@ body.panel-open #panelToggle{display:none}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script src="patrolstatus.js"></script>
 <script>
-const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+const db = createDb();
 (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
 const KIND={equipment:{c:'#00d4ff',n:'設備'},space:{c:'#00ff9d',n:'空間'},patrol:{c:'#c77dff',n:'巡邏點'},repair:{c:'#ff5470',n:'報修點'},note:{c:'#ffb300',n:'一般'}};
 function prog(p,m){document.getElementById('ldfill').style.width=p+'%';document.getElementById('ldmsg').textContent=m;}

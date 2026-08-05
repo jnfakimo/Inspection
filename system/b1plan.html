@@ -169,11 +169,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Segoe 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script src="patrolstatus.js"></script>
 <script>
-const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+const db = createDb();
 // 巡邏點打卡即時反映：不必等 30 秒輪詢，有新打卡就馬上重繪
 db.channel('checkin_logs_realtime_plan')
   .on('postgres_changes',{event:'*',schema:'public',table:'checkin_logs'},()=>refreshPatrolStatus())

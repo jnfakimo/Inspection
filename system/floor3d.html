@@ -214,11 +214,10 @@ body.controls-hidden #panelToggle{display:inline-flex}
 <script src="vendor/three-r128.min.js?v=128" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'"></script>
 <script src="model-theme.js?v=20260718-2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script src="patrolstatus.js"></script>
 <script>
-const SUPA_URL='https://qztffronusdhgxhjjubt.supabase.co';
-const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-const db=supabase.createClient(SUPA_URL,SUPA_KEY);
+const db = createDb();
 const focusParams=new URLSearchParams(location.search),requestedMarkerId=focusParams.get('marker'),requestedEquipmentId=focusParams.get('equipment');
 (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){const redirect='floor3d.html'+location.search;location.href='login.html?redirect='+encodeURIComponent(redirect);}})();
 function prog(p,m){document.getElementById('ldfill').style.width=p+'%';document.getElementById('ldmsg').textContent=m;}
