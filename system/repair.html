@@ -957,6 +957,7 @@ async function submitRepairLog(){
   // Validation
   if(!desc){setMsg(msgEl,'請填寫維修說明','err');return;}
   if(hasCost&&(!costAmt||costAmt<=0)){setMsg(msgEl,'請填寫費用金額','err');return;}
+  if(hasCost&&!currentOrder?.equipment_id){setMsg(msgEl,'此工單尚未關聯設備，無法登錄設備維修成本；請先由派工人員補上設備後再送出','err');return;}
   if(activePhotos.length===0){setMsg(msgEl,'請上傳至少 1 張完工照片','err');return;}
 
   btn.disabled=true;btn.textContent='上傳中…';
@@ -1004,8 +1005,8 @@ async function submitRepairLog(){
     const {error:reqErr}=await db.from('repair_requests').update({status:'pending_review',updated_at:now}).eq('request_id',order.request_id);
     if(reqErr)throw reqErr;
 
-    // 4. Record cost when an equipment link is available; note remains authoritative otherwise.
-    if(hasCost&&order.equipment_id){
+    // 4. Record cost against the linked equipment.
+    if(hasCost){
       const costPayload={equipment_id:order.equipment_id,order_id:order.order_id,cost_type:'other',amount:costAmt,cost_date:now.slice(0,10),note:costNote||'維修完工費用'};
       if(myId)costPayload.created_by=myId;
       const {error:costErr}=await db.from('cost_records').insert(costPayload);
