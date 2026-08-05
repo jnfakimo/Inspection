@@ -441,6 +441,7 @@ function urgLabel(u){
 /* ===== STATE ===== */
 let me_=null;
 let allOrders=[];
+let loadError='';
 let currentTab='mine';
 let currentOrder=null;
 let uploadedFiles=[];   // {file, dataUrl, removed}
@@ -491,21 +492,31 @@ function cacheLoginUser(user){
 }
 function validUuid(value){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value||''));}
 async function hydrateLoginUser(){
-  try{
-    const {data:{session}}=await db.auth.getSession();
-    if(!session)return false;
-    const {data,error}=await db.from('users').select('user_id,username,name,department,role,rbac_role,permissions').eq('auth_id',session.user.id).maybeSingle();
-    if(error||!data?.user_id)return false;
-    me_={...(me_||{}),...data};cacheLoginUser(me_);return true;
-  }catch(e){console.warn('hydrateLoginUser',e);return false;}
+  const {data:{session},error:sessionError}=await db.auth.getSession();
+  if(sessionError)throw sessionError;
+  if(!session)return false;
+  const {data,error}=await db.from('users').select('user_id,username,name,department,role,rbac_role,permissions').eq('auth_id',session.user.id).maybeSingle();
+  if(error)throw error;
+  if(!data?.user_id)return false;
+  me_={...(me_||{}),...data};cacheLoginUser(me_);return true;
 }
 
 /* ===== INIT ===== */
 async function init(){
   startClock();
   me_=readLoginCache();
-  const authenticated=await hydrateLoginUser();
   const navUser=document.getElementById('navUser');
+  let authenticated=false;
+  try{
+    authenticated=await hydrateLoginUser();
+  }catch(error){
+    console.error('登入驗證失敗',error);
+    navUser.textContent='連線失敗';
+    loadError='登入驗證失敗：'+feedbackError();
+    renderCards();
+    toast(loadError,true);
+    return;
+  }
   if(!authenticated||!me_){
     me_=null;
     navUser.textContent='未登入';
@@ -559,6 +570,7 @@ async function loadOrders(){
       .limit(500);
     if(error)throw error;
     allOrders=(data||[]).map(normalizeOrder);
+    loadError='';
     if(normalizeRoleId(me_)==='technician'){
       const myName=String(me_.name||me_.username||'').toLowerCase();
       const myId=String(me_.user_id||'').toLowerCase();
@@ -567,7 +579,8 @@ async function loadOrders(){
     updateCounts();
   }catch(e){
     console.error('loadOrders error',e);
-    toast('工單載入失敗：'+feedbackError(),true);
+    loadError='工單載入失敗：'+feedbackError();
+    toast(loadError,true);
     allOrders=[];
     updateCounts();
   }
@@ -635,12 +648,20 @@ function getFiltered(){
 
 /* ===== RENDER CARDS ===== */
 function renderCards(){
+  const grid=document.getElementById('cardsGrid');
+  if(loadError){
+    grid.innerHTML=`<div class="empty" style="grid-column:1/-1;color:var(--red)">
+      <span class="empty-icon">⚠</span>
+      ${escHtml(loadError)}
+    </div>`;
+    renderPager(0,0);
+    return;
+  }
   const filtered=getFiltered();
   const total=filtered.length;
   const start=(currentPage-1)*PAGE_SIZE;
   const paged=filtered.slice(start,start+PAGE_SIZE);
 
-  const grid=document.getElementById('cardsGrid');
   if(!paged.length){
     grid.innerHTML=`<div class="empty" style="grid-column:1/-1">
       <span class="empty-icon">📋</span>
