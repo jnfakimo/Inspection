@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260805-4"></script>
+<script src="floor-utils.js"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
@@ -747,11 +748,7 @@ initDashboardLayout().finally(()=>quick('month'));
 const P_MS=12000;let _pt;let _patrolFloor='';
 function fh(t){return String(t||'').slice(0,5);}
 function canonicalPatrolFloor(value){
-  const floor=String(value||'未分類').trim().toUpperCase().replace(/\s+/g,'');
-  const basement=floor.match(/^B(\d+)F?$/);if(basement)return 'B'+basement[1];
-  const normal=floor.match(/^(\d+)F?$/);if(normal)return normal[1]+'F';
-  if(floor==='RF'||floor==='R'||floor==='頂樓')return 'RF';
-  return floor||'未分類';
+  return window.FloorUtils.canonicalFloor(value)||'未分類';
 }
 function patrolFloorOrder(value){
   const floor=canonicalPatrolFloor(value),basement=floor.match(/^B(\d+)$/),normal=floor.match(/^(\d+)F$/);
@@ -765,7 +762,7 @@ function syncPatrolFloorFilter(markers){
   const select=document.getElementById('patrolFloorFilter');if(!select)return;
   const floors=[...new Set(markers.map(m=>canonicalPatrolFloor(m.floor_id)))].sort((a,b)=>patrolFloorOrder(a)-patrolFloorOrder(b)||a.localeCompare(b,'zh-Hant'));
   if(_patrolFloor&&!floors.includes(_patrolFloor))_patrolFloor='';
-  select.innerHTML='<option value="">全部樓層</option>'+floors.map(f=>'<option value="'+escapePatrolText(f)+'">'+escapePatrolText(f)+'</option>').join('');
+  select.innerHTML='<option value="">全部樓層</option>'+floors.map(f=>'<option value="'+escapePatrolText(f)+'">'+escapePatrolText(window.FloorUtils.floorLabel(f))+'</option>').join('');
   select.value=_patrolFloor;
 }
 function changePatrolFloor(value){_patrolFloor=value?canonicalPatrolFloor(value):'';ld();}
@@ -801,7 +798,7 @@ async function ld(){
     if(!visibleMarkers.length){g.innerHTML='<div class="empty">'+(_patrolFloor?'此樓層尚無巡邏點':'\u5c1a\u7121\u5de1\u908f\u9ede')+'</div>';return;}
     const ic={ok:'\u2713',pending:'\u2026',overdue:'\u2715'};
     g.innerHTML='<table class="pt"><tr><th class="pl">\u5de1\u6aa2\u9ede</th><th>'+escapePatrolText(shift.name)+'<br>'+fh(shift.start_time)+'-'+fh(shift.end_time)+'</th></tr>'
-      +visibleMarkers.map(m=>{const st=duty.map.get(m.marker_id)||'pending';return '<tr><td class="pl">'+escapePatrolText(canonicalPatrolFloor(m.floor_id))+' '+escapePatrolText(m.label||'')+'</td><td><span class="pd '+st+'">'+ic[st]+'</span></td></tr>';}).join('')+'</table>';
+      +visibleMarkers.map(m=>{const st=duty.map.get(m.marker_id)||'pending';return '<tr><td class="pl">'+escapePatrolText(window.FloorUtils.floorLabel(canonicalPatrolFloor(m.floor_id)))+' '+escapePatrolText(m.label||'')+'</td><td><span class="pd '+st+'">'+ic[st]+'</span></td></tr>';}).join('')+'</table>';
   }catch(e){document.getElementById('pg').innerHTML='<div class="empty">\u8f09\u5165\u5931\u6557</div>';}
 }
 function sr(){ld();if(_pt)clearInterval(_pt);_pt=setInterval(ld,P_MS);}
