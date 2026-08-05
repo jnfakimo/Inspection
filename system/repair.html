@@ -417,6 +417,7 @@ function hasPerm(key){
   return ROLE_PERMISSION_PRESETS[normalizeRoleId(me_)]?.[key]===true;
 }
 function canClose(){return hasPerm('close');}
+function canReportRepair(){return hasPerm('repair')||hasPerm('update');}
 
 /* ===== STATUS MAP ===== */
 const ST={
@@ -492,19 +493,21 @@ function validUuid(value){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89a
 async function hydrateLoginUser(){
   try{
     const {data:{session}}=await db.auth.getSession();
-    if(!session)return;
-    const {data}=await db.from('users').select('user_id,username,name,department,role,rbac_role,permissions').eq('auth_id',session.user.id).maybeSingle();
-    if(data){me_={...(me_||{}),...data};cacheLoginUser(me_);}
-  }catch(e){console.warn('hydrateLoginUser',e);}
+    if(!session)return false;
+    const {data,error}=await db.from('users').select('user_id,username,name,department,role,rbac_role,permissions').eq('auth_id',session.user.id).maybeSingle();
+    if(error||!data?.user_id)return false;
+    me_={...(me_||{}),...data};cacheLoginUser(me_);return true;
+  }catch(e){console.warn('hydrateLoginUser',e);return false;}
 }
 
 /* ===== INIT ===== */
 async function init(){
   startClock();
   me_=readLoginCache();
-  await hydrateLoginUser();
+  const authenticated=await hydrateLoginUser();
   const navUser=document.getElementById('navUser');
-  if(!me_){
+  if(!authenticated||!me_){
+    me_=null;
     navUser.textContent='未登入';
     toast('請先登入系統',true);
     setTimeout(()=>{location.href='login.html';},2000);
@@ -663,7 +666,7 @@ function buildCard(o){
   const assignee=o.assigned_to_name||'未指派';
   const idArg=encodedJsArg(o.id);
 
-  const canReport=['in_progress','accepted','waiting_parts','waiting_vendor'].includes(status);
+  const canReport=canReportRepair()&&['in_progress','accepted','waiting_parts','waiting_vendor'].includes(status);
   const isDone=status==='pending_review'||status==='closed';
 
   return `<div class="wo-card${isUrgent?' urgent':''}" onclick="openDetail(decodeURIComponent('${idArg}'))">
@@ -751,7 +754,7 @@ function buildDetailBody(o,repairLog,timeline){
   const status=o.status||'pending';
   const orderIdArg=encodedJsArg(o.id);
 
-  const canReport=['in_progress','accepted','waiting_parts','waiting_vendor'].includes(status);
+  const canReport=canReportRepair()&&['in_progress','accepted','waiting_parts','waiting_vendor'].includes(status);
   const role=normalizeRoleId(me_);
   const isSupervisor=canClose();
 
@@ -941,6 +944,7 @@ async function uploadPhoto(file,orderId,index){
 
 /* ===== SUBMIT REPAIR LOG ===== */
 async function submitRepairLog(){
+  if(!canReportRepair()){toast('沒有完工回報權限',true);return;}
   const desc=(document.getElementById('r-desc')?.value||'').trim();
   const hasCost=document.getElementById('r-has-cost')?.checked||false;
   const costAmt=hasCost?parseFloat(document.getElementById('r-cost')?.value||0):0;

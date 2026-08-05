@@ -35,15 +35,16 @@ alter table public.repair_requests add constraint repair_requests_status_check
     'cancelled','overdue'
   ));
 
--- 確認 RLS 寫入政策含 with check，避免 insert 被舊政策卡住。
+-- 確認 RLS 僅允許已登入使用者。不得為了排除 timeout 重新開放 anon 寫入。
 alter table public.repair_requests enable row level security;
 drop policy if exists "allow_all_for_now" on public.repair_requests;
-create policy "allow_all_for_now" on public.repair_requests
-  for all using (true) with check (true);
+drop policy if exists "authenticated_only" on public.repair_requests;
+create policy "authenticated_only" on public.repair_requests
+  for all to authenticated using (true) with check (true);
 
--- 若 repair_requests 上有舊的觸發器 / Database Webhook，可能在新增時造成 statement timeout。
--- 先停用使用者自訂觸發器；外鍵等系統內部觸發器不會被 disable trigger user 停用。
-alter table public.repair_requests disable trigger user;
+-- 舊版腳本曾停用所有使用者觸發器，會連帶關閉稽核與資料同步。
+-- 重跑本版時恢復觸發器；真正逾時的觸發器應逐一診斷，不可整批繞過。
+alter table public.repair_requests enable trigger user;
 
 -- 讓 PostgREST/Supabase 立即刷新欄位快取。
 notify pgrst, 'reload schema';

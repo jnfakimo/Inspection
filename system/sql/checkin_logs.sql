@@ -26,4 +26,6 @@ create index if not exists idx_checkin_logs_time   on checkin_logs(checkin_at de
 -- ── RLS ────────────────────────────────────────────────────
 alter table checkin_logs enable row level security;
 drop policy if exists "allow_all_for_now" on checkin_logs;
-create policy "allow_all_for_now" on checkin_logs for all using (true);
+drop policy if exists "authenticated_only" on checkin_logs;
+create policy "authenticated_only" on checkin_logs
+  for all to authenticated using (true) with check (true);

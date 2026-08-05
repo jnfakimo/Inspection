@@ -36,11 +36,15 @@ alter table patrol_shifts add column if not exists assigned_user_ids uuid[] not 
 -- ── RLS ────────────────────────────────────────────────────
 alter table patrol_shift_template enable row level security;
 drop policy if exists "allow_all_for_now" on patrol_shift_template;
-create policy "allow_all_for_now" on patrol_shift_template for all using (true);
+drop policy if exists "authenticated_only" on patrol_shift_template;
+create policy "authenticated_only" on patrol_shift_template
+  for all to authenticated using (true) with check (true);
 
 alter table patrol_shifts enable row level security;
 drop policy if exists "allow_all_for_now" on patrol_shifts;
-create policy "allow_all_for_now" on patrol_shifts for all using (true);
+drop policy if exists "authenticated_only" on patrol_shifts;
+create policy "authenticated_only" on patrol_shifts
+  for all to authenticated using (true) with check (true);
 
 -- ── 預設範本（可在後台自行調整）──────────────────────────────
 insert into patrol_shift_template (name, start_time, end_time, sort_order)

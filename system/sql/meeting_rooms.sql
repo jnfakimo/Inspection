@@ -150,13 +150,15 @@ $$;
 revoke all on function create_meeting_booking_series(uuid,text,date,time,time,text,text,boolean,date) from public,anon;
 grant execute on function create_meeting_booking_series(uuid,text,date,time,time,text,text,boolean,date) to authenticated;
 
--- ── RLS：沿用 allow_all_for_now 慣例 ─────────────────────────
+-- ── RLS：會議室資料僅供已登入人員使用 ───────────────────────
 alter table meeting_rooms enable row level security;
 alter table meeting_bookings enable row level security;
 drop policy if exists "allow_all_for_now" on meeting_rooms;
 drop policy if exists "allow_all_for_now" on meeting_bookings;
-create policy "allow_all_for_now" on meeting_rooms for all using (true);
-create policy "allow_all_for_now" on meeting_bookings for all using (true);
+drop policy if exists "authenticated_only" on meeting_rooms;
+drop policy if exists "authenticated_only" on meeting_bookings;
+create policy "authenticated_only" on meeting_rooms for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on meeting_bookings for all to authenticated using (true) with check (true);
 
 -- ── 永久資料保護 ──────────────────────────────────────────
 -- meeting_rooms/meeting_bookings 已加進 permanent_data_protection.sql 的保護

@@ -191,7 +191,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
         <div class="field"><label>手機（必填）</label><input id="c-mobile" placeholder="請填手機號碼" required></div>
         <div class="field"><label>所屬單位</label><input id="c-dept" list="deptList" value="改建室"><datalist id="deptList"></datalist></div>
       </div>
-      <select id="c-eqp" style="display:none" aria-hidden="true"><option value="">系統自動帶入</option></select>
+      <div class="field"><label>關聯設備（選填）</label><select id="c-eqp" onchange="onEqp()"><option value="">-- 未指定設備 --</option></select></div>
       <div class="field"><label>故障位置</label><input id="c-location-desc" placeholder="請描述故障位置，例如：第一市場 2F 配電盤旁"></div>
       <div class="field"><label>故障位置照片（必填，請上傳一張照片）</label><input id="c-location-photo" type="file" accept="image/*" required></div>
       <div class="field"><label>故障類型</label><input id="c-ftype" list="ftypeList" placeholder="電氣/機械/漏水…"><datalist id="ftypeList"><option>電氣</option><option>機械</option><option>漏水</option><option>異音</option><option>停機</option><option>其他</option></datalist></div>
@@ -216,7 +216,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
       </div>
       <div class="field"><label>其他附件（照片/影片/PDF/Word/Excel，可多選）</label><input id="c-files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"></div>
       <div id="c-msg" class="msg"></div>
-      <button class="btn-primary" style="width:100%" onclick="submitCreate()">送出報修</button>
+      <button class="btn-primary" id="btnCreate" style="width:100%" onclick="submitCreate()">送出報修</button>
     </div>
   </div>
 </div>
@@ -395,6 +395,7 @@ function setReporterSelect(){
 let me_=readLoginCache();
 const PAGE_SIZE=10;
 let reqs=[],ordersByReq={},equip=[],locs=[],techs=[],filterStatus='',currentPage=1,lastFilterKey='',reqNoDisplayMap={};
+let createSubmitting=false;
 
 async function init(){
   try{const {data:{session}}=await db.auth.getSession();
@@ -422,27 +423,25 @@ async function init(){
 }
 
 async function loadRefs(){
-  const [{data:e},{data:l},{data:u}]=await Promise.all([
+  const [equipmentRes,locationRes,userRes]=await Promise.all([
     db.from('equipment').select('equipment_id,name,qr_code,category,location').eq('status','active').order('name'),
     db.from('locations').select('location_id,floor,area,detail,markets(name)').eq('status','active').limit(2000),
     db.from('users').select('user_id,name,role,rbac_role').eq('status','active')
   ]);
-  equip=e||[]; locs=l||[]; techs=(u||[]).filter(canAssign);
+  equip=equipmentRes.data||[]; locs=locationRes.data||[]; techs=(userRes.data||[]).filter(canAssign);
+  const failed=[equipmentRes.error&&'設備',locationRes.error&&'位置',userRes.error&&'人員'].filter(Boolean);
+  if(failed.length)toast(failed.join('、')+'資料載入失敗，部分選項暫時無法使用',true);
   // fill selects
   const eq=document.getElementById('c-eqp');
   if(eq){
-    eq.innerHTML='<option value="">系統自動帶入</option>'+equip.map(x=>`<option value="${x.equipment_id}">${escHtml(x.name)}${x.qr_code?' ('+escHtml(x.qr_code)+')':''}</option>`).join('');
-    const d=defaultEquipment(); if(d)eq.value=d.equipment_id;
+    eq.innerHTML='<option value="">-- 未指定設備 --</option>'+equip.map(x=>`<option value="${x.equipment_id}">${escHtml(x.name)}${x.qr_code?' ('+escHtml(x.qr_code)+')':''}</option>`).join('');
   }
   const dl=document.getElementById('deptList'); dl.innerHTML=[...new Set(reqs.map(r=>r.department).filter(Boolean))].map(d=>`<option>${escHtml(d)}</option>`).join('');
 }
-function defaultEquipment(){
-  return equip.find(x=>/未指定|一般|報修|其他/i.test(x.name||'')) || equip[0] || null;
-}
-
 async function loadCases(){
-  const {data:r}=await db.from('repair_requests')
+  const {data:r,error}=await db.from('repair_requests')
     .select('*,equipment(name,category,qr_code)').eq('hidden',false).order('created_at',{ascending:false}).limit(500);
+  if(error){reqs=[];ordersByReq={};toast('報修案件載入失敗：'+translateError(error.message),true);return;}
   reqs=r||[];
   buildReqNoMap();
   const ids=reqs.map(x=>x.request_id);
@@ -705,13 +704,15 @@ addEventListener('resize',placeDesiredCalendar);
 addEventListener('scroll',placeDesiredCalendar,true);
 
 // ─── Create ───
-function openCreate(){if(!hasPerm('create')){toast('沒有新增報修權限',true);return;}['c-reporter','c-phone','c-mobile','c-dept','c-desc','c-ftype','c-location-desc','c-desired','c-desired-view'].forEach(i=>document.getElementById(i).value='');
+function openCreate(){if(!hasPerm('create')){toast('沒有新增報修權限',true);return;}['c-reporter','c-phone','c-mobile','c-dept','c-eqp','c-desc','c-ftype','c-location-desc','c-desired','c-desired-view'].forEach(i=>document.getElementById(i).value='');
+  setCreateSubmitting(false);
   setReporterSelect(); document.getElementById('c-phone').value=operatorPhone(); document.getElementById('c-mobile').value=''; document.getElementById('c-dept').value=operatorDepartment(); document.getElementById('c-msg').textContent='';
   document.getElementById('c-filed').textContent=todayISO();
-  const d=defaultEquipment(); if(d)document.getElementById('c-eqp').value=d.equipment_id;
   document.getElementById('c-location-photo').value=''; document.getElementById('c-files').value=''; closeDesiredCalendar(); show('m-create');}
 function onEqp(){const e=equip.find(x=>x.equipment_id===document.getElementById('c-eqp').value);
-  if(e&&!document.getElementById('c-ftype').value){} }
+  const loc=document.getElementById('c-location-desc');
+  if(e?.location&&!loc.value.trim())loc.value=e.location;
+}
 const OPTIONAL_REPAIR_COLUMNS=['fault_location','mobile','equipment_category','location_id','desired_finish'];
 function isSchemaColumnError(error){
   return error?.code==='PGRST204'||/schema cache|Could not find the .+ column/i.test(error?.message||'');
@@ -773,17 +774,9 @@ async function uploadRepairFile(path,file){
 }
 async function insertRepairRequest(rec){
   let payload={...rec};
-  let triedWithoutEquipment=false;
   for(let i=0;i<8;i++){
     const res=await db.from('repair_requests').insert(payload).select('request_id,req_no').single();
     if(!res.error)return res;
-    if(isStatementTimeout(res.error) && payload.equipment_id && !triedWithoutEquipment){
-      triedWithoutEquipment=true;
-      delete payload.equipment_id;
-      delete payload.equipment_category;
-      delete payload.location_id;
-      continue;
-    }
     const msg=res.error.message||'', quoted=msg.match(/'([^']+)' column/)?.[1];
     const col=OPTIONAL_REPAIR_COLUMNS.find(c=>payload[c]!==undefined && (quoted===c||msg.includes(`'${c}'`)||msg.includes(`"${c}"`)));
     if(!col)return res;
@@ -804,8 +797,14 @@ function repairRequestErrorMessage(error){
   }
   return '錯誤：'+(error.message?translateError(error.message):'送出失敗');
 }
+function setCreateSubmitting(active){
+  createSubmitting=active;
+  const btn=document.getElementById('btnCreate');
+  if(btn){btn.disabled=active;btn.setAttribute('aria-busy',String(active));btn.textContent=active?'送出中…':'送出報修';}
+}
 async function submitCreate(){
   if(!hasPerm('create')){toast('沒有新增報修權限',true);return;}
+  if(createSubmitting)return;
   const desc=document.getElementById('c-desc').value.trim();
   const msg=document.getElementById('c-msg');
   const mobile=document.getElementById('c-mobile').value.trim();
@@ -814,32 +813,50 @@ async function submitCreate(){
   if(!mobile){msg.textContent='請填寫手機號碼';msg.className='msg err';return;}
   if(!locationPhoto){msg.textContent='請上傳一張故障位置照片';msg.className='msg err';return;}
   if(!desc){msg.textContent='請填寫故障描述';msg.className='msg err';return;}
+  setCreateSubmitting(true);
   msg.textContent='送出中…';msg.className='msg';
-  setReporterSelect();
-  const faultDesc=[faultLocation?`故障位置：${faultLocation}`:'',`聯絡手機：${mobile}`,`故障描述：${desc}`].filter(Boolean).join('\n');
-  const rec={request_id:clientUuid(),req_no:clientReqNo(),source:'direct',reporter:operatorLabel(),
-    phone:document.getElementById('c-phone').value.trim()||null, department:document.getElementById('c-dept').value.trim()||operatorDepartment()||null,
-    equipment_category:null, location_id:null, fault_location:faultLocation||null,
-    fault_type:document.getElementById('c-ftype').value.trim()||null, fault_desc:faultDesc,
-    desired_finish:document.getElementById('c-desired').value||null, status:'pending', created_by:me_.user_id||null};
-  rec.mobile=mobile;
-  const {data,error}=await insertRepairRequest(rec);
-  if(error){msg.textContent=repairRequestErrorMessage(error);msg.className='msg err';return;}
-  // attachments
-  const photoPath=storagePath(data.request_id,locationPhoto,'location');
-  const photoUp=await uploadRepairFile(photoPath,locationPhoto);
-  if(photoUp.error){msg.textContent='案件已建立，但故障位置照片上傳失敗：'+uploadErrorMessage(photoUp.error);msg.className='msg err';return;}
-  await db.from('repair_attachments').insert({request_id:data.request_id,kind:'location_photo',file_path:photoPath,file_name:locationPhoto.name,uploaded_by:me_.user_id});
-  const files=document.getElementById('c-files').files;
-  for(const f of files){
-    const path=storagePath(data.request_id,f,kindOf(f));
-    const up=await uploadRepairFile(path,f);
-    if(!up.error){ await db.from('repair_attachments').insert({request_id:data.request_id,kind:kindOf(f),file_path:path,file_name:f.name,uploaded_by:me_.user_id}); }
+  let requestCreated=false;
+  try{
+    setReporterSelect();
+    const equipmentId=document.getElementById('c-eqp').value||null;
+    const selectedEquipment=equip.find(x=>x.equipment_id===equipmentId)||null;
+    const faultDesc=[faultLocation?`故障位置：${faultLocation}`:'',`聯絡手機：${mobile}`,`故障描述：${desc}`].filter(Boolean).join('\n');
+    const rec={request_id:clientUuid(),req_no:clientReqNo(),source:'direct',reporter:operatorLabel(),
+      phone:document.getElementById('c-phone').value.trim()||null, department:document.getElementById('c-dept').value.trim()||operatorDepartment()||null,
+      equipment_id:equipmentId,equipment_category:selectedEquipment?.category||null,location_id:null,fault_location:faultLocation||null,
+      fault_type:document.getElementById('c-ftype').value.trim()||null,fault_desc:faultDesc,
+      desired_finish:document.getElementById('c-desired').value||null,status:'pending',created_by:me_.user_id||null,mobile};
+    const {data,error}=await insertRepairRequest(rec);
+    if(error){msg.textContent=repairRequestErrorMessage(error);msg.className='msg err';return;}
+    requestCreated=true;
+
+    const photoPath=storagePath(data.request_id,locationPhoto,'location');
+    const photoUp=await uploadRepairFile(photoPath,locationPhoto);
+    if(photoUp.error)throw new Error('故障位置照片上傳失敗：'+uploadErrorMessage(photoUp.error));
+    const photoMeta=await db.from('repair_attachments').insert({request_id:data.request_id,kind:'location_photo',file_path:photoPath,file_name:locationPhoto.name,uploaded_by:me_.user_id});
+    if(photoMeta.error)throw new Error('故障位置照片紀錄失敗：'+translateError(photoMeta.error.message));
+
+    const attachmentErrors=[];
+    for(const f of document.getElementById('c-files').files){
+      const kind=kindOf(f),path=storagePath(data.request_id,f,kind);
+      const up=await uploadRepairFile(path,f);
+      if(up.error){attachmentErrors.push(f.name);continue;}
+      const meta=await db.from('repair_attachments').insert({request_id:data.request_id,kind,file_path:path,file_name:f.name,uploaded_by:me_.user_id});
+      if(meta.error)attachmentErrors.push(f.name);
+    }
+    await logStatus(data.request_id,null,null,'pending','建立報修');
+    await notifyLineRepair({...rec,...data});
+    closeM('m-create');
+    toast('已新增報修 '+displayReqNo(data)+(attachmentErrors.length?'；部分附件失敗：'+attachmentErrors.join('、'):''),attachmentErrors.length>0);
+    await loadCases();renderTableFilters();renderChips();renderList();
+  }catch(error){
+    console.error('submitCreate',error);
+    msg.textContent=(requestCreated?'案件已建立，但後續處理失敗，請勿重複送出：':'送出失敗：')+(error?.message||translateError(''));
+    msg.className='msg err';
+    if(requestCreated){await loadCases();renderTableFilters();renderChips();renderList();}
+  }finally{
+    if(!requestCreated)setCreateSubmitting(false);
   }
-  await logStatus(data.request_id,null,null,'pending','建立報修');
-  await notifyLineRepair({...rec,...data});
-  closeM('m-create'); toast('已新增報修 '+displayReqNo(data));
-  await loadCases(); renderTableFilters(); renderChips(); renderList();
 }
 function kindOf(f){const t=f.type;if(t.startsWith('image'))return'photo';if(t.startsWith('video'))return'video';if(t.includes('pdf'))return'pdf';if(t.includes('word')||/\.docx?$/i.test(f.name))return'doc';if(t.includes('sheet')||/\.xlsx?$/i.test(f.name))return'xls';return'other';}
 function displayFaultLocation(r){

@@ -171,7 +171,21 @@ create table if not exists notifications (
 );
 create index if not exists idx_notif_rcpt on notifications(recipient_id, is_read);
 
--- ── 9. RLS（沿用現行寬鬆政策，正式上線再收斂）───────────────
+-- ── 9. RLS ──────────────────────────────────────────────────
+create or replace function public.is_admin() returns boolean
+language sql security definer stable
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.users
+    where auth_id = auth.uid()
+      and (role = 'admin' or rbac_role in ('admin','sysadmin'))
+      and status = 'active'
+  );
+$$;
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated;
+
 alter table case_status_log   enable row level security;
 alter table repair_attachments enable row level security;
 alter table roles             enable row level security;
@@ -180,9 +194,27 @@ alter table notifications     enable row level security;
 do $$
 declare t text;
 begin
-  foreach t in array array['case_status_log','repair_attachments','roles','role_permissions','notifications'] loop
+  foreach t in array array['case_status_log','repair_attachments','notifications'] loop
     execute format('drop policy if exists "allow_all_for_now" on %I', t);
-    execute format('create policy "allow_all_for_now" on %I for all using (true) with check (true)', t);
+    execute format('drop policy if exists "authenticated_only" on %I', t);
+    execute format('create policy "authenticated_only" on %I for all to authenticated using (true) with check (true)', t);
+  end loop;
+end $$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['roles','role_permissions'] loop
+    execute format('drop policy if exists "allow_all_for_now" on %I', t);
+    execute format('drop policy if exists "authenticated_only" on %I', t);
+    execute format('drop policy if exists "rbac_read" on %I', t);
+    execute format('drop policy if exists "rbac_admin_insert" on %I', t);
+    execute format('drop policy if exists "rbac_admin_update" on %I', t);
+    execute format('drop policy if exists "rbac_admin_delete" on %I', t);
+    execute format('create policy "rbac_read" on %I for select to authenticated using (true)', t);
+    execute format('create policy "rbac_admin_insert" on %I for insert to authenticated with check (public.is_admin())', t);
+    execute format('create policy "rbac_admin_update" on %I for update to authenticated using (public.is_admin()) with check (public.is_admin())', t);
+    execute format('create policy "rbac_admin_delete" on %I for delete to authenticated using (public.is_admin())', t);
   end loop;
 end $$;
 
@@ -194,6 +226,6 @@ drop policy if exists "repairfiles_write"  on storage.objects;
 drop policy if exists "repairfiles_update" on storage.objects;
 drop policy if exists "repairfiles_delete" on storage.objects;
 create policy "repairfiles_read"   on storage.objects for select using (bucket_id='repair-files');
-create policy "repairfiles_write"  on storage.objects for insert with check (bucket_id='repair-files');
-create policy "repairfiles_update" on storage.objects for update using (bucket_id='repair-files');
-create policy "repairfiles_delete" on storage.objects for delete using (bucket_id='repair-files');
+create policy "repairfiles_write"  on storage.objects for insert to authenticated with check (bucket_id='repair-files');
+create policy "repairfiles_update" on storage.objects for update to authenticated using (bucket_id='repair-files') with check (bucket_id='repair-files');
+create policy "repairfiles_delete" on storage.objects for delete to authenticated using (bucket_id='repair-files');

@@ -79,7 +79,8 @@ CREATE TABLE IF NOT EXISTS system_settings (
 
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "allow_all_for_now" ON system_settings;
-CREATE POLICY "allow_all_for_now" ON system_settings FOR ALL USING (true);
+-- Policies are owned by rls_hardening.sql. Keep a newly created table closed
+-- until that final migration runs, and never reopen an existing hardened table.
 
 INSERT INTO system_settings (key, value) VALUES
   ('org_name',  '臺北農產運銷股份有限公司'),

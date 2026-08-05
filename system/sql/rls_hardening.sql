@@ -33,15 +33,19 @@
 -- ============================================================
 
 -- ---- helper: is the logged-in user an admin? ----
-create or replace function is_admin() returns boolean
-language sql security definer stable as $$
+create or replace function public.is_admin() returns boolean
+language sql security definer stable
+set search_path = public, pg_temp
+as $$
   select exists (
-    select 1 from users
+    select 1 from public.users
     where auth_id = auth.uid()
-      and (role = 'admin' or rbac_role = 'admin')
+      and (role = 'admin' or rbac_role in ('admin','sysadmin'))
       and status = 'active'
   );
 $$;
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated;
 
 -- ---- generic tables: swap allow_all_for_now -> must be logged in ----
 do $$
@@ -51,13 +55,44 @@ begin
     'equipment','inspection_records','repair_requests','maintenance_orders',
     'cost_records','audit_logs','inspection_cycles',
     'markets','locations','departments',
-    'case_status_log','repair_attachments','roles','role_permissions','notifications',
+    'case_status_log','repair_attachments','notifications',
     'floor_models','handover_records','floor_spaces','plan_markers',
-    'material_categories','materials'
+    'material_categories','materials',
+    'checkin_logs','patrol_shift_template','patrol_shifts',
+    'equipment_maintenance_plans','equipment_maintenance_records',
+    'equipment_contracts','equipment_documents','equipment_annual_costs',
+    'equipment_external_links','equipment_monitor_points','equipment_monitor_events',
+    'meeting_rooms','meeting_bookings','meeting_booking_notifications'
   ] loop
-    execute format('drop policy if exists "allow_all_for_now" on %I', t);
-    execute format('drop policy if exists "authenticated_only" on %I', t);
-    execute format('create policy "authenticated_only" on %I for all using (auth.uid() is not null) with check (auth.uid() is not null)', t);
+    if to_regclass('public.' || t) is not null then
+      execute format('alter table public.%I enable row level security', t);
+      execute format('drop policy if exists "allow_all_for_now" on public.%I', t);
+      execute format('drop policy if exists "authenticated_only" on public.%I', t);
+      execute format('create policy "authenticated_only" on public.%I for all to authenticated using (true) with check (true)', t);
+    end if;
+  end loop;
+end $$;
+
+-- RBAC metadata is readable by signed-in pages, but only administrators may
+-- change the role matrix. Treating these as generic authenticated tables lets
+-- any staff account grant itself sysadmin permissions through PostgREST.
+do $$
+declare t text;
+begin
+  foreach t in array array['roles','role_permissions'] loop
+    if to_regclass('public.' || t) is not null then
+      execute format('alter table public.%I enable row level security', t);
+      execute format('drop policy if exists "allow_all_for_now" on public.%I', t);
+      execute format('drop policy if exists "authenticated_only" on public.%I', t);
+      execute format('drop policy if exists "rbac_read" on public.%I', t);
+      execute format('drop policy if exists "rbac_admin_insert" on public.%I', t);
+      execute format('drop policy if exists "rbac_admin_update" on public.%I', t);
+      execute format('drop policy if exists "rbac_admin_delete" on public.%I', t);
+      execute format('create policy "rbac_read" on public.%I for select to authenticated using (true)', t);
+      execute format('create policy "rbac_admin_insert" on public.%I for insert to authenticated with check (public.is_admin())', t);
+      execute format('create policy "rbac_admin_update" on public.%I for update to authenticated using (public.is_admin()) with check (public.is_admin())', t);
+      execute format('create policy "rbac_admin_delete" on public.%I for delete to authenticated using (public.is_admin())', t);
+    end if;
   end loop;
 end $$;
 
@@ -66,11 +101,13 @@ do $$
 declare t text;
 begin
   foreach t in array array['handover_cases','handover_case_logs','handover_case_attachments'] loop
-    execute format('drop policy if exists "all_access_cases" on %I', t);
-    execute format('drop policy if exists "all_access_case_logs" on %I', t);
-    execute format('drop policy if exists "all_access_attachments" on %I', t);
-    execute format('drop policy if exists "authenticated_only" on %I', t);
-    execute format('create policy "authenticated_only" on %I for all using (auth.uid() is not null) with check (auth.uid() is not null)', t);
+    if to_regclass('public.' || t) is not null then
+      execute format('drop policy if exists "all_access_cases" on public.%I', t);
+      execute format('drop policy if exists "all_access_case_logs" on public.%I', t);
+      execute format('drop policy if exists "all_access_attachments" on public.%I', t);
+      execute format('drop policy if exists "authenticated_only" on public.%I', t);
+      execute format('create policy "authenticated_only" on public.%I for all to authenticated using (true) with check (true)', t);
+    end if;
   end loop;
 end $$;
 

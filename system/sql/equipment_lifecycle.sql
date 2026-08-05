@@ -336,14 +336,22 @@ drop policy if exists "allow_all_for_now" on equipment_annual_costs;
 drop policy if exists "allow_all_for_now" on equipment_external_links;
 drop policy if exists "allow_all_for_now" on equipment_monitor_points;
 drop policy if exists "allow_all_for_now" on equipment_monitor_events;
-create policy "allow_all_for_now" on equipment_maintenance_plans for all using (true);
-create policy "allow_all_for_now" on equipment_maintenance_records for all using (true);
-create policy "allow_all_for_now" on equipment_contracts for all using (true);
-create policy "allow_all_for_now" on equipment_documents for all using (true);
-create policy "allow_all_for_now" on equipment_annual_costs for all using (true);
-create policy "allow_all_for_now" on equipment_external_links for all using (true);
-create policy "allow_all_for_now" on equipment_monitor_points for all using (true);
-create policy "allow_all_for_now" on equipment_monitor_events for all using (true);
+drop policy if exists "authenticated_only" on equipment_maintenance_plans;
+drop policy if exists "authenticated_only" on equipment_maintenance_records;
+drop policy if exists "authenticated_only" on equipment_contracts;
+drop policy if exists "authenticated_only" on equipment_documents;
+drop policy if exists "authenticated_only" on equipment_annual_costs;
+drop policy if exists "authenticated_only" on equipment_external_links;
+drop policy if exists "authenticated_only" on equipment_monitor_points;
+drop policy if exists "authenticated_only" on equipment_monitor_events;
+create policy "authenticated_only" on equipment_maintenance_plans for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_maintenance_records for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_contracts for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_documents for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_annual_costs for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_external_links for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_monitor_points for all to authenticated using (true) with check (true);
+create policy "authenticated_only" on equipment_monitor_events for all to authenticated using (true) with check (true);
 
 -- ── 11. 查詢檢視：設備生命週期、年度成本、監控介接清冊 ─────
 create or replace view equipment_lifecycle_overview as

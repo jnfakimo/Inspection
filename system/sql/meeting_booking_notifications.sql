@@ -19,6 +19,8 @@ create table if not exists meeting_booking_notifications (
 
 alter table meeting_booking_notifications enable row level security;
 drop policy if exists "allow_all_for_now" on meeting_booking_notifications;
-create policy "allow_all_for_now" on meeting_booking_notifications for all using (true);
+drop policy if exists "authenticated_only" on meeting_booking_notifications;
+create policy "authenticated_only" on meeting_booking_notifications
+  for all to authenticated using (true) with check (true);
 
 commit;
