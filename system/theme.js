@@ -1,4 +1,12 @@
 (function(){
+  // 全站錯誤自動回報：只需 theme.js 這一處注入，所有已載入 theme.js 的頁面
+  // 就會自動載入 error-tracker.js，不必逐頁加 <script> 標籤。
+  (function(){
+    if(document.querySelector('script[src^="error-tracker.js"]'))return;
+    var s=document.createElement('script');
+    s.src='error-tracker.js';
+    document.head.appendChild(s);
+  })();
   var KEY='siteTheme';
   var PROFILE_KEY='inspectionSystemUserProfile';
   var SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
