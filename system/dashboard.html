@@ -794,11 +794,11 @@ async function ld(){
     document.getElementById('p1').textContent=a;
     document.getElementById('p2').textContent=b;
     document.getElementById('p3').textContent=c;
-    document.getElementById('pi').innerHTML='\u7576\u73ed\u5373\u6642\u7d71\u8a08\uff5c<b style="color:var(--cyan)">'+shift.name+'</b> ('+fh(shift.start_time)+'-'+fh(shift.end_time)+')'+(_patrolFloor?'\uff5c樓層 <b style="color:var(--cyan)">'+escapePatrolText(_patrolFloor)+'</b>':'');
+    document.getElementById('pi').innerHTML='\u7576\u73ed\u5373\u6642\u7d71\u8a08\uff5c<b style="color:var(--cyan)">'+escapePatrolText(shift.name)+'</b> ('+fh(shift.start_time)+'-'+fh(shift.end_time)+')'+(_patrolFloor?'\uff5c樓層 <b style="color:var(--cyan)">'+escapePatrolText(_patrolFloor)+'</b>':'');
     const g=document.getElementById('pg');
     if(!visibleMarkers.length){g.innerHTML='<div class="empty">'+(_patrolFloor?'此樓層尚無巡邏點':'\u5c1a\u7121\u5de1\u908f\u9ede')+'</div>';return;}
     const ic={ok:'\u2713',pending:'\u2026',overdue:'\u2715'};
-    g.innerHTML='<table class="pt"><tr><th class="pl">\u5de1\u6aa2\u9ede</th><th>'+shift.name+'<br>'+fh(shift.start_time)+'-'+fh(shift.end_time)+'</th></tr>'
+    g.innerHTML='<table class="pt"><tr><th class="pl">\u5de1\u6aa2\u9ede</th><th>'+escapePatrolText(shift.name)+'<br>'+fh(shift.start_time)+'-'+fh(shift.end_time)+'</th></tr>'
       +visibleMarkers.map(m=>{const st=duty.map.get(m.marker_id)||'pending';return '<tr><td class="pl">'+escapePatrolText(canonicalPatrolFloor(m.floor_id))+' '+escapePatrolText(m.label||'')+'</td><td><span class="pd '+st+'">'+ic[st]+'</span></td></tr>';}).join('')+'</table>';
   }catch(e){document.getElementById('pg').innerHTML='<div class="empty">\u8f09\u5165\u5931\u6557</div>';}
 }
