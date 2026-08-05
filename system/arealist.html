@@ -495,14 +495,16 @@ async function saveSpace(){
 // 查詢某空間是否已於整合標記系統被標記 → 回傳被標記的樓層陣列（防呆用）
 async function markedFloorsOf(spaceId){
   const {data,error}=await db.from('plan_markers').select('floor_id').eq('space_id',spaceId).eq('status','active');
-  if(error) return [];                       // 標記表不存在或查詢失敗 → 視為未被標記
+  if(error) throw error;                      // 查詢失敗時交由呼叫端中止操作，不可視為「未被標記」
   return [...new Set((data||[]).map(x=>x.floor_id))];
 }
 
 async function delSpace(id){
   const r=rows.find(x=>x.space_id===id);if(!r)return;
   // 防呆：已被整合標記系統標記者不可停用
-  const mf=await markedFloorsOf(id);
+  let mf;
+  try{ mf=await markedFloorsOf(id); }
+  catch(e){ toast('無法確認此空間是否使用中，請稍後再試：'+translateError(e.message),true); return; }
   if(mf.length){
     alert(`無法停用「${r.floor} · ${r.space_name}」\n\n此空間已於「整合標記系統」使用中（樓層：${mf.join('、')}）。\n請先停用該標記後再操作。`);
     return;
@@ -517,7 +519,8 @@ async function delSpace(id){
 async function clearAll(){
   if(!rows.length){toast('目前沒有資料');return;}
   // 找出被整合標記系統引用的空間及其樓層
-  const {data:mk}=await db.from('plan_markers').select('space_id,floor_id').not('space_id','is',null).eq('status','active');
+  const {data:mk,error:mkErr}=await db.from('plan_markers').select('space_id,floor_id').not('space_id','is',null).eq('status','active');
+  if(mkErr){toast('無法確認空間使用狀態，請稍後再試：'+translateError(mkErr.message),true);return;}
   const refFloors={};
   (mk||[]).forEach(x=>{(refFloors[x.space_id]=refFloors[x.space_id]||new Set()).add(x.floor_id);});
   const refIds=Object.keys(refFloors);
