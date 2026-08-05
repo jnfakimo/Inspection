@@ -58,6 +58,7 @@ table.roomgrid td.roomname{background:var(--surface);color:var(--text-hi);font-w
 .bk-action.cancel{border-color:rgba(255,59,59,.45);color:var(--red)}
 .add-cell{border:1px dashed var(--border);border-radius:3px;color:var(--text-dim);text-align:center;font-size:.7rem;padding:3px;cursor:pointer;background:none;width:100%}
 .add-cell:hover{border-color:var(--cyan);color:var(--cyan)}
+.add-cell:disabled{cursor:not-allowed;opacity:.48;border-style:solid}
 .empty{text-align:center;padding:32px 16px;color:var(--text-dim);font-size:.78rem}
 table.mytable{width:100%;border-collapse:collapse;font-size:.75rem}
 #myBox{overflow-x:auto}
@@ -87,6 +88,9 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
 .field input[readonly]{color:var(--text-dim);cursor:not-allowed}
 .time-parts{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:6px}
 .time-parts select{text-align:center}
+.booking-repeat{display:flex;align-items:center;gap:8px;min-height:37px;padding:7px 9px;border:1px solid var(--border);border-radius:3px;background:var(--surface);color:var(--text-hi);font-size:.72rem;cursor:pointer}
+.booking-repeat input{width:17px;height:17px;accent-color:var(--cyan)}
+.field.is-required>label::after{content:' *';color:var(--red)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .conflict-alert{display:none;border:1px solid rgba(255,59,59,.5);background:rgba(255,59,59,.08);color:var(--red);padding:9px 10px;border-radius:4px;font-size:.72rem;margin-bottom:10px;line-height:1.6}
 .conflict-alert.show{display:block}
@@ -163,7 +167,7 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
       <div class="conflict-alert" id="conflictAlert"></div>
       <div class="field"><label>會議室</label><select id="bkRoom" onchange="checkConflictSoon()"></select></div>
       <div class="row2">
-        <div class="field"><label>日期</label><input type="date" id="bkDate" onchange="checkConflictSoon()"></div>
+        <div class="field"><label>日期</label><input type="date" id="bkDate" onchange="onBookingDateChange()"></div>
         <div class="field"><label>會議名稱</label><input type="text" id="bkPurpose" placeholder="例：管理部週會、面談會議"></div>
       </div>
       <div class="row2">
@@ -180,7 +184,11 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
       </div>
       <div class="row2">
         <div class="field"><label>系統登記電話</label><input type="tel" id="bkSystemPhone" readonly></div>
-        <div class="field"><label>本次聯繫電話</label><input type="tel" id="bkContactPhone" autocomplete="tel" placeholder="請輸入可聯繫的電話或分機"></div>
+        <div class="field" id="bkContactPhoneField"><label>聯繫電話</label><input type="tel" id="bkContactPhone" autocomplete="tel" placeholder="請輸入可聯繫的電話或分機"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>週期預約</label><label class="booking-repeat"><input type="checkbox" id="bkRepeatWeekly" onchange="toggleRecurringOptions()">每週同星期、同時段重複預約</label></div>
+        <div class="field" id="bkRepeatUntilField" hidden><label>週期截止日期（最多 52 次）</label><input type="date" id="bkRepeatUntil" onchange="checkConflictSoon()"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -197,7 +205,7 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
     <div class="modal-body">
       <div class="field"><label>原預約資訊</label><input type="text" id="crTargetInfo" readonly></div>
       <div class="field"><label>申請者會議名稱</label><input type="text" id="crMeetingName" placeholder="請填寫承接此時段的會議名稱"></div>
-      <div class="field"><label>本次聯繫電話</label><input type="tel" id="crContactPhone" autocomplete="tel"></div>
+      <div class="field"><label>聯繫電話</label><input type="tel" id="crContactPhone" autocomplete="tel"></div>
       <div class="field"><label>申請原因</label><textarea id="crReason" rows="3" placeholder="請說明需要此時段的原因"></textarea></div>
     </div>
     <div class="modal-foot">
@@ -280,10 +288,26 @@ function mondayOf(d){
   return x;
 }
 function isoDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
+function todayISO(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());}
 function fmtMD(d){return `${d.getMonth()+1}/${d.getDate()}`;}
 const DOW=['一','二','三','四','五','六','日'];
 
 function timeValue(minutes){return `${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;}
+function addISODate(dateStr,days){const d=new Date(`${dateStr}T12:00:00+08:00`);d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
+function bookingStartAt(dateStr,start){return new Date(`${dateStr}T${start}:00+08:00`);}
+function isPastBookingSlot(dateStr,start){return !dateStr||!start||bookingStartAt(dateStr,start)<=new Date();}
+function recurringDates(dateStr,repeatWeekly,repeatUntil){
+  if(!dateStr)return [];
+  if(!repeatWeekly)return [dateStr];
+  if(!repeatUntil)throw new Error('請選擇週期截止日期');
+  if(repeatUntil<dateStr)throw new Error('週期截止日期不得早於首次預約日期');
+  const dates=[];
+  for(let date=dateStr;date<=repeatUntil;date=addISODate(date,7)){
+    dates.push(date);
+    if(dates.length>52)throw new Error('週期預約最多 52 次');
+  }
+  return dates;
+}
 function installTimeOptions(){
   const periodOptions='<option value="">上／下午</option><option value="am">上午</option><option value="pm">下午</option>';
   const hourOptions='<option value="">時</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">${String(i+1).padStart(2,'0')}</option>`).join('');
@@ -419,7 +443,8 @@ function renderGrid(){
         return `<div class="bk-pill${mine?' mine':''}${canCancel?' can-cancel':''}"${interaction}><span class="bk-line">${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}</span><span class="bk-line person">${esc(profileLabel(b.user_id))}</span><span class="bk-line meeting">${esc(b.purpose||'未填會議名稱')}</span>${actions}</div>`;
       }).join('');
       const weekend=d.getDay()===0||d.getDay()===6;
-      h+=`<td class="${weekend?'weekend':''}"><div class="daycell">${pills}<button class="add-cell" onclick="openBookingModal('${r.room_id}','${dateStr}')">+ 預約</button></div></td>`;
+      const pastDate=dateStr<todayISO();
+      h+=`<td class="${weekend?'weekend':''}"><div class="daycell">${pills}${pastDate?'<button class="add-cell" disabled>日期已過</button>':`<button class="add-cell" onclick="openBookingModal('${r.room_id}','${dateStr}')">+ 預約</button>`}</div></td>`;
     });
     h+='</tr>';
   });
@@ -433,18 +458,46 @@ function goToday(){weekStart=mondayOf(new Date());loadWeek();}
 function openBookingModal(roomId,dateStr){
   const sel=document.getElementById('bkRoom');
   sel.innerHTML=rooms.map(r=>`<option value="${r.room_id}"${r.room_id===roomId?' selected':''}>${esc(r.name)}</option>`).join('');
-  document.getElementById('bkDate').value=dateStr||isoDate(new Date());
+  const bookingDate=document.getElementById('bkDate');
+  bookingDate.min=todayISO();
+  bookingDate.value=dateStr&&dateStr>=todayISO()?dateStr:todayISO();
   setTimeParts('Start','');
   setTimeParts('End','');
   document.getElementById('bkPurpose').value='';
   const systemPhone=(currentUser?.phone||sessionStorage.getItem('user_phone')||'').trim();
   document.getElementById('bkSystemPhone').value=systemPhone;
-  document.getElementById('bkContactPhone').value=systemPhone;
+  document.getElementById('bkContactPhone').value='';
+  document.getElementById('bkRepeatWeekly').checked=false;
+  document.getElementById('bkRepeatUntil').value='';
+  updateContactRequirement();
+  toggleRecurringOptions();
   document.getElementById('bkMsg').textContent='';
   activeConflict=null;
   document.getElementById('conflictAlert').classList.remove('show');
   document.getElementById('conflictAlert').innerHTML='';
   openModal('bookingModal');
+}
+
+function updateContactRequirement(){
+  const hasSystemPhone=!!document.getElementById('bkSystemPhone').value.trim();
+  const field=document.getElementById('bkContactPhoneField');
+  const input=document.getElementById('bkContactPhone');
+  field.classList.toggle('is-required',!hasSystemPhone);
+  input.required=!hasSystemPhone;
+  input.placeholder=hasSystemPhone?'可免填；未填時使用系統登記電話':'系統未登記電話，此欄必填';
+}
+function onBookingDateChange(){toggleRecurringOptions(false);checkConflictSoon();}
+function toggleRecurringOptions(runAudit=true){
+  const repeat=document.getElementById('bkRepeatWeekly').checked;
+  const dateStr=document.getElementById('bkDate').value;
+  const field=document.getElementById('bkRepeatUntilField');
+  const input=document.getElementById('bkRepeatUntil');
+  field.hidden=!repeat;input.disabled=!repeat;input.required=repeat;
+  if(repeat&&dateStr){
+    input.min=dateStr;input.max=addISODate(dateStr,357);
+    if(!input.value||input.value<dateStr||input.value>input.max)input.value=addISODate(dateStr,28);
+  }
+  if(runAudit)checkConflictSoon();
 }
 
 let _conflictTimer=null;
@@ -456,6 +509,13 @@ async function findConflict(roomId,dateStr,start,end,excludeId){
   if(error)throw error;
   return (data||[]).filter(b=>b.booking_id!==excludeId).find(b=>start<b.end_time.slice(0,5)&&end>b.start_time.slice(0,5))||null;
 }
+async function findSeriesConflict(roomId,dates,start,end){
+  if(!roomId||!dates.length||!start||!end||end<=start)return null;
+  const {data,error}=await db.from('meeting_bookings').select('booking_id,booking_no,room_id,booking_date,start_time,end_time,purpose,user_id,status')
+    .eq('room_id',roomId).in('booking_date',dates).in('status',['booked','checked_in']);
+  if(error)throw error;
+  return (data||[]).find(b=>start<b.end_time.slice(0,5)&&end>b.start_time.slice(0,5))||null;
+}
 async function checkConflictNow(){
   const roomId=document.getElementById('bkRoom').value;
   const dateStr=document.getElementById('bkDate').value;
@@ -463,13 +523,23 @@ async function checkConflictNow(){
   const end=selectedTime('End');
   const alertEl=document.getElementById('conflictAlert');
   try{
-    const conflict=await findConflict(roomId,dateStr,start,end);
+    if(!dateStr||!start||!end){activeConflict=null;alertEl.innerHTML='';alertEl.classList.remove('show');return;}
+    if(isPastBookingSlot(dateStr,start)){
+      activeConflict=null;
+      alertEl.textContent='不能預約：開始時間已經過去，請選擇目前時間之後的時段。';
+      alertEl.classList.add('show');
+      return;
+    }
+    const repeatWeekly=document.getElementById('bkRepeatWeekly').checked;
+    const repeatUntil=repeatWeekly?document.getElementById('bkRepeatUntil').value:null;
+    const dates=recurringDates(dateStr,repeatWeekly,repeatUntil);
+    const conflict=await findSeriesConflict(roomId,dates,start,end);
     if(conflict){
-      activeConflict={...conflict,room_id:roomId,booking_date:dateStr};
+      activeConflict={...conflict,room_id:roomId,booking_date:conflict.booking_date};
       await ensureUserProfiles([conflict.user_id]);
       const mine=conflict.user_id===currentUser.user_id;
       const canChange=conflict.status==='booked'&&bookingEndDate(activeConflict)>new Date();
-      alertEl.innerHTML=`<div>不能預約：此時段已有預約。已預約單號：${esc(conflict.booking_no||'舊資料未編號')}（${esc(conflict.start_time.slice(0,5))}–${esc(conflict.end_time.slice(0,5))}，${esc(profileLabel(conflict.user_id))}，${esc(conflict.purpose||'未填會議名稱')}）。</div>`+
+      alertEl.innerHTML=`<div>不能預約：${repeatWeekly?`週期中的 ${esc(conflict.booking_date)} `:''}此時段已有預約。已預約單號：${esc(conflict.booking_no||'舊資料未編號')}（${esc(conflict.start_time.slice(0,5))}–${esc(conflict.end_time.slice(0,5))}，${esc(profileLabel(conflict.user_id))}，${esc(conflict.purpose||'未填會議名稱')}）。</div>`+
         (canChange?`<button class="btn" type="button" onclick="${mine?`cancelBooking('${conflict.booking_id}')`:`openChangeRequestModal('${conflict.booking_id}',true)`}">${mine?'取消我的原預約':'提出變更申請'}</button>`:'');
       alertEl.classList.add('show');
     }else{
@@ -477,7 +547,7 @@ async function checkConflictNow(){
       alertEl.innerHTML='';
       alertEl.classList.remove('show');
     }
-  }catch(e){}
+  }catch(e){activeConflict=null;alertEl.textContent=e.message||'時段稽核失敗';alertEl.classList.add('show');}
 }
 
 async function saveBooking(){
@@ -488,28 +558,37 @@ async function saveBooking(){
   const purpose=document.getElementById('bkPurpose').value.trim();
   const systemPhone=document.getElementById('bkSystemPhone').value.trim();
   const contactPhone=document.getElementById('bkContactPhone').value.trim();
+  const repeatWeekly=document.getElementById('bkRepeatWeekly').checked;
+  const repeatUntil=repeatWeekly?document.getElementById('bkRepeatUntil').value:null;
   const msg=document.getElementById('bkMsg');
   msg.textContent='';
   if(!roomId||!dateStr||!start||!end){msg.textContent='請填寫完整的會議室、日期與時段';return;}
   if(end<=start){msg.textContent='結束時間必須晚於開始時間';return;}
+  if(isPastBookingSlot(dateStr,start)){msg.textContent='開始時間已經過去，不能預約過去時段';return;}
   if(!purpose){msg.textContent='請填寫會議名稱';return;}
-  if(!contactPhone||contactPhone.replace(/[^0-9#*]/g,'').length<4){msg.textContent='請填寫至少 4 碼的本次聯繫電話或分機';return;}
+  if(!systemPhone&&!contactPhone){msg.textContent='系統未登記電話，聯繫電話為必填';return;}
+  if(contactPhone&&contactPhone.replace(/[^0-9#*]/g,'').length<4){msg.textContent='聯繫電話請至少填寫 4 碼的電話或分機';return;}
+  let dates;
+  try{dates=recurringDates(dateStr,repeatWeekly,repeatUntil);}catch(e){msg.textContent=e.message;return;}
   document.getElementById('bkSaveBtn').disabled=true;
   try{
-    const conflict=await findConflict(roomId,dateStr,start,end);
-    if(conflict){msg.textContent=`不能預約，已預約單號：${conflict.booking_no||'舊資料未編號'}`;await checkConflictNow();document.getElementById('bkSaveBtn').disabled=false;return;}
-    const payload={room_id:roomId,user_id:currentUser.user_id,purpose,booking_date:dateStr,start_time:start,end_time:end,booker_phone:systemPhone||null,contact_phone:contactPhone,status:'booked'};
-    const {data,error}=await db.from('meeting_bookings').insert(payload).select().single();
+    const conflict=await findSeriesConflict(roomId,dates,start,end);
+    if(conflict){msg.textContent=`不能預約，${repeatWeekly?`${conflict.booking_date} `:''}已預約單號：${conflict.booking_no||'舊資料未編號'}`;await checkConflictNow();return;}
+    const {data,error}=await db.rpc('create_meeting_booking_series',{
+      p_room_id:roomId,p_purpose:purpose,p_booking_date:dateStr,p_start_time:start,p_end_time:end,
+      p_booker_phone:systemPhone||null,p_contact_phone:contactPhone||null,
+      p_repeat_weekly:repeatWeekly,p_repeat_until:repeatUntil
+    });
     if(error)throw error;
-    await writeAudit('meeting_bookings',data.booking_id,'insert',null,payload);
-    toast('預約成功');
+    const count=Number(data?.count||dates.length||1);
+    toast(repeatWeekly?`週期預約成功，共建立 ${count} 筆`:'預約成功');
     closeModal('bookingModal');
     await loadWeek();await loadMyBookings();await loadChangeRequests();
   }catch(e){
     if(String(e.message||e).includes('meeting_bookings_no_overlap')||String(e.message||e).includes('exclusion')){
       try{
-        const conflict=await findConflict(roomId,dateStr,start,end);
-        msg.textContent=`不能預約，已預約單號：${conflict?.booking_no||'舊資料未編號'}`;
+        const conflict=await findSeriesConflict(roomId,dates,start,end);
+        msg.textContent=`不能預約，${repeatWeekly&&conflict?`${conflict.booking_date} `:''}已預約單號：${conflict?.booking_no||'舊資料未編號'}`;
       }catch(_){msg.textContent=translateError(e.message||String(e));}
     }else msg.textContent=translateError(e.message||String(e));
   }finally{
