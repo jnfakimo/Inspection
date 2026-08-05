@@ -148,12 +148,12 @@ function permissionsForRole(role){
 }
 
 async function init(){
-  const [{data:r,error:re},{data:rp},{data:d,error:de}]=await Promise.all([
+  const [{data:r,error:re},{data:rp,error:rpe},{data:d,error:de}]=await Promise.all([
     db.from('roles').select('*').order('sort_order'),
     db.from('role_permissions').select('*'),
     db.from('departments').select('dept_id,parent_id,name,status').eq('status','active').order('sort_order').limit(5000)
   ]);
-  if(re||de){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">角色或部門主檔讀取失敗，請通知系統管理員。</div>';return;}
+  if(re||rpe||de){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">角色或權限主檔讀取失敗，請通知系統管理員。</div>';return;}
   // 管理部主管已停用，不再於角色權限矩陣／系統存取權限／使用者角色指派中出現
   roles=(r||[]).filter(x=>x.role_id!=='mgmt_supervisor'); perms={}; (rp||[]).forEach(x=>{perms[x.role_id+'|'+x.perm]=x.allowed;});
   departments=d||[];departmentMap=new Map(departments.map(x=>[x.dept_id,x]));
