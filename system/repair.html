@@ -429,6 +429,8 @@ const ST={
 function statusText(s){return ST[s]?.[0]||'未知狀態';}
 function badge(s){const x=ST[s]||['未知狀態','#888'];return `<span class="badge" style="background:${x[1]}22;color:${x[1]};border:1px solid ${x[1]}66">${x[0]}</span>`;}
 function feedbackError(){return '系統操作失敗，請稍後再試或聯絡系統管理員';}
+function escHtml(value){return String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function encodedJsArg(value){return encodeURIComponent(String(value==null?'':value)).replace(/'/g,'%27');}
 function urgLabel(u){
   if(u==='urgent')return '<span class="urg-tag urg-urgent">⚠ 緊急</span>';
   if(u==='high')return '<span class="urg-tag urg-high">▲ 高</span>';
@@ -659,23 +661,24 @@ function buildCard(o){
   const created=o.created_at?new Date(o.created_at).toLocaleDateString('zh-TW'):'—';
   const status=o.status||'pending';
   const assignee=o.assigned_to_name||'未指派';
+  const idArg=encodedJsArg(o.id);
 
   const canReport=['in_progress','accepted','waiting_parts','waiting_vendor'].includes(status);
   const isDone=status==='pending_review'||status==='closed';
 
-  return `<div class="wo-card${isUrgent?' urgent':''}" onclick="openDetail('${o.id}')">
-    <div class="wo-no">📋 ${o.req_no||o.id?.slice(0,8)||'—'}</div>
-    <div class="wo-title">${ft}</div>
+  return `<div class="wo-card${isUrgent?' urgent':''}" onclick="openDetail(decodeURIComponent('${idArg}'))">
+    <div class="wo-no">📋 ${escHtml(o.req_no||o.id?.slice(0,8)||'—')}</div>
+    <div class="wo-title">${escHtml(ft)}</div>
     <div class="wo-meta">
-      <span>📍 ${loc}</span>
-      <span>👤 ${reporter}</span>
-      <span>🔧 ${assignee}</span>
-      <span>📅 ${created}</span>
+      <span>📍 ${escHtml(loc)}</span>
+      <span>👤 ${escHtml(reporter)}</span>
+      <span>🔧 ${escHtml(assignee)}</span>
+      <span>📅 ${escHtml(created)}</span>
     </div>
     <div class="wo-footer">
       ${urgLabel(urg)}
       ${badge(status)}
-      ${canReport?`<button class="btn-report" onclick="event.stopPropagation();openReport('${o.id}')">📝 填寫完工</button>`:
+      ${canReport?`<button class="btn-report" onclick="event.stopPropagation();openReport(decodeURIComponent('${idArg}'))">📝 填寫完工</button>`:
         isDone?`<span class="btn-done-tag">✅ 已回報</span>`:''}
     </div>
   </div>`;
@@ -746,6 +749,7 @@ function buildDetailBody(o,repairLog,timeline){
   const created=o.created_at?new Date(o.created_at).toLocaleString('zh-TW'):'—';
   const urg=o.urgency||'normal';
   const status=o.status||'pending';
+  const orderIdArg=encodedJsArg(o.id);
 
   const canReport=['in_progress','accepted','waiting_parts','waiting_vendor'].includes(status);
   const role=normalizeRoleId(me_);
@@ -759,8 +763,8 @@ function buildDetailBody(o,repairLog,timeline){
       const ts=new Date(t.created_at).toLocaleString('zh-TW');
       tlHTML+=`<li>
         <div class="ts">${ts}</div>
-        <div class="st">${t.action||statusText(t.status||t.to_status)} ${t.operator_name?'— '+t.operator_name:''}</div>
-        ${t.note?`<div class="nt">${t.note}</div>`:''}
+        <div class="st">${escHtml(t.action||statusText(t.status||t.to_status))} ${t.operator_name?'— '+escHtml(t.operator_name):''}</div>
+        ${t.note?`<div class="nt">${escHtml(t.note)}</div>`:''}
       </li>`;
     });
     tlHTML+='</ul>';
@@ -771,13 +775,13 @@ function buildDetailBody(o,repairLog,timeline){
   if(repairLog){
     const photos=(repairLog.photo_urls||[]);
     const photoHTML=photos.length?`<div class="repair-log-photos">${photos.map(url=>`
-      <div class="repair-log-photo" onclick="openLightbox('${url}')"><img src="${url}" alt="完工照片" loading="lazy"></div>
+      <div class="repair-log-photo" onclick="openLightbox(decodeURIComponent('${encodedJsArg(url)}'))"><img src="${escHtml(url)}" alt="完工照片" loading="lazy"></div>
     `).join('')}</div>`:'';
     repairLogHTML=`<div class="repair-log-box">
       <div class="repair-log-header">✅ 完工回報記錄</div>
-      <div class="repair-log-row"><span class="repair-log-k">維修人員</span><span class="repair-log-v">${repairLog.technician_name||'—'}</span></div>
+      <div class="repair-log-row"><span class="repair-log-k">維修人員</span><span class="repair-log-v">${escHtml(repairLog.technician_name||'—')}</span></div>
       <div class="repair-log-row"><span class="repair-log-k">回報時間</span><span class="repair-log-v">${new Date(repairLog.submitted_at).toLocaleString('zh-TW')}</span></div>
-      <div class="repair-log-row"><span class="repair-log-k">維修說明</span><span class="repair-log-v">${repairLog.repair_desc||'—'}</span></div>
+      <div class="repair-log-row"><span class="repair-log-k">維修說明</span><span class="repair-log-v">${escHtml(repairLog.repair_desc||'—')}</span></div>
       <div class="repair-log-row"><span class="repair-log-k">產生費用</span><span class="repair-log-v">${repairLog.has_cost?'<span style="color:var(--amber)">是 — NT$ '+Number(repairLog.cost_amount||0).toLocaleString()+'</span>':'<span style="color:var(--green)">否</span>'}</span></div>
       ${photoHTML}
     </div>`;
@@ -790,7 +794,7 @@ function buildDetailBody(o,repairLog,timeline){
       <div class="close-case-header">📋 主管結案</div>
       <p style="font-size:.8rem;color:var(--text-dim);margin-bottom:12px">確認維修完工後，點選下方按鈕結案。</p>
       <div class="field"><label>結案備註（選填）</label><textarea id="close-remark" placeholder="結案說明或驗收備註…" rows="2"></textarea></div>
-      <button class="btn-close-case" onclick="doCloseCase('${o.id}')">✅ 確認結案</button>
+      <button class="btn-close-case" onclick="doCloseCase(decodeURIComponent('${orderIdArg}'))">✅ 確認結案</button>
     </div>`;
   }
 
@@ -802,17 +806,17 @@ function buildDetailBody(o,repairLog,timeline){
 
   return `
     <div class="d-info">
-      <div><div class="k">報修單號</div><div class="v" style="font-family:var(--font-mono);color:var(--cyan)">${o.req_no||'—'}</div></div>
+      <div><div class="k">報修單號</div><div class="v" style="font-family:var(--font-mono);color:var(--cyan)">${escHtml(o.req_no||'—')}</div></div>
       <div><div class="k">狀態</div><div class="v">${badge(status)}</div></div>
-      <div><div class="k">故障類型</div><div class="v">${ft}</div></div>
+      <div><div class="k">故障類型</div><div class="v">${escHtml(ft)}</div></div>
       <div><div class="k">緊急程度</div><div class="v">${urgLabel(urg)}</div></div>
-      <div class="full"><div class="k">故障位置</div><div class="v">📍 ${loc}</div></div>
-      <div class="full"><div class="k">故障描述</div><div class="v">${desc}</div></div>
-      <div><div class="k">報修人</div><div class="v">${reporter}</div></div>
-      <div><div class="k">聯絡電話</div><div class="v">${phone}</div></div>
-      <div><div class="k">所屬單位</div><div class="v">${dept}</div></div>
-      <div><div class="k">指派技師</div><div class="v">🔧 ${assignee}</div></div>
-      <div><div class="k">報修時間</div><div class="v">${created}</div></div>
+      <div class="full"><div class="k">故障位置</div><div class="v">📍 ${escHtml(loc)}</div></div>
+      <div class="full"><div class="k">故障描述</div><div class="v">${escHtml(desc)}</div></div>
+      <div><div class="k">報修人</div><div class="v">${escHtml(reporter)}</div></div>
+      <div><div class="k">聯絡電話</div><div class="v">${escHtml(phone)}</div></div>
+      <div><div class="k">所屬單位</div><div class="v">${escHtml(dept)}</div></div>
+      <div><div class="k">指派技師</div><div class="v">🔧 ${escHtml(assignee)}</div></div>
+      <div><div class="k">報修時間</div><div class="v">${escHtml(created)}</div></div>
     </div>
 
     ${repairLogHTML}

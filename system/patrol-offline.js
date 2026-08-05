@@ -45,9 +45,9 @@
       try{
         const {error}=await db.from('checkin_logs').insert(payload);
         if(!error||error.code==='23505'){synced++;continue;}
-        if(isNetworkError(error)){remaining=rows.slice(i);break;}
+        if(isNetworkError(error)){remaining.push(...rows.slice(i));break;}
         item.last_error=error.message||'sync failed';remaining.push(item);
-      }catch(error){remaining=rows.slice(i);break;}
+      }catch(error){remaining.push(...rows.slice(i));break;}
     }
     write(QUEUE_KEY,remaining);syncing=false;
     const result={synced,pending:remaining.length};notify(result);return result;

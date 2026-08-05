@@ -777,10 +777,15 @@ function hasPagePerm(key) {
 }
 
 function applyPerms() {
-  if (_handoverHasSession && !hasPagePerm('handover')) {
-    showToast('此帳號未開通電子交接簿權限', true);
-    return;
+  if (!_handoverHasSession || !currentUser?.user_id) {
+    showToast('無法確認登入身分，請重新登入', true);
+    return false;
   }
+  if (!hasPagePerm('handover')) {
+    showToast('此帳號未開通電子交接簿權限', true);
+    return false;
+  }
+  return true;
 }
 
 // ── CLOCK ──────────────────────────────────────────
@@ -792,7 +797,7 @@ function applyPerms() {
 
 // ── INIT ───────────────────────────────────────────
 (async () => {
-  currentUser = { user_id: null, name: '交接人員' };
+  currentUser = null;
   document.getElementById('navUser').textContent = '電子交接簿';
 
   db.from('system_settings').select('key,value').then(({ data }) => {
@@ -814,18 +819,19 @@ function applyPerms() {
   try {
     const { data: { session } } = await db.auth.getSession();
     _handoverHasSession = !!session;
-    if (session?.user?.id) {
-      const { data: u } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
-      if (u) { currentUser = u; document.getElementById('navUser').textContent = u.name; }
-    }
-    if (!currentUser?.user_id && allUsers.length) {
-      currentUser = allUsers[0];
-      document.getElementById('navUser').textContent = allUsers[0].name;
-    }
+    if (!session?.user?.id) throw new Error('missing auth session');
+    const { data: u, error: userError } = await db.from('users').select('*').eq('auth_id', session.user.id).maybeSingle();
+    if (userError) throw userError;
+    if (!u?.user_id) throw new Error('missing user profile');
+    currentUser = u;
+    document.getElementById('navUser').textContent = u.name || u.username || '使用者';
   } catch(e) {
-    if (allUsers.length) { currentUser = allUsers[0]; document.getElementById('navUser').textContent = allUsers[0].name; }
+    console.error('handover identity verification failed', e);
   }
-  applyPerms();
+  if (!applyPerms()) {
+    setTimeout(() => { location.href = _handoverHasSession ? 'index.html' : 'handover-login.html'; }, 1800);
+    return;
+  }
 
   buildDeptSelects();
   presetCurrentHandover();
