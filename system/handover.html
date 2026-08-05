@@ -381,8 +381,8 @@ body.handover-only .repair-handover-head a{display:none!important}
 
     <div class="handover-flow-note"><b>雙層交接稽核：</b>交接人送出填單 → 指定接班人登入並點選接收 → 系統才登記交接完成</div>
     <div class="btn-row">
-      <button class="btn-primary" onclick="saveDraft()">儲存草稿</button>
-      <button class="btn-primary btn-confirm" onclick="submitHandover()">送出交接（待接班人接收）</button>
+      <button class="btn-primary" id="hSaveDraftBtn" onclick="saveDraft()">儲存草稿</button>
+      <button class="btn-primary btn-confirm" id="hSubmitBtn" onclick="submitHandover()">送出交接（待接班人接收）</button>
     </div>
     <div style="height:24px"></div>
   </div>
@@ -1161,7 +1161,9 @@ async function submitHandover() {
   await doSave('submitted');
 }
 
+let handoverSaving = false;
 async function doSave(mode) {
+  if (handoverSaving) return;
   const shift     = document.getElementById('hShift').value;
   const date      = DTP.getValue('hDate-dtp');
   const deptId    = document.getElementById('hHandoverL2').value || document.getElementById('hHandoverL1').value || null;
@@ -1183,18 +1185,28 @@ async function doSave(mode) {
     confirmed_at: null,
     confirmed_by: null,
   };
-  let err;
-  if (editingId) {
-    ({ error: err } = await db.from('handover_records').update(record).eq('record_id', editingId));
-  } else {
-    ({ error: err } = await db.from('handover_records').insert(record));
+  handoverSaving = true;
+  const draftBtn = document.getElementById('hSaveDraftBtn'), submitBtn = document.getElementById('hSubmitBtn');
+  if (draftBtn) draftBtn.disabled = true;
+  if (submitBtn) submitBtn.disabled = true;
+  try {
+    let err;
+    if (editingId) {
+      ({ error: err } = await db.from('handover_records').update(record).eq('record_id', editingId));
+    } else {
+      ({ error: err } = await db.from('handover_records').insert(record));
+    }
+    if (err) { showToast('儲存失敗：' + translateError(err.message || err.code), true); return; }
+    showToast(mode==='submitted' ? '交接單已送出，等待指定接班人接收' : '草稿已儲存');
+    resetHandoverForm();
+    editingId = null;
+    await loadHistory();
+    switchTab('history');
+  } finally {
+    handoverSaving = false;
+    if (draftBtn) draftBtn.disabled = false;
+    if (submitBtn) submitBtn.disabled = false;
   }
-  if (err) { showToast('儲存失敗：' + translateError(err.message || err.code), true); return; }
-  showToast(mode==='submitted' ? '交接單已送出，等待指定接班人接收' : '草稿已儲存');
-  resetHandoverForm();
-  editingId = null;
-  await loadHistory();
-  switchTab('history');
 }
 
 function resetHandoverForm() {
