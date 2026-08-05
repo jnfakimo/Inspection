@@ -228,7 +228,7 @@ function updateRoleText(){if(!currentUser)return;let label=ROLE_NAME[currentRole
 function isApplicant(r){return r?.applicant_id===currentUser?.user_id;}
 function isAssignedDriver(r){return r?.driver_id===currentUser?.user_id;}
 function canSee(r){return isAdmin()||isManager()||isApplicant(r)||r.driver_id===currentUser?.user_id||(isSupervisor()&&sameDepartment(r));}
-function canApprove(r){return r.status==='pending_approval'&&!isApplicant(r)&&isSupervisor()&&(sameDepartment(r)||isAdmin());}
+function canApprove(r){return r.status==='pending_approval'&&isSupervisor()&&(isAdmin()||(!isApplicant(r)&&sameDepartment(r)));}
 function canDispatch(r){return r.status==='approved'&&isManager();}
 function canAccept(r){return r.status==='assigned'&&!r.driver_accepted_at&&isAssignedDriver(r)&&isVehicleDriver()&&r.trip_date===todayISO();}
 function canDrive(r){return r.status==='assigned'&&!!r.driver_accepted_at&&((isAssignedDriver(r)&&isVehicleDriver())||isAdmin());}
@@ -246,7 +246,9 @@ async function init(){
   if(!user.dept_id&&sharedProfile?.dept_id)user.dept_id=sharedProfile.dept_id;
   if(!user.department&&sharedProfile?.department)user.department=sharedProfile.department;
   if(!user.phone&&sharedProfile?.phone)user.phone=sharedProfile.phone;
-  currentUser=user;currentRole=user.rbac_role||LEGACY_ROLE[user.role]||'reporter';
+  currentUser=user;
+  const storedRole=user.rbac_role||user.role||'reporter';
+  currentRole=LEGACY_ROLE[storedRole]||storedRole;
   updateRoleText();
   byId('vehicleBtn').hidden=!isManager();
   byId('reportBtn').hidden=!canReport();
