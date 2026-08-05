@@ -875,8 +875,12 @@ async function logStatus(reqId,ordId,from,to,note){
 
 // ─── Detail ───
 let curReq=null;
+let dispatchSubmitting=false;
+let detailRequestSeq=0;
 async function openDetail(id){
-  curReq=reqs.find(r=>r.request_id===id); if(!curReq)return;
+  const seq=++detailRequestSeq;
+  const req=reqs.find(r=>r.request_id===id); if(!req)return;
+  curReq=req;
   const o=ordersByReq[id];
   document.getElementById('d-title').textContent=displayReqNo(curReq);
   document.getElementById('d-badge').outerHTML=`<span class="badge" id="d-badge">${(ST[driver(curReq)]||['',''])[0]}</span>`;
@@ -886,6 +890,7 @@ async function openDetail(id){
     db.from('case_status_log').select('*').eq('request_id',id).order('created_at',{ascending:true}),
     db.from('repair_attachments').select('*').eq('request_id',id)
   ]);
+  if(seq!==detailRequestSeq)return;
   const loc=locs.find(l=>l.location_id===curReq.location_id);
   const eqName=curReq.equipment?.name||'—';
   body.innerHTML=`
@@ -955,6 +960,9 @@ function dispatchForm(r){
   </div>`;
 }
 async function doDispatch(reqId){
+  if(dispatchSubmitting)return;
+  dispatchSubmitting=true;
+  try{
   if(!hasPerm('dispatch')){toast('沒有派工權限',true);return;}
   const r=reqs.find(x=>x.request_id===reqId);
   const tech=document.getElementById('x-tech').value, vendor=document.getElementById('x-vendor').value.trim();
@@ -971,6 +979,9 @@ async function doDispatch(reqId){
   if(tech){ try{ await db.from('notifications').insert({recipient_id:tech,event:'dispatch',title:'新派工通知',
     body:`${r.req_no||''}｜${r.equipment?.name||'設備'}｜${r.fault_desc||''}`,request_id:reqId,order_id:data.order_id}); }catch(e){} }
   await refreshAndReopen(reqId); toast('已派工');
+  }finally{
+    dispatchSubmitting=false;
+  }
 }
 async function accept(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}await db.from('maintenance_orders').update({status:'accepted',accept_status:'accepted'}).eq('order_id',o.order_id);
   await db.from('repair_requests').update({status:'assigned',updated_at:new Date().toISOString()}).eq('request_id',r.request_id);
@@ -1030,7 +1041,7 @@ async function refreshAndReopen(reqId){ await loadCases(); renderTableFilters();
 
 // ─── UI helpers ───
 function show(id){document.getElementById(id).classList.add('show');}
-function closeM(id){document.getElementById(id).classList.remove('show');if(id==='m-create')closeDesiredCalendar();}
+function closeM(id){document.getElementById(id).classList.remove('show');if(id==='m-detail')detailRequestSeq++;if(id==='m-create')closeDesiredCalendar();}
 let _tt;function toast(m,err){const el=document.getElementById('toast');el.textContent=m;el.style.borderColor=err?'var(--red)':'var(--border-hi)';el.style.color=err?'var(--red)':'var(--text)';el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2400);}
 
 init().catch(e=>{document.getElementById('list').innerHTML=`<tr><td colspan="6" class="empty" style="color:var(--red)">載入失敗：${escHtml(translateError(e.message))}<br><small>請確認已執行 work_order_schema.sql</small></td></tr>`;});
