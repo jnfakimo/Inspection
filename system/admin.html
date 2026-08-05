@@ -703,6 +703,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
       <a class="nav-item" href="structure_map.html"><span class="nav-icon"><img src="../assets/system-icons/settings-icon.png" alt=""></span> 專案關係地圖</a>
       <div class="nav-item" data-page="costs"><span class="nav-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 費用統計</div>
       <div class="nav-item" data-page="audit"><span class="nav-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統紀錄</div>
+      <div class="nav-item" data-page="syshealth"><span class="nav-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統健康</div>
     </nav>
     <div class="sidebar-footer">
       <div class="user-info" id="sidebarUser">載入中…</div>
@@ -1163,6 +1164,29 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
           <div class="modelhub-stat"><b id="mh-space-count">—</b><small>空間主檔</small></div>
           <div class="modelhub-stat"><b id="mh-marked-count">—</b><small>已標記空間</small></div>
           <div class="modelhub-stat"><b id="mh-unmarked-count">—</b><small>未標記空間</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SYSTEM HEALTH -->
+    <div class="page-section" id="page-syshealth">
+      <div class="page-header"><h2><span class="section-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統健康</h2><p>前端自動回報的 JS 錯誤與未捕捉例外，供維運排查（system/error-tracker.js）</p></div>
+      <div class="panel">
+        <div class="search-bar">
+          <select id="healthKindFilter" onchange="loadSystemHealth()">
+            <option value="">全部類型</option>
+            <option value="js_error">JS 錯誤</option>
+            <option value="unhandled_rejection">未捕捉 Promise</option>
+            <option value="manual">頁面主動回報</option>
+            <option value="api_error">API 失敗</option>
+          </select>
+          <button class="btn" onclick="loadSystemHealth()">重新整理</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>時間</th><th>類型</th><th>頁面</th><th>訊息</th><th>使用者</th></tr></thead>
+            <tbody id="syshealthTbody"><tr><td colspan="5" class="empty">載入中…</td></tr></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -1785,6 +1809,7 @@ function activateAdminPage(page, opts = {}) {
   else if (page === 'repairs') loadRepairs();
   else if (page === 'costs') { populateEqFilter('costEqFilter'); populateEqFilter('cost-eq'); loadCostAdmin(); loadCostByEq(); }
   else if (page === 'audit') loadAudit();
+  else if (page === 'syshealth') loadSystemHealth();
   else if (page === 'cycles') loadCycles();
   else if (page === 'locanalysis') loadLocationAnalysis();
   else if (page === 'modelhub') loadModelHub();
@@ -3106,6 +3131,28 @@ function formatAuditRecord(row) {
   return { tableLabel, actionLabel, summary, chips };
 }
 
+async function loadSystemHealth() {
+  const kindFilter = document.getElementById('healthKindFilter')?.value || '';
+  const tbody = document.getElementById('syshealthTbody');
+  if (!tbody) return;
+  let query = db.from('client_error_logs').select('*,users(name)').order('occurred_at',{ascending:false}).limit(200);
+  if (kindFilter) query = query.eq('kind', kindFilter);
+  const { data, error } = await query;
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red)">載入失敗：${escHtml(translateError(error.message))}<br><small>請確認已在 Supabase SQL Editor 執行 system/sql/error_logging.sql</small></td></tr>`;
+    return;
+  }
+  const rows = data || [];
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">目前沒有錯誤紀錄。</td></tr>'; return; }
+  const KIND_LABEL = { js_error: 'JS 錯誤', unhandled_rejection: '未捕捉 Promise', manual: '頁面主動回報', api_error: 'API 失敗' };
+  tbody.innerHTML = rows.map(r => `<tr>
+    <td>${escHtml(new Date(r.occurred_at).toLocaleString('zh-TW'))}</td>
+    <td>${escHtml(KIND_LABEL[r.kind] || r.kind)}</td>
+    <td>${escHtml(r.page || '—')}</td>
+    <td style="max-width:420px;white-space:normal;word-break:break-word">${escHtml(r.message)}</td>
+    <td>${escHtml(r.users?.name || '—')}</td>
+  </tr>`).join('');
+}
 async function loadAudit() {
   const tableFilter = document.getElementById('auditTableFilter').value;
   const actionFilter = document.getElementById('auditActionFilter').value;
