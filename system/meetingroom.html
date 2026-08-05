@@ -45,6 +45,9 @@ table.roomgrid td.roomname{background:var(--surface);color:var(--text-hi);font-w
 .daycell{min-height:56px;display:flex;flex-direction:column;gap:3px}
 .bk-pill{background:rgba(0,212,255,.08);border:1px solid var(--border-hi);border-radius:3px;padding:5px 6px;font-size:.65rem;line-height:1.45;cursor:default}
 .bk-pill.mine{background:rgba(0,255,157,.1);border-color:rgba(0,255,157,.4)}
+.bk-pill.mine.can-cancel{cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s}
+.bk-pill.mine.can-cancel:hover,.bk-pill.mine.can-cancel:focus-visible{background:rgba(255,59,59,.08);border-color:rgba(255,59,59,.72);box-shadow:0 0 0 2px rgba(255,59,59,.12);outline:none}
+.bk-cancel-hint{display:block;margin-top:3px;color:var(--red);font-size:.58rem;font-weight:700}
 .bk-pill.expired,.bk-pill.cancelled{opacity:.45;text-decoration:line-through}
 .bk-line{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bk-line.person{color:var(--text-hi)}
@@ -405,12 +408,15 @@ function renderGrid(){
       const pills=items.map(b=>{
         const mine=currentUser&&b.user_id===currentUser.user_id;
         const future=bookingEndDate(b)>new Date();
-        const actions=b.status==='booked'&&future
-          ? `<span class="bk-actions">${mine
-              ? `<button class="bk-action cancel" onclick="cancelBooking('${b.booking_id}')">取消預約</button>`
-              : `<button class="bk-action" onclick="openChangeRequestModal('${b.booking_id}')">申請變更</button>`}</span>`
+        const canCancel=mine&&b.status==='booked';
+        const canRequest=!mine&&b.status==='booked'&&future;
+        const actions=canCancel
+          ? '<span class="bk-cancel-hint">點擊圖卡取消預約</span>'
+          : (canRequest?`<span class="bk-actions"><button class="bk-action" onclick="openChangeRequestModal('${b.booking_id}')">申請變更</button></span>`:'');
+        const interaction=canCancel
+          ? ` role="button" tabindex="0" title="點擊取消此預約" onclick="cancelBooking('${b.booking_id}')" onkeydown="handleOwnBookingCardKeydown(event,'${b.booking_id}')"`
           : '';
-        return `<div class="bk-pill${mine?' mine':''}"><span class="bk-line">${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}</span><span class="bk-line person">${esc(profileLabel(b.user_id))}</span><span class="bk-line meeting">${esc(b.purpose||'未填會議名稱')}</span>${actions}</div>`;
+        return `<div class="bk-pill${mine?' mine':''}${canCancel?' can-cancel':''}"${interaction}><span class="bk-line">${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}</span><span class="bk-line person">${esc(profileLabel(b.user_id))}</span><span class="bk-line meeting">${esc(b.purpose||'未填會議名稱')}</span>${actions}</div>`;
       }).join('');
       const weekend=d.getDay()===0||d.getDay()===6;
       h+=`<td class="${weekend?'weekend':''}"><div class="daycell">${pills}<button class="add-cell" onclick="openBookingModal('${r.room_id}','${dateStr}')">+ 預約</button></div></td>`;
@@ -549,6 +555,12 @@ async function cancelBooking(bookingId){
   toast('已取消預約');
   closeModal('bookingModal');
   await loadWeek();await loadMyBookings();await loadChangeRequests();
+}
+
+function handleOwnBookingCardKeydown(event,bookingId){
+  if(event.key!=='Enter'&&event.key!==' ')return;
+  event.preventDefault();
+  cancelBooking(bookingId);
 }
 
 // ── 預約時段變更申請 ──────────────────────────────────────
