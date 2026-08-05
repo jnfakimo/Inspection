@@ -2500,7 +2500,7 @@ async function importUsersXlsx() {
       log.innerHTML += `<div style="color:var(--amber)">第 ${headerRowIndex+i+2} 行：缺少必填欄位（姓名/帳號/Email），跳過</div>`; failed++; continue;
     }
     if (existingUsernames.has((username||'').toLowerCase()) || existingEmails.has((email||'').toLowerCase())) {
-      log.innerHTML += `<div style="color:var(--text-dim)">第 ${headerRowIndex+i+2} 行「${name}」（${username}）：帳號或Email已存在，跳過</div>`; skipped++; continue;
+      log.innerHTML += `<div style="color:var(--text-dim)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」（${escHtml(username)}）：帳號或Email已存在，跳過</div>`; skipped++; continue;
     }
     const pwd = password || genTempPassword();
     const rbacRole = roleMap[roleRaw] || 'reporter';
@@ -2509,11 +2509,11 @@ async function importUsersXlsx() {
     const profile = { name, username, email: email.toLowerCase(), phone: phone || null, role: userRole, rbac_role: rbacRole, permissions, status: 'active', created_by: currentUser?.user_id };
     const created = await createAuthBackedProfile(profile, pwd);
     if (created.error) {
-      log.innerHTML += `<div style="color:var(--red)">第 ${headerRowIndex+i+2} 行「${name}」：${translateError(created.error.message)}</div>`; failed++; continue;
+      log.innerHTML += `<div style="color:var(--red)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」：${escHtml(translateError(created.error.message))}</div>`; failed++; continue;
     }
     const pwdNote = !password ? `<span style="color:var(--amber)">（臨時密碼：${pwd}）</span>` : '';
     const recoverNote = created.recovered ? '<span style="color:var(--amber)">（已修復既有 Email 的帳戶清單）</span>' : '';
-    log.innerHTML += `<div style="color:var(--green)">✓ 「${name}」（${username}）${created.recovered ? '修復成功' : '匯入成功'} ${recoverNote}${pwdNote}</div>`;
+    log.innerHTML += `<div style="color:var(--green)">✓ 「${escHtml(name)}」（${escHtml(username)}）${created.recovered ? '修復成功' : '匯入成功'} ${recoverNote}${pwdNote}</div>`;
     existingUsernames.add(username.toLowerCase());
     existingEmails.add(email.toLowerCase());
     success++;
@@ -3366,10 +3366,6 @@ function buildL1Block(d) {
         <button class="dept-btn-add" onclick="startAddDept('${d.dept_id}')">＋ 新增二級部門</button>
       </div>
     </div>`;
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function startEditDept(deptId) {
