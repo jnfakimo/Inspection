@@ -398,13 +398,13 @@ const RBAC_ROLES={reporter:'一般報修人員',duty:'值班人員',dispatcher:'
   technician:'維修技術人員',unit_supervisor:'單位主管',mgmt_supervisor:'管理部主管',sysadmin:'系統管理員'};
 const LEGACY_TO_RBAC={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
 const ROLE_PERMISSION_PRESETS={
-  reporter:{read:true,create:true},
-  duty:{read:true,create:true,dispatch:true},
-  dispatcher:{read:true,create:true,update:true,dispatch:true,export:true},
-  technician:{read:true,update:true,repair:true},
-  unit_supervisor:{read:true,create:true,dispatch:true,close:true,sign:true,export:true,repair:true},
-  mgmt_supervisor:{read:true,close:true,sign:true,export:true,repair:true},
-  sysadmin:{read:true,create:true,update:true,delete:true,dispatch:true,close:true,sign:true,export:true,admin:true,repair:true}
+  reporter:{maintenance:true,repair:true,read:true,create:true},
+  duty:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true},
+  dispatcher:{maintenance:true,repair:true,read:true,create:true,update:true,dispatch:true,export:true},
+  technician:{maintenance:true,read:true,update:true,dispatch:true},
+  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true,close:true,sign:true,export:true},
+  mgmt_supervisor:{maintenance:true,handover:true,read:true,close:true,sign:true,export:true},
+  sysadmin:{inspector:true,maintenance:true,handover:true,repair:true,read:true,create:true,update:true,delete:true,dispatch:true,close:true,sign:true,export:true,admin:true}
 };
 function normalizeRoleId(user){
   const role=user?.rbac_role||user?.role;
