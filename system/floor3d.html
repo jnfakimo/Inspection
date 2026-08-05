@@ -314,6 +314,7 @@ async function loadMarkers(){
     document.getElementById('mkCount').textContent=markerObjs.length;
     layoutMarkers();
     focusRequestedMarker();
+    refreshPatrolStatus();
   }catch(e){}
 }
 let patrolStatusMap=new Map();
@@ -328,6 +329,7 @@ async function refreshPatrolStatus(){
     mk.stem.material.color.setHex(hex);
   });
 }
+setInterval(refreshPatrolStatus,30000);
 // 文字標籤 sprite（canvas 材質）
 function makeLabelSprite(text,colorHex){
   const c=document.createElement('canvas'),ctx=c.getContext('2d'),fs=44;
