@@ -1,5 +1,32 @@
 # 專案筆記
 
+## 2026-08-05 收工（Claude Sonnet 5 @ DESKTOP-0CFB6UK）
+
+### 完成事項
+
+- 用 RDQ 需求訪談法（四象限）跟業主釐清「功能室/會議室預約系統」的需求，確認後的規格卡存在 `rdq/RDQ-spec-meeting-room-booking-20260804.md`（`status: confirmed`）。
+- 新增並**完整部署**第 8 個子系統「會議室預約系統」：
+  - 新表 `meeting_rooms`（會議室主檔，後台可新增/編輯，停用不刪除）、`meeting_bookings`（預約紀錄）；用 Postgres `EXCLUDE`（`btree_gist`）約束在**資料庫層級**防止同房間同時段重複預約，比純前端檢查更可靠。
+  - 新頁 `meetingroom.html`：獨立頁面（比照 `vehicle-dispatch.html` 的模式，非掛在 `admin.html` 底下），含週視圖排程總覽、送出前即時衝突預檢、報到、取消、管理者專屬的會議室管理彈窗。
+  - RBAC 新增 `sys_meetingroom` 存取鍵，入口頁新增 SYS-08 卡片，依權限顯示/隱藏。
+  - 新增 Edge Function `meeting-booking-check`（比照 `patrol-timeout-check` 架構）：開始前 15 分鐘 LINE 提醒、開始後 15 分鐘未報到自動取消釋出，用 `meeting_booking_notifications` 表防止重複推播。
+  - 新增 GitHub Actions `meeting-room-notify.yml`，每 5 分鐘觸發一次（跟現有巡邏通知錯開分鐘）。
+  - **已實際部署驗證**：Supabase 資料表已建、Edge Function 已用 CLI 部署且測試呼叫回應正常（`{"ok":true,"checked":0,"results":[]}`）。
+- 移除 `floor3d.html` 上「立體控制」「樓層顯示」「標記顯示」「3D 模型圖」四處按鈕前面的圖示，只留文字。
+- 修正 `system_access_seed.sql`／`permanent_data_protection.sql` 兩份既有 idempotent 遷移檔，補上這次新表；`AGENTS.md` 的 SQL 套用順序清單同步更新。
+
+### 下一步
+
+- 業主尚未實際建立任何會議室資料，下次開工請先確認有沒有人已經進 `meetingroom.html` 用「會議室管理」新增至少 1 間會議室、並試訂過一筆看衝突擋不擋得住。
+- 尚未觀察過 `meeting-booking-check` 在真實預約情境下的「到期提醒」「逾時自動取消」是否真的送出 LINE、時機是否準確——目前只確認過空跑（沒有任何預約時）呼叫成功。
+- `.github/workflows/meeting-room-notify.yml` 是透過 GitHub 網頁手動新增的（見下方踩坑），不是我 push 上去的，push 完後已 fetch 確認本地與遠端一致。
+
+### 踩坑
+
+- 這台電腦用 `gh` CLI 的 OAuth token 只有 `gist`／`read:org`／`repo` 範圍，**沒有 `workflow` 範圍**，凡是要新增/修改 `.github/workflows/*` 的 push 都會被 GitHub 拒絕（`refusing to allow an OAuth App to create or update workflow ... without workflow scope`）。試過 `gh auth refresh -h github.com -s workflow` 兩次，device code 都在使用者完成瀏覽器授權前就過期（`context deadline exceeded`），最後改用「請使用者自己到 GitHub 網頁手動新增該檔案」的替代方案解決——這比再花時間排查 device flow 逾時原因更省事，之後遇到同樣情況可以直接跳過 CLI 授權、走網頁手動新增。
+- 這台電腦其實已經裝好 Supabase CLI（`npx supabase`）且專案已連結、有既存登入憑證，**不需要另外登入就能直接部署 Edge Function**（`npx supabase functions deploy <name> --project-ref qztffronusdhgxhjjubt`）——下次要部署新的 Edge Function，不用像本次一開始以為的那樣只能請業主自己用 CLI 跑，可以直接檢查這台電腦能不能用。
+- 本次工作全程都跟另一個/另幾個代理交錯進行同一個 repo（過程中發現 3 個不在自己掌控中的遠端 commit、以及 `vehicle-dispatch.html`／`system_access_seed.sql` 等檔案被業主或其他代理直接修改）；每次要 push 前務必先 `git fetch` + 檢查 `git rev-list --left-right --count HEAD...origin/main`，落後就先 rebase，且要小心保護工作目錄裡不屬於自己這次任務的未提交變更（本次用 `git stash` 保護了一份不相關的 `guardpatrol3d.html` WIP，收工時仍原封不動保留、未 commit）。
+
 ## 2026-08-04 收工（第二次｜Claude Sonnet 5 @ DESKTOP-0CFB6UK）
 
 ### 完成事項
