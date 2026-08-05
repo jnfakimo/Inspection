@@ -1733,7 +1733,7 @@ renderPermissionList('e', defaultPermsForRole('reporter'));
   DTP.init('edit-eq-date-dtp','date');
   DTP.init('auditDateFrom-dtp','date',loadAudit);
   DTP.init('auditDateTo-dtp','date',loadAudit);
-  await loadAll();
+  if(!await loadAll())return;
   activateAdminPage(getAdminInitialPage(), { persist:false });
   // 載入系統設定並套用名稱
   db.from('system_settings').select('key,value').then(({ data }) => {
@@ -1743,8 +1743,7 @@ renderPermissionList('e', defaultPermsForRole('reporter'));
   setInterval(async () => {
     const activePage = document.querySelector('.page-section.active');
     if (activePage && activePage.id === 'page-dashboard') {
-      await loadAll();
-      loadDashboard();
+      if(await loadAll())loadDashboard();
     }
   }, 60000);
 })();
@@ -1791,12 +1790,21 @@ function activateAdminPage(page, opts = {}) {
 }
 
 async function loadAll() {
-  const [{ data: us }, { data: eqs }, { data: depts }, { data: rolePerms }] = await Promise.all([
+  const [{ data: us, error: userErr }, { data: eqs, error: equipmentErr }, { data: depts, error: deptErr }, { data: rolePerms, error: permissionErr }] = await Promise.all([
     db.from('users').select('*').order('name'),
     db.from('equipment').select('*').order('name'),
     db.from('departments').select('*').eq('status','active').order('sort_order'),
     db.from('role_permissions').select('role_id,perm,allowed'),
   ]);
+  const queryError = userErr || equipmentErr || deptErr || permissionErr;
+  if(queryError){
+    showToast('後台核心資料讀取失敗：'+translateError(queryError.message),true);
+    const usersBody=document.getElementById('usersTbody');
+    if(usersBody)usersBody.innerHTML='<tr><td colspan="7" style="color:var(--amber);padding:24px">資料讀取失敗，請重新整理或通知系統管理員。</td></tr>';
+    const eqBody=document.getElementById('eqTbody');
+    if(eqBody)eqBody.innerHTML='<tr><td colspan="6" style="color:var(--amber);padding:24px">資料讀取失敗，請重新整理或通知系統管理員。</td></tr>';
+    return false;
+  }
   allUsers = us || []; allEquipment = eqs || []; allDepts = depts || [];
   rolePermissionMatrix = {};
   (rolePerms || []).forEach(row => {
@@ -1808,6 +1816,7 @@ async function loadAll() {
   allDepts.forEach(d => deptMap[d.dept_id] = d);
   populateAdminDeptSelects();
   populateEqFilter('cost-eq');
+  return true;
 }
 
 function populateAdminDeptSelects(selectedDeptId) {
@@ -2008,12 +2017,19 @@ function populateEqFilter(selectId) {
 
 async function loadDashboard() {
   const today = new Date().toISOString().split('T')[0];
-  const [{ data: orders }, { count: inspCount }, { count: pendingCount }, { count: abnormalCount }] = await Promise.all([
+  const [{ data: orders, error: ordersErr }, { count: inspCount, error: inspErr }, { count: pendingCount, error: pendingErr }, { count: abnormalCount, error: abnormalErr }] = await Promise.all([
     db.from('maintenance_orders').select('*,equipment(name),repair_requests(reporter,fault_desc)').order('created_at',{ascending:false}).limit(10),
     db.from('inspection_records').select('*', { count: 'exact', head: true }).gte('inspect_time', today + 'T00:00:00'),
     db.from('maintenance_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('inspection_records').select('*', { count: 'exact', head: true }).eq('run_status','abnormal').gte('inspect_time', today + 'T00:00:00'),
   ]);
+  const queryError=ordersErr||inspErr||pendingErr||abnormalErr;
+  if(queryError){
+    showToast('戰情資料讀取失敗：'+translateError(queryError.message),true);
+    const box=document.getElementById('dashboardOrders');
+    if(box)box.innerHTML='<div style="color:var(--amber);font-size:.85rem;font-family:var(--font-mono)">戰情資料讀取失敗，請重新整理或通知系統管理員。</div>';
+    return;
+  }
   document.getElementById('stat-eq').textContent = allEquipment.filter(e => e.status === 'active').length;
   document.getElementById('stat-pending').textContent = pendingCount || 0;
   document.getElementById('stat-insp-today').textContent = inspCount || 0;
@@ -2037,7 +2053,7 @@ async function loadDashboard() {
 }
 
 async function loadUsers() {
-  await loadAll();
+  if(!await loadAll())return;
   populateUserFilters();
   filterUsers();
 }
@@ -2638,7 +2654,7 @@ async function toggleUserStatus(userId, status) {
 }
 
 async function loadEquipmentList() {
-  await loadAll();
+  if(!await loadAll())return;
   renderEquipment(allEquipment);
 }
 
@@ -2686,7 +2702,7 @@ async function createEquipment() {
 
   ['eq-name','eq-loc','eq-cost'].forEach(id => document.getElementById(id).value = '');
   DTP.setValue('eq-date-dtp', null);
-  await loadAll(); renderEquipment(allEquipment);
+  if(await loadAll())renderEquipment(allEquipment);
 }
 
 function openEditEq(eqId) {
@@ -2717,7 +2733,7 @@ async function saveEquipment() {
   await writeAudit('equipment', eqId, 'update', before, updates);
   showToast('設備資料已更新');
   closeModal('editEqModal');
-  await loadAll(); renderEquipment(allEquipment);
+  if(await loadAll())renderEquipment(allEquipment);
 }
 
 function showQr(eqId, name, qrCode) {
@@ -3366,10 +3382,6 @@ function buildL1Block(d) {
         <button class="dept-btn-add" onclick="startAddDept('${d.dept_id}')">＋ 新增二級部門</button>
       </div>
     </div>`;
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function startEditDept(deptId) {

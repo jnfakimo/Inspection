@@ -126,8 +126,11 @@ create table if not exists equipment_maintenance_records (
   created_by uuid references users(user_id)
 );
 alter table equipment_maintenance_records add column if not exists import_key text;
+alter table equipment_maintenance_records add column if not exists dedupe_key text;
 create unique index if not exists uq_eq_maintenance_record_import
   on equipment_maintenance_records(import_key);
+create unique index if not exists uq_eq_maintenance_record_dedupe
+  on equipment_maintenance_records(dedupe_key) where dedupe_key is not null;
 create index if not exists idx_eq_maintenance_record_equipment_date
   on equipment_maintenance_records(equipment_id,performed_on desc);
 
@@ -153,9 +156,12 @@ create table if not exists equipment_contracts (
   updated_by uuid references users(user_id)
 );
 alter table equipment_contracts add column if not exists import_key text;
+alter table equipment_contracts add column if not exists dedupe_key text;
 create index if not exists idx_eq_contract_equipment_end
   on equipment_contracts(equipment_id,ends_on);
 create unique index if not exists uq_eq_contract_import on equipment_contracts(import_key);
+create unique index if not exists uq_eq_contract_dedupe
+  on equipment_contracts(dedupe_key) where dedupe_key is not null;
 
 alter table equipment_maintenance_plans
   drop constraint if exists equipment_maintenance_plans_contract_id_fkey;
@@ -298,6 +304,38 @@ create or replace function set_equipment_lifecycle_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at := now(); return new; end;
 $$;
+
+-- 手動新增的維修履歷／保養合約沒有 import_key，不能只依賴匯入去重。
+-- 以穩定指紋保護新增與更新；既有資料保持不動，NULL dedupe_key 不會被重整。
+create or replace function set_equipment_lifecycle_dedupe_key()
+returns trigger language plpgsql as $$
+begin
+  if new.import_key is not null then
+    new.dedupe_key := null;
+  elsif tg_table_name = 'equipment_maintenance_records' then
+    new.dedupe_key := md5(jsonb_build_object(
+      'equipment_id',new.equipment_id,'record_type',new.record_type,
+      'performed_on',new.performed_on,'fault_description',new.fault_description,
+      'action_taken',new.action_taken,'maintenance_cost',new.maintenance_cost,
+      'parts_cost',new.parts_cost
+    )::text);
+  elsif tg_table_name = 'equipment_contracts' then
+    new.dedupe_key := md5(jsonb_build_object(
+      'equipment_id',new.equipment_id,'vendor',lower(trim(new.vendor)),
+      'contract_no',nullif(lower(trim(new.contract_no)),''),
+      'starts_on',new.starts_on,'ends_on',new.ends_on,'service_scope',new.service_scope
+    )::text);
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_eq_maintenance_record_dedupe on equipment_maintenance_records;
+create trigger trg_eq_maintenance_record_dedupe before insert or update
+  on equipment_maintenance_records for each row execute function set_equipment_lifecycle_dedupe_key();
+drop trigger if exists trg_eq_contract_dedupe on equipment_contracts;
+create trigger trg_eq_contract_dedupe before insert or update
+  on equipment_contracts for each row execute function set_equipment_lifecycle_dedupe_key();
 
 drop trigger if exists trg_equipment_updated_at on equipment;
 create trigger trg_equipment_updated_at before update on equipment

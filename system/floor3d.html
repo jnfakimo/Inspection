@@ -455,7 +455,7 @@ function finishLoad(){
   prog(100,'完成');
   setTimeout(()=>{const l=document.getElementById('loading');l.style.transition='opacity .4s';l.style.opacity='0';setTimeout(()=>l.style.display='none',400);},150);
   resetView(); animate();
-  loadMarkers();
+  loadMarkers().then(()=>refreshPatrolStatus());
   const img=document.getElementById('planThumbImg');
   if(img) img.src=FLOORS[0].tex;
   updateHud();
