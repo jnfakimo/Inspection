@@ -1,0 +1,30 @@
+name: Meeting room booking check
+
+on:
+  schedule:
+    # Offset from patrol-line-notify.yml's minutes to avoid both hitting the
+    # scheduler at the same time.
+    - cron: "4,9,14,19,24,29,34,39,44,49,54,59 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: meeting-room-booking-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger meeting room booking check
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          test -n "$SUPABASE_ANON_KEY"
+          curl --fail-with-body --retry 2 --retry-all-errors \
+            --max-time 45 \
+            -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/meeting-booking-check
