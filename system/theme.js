@@ -557,7 +557,146 @@
       timer=setTimeout(function(){captureOffsets();syncHeight();},80);
     });
   }
+  function installSegmentedTimeInputs(){
+    if(document.getElementById('systemSegmentedTimeStyle'))return;
+    var style=document.createElement('style');
+    style.id='systemSegmentedTimeStyle';
+    style.textContent=`
+      .system-segmented-native{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important}
+      .system-segmented-time{display:grid!important;grid-template-columns:minmax(86px,1.15fr) minmax(54px,1fr) minmax(54px,1fr);gap:6px;width:100%;min-width:0;align-items:center}
+      .system-segmented-time.has-date{grid-template-columns:minmax(132px,1.45fr) minmax(86px,1.15fr) minmax(54px,1fr) minmax(54px,1fr)}
+      .system-segmented-time .system-time-parts{display:contents}
+      .system-segmented-time select,.system-segmented-time input[type=date]{width:100%!important;min-width:0!important;box-sizing:border-box!important;background:var(--surface,var(--panel,#05101e))!important;border:1px solid var(--border,#0c2840)!important;color:var(--text,#a8d8f0)!important;padding:8px 6px!important;border-radius:3px!important;font:inherit!important;font-size:.78rem!important;outline:none!important;text-align:center!important}
+      .system-segmented-time select:focus,.system-segmented-time input[type=date]:focus{border-color:var(--cyan,#00d4ff)!important}
+      .system-segmented-time select:disabled,.system-segmented-time input:disabled{opacity:.62!important;cursor:not-allowed!important}
+      @media(max-width:600px){
+        .system-segmented-time{grid-template-columns:minmax(80px,1.15fr) minmax(50px,1fr) minmax(50px,1fr)}
+        .system-segmented-time.has-date{grid-template-columns:1fr;gap:5px}
+        .system-segmented-time.has-date .system-time-parts{display:grid;grid-template-columns:minmax(80px,1.15fr) minmax(50px,1fr) minmax(50px,1fr);gap:5px}
+      }
+    `;
+    document.head.appendChild(style);
+
+    function nativeDescriptor(el){
+      var proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;
+      return Object.getOwnPropertyDescriptor(proto,'value');
+    }
+    function two(n){return String(n).padStart(2,'0');}
+    function parseTime(value){
+      var match=String(value||'').match(/^(\d{4}-\d{2}-\d{2}T)?(\d{2}):(\d{2})/);
+      if(!match)return null;
+      var hour=Number(match[2]),minute=Number(match[3]);
+      return {date:match[1]?match[1].slice(0,10):'',period:hour<12?'am':'pm',hour:String(hour%12||12),minute:two(minute)};
+    }
+    function addThirty(value,isDateTime){
+      var parsed=parseTime(value);
+      if(!parsed)return '';
+      var hour24=Number(value.slice(isDateTime?11:0,isDateTime?13:2));
+      var minute=Number(value.slice(isDateTime?14:3,isDateTime?16:5));
+      if(isDateTime){
+        var d=new Date(value);
+        if(Number.isNaN(d.getTime()))return '';
+        d.setMinutes(d.getMinutes()+30);
+        return d.getFullYear()+'-'+two(d.getMonth()+1)+'-'+two(d.getDate())+'T'+two(d.getHours())+':'+two(d.getMinutes());
+      }
+      var total=(hour24*60+minute+30)%(24*60);
+      return two(Math.floor(total/60))+':'+two(total%60);
+    }
+    function transform(el){
+      if(!el||el.dataset.systemSegmentedReady==='1')return;
+      var marked=el.hasAttribute('data-segmented-time');
+      var type=(el.getAttribute('type')||'').toLowerCase();
+      if(!marked&&type!=='time'&&type!=='datetime-local')return;
+      var isDateTime=type==='datetime-local';
+      var desc=nativeDescriptor(el);
+      if(!desc||!desc.get||!desc.set)return;
+      el.dataset.systemSegmentedReady='1';
+      var wrapper=document.createElement('div');
+      wrapper.className='system-segmented-time'+(isDateTime?' has-date':'');
+      wrapper.dataset.for=el.id||'';
+      var dateInput=isDateTime?document.createElement('input'):null;
+      var timeHost=document.createElement('div');
+      timeHost.className='system-time-parts';
+      if(!isDateTime)timeHost.style.display='contents';
+      var period=document.createElement('select');
+      var hour=document.createElement('select');
+      var minute=document.createElement('select');
+      period.innerHTML='<option value="">上午／下午</option><option value="am">上午</option><option value="pm">下午</option>';
+      hour.innerHTML='<option value="">時</option>'+Array.from({length:12},function(_,i){return '<option value="'+(i+1)+'">'+two(i+1)+'</option>';}).join('');
+      minute.innerHTML='<option value="">分</option><option value="00">00</option><option value="30">30</option>';
+      var label=el.getAttribute('aria-label')||el.id||'時間';
+      period.setAttribute('aria-label',label+' 上午或下午');
+      hour.setAttribute('aria-label',label+' 小時');
+      minute.setAttribute('aria-label',label+' 分鐘');
+      if(dateInput){
+        dateInput.type='date';
+        dateInput.setAttribute('aria-label',label+' 日期');
+        var min=el.getAttribute('min'),max=el.getAttribute('max');
+        if(min)dateInput.min=min.slice(0,10);
+        if(max)dateInput.max=max.slice(0,10);
+        wrapper.appendChild(dateInput);
+      }
+      timeHost.appendChild(period);timeHost.appendChild(hour);timeHost.appendChild(minute);wrapper.appendChild(timeHost);
+      el.insertAdjacentElement('afterend',wrapper);
+      el.classList.add('system-segmented-native');
+      el.setAttribute('aria-hidden','true');
+      el.tabIndex=-1;
+
+      function rawValue(){return desc.get.call(el)||'';}
+      function writeRaw(value,emit){
+        desc.set.call(el,value||'');
+        syncFromRaw();
+        if(emit){
+          el.dispatchEvent(new Event('input',{bubbles:true}));
+          el.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+      }
+      function syncFromRaw(){
+        var parsed=parseTime(rawValue());
+        if(dateInput)dateInput.value=parsed?parsed.date:'';
+        period.value=parsed?parsed.period:'';
+        hour.value=parsed?parsed.hour:'';
+        minute.value=parsed&&(['00','30'].indexOf(parsed.minute)>=0)?parsed.minute:'';
+      }
+      function syncDisabled(){
+        [dateInput,period,hour,minute].filter(Boolean).forEach(function(control){control.disabled=el.disabled;});
+      }
+      function compose(){
+        if(!period.value||!hour.value||minute.value==='')return '';
+        var hour24=Number(hour.value);
+        if(period.value==='am'&&hour24===12)hour24=0;
+        if(period.value==='pm'&&hour24!==12)hour24+=12;
+        var time=two(hour24)+':'+minute.value;
+        if(isDateTime){if(!dateInput.value)return '';return dateInput.value+'T'+time;}
+        return time;
+      }
+      function changed(){
+        var value=compose();
+        if(value)writeRaw(value,false);
+        else desc.set.call(el,'');
+        if(value&&el.dataset.timeEndId){
+          var end=document.getElementById(el.dataset.timeEndId);
+          if(end)end.value=addThirty(value,isDateTime);
+        }
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+        el.dispatchEvent(new Event('change',{bubbles:true}));
+      }
+      [dateInput,period,hour,minute].filter(Boolean).forEach(function(control){control.addEventListener('change',changed);});
+      Object.defineProperty(el,'value',{configurable:true,get:function(){return desc.get.call(el);},set:function(value){desc.set.call(el,value||'');syncFromRaw();}});
+      new MutationObserver(function(){syncDisabled();}).observe(el,{attributes:true,attributeFilter:['disabled','min','max']});
+      if(el.form)el.form.addEventListener('reset',function(){setTimeout(syncFromRaw,0);});
+      syncFromRaw();syncDisabled();
+    }
+    function scan(root){
+      if(root&&root.matches&&root.matches('input[type="time"],input[type="datetime-local"],[data-segmented-time]'))transform(root);
+      if(root&&root.querySelectorAll)root.querySelectorAll('input[type="time"],input[type="datetime-local"],[data-segmented-time]').forEach(transform);
+    }
+    scan(document);
+    new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(scan);});}).observe(document.body,{childList:true,subtree:true});
+    window.SystemSegmentedTime={scan:scan};
+  }
   ready(function(){
+    installSegmentedTimeInputs();
     installSysadminOnlyAccess();
     installSystemMeta();
     installBrandBar();

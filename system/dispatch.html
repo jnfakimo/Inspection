@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-3"></script>
+<script src="theme.js?v=20260805-4"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
@@ -663,7 +663,7 @@ function dispatchForm(r){
       <div class="field"><label>委外廠商（選填）</label><input id="x-vendor"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>預計到場</label><input id="x-arr" type="datetime-local"></div>
+      <div class="field"><label>預計到場</label><input id="x-arr" type="datetime-local" data-time-end-id="x-fin"></div>
       <div class="field"><label>預計完成</label><input id="x-fin" type="datetime-local"></div>
     </div>
     <div class="field"><label>工作內容</label><textarea id="x-content" placeholder="派工說明…"></textarea></div>

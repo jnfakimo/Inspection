@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-3"></script>
+<script src="theme.js?v=20260805-4"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
@@ -414,8 +414,8 @@ function applicationFields(r={},editable=true){
     <div class="field"><label>申請單位</label><input value="${esc(r.applicant_department||currentUser.department||'')}" readonly></div>
     <div class="field"><label class="req">聯絡電話／手機</label><input type="tel" id="fApplicantPhone" autocomplete="tel" value="${esc(r.applicant_phone||currentUser.phone||'')}" placeholder="請輸入可聯絡電話"${disabled}></div>
     <div class="field"><label class="req">用車日期</label><input type="date" id="fTripDate" value="${esc(r.trip_date||'')}" onchange="auditScheduleConflict(true)"${tripMin}${disabled}></div>
-    <div class="field"><label class="req">預計出發時間（30 分鐘）</label><select id="fDepartureTime" onchange="auditScheduleConflict(true)"${disabled}>${timeOptions(departure)}</select></div>
-    <div class="field"><label class="req">預計回程時間（30 分鐘）</label><select id="fReturnTime" onchange="auditScheduleConflict(true)"${disabled}>${timeOptions(returned)}</select></div>
+    <div class="field"><label class="req">預計出發時間（30 分鐘）</label><select id="fDepartureTime" data-segmented-time data-time-end-id="fReturnTime" onchange="auditScheduleConflict(true)"${disabled}>${timeOptions(departure)}</select></div>
+    <div class="field"><label class="req">預計回程時間（30 分鐘）</label><select id="fReturnTime" data-segmented-time onchange="auditScheduleConflict(true)"${disabled}>${timeOptions(returned)}</select></div>
     ${editable?'<div class="field wide schedule-conflict" id="fScheduleConflict" role="alert" hidden></div>':''}
     ${locationSelector('Origin','起點',r.origin_location,editable,'第一果菜市場')}
     ${locationSelector('Destination','迄點',r.destination_location,editable,'')}
@@ -456,7 +456,7 @@ function driverForm(r){
   const lastRefuelOdometer=r.last_refuel_odometer??previous?.refuel_odometer??'',lastRefuelCost=r.last_refuel_cost??previous?.refuel_cost??'';
   return `<section class="form-section"><h3>司機行車回報 <span class="tag">系統自動核算里程</span></h3><div class="form-grid">
     <div class="field"><label class="req">實際乘車人數</label><input type="number" min="0" id="fActualPassengers" value="${esc(r.actual_passenger_count??r.passenger_count??'')}"></div>
-    <div class="field"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" min="${esc(r.trip_date)}T00:00" max="${esc(r.trip_date)}T23:30" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
+    <div class="field"><label class="req">實際出發時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualDeparture" data-time-end-id="fActualReturn" min="${esc(r.trip_date)}T00:00" max="${esc(r.trip_date)}T23:30" value="${esc(localDateTimeValue(r.actual_departure_at)||nowLocalInput())}"></div>
     <div class="field"><label class="req">實際回程時間（30 分鐘）</label><input type="datetime-local" step="1800" id="fActualReturn" min="${esc(r.trip_date)}T00:00" value="${esc(localDateTimeValue(r.actual_return_at))}"></div>
     <div class="field"><label class="req">汽車起始里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerStart" value="${esc(start)}" oninput="updateMileage()"></div>
     <div class="field"><label class="req">汽車回程里程（km）</label><input type="number" min="0" step="0.1" id="fOdometerEnd" value="${esc(r.odometer_end??'')}" oninput="updateMileage()"></div>
