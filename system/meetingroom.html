@@ -75,6 +75,8 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
 .field input,.field select,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 9px;border-radius:3px;font-size:.8rem;outline:none}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan)}
 .field input[readonly]{color:var(--text-dim);cursor:not-allowed}
+.time-parts{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:6px}
+.time-parts select{text-align:center}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .conflict-alert{display:none;border:1px solid rgba(255,59,59,.5);background:rgba(255,59,59,.08);color:var(--red);padding:9px 10px;border-radius:4px;font-size:.72rem;margin-bottom:10px;line-height:1.6}
 .conflict-alert.show{display:block}
@@ -142,8 +144,16 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
         <div class="field"><label>用途</label><input type="text" id="bkPurpose" placeholder="例：週會、面談"></div>
       </div>
       <div class="row2">
-        <div class="field"><label>開始時間（每 30 分鐘）</label><select id="bkStart" onchange="onStartTimeChange()"></select></div>
-        <div class="field"><label>結束時間（每 30 分鐘）</label><select id="bkEnd" onchange="checkConflictSoon()"></select></div>
+        <div class="field"><label>開始時間（上午／下午・時・分）</label><div class="time-parts">
+          <select id="bkStartPeriod" aria-label="開始時間上午或下午" onchange="onTimePartChange('Start')"></select>
+          <select id="bkStartHour" aria-label="開始時間小時" onchange="onTimePartChange('Start')"></select>
+          <select id="bkStartMinute" aria-label="開始時間分鐘" onchange="onTimePartChange('Start')"></select>
+        </div></div>
+        <div class="field"><label>結束時間（上午／下午・時・分）</label><div class="time-parts">
+          <select id="bkEndPeriod" aria-label="結束時間上午或下午" onchange="onTimePartChange('End')"></select>
+          <select id="bkEndHour" aria-label="結束時間小時" onchange="onTimePartChange('End')"></select>
+          <select id="bkEndMinute" aria-label="結束時間分鐘" onchange="onTimePartChange('End')"></select>
+        </div></div>
       </div>
       <div class="row2">
         <div class="field"><label>系統登記電話</label><input type="tel" id="bkSystemPhone" readonly></div>
@@ -226,31 +236,44 @@ function isoDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,
 function fmtMD(d){return `${d.getMonth()+1}/${d.getDate()}`;}
 const DOW=['一','二','三','四','五','六','日'];
 
-function timeLabel(minutes){
-  const h=Math.floor(minutes/60),m=minutes%60,period=h<12?'上午':'下午';
-  const h12=h%12||12;
-  return `${period} ${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-}
 function timeValue(minutes){return `${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`;}
-function timeOptions(kind){
-  let html='<option value="">請選擇</option>';
-  const ranges=kind==='start'?[['上午',0,690],['下午',720,1380]]:[['上午',30,690],['下午',720,1410]];
-  ranges.forEach(([label,from,to])=>{
-    html+=`<optgroup label="${label}">`;
-    for(let min=from;min<=to;min+=30)html+=`<option value="${timeValue(min)}">${timeLabel(min)}</option>`;
-    html+='</optgroup>';
-  });
-  return html;
-}
 function installTimeOptions(){
-  document.getElementById('bkStart').innerHTML=timeOptions('start');
-  document.getElementById('bkEnd').innerHTML=timeOptions('end');
+  const periodOptions='<option value="">上／下午</option><option value="am">上午</option><option value="pm">下午</option>';
+  const hourOptions='<option value="">時</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">${String(i+1).padStart(2,'0')}</option>`).join('');
+  const minuteOptions='<option value="">分</option><option value="00">00</option><option value="30">30</option>';
+  ['Start','End'].forEach(prefix=>{
+    document.getElementById(`bk${prefix}Period`).innerHTML=periodOptions;
+    document.getElementById(`bk${prefix}Hour`).innerHTML=hourOptions;
+    document.getElementById(`bk${prefix}Minute`).innerHTML=minuteOptions;
+  });
 }
-function onStartTimeChange(){
-  const start=document.getElementById('bkStart').value,end=document.getElementById('bkEnd');
-  if(start&&(!end.value||end.value<=start)){
+function selectedTime(prefix){
+  const period=document.getElementById(`bk${prefix}Period`).value;
+  const hourValue=document.getElementById(`bk${prefix}Hour`).value;
+  const minute=document.getElementById(`bk${prefix}Minute`).value;
+  if(!period||!hourValue||minute==='')return '';
+  let hour=Number(hourValue);
+  if(period==='am'&&hour===12)hour=0;
+  if(period==='pm'&&hour!==12)hour+=12;
+  return `${String(hour).padStart(2,'0')}:${minute}`;
+}
+function setTimeParts(prefix,value){
+  let period='',hour='',minute='';
+  if(value){
+    const [hour24,min]=value.split(':').map(Number);
+    period=hour24<12?'am':'pm';
+    hour=String(hour24%12||12);
+    minute=String(min).padStart(2,'0');
+  }
+  document.getElementById(`bk${prefix}Period`).value=period;
+  document.getElementById(`bk${prefix}Hour`).value=hour;
+  document.getElementById(`bk${prefix}Minute`).value=minute;
+}
+function onTimePartChange(prefix){
+  const start=selectedTime('Start'),end=selectedTime('End');
+  if(prefix==='Start'&&start&&(!end||end<=start)){
     const [h,m]=start.split(':').map(Number),next=h*60+m+30;
-    end.value=next<=1410?timeValue(next):'';
+    setTimeParts('End',next<=1410?timeValue(next):'');
   }
   checkConflictSoon();
 }
@@ -333,8 +356,8 @@ function openBookingModal(roomId,dateStr){
   const sel=document.getElementById('bkRoom');
   sel.innerHTML=rooms.map(r=>`<option value="${r.room_id}"${r.room_id===roomId?' selected':''}>${esc(r.name)}</option>`).join('');
   document.getElementById('bkDate').value=dateStr||isoDate(new Date());
-  document.getElementById('bkStart').value='';
-  document.getElementById('bkEnd').value='';
+  setTimeParts('Start','');
+  setTimeParts('End','');
   document.getElementById('bkPurpose').value='';
   const systemPhone=(currentUser?.phone||sessionStorage.getItem('user_phone')||'').trim();
   document.getElementById('bkSystemPhone').value=systemPhone;
@@ -356,8 +379,8 @@ async function findConflict(roomId,dateStr,start,end,excludeId){
 async function checkConflictNow(){
   const roomId=document.getElementById('bkRoom').value;
   const dateStr=document.getElementById('bkDate').value;
-  const start=document.getElementById('bkStart').value;
-  const end=document.getElementById('bkEnd').value;
+  const start=selectedTime('Start');
+  const end=selectedTime('End');
   const alertEl=document.getElementById('conflictAlert');
   try{
     const conflict=await findConflict(roomId,dateStr,start,end);
@@ -373,8 +396,8 @@ async function checkConflictNow(){
 async function saveBooking(){
   const roomId=document.getElementById('bkRoom').value;
   const dateStr=document.getElementById('bkDate').value;
-  const start=document.getElementById('bkStart').value;
-  const end=document.getElementById('bkEnd').value;
+  const start=selectedTime('Start');
+  const end=selectedTime('End');
   const purpose=document.getElementById('bkPurpose').value.trim();
   const systemPhone=document.getElementById('bkSystemPhone').value.trim();
   const contactPhone=document.getElementById('bkContactPhone').value.trim();
