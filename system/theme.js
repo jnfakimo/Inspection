@@ -90,7 +90,7 @@
     location.replace(target+(target.indexOf('?')>=0?'&':'?')+'denied=sysadmin');
     return false;
   }
-  var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap','vehicle'];
+  var ALL_SYSTEM_KEYS=['admin','workorder','guardpatrol','handover','equipment','structuremap','vehicle','meetingroom'];
   window.SystemAccess={
     ALL_SYSTEM_KEYS:ALL_SYSTEM_KEYS,
     // 回傳 Promise<Set<string>|null>；null 代表 sysadmin，視為全部允許。

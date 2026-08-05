@@ -55,7 +55,8 @@ fresh Supabase project, run in the SQL Editor in this order:
 `schema.sql` → `locations_schema.sql` → `work_order_schema.sql` → `floor_models.sql`
 → `handover_schema.sql` → `floor_spaces.sql` → `plan_markers.sql` → `material_master.sql`
 → `equipment_lifecycle.sql` → `patrol_shifts.sql` → `checkin_logs.sql` → `dashboard_layouts.sql` → `system_access_seed.sql`
-→ `audit_login_events.sql` → `rls_hardening.sql` → `rls_hardening_login_fix.sql` → `permanent_data_protection.sql`.
+→ `audit_login_events.sql` → `meeting_rooms.sql` → `meeting_booking_notifications.sql`
+→ `rls_hardening.sql` → `rls_hardening_login_fix.sql` → `permanent_data_protection.sql`.
 `permanent_data_protection.sql` must be applied last. Production data is append/update/
 deactivate only: never reset the database, truncate tables, or physically delete personnel.
 RLS is currently open (`allow_all_for_now`) for development. Storage buckets:

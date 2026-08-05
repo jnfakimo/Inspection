@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
+<script src="theme.js?v=20260805-3"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>會議室預約系統 — 臺北農產公司</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#9b5cff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--font-head:'Rajdhani','Noto Sans TC',sans-serif}
+:root[data-theme="light"]{--bg:#f4f6fa;--surface:#f8fafc;--panel:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:42px}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}
+.navbar{position:sticky;top:0;z-index:80;display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);overflow-x:auto}
+:root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}
+.nav-title{font-family:var(--font-head);font-size:1.08rem;font-weight:800;color:var(--cyan);white-space:nowrap}
+.nav-space{flex:1}
+.nav-btn{white-space:nowrap;border:1px solid var(--border);background:transparent;color:var(--text-dim);padding:6px 10px;border-radius:3px;font-size:.72rem;cursor:pointer}
+.nav-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.content{max-width:1400px;margin:0 auto;padding:16px}
+.hero{display:flex;align-items:flex-end;gap:16px;margin-bottom:14px;flex-wrap:wrap}
+.hero h1{font-family:var(--font-head);font-size:1.25rem;color:var(--text-hi);letter-spacing:.04em}
+.hero p{font-size:.72rem;color:var(--text-dim);margin-top:4px}
+.hero .spacer{flex:1}
+.btn{border:1px solid var(--border);background:transparent;color:var(--text-dim);padding:7px 12px;border-radius:3px;cursor:pointer;font-size:.75rem;white-space:nowrap}
+.btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.btn-primary{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.1)}
+.btn-primary:hover{background:rgba(0,212,255,.18)}
+.btn-green{border-color:rgba(0,255,157,.45);color:var(--green)}
+.btn-red{border-color:rgba(255,59,59,.45);color:var(--red)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:4px;margin-bottom:16px;overflow:hidden}
+.panel-head{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:.78rem;color:var(--text-hi);flex-wrap:wrap}
+.panel-head strong{color:var(--cyan)}
+.panel-body{padding:12px}
+.week-nav{display:flex;align-items:center;gap:8px}
+.week-label{font-family:var(--font-head);font-weight:700;color:var(--cyan);min-width:170px;text-align:center}
+.grid-wrap{overflow-x:auto}
+table.roomgrid{width:100%;border-collapse:collapse;font-size:.72rem;min-width:900px}
+table.roomgrid th{background:var(--surface);color:var(--cyan);font-weight:700;padding:8px 6px;border:1px solid var(--border);text-align:center;white-space:nowrap}
+table.roomgrid td{border:1px solid var(--border);vertical-align:top;padding:5px;min-width:110px}
+table.roomgrid td.roomname{background:var(--surface);color:var(--text-hi);font-weight:700;white-space:nowrap;text-align:left;padding:8px}
+.daycell{min-height:56px;display:flex;flex-direction:column;gap:3px}
+.bk-pill{background:rgba(0,212,255,.08);border:1px solid var(--border-hi);border-radius:3px;padding:3px 5px;font-size:.65rem;line-height:1.4;cursor:default}
+.bk-pill.mine{background:rgba(0,255,157,.1);border-color:rgba(0,255,157,.4)}
+.bk-pill.expired,.bk-pill.cancelled{opacity:.45;text-decoration:line-through}
+.add-cell{border:1px dashed var(--border);border-radius:3px;color:var(--text-dim);text-align:center;font-size:.7rem;padding:3px;cursor:pointer;background:none;width:100%}
+.add-cell:hover{border-color:var(--cyan);color:var(--cyan)}
+.empty{text-align:center;padding:32px 16px;color:var(--text-dim);font-size:.78rem}
+table.mytable{width:100%;border-collapse:collapse;font-size:.75rem}
+table.mytable th{text-align:left;background:var(--surface);color:var(--cyan);padding:8px;border-bottom:1px solid var(--border)}
+table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
+.pill{display:inline-block;padding:2px 7px;border:1px solid var(--border);border-radius:9px;font-size:.62rem;color:var(--text-dim)}
+.pill.ok{color:var(--green);border-color:rgba(0,255,157,.4)}
+.pill.warn{color:var(--amber);border-color:rgba(255,179,0,.4)}
+.pill.bad{color:var(--red);border-color:rgba(255,59,59,.4)}
+.act{border:1px solid var(--border);background:none;color:var(--text-dim);padding:3px 8px;border-radius:3px;cursor:pointer;font-size:.68rem;margin-right:4px}
+.act:hover{border-color:var(--cyan);color:var(--cyan)}
+.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(1,6,14,.86);padding:28px 14px;overflow:auto;align-items:flex-start;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--border-hi);border-radius:5px}
+.modal.wide{max-width:760px}
+.modal-head{display:flex;align-items:center;padding:13px 17px;border-bottom:1px solid var(--border)}
+.modal-title{font-family:var(--font-head);font-weight:800;color:var(--cyan)}
+.modal-close{margin-left:auto;border:0;background:none;color:var(--text-dim);font-size:1.15rem;cursor:pointer}
+.modal-body{padding:15px 17px}
+.modal-foot{display:flex;align-items:center;gap:8px;padding:13px 17px;border-top:1px solid var(--border)}
+.modal-foot .msg{font-size:.7rem;color:var(--red);margin-right:auto}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0;margin-bottom:10px}
+.field label{font-size:.68rem;color:var(--text-dim)}
+.field input,.field select,.field textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:8px 9px;border-radius:3px;font-size:.8rem;outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--cyan)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.conflict-alert{display:none;border:1px solid rgba(255,59,59,.5);background:rgba(255,59,59,.08);color:var(--red);padding:9px 10px;border-radius:4px;font-size:.72rem;margin-bottom:10px;line-height:1.6}
+.conflict-alert.show{display:block}
+.toast{position:fixed;left:50%;bottom:22px;z-index:400;transform:translate(-50%,90px);background:var(--panel);border:1px solid var(--cyan);color:var(--text-hi);padding:10px 17px;border-radius:4px;font-size:.76rem;transition:transform .25s}
+.toast.show{transform:translate(-50%,0)}
+.toast.err{border-color:var(--red)}
+</style>
+<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
+</head>
+<body>
+<nav class="navbar">
+  <div><div class="nav-title">會議室預約系統</div></div>
+  <div class="nav-space"></div>
+  <a class="mobile-hide" href="dashboard.html"><button class="nav-btn"><span class="ic ic-dashboard"></span> 戰情儀表板</button></a>
+  <a href="admin.html#repairs"><button class="nav-btn"><span class="ic ic-dispatch"></span> 報修系統</button></a>
+  <a href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7"><button class="nav-btn">駐衛警巡檢</button></a>
+  <a href="admin.html"><button class="nav-btn">← 後台</button></a>
+</nav>
+
+<div class="content">
+  <div class="hero">
+    <div>
+      <h1>會議室預約系統</h1>
+      <p>週視圖排程總覽 · 送出即生效 · 系統自動防止同時段重複預約</p>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="roomAdminBtn" style="display:none" onclick="openRoomAdminModal()">🏢 會議室管理</button>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <strong>週排程</strong>
+      <div class="spacer"></div>
+      <div class="week-nav">
+        <button class="btn" onclick="shiftWeek(-1)">‹ 上週</button>
+        <span class="week-label" id="weekLabel">—</span>
+        <button class="btn" onclick="shiftWeek(1)">下週 ›</button>
+        <button class="btn" onclick="goToday()">本週</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="grid-wrap"><div id="gridBox" class="empty">載入中…</div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><strong>我的預約</strong></div>
+    <div class="panel-body">
+      <div id="myBox" class="empty">載入中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- 預約表單 -->
+<div class="modal-bg" id="bookingModal">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">新增預約</span><button class="modal-close" onclick="closeModal('bookingModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="conflict-alert" id="conflictAlert"></div>
+      <div class="field"><label>會議室</label><select id="bkRoom" onchange="checkConflictSoon()"></select></div>
+      <div class="row2">
+        <div class="field"><label>日期</label><input type="date" id="bkDate" onchange="checkConflictSoon()"></div>
+        <div class="field"><label>用途</label><input type="text" id="bkPurpose" placeholder="例：週會、面談"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>開始時間</label><input type="time" id="bkStart" step="900" onchange="checkConflictSoon()"></div>
+        <div class="field"><label>結束時間</label><input type="time" id="bkEnd" step="900" onchange="checkConflictSoon()"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span class="msg" id="bkMsg"></span>
+      <button class="btn btn-primary" id="bkSaveBtn" onclick="saveBooking()">送出預約</button>
+    </div>
+  </div>
+</div>
+
+<!-- 會議室管理（管理者） -->
+<div class="modal-bg" id="roomAdminModal">
+  <div class="modal wide">
+    <div class="modal-head"><span class="modal-title">會議室管理</span><button class="modal-close" onclick="closeModal('roomAdminModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="row2">
+        <div class="field"><label>名稱</label><input type="text" id="rmName" placeholder="例：3F 大會議室"></div>
+        <div class="field"><label>可容納人數</label><input type="number" id="rmCapacity" min="0" placeholder="0"></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>樓層</label><input type="text" id="rmFloor" placeholder="例：3F"></div>
+        <div class="field"><label>狀態</label><select id="rmStatus"><option value="active">啟用</option><option value="inactive">停用</option></select></div>
+      </div>
+      <div class="field"><label>備註</label><input type="text" id="rmNote" placeholder="選填"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-primary" id="rmSaveBtn" onclick="saveRoom()">+ 新增會議室</button>
+        <button class="btn" id="rmCancelEditBtn" style="display:none" onclick="resetRoomForm()">取消編輯</button>
+      </div>
+      <div id="roomListBox" class="empty">載入中…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+const db=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function translateError(msg){
+  if(!msg) return '未知錯誤';
+  if(msg.includes('meeting_bookings_no_overlap')||msg.includes('exclusion')) return '此時段該會議室已被預約，請改選其他時段';
+  if(msg.includes('duplicate key value')) return '資料重複，請確認是否已存在';
+  if(msg.includes('null value in column')) return '必填欄位不可空白';
+  if(msg.includes('violates row-level security')||msg.includes('permission denied')) return '無操作權限';
+  if(msg.includes('Failed to fetch')||msg.includes('NetworkError')) return '網路連線失敗，請稍後再試';
+  return '操作失敗，請稍後再試或聯絡系統管理員';
+}
+function openModal(id){document.getElementById(id).classList.add('show');}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+let _tt;
+function toast(msg,err){const el=document.getElementById('toast');el.textContent=msg;el.classList.toggle('err',!!err);el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);}
+
+async function writeAudit(table,recordId,action,before,after){
+  if(!currentUser) return;
+  try{ await db.from('audit_logs').insert({table_name:table,record_id:String(recordId),action,changes:{before,after},operator_id:currentUser.user_id}); }catch(e){}
+}
+
+let currentUser=null;
+let rooms=[];          // active meeting_rooms
+let allRooms=[];        // all rooms incl. inactive (admin management)
+let weekBookings=[];    // bookings overlapping the visible week
+let myBookings=[];
+let weekStart=mondayOf(new Date());
+let editingRoomId=null;
+
+function mondayOf(d){
+  const x=new Date(d);
+  const day=(x.getDay()+6)%7; // 0=Mon
+  x.setDate(x.getDate()-day);
+  x.setHours(0,0,0,0);
+  return x;
+}
+function isoDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
+function fmtMD(d){return `${d.getMonth()+1}/${d.getDate()}`;}
+const DOW=['一','二','三','四','五','六','日'];
+
+function isAdmin(){
+  if(!currentUser) return false;
+  return currentUser.rbac_role==='sysadmin'||currentUser.role==='admin';
+}
+
+(async()=>{
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html?redirect='+encodeURIComponent('meetingroom.html');return;}
+  if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
+    const allowed=await window.SystemAccess.enforce('meetingroom');
+    if(!allowed)return;
+  }
+  const {data:user}=await db.from('users').select('*').eq('auth_id',session.user.id).eq('status','active').maybeSingle();
+  if(!user){toast('找不到使用者資料',true);return;}
+  currentUser=user;
+  if(window.SystemUserProfile)window.SystemUserProfile.save(user);
+  document.getElementById('roomAdminBtn').style.display=isAdmin()?'inline-flex':'none';
+  await loadRooms();
+  await loadWeek();
+  await loadMyBookings();
+})();
+
+async function loadRooms(){
+  const {data,error}=await db.from('meeting_rooms').select('*').order('name');
+  if(error){toast('讀取會議室清單失敗：'+translateError(error.message),true);return;}
+  allRooms=data||[];
+  rooms=allRooms.filter(r=>r.status==='active');
+}
+
+function weekDays(){
+  const out=[];
+  for(let i=0;i<7;i++){const d=new Date(weekStart);d.setDate(d.getDate()+i);out.push(d);}
+  return out;
+}
+
+async function loadWeek(){
+  document.getElementById('weekLabel').textContent=`${fmtMD(weekStart)} — ${fmtMD(weekDays()[6])}`;
+  const days=weekDays();
+  const from=isoDate(days[0]),to=isoDate(days[6]);
+  const {data,error}=await db.from('meeting_bookings').select('*').gte('booking_date',from).lte('booking_date',to).order('start_time');
+  if(error){document.getElementById('gridBox').innerHTML='讀取失敗：'+esc(translateError(error.message));return;}
+  weekBookings=data||[];
+  renderGrid();
+}
+
+function renderGrid(){
+  const box=document.getElementById('gridBox');
+  if(!rooms.length){box.innerHTML='<div class="empty">尚未建立會議室，請洽系統管理員於「會議室管理」新增。</div>';return;}
+  const days=weekDays();
+  let h='<table class="roomgrid"><tr><th style="min-width:110px">會議室</th>'+days.map(d=>`<th>週${DOW[(d.getDay()+6)%7]}<br>${fmtMD(d)}</th>`).join('')+'</tr>';
+  rooms.forEach(r=>{
+    h+=`<tr><td class="roomname">${esc(r.name)}${r.capacity?`<br><span style="color:var(--text-dim);font-weight:400">${esc(r.capacity)} 人</span>`:''}</td>`;
+    days.forEach(d=>{
+      const dateStr=isoDate(d);
+      const items=weekBookings.filter(b=>b.room_id===r.room_id&&b.booking_date===dateStr).sort((a,b)=>a.start_time.localeCompare(b.start_time));
+      const pills=items.map(b=>{
+        const mine=currentUser&&b.user_id===currentUser.user_id;
+        const dead=b.status==='cancelled'||b.status==='expired';
+        const who=mine?'我':(b.purpose||'已預約');
+        return `<div class="bk-pill${mine?' mine':''}${dead?' '+b.status:''}">${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}<br>${esc(who)}</div>`;
+      }).join('');
+      h+=`<td><div class="daycell">${pills}<button class="add-cell" onclick="openBookingModal('${r.room_id}','${dateStr}')">+ 預約</button></div></td>`;
+    });
+    h+='</tr>';
+  });
+  h+='</table>';
+  box.innerHTML=h;
+}
+
+function shiftWeek(n){weekStart.setDate(weekStart.getDate()+n*7);loadWeek();}
+function goToday(){weekStart=mondayOf(new Date());loadWeek();}
+
+function openBookingModal(roomId,dateStr){
+  const sel=document.getElementById('bkRoom');
+  sel.innerHTML=rooms.map(r=>`<option value="${r.room_id}"${r.room_id===roomId?' selected':''}>${esc(r.name)}</option>`).join('');
+  document.getElementById('bkDate').value=dateStr||isoDate(new Date());
+  document.getElementById('bkStart').value='';
+  document.getElementById('bkEnd').value='';
+  document.getElementById('bkPurpose').value='';
+  document.getElementById('bkMsg').textContent='';
+  document.getElementById('conflictAlert').classList.remove('show');
+  openModal('bookingModal');
+}
+
+let _conflictTimer=null;
+function checkConflictSoon(){clearTimeout(_conflictTimer);_conflictTimer=setTimeout(checkConflictNow,250);}
+async function findConflict(roomId,dateStr,start,end,excludeId){
+  if(!roomId||!dateStr||!start||!end||end<=start)return null;
+  const {data,error}=await db.from('meeting_bookings').select('booking_id,start_time,end_time,purpose,user_id')
+    .eq('room_id',roomId).eq('booking_date',dateStr).in('status',['booked','checked_in']);
+  if(error)throw error;
+  return (data||[]).filter(b=>b.booking_id!==excludeId).find(b=>start<b.end_time.slice(0,5)&&end>b.start_time.slice(0,5))||null;
+}
+async function checkConflictNow(){
+  const roomId=document.getElementById('bkRoom').value;
+  const dateStr=document.getElementById('bkDate').value;
+  const start=document.getElementById('bkStart').value;
+  const end=document.getElementById('bkEnd').value;
+  const alertEl=document.getElementById('conflictAlert');
+  try{
+    const conflict=await findConflict(roomId,dateStr,start,end);
+    if(conflict){
+      alertEl.textContent=`此時段已有一筆預約（${conflict.start_time.slice(0,5)}–${conflict.end_time.slice(0,5)}，${conflict.purpose||'無用途說明'}），請改選其他時段。`;
+      alertEl.classList.add('show');
+    }else{
+      alertEl.classList.remove('show');
+    }
+  }catch(e){}
+}
+
+async function saveBooking(){
+  const roomId=document.getElementById('bkRoom').value;
+  const dateStr=document.getElementById('bkDate').value;
+  const start=document.getElementById('bkStart').value;
+  const end=document.getElementById('bkEnd').value;
+  const purpose=document.getElementById('bkPurpose').value.trim();
+  const msg=document.getElementById('bkMsg');
+  msg.textContent='';
+  if(!roomId||!dateStr||!start||!end){msg.textContent='請填寫完整的會議室、日期與時段';return;}
+  if(end<=start){msg.textContent='結束時間必須晚於開始時間';return;}
+  document.getElementById('bkSaveBtn').disabled=true;
+  try{
+    const conflict=await findConflict(roomId,dateStr,start,end);
+    if(conflict){msg.textContent='此時段已被預約，請改選其他時段';document.getElementById('bkSaveBtn').disabled=false;return;}
+    const payload={room_id:roomId,user_id:currentUser.user_id,purpose,booking_date:dateStr,start_time:start,end_time:end,status:'booked'};
+    const {data,error}=await db.from('meeting_bookings').insert(payload).select().single();
+    if(error)throw error;
+    await writeAudit('meeting_bookings',data.booking_id,'insert',null,payload);
+    toast('預約成功');
+    closeModal('bookingModal');
+    await loadWeek();await loadMyBookings();
+  }catch(e){
+    msg.textContent=translateError(e.message||String(e));
+  }finally{
+    document.getElementById('bkSaveBtn').disabled=false;
+  }
+}
+
+async function loadMyBookings(){
+  const {data,error}=await db.from('meeting_bookings').select('*,meeting_rooms(name)').eq('user_id',currentUser.user_id)
+    .order('booking_date',{ascending:false}).order('start_time',{ascending:false}).limit(50);
+  const box=document.getElementById('myBox');
+  if(error){box.innerHTML='讀取失敗：'+esc(translateError(error.message));return;}
+  myBookings=data||[];
+  if(!myBookings.length){box.innerHTML='<div class="empty">尚無預約紀錄</div>';return;}
+  const STATUS_LABEL={booked:['待報到','warn'],checked_in:['已報到','ok'],cancelled:['已取消',''],expired:['已逾時取消','bad']};
+  const now=new Date();
+  box.innerHTML=`<table class="mytable"><tr><th>日期</th><th>時段</th><th>會議室</th><th>用途</th><th>狀態</th><th>操作</th></tr>`+
+    myBookings.map(b=>{
+      const [label,cls]=STATUS_LABEL[b.status]||[b.status,''];
+      const startDt=new Date(`${b.booking_date}T${b.start_time}`);
+      const endDt=new Date(`${b.booking_date}T${b.end_time}`);
+      const canCheckIn=b.status==='booked'&&now>=startDt&&now<=endDt;
+      const canCancel=b.status==='booked'&&now<startDt;
+      return `<tr><td>${esc(b.booking_date)}</td><td>${esc(b.start_time.slice(0,5))}-${esc(b.end_time.slice(0,5))}</td><td>${esc(b.meeting_rooms?.name||'—')}</td><td>${esc(b.purpose||'—')}</td>`+
+        `<td><span class="pill ${cls}">${esc(label)}</span></td>`+
+        `<td>${canCheckIn?`<button class="act" onclick="checkIn('${b.booking_id}')">✓ 報到</button>`:''}${canCancel?`<button class="act" onclick="cancelBooking('${b.booking_id}')">取消</button>`:''}${!canCheckIn&&!canCancel?'—':''}</td></tr>`;
+    }).join('')+'</table>';
+}
+
+async function checkIn(bookingId){
+  const before=myBookings.find(b=>b.booking_id===bookingId);
+  const {error}=await db.from('meeting_bookings').update({status:'checked_in',checked_in_at:new Date().toISOString()}).eq('booking_id',bookingId);
+  if(error){toast('報到失敗：'+translateError(error.message),true);return;}
+  await writeAudit('meeting_bookings',bookingId,'update',{status:before?.status},{status:'checked_in'});
+  toast('報到成功');
+  await loadWeek();await loadMyBookings();
+}
+
+async function cancelBooking(bookingId){
+  if(!confirm('確定要取消這筆預約？'))return;
+  const before=myBookings.find(b=>b.booking_id===bookingId);
+  const {error}=await db.from('meeting_bookings').update({status:'cancelled'}).eq('booking_id',bookingId);
+  if(error){toast('取消失敗：'+translateError(error.message),true);return;}
+  await writeAudit('meeting_bookings',bookingId,'update',{status:before?.status},{status:'cancelled'});
+  toast('已取消預約');
+  await loadWeek();await loadMyBookings();
+}
+
+// ── 會議室管理（管理者） ──────────────────────────────────
+function openRoomAdminModal(){
+  if(!isAdmin())return;
+  resetRoomForm();
+  renderRoomList();
+  openModal('roomAdminModal');
+}
+function renderRoomList(){
+  const box=document.getElementById('roomListBox');
+  if(!allRooms.length){box.innerHTML='<div class="empty">尚未建立會議室，請在上方新增。</div>';return;}
+  box.innerHTML=`<table class="mytable"><tr><th>名稱</th><th>可容納人數</th><th>樓層</th><th>狀態</th><th>操作</th></tr>`+
+    allRooms.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.capacity??'—')}</td><td>${esc(r.floor||'—')}</td>`+
+      `<td><span class="pill ${r.status==='active'?'ok':'bad'}">${r.status==='active'?'啟用':'停用'}</span></td>`+
+      `<td><button class="act" onclick="editRoom('${r.room_id}')">編輯</button></td></tr>`).join('')+'</table>';
+}
+function resetRoomForm(){
+  editingRoomId=null;
+  document.getElementById('rmName').value='';
+  document.getElementById('rmCapacity').value='';
+  document.getElementById('rmFloor').value='';
+  document.getElementById('rmStatus').value='active';
+  document.getElementById('rmNote').value='';
+  document.getElementById('rmSaveBtn').textContent='+ 新增會議室';
+  document.getElementById('rmCancelEditBtn').style.display='none';
+}
+function editRoom(roomId){
+  const r=allRooms.find(x=>x.room_id===roomId);
+  if(!r)return;
+  editingRoomId=roomId;
+  document.getElementById('rmName').value=r.name||'';
+  document.getElementById('rmCapacity').value=r.capacity??'';
+  document.getElementById('rmFloor').value=r.floor||'';
+  document.getElementById('rmStatus').value=r.status;
+  document.getElementById('rmNote').value=r.note||'';
+  document.getElementById('rmSaveBtn').textContent='儲存修改';
+  document.getElementById('rmCancelEditBtn').style.display='inline-flex';
+}
+async function saveRoom(){
+  if(!isAdmin())return;
+  const name=document.getElementById('rmName').value.trim();
+  if(!name){toast('請輸入會議室名稱',true);return;}
+  const payload={
+    name,
+    capacity:document.getElementById('rmCapacity').value?Number(document.getElementById('rmCapacity').value):null,
+    floor:document.getElementById('rmFloor').value.trim()||null,
+    status:document.getElementById('rmStatus').value,
+    note:document.getElementById('rmNote').value.trim()||null
+  };
+  try{
+    if(editingRoomId){
+      const before=allRooms.find(r=>r.room_id===editingRoomId);
+      const {error}=await db.from('meeting_rooms').update(payload).eq('room_id',editingRoomId);
+      if(error)throw error;
+      await writeAudit('meeting_rooms',editingRoomId,'update',before,payload);
+      toast('已更新會議室');
+    }else{
+      payload.created_by=currentUser.user_id;
+      const {data,error}=await db.from('meeting_rooms').insert(payload).select().single();
+      if(error)throw error;
+      await writeAudit('meeting_rooms',data.room_id,'insert',null,payload);
+      toast('已新增會議室');
+    }
+    await loadRooms();
+    resetRoomForm();
+    renderRoomList();
+    renderGrid();
+  }catch(e){
+    toast('儲存失敗：'+translateError(e.message||String(e)),true);
+  }
+}
+</script>
+</body>
+</html>

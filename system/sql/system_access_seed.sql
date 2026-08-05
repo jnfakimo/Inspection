@@ -17,7 +17,8 @@ cross join (values
   ('sys_handover'),
   ('sys_equipment'),
   ('sys_structuremap'),
-  ('sys_vehicle')
+  ('sys_vehicle'),
+  ('sys_meetingroom')
 ) as p(perm)
 on conflict (role_id, perm) do nothing;
 
