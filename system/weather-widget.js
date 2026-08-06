@@ -11,21 +11,22 @@
     '桃園市':[375,245],
     '新竹市':[325,280],
     '新竹縣':[285,325],
-    '苗栗縣':[295,385],
-    '臺中市':[295,450],
-    '彰化縣':[295,515],
-    '雲林縣':[295,580],
-    '嘉義市':[295,640],
-    '嘉義縣':[310,690],
-    '臺南市':[365,730],
-    '高雄市':[430,745],
+    // 西部中南段改放在地圖右側，與北部縣市標記保持相近的間距。
+    '苗栗縣':[610,315],
+    '臺中市':[635,375],
+    '彰化縣':[635,445],
+    '雲林縣':[635,515],
+    '嘉義市':[635,585],
+    '嘉義縣':[620,650],
+    '臺南市':[580,720],
+    '高雄市':[515,755],
     '屏東縣':[495,725],
     '臺東縣':[565,675],
     '花蓮縣':[620,555],
     '宜蘭縣':[625,390],
     '南投縣':[455,465]
   };
-  const LEFT_TEMP_COUNTIES=new Set(['苗栗縣','臺中市','彰化縣','雲林縣','嘉義市','嘉義縣','臺南市','高雄市']);
+  const LEFT_TEMP_COUNTIES=new Set();
   const state={endpoint:'',anonKey:'',summary:null,selected:'臺北市',towns:[],townCounty:'',svgText:'',refreshTimer:null,townRequest:0};
   const byId=id=>document.getElementById(id);
   const esc=value=>String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -134,15 +135,32 @@
       const [x,y]=MARKER_POSITIONS[county]||[countyX,countyY];
       if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(countyX)||!Number.isFinite(countyY))return;
       const line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('class','weather-marker-line');line.setAttribute('x1',countyX);line.setAttribute('y1',countyY);line.setAttribute('x2',x);line.setAttribute('y2',y);layer.appendChild(line);
-      const group=document.createElementNS('http://www.w3.org/2000/svg','g');group.setAttribute('class','weather-marker');group.setAttribute('data-county',county);group.setAttribute('transform',`translate(${x} ${y})`);
+      const group=document.createElementNS('http://www.w3.org/2000/svg','g');group.setAttribute('class','weather-marker');group.setAttribute('data-county',county);group.setAttribute('data-clickable','true');group.setAttribute('role','button');group.setAttribute('tabindex','0');group.setAttribute('aria-label',county+'天氣');group.setAttribute('transform',`translate(${x} ${y})`);
       const tempGroup=document.createElementNS('http://www.w3.org/2000/svg','g');tempGroup.setAttribute('class','weather-marker weather-temp-label');tempGroup.setAttribute('data-county',county);tempGroup.setAttribute('transform',`translate(${x} ${y})`);
       const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');circle.setAttribute('r','27');
       const icon=document.createElementNS('http://www.w3.org/2000/svg','text');icon.setAttribute('y','-1');icon.textContent=weatherIcon(data.weather,data.weatherCode);
       const temp=document.createElementNS('http://www.w3.org/2000/svg','text');temp.setAttribute('class','marker-temp');temp.setAttribute('y','44');temp.textContent=present(data.temperature)?Math.round(Number(data.temperature))+'°':'';
       if(LEFT_TEMP_COUNTIES.has(county)){temp.classList.add('marker-temp-left');temp.setAttribute('x','-34');temp.setAttribute('y','0');}
-      group.append(circle,icon);tempGroup.appendChild(temp);layer.appendChild(group);tempLayer.appendChild(tempGroup);
+      group.append(circle,icon);const choose=event=>{event.preventDefault();event.stopPropagation();selectCounty(county,true);};group.addEventListener('click',choose);group.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){choose(event);}});tempGroup.appendChild(temp);layer.appendChild(group);tempLayer.appendChild(tempGroup);
     });
     layer.appendChild(tempLayer);
+  }
+
+  function renderMapCallout(svg){
+    if(!svg)return;
+    const old=svg.querySelector('.weather-map-callout');if(old)old.remove();
+    if(!state.summary)return;
+    const county=canonical(state.selected),data=countyData(county),pos=MARKER_POSITIONS[county];
+    if(!data||!pos)return;
+    const [x,y]=pos,ns='http://www.w3.org/2000/svg';
+    const group=document.createElementNS(ns,'g');group.setAttribute('class','weather-map-callout');group.setAttribute('role','status');
+    const width=148,height=52,left=Math.max(225,Math.min(518,x-width/2)),top=Math.max(190,y-78);
+    const rect=document.createElementNS(ns,'rect');rect.setAttribute('x',left);rect.setAttribute('y',top);rect.setAttribute('width',width);rect.setAttribute('height',height);rect.setAttribute('rx','8');
+    const pointer=document.createElementNS(ns,'polygon');pointer.setAttribute('points',(x-8)+','+(top+height)+' '+x+','+(top+height+10)+' '+(x+8)+','+(top+height));
+    const title=document.createElementNS(ns,'text');title.setAttribute('class','weather-map-callout-title');title.setAttribute('x',left+12);title.setAttribute('y',top+19);title.textContent=county;
+    const detail=document.createElementNS(ns,'text');detail.setAttribute('class','weather-map-callout-detail');detail.setAttribute('x',left+12);detail.setAttribute('y',top+39);
+    const description=String(data.weather||'天氣資料待更新');detail.textContent=weatherIcon(data.weather,data.weatherCode)+' '+description.slice(0,12)+(present(data.temperature)?'  '+Math.round(Number(data.temperature))+'°C':'');
+    group.append(rect,pointer,title,detail);svg.appendChild(group);
   }
 
   async function loadSvg(){
@@ -170,6 +188,7 @@
       path.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ' )choose(event);});
     });
     updateMapStates();
+    renderMapCallout(svg);
   }
 
   function renderTown(){
@@ -207,6 +226,7 @@
     state.selected=county;
     document.querySelectorAll('[data-weather-county-select]').forEach(select=>{select.value=county;});
     renderSummary();renderCountyPanel();updateMapStates();
+    document.querySelectorAll('.weather-map-shell svg').forEach(renderMapCallout);
     if(withTowns&&state.townCounty!==county)loadTowns(county);
   }
 
@@ -241,6 +261,7 @@
       renderAlerts();renderSummary();renderCountyPanel();
       document.querySelectorAll('.weather-map-shell svg').forEach(addMapMarkers);
       updateMapStates();
+      document.querySelectorAll('.weather-map-shell svg').forEach(renderMapCallout);
       if(state.townCounty!==state.selected)loadTowns(state.selected);
     }catch(error){showError(error.message||'中央氣象署資料載入失敗');}
   }
