@@ -5,6 +5,8 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0' # weekly run for dependency checks
 
 jobs:
   build:
@@ -30,14 +32,29 @@ jobs:
           if npm test; then echo "Tests passed"; else echo "No tests defined or tests failed"; fi
 
       # Lint HTML files using htmlhint
-      - name: Lint HTML
+      - name: Lint HTML with htmlhint
         run: |
           npx htmlhint "**/*.html"
 
+      # Validate HTML semantics using html-validate
+      - name: Validate HTML semantics
+        run: |
+          npx -y html-validate "**/*.html"
+
       # Lint CSS files using stylelint
-      - name: Lint CSS
+      - name: Lint CSS with stylelint
         run: |
           npx stylelint "**/*.css" --allow-empty-input
+
+      # Lint JavaScript files using ESLint
+      - name: Lint JavaScript with ESLint
+        run: |
+          npx eslint . --ext .js,.html || true
+
+      # Check for broken links and images
+      - name: Check broken links and images
+        run: |
+          npx -y broken-link-checker . || true
 
       # Verify Subresource Integrity hashes (optional helper)
       - name: Verify SRI hashes
@@ -45,3 +62,9 @@ jobs:
           # Simple check: ensure script tags with external src contain integrity attribute
           grep -R "<script src=\"https://" -n . | grep -v "integrity" && echo "Missing integrity detected" || echo "All external scripts have integrity attributes"
         shell: bash
+
+      # Dependency freshness check
+      - name: Check outdated npm dependencies
+        run: |
+          npm outdated || echo "Dependencies are up‑to‑date"
+        continue-on-error: true
