@@ -1739,7 +1739,8 @@ renderPermissionList('e', defaultPermsForRole('reporter'));
   let profile = null;
   const { data: { session } } = await db.auth.getSession();
   if (session) {
-    const { data } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+    const { data, error } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
+    if (error) console.warn('users lookup by auth_id failed', error);
     profile = data;
   }
   if (!profile) {
@@ -1818,12 +1819,15 @@ function activateAdminPage(page, opts = {}) {
 }
 
 async function loadAll() {
-  const [{ data: us }, { data: eqs }, { data: depts }, { data: rolePerms }] = await Promise.all([
+  const [{ data: us, error: usErr }, { data: eqs, error: eqErr }, { data: depts, error: deptErr }, { data: rolePerms, error: rpErr }] = await Promise.all([
     db.from('users').select('*').order('name'),
     db.from('equipment').select('*').order('name'),
     db.from('departments').select('*').eq('status','active').order('sort_order'),
     db.from('role_permissions').select('role_id,perm,allowed'),
   ]);
+  if (usErr || eqErr || deptErr || rpErr) {
+    showToast('後台主資料載入失敗，請重新整理頁面：' + translateError((usErr||eqErr||deptErr||rpErr).message), true);
+  }
   allUsers = us || []; allEquipment = eqs || []; allDepts = depts || [];
   rolePermissionMatrix = {};
   (rolePerms || []).forEach(row => {
@@ -2035,12 +2039,15 @@ function populateEqFilter(selectId) {
 
 async function loadDashboard() {
   const today = new Date().toISOString().split('T')[0];
-  const [{ data: orders }, { count: inspCount }, { count: pendingCount }, { count: abnormalCount }] = await Promise.all([
+  const [{ data: orders, error: ordErr }, { count: inspCount, error: inspErr }, { count: pendingCount, error: pendErr }, { count: abnormalCount, error: abnErr }] = await Promise.all([
     db.from('maintenance_orders').select('*,equipment(name),repair_requests(reporter,fault_desc)').order('created_at',{ascending:false}).limit(10),
     db.from('inspection_records').select('*', { count: 'exact', head: true }).gte('inspect_time', today + 'T00:00:00'),
     db.from('maintenance_orders').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     db.from('inspection_records').select('*', { count: 'exact', head: true }).eq('run_status','abnormal').gte('inspect_time', today + 'T00:00:00'),
   ]);
+  if (ordErr || inspErr || pendErr || abnErr) {
+    showToast('戰情儀表板統計載入失敗：' + translateError((ordErr||inspErr||pendErr||abnErr).message), true);
+  }
   document.getElementById('stat-eq').textContent = allEquipment.filter(e => e.status === 'active').length;
   document.getElementById('stat-pending').textContent = pendingCount || 0;
   document.getElementById('stat-insp-today').textContent = inspCount || 0;
@@ -2776,7 +2783,8 @@ async function loadInspections() {
   if (statusFilter) query = query.eq('run_status', statusFilter);
   if (dateFrom) query = query.gte('inspect_time', dateFrom + 'T00:00:00');
   if (dateTo) query = query.lte('inspect_time', dateTo + 'T23:59:59');
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) showToast('巡檢紀錄載入失敗：' + translateError(error.message), true);
   const rows = data || [];
   document.getElementById('inspTbody').innerHTML = rows.length ? rows.map(r => `<tr>
     <td>${r.equipment?.name || '—'}</td>
@@ -2916,7 +2924,8 @@ async function addCostRecord() {
 }
 
 async function loadCostByEq() {
-  const { data } = await db.from('cost_records').select('equipment_id,amount,equipment(name)');
+  const { data, error } = await db.from('cost_records').select('equipment_id,amount,equipment(name)');
+  if (error) showToast('成本統計載入失敗：' + translateError(error.message), true);
   const byEq = {};
   (data || []).forEach(c => {
     if (!byEq[c.equipment_id]) byEq[c.equipment_id] = { name: c.equipment?.name || '—', total: 0 };
@@ -3212,7 +3221,8 @@ function clearAuditFilters() {
 }
 
 async function loadCycles() {
-  const { data } = await db.from('inspection_cycles').select('*,users(name)').order('started_at',{ascending:false});
+  const { data, error } = await db.from('inspection_cycles').select('*,users(name)').order('started_at',{ascending:false});
+  if (error) showToast('巡檢週期紀錄載入失敗：' + translateError(error.message), true);
   const CYCLE_LABEL = { daily:'每日', shift:'每班', weekly:'每週' };
   document.getElementById('cyclesTbody').innerHTML = (data || []).map(c => `<tr>
     <td>${CYCLE_LABEL[c.cycle_type] || c.cycle_type}</td>
@@ -3226,7 +3236,8 @@ async function createCycle() {
   if (currentUser.role !== 'admin') { showToast('無權限', true); return; }
   if (!confirm('確定要開啟新巡檢週期？所有設備將重置為未巡檢（紅燈）。')) return;
 
-  await db.from('inspection_cycles').update({ ended_at: new Date().toISOString() }).is('ended_at', null);
+  const { error: closeErr } = await db.from('inspection_cycles').update({ ended_at: new Date().toISOString() }).is('ended_at', null);
+  if (closeErr) { showToast('結束現有週期失敗，未建立新週期：' + translateError(closeErr.message), true); return; }
 
   const cycleType = document.getElementById('cycleType').value;
   const { error } = await db.from('inspection_cycles').insert({ cycle_type: cycleType, started_at: new Date().toISOString(), created_by: currentUser.user_id });
@@ -3256,7 +3267,8 @@ let _shifts = [
 ];
 
 async function loadSettings() {
-  const { data } = await db.from('system_settings').select('*');
+  const { data, error } = await db.from('system_settings').select('*');
+  if (error) showToast('系統設定載入失敗：' + translateError(error.message), true);
   sysSettings = {};
   (data || []).forEach(s => sysSettings[s.key] = s.value);
   document.getElementById('set-org-name').value  = sysSettings.org_name  || '臺北農產公司';
@@ -3516,7 +3528,8 @@ async function deleteDept(deptId) {
 }
 
 async function reloadDepts() {
-  const { data } = await db.from('departments').select('*').eq('status','active').order('sort_order');
+  const { data, error } = await db.from('departments').select('*').eq('status','active').order('sort_order');
+  if (error) showToast('部門資料載入失敗：' + translateError(error.message), true);
   allDepts = data || [];
   allDepts.forEach(d => deptMap[d.dept_id] = d);
   populateAdminDeptSelects();
