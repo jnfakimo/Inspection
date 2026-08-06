@@ -10,7 +10,7 @@ Deno.serve(async(req)=>{
     const body=await req.json().catch(()=>({}));
     const username=String(body.username||"").trim();
     const password=String(body.password||"");
-    if(!/^[A-Za-z0-9._-]{2,80}$/.test(username)||password.length<8||password.length>200)return reply({ok:false,message:"帳號或密碼錯誤"},401);
+    if(!/^[\p{L}0-9._-]{2,80}$/u.test(username)||password.length<8||password.length>200)return reply({ok:false,message:"帳號或密碼錯誤"},401);
     const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,{auth:{persistSession:false,autoRefreshToken:false}});
     const {data:profile}=await admin.from("users").select("email").eq("username",username).eq("status","active").maybeSingle();
     if(!profile?.email)return reply({ok:false,message:"帳號或密碼錯誤"},401);
