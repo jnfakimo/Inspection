@@ -403,12 +403,13 @@ async function refreshPatrolStatus(){
       const patrolMarkerIds=markerObjs.filter(mk=>mk.kind==='patrol'&&mk.markerId).map(mk=>mk.markerId);
       let checkins=[];
       if(patrolMarkerIds.length){
-        const {data}=await db.from('checkin_logs').select('target_id,user_name,checkin_at')
+        const {data,error}=await db.from('checkin_logs').select('target_id,user_name,checkin_at')
           .eq('target_type','marker')
           .in('target_id',patrolMarkerIds)
           .gte('checkin_at', r.range.start.toISOString())
           .lte('checkin_at', r.range.end.toISOString())
           .order('checkin_at',{ascending:true});             // 升冪，後面覆寫留下每點「最近一次」打卡
+        if(error) console.warn('checkin_logs query failed, check-in labels may be missing',error);
         checkins=data||[];
       }
       checkinInfoMap=new Map();
@@ -677,7 +678,8 @@ async function applyCustomModels(){
   try{
     prog(20,'讀取樓層模型設定…');
     const timeout=new Promise(resolve=>setTimeout(()=>resolve({data:null,error:new Error('timeout')}),4000));
-    const {data}=await Promise.race([db.from('floor_models').select('*'),timeout]);
+    const {data,error}=await Promise.race([db.from('floor_models').select('*'),timeout]);
+    if(error) console.warn('floor_models query failed or timed out, using static textures only',error);
     if(data&&data.length){
       data.forEach(m=>{
         const fl=FLOORS.find(f=>f.id===m.floor_id);
@@ -742,7 +744,8 @@ async function manualRefreshCurrentModel(){
 }
 async function checkModelUpdates(){
   try{
-    const {data}=await db.from('floor_models').select('*');
+    const {data,error}=await db.from('floor_models').select('*');
+    if(error){ console.warn('floor_models update-check query failed',error); return; }
     if(!data) return;
     data.forEach(m=>{
       const fl=FLOORS.find(f=>f.id===m.floor_id);
