@@ -18,12 +18,13 @@
 - 三支 Edge Functions：Deno TypeScript 檢查通過。
 - 正式站首頁：可正確導向登入頁，瀏覽器主控台無錯誤或警告。
 - 已部署的巡檢與會議室排程函式：匿名呼叫均回傳 HTTP 401。
+- 遠端 4 筆舊 migration 已逐項核對實際資料庫物件後補登，local/remote migration 歷史一致。
+- `20260806003000_commercial_security_hardening.sql` 已套用正式庫；會議室兩表均強制 RLS、匿名權限已撤銷，匿名 REST 回傳 404。
 
 ## 上線前仍需完成
 
 ### P0：阻擋商業上線
 
-- 正式資料庫目前曾驗證到匿名使用者可讀取 `meeting_bookings`（共 4 筆）。本次 RLS migration 已完成，但因遠端 migration 歷史缺少四筆舊版紀錄，不能安全地用 `db push --include-all`；須先核對舊 migration 是否曾人工執行，再只套用 `20260806003000_commercial_security_hardening.sql`。
 - LINE Developers Console 尚需設定 `LINE_CHANNEL_SECRET` 至 Supabase Secrets，之後才部署新版 `line-notify`，否則 LINE webhook 簽章無法驗證。
 
 ### P1：正式營運必要
@@ -41,4 +42,4 @@
 
 ## 結論
 
-程式層的 7 項稽核問題已處理且掃描歸零，但在 P0 的正式資料庫 RLS 套用與 LINE Channel Secret 完成前，系統仍不應宣告為可商業正式上線。
+程式層的 7 項稽核問題已處理且掃描歸零，正式資料庫 RLS 亦已完成套用與驗證；在剩餘 P0 的 LINE Channel Secret 完成前，系統仍不應宣告為可商業正式上線。
