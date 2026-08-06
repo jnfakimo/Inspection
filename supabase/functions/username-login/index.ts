@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 
-const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"apikey, content-type, x-client-info"};
+const cors={"Access-Control-Allow-Origin":"https://jnfakimo.github.io","Access-Control-Allow-Headers":"apikey, content-type, x-client-info"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json","Cache-Control":"no-store"}});
 
 Deno.serve(async(req)=>{

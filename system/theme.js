@@ -476,7 +476,7 @@
     var authLookupStarted=false;
     function storedAuthSession(){
       try{
-        var raw=localStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
+        var raw=sessionStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
         if(!raw)return null;
         if(raw.indexOf('base64-')===0)raw=decodeURIComponent(escape(atob(raw.slice(7))));
         return JSON.parse(raw);

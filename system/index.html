@@ -443,12 +443,15 @@
     document.querySelectorAll('[data-sysname="site"]').forEach(el => { if (s.site_name) el.textContent = s.site_name; });
   });
 
-  // Real-time clock
+  // Real-time clock — 固定使用 Asia/Taipei 時區（P0-03 修正）
+  const _taipeiClock = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false
+  });
   function tick() {
-    const n = new Date();
-    const p = x => String(x).padStart(2,'0');
-    document.getElementById('clock').textContent =
-      `${n.getFullYear()}-${p(n.getMonth()+1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+    document.getElementById('clock').textContent = _taipeiClock.format(new Date()).replace('T', ' ');
   }
   tick();
   setInterval(tick, 1000);

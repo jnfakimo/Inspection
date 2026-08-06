@@ -6,6 +6,7 @@
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script>{const p=new URLSearchParams(location.search);if(p.get('embed')==='1')document.documentElement.classList.add('embed-mode');if(p.get('patrol')==='1')document.documentElement.classList.add('patrol-only');}</script>
 <script src="theme.js?v=20260806-1"></script>
+<script src="floor-utils.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -181,7 +182,7 @@ db.channel('checkin_logs_realtime_plan')
 const PAGE_PARAMS=new URLSearchParams(location.search);
 const MODEL_VERSION=PAGE_PARAMS.get('modelv')||'';
 const PATROL_ONLY=PAGE_PARAMS.get('patrol')==='1';
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol3d.html');}})();
+(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
 function versionedModelUrl(url){
   if(!MODEL_VERSION||!url) return url;
   const join=url.includes('?')?'&':'?';
@@ -359,18 +360,7 @@ function markerColor(m){
   if(m.kind==='patrol') return PatrolStatus.COLORS[patrolStatusMap.get(m.marker_id)||'pending'];
   return MK_COL[m.kind]||'#ffb300';
 }
-function drawPlanMarkers(){
-  if(!viewer.viewport) return;
-  viewer.clearOverlays();
-  const list=planMarkers.filter(m=>m.floor_id===curFloor && KV[m.kind]!==false);
-  list.forEach(m=>{
-    const el=document.createElement('div'); el.className='pin'+(showLab?' show-lab':'');
-    const col=markerColor(m);
-    el.innerHTML=`<div class="pdot" style="background:${col}"></div><div class="plab">${escB(m.label)}</div>`;
-    viewer.addOverlay({element:el, location:new OpenSeadragon.Point(m.x,m.y), placement:OpenSeadragon.Placement.CENTER, checkResize:false});
-  });
-  const n=document.getElementById('mkNum'); if(n) n.textContent=list.length+' 個';
-}
+// 舊版 drawPlanMarkers() 已由下方使用 requestAnimationFrame 的優化版本取代（P1-01 修正）
 function drawPlanMarkers(){
   if(markerRenderQueued) return;
   markerRenderQueued=true;

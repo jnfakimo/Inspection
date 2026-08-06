@@ -626,21 +626,6 @@ body.handover-only .repair-handover-head a{display:none!important}
   </div>
 </div>
 
-<!-- 更改密碼 -->
-<div class="modal-bg" id="changePwModal">
-  <div class="modal">
-    <div class="modal-title"><span class="ic ic-inspection"></span> 更改密碼</div>
-    <div class="form-grid">
-      <div class="field"><label>新密碼</label><input id="new-pw" type="password" placeholder="至少 8 個字元" autocomplete="new-password"></div>
-      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" placeholder="再輸入一次" autocomplete="new-password"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-sm" onclick="closeThisModal('changePwModal')">取消</button>
-      <button class="btn btn-primary btn-sm" onclick="changePassword()">確認更改</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1913,35 +1898,24 @@ async function checkFirstLogin() {
   if (!currentUser?.user_id) return;
   const { data: { session } } = await db.auth.getSession();
   if (!session) return;
-  if (!localStorage.getItem('pw_noted_' + currentUser.user_id)) {
+  // P0-02: 改用 sessionStorage，關閉分頁後自動清除提示記錄
+  if (!sessionStorage.getItem('pw_noted_' + currentUser.user_id)) {
     document.getElementById('firstLoginModal').classList.add('show');
   }
 }
 
 function dismissFirstLogin() {
-  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
+  // P0-02: sessionStorage（關閉分頁即清除，不長期留存）
+  if (currentUser?.user_id) sessionStorage.setItem('pw_noted_' + currentUser.user_id, '1');
   closeThisModal('firstLoginModal');
 }
 
+// P0-02: 統一使用 theme.js 的 SystemAccountActions 處理密碼更改
 function openChangePwModal() {
   closeThisModal('firstLoginModal');
-  document.getElementById('new-pw').value = '';
-  document.getElementById('new-pw2').value = '';
-  document.getElementById('changePwModal').classList.add('show');
-}
-
-async function changePassword() {
-  const pw  = document.getElementById('new-pw').value;
-  const pw2 = document.getElementById('new-pw2').value;
-  if (pw.length < 8) { showToast('密碼至少需要 8 個字元', true); return; }
-  if (pw !== pw2) { showToast('兩次密碼不一致', true); return; }
-  const { data: { session } } = await db.auth.getSession();
-  if (!session) { showToast('請先透過登入頁面登入後再更改密碼', true); return; }
-  const { error } = await db.auth.updateUser({ password: pw });
-  if (error) { showToast('更改失敗：' + translateError(error.message), true); return; }
-  if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
-  showToast('密碼已更改');
-  closeThisModal('changePwModal');
+  if (window.SystemAccountActions?.openChangePassword) {
+    window.SystemAccountActions.openChangePassword();
+  }
 }
 </script>
 </body>
