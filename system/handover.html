@@ -1012,8 +1012,9 @@ async function fetchEqStatus() {
   const shift = document.getElementById('hShift').value;
   if (!date || !shift) return;
   const { from, to } = shiftRange(date, shift);
-  const { data } = await db.from('inspection_records')
+  const { data, error } = await db.from('inspection_records')
     .select('run_status,abnormal_note,equipment(name)').gte('inspect_time',from).lte('inspect_time',to);
+  if (error) { showToast('設備巡檢狀態載入失敗，下方數字可能不完整：' + translateError(error.message), true); }
   const recs = data || [];
   const normal = recs.filter(r => r.run_status === 'normal').length;
   const abnRecs = recs.filter(r => r.run_status === 'abnormal');

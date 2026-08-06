@@ -274,7 +274,8 @@ async function hydrateOperatorDepartment(){
   if(explicit){me_.departmentName=explicit;sessionStorage.setItem('user_department',explicit);return;}
   if(!me_?.dept_id)return;
   try{
-    const {data}=await db.from('departments').select('dept_id,name,parent_id').eq('status','active').limit(1000);
+    const {data,error}=await db.from('departments').select('dept_id,name,parent_id').eq('status','active').limit(1000);
+    if(error) console.warn('department path lookup failed',error);
     const map=Object.fromEntries((data||[]).map(d=>[d.dept_id,d]));
     const path=[];let cur=map[me_.dept_id],guard=0;
     while(cur&&guard++<8){path.unshift(cur.name);cur=cur.parent_id?map[cur.parent_id]:null;}
@@ -289,7 +290,7 @@ let reqs=[],orders=[],ordersByReq={},equip=[],locs=[],techs=[],currentTab='pendi
 
 async function init(){
   try{const {data:{session}}=await db.auth.getSession();
-    if(session){const {data}=await db.from('users').select('*').eq('auth_id',session.user.id).single();if(data){
+    if(session){const {data,error}=await db.from('users').select('*').eq('auth_id',session.user.id).single();if(error)console.warn('users lookup by auth_id failed',error);if(data){
       me_={...me_,...data,name:cleanOperatorName(data.name||me_.name)};
       sessionStorage.setItem('user_name',me_.name);
       if(me_.username) sessionStorage.setItem('user_username',me_.username);
@@ -314,19 +315,23 @@ async function init(){
 }
 
 async function loadData(){
-  const {data:r}=await db.from('repair_requests').select('*,equipment(name,category,qr_code)').eq('hidden',false).order('created_at',{ascending:false}).limit(500);
+  const {data:r,error:rErr}=await db.from('repair_requests').select('*,equipment(name,category,qr_code)').eq('hidden',false).order('created_at',{ascending:false}).limit(500);
   reqs=r||[];
   buildReqNoMap();
-  const {data:o}=await db.from('maintenance_orders').select('*,repair_requests!inner(*,equipment(name,category,qr_code)),users:assignee_id(name)').order('created_at',{ascending:false}).limit(500);
+  const {data:o,error:oErr}=await db.from('maintenance_orders').select('*,repair_requests!inner(*,equipment(name,category,qr_code)),users:assignee_id(name)').order('created_at',{ascending:false}).limit(500);
   orders=o||[];
   ordersByReq={};
   orders.forEach(ord=>{ if(!ordersByReq[ord.request_id]) ordersByReq[ord.request_id]=ord; });
-  const [{data:e},{data:l},{data:u}]=await Promise.all([
+  const [{data:e,error:eErr},{data:l,error:lErr},{data:u,error:uErr}]=await Promise.all([
     db.from('equipment').select('equipment_id,name,qr_code,category,location').eq('status','active').order('name'),
     db.from('locations').select('location_id,floor,area,detail,markets(name)').eq('status','active').limit(2000),
     db.from('users').select('user_id,name,role,rbac_role').eq('status','active')
   ]);
   equip=e||[]; locs=l||[]; techs=(u||[]).filter(canAssign);
+  if(rErr||oErr||eErr||lErr||uErr){
+    toast('部分資料載入失敗，清單可能不完整，請重新整理頁面',true);
+    console.warn('dispatch.html loadData partial failure',{rErr,oErr,eErr,lErr,uErr});
+  }
 }
 
 function buildReqNoMap(){
@@ -605,11 +610,12 @@ async function openPendingDetail(id){
   document.getElementById('d-badge').outerHTML=`<span class="badge" id="d-badge">${(ST[curReq.status]||['',''])[0]}</span>`;
   const body=document.getElementById('d-body');
   body.innerHTML='<div class="empty">載入中…</div>'; show('m-detail');
-  const [{data:logs},{data:atts}]=await Promise.all([
+  const [{data:logs,error:logsErr},{data:atts,error:attsErr}]=await Promise.all([
     db.from('case_status_log').select('*').eq('request_id',id).order('created_at',{ascending:true}),
     db.from('repair_attachments').select('*').eq('request_id',id)
   ]);
   if(seq!==detailRequestSeq)return;
+  if(logsErr||attsErr) console.warn('case detail logs/attachments query failed',{logsErr,attsErr});
   body.innerHTML=`
     <div class="d-info">
       <div><span class="k">報修單號：</span><span class="v">${escHtml(displayReqNo(curReq))}</span></div>
@@ -718,9 +724,10 @@ async function openOrderDetail(ordId){
   document.getElementById('d-badge').outerHTML=`<span class="badge" id="d-badge">${(ST[o.status]||['',''])[0]}</span>`;
   const body=document.getElementById('d-body');
   body.innerHTML='<div class="empty">載入中…</div>'; show('m-detail');
-  const [{data:logs}]=await Promise.all([
+  const [{data:logs,error:logsErr}]=await Promise.all([
     db.from('case_status_log').select('*').eq('order_id',ordId).order('created_at',{ascending:true})
   ]);
+  if(logsErr) console.warn('order detail logs query failed',logsErr);
   if(seq!==detailRequestSeq)return;
   const tech=o.users?.name||'';
   const vendor=o.vendor||'';

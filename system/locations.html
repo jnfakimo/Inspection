@@ -348,11 +348,13 @@ async function loadMarkets(){
   }
 }
 async function loadLocations(){
-  const {data}=await db.from('locations').select('*').eq('status','active').order('floor_order').order('area_order').order('detail_order');
+  const {data,error}=await db.from('locations').select('*').eq('status','active').order('floor_order').order('area_order').order('detail_order');
+  if(error){toast('位置資料載入失敗：'+translateError(error.message),true);allLocs=[];return;}
   allLocs=data||[];
 }
 async function loadDepts(){
-  const {data}=await db.from('departments').select('*').eq('status','active').order('sort_order');
+  const {data,error}=await db.from('departments').select('*').eq('status','active').order('sort_order');
+  if(error){toast('部門資料載入失敗：'+translateError(error.message),true);allDepts=[];return;}
   allDepts=data||[];
 }
 
