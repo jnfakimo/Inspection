@@ -66,7 +66,21 @@ const EV={new_repair:'新報修',dispatch:'派工',return:'退件',overdue:'逾�
 let me_={user_id:null};
 function fmt(t){if(!t)return'';const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
 async function init(){
-  try{const {data:{session}}=await db.auth.getSession();if(session){const {data}=await db.from('users').select('user_id,name').eq('auth_id',session.user.id).single();if(data)me_=data;}}catch(e){}
+  let identityFailed=false;
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    if(session){
+      const {data,error}=await db.from('users').select('user_id,name').eq('auth_id',session.user.id).single();
+      if(error){identityFailed=true;console.warn('users lookup by auth_id failed',error);}
+      else if(data)me_=data;
+    }
+  }catch(e){identityFailed=true;}
+  // 查不到自己的身分時絕不能落到 load()：load() 只在 me_.user_id 有值時才會
+  // 依收件人篩選，身分未知時等於會顯示「所有人」的通知，是越權讀取風險。
+  if(identityFailed){
+    document.getElementById('list').innerHTML='<div class="empty" style="color:var(--red)">無法確認登入身分，請重新整理頁面或重新登入。</div>';
+    return;
+  }
   load();
 }
 async function load(){
