@@ -264,7 +264,8 @@ async function buildSources(){
   });
 
   try{
-    const {data}=await db.from('floor_models').select('*');
+    const {data,error}=await db.from('floor_models').select('*');
+    if(error) console.warn('floor_models query failed, using static plans only',error);
     if(!mobileModel&&data&&data.length){
       data.forEach(m=>{
         if(!m.image_path) return;

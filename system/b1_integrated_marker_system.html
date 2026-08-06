@@ -379,7 +379,8 @@ const viewer = OpenSeadragon({
 
 async function buildSources(){
   try{
-    const {data}=await db.from('floor_models').select('*');
+    const {data,error}=await db.from('floor_models').select('*');
+    if(error) console.warn('floor_models query failed, using static plans only',error);
     if(data&&data.length){
       data.forEach(m=>{
         if(!m.image_path) return;
@@ -434,6 +435,10 @@ async function loadData(){
     db.from('floor_spaces').select('space_id,floor,space_name').eq('market_id','market1').eq('status','active').limit(5000),
     db.from('repair_requests').select('request_id,req_no,fault_type,fault_desc,status').order('created_at',{ascending:false}).limit(500)
   ]);
+  if(mk.error||eq.error||sp.error||rp.error){
+    console.warn('loadData partial failure',{markers:mk.error,equipment:eq.error,spaces:sp.error,repairs:rp.error});
+    alert('部分資料載入失敗，畫面可能不完整，請重新整理頁面。');
+  }
   markers=mk.data||[]; equip=eq.data||[]; spaces=sp.data||[]; repairs=(rp.data||[]).filter(r=>!['done','closed','completed','已完成','已結案'].includes(r.status));
   fillLinkSelects();
   drawMarkers(); renderList();
