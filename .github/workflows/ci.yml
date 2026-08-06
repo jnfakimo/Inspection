@@ -51,6 +51,20 @@ jobs:
         run: |
           npx eslint . --ext .js,.html || true
 
+      # login.html contains the production authentication flow as inline JS.
+      # Compile every inline script so a missing brace cannot reach GitHub Pages.
+      - name: Validate login JavaScript syntax
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const vm = require('vm');
+          const html = fs.readFileSync('system/login.html', 'utf8');
+          const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+          if (!scripts.length) throw new Error('No inline login script found');
+          scripts.forEach((match, index) => new vm.Script(match[1], { filename: `system/login.html:inline-${index + 1}` }));
+          console.log(`Validated ${scripts.length} inline login script(s)`);
+          NODE
+
       # Check for broken links and images
       - name: Check broken links and images
         run: |

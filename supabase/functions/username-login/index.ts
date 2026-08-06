@@ -1,6 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 
-const cors={"Access-Control-Allow-Origin":"https://jnfakimo.github.io","Access-Control-Allow-Headers":"apikey, content-type, x-client-info"};
+// supabase-js 的 functions.invoke() 會送出 Authorization；若預檢回應未明確
+// 允許此標頭，瀏覽器會在 POST 前直接擋下請求，導致所有帳號登入失敗。
+const cors={
+  "Access-Control-Allow-Origin":"https://jnfakimo.github.io",
+  "Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods":"POST, OPTIONS",
+  "Vary":"Origin"
+};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json","Cache-Control":"no-store"}});
 
 Deno.serve(async(req)=>{

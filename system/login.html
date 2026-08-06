@@ -277,24 +277,18 @@ async function doLogin() {
   btn.disabled = true; btn.textContent = '登入中…';
 
   let sessionUser = null;
-  // If identifier looks like an email, use direct auth sign-in
+  // Email 可直接交給 Supabase Auth；一般帳號由 Edge Function 在伺服器端
+  // 解析 Email，避免重新開放匿名 Email 查詢 RPC。
   if (identifier.includes('@')) {
     const { data, error } = await db.auth.signInWithPassword({ email: identifier, password });
-    if (error || !data.session) {
+    if (error || !data.session || !data.user) {
       err.textContent = error?.message ? translateError(error.message) : '帳號或密碼錯誤';
       btn.disabled = false; btn.textContent = '登入';
       return;
     }
     sessionUser = data.user;
-    const { access_token, refresh_token } = data.session;
-    const setResult = await db.auth.setSession({ access_token, refresh_token });
-    if (setResult.error) {
-      err.textContent = '登入狀態建立失敗，請稍後重試';
-      btn.disabled = false; btn.textContent = '登入';
-      return;
-    }
   } else {
-    // Use username-login edge function
+    // 未登入狀態不可查詢 users.email；改由伺服器端完成帳號驗證。
     const { data: loginResult, error: loginError } = await db.functions.invoke('username-login', { body: { username: identifier, password } });
     if (loginError || !loginResult?.access_token || !loginResult?.refresh_token) {
       err.textContent = loginResult?.message || '帳號或密碼錯誤';
@@ -308,11 +302,14 @@ async function doLogin() {
       return;
     }
     sessionUser = setResult.data?.user;
-    if (setResult.error) {
-      err.textContent = '登入狀態建立失敗，請稍後重試';
-      btn.disabled = false; btn.textContent = '登入';
-      return;
-    }
+  }
+
+  if (!sessionUser) {
+    err.textContent = '登入狀態建立失敗，請稍後重試';
+    btn.disabled = false; btn.textContent = '登入';
+    return;
+  }
+
   const { data: profile } = await db.from('users').select('user_id,username,role,rbac_role,name,phone,permissions,dept_id,department').eq('auth_id', sessionUser?.id).single();
   if (!profile) {
     err.textContent = '找不到使用者資料，請聯絡管理員';
