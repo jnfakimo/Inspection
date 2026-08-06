@@ -203,6 +203,10 @@ async function loadStaff(){
     db.from('departments').select('dept_id,name').eq('status','active'),
     db.from('system_settings').select('value').eq('key','patrol_shift_staff').maybeSingle()
   ]);
+  if(u.error||d.error||setting.error){
+    toast('人員/部門資料載入失敗，排班清單可能不完整，請重新整理頁面',true);
+    console.warn('loadStaff partial failure',{userErr:u.error,deptErr:d.error,settingErr:setting.error});
+  }
   (d.data||[]).forEach(x=>deptNames[x.dept_id]=x.name);
   staffRows=(u.data||[]).filter(x=>String(x.department||deptNames[x.dept_id]||'').includes('駐衛'));
   try{staffAssignments=JSON.parse(setting.data?.value||'null')||{templates:{},dates:{},workTimes:{templates:{},dates:{}}};}catch(e){staffAssignments={templates:{},dates:{},workTimes:{templates:{},dates:{}}};}
