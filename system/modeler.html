@@ -2,16 +2,16 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>3D建模系統 — 臺北農產巡檢系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js"
-        onerror="var s=document.createElement('script');s.src='https://unpkg.com/dxf-parser@1.1.2/dist/dxf-parser.js';document.head.appendChild(s);"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/dxf-parser@1.1.2/dist/dxf-parser.js" integrity="sha384-bFhNbiyxHEo2RbidLz4oUgawuuHSALUTKp85+l9Vg+WFNX2gMnROUY6I/e8MWhuD" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--pink:#ff5ea0;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;
@@ -63,7 +63,7 @@ select:focus,input:focus{border-color:var(--cyan)}
 .hintbox{font-size:.68rem;color:var(--text-dim);line-height:1.7;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -312,7 +312,7 @@ async function loadSaved(){
   if(error){box.innerHTML=`<div class="stat" style="color:var(--amber)">尚未建立 floor_models 表<br><small>請先執行 system/sql/floor_models.sql</small></div>`;return;}
   if(!data?.length){box.innerHTML='<div class="stat">尚無樓層模型</div>';return;}
   box.innerHTML=data.map(d=>{
-    const dt=new Date(d.updated_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    const dt=SystemDate.formatDateTime(d.updated_at);
     return `<div class="saved-item"><span class="dot"></span><span class="fl">${escHtml(d.floor_id)}</span><span>${escHtml(d.name||'')}</span><span class="dt">${dt}</span></div>`;
   }).join('');
 }

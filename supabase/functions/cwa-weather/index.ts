@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 
 const CWA_BASE = "https://opendata.cwa.gov.tw/api/v1/rest/datastore";
 const CWA_KEY = Deno.env.get("CWA_API_KEY") || "";

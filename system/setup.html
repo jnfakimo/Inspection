@@ -2,12 +2,11 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>系統初始化</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -46,139 +45,46 @@ h1{font-size:1.3rem;font-weight:700;color:#f8fafc;margin-bottom:6px}
 :root[data-theme="light"] .result.fail{background:#fee2e2;border-color:#dc2626;color:#991b1b}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
 <div class="card">
   <h1>🔧 系統初始化</h1>
-  <div class="sub">自動建立管理者帳號，請稍候…</div>
+  <div class="sub">正式環境已停用瀏覽器初始化，避免未授權建立管理者或基礎資料。</div>
 
   <div id="steps">
     <div class="step" id="s1">
       <div class="step-icon pending" id="i1">1</div>
       <div class="step-text">
-        <div class="step-label">連線 Supabase</div>
-        <div class="step-detail" id="d1">等待中…</div>
+        <div class="step-label">瀏覽器初始化</div>
+        <div class="step-detail" id="d1">已停用</div>
       </div>
     </div>
     <div class="step" id="s2">
       <div class="step-icon pending" id="i2">2</div>
       <div class="step-text">
-        <div class="step-label">確認資料表存在</div>
-        <div class="step-detail" id="d2">等待中…</div>
+        <div class="step-label">資料庫建置</div>
+        <div class="step-detail" id="d2">僅能由受控的 migration 流程執行</div>
       </div>
     </div>
     <div class="step" id="s3">
       <div class="step-icon pending" id="i3">3</div>
       <div class="step-text">
-        <div class="step-label">建立管理者帳號</div>
-        <div class="step-detail" id="d3">等待中…</div>
+        <div class="step-label">管理者帳號</div>
+        <div class="step-detail" id="d3">請由 Supabase Auth 與核准的管理流程建立</div>
       </div>
     </div>
     <div class="step" id="s4">
       <div class="step-icon pending" id="i4">4</div>
       <div class="step-text">
-        <div class="step-label">建立初始巡檢週期</div>
-        <div class="step-detail" id="d4">等待中…</div>
+        <div class="step-label">正式資料保護</div>
+        <div class="step-detail" id="d4">本頁不會寫入、清空或重設任何資料</div>
       </div>
     </div>
   </div>
 
-  <div class="result" id="resultBox"></div>
+  <div class="result ok" id="resultBox">✓ 安全模式已啟用。<br><a class="btn" href="login.html">返回登入 →</a></div>
 </div>
-
-<script>
-const ADMIN_AUTH_ID = 'eb771a87-aa4d-4066-b23d-9b810a5c00bd';
-
-const db = createDb();
-function translateError(msg) {
-  if (!msg) return '未知錯誤';
-  if (msg.includes('duplicate key value')) return '資料重複，請確認是否已存在';
-  if (msg.includes('null value in column')) return '必填欄位不可空白';
-  if (msg.includes('violates row-level security')) return '無操作權限';
-  if (msg.includes('permission denied')) return '無操作權限';
-  if (msg.includes('relation') && msg.includes('does not exist')) return '資料表不存在，請確認資料庫設定';
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) return '網路連線失敗，請稍後再試';
-  return '操作失敗，請稍後再試或聯絡系統管理員';
-}
-
-function setStep(n, state, detail) {
-  const icon = document.getElementById('i' + n);
-  const det  = document.getElementById('d' + n);
-  icon.className = 'step-icon ' + state;
-  icon.textContent = state === 'ok' ? '✓' : state === 'fail' ? '✗' : state === 'running' ? '…' : n;
-  if (detail) det.textContent = detail;
-}
-
-function showResult(ok, msg, link) {
-  const box = document.getElementById('resultBox');
-  box.className = 'result ' + (ok ? 'ok' : 'fail');
-  box.innerHTML = msg + (link ? `<br><a class="btn" href="${link}">前往登入 →</a>` : '');
-}
-
-async function run() {
-  // Step 1: Connect
-  setStep(1, 'running', '連線中…');
-  try {
-    const { error } = await db.from('users').select('user_id', { count: 'exact', head: true });
-    if (error && error.code === '42P01') {
-      setStep(1, 'fail', '連線成功');
-      setStep(2, 'fail', '資料表不存在，請先在 SQL Editor 執行 schema.sql');
-      showResult(false, '❌ 請先在 Supabase SQL Editor 執行 system/sql/schema.sql，再重新開啟此頁面。');
-      return;
-    }
-    setStep(1, 'ok', '連線成功');
-  } catch(e) {
-    setStep(1, 'fail', '連線失敗：' + translateError(e.message));
-    showResult(false, '❌ 無法連線 Supabase，請確認網路連線。');
-    return;
-  }
-
-  // Step 2: Check table
-  setStep(2, 'running', '確認中…');
-  const { data: existing } = await db.from('users').select('user_id').eq('auth_id', ADMIN_AUTH_ID);
-  if (existing && existing.length > 0) {
-    setStep(2, 'ok', '管理者帳號已存在');
-    setStep(3, 'ok', '跳過（已存在）');
-    setStep(4, 'ok', '跳過');
-    showResult(true, '✓ 系統已初始化完成，管理者帳號存在。', 'login.html');
-    return;
-  }
-  setStep(2, 'ok', '資料表正常');
-
-  // Step 3: Insert admin user
-  setStep(3, 'running', '建立中…');
-  const { error: insErr } = await db.from('users').insert({
-    auth_id: ADMIN_AUTH_ID,
-    name: '系統管理者',
-    phone: '',
-    department: '資訊部',
-    role: 'admin',
-    status: 'active',
-  });
-  if (insErr) {
-    setStep(3, 'fail', '失敗：' + translateError(insErr.message));
-    showResult(false, '❌ 建立管理者失敗：' + translateError(insErr.message) + '<br>請確認 schema.sql 已執行，且 RLS policy 已開啟。');
-    return;
-  }
-  setStep(3, 'ok', '管理者帳號建立成功');
-
-  // Step 4: Ensure cycle exists
-  setStep(4, 'running', '建立中…');
-  const { data: cycles } = await db.from('inspection_cycles').select('cycle_id').is('ended_at', null).limit(1);
-  if (!cycles || cycles.length === 0) {
-    await db.from('inspection_cycles').insert({ cycle_type: 'daily', started_at: new Date().toISOString() });
-  }
-  setStep(4, 'ok', '巡檢週期就緒');
-
-  showResult(true,
-    '✓ 初始化完成！管理者帳號已建立，現在可以登入後台。',
-    'login.html'
-  );
-}
-
-run();
-</script>
 </body>
 </html>

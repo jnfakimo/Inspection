@@ -1,7 +1,7 @@
 project_id = "qztffronusdhgxhjjubt"
 
 [functions.ipcam-proxy]
-verify_jwt = false
+verify_jwt = true
 
 [functions.cwa-weather]
 verify_jwt = false
@@ -9,4 +9,7 @@ verify_jwt = false
 # LINE itself cannot send a Supabase JWT. The function verifies LINE's HMAC
 # signature and separately authenticates internal/test requests.
 [functions.line-notify]
+verify_jwt = false
+
+[functions.username-login]
 verify_jwt = false

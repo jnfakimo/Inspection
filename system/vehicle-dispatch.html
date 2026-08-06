@@ -2,14 +2,15 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" integrity="sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -34,7 +35,7 @@
 @media(max-width:1000px){.flow{grid-template-columns:repeat(2,1fr)}.kpis{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:repeat(2,1fr)}.summary-grid{grid-template-columns:repeat(2,1fr)}.report-filters{grid-template-columns:repeat(2,1fr)}.report-kpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:720px){.content{padding:10px}.hero{align-items:flex-start}.identity{display:none}.flow{grid-template-columns:1fr 1fr}.flow-step{min-height:54px;padding:8px}.flow-step span{display:none}.kpis{gap:6px}.toolbar .grow{flex-basis:100%;order:-1}.form-grid,.summary-grid,.driver-time-grid{grid-template-columns:1fr}.driver-time-grid .driver-passengers,.driver-time-grid .driver-departure,.driver-time-grid .driver-return{grid-column:auto;grid-row:auto}.field.span2,.field.wide{grid-column:auto}.modal-bg{padding:7px}.modal{max-height:calc(100vh - 14px);overflow:auto}table{font-size:.68rem}th,td{padding:8px 7px}.hide-mobile{display:none}.route{max-width:180px}}
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 </head>
 <body>
 <nav class="navbar">
@@ -195,9 +196,9 @@ async function auditScheduleConflict(notify=false){
   catch(e){setMsg('派車時段稽核失敗，請稍後重試');return {audit_error:true};}
 }
 function attachmentsFor(requestId,stages){const accepted=Array.isArray(stages)?stages:[stages];return state.attachments.filter(x=>x.request_id===requestId&&(!stages||accepted.includes(x.stage)));}
-function attachmentUrl(path){return db.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;}
+function attachmentUrl(path){return state.attachments.find(x=>x.file_path===path)?.signed_url||'';}
 function photoGallery(requestId,stages,title='已上傳照片'){
-  const photos=attachmentsFor(requestId,stages);if(!photos.length)return '';
+  const photos=attachmentsFor(requestId,stages).filter(x=>x.signed_url);if(!photos.length)return '';
   return `<section class="form-section"><h3>${esc(title)} <span class="tag">${photos.length} 張</span></h3><div class="form-grid"><div class="field wide"><div class="photo-grid">${photos.map(x=>`<a class="photo-card" href="${esc(attachmentUrl(x.file_path))}" target="_blank" rel="noopener"><img src="${esc(attachmentUrl(x.file_path))}" alt="${esc(x.file_name)}" loading="lazy"><span title="${esc(x.file_name)}">${esc(x.file_name)}</span></a>`).join('')}</div></div></div></section>`;
 }
 async function uploadPhotos(requestId,files,stage){
@@ -209,9 +210,9 @@ async function uploadPhotos(requestId,files,stage){
     const token=globalThis.crypto?.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const path=`${requestId}/${stage}/${Date.now()}-${token}.${ext}`;
     const uploaded=await db.storage.from(PHOTO_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
-    if(uploaded.error){errors.push(`${file.name}：${uploaded.error.message}`);continue;}
+    if(uploaded.error){errors.push(`${file.name}：${safeDbError(uploaded.error)}`);continue;}
     const saved=await db.from('vehicle_dispatch_attachments').insert({request_id:requestId,stage,file_path:path,file_name:file.name,mime_type:file.type,file_size:file.size,uploaded_by:currentUser.user_id,uploaded_by_name:currentUser.name});
-    if(saved.error)errors.push(`${file.name}：${saved.error.message}`);
+    if(saved.error){await db.storage.from(PHOTO_BUCKET).remove([path]);errors.push(`${file.name}：${safeDbError(saved.error)}`);}
   }
   return errors;
 }
@@ -268,13 +269,20 @@ async function init(){
   byId('reportBtn').hidden=!canReport();
   buildStatusFilter();
   await loadAll();
-  db.channel('vehicle-dispatch-live').on('postgres_changes',{event:'*',schema:'public',table:'vehicle_dispatch_requests'},()=>loadAll(true)).subscribe();
+  db.channel('vehicle-dispatch-live').on('postgres_changes',{event:'*',schema:'public',table:'vehicle_dispatch_requests'},scheduleLoadAll).subscribe();
 }
 
 function showFatal(message){schemaReady=false;const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML=esc(message);byId('requestRows').innerHTML=`<tr><td colspan="8" class="empty">${esc(message)}</td></tr>`;}
 function showSchemaSetup(){const b=byId('setupBanner');b.className='setup-banner show';b.innerHTML='派車模組資料結構正在更新，請稍後重新整理；若持續發生，請通知系統管理員。請勿重建或清除既有資料。';}
 
-async function loadAll(silent=false){
+let loadAllPromise=null,liveReloadTimer=null;
+function scheduleLoadAll(){clearTimeout(liveReloadTimer);liveReloadTimer=setTimeout(()=>loadAll(true),500);}
+function loadAll(silent=false){
+  if(loadAllPromise)return loadAllPromise;
+  loadAllPromise=loadAllInternal(silent).finally(()=>{loadAllPromise=null;});
+  return loadAllPromise;
+}
+async function loadAllInternal(silent=false){
   if(!currentUser)return;
   if(!silent)byId('syncText').textContent='讀取資料中…';
   const [requests,vehicles,users,departments,logs,attachments,managers,drivers]=await Promise.all([
@@ -282,13 +290,18 @@ async function loadAll(silent=false){
     db.from('official_vehicles').select('*').order('plate_no').limit(500),
     db.from('users').select('user_id,name,dept_id,department,rbac_role,role,status').eq('status','active').order('name').limit(3000),
     db.from('departments').select('dept_id,parent_id,name,status').eq('status','active').order('sort_order').limit(5000),
-    db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(10000),
-    db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(10000),
+    db.from('vehicle_dispatch_logs').select('*').order('created_at',{ascending:true}).limit(5000),
+    db.from('vehicle_dispatch_attachments').select('*').order('created_at',{ascending:true}).limit(5000),
     db.from('vehicle_dispatch_managers').select('user_id,active').eq('active',true).limit(3000),
     db.from('vehicle_dispatch_drivers').select('user_id,active').eq('active',true).limit(3000)
   ]);
   const firstError=[requests,vehicles,users,departments,logs,attachments,managers,drivers].find(x=>x.error)?.error;
-  if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+firstError.message);return;}
+  if(firstError){if(schemaError(firstError)){showSchemaSetup();return;}showFatal('資料讀取失敗：'+safeDbError(firstError));return;}
+  if(attachments.data?.length){
+    const {data:signed}=await db.storage.from(PHOTO_BUCKET).createSignedUrls(attachments.data.map(x=>x.file_path),3600);
+    const signedMap=new Map((signed||[]).map(x=>[x.path,x.signedUrl]));
+    attachments.data.forEach(x=>x.signed_url=signedMap.get(x.file_path)||'');
+  }
   schemaReady=true;byId('setupBanner').className='setup-banner';
   state={requests:requests.data||[],vehicles:vehicles.data||[],users:users.data||[],departments:departments.data||[],logs:logs.data||[],attachments:attachments.data||[],managers:managers.data||[],drivers:drivers.data||[]};
   const resolvedDepartment=departmentForUser(currentUser);if(resolvedDepartment!=='未設定單位'){currentUser.department=resolvedDepartment;if(window.SystemUserProfile?.save)window.SystemUserProfile.save(currentUser);}
@@ -644,7 +657,7 @@ function editVehicle(id){const v=state.vehicles.find(x=>x.vehicle_id===id);if(!v
 async function saveVehicle(){
   if(!isManager())return;const plate=val('vPlate').toUpperCase(),seats=Number(val('vSeats')),odometer=Number(val('vOdometer'));if(!plate||!Number.isInteger(seats)||seats<1||!Number.isFinite(odometer)||odometer<0){byId('vehicleMsg').textContent='請正確填寫車牌、座位數及目前里程';return;}
   const payload={plate_no:plate,vehicle_name:val('vName')||null,brand:val('vBrand')||null,model:val('vModel')||null,seats,current_odometer:odometer,status:val('vStatus'),note:val('vNote')||null};if(!vehicleEditId)payload.created_by=currentUser.user_id;
-  const result=vehicleEditId?await db.from('official_vehicles').update(payload).eq('vehicle_id',vehicleEditId):await db.from('official_vehicles').insert(payload);if(result.error){byId('vehicleMsg').textContent=result.error.code==='23505'?'此車牌已存在':result.error.message;return;}await loadAll(true);renderVehicleList();resetVehicleForm();toast('公務車資料已儲存');
+  const result=vehicleEditId?await db.from('official_vehicles').update(payload).eq('vehicle_id',vehicleEditId):await db.from('official_vehicles').insert(payload);if(result.error){byId('vehicleMsg').textContent=result.error.code==='23505'?'此車牌已存在':safeDbError(result.error);return;}await loadAll(true);renderVehicleList();resetVehicleForm();toast('公務車資料已儲存');
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-bg.show').forEach(x=>x.classList.remove('show'));});

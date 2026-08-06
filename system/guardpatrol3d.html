@@ -2,8 +2,9 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -133,7 +134,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
   .fbtn{font-size:11px;padding:8px 11px}
 }
 </style>
-<link rel="stylesheet" href="light-mode-fix.css?v=20260713-4">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body class="controls-hidden">
@@ -211,10 +212,10 @@ body.controls-hidden #panelToggle{display:inline-flex}
   </div>
 </div>
 
-<script src="vendor/three-r128.min.js?v=128" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'"></script>
-<script src="model-theme.js?v=20260718-2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/three-r128.min.js?v=128"></script>
+<script src="model-theme.js?v=20260806-1"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <script src="patrolstatus.js"></script>
 <script>
 const db = createDb();

@@ -28,6 +28,7 @@ function auditHtml(file){
   if(!/<meta\s+charset=["']?utf-8/i.test(html))add('error','html-charset',file,'缺少 UTF-8 charset。');
   if(!/<meta\s+name=["']viewport["']/i.test(html))add('error','html-viewport',file,'缺少 responsive viewport。');
   if(!/<title>[^<]+<\/title>/i.test(html))add('error','html-title',file,'缺少頁面標題。');
+  if(!/http-equiv=["']Content-Security-Policy["']/i.test(html))add('error','content-security-policy',file,'缺少 Content Security Policy。');
 
   const visibleMarkup=stripScriptsAndStyles(html);
   const ids=[...visibleMarkup.matchAll(/\sid=["']([^"']+)["']/gi)].map(m=>m[1]);
@@ -51,23 +52,45 @@ function auditHtml(file){
 
   for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
     const attrs=match[1],code=match[2].trim();
+    const external=attrs.match(/\bsrc=["'](https:\/\/[^"']+)["']/i);
+    if(external&&!/\bintegrity=["']sha(?:256|384|512)-/i.test(attrs))add('error','script-integrity',file,`外部程式缺少 SRI：${external[1]}`);
     if(!code||/\bsrc\s*=/i.test(attrs)||/\btype=["']module["']/i.test(attrs))continue;
     try{new vm.Script(code,{filename:path.relative(root,file)});}catch(error){add('error','inline-js-syntax',file,String(error.message).split('\n')[0]);}
   }
+  for(const match of html.matchAll(/<link\b([^>]*\brel=["']stylesheet["'][^>]*)>/gi)){
+    const external=match[1].match(/\bhref=["'](https:\/\/(?!fonts\.googleapis\.com)[^"']+)["']/i);
+    if(external&&!/\bintegrity=["']sha(?:256|384|512)-/i.test(match[1]))add('error','stylesheet-integrity',file,`外部樣式缺少 SRI：${external[1]}`);
+  }
 
   if(/https?:\/\/api\.ipify\.org/i.test(html))add('error','third-party-ip',file,'前端將使用者 IP 傳送至未受控第三方。');
+  if(/@supabase\/supabase-js@2(?:["'\/])/i.test(html))add('error','floating-supabase-version',file,'Supabase 套件不可使用浮動 @2 版本。');
+  if(/\.storage\.from\(["'](?:repair-files|handover-attachments|vehicle-dispatch-files)["']\)\.getPublicUrl/i.test(html))add('error','public-business-file',file,'業務附件不可產生永久公開網址。');
+  if(/new Date\(\)\.toISOString\(\)\.split\(["']T["']\)/.test(html))add('error','utc-date-only',file,'日期欄位不可用 UTC 截日，請使用 Asia/Taipei。');
+  if(/\bzoom\s*:\s*\d+/i.test(stripScriptsAndStyles(html)))add('error','css-zoom',file,'頁面不可用 CSS zoom 縮放整體介面。');
   for(const match of html.matchAll(/http:\/\/([A-Za-z0-9.-]+(?::\d+)?)/gi)){
     if(!/^(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(match[1]))add('warning','mixed-content',file,`非本機 HTTP 資源：${match[0]}`);
   }
 }
 
+function auditCss(file){
+  const css=fs.readFileSync(file,'utf8');
+  for(const match of css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)){
+    const raw=match[1];
+    if(/^(?:data:|https?:|\/\/)/i.test(raw))continue;
+    const target=path.resolve(path.dirname(file),decodeURIComponent(raw.split(/[?#]/,1)[0]));
+    if(!fs.existsSync(target))add('error','missing-css-asset',file,`找不到 CSS 資源：${raw}`);
+  }
+}
+
 const htmlFiles=walk(systemDir,file=>file.endsWith('.html'));
 htmlFiles.forEach(auditHtml);
+walk(systemDir,file=>file.endsWith('.css')).forEach(auditCss);
 
 const sourceFiles=walk(root,file=>/\.(?:html|js|mjs|ts|sql|ya?ml|toml|json)$/i.test(file));
 for(const file of sourceFiles){
   const text=fs.readFileSync(file,'utf8');
   if(/SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*["']eyJ/i.test(text))add('error','service-key-literal',file,'偵測到硬編碼 service_role JWT。');
+  if(/@supabase\/supabase-js@2(?:["'/])/i.test(text))add('error','floating-supabase-version',file,'Supabase 套件不可使用浮動 @2 版本。');
   if(/-----BEGIN (?:RSA |EC |)PRIVATE KEY-----\s*\r?\n[A-Za-z0-9+/=\r\n]{100,}\r?\n-----END (?:RSA |EC |)PRIVATE KEY-----/.test(text))add('error','private-key',file,'偵測到私鑰內容。');
 }
 

@@ -2,18 +2,19 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
-<script src="floor-utils.js"></script>
+<script src="theme.js?v=20260806-1"></script>
+<script src="floor-utils.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>戰情儀表板 — 報修派工管理系統</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack.min.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack-all.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack.min.css" integrity="sha384-reWJy/9PhZqtHjyk55jFghoSgDImjVRCwDrYj1iJqjDLFQH+NCdw/fg9JdN56NzQ" crossorigin="anonymous">
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack-all.js" integrity="sha384-a8wc/o+bO4GyanNlix0eyaj0hS0pbjAaEFSfih5bcg/tJBznHTlj5/FARvr2vq87" crossorigin="anonymous"></script>
 <script src="dashboard-layout.js?v=20260804-1"></script>
 <script src="patrolstatus.js"></script>
 <style>
@@ -197,7 +198,7 @@ a{color:inherit;text-decoration:none}
   .weather-modal{padding:0}.weather-dialog{height:100vh;border-radius:0;border-width:0}.weather-dialog-body{display:block;overflow:auto}.weather-full-map{height:55vh;min-height:390px;border-right:0;border-bottom:1px solid var(--border)}.weather-detail{overflow:visible}.weather-controls{grid-template-columns:1fr}
 }
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -731,9 +732,10 @@ async function drawTrend(){
   const now=new Date(); const labels=[],keys=[];
   for(let i=11;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);labels.push((d.getMonth()+1)+'\u6708');keys.push(ym(d));}
   const start=keys[0]+'-01';
-  const {data,error}=await db.from('repair_requests').select('created_at,hidden').gte('created_at',start+'T00:00:00+08:00').limit(20000);
-  if(error) console.warn('drawTrend repair_requests query failed',error);
-  const cnt={}; (data||[]).filter(r=>!r.hidden).forEach(r=>{const k=taipeiDateStr(r.created_at)?.slice(0,7);cnt[k]=(cnt[k]||0)+1;});
+  const end=ymd(new Date(now.getFullYear(),now.getMonth()+1,0));
+  const {data,error}=await db.rpc('repair_monthly_counts',{p_start:start,p_end:end});
+  if(error)console.warn('drawTrend repair_monthly_counts query failed',error);
+  const cnt={};if(!error)(data||[]).forEach(r=>{cnt[r.month_key]=Number(r.total)||0;});
   const vals=keys.map(k=>cnt[k]||0);
   const ctx=document.getElementById('trendChart');
   if(trendChart) trendChart.destroy();

@@ -2,18 +2,19 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>臺北農產公司 第一果菜市場 設備巡檢維修系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{overflow-x:hidden;max-width:100%}
 :root{--surface:#1e293b;--border:#334155;--text:#e2e8f0;--text-dim:#94a3b8;--cyan:#818cf8;--green:#4ade80;--red:#f87171}
 :root[data-theme="light"]{--surface:#ffffff;--border:#e2e8f0;--text:#1e293b;--text-dim:#64748b;--cyan:#4f46e5;--green:#16a34a;--red:#dc2626}
-body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column;zoom:70%}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}
 .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 16px;min-height:48px;flex-shrink:0}
 .page{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
 .card{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 25px 50px rgba(0,0,0,.5)}
@@ -32,7 +33,7 @@ input:focus{border-color:#6366f1}
 .ok{color:#4ade80;font-size:.83rem;margin-top:10px;text-align:center;min-height:20px}
 .logo{text-align:center;font-size:2.5rem;margin-bottom:16px}
 .brand-logo{display:block;width:min(100%,230px);height:auto;margin:0 auto 18px;object-fit:contain}
-.forgot-link{display:block;text-align:center;margin-top:14px;color:#6366f1;font-size:.83rem;cursor:pointer;text-decoration:underline}
+.forgot-link{display:block;width:100%;text-align:center;margin-top:14px;padding:0;border:0;background:transparent;color:#6366f1;font-size:.83rem;cursor:pointer;text-decoration:underline}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;align-items:center;justify-content:center;padding:24px}
 .overlay.show{display:flex}
 .bottom-nav{flex-shrink:0;min-height:44px;display:flex;align-items:center;justify-content:center;padding:9px 16px calc(9px + env(safe-area-inset-bottom));background:transparent;border:0;text-align:center}
@@ -57,7 +58,7 @@ input:focus{border-color:#6366f1}
 }
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -69,15 +70,15 @@ input:focus{border-color:#6366f1}
   <div class="subtitle" style="font-size:.95rem;color:#94a3b8;margin-bottom:4px">第一果菜市場 設備巡檢維修系統</div>
   <div class="subtitle">請使用帳號登入</div>
   <div class="field">
-    <label>帳號（英數字）</label>
+    <label for="username">帳號（英數字）</label>
     <input id="username" type="text" placeholder="例：tcfm_admin" autocomplete="username">
   </div>
   <div class="field">
-    <label>密碼</label>
+    <label for="password">密碼</label>
     <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
   </div>
-  <button class="btn" id="loginBtn">登入</button>
-  <a class="forgot-link" id="forgotLink">忘記密碼？</a>
+  <button type="button" class="btn" id="loginBtn">登入</button>
+  <button type="button" class="forgot-link" id="forgotLink">忘記密碼？</button>
   <div class="err" id="errMsg"></div>
 </div>
 </div>
@@ -93,11 +94,11 @@ input:focus{border-color:#6366f1}
     <h1 style="font-size:1.2rem;margin-bottom:6px">重設密碼</h1>
     <div class="subtitle" style="margin-bottom:24px">請輸入您帳號對應的 Email，系統將寄送重設連結</div>
     <div class="field">
-      <label>Email</label>
+      <label for="forgotEmail">Email</label>
       <input id="forgotEmail" type="email" placeholder="your@email.com" autocomplete="email">
     </div>
-    <button class="btn" id="forgotSendBtn">寄送重設連結</button>
-    <button class="btn btn-ghost" id="forgotBackBtn">返回登入</button>
+    <button type="button" class="btn" id="forgotSendBtn">寄送重設連結</button>
+    <button type="button" class="btn btn-ghost" id="forgotBackBtn">返回登入</button>
     <div class="err" id="forgotErr"></div>
     <div class="ok" id="forgotOk"></div>
   </div>
@@ -110,14 +111,14 @@ input:focus{border-color:#6366f1}
     <h1 style="font-size:1.2rem;margin-bottom:6px">設定新密碼</h1>
     <div class="subtitle" style="margin-bottom:24px">請輸入您的新密碼（至少 8 個字元）</div>
     <div class="field">
-      <label>新密碼</label>
+      <label for="resetPw">新密碼</label>
       <input id="resetPw" type="password" placeholder="••••••••" autocomplete="new-password">
     </div>
     <div class="field">
-      <label>確認新密碼</label>
+      <label for="resetPw2">確認新密碼</label>
       <input id="resetPw2" type="password" placeholder="••••••••" autocomplete="new-password">
     </div>
-    <button class="btn" id="resetSaveBtn">設定新密碼</button>
+    <button type="button" class="btn" id="resetSaveBtn">設定新密碼</button>
     <div class="err" id="resetErr"></div>
     <div class="ok" id="resetOk"></div>
   </div>
@@ -275,16 +276,16 @@ async function doLogin() {
   if (!username || !password) { err.textContent = '請填寫帳號與密碼'; return; }
   btn.disabled = true; btn.textContent = '登入中…';
 
-  const { data: loginEmail, error: lookupErr } = await db.rpc('login_lookup_email', { p_username: username });
-  if (lookupErr || !loginEmail) {
-    err.textContent = '找不到帳號，請確認帳號是否正確';
+  const { data: loginResult, error: loginError } = await db.functions.invoke('username-login',{body:{username,password}});
+  if (loginError || !loginResult?.access_token || !loginResult?.refresh_token) {
+    err.textContent = loginResult?.message || '帳號或密碼錯誤';
     btn.disabled = false; btn.textContent = '登入';
     return;
   }
 
-  const { data, error } = await db.auth.signInWithPassword({ email: loginEmail, password });
-  if (error) {
-    err.textContent = '密碼錯誤';
+  const {data,error}=await db.auth.setSession({access_token:loginResult.access_token,refresh_token:loginResult.refresh_token});
+  if(error||!data.user){
+    err.textContent = '登入狀態建立失敗，請稍後重試';
     btn.disabled = false; btn.textContent = '登入';
     return;
   }

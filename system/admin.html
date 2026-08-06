@@ -2,22 +2,23 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>
 if (location.hash === '#repairs') {
   document.documentElement.classList.add('maintenance-only');
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>臺北農產公司 第一果菜市場 後台管理系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" integrity="sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -663,7 +664,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 .line-toggle input:checked+.line-toggle-slider:before{transform:translateX(20px);background:var(--cyan)}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -1567,7 +1568,7 @@ const DTP=(()=>{
   return{init,getValue,setValue,_tog,_pm,_nm,_pd,_sh,_sm,_cl,_ok};
 })();
 // ─────────────────────────────────────────────────────────────────────────────
-// 別名指向共用設定（system/supabase-config.js），保留本檔其餘處對這兩個
+// 別名指向共用設定（system/supabase-config.js?v=20260806-1），保留本檔其餘處對這兩個
 // 名稱的既有引用（authClient 建立、LINE 通知 fetch 標頭）不必逐一修改。
 const SUPABASE_URL = window.SUPA_URL, SUPABASE_ANON_KEY = window.SUPA_KEY;
 const db = createDb();
@@ -2038,7 +2039,7 @@ function populateEqFilter(selectId) {
 }
 
 async function loadDashboard() {
-  const today = new Date().toISOString().split('T')[0];
+  const today = window.SystemDate?.todayISO?.() || new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
   const [{ data: orders, error: ordErr }, { count: inspCount, error: inspErr }, { count: pendingCount, error: pendErr }, { count: abnormalCount, error: abnErr }] = await Promise.all([
     db.from('maintenance_orders').select('*,equipment(name),repair_requests(reporter,fault_desc)').order('created_at',{ascending:false}).limit(10),
     db.from('inspection_records').select('*', { count: 'exact', head: true }).gte('inspect_time', today + 'T00:00:00'),
@@ -2061,11 +2062,11 @@ async function loadDashboard() {
     <div style="overflow-x:auto"><table class="data-table">
       <thead><tr><th>設備</th><th>報修人</th><th>故障說明</th><th>狀態</th><th>建立時間</th></tr></thead>
       <tbody>${(orders || []).map(o => `<tr>
-        <td>${o.equipment?.name || '—'}</td>
-        <td>${o.repair_requests?.reporter || '—'}</td>
-        <td>${(o.repair_requests?.fault_desc || '—').substring(0,40)}</td>
+        <td>${escHtml(o.equipment?.name || '—')}</td>
+        <td>${escHtml(o.repair_requests?.reporter || '—')}</td>
+        <td>${escHtml((o.repair_requests?.fault_desc || '—').substring(0,40))}</td>
         <td><span class="badge ${o.status === 'closed' ? 'badge-active' : 'badge-inactive'}">${maintenanceStatusLabel(o.status)}</span></td>
-        <td style="font-family:var(--font-mono);font-size:.75rem">${new Date(o.created_at).toLocaleDateString('zh-TW')}</td>
+        <td style="font-family:var(--font-mono);font-size:.75rem">${SystemDate.formatDate(o.created_at)}</td>
       </tr>`).join('')}</tbody>
     </table></div>` : '<div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">目前無維修單</div>';
 }
@@ -2690,7 +2691,7 @@ function renderEquipment(list) {
     <td>${escHtml(e.location || '—')}</td>
     <td style="font-family:var(--font-mono)">${e.purchase_cost ? Number(e.purchase_cost).toLocaleString() + ' 元' : '—'}</td>
     <td><span class="badge badge-${e.status}">${e.status === 'active' ? '啟用' : e.status === 'inactive' ? '停用' : '已汰除'}</span></td>
-    <td><button class="btn btn-sm" style="background:rgba(12,40,64,0.5);border:1px solid var(--border-hi);color:var(--text-dim)" onclick="showQr('${e.equipment_id}','${e.name.replace(/'/g,"\\'")}','${e.qr_code}')">QR ↗</button></td>
+    <td><button class="btn btn-sm" style="background:rgba(12,40,64,0.5);border:1px solid var(--border-hi);color:var(--text-dim)" onclick="showQr('${e.equipment_id}')">QR ↗</button></td>
     <td>${currentUser.role === 'admin' ? `<button class="btn btn-primary btn-sm" onclick="openEditEq('${e.equipment_id}')">編輯</button>` : '—'}</td>
   </tr>`).join('');
 }
@@ -2714,7 +2715,7 @@ async function createEquipment() {
   if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
 
   if (cost) {
-    await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || new Date().toISOString().split('T')[0], note: '初始購置費', created_by: currentUser.user_id });
+    await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || (window.SystemDate?.todayISO?.() || new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date())), note: '初始購置費', created_by: currentUser.user_id });
   }
   await writeAudit('equipment', data.equipment_id, 'insert', null, eq);
   showToast(`設備「${name}」已新增`);
@@ -2762,7 +2763,10 @@ async function saveEquipment() {
   await loadAll(); renderEquipment(allEquipment);
 }
 
-function showQr(eqId, name, qrCode) {
+function showQr(eqId) {
+  const equipment=eqMap[eqId];
+  if(!equipment)return;
+  const name=equipment.name||'設備',qrCode=equipment.qr_code||equipment.asset_code||eqId;
   document.getElementById('qrModalTitle').textContent = name + ' — QR CODE';
   document.getElementById('qrModalId').textContent = 'ID: ' + qrCode;
   const container = document.getElementById('qrModalCode');
@@ -2789,7 +2793,7 @@ async function loadInspections() {
   document.getElementById('inspTbody').innerHTML = rows.length ? rows.map(r => `<tr>
     <td>${r.equipment?.name || '—'}</td>
     <td>${r.users?.name || '—'}</td>
-    <td style="font-family:var(--font-mono);font-size:.78rem">${new Date(r.inspect_time).toLocaleString('zh-TW')}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${SystemDate.formatDateTime(r.inspect_time)}</td>
     <td><span class="badge ${r.run_status === 'normal' ? 'badge-active' : 'badge-retired'}">${r.run_status === 'normal' ? '正常' : '異常'}</span></td>
     <td style="font-size:.78rem;color:var(--text-dim)">${fmtLoc(r.locations)}</td>
     <td>${r.abnormal_note || '—'}</td>
@@ -2861,15 +2865,15 @@ function renderRepairs() {
   document.getElementById('repairsTbody').innerHTML = rows.length ? rows.map(r => {
     const ordStatus = getRepairOrderStatus(r);
     return `<tr>
-      <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--cyan)">${r._repairNo}</td>
-      <td>${r.equipment?.name || '—'}</td>
-      <td>${r.reporter || '—'}</td>
-      <td>${(r.fault_desc || '').substring(0,40)}</td>
-      <td style="font-size:.78rem;color:var(--text-dim)">${fmtLoc(r.locations)}</td>
+      <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--cyan)">${escHtml(r._repairNo)}</td>
+      <td>${escHtml(r.equipment?.name || '—')}</td>
+      <td>${escHtml(r.reporter || '—')}</td>
+      <td>${escHtml((r.fault_desc || '').substring(0,40))}</td>
+      <td style="font-size:.78rem;color:var(--text-dim)">${escHtml(fmtLoc(r.locations))}</td>
       <td style="font-family:var(--font-mono);font-size:.78rem">${r.source === 'inspection' ? '巡檢' : '直接通報'}</td>
       <td><span class="badge badge-${r.status === 'closed' ? 'active' : 'inactive'}">${maintenanceStatusLabel(r.status)}</span></td>
       <td>${ordStatus ? `<span class="badge badge-inactive">${maintenanceStatusLabel(ordStatus)}</span>` : '—'}</td>
-      <td style="font-family:var(--font-mono);font-size:.75rem">${new Date(r.created_at).toLocaleDateString('zh-TW')}</td>
+      <td style="font-family:var(--font-mono);font-size:.75rem">${SystemDate.formatDate(r.created_at)}</td>
     </tr>`;
   }).join('') : '<tr><td colspan="9" style="color:var(--text-dim);font-family:var(--font-mono)">目前無紀錄</td></tr>';
   renderRepairsPagination(filtered.length, totalPages);
@@ -2890,11 +2894,11 @@ async function loadCostAdmin() {
   _lastCosts = data || [];
   const total = _lastCosts.reduce((s, c) => s + Number(c.amount), 0);
   document.getElementById('costTbody').innerHTML = _lastCosts.length ? _lastCosts.map(c => `<tr>
-    <td>${c.equipment?.name || '—'}</td>
-    <td>${COST_TYPE_LABEL[c.cost_type] || c.cost_type}</td>
-    <td>${c.vendor || '—'}</td>
-    <td style="font-family:var(--font-mono);font-size:.78rem">${c.cost_date || '—'}</td>
-    <td>${c.note || '—'}</td>
+    <td>${escHtml(c.equipment?.name || '—')}</td>
+    <td>${escHtml(COST_TYPE_LABEL[c.cost_type] || c.cost_type)}</td>
+    <td>${escHtml(c.vendor || '—')}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${escHtml(c.cost_date || '—')}</td>
+    <td>${escHtml(c.note || '—')}</td>
     <td style="text-align:right;font-family:var(--font-mono)">${Number(c.amount).toLocaleString()}</td>
   </tr>`).join('') : '<tr><td colspan="6" style="color:var(--text-dim);font-family:var(--font-mono)">目前無費用紀錄</td></tr>';
   document.getElementById('costTotalDisplay').textContent = _lastCosts.length ? `合計：${total.toLocaleString()} 元` : '';
@@ -3163,7 +3167,7 @@ async function loadSystemHealth() {
   if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">目前沒有錯誤紀錄。</td></tr>'; return; }
   const KIND_LABEL = { js_error: 'JS 錯誤', unhandled_rejection: '未捕捉 Promise', manual: '頁面主動回報', api_error: 'API 失敗' };
   tbody.innerHTML = rows.map(r => `<tr>
-    <td>${escHtml(new Date(r.occurred_at).toLocaleString('zh-TW'))}</td>
+    <td>${escHtml(SystemDate.formatDateTime(r.occurred_at))}</td>
     <td>${escHtml(KIND_LABEL[r.kind] || r.kind)}</td>
     <td>${escHtml(r.page || '—')}</td>
     <td style="max-width:420px;white-space:normal;word-break:break-word">${escHtml(r.message)}</td>
@@ -3204,7 +3208,7 @@ async function loadAudit() {
       <div class="audit-head">
         <span class="audit-action-${r.action}">[${escHtml(item.actionLabel)}]</span>
         <span class="audit-table-label">${escHtml(item.tableLabel)}</span>
-        <span class="audit-time">操作人：${escHtml(r.users?.name || '系統')} · ${new Date(r.operated_at).toLocaleString('zh-TW')}</span>
+        <span class="audit-time">操作人：${escHtml(r.users?.name || '系統')} · ${SystemDate.formatDateTime(r.operated_at)}</span>
       </div>
       <div class="audit-summary">${escHtml(item.summary)}</div>
       ${item.chips.length ? `<div class="audit-changes">${item.chips.map(x => `<span class="audit-chip">${escHtml(x)}</span>`).join('')}</div>` : ''}
@@ -3226,8 +3230,8 @@ async function loadCycles() {
   const CYCLE_LABEL = { daily:'每日', shift:'每班', weekly:'每週' };
   document.getElementById('cyclesTbody').innerHTML = (data || []).map(c => `<tr>
     <td>${CYCLE_LABEL[c.cycle_type] || c.cycle_type}</td>
-    <td style="font-family:var(--font-mono);font-size:.78rem">${new Date(c.started_at).toLocaleString('zh-TW')}</td>
-    <td style="font-family:var(--font-mono);font-size:.78rem">${c.ended_at ? new Date(c.ended_at).toLocaleString('zh-TW') : '—'}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${SystemDate.formatDateTime(c.started_at)}</td>
+    <td style="font-family:var(--font-mono);font-size:.78rem">${SystemDate.formatDateTime(c.ended_at)}</td>
     <td><span class="badge ${c.ended_at ? 'badge-inactive' : 'badge-active'}">${c.ended_at ? '已結束' : '進行中'}</span></td>
   </tr>`).join('') || '<tr><td colspan="4" style="color:var(--text-dim);font-family:var(--font-mono)">目前無週期紀錄</td></tr>';
 }
@@ -3730,7 +3734,7 @@ function renderLocAnalysis() {
     Object.values(mNode.floors).forEach(fn => Object.values(fn.areas).forEach(an =>
       Object.values(an.details).forEach(dn => { mkInsp+=dn.insp; mkAbn+=dn.abn; mkRepair+=dn.repair; })));
     if (hideZero && mkInsp+mkRepair === 0) continue;
-    rows.push(`<tr class="la-market-row" onclick="laToggle('${mkKey}')" style="cursor:pointer;background:rgba(0,212,255,0.06);border-top:1px solid var(--border-hi)">
+    rows.push(`<tr class="la-market-row" onclick="laToggle(decodeURIComponent('${encodeURIComponent(mkKey)}'))" style="cursor:pointer;background:rgba(0,212,255,0.06);border-top:1px solid var(--border-hi)">
       <td colspan="4" style="font-family:var(--font-head);font-size:.85rem;color:var(--cyan);letter-spacing:.06em;padding-left:12px">
         <span style="margin-right:6px">${mkCollapsed ? '▶' : '▼'}</span>${escHtml(mNode.name)}
       </td>
@@ -3749,11 +3753,11 @@ function renderLocAnalysis() {
       let flInsp=0, flAbn=0, flRepair=0;
       Object.values(fNode.areas).forEach(an => Object.values(an.details).forEach(dn => { flInsp+=dn.insp; flAbn+=dn.abn; flRepair+=dn.repair; }));
       if (hideZero && flInsp+flRepair === 0) continue;
-      rows.push(`<tr class="la-floor-row" onclick="laToggle('${flKey}')" style="cursor:pointer;background:rgba(0,212,255,0.03)">
+      rows.push(`<tr class="la-floor-row" onclick="laToggle(decodeURIComponent('${encodeURIComponent(flKey)}'))" style="cursor:pointer;background:rgba(0,212,255,0.03)">
         <td style="padding-left:22px;color:var(--text-dim);font-family:var(--font-mono);font-size:.8rem">
           <span style="margin-right:6px">${flCollapsed ? '▶' : '▼'}</span>
         </td>
-        <td style="font-family:var(--font-head);font-size:.82rem;color:var(--text-hi);letter-spacing:.04em">${fl}</td>
+        <td style="font-family:var(--font-head);font-size:.82rem;color:var(--text-hi);letter-spacing:.04em">${escHtml(fl)}</td>
         <td colspan="2" style="color:var(--text-dim);font-size:.78rem;font-family:var(--font-mono)">小計</td>
         <td style="text-align:right;font-family:var(--font-mono)">${flInsp||'—'}</td>
         <td style="text-align:right;font-family:var(--font-mono);color:${flAbn?'var(--red)':'inherit'}">${flAbn||'—'}</td>
@@ -3781,13 +3785,13 @@ function renderLocAnalysis() {
             if (hideZero && dn.insp+dn.repair === 0) continue;
             rows.push(`<tr>
               <td></td><td></td>
-              <td style="padding-left:8px;font-size:.78rem;color:var(--text-dim)">${ar}</td>
-              <td style="font-size:.82rem;color:var(--text-hi)">${dt}</td>
+              <td style="padding-left:8px;font-size:.78rem;color:var(--text-dim)">${escHtml(ar)}</td>
+              <td style="font-size:.82rem;color:var(--text-hi)">${escHtml(dt)}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:.82rem">${dn.insp||'—'}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:.82rem;color:${dn.abn?'var(--red)':'inherit'}">${dn.abn||'—'}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:.78rem;color:${dn.abn?'var(--red)':'var(--text-dim)'}">${dn.insp?(dn.abn/dn.insp*100).toFixed(1)+'%':'—'}</td>
               <td style="text-align:right;font-family:var(--font-mono);font-size:.82rem">${dn.repair||'—'}</td>
-              <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${dn.lastTime ? new Date(dn.lastTime).toLocaleDateString('zh-TW') : '—'}</td>
+              <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${SystemDate.formatDate(dn.lastTime)}</td>
             </tr>`);
           }
         }
@@ -3804,13 +3808,13 @@ function areaRow(ar, suffix, insp, abn, repair, lastTime, isHeader) {
   const style = isHeader ? 'background:rgba(255,255,255,0.02)' : '';
   return `<tr style="${style}">
     <td></td><td></td>
-    <td style="font-size:.85rem;color:${isHeader ? 'var(--text-hi)' : 'var(--text-hi)'};padding-left:4px">${ar} <span style="color:var(--text-dim);font-size:.72rem">${suffix}</span></td>
+    <td style="font-size:.85rem;color:${isHeader ? 'var(--text-hi)' : 'var(--text-hi)'};padding-left:4px">${escHtml(ar)} <span style="color:var(--text-dim);font-size:.72rem">${escHtml(suffix)}</span></td>
     <td style="color:var(--text-dim);font-size:.78rem">—</td>
     <td style="text-align:right;font-family:var(--font-mono)">${insp||'—'}</td>
     <td style="text-align:right;font-family:var(--font-mono);color:${abn?'var(--red)':'inherit'}">${abn||'—'}</td>
     <td style="text-align:right;font-family:var(--font-mono);color:${abn?'var(--red)':'var(--text-dim)'}">${insp?(abn/insp*100).toFixed(1)+'%':'—'}</td>
     <td style="text-align:right;font-family:var(--font-mono)">${repair||'—'}</td>
-    <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${lastTime ? new Date(lastTime).toLocaleDateString('zh-TW') : '—'}</td>
+    <td style="font-family:var(--font-mono);font-size:.72rem;color:var(--text-dim)">${SystemDate.formatDate(lastTime)}</td>
   </tr>`;
 }
 

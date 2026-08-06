@@ -4,7 +4,7 @@
   (function(){
     if(document.querySelector('script[src^="error-tracker.js"]'))return;
     var s=document.createElement('script');
-    s.src='error-tracker.js';
+    s.src='error-tracker.js?v=20260806-1';
     document.head.appendChild(s);
   })();
   var KEY='siteTheme';
@@ -12,14 +12,45 @@
   var SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
   var SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
   var PROFILE_FIELDS=['user_id','username','name','role','rbac_role','dept_id','department','phone'];
+  // Shared floor normalization keeps B1/B1F and numeric floors consistent
+  // across equipment, patrol and marker pages.
+  window.canonicalFloor=function(value){
+    var raw=String(value||'').trim().toUpperCase().replace(/\s+/g,'');
+    var basement=raw.match(/^B(\d+)F?$/); if(basement)return 'B'+basement[1];
+    if(raw==='RF'||raw==='R'||raw==='頂樓'||raw==='PH'||raw==='ROOF')return 'RF';
+    var above=raw.match(/^(\d+)F?$/); if(above)return above[1]+'F';
+    return raw;
+  };
+  window.SystemDate={
+    todayISO:function(){
+      var parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+      var out={};parts.forEach(function(p){out[p.type]=p.value;});
+      return out.year+'-'+out.month+'-'+out.day;
+    },
+    formatDate:function(value){
+      if(!value)return '—';
+      var d=value instanceof Date?value:new Date(value);
+      if(Number.isNaN(d.getTime()))return '—';
+      return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+    },
+    formatDateTime:function(value){
+      if(!value)return '—';
+      var d=value instanceof Date?value:new Date(value);
+      if(Number.isNaN(d.getTime()))return '—';
+      return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replace(',','');
+    }
+  };
+  var systemActionLocks=Object.create(null);
+  window.beginSystemAction=function(key){if(systemActionLocks[key])return false;systemActionLocks[key]=true;return true;};
+  window.endSystemAction=function(key){delete systemActionLocks[key];};
   function readProfile(){
-    try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||'null')||null;}catch(e){return null;}
+    try{return JSON.parse(sessionStorage.getItem(PROFILE_KEY)||'null')||null;}catch(e){return null;}
   }
   function saveProfile(profile){
     if(!profile||!profile.name)return;
     var clean={};
     PROFILE_FIELDS.forEach(function(key){if(profile[key]!=null&&profile[key]!=='')clean[key]=profile[key];});
-    localStorage.setItem(PROFILE_KEY,JSON.stringify(clean));
+    sessionStorage.setItem(PROFILE_KEY,JSON.stringify(clean));
     var keyMap={user_id:'user_id',username:'user_username',name:'user_name',role:'user_role',rbac_role:'user_rbac_role',dept_id:'user_dept_id',department:'user_department',phone:'user_phone'};
     Object.keys(keyMap).forEach(function(key){
       if(clean[key]!=null&&clean[key]!=='')sessionStorage.setItem(keyMap[key],clean[key]);
@@ -28,6 +59,7 @@
     window.dispatchEvent(new CustomEvent('system-user-profile-updated'));
   }
   function clearProfile(){
+    sessionStorage.removeItem(PROFILE_KEY);
     localStorage.removeItem(PROFILE_KEY);
     ['user_id','user_username','user_name','user_role','user_rbac_role','user_dept_id','user_department','user_phone'].forEach(function(key){sessionStorage.removeItem(key);});
   }
@@ -38,7 +70,7 @@
   }
   function storedAuthSessionForAccess(){
     try{
-      var raw=localStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
+      var raw=sessionStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
       if(!raw)return null;
       if(raw.indexOf('base64-')===0)raw=decodeURIComponent(escape(atob(raw.slice(7))));
       return JSON.parse(raw);
@@ -52,15 +84,14 @@
       .catch(function(){return null;});
   }
   function resolveCurrentProfileForAccess(){
-    var cached=readProfile();
-    if(cached&&(cached.rbac_role||cached.role))return Promise.resolve(cached);
     var auth=storedAuthSessionForAccess();
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
-    if(!token||!authId)return Promise.resolve(cached);
+    if(!token||!authId){clearProfile();return Promise.resolve(null);}
     return fetchUserRowForAccess(authId,token).then(function(row){
       if(row){saveProfile(row);return row;}
-      return cached;
+      clearProfile();
+      return null;
     });
   }
   function denyAccess(systemKey){
@@ -86,12 +117,67 @@
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
     function isSysadminProfile(profile){return !!profile&&(profile.rbac_role==='sysadmin'||profile.role==='admin');}
-    if(!token||!authId)return Promise.resolve(isSysadminProfile(readProfile()));
+    if(!token||!authId){clearProfile();return Promise.resolve(false);}
     return fetchUserRowForAccess(authId,token).then(function(profile){
       if(!profile)return false;
       saveProfile(profile);
       return isSysadminProfile(profile);
     });
+  }
+
+  function installAccessibility(){
+    var style=document.createElement('style');
+    style.id='sharedAccessibilityStyle';
+    style.textContent=':where(a,button,input,select,textarea,[tabindex]):focus-visible{outline:3px solid var(--cyan,#0284c7)!important;outline-offset:2px!important}';
+    document.head.appendChild(style);
+    var seq=0;
+    function scan(root){
+      if(!root||!root.querySelectorAll)return;
+      root.querySelectorAll('button').forEach(function(button){
+        if(!button.hasAttribute('type')&&!button.closest('form'))button.type='button';
+        if(!button.getAttribute('aria-label')&&!String(button.textContent||'').trim()&&button.title)button.setAttribute('aria-label',button.title);
+      });
+      root.querySelectorAll('label:not([for])').forEach(function(label){
+        if(label.querySelector('input,select,textarea'))return;
+        var host=label.closest('.field,.form-group,.input-group,.row')||label.parentElement;
+        var control=host&&host.querySelector('input:not([type="hidden"]),select,textarea');
+        if(!control)return;
+        if(!control.id)control.id='systemField'+(++seq);
+        label.htmlFor=control.id;
+      });
+      root.querySelectorAll('img:not([alt])').forEach(function(img){img.alt='';});
+    }
+    scan(document);
+    new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)scan(node);});});}).observe(document.body,{childList:true,subtree:true});
+  }
+
+  function installDialogKeyboard(){
+    var activeDialog=null,returnFocus=null;
+    function visibleDialog(){
+      return Array.from(document.querySelectorAll('[role="dialog"],.modal,.overlay')).reverse().find(function(node){
+        var style=getComputedStyle(node);return !node.hidden&&style.display!=='none'&&style.visibility!=='hidden'&&(node.classList.contains('show')||node.getAttribute('role')==='dialog');
+      })||null;
+    }
+    function sync(){
+      var next=visibleDialog();
+      if(next===activeDialog)return;
+      if(next){returnFocus=document.activeElement;activeDialog=next;setTimeout(function(){var first=next.querySelector('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]');if(first)first.focus();},0);}
+      else{activeDialog=null;if(returnFocus&&document.contains(returnFocus)&&returnFocus.focus)returnFocus.focus();returnFocus=null;}
+    }
+    document.addEventListener('keydown',function(event){
+      sync();if(!activeDialog)return;
+      if(event.key==='Escape'){
+        var close=activeDialog.querySelector('[data-close],[data-modal-close],.modal-close,.close,[aria-label*="關閉"]');
+        if(close){event.preventDefault();close.click();}return;
+      }
+      if(event.key!=='Tab')return;
+      var focusable=Array.from(activeDialog.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')).filter(function(el){return getComputedStyle(el).display!=='none';});
+      if(!focusable.length)return;
+      var first=focusable[0],last=focusable[focusable.length-1];
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    });
+    new MutationObserver(sync).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden','style']});
   }
   function denySysadminAccess(redirectPage){
     var target=redirectPage||'index.html';
@@ -175,7 +261,7 @@
       }
     }catch(e){}
     clearProfile();
-    try{localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');}catch(e){}
+    try{sessionStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');}catch(e){}
     location.href='login.html';
   }
   function ensureChangePwModal(){
@@ -341,7 +427,10 @@
   // 機構／場所名稱可在後台「系統設定」修改；全站沿用 data-sysname 屬性作為統一掛勾點，
   // 抓一次 system_settings 就能同步套用到品牌列與其他既有沿用同一屬性的頁面內容。
   function applyBrandNames(){
-    fetch(SUPABASE_URL+'/rest/v1/system_settings?select=key,value&key=in.(org_name,site_name)',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY}})
+    var auth=storedAuthSessionForAccess();
+    var token=auth&&auth.access_token;
+    if(!token)return;
+    fetch(SUPABASE_URL+'/rest/v1/system_settings?select=key,value&key=in.(org_name,site_name)',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}})
       .then(function(r){return r.ok?r.json():[];})
       .then(function(rows){
         var s={};(rows||[]).forEach(function(row){s[row.key]=row.value;});
@@ -704,6 +793,8 @@
     window.SystemSegmentedTime={scan:scan};
   }
   ready(function(){
+    installAccessibility();
+    installDialogKeyboard();
     installSegmentedTimeInputs();
     installSysadminOnlyAccess();
     installSystemMeta();

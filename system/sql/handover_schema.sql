@@ -35,7 +35,8 @@ create index if not exists idx_ho_date on handover_records(shift_date desc);
 create index if not exists idx_ho_dept on handover_records(dept_id);
 
 alter table handover_records enable row level security;
-create policy "allow_all_for_now" on handover_records for all using (true);
+drop policy if exists "allow_all_for_now" on handover_records;
+create policy "allow_all_for_now" on handover_records for all to authenticated using (true) with check (true);
 
 -- 禁止建立已結束的過去班次；班別時間優先讀取 system_settings.shifts。
 create or replace function handover_shift_end_at(p_shift_date date,p_shift_type text)

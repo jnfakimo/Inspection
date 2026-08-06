@@ -1,8 +1,9 @@
 import md5 from "npm:md5@2.3.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
 };
 
 function textResponse(message: string, status = 500) {
@@ -91,12 +92,34 @@ async function fetchIpcamFrame(targetUrl: URL, username: string, password: strin
   });
 }
 
+async function isAuthorized(req: Request) {
+  const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  if (!bearer) return false;
+  const db = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+  const { data: { user } } = await db.auth.getUser(bearer);
+  if (!user) return false;
+  const { data: profile } = await db.from("users")
+    .select("rbac_role,role,status")
+    .eq("auth_id", user.id).maybeSingle();
+  if (!profile || profile.status !== "active") return false;
+  const role = profile.rbac_role || (profile.role === "admin" ? "sysadmin" : profile.role);
+  if (role === "sysadmin") return true;
+  const { data: permission } = await db.from("role_permissions")
+    .select("allowed").eq("role_id", role).eq("perm", "sys_admin").maybeSingle();
+  return permission?.allowed === true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
 
   try {
+    if (!await isAuthorized(req)) return textResponse("Unauthorized", 401);
     const requestUrl = new URL(req.url);
     if (requestUrl.searchParams.get("health") === "1") {
       return jsonResponse({ ok: true, fn: "ipcam-proxy", time: new Date().toISOString() });
@@ -127,6 +150,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return textResponse(message, 500);
+    console.error("IPCAM proxy error:", message);
+    return textResponse("IPCAM proxy unavailable", 502);
   }
 });

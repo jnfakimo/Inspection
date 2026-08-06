@@ -2,12 +2,13 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>電子交接簿 — 臺北農產公司</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <style>
 :root{
   --bg:#020b18;--surface:#04111f;--panel:#05101e;
@@ -216,7 +217,7 @@ body.handover-only .repair-handover-head a{display:none!important}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body class="handover-only">
@@ -1162,7 +1163,7 @@ async function submitHandover() {
 }
 
 let handoverSaving = false;
-async function doSave(mode) {
+async function doSaveUnsafe(mode) {
   if (handoverSaving) return;
   const shift     = document.getElementById('hShift').value;
   const date      = DTP.getValue('hDate-dtp');
@@ -1208,6 +1209,8 @@ async function doSave(mode) {
     if (submitBtn) submitBtn.disabled = false;
   }
 }
+
+async function doSave(mode){if(!beginSystemAction('handover.save'))return;try{return await doSaveUnsafe(mode);}finally{endSystemAction('handover.save');}}
 
 function resetHandoverForm() {
   issues = ['無異常事項。如果有需要再填列']; pendings = ['無代辦事項。如果有需要再填列']; renderIssues(); renderPendings();
@@ -1311,8 +1314,8 @@ async function openHandoverDetail(id) {
     <div class="detail-row"><span class="detail-label">接班人</span><span class="detail-value">${r.takeover_user?.name||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">設備狀況</span><span class="detail-value"><span style="color:var(--green)">✓ 正常 ${r.eq_normal} 台</span>&nbsp;&nbsp;<span style="color:${r.eq_abnormal?'var(--red)':'var(--text-dim)'}">✗ 異常 ${r.eq_abnormal} 台</span></span></div>
     <div class="detail-row"><span class="detail-label">狀態</span><span class="detail-value"><span class="badge ${stage.cls}">${stage.label}</span></span></div>
-    <div class="detail-row"><span class="detail-label">填單稽核</span><span class="detail-value">${escHtml(r.created_user?.name||r.handover_user?.name||'—')}　${r.created_at?new Date(r.created_at).toLocaleString('zh-TW'):'—'}</span></div>
-    <div class="detail-row"><span class="detail-label">接收稽核</span><span class="detail-value">${isHandoverReceived(r)?`${escHtml(r.confirmed_user?.name||r.takeover_user?.name||'—')}　${new Date(r.confirmed_at).toLocaleString('zh-TW')}`:'尚未接收'}</span></div>
+    <div class="detail-row"><span class="detail-label">填單稽核</span><span class="detail-value">${escHtml(r.created_user?.name||r.handover_user?.name||'—')}　${SystemDate.formatDateTime(r.created_at)}</span></div>
+    <div class="detail-row"><span class="detail-label">接收稽核</span><span class="detail-value">${isHandoverReceived(r)?`${escHtml(r.confirmed_user?.name||r.takeover_user?.name||'—')}　${SystemDate.formatDateTime(r.confirmed_at)}`:'尚未接收'}</span></div>
     <div class="detail-section">
       <div class="detail-section-title" style="color:var(--red)">⚠ 異常事項（${issueLines.length}項）</div>
       ${issueLines.length ? issueLines.map(l=>`<div class="detail-item issue">${escHtml(l)}</div>`).join('') : '<span class="detail-empty">無異常事項</span>'}
@@ -1374,7 +1377,7 @@ async function genCaseNo() {
 async function openCaseForm() {
   const now = new Date();
   document.getElementById('caseNo').value = await genCaseNo();
-  document.getElementById('caseCreatedAt').value = now.toLocaleString('zh-TW');
+  document.getElementById('caseCreatedAt').value = SystemDate.formatDateTime(now);
   const h = now.getHours();
   document.getElementById('caseShift').value = h>=6&&h<14 ? 'morning' : h>=14&&h<22 ? 'afternoon' : 'night';
   document.getElementById('caseCat').value = '';
@@ -1434,7 +1437,7 @@ function onCaseCatChange() {
   }
 }
 
-async function submitCase() {
+async function submitCaseUnsafe() {
   const caseNo   = document.getElementById('caseNo').value;
   const cat      = document.getElementById('caseCat').value;
   if (!cat) { showToast('請選擇異常大類', true); return; }
@@ -1481,6 +1484,8 @@ async function submitCase() {
 }
 
 // ── CASE LIST ──────────────────────────────────────
+async function submitCase(){if(!beginSystemAction('handover.submitCase'))return;try{return await submitCaseUnsafe();}finally{endSystemAction('handover.submitCase');}}
+
 async function loadCases() {
   const statusFilter = document.getElementById('cfStatus').value;
   const catFilter    = document.getElementById('cfCat').value;
@@ -1498,7 +1503,7 @@ async function loadCases() {
   const { data, error } = await q;
   if (error) { showToast('載入失敗', true); return; }
   const rows = data || [];
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayISO();
 
   // Update stats
   const allQ = await db.from('handover_cases').select('status,due_date');
@@ -1534,9 +1539,14 @@ async function openCaseDetail(caseId) {
     db.from('handover_case_attachments').select('*').eq('case_id', caseId).order('uploaded_at')
   ]);
   if (!c) { showToast('載入失敗', true); return; }
+  if(attachments?.length){
+    const {data:signed}=await db.storage.from('handover-attachments').createSignedUrls(attachments.map(a=>a.storage_path),3600);
+    const signedMap=new Map((signed||[]).map(x=>[x.path,x.signedUrl]));
+    attachments.forEach(a=>a.signed_url=signedMap.get(a.storage_path)||'');
+  }
 
   const s = CASE_STATUS[c.status] || { label:c.status, cls:'' };
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayISO();
   const isOverdue = c.due_date && c.due_date < today && c.status !== 'closed';
   const attachList = attachments || [];
   const canAddAttach = attachList.length < 20;
@@ -1546,11 +1556,11 @@ async function openCaseDetail(caseId) {
     <div class="detail-section">
       <div class="detail-section-title">基本資訊</div>
       <div class="detail-row"><span class="detail-label">案件編號</span><span class="detail-value" style="font-family:var(--font-mono)">${escHtml(c.case_no)}</span></div>
-      <div class="detail-row"><span class="detail-label">建立時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.78rem">${new Date(c.created_at).toLocaleString('zh-TW')}</span></div>
+      <div class="detail-row"><span class="detail-label">建立時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.78rem">${SystemDate.formatDateTime(c.created_at)}</span></div>
       <div class="detail-row"><span class="detail-label">班別</span><span class="detail-value">${SHIFT_LABEL[c.shift_type]||c.shift_type||'—'}</span></div>
       <div class="detail-row"><span class="detail-label">通報人</span><span class="detail-value">${escHtml(c.reporter||'—')}</span></div>
       <div class="detail-row"><span class="detail-label">所屬單位</span><span class="detail-value">${escHtml(c.reporter_unit||'—')}</span></div>
-      <div class="detail-row"><span class="detail-label">發生時間</span><span class="detail-value">${c.incident_time?new Date(c.incident_time).toLocaleString('zh-TW'):'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">發生時間</span><span class="detail-value">${SystemDate.formatDateTime(c.incident_time)}</span></div>
       <div class="detail-row"><span class="detail-label">發生地點</span><span class="detail-value">${escHtml(c.incident_location||'—')}</span></div>
     </div>
 
@@ -1570,7 +1580,7 @@ async function openCaseDetail(caseId) {
       <div class="detail-row"><span class="detail-label">承辦人</span><span class="detail-value">${c.assigned_user?.name?escHtml(c.assigned_user.name):'<span style="color:var(--text-dim)">未指派</span>'}</span></div>
       <div class="detail-row"><span class="detail-label">負責單位</span><span class="detail-value">${escHtml(c.responsible_unit||'—')}</span></div>
       <div class="detail-row"><span class="detail-label">到期日</span><span class="detail-value" style="color:${isOverdue?'var(--red)':'inherit'}">${c.due_date||'—'}</span></div>
-      ${c.closed_at?`<div class="detail-row"><span class="detail-label">結案時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.76rem">${new Date(c.closed_at).toLocaleString('zh-TW')} by ${escHtml(c.closed_user?.name||'—')}</span></div>`:''}
+      ${c.closed_at?`<div class="detail-row"><span class="detail-label">結案時間</span><span class="detail-value" style="font-family:var(--font-mono);font-size:.76rem">${SystemDate.formatDateTime(c.closed_at)} by ${escHtml(c.closed_user?.name||'—')}</span></div>`:''}
       ${c.note?`<div class="detail-row"><span class="detail-label">備註</span><span class="detail-value">${escHtml(c.note)}</span></div>`:''}
     </div>
 
@@ -1626,16 +1636,13 @@ function buildAttachmentList(list) {
   if (!list.length) return '<span class="detail-empty">尚無附件</span>';
   return list.map(a => {
     const isImage = /\.(jpg|jpeg|png)$/i.test(a.file_name);
-    let publicUrl = '#';
-    try {
-      publicUrl = db.storage.from('handover-attachments').getPublicUrl(a.storage_path).data.publicUrl;
-    } catch(e) {}
+    const publicUrl = a.signed_url || '';
     return `<div class="attach-item">
       <span class="attach-name">${escHtml(a.file_name)}</span>
       <span class="attach-meta">${a.file_size ? Math.round(a.file_size/1024) + 'KB' : ''}</span>
       <div class="attach-actions">
-        ${isImage ? `<a href="${publicUrl}" target="_blank">預覽</a>` : ''}
-        <a href="${publicUrl}" target="_blank">下載</a>
+        ${isImage&&publicUrl ? `<a href="${escHtml(publicUrl)}" target="_blank" rel="noopener">預覽</a>` : ''}
+        ${publicUrl?`<a href="${escHtml(publicUrl)}" target="_blank" rel="noopener">下載</a>`:'<span>無法開啟</span>'}
       </div>
     </div>`;
   }).join('');
@@ -1682,7 +1689,7 @@ async function assignCase(caseId) {
   await loadCases();
 }
 
-async function updateCaseStatus(caseId, oldStatus) {
+async function updateCaseStatusUnsafe(caseId, oldStatus) {
   const newStatus = document.getElementById('actionStatus').value;
   if (newStatus === oldStatus) { showToast('狀態未變更', true); return; }
   const updates = { status: newStatus, updated_at: new Date().toISOString() };
@@ -1703,7 +1710,9 @@ async function updateCaseStatus(caseId, oldStatus) {
   await loadCases();
 }
 
-async function reopenCase(caseId) {
+async function updateCaseStatus(caseId,oldStatus){if(!beginSystemAction('handover.updateCaseStatus'))return;try{return await updateCaseStatusUnsafe(caseId,oldStatus);}finally{endSystemAction('handover.updateCaseStatus');}}
+
+async function reopenCaseUnsafe(caseId) {
   const { error } = await db.from('handover_cases').update({ status:'open', closed_at:null, closed_by:null, updated_at:new Date().toISOString() }).eq('case_id', caseId);
   if (error) { showToast('操作失敗', true); return; }
   await db.from('handover_case_logs').insert({ case_id:caseId, action:'reopen', content:'案件重新開啟', created_by:currentUser.user_id });
@@ -1712,7 +1721,9 @@ async function reopenCase(caseId) {
   await loadCases();
 }
 
-async function addProgressNote(caseId) {
+async function reopenCase(caseId){if(!beginSystemAction('handover.reopenCase'))return;try{return await reopenCaseUnsafe(caseId);}finally{endSystemAction('handover.reopenCase');}}
+
+async function addProgressNoteUnsafe(caseId) {
   const note = document.getElementById('progressNote').value.trim();
   if (!note) { showToast('請輸入進度說明', true); return; }
   await db.from('handover_cases').update({ updated_at: new Date().toISOString() }).eq('case_id', caseId);
@@ -1723,6 +1734,8 @@ async function addProgressNote(caseId) {
 }
 
 // ── ATTACHMENTS ────────────────────────────────────
+async function addProgressNote(caseId){if(!beginSystemAction('handover.addProgressNote'))return;try{return await addProgressNoteUnsafe(caseId);}finally{endSystemAction('handover.addProgressNote');}}
+
 function renderPendingAttachments() {
   const container = document.getElementById('pendingAttachList');
   document.getElementById('attachCount').textContent = pendingAttachments.length + '/20';
@@ -1743,6 +1756,7 @@ function onAttachSelect() {
   const allowed = /\.(jpg|jpeg|png|pdf|docx|xlsx)$/i;
   for (const f of Array.from(input.files)) {
     if (!allowed.test(f.name)) { showToast(`不支援的格式：${f.name}`, true); continue; }
+    if (f.size > 10*1024*1024) { showToast(`檔案超過 10MB：${f.name}`, true); continue; }
     if (pendingAttachments.length >= 20) { showToast('每案最多 20 個附件', true); break; }
     pendingAttachments.push(f);
   }
@@ -1754,13 +1768,15 @@ function removePendingAttach(i) { pendingAttachments.splice(i,1); renderPendingA
 
 async function uploadAttachments(caseId) {
   for (const file of pendingAttachments) {
-    const path = `${caseId}/${Date.now()}_${file.name}`;
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120);
+    const path = `${caseId}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
     const { error: upErr } = await db.storage.from('handover-attachments').upload(path, file);
     if (upErr) { showToast(`附件上傳失敗：${file.name}`, true); continue; }
-    await db.from('handover_case_attachments').insert({
+    const {error:metaErr}=await db.from('handover_case_attachments').insert({
       case_id: caseId, file_name: file.name, file_type: file.type,
       file_size: file.size, storage_path: path, uploaded_by: currentUser.user_id
     });
+    if(metaErr){await db.storage.from('handover-attachments').remove([path]);showToast(`附件紀錄失敗：${file.name}`,true);}
   }
   pendingAttachments = [];
 }
@@ -1774,13 +1790,16 @@ async function addAttachmentToCase(caseId) {
   const allowed = /\.(jpg|jpeg|png|pdf|docx|xlsx)$/i;
   for (const file of files) {
     if (!allowed.test(file.name)) { showToast(`不支援格式：${file.name}`, true); continue; }
-    const path = `${caseId}/${Date.now()}_${file.name}`;
+    if (file.size > 10*1024*1024) { showToast(`檔案超過 10MB：${file.name}`, true); continue; }
+    const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120);
+    const path = `${caseId}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
     const { error: upErr } = await db.storage.from('handover-attachments').upload(path, file);
     if (upErr) { showToast(`上傳失敗：${file.name}`, true); continue; }
-    await db.from('handover_case_attachments').insert({
+    const {error:metaErr}=await db.from('handover_case_attachments').insert({
       case_id: caseId, file_name: file.name, file_type: file.type,
       file_size: file.size, storage_path: path, uploaded_by: currentUser.user_id
     });
+    if(metaErr){await db.storage.from('handover-attachments').remove([path]);showToast(`附件紀錄失敗：${file.name}`,true);}
   }
   showToast('附件已上傳');
   input.value = '';

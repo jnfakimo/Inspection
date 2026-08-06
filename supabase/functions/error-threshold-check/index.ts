@@ -1,15 +1,26 @@
 // 關鍵功能異常通知 — 每隔 N 分鐘檢查 client_error_logs 是否短時間內爆量，
 // 超過門檻就推播 LINE，讓維運方主動發現系統性問題（而非等使用者反映）。
 // 沿用 patrol-timeout-check 的 system_settings 驅動與 LINE 推播寫法。
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 
-const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type"};
+const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type, x-cron-secret"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
+const safeEqual=(a:string,b:string)=>{if(!a||!b||a.length!==b.length)return false;let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);return diff===0;};
+async function authorized(req:Request,db:any){
+  const cron=Deno.env.get("CRON_SECRET")||"";
+  if(cron&&safeEqual(req.headers.get("x-cron-secret")||"",cron))return true;
+  const bearer=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+  if(!bearer)return false;
+  const {data:{user}}=await db.auth.getUser(bearer);if(!user)return false;
+  const {data:p}=await db.from("users").select("role,rbac_role,status").eq("auth_id",user.id).maybeSingle();
+  return p?.status==="active"&&(p.role==="admin"||["admin","sysadmin"].includes(p.rbac_role||""));
+}
 
 Deno.serve(async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
   try{
     const db=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    if(!await authorized(req,db))return reply({ok:false,msg:"Unauthorized"},401);
     const body=await req.json().catch(()=>({}));
     const {data:rows,error:settingsError}=await db.from("system_settings").select("key,value");
     if(settingsError)throw settingsError;
@@ -50,11 +61,14 @@ Deno.serve(async req=>{
       const lineRes=await fetch("https://api.line.me/v2/bot/message/push",{method:"POST",headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({to:groupId,messages:[{type:"text",text}]})});
       const lineOk=lineRes.ok;
       await db.from("system_settings").upsert({key:"error_threshold_last_notified",value:new Date().toISOString()},{onConflict:"key"});
-      return reply({ok:lineOk,msg:lineOk?"sent":"line failed",total,threshold,response:await lineRes.text()});
+      const responseText=await lineRes.text();
+      if(!lineOk)console.error("LINE threshold notification failed",lineRes.status,responseText);
+      return reply({ok:lineOk,msg:lineOk?"sent":"line failed",total,threshold},lineOk?200:502);
     }
     return reply({ok:true,msg:"dryRun",total,threshold,text});
   }catch(e){
     const msg=e instanceof Error?e.message:typeof e==="object"&&e?JSON.stringify(e):String(e);
-    return reply({ok:false,msg},500);
+    console.error("Error threshold check failed",msg);
+    return reply({ok:false,msg:"Error threshold service unavailable"},500);
   }
 });

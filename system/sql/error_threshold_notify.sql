@@ -1,7 +1,7 @@
 -- ============================================================
 -- 關鍵功能異常通知排程
 -- 先部署 error-threshold-check Edge Function，再執行本檔。
--- 沿用 patrol_timeout_notifications.sql 的 pg_cron 排程寫法。
+-- 正式排程由 GitHub Actions 以 CRON_SECRET 觸發。
 -- 可重複執行。
 -- ============================================================
 
@@ -16,7 +16,6 @@ insert into system_settings (key, value) values
 on conflict (key) do nothing;
 
 create extension if not exists pg_cron;
-create extension if not exists pg_net;
 
 do $$
 declare job_id bigint;
@@ -25,18 +24,5 @@ begin
   if job_id is not null then perform cron.unschedule(job_id); end if;
 end $$;
 
--- 每 5 分鐘檢查一次；函式內部有冷卻時間，不會因此每 5 分鐘就推播一次。
-select cron.schedule(
-  'error-threshold-check',
-  '*/5 * * * *',
-  $job$
-  select net.http_post(
-    url := 'https://qztffronusdhgxhjjubt.supabase.co/functions/v1/error-threshold-check',
-    headers := jsonb_build_object(
-      'Content-Type','application/json',
-      'Authorization','Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA'
-    ),
-    body := '{"scheduled":true}'::jsonb
-  );
-  $job$
-);
+-- 排程由 .github/workflows/error-threshold-check.yml 執行，並以
+-- CRON_SECRET 驗證。請勿在資料庫內以公開 anon JWT 建立排程。

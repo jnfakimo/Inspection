@@ -2,23 +2,19 @@
 // 攔截未捕捉的 JS 例外與 Promise rejection，寫入 Supabase 的 client_error_logs
 // 表（system/sql/error_logging.sql），供後台「系統健康」頁面查看。
 //
-// 使用獨立的最小 Supabase client（不依賴各頁面自己的 db 變數），避免載入
-// 順序造成的相依問題；讀寫本身走既有的 window.SUPA_URL/window.SUPA_KEY
-// （由 supabase-config.js 提供），未載入時會安靜略過，不影響頁面其他功能。
+// 使用目前登入者的 access token 直接寫入 REST，不建立第二個 Auth client；
+// 未登入時不蒐集，也不保存網址 query/hash，避免密碼重設資訊進入錯誤紀錄。
 (function () {
   if (window.__errorTrackerInstalled) return;
   window.__errorTrackerInstalled = true;
 
-  var _client = null;
-  function client() {
-    if (_client) return _client;
-    if (typeof supabase === 'undefined') return null;
-    var url = window.SUPA_URL, key = window.SUPA_KEY;
-    if (!url || !key) return null;
-    _client = supabase.createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-    });
-    return _client;
+  function authToken() {
+    try {
+      var raw=sessionStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
+      if(!raw)return '';
+      if(raw.indexOf('base64-')===0)raw=decodeURIComponent(escape(atob(raw.slice(7))));
+      return JSON.parse(raw).access_token||'';
+    } catch(e) { return ''; }
   }
 
   var queue = [];
@@ -27,14 +23,13 @@
 
   function flush() {
     if (flushing || !queue.length) return;
-    var c = client();
-    if (!c) return; // supabase-js 或設定尚未就緒，留在佇列，下次錯誤觸發時再試
+    var url=window.SUPA_URL,key=window.SUPA_KEY,token=authToken();
+    if(!url||!key||!token){queue.length=0;return;} // 未登入頁不蒐集瀏覽器錯誤或重設連結資訊
     flushing = true;
     var batch = queue.splice(0, queue.length);
-    c.from('client_error_logs').insert(batch).then(
-      function () { flushing = false; },
-      function () { flushing = false; } // 回報失敗就放棄這批，不能因為回報錯誤本身又製造新錯誤
-    );
+    fetch(url+'/rest/v1/client_error_logs',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+token,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(batch)})
+      .catch(function(){})
+      .finally(function(){flushing=false;});
   }
 
   function currentUserId() {
@@ -51,7 +46,7 @@
         message: String(message == null ? '' : message).slice(0, 2000),
         detail: detail ? JSON.stringify(detail).slice(0, 4000) : null,
         page: location.pathname.split('/').pop() || '',
-        url: location.href.slice(0, 1000),
+        url: (location.origin + location.pathname).slice(0, 1000),
         user_id: currentUserId(),
         user_agent: navigator.userAgent.slice(0, 500),
         occurred_at: new Date().toISOString()

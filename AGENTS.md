@@ -56,11 +56,25 @@ fresh Supabase project, run in the SQL Editor in this order:
 → `handover_schema.sql` → `floor_spaces.sql` → `plan_markers.sql` → `material_master.sql`
 → `equipment_lifecycle.sql` → `patrol_shifts.sql` → `checkin_logs.sql` → `dashboard_layouts.sql` → `system_access_seed.sql`
 → `audit_login_events.sql` → `meeting_rooms.sql` → `meeting_booking_change_requests.sql` → `meeting_booking_notifications.sql`
-→ `rls_hardening.sql` → `rls_hardening_login_fix.sql` → `permanent_data_protection.sql`.
+→ `rls_hardening.sql` → `rls_hardening_login_fix.sql`
+→ `supabase/migrations/20260806020000_full_commercial_hardening.sql`
+→ `supabase/migrations/20260806023000_atomic_repair_completion.sql`
+→ `supabase/migrations/20260806024000_query_performance.sql`
+→ `supabase/migrations/20260806025000_disable_insecure_error_threshold_cron.sql`
+→ `supabase/migrations/20260806026000_client_error_monitoring.sql`
+→ `supabase/migrations/20260806027000_permission_fallback_alignment.sql`
+→ `supabase/migrations/20260806028000_workorder_equipment_scope.sql`
+→ `supabase/migrations/20260806029000_workorder_close_sign_scope.sql`
+→ `supabase/migrations/20260806030000_floorplan_storage_scope.sql`
+→ `supabase/migrations/20260806031000_notification_log_scope.sql`
+→ `supabase/migrations/20260806032000_disable_email_lookup_rpc.sql`
+→ `permanent_data_protection.sql`.
 `permanent_data_protection.sql` must be applied last. Production data is append/update/
 deactivate only: never reset the database, truncate tables, or physically delete personnel.
-RLS is currently open (`allow_all_for_now`) for development. Storage buckets:
-`floorplans`, `repair-files`.
+RLS is enforced in production. Bootstrap `allow_all_for_now` policies apply only to
+`authenticated`; the commercial hardening migrations replace them with row-scoped
+rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
+`vehicle-dispatch-files`.
 
 ## Conventions (follow these)
 - **Match the surrounding style**: cyberpunk dark theme. Core vars: `--bg:#020b18`,

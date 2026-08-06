@@ -2,13 +2,14 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>維修完工回報 — 第一果菜市場</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
@@ -302,8 +303,8 @@ a{color:inherit;text-decoration:none}
 }
 </style>
 <script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');}catch(_){document.documentElement.setAttribute('data-theme','tech');}</script>
-<script src="theme.js?v=20260805-4"></script>
-<link rel="stylesheet" href="light-mode-fix.css">
+<script src="theme.js?v=20260806-1"></script>
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 </head>
 <body>
 
@@ -401,7 +402,7 @@ const ROLE_PERMISSION_PRESETS={
   duty:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true},
   dispatcher:{maintenance:true,repair:true,read:true,create:true,update:true,dispatch:true,export:true},
   technician:{maintenance:true,read:true,update:true,dispatch:true},
-  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true,close:true,sign:true,export:true},
+  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,close:true,sign:true,export:true},
   mgmt_supervisor:{maintenance:true,handover:true,read:true,close:true,sign:true,export:true},
   sysadmin:{inspector:true,maintenance:true,handover:true,repair:true,read:true,create:true,update:true,delete:true,dispatch:true,close:true,sign:true,export:true,admin:true}
 };
@@ -661,7 +662,7 @@ function buildCard(o){
   const loc=o.location||o.location_desc||'—';
   const ft=o.fault_type||o.ftype||'—';
   const reporter=o.reporter_name||o.reporter||'—';
-  const created=o.created_at?new Date(o.created_at).toLocaleDateString('zh-TW'):'—';
+  const created=SystemDate.formatDate(o.created_at);
   const status=o.status||'pending';
   const assignee=o.assigned_to_name||'未指派';
   const idArg=encodedJsArg(o.id);
@@ -705,11 +706,6 @@ function renderPager(total,shown){
 function goPage(p){currentPage=p;renderCards();window.scrollTo(0,0);}
 
 /* ===== OPEN DETAIL ===== */
-function attachmentUrl(filePath){
-  if(!filePath)return '';
-  if(/^https?:\/\//i.test(filePath))return filePath;
-  return db.storage.from('repair-files').getPublicUrl(filePath).data?.publicUrl||'';
-}
 async function openDetail(id){
   const seq=++detailRequestSeq;
   const order=allOrders.find(o=>o.id===id)||null;
@@ -727,7 +723,9 @@ async function openDetail(id){
   if(attRes.error)console.warn('repair_attachments',attRes.error);
   if(timelineRes.error)console.warn('case_status_log',timelineRes.error);
   if(costRes.error)console.warn('cost_records',costRes.error);
-  const photoUrls=(attRes.data||[]).filter(x=>x.kind==='photo').map(x=>attachmentUrl(x.file_path)).filter(Boolean);
+  const photoRows=(attRes.data||[]).filter(x=>x.kind==='photo');
+  const {data:signedPhotos}=photoRows.length?await db.storage.from('repair-files').createSignedUrls(photoRows.map(x=>x.file_path),3600):{data:[]};
+  const photoUrls=(signedPhotos||[]).map(x=>x.signedUrl).filter(Boolean);
   const totalCost=(costRes.data||[]).reduce((sum,x)=>sum+Number(x.amount||0),0);
   const hasCompletion=!!(order.finish_time||order.result_desc||order.handle_method||photoUrls.length);
   const repairLog=hasCompletion?{
@@ -752,7 +750,7 @@ function buildDetailBody(o,repairLog,timeline){
   const phone=o.mobile||o.reporter_mobile||o.phone||'—';
   const dept=o.department||o.dept||'—';
   const assignee=o.assigned_to_name||'未指派';
-  const created=o.created_at?new Date(o.created_at).toLocaleString('zh-TW'):'—';
+  const created=SystemDate.formatDateTime(o.created_at);
   const urg=o.urgency||'normal';
   const status=o.status||'pending';
   const orderIdArg=encodedJsArg(o.id);
@@ -766,7 +764,7 @@ function buildDetailBody(o,repairLog,timeline){
   if(timeline.length){
     tlHTML=`<div class="sect">流程紀錄</div><ul class="tl">`;
     timeline.forEach(t=>{
-      const ts=new Date(t.created_at).toLocaleString('zh-TW');
+      const ts=SystemDate.formatDateTime(t.created_at);
       tlHTML+=`<li>
         <div class="ts">${ts}</div>
         <div class="st">${escHtml(t.action||statusText(t.status||t.to_status))} ${t.operator_name?'— '+escHtml(t.operator_name):''}</div>
@@ -786,7 +784,7 @@ function buildDetailBody(o,repairLog,timeline){
     repairLogHTML=`<div class="repair-log-box">
       <div class="repair-log-header">✅ 完工回報記錄</div>
       <div class="repair-log-row"><span class="repair-log-k">維修人員</span><span class="repair-log-v">${escHtml(repairLog.technician_name||'—')}</span></div>
-      <div class="repair-log-row"><span class="repair-log-k">回報時間</span><span class="repair-log-v">${new Date(repairLog.submitted_at).toLocaleString('zh-TW')}</span></div>
+      <div class="repair-log-row"><span class="repair-log-k">回報時間</span><span class="repair-log-v">${SystemDate.formatDateTime(repairLog.submitted_at)}</span></div>
       <div class="repair-log-row"><span class="repair-log-k">維修說明</span><span class="repair-log-v">${escHtml(repairLog.repair_desc||'—')}</span></div>
       <div class="repair-log-row"><span class="repair-log-k">產生費用</span><span class="repair-log-v">${repairLog.has_cost?'<span style="color:var(--amber)">是 — NT$ '+Number(repairLog.cost_amount||0).toLocaleString()+'</span>':'<span style="color:var(--green)">否</span>'}</span></div>
       ${photoHTML}
@@ -937,12 +935,13 @@ function removePhoto(idx){
 
 /* ===== UPLOAD PHOTO TO SUPABASE STORAGE ===== */
 async function uploadPhoto(file,orderId,index){
+  if(!/^image\/(jpeg|png|webp)$/i.test(file.type)||file.size>10*1024*1024)throw new Error('照片僅接受 JPG、PNG、WebP，且每檔不得超過 10MB');
   const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase()||'jpg';
   const path=`completion/${orderId}/${Date.now()}_${index}.${ext}`;
   const {error}=await db.storage.from('repair-files').upload(path,file,{upsert:false,contentType:file.type||'application/octet-stream'});
   if(error)throw new Error('照片上傳失敗：'+error.message);
-  const {data:pub}=db.storage.from('repair-files').getPublicUrl(path);
-  return {path,fileName:file.name,publicUrl:pub?.publicUrl||''};
+  const {data:signed}=await db.storage.from('repair-files').createSignedUrl(path,3600);
+  return {path,fileName:file.name,publicUrl:signed?.signedUrl||''};
 }
 
 /* ===== SUBMIT REPAIR LOG ===== */
@@ -965,71 +964,34 @@ async function submitRepairLog(){
 
   btn.disabled=true;btn.textContent='上傳中…';
   setMsg(msgEl,'');
+  const uploadedPaths=[];
+  let completionCommitted=false;
 
   try{
     const order=currentOrder;
     if(!order)throw new Error('找不到目前工單，請重新整理後再試');
-    const now=new Date().toISOString();
-    const myName=me_?.name||me_?.username||'維修人員';
-    const myId=validUuid(me_?.user_id)?me_.user_id:null;
     const reqNo=order.req_no||order.wo_no||'';
 
     // 1. Upload photos to the existing repair-files bucket.
     const uploads=[];
     for(let i=0;i<activePhotos.length;i++){
       setMsg(msgEl,`上傳照片 ${i+1}/${activePhotos.length}…`);
-      uploads.push(await uploadPhoto(activePhotos[i].file,order.order_id,i));
+      const uploaded=await uploadPhoto(activePhotos[i].file,order.order_id,i);
+      uploads.push(uploaded);uploadedPaths.push(uploaded.path);
     }
 
-    // 2. Register uploaded files in the shared attachment table.
-    const attachmentRows=uploads.map(x=>({
-      request_id:order.request_id,
-      order_id:order.order_id,
-      kind:'photo',
-      file_path:x.path,
-      file_name:x.fileName,
-      uploaded_by:myId
-    }));
-    const {error:attachmentErr}=await db.from('repair_attachments').insert(attachmentRows);
-    if(attachmentErr)throw attachmentErr;
-
-    // 3. Store completion details in the existing maintenance order.
+    // 2. Commit the order, request, attachment metadata, cost and audit log atomically.
     const costSummary=hasCost?`維修費用 NT$ ${Number(costAmt).toLocaleString('zh-TW')}${costNote?'｜'+costNote:''}`:'本次無維修費用';
     const completionNote=[order.note,`[完工回報] ${costSummary}`].filter(Boolean).join('\n');
-    const {error:statusErr}=await db.from('maintenance_orders').update({
-      status:'pending_review',
-      finish_time:now,
-      result_desc:desc,
-      handle_method:desc,
-      note:completionNote
-    }).eq('order_id',order.order_id);
-    if(statusErr)throw statusErr;
+    const {error:commitErr}=await db.rpc('complete_repair_order',{
+      p_order_id:order.order_id,p_description:desc,p_completion_note:completionNote,
+      p_has_cost:hasCost,p_cost_amount:hasCost?costAmt:0,p_cost_note:costNote||'',
+      p_attachments:uploads.map(x=>({file_path:x.path,file_name:x.fileName}))
+    });
+    if(commitErr)throw commitErr;
+    completionCommitted=true;
 
-    const {error:reqErr}=await db.from('repair_requests').update({status:'pending_review',updated_at:now}).eq('request_id',order.request_id);
-    if(reqErr)throw reqErr;
-
-    // 4. Record cost against the linked equipment.
-    if(hasCost){
-      const costPayload={equipment_id:order.equipment_id,order_id:order.order_id,cost_type:'other',amount:costAmt,cost_date:now.slice(0,10),note:costNote||'維修完工費用'};
-      if(myId)costPayload.created_by=myId;
-      const {error:costErr}=await db.from('cost_records').insert(costPayload);
-      if(costErr)throw costErr;
-    }
-
-    // 5. Append an auditable status event.
-    const logPayload={
-      request_id:order.request_id,
-      order_id:order.order_id,
-      from_status:order.status,
-      to_status:'pending_review',
-      operator_name:myName,
-      note:`維修說明：${desc}｜${costSummary}`
-    };
-    if(myId)logPayload.operator_id=myId;
-    const {error:logErr}=await db.from('case_status_log').insert(logPayload);
-    if(logErr)throw logErr;
-
-    // 6. Show success.
+    // 3. Show success.
     closeModal();
     document.getElementById('successSub').textContent=
       `工單 ${reqNo} 已更新為「待驗收」，請等待主管結案。`;
@@ -1040,6 +1002,7 @@ async function submitRepairLog(){
     renderCards();
 
   }catch(e){
+    if(!completionCommitted&&uploadedPaths.length)await db.storage.from('repair-files').remove(uploadedPaths);
     console.error('submitRepairLog error',e);
     setMsg(msgEl,'送出失敗：'+feedbackError(),'err');
   }finally{

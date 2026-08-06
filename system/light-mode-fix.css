@@ -440,19 +440,19 @@
 .ic{display:inline-block;width:1.1em;height:1.1em;vertical-align:middle;background-size:contain;background-repeat:no-repeat;background-position:center;flex-shrink:0;filter:invert(1);}
 :root[data-theme="light"] .ic{filter:none;}
 .ic-logout, .ic-refresh, .ic-password { filter: none !important; width: 1.5em !important; height: 1.5em !important; }
-.ic-dashboard{background-image:url(icons/nav-dashboard.png);}
-.ic-dispatch{background-image:url(icons/nav-dispatch.png);}
-.ic-inspection{background-image:url(icons/nav-inspection.png);}
-.ic-equipment{background-image:url(icons/nav-equipment.png?v=20260716-2);}
-.ic-handover{background-image:url(icons/nav-handover.png?v=20260716);}
-.ic-3d{background-image:url(icons/nav-3d.png);}
+.ic-dashboard{background-image:url(../assets/system-icons/admin-icon.png);}
+.ic-dispatch{background-image:url(../assets/system-icons/maintenance-icon.png);}
+.ic-inspection{background-image:url(../assets/system-icons/guardpatrol-icon.png);}
+.ic-equipment{background-image:url(../assets/system-icons/equipment-icon.png);}
+.ic-handover{background-image:url(../assets/system-icons/handover-icon.png);}
+.ic-3d{background-image:url(../assets/system-icons/guardpatrol-3d-icon.png);}
 .ic-refresh{background-image:url(icons/icon-refresh.png?v=20260716-3);}
 .ic-logout{background-image:url(icons/icon-logout.png?v=20260716-3);}
 .ic-notification{background-image:url(icons/icon-notification.png);}
-.ic-template{background-image:url(icons/icon-template.png);}
-.ic-user{background-image:url(icons/icon-user.png);}
+.ic-template{background-image:url(../assets/system-icons/settings-icon.png);}
+.ic-user{background-image:url(../assets/system-icons/account-icon.png);}
 .ic-password{background-image:url(icons/icon-password.png?v=20260716-3);}
-.ic-checkmark{background-image:url(icons/icon-checkmark.png);}
-.ic-location{background-image:url(icons/icon-location.png);}
-.ic-costs{background-image:url(icons/icon-costs.png);}
-.ic-audit{background-image:url(icons/icon-audit.png);}
+.ic-checkmark{background-image:url(../assets/system-icons/repair-complete-icon.png);}
+.ic-location{background-image:url(../assets/system-icons/guardpatrol-list-icon.png);}
+.ic-costs{background-image:url(../assets/system-icons/maintenance-icon.png);}
+.ic-audit{background-image:url(../assets/system-icons/audit-icon.png);}

@@ -2,14 +2,15 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>派工系統 — 報修派工管理系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;
@@ -110,7 +111,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
 .toast.show{opacity:1}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -194,7 +195,7 @@ const ROLE_PERMISSION_PRESETS={
   duty:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true},
   dispatcher:{maintenance:true,repair:true,read:true,create:true,update:true,dispatch:true,export:true},
   technician:{maintenance:true,read:true,update:true,dispatch:true},
-  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true,close:true,sign:true,export:true},
+  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,close:true,sign:true,export:true},
   mgmt_supervisor:{maintenance:true,handover:true,read:true,close:true,sign:true,export:true},
   sysadmin:{inspector:true,maintenance:true,handover:true,repair:true,read:true,create:true,update:true,delete:true,dispatch:true,close:true,sign:true,export:true,admin:true}
 };
@@ -616,6 +617,12 @@ async function openPendingDetail(id){
   ]);
   if(seq!==detailRequestSeq)return;
   if(logsErr||attsErr) console.warn('case detail logs/attachments query failed',{logsErr,attsErr});
+  if(atts?.length){
+    const {data:signed,error:signedErr}=await db.storage.from('repair-files').createSignedUrls(atts.map(a=>a.file_path),3600);
+    if(signedErr)console.warn('repair attachment signed URL query failed',signedErr);
+    const signedMap=new Map((signed||[]).map(x=>[x.path,x.signedUrl]));
+    atts.forEach(a=>a.signed_url=signedMap.get(a.file_path)||'');
+  }
   body.innerHTML=`
     <div class="d-info">
       <div><span class="k">報修單號：</span><span class="v">${escHtml(displayReqNo(curReq))}</span></div>
@@ -646,9 +653,10 @@ function displayFaultDesc(r){
   return (r?.fault_desc||'').replace(/^故障位置：.*\n?/,'').replace(/^故障描述：/,'')||'—';
 }
 function attHtml(a){
-  const url=`${SUPA_URL}/storage/v1/object/public/repair-files/${(a.file_path||'').split('/').map(encodeURIComponent).join('/')}`;
-  if(a.kind==='photo'||a.kind==='location_photo') return `<a class="att" style="font-size:.7rem;color:var(--blue);border:1px solid var(--border);padding:4px 8px;border-radius:2px;display:inline-block" href="${escHtml(url)}" target="_blank"><img src="${escHtml(url)}" alt="" style="max-width:90px;max-height:70px;display:block;border-radius:2px"></a>`;
-  return `<a class="att" style="font-size:.7rem;color:var(--blue);border:1px solid var(--border);padding:4px 8px;border-radius:2px;display:inline-block" href="${escHtml(url)}" target="_blank">📎 ${escHtml(a.file_name||a.kind)}</a>`;
+  const url=a.signed_url||'';
+  if(!url)return '<span class="att">附件暫時無法開啟</span>';
+  if(a.kind==='photo'||a.kind==='location_photo') return `<a class="att" style="font-size:.7rem;color:var(--blue);border:1px solid var(--border);padding:4px 8px;border-radius:2px;display:inline-block" href="${escHtml(url)}" target="_blank" rel="noopener"><img src="${escHtml(url)}" alt="${escHtml(a.file_name||'附件照片')}" style="max-width:90px;max-height:70px;display:block;border-radius:2px"></a>`;
+  return `<a class="att" style="font-size:.7rem;color:var(--blue);border:1px solid var(--border);padding:4px 8px;border-radius:2px;display:inline-block" href="${escHtml(url)}" target="_blank" rel="noopener">📎 ${escHtml(a.file_name||a.kind)}</a>`;
 }
 function act(fn){ fn(); }
 

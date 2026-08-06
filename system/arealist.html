@@ -2,18 +2,19 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
-<script src="floor-utils.js"></script>
+<script src="theme.js?v=20260806-1"></script>
+<script src="floor-utils.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>區域位置表 — 臺北農產公司巡檢系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--cyan-glow:0 0 14px rgba(0,212,255,.5);--blue:#1a7fff;--green:#00ff9d;
@@ -162,7 +163,7 @@ a{color:inherit;text-decoration:none}
 }
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -480,7 +481,7 @@ function locateSpace(spaceId){
   location.href='b1_integrated_marker_system.html?marker='+encodeURIComponent(markerId);
 }
 
-async function saveSpace(){
+async function saveSpaceUnsafe(){
   const floor=normFloor(document.getElementById('f-floor').value);
   const name=document.getElementById('f-name').value.trim();
   const msg=document.getElementById('editMsg');
@@ -495,6 +496,8 @@ async function saveSpace(){
 }
 
 // 查詢某空間是否已於整合標記系統被標記 → 回傳被標記的樓層陣列（防呆用）
+async function saveSpace(){if(!beginSystemAction('arealist.saveSpace'))return;try{return await saveSpaceUnsafe();}finally{endSystemAction('arealist.saveSpace');}}
+
 async function markedFloorsOf(spaceId){
   const {data,error}=await db.from('plan_markers').select('floor_id').eq('space_id',spaceId).eq('status','active');
   if(error) throw error;                      // 查詢失敗時交由呼叫端中止操作，不可視為「未被標記」

@@ -1,0 +1,34 @@
+name: Error threshold notification
+
+on:
+  schedule:
+    - cron: "4,9,14,19,24,29,34,39,44,49,54,59 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: error-threshold-notification
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger error threshold check
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --retry 2 --retry-all-errors \
+            --max-time 45 \
+            -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/error-threshold-check

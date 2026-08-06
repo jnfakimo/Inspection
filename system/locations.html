@@ -2,13 +2,14 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
-<script src="floor-utils.js"></script>
+<script src="theme.js?v=20260806-1"></script>
+<script src="floor-utils.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
 <title>場域位置管理 — 臺北農產公司巡檢系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--cyan-glow:0 0 14px rgba(0,212,255,.5);--blue:#1a7fff;--green:#00ff9d;
@@ -159,7 +160,7 @@ a{color:inherit;text-decoration:none}
 .empty{text-align:center;padding:40px;color:var(--text-dim);font-size:.8rem}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -559,7 +560,7 @@ function lmAreaSel(){
   if(v) document.getElementById('lm-area').value=v;
 }
 
-async function saveLocation(){
+async function saveLocationUnsafe(){
   const id=document.getElementById('lm-id').value;
   const market=document.getElementById('lm-market').value;
   // 正規化寫入值（B1F→B1、1→1F、頂樓→RF），避免與其他頁面的樓層比對再度分歧；
@@ -585,6 +586,8 @@ async function saveLocation(){
   setTimeout(()=>closeModal('loc-modal'),800);
   toast(id?'已更新位置':'已新增位置');
 }
+
+async function saveLocation(){if(!beginSystemAction('locations.saveLocation'))return;try{return await saveLocationUnsafe();}finally{endSystemAction('locations.saveLocation');}}
 
 async function toggleLoc(id,cur){
   const nxt=cur==='active'?'inactive':'active';
@@ -660,7 +663,7 @@ function openEditDept(id){
   document.getElementById('dept-modal').classList.add('show');
 }
 
-async function saveDept(){
+async function saveDeptUnsafe(){
   const id=document.getElementById('dm-id').value;
   const name=document.getElementById('dm-name').value.trim();
   const code=document.getElementById('dm-code').value.trim()||null;
@@ -679,6 +682,8 @@ async function saveDept(){
   setTimeout(()=>closeModal('dept-modal'),800);
   toast(id?'已更新部門':'已新增部門');
 }
+
+async function saveDept(){if(!beginSystemAction('locations.saveDept'))return;try{return await saveDeptUnsafe();}finally{endSystemAction('locations.saveDept');}}
 
 async function toggleDept(id,cur){
   const nxt=cur==='active'?'inactive':'active';

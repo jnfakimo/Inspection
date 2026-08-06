@@ -2,17 +2,18 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
-<script src="floor-utils.js"></script>
+<script src="theme.js?v=20260806-1"></script>
+<script src="floor-utils.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>設備建置與生命週期管理 — 臺北農產公司</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#9b5cff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--font-head:'Rajdhani','Noto Sans TC',sans-serif}
 :root[data-theme="light"]{--bg:#f4f6fa;--surface:#f8fafc;--panel:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b}
@@ -31,7 +32,7 @@
 @media(max-width:1000px){.kpis{grid-template-columns:repeat(3,1fr)}.split{grid-template-columns:1fr}.form-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:720px){.content{padding:10px}.nav-sub,.desktop-only,.tab.mobile-optional{display:none!important}.hero{align-items:flex-start}.hero p{max-width:92vw}.sync-state{display:none}.kpis{grid-template-columns:repeat(2,1fr)}.kpi:last-child{display:none}.toolbar .grow{flex-basis:100%;order:-1}.toolbar input.grow{width:100%}.form-grid{grid-template-columns:1fr}.field.wide{grid-column:auto}.modal-bg{padding:8px}.modal{max-height:calc(100vh - 16px);overflow:auto}.import-summary{grid-template-columns:repeat(2,1fr)}#assetTable th:nth-child(5),#assetTable td:nth-child(5),#assetTable th:nth-child(6),#assetTable td:nth-child(6),#assetTable th:nth-child(7),#assetTable td:nth-child(7),#assetTable th:nth-child(9),#assetTable td:nth-child(9),#assetTable th:nth-child(10),#assetTable td:nth-child(10){display:none}table{font-size:.69rem}th,td{padding:8px 7px}.panel-head .hint{display:none}.qr-meta{grid-template-columns:82px 1fr}}
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 <style>
 @media(max-width:720px){
@@ -158,7 +159,7 @@ const TYPE_LABEL={plan:'保養排程',record:'維修履歷',contract:'保養合�
 
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function safeUrl(v){const s=String(v||'').trim();return /^https?:\/\//i.test(s)?esc(s):'';}
-function todayISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function todayISO(){return SystemDate.todayISO();}
 function fmtDate(v){if(!v)return '—';const s=String(v);if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);const d=new Date(v);return isNaN(d)?s:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function money(v){return Number(v||0).toLocaleString('zh-TW',{maximumFractionDigits:0});}
 function eq(id){return state.assets.find(x=>x.equipment_id===id)||{};}
@@ -181,7 +182,7 @@ async function loadAll(){
   document.getElementById('syncText').textContent='讀取資料中…';missingTables=[];
   const assetReq=db.from('equipment').select('*').eq('status','active').order('name').limit(5000);
   const [a,plans,records,contracts,documents,costs,links,points,inspections,repairs,orders,costRecords,materials,markers]=await Promise.all([assetReq,safeLoad('plans'),safeLoad('records'),safeLoad('contracts'),safeLoad('documents'),safeLoad('costs'),safeLoad('links'),safeLoad('points'),safeCoreLoad('inspection_records'),safeCoreLoad('repair_requests'),safeCoreLoad('maintenance_orders'),safeCoreLoad('cost_records'),safeCoreLoad('materials'),safeCoreLoad('plan_markers')]);
-  if(a.error){document.getElementById('view').innerHTML=`<div class="panel"><div class="empty">設備主檔讀取失敗：${esc(a.error.message)}</div></div>`;document.getElementById('syncText').textContent='讀取失敗';return;}
+  if(a.error){document.getElementById('view').innerHTML=`<div class="panel"><div class="empty">設備主檔讀取失敗：${esc(safeDbError(a.error))}</div></div>`;document.getElementById('syncText').textContent='讀取失敗';return;}
   state={assets:a.data||[],plans,records,contracts,documents,costs,links,points,inspections,repairs,orders,costRecords,materials,markers};
   updateFilters();updateKpis();updateCounts();renderSetup();renderCurrent();
   document.getElementById('syncText').textContent=`最後更新 ${new Date().toLocaleTimeString('zh-TW',{hour12:false})}`;
@@ -285,7 +286,7 @@ function renderIntegration(){
   const q=searchText();const links=state.links.filter(x=>!q||eqText(x.equipment_id).toLowerCase().includes(q)||JSON.stringify(x).toLowerCase().includes(q));
   const points=state.points.filter(x=>!q||eqText(x.equipment_id).toLowerCase().includes(q)||JSON.stringify(x).toLowerCase().includes(q));
   const lr=links.map(x=>`<tr><td>${esc(eqText(x.equipment_id))}</td><td>${esc(x.external_system)}</td><td class="code">${esc(x.external_equipment_key)}</td><td>${esc(x.protocol)}</td><td>${esc(x.sync_mode)}</td><td>${x.last_sync_at?fmtDate(x.last_sync_at):'—'}</td><td>${statusPill(x.status)}</td><td><button class="act" onclick="openRelated('link','${x.link_id}')">編輯</button></td></tr>`).join('');
-  const pr=points.map(x=>`<tr><td>${esc(eqText(x.equipment_id))}</td><td class="code">${esc(x.point_code)}</td><td>${esc(x.point_name)}</td><td>${esc(x.point_address||'—')}</td><td>${esc(x.unit||'—')}</td><td>${x.last_value==null?'—':esc(JSON.stringify(x.last_value))}</td><td>${x.last_seen_at?new Date(x.last_seen_at).toLocaleString('zh-TW',{hour12:false}):'—'}</td><td><button class="act" onclick="openRelated('point','${x.point_id}')">編輯</button></td></tr>`).join('');
+  const pr=points.map(x=>`<tr><td>${esc(eqText(x.equipment_id))}</td><td class="code">${esc(x.point_code)}</td><td>${esc(x.point_name)}</td><td>${esc(x.point_address||'—')}</td><td>${esc(x.unit||'—')}</td><td>${x.last_value==null?'—':esc(JSON.stringify(x.last_value))}</td><td>${SystemDate.formatDateTime(x.last_seen_at)}</td><td><button class="act" onclick="openRelated('point','${x.point_id}')">編輯</button></td></tr>`).join('');
   document.getElementById('view').innerHTML=`<div class="split"><section class="panel subpanel"><div class="panel-head"><strong>外部系統設備對照</strong><span class="spacer"></span><button class="act" onclick="openRelated('link')">＋ 新增</button></div><div class="table-wrap"><table><thead><tr><th>設備</th><th>外部系統</th><th>外部設備鍵</th><th>協定</th><th>同步</th><th>最後同步</th><th>狀態</th><th>操作</th></tr></thead><tbody>${lr||'<tr><td colspan="8" class="empty">尚未建立外部設備對照。</td></tr>'}</tbody></table></div></section><section class="panel subpanel"><div class="panel-head"><strong>監控點位清冊</strong><span class="spacer"></span><button class="act" onclick="openRelated('point')">＋ 新增點位</button></div><div class="table-wrap"><table><thead><tr><th>設備</th><th>點位碼</th><th>點位名稱</th><th>位址</th><th>單位</th><th>最新值</th><th>最後收到</th><th>操作</th></tr></thead><tbody>${pr||'<tr><td colspan="8" class="empty">尚未建立監控點位。</td></tr>'}</tbody></table></div></section></div>`;
 }
 
@@ -306,8 +307,10 @@ function fieldHtml(key,label,type,value='',editing=false){
 function openEquipment(id=null){editEquipmentId=id;const e=id?eq(id):{status:'active',criticality:'medium',floor:'B1'};document.getElementById('equipmentModalTitle').textContent=id?`編輯設備｜${e.asset_code||e.name}`:'新增設備';document.getElementById('equipmentMsg').textContent='';document.getElementById('equipmentForm').innerHTML=EQ_GROUPS.map(g=>`<section class="form-group"><h3>${g.name}</h3><div class="form-grid">${g.fields.map(f=>fieldHtml(f[0],f[1],f[2],e[f[0]],!!id)).join('')}</div></section>`).join('');openModal('equipmentModal');}
 function formData(root){const out={};document.querySelectorAll(`#${root} [data-field]`).forEach(el=>{let v=el.value;if(el.type==='number')v=v===''?null:Number(v);if(el.tagName==='SELECT'&&(v==='true'||v==='false'))v=v==='true';if(el.type==='date'&&v==='')v=null;out[el.dataset.field]=v===''?null:v;});return out;}
 async function saveEquipment(){
+  if(!beginSystemAction('equipment.save'))return;try{
   const msg=document.getElementById('equipmentMsg'),p=formData('equipmentForm');msg.textContent='';if(!p.asset_code||!p.name){msg.textContent='設備編號與設備名稱為必填。';return;}p.asset_code=String(p.asset_code).trim().toUpperCase();p.floor=canonicalFloor(p.floor);p.qr_code=editEquipmentId?(eq(editEquipmentId).qr_code||p.asset_code):p.asset_code;p.manual_url=p.operation_manual_url||null;
-  const req=editEquipmentId?db.from('equipment').update(p).eq('equipment_id',editEquipmentId):db.from('equipment').insert(p);const {error}=await req;if(error){msg.textContent=schemaError(error)?'資料庫尚未套用 equipment_lifecycle.sql。':error.message;return;}closeModal('equipmentModal');toast('設備資料已儲存');await loadAll();
+  const req=editEquipmentId?db.from('equipment').update(p).eq('equipment_id',editEquipmentId):db.from('equipment').insert(p);const {error}=await req;if(error){msg.textContent=safeDbError(error);return;}closeModal('equipmentModal');toast('設備資料已儲存');await loadAll();
+  }finally{endSystemAction('equipment.save');}
 }
 
 const RELATED_DEFS={
@@ -323,18 +326,19 @@ function relatedDef(type){return RELATED_DEFS[type];}
 function relatedFieldHtml(f,v){const [key,label,type,opt]=f;if(type==='equipment')return `<div class="field"><label>${label}</label><select data-field="${key}"><option value="">— 選擇設備 —</option>${state.assets.map(e=>`<option value="${e.equipment_id}" ${v===e.equipment_id?'selected':''}>${esc(eqText(e.equipment_id))}</option>`).join('')}</select></div>`;if(type==='link')return `<div class="field"><label>${label}</label><select data-field="${key}"><option value="">— 未指定 —</option>${state.links.map(x=>`<option value="${x.link_id}" ${v===x.link_id?'selected':''}>${esc(x.external_system+'｜'+x.external_equipment_key)}</option>`).join('')}</select></div>`;if(type==='select')return `<div class="field"><label>${label}</label><select data-field="${key}">${opt.split('|').map(x=>{const [val,txt]=x.split(':');return `<option value="${val}" ${String(v||'')===val?'selected':''}>${txt}</option>`;}).join('')}</select></div>`;if(type==='boolean')return `<div class="field"><label>${label}</label><select data-field="${key}"><option value="true" ${v!==false?'selected':''}>是</option><option value="false" ${v===false?'selected':''}>否</option></select></div>`;if(type==='textarea')return `<div class="field wide"><label>${label}</label><textarea data-field="${key}">${esc(v||'')}</textarea></div>`;return `<div class="field"><label>${label}</label><input data-field="${key}" type="${type}" value="${esc(type==='date'&&v?fmtDate(v):(v??''))}"></div>`;}
 function openRelated(type,id=null){relatedType=type;relatedEditId=id;const d=relatedDef(type),key=type==='plan'?'plans':type==='record'?'records':type==='contract'?'contracts':type==='document'?'documents':type==='cost'?'costs':type==='link'?'links':'points';const r=id?state[key].find(x=>x[d.pk]===id):{};if(!id&&type==='record')r.performed_on=todayISO();if(!id&&type==='cost'){r.fiscal_year=new Date().getFullYear();r.source='manual';}if(!id&&['plan','contract','link','point'].includes(type))r.status='active';document.getElementById('relatedModalTitle').textContent=`${id?'編輯':'新增'}${TYPE_LABEL[type]}`;document.getElementById('relatedMsg').textContent='';document.getElementById('relatedForm').innerHTML=d.fields.map(f=>relatedFieldHtml(f,r[f[0]])).join('');openModal('relatedModal');}
 let relatedSubmitting=false;
-async function saveRelated(){
+async function saveRelatedUnsafe(){
   if(relatedSubmitting)return;
   const d=relatedDef(relatedType),p=formData('relatedForm'),msg=document.getElementById('relatedMsg');msg.textContent='';if(!p.equipment_id){msg.textContent='請選擇設備。';return;}const required={plan:['item_name'],record:['performed_on'],contract:['vendor'],document:['document_type','title','file_url'],cost:['fiscal_year'],link:['external_system','external_equipment_key'],point:['point_code','point_name']}[relatedType];if(required.some(k=>!p[k])){msg.textContent='請完成所有必填欄位。';return;}if(relatedType==='document'&&!safeUrl(p.file_url)){msg.textContent='文件連結必須使用 https:// 或 http://。';return;}
   relatedSubmitting=true;
   const btn=document.getElementById('relatedSaveBtn');if(btn){btn.disabled=true;btn.textContent='儲存中…';}
   try{
-    const req=relatedEditId?db.from(d.table).update(p).eq(d.pk,relatedEditId):db.from(d.table).insert(p);const {error}=await req;if(error){msg.textContent=error.message;return;}closeModal('relatedModal');toast(`${TYPE_LABEL[relatedType]}已儲存`);await loadAll();
+    const req=relatedEditId?db.from(d.table).update(p).eq(d.pk,relatedEditId):db.from(d.table).insert(p);const {error}=await req;if(error){msg.textContent=safeDbError(error);return;}closeModal('relatedModal');toast(`${TYPE_LABEL[relatedType]}已儲存`);await loadAll();
   }finally{
     relatedSubmitting=false;
     if(btn){btn.disabled=false;btn.textContent='儲存';}
   }
 }
+async function saveRelated(){if(!beginSystemAction('equipment.related'))return;try{return await saveRelatedUnsafe();}finally{endSystemAction('equipment.related');}}
 function addForCurrentTab(){if(tab==='assets')openEquipment();else if(tab==='integration')openRelated('link');else openRelated(tab.slice(0,-1));}
 
 const XLSX_HEADERS={

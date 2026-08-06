@@ -2,15 +2,16 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>統計分析 — 報修派工管理系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;
@@ -53,7 +54,7 @@ td.num,th.num{text-align:right;font-family:var(--font-mono);color:var(--cyan)}
 @media print{.navbar,.toolbar,.nav-back,.card h3 .ex{display:none}body{background:#fff;color:#000}.card{border:1px solid #999;break-inside:avoid}.card h3{color:#000}td,th{color:#000}}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -84,7 +85,7 @@ const db = createDb();
 (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
 function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 let reports=[]; // {title, cols, rows}
-function ymd(d){return d.toISOString().slice(0,10);}
+function ymd(d){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(d);}
 function quick(r){const now=new Date();let f;
   if(r==='month')f=new Date(now.getFullYear(),now.getMonth(),1);
   else if(r==='quarter')f=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);
@@ -95,10 +96,10 @@ async function fetchSafe(q,fallbackCols){const res=await q;if(res.error)return [
 
 async function load(){
   const from=document.getElementById('from').value,to=document.getElementById('to').value,toEnd=to+'T23:59:59';
-  let reqs=await fetchSafe(db.from('repair_requests').select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,equipment(name,category)').gte('created_at',from).lte('created_at',toEnd).limit(8000));
-  if(!reqs.length){reqs=await fetchSafe(db.from('repair_requests').select('request_id,department,equipment_id,status,created_at,equipment(name)').gte('created_at',from).lte('created_at',toEnd).limit(8000));}
-  let ords=await fetchSafe(db.from('maintenance_orders').select('order_id,request_id,assignee_id,status,start_time,finish_time,created_at,expected_finish,fault_cause,labor_hours,vendor,users:assignee_id(name)').limit(8000));
-  let costs=await fetchSafe(db.from('cost_records').select('cost_type,amount,vendor,cost_date,equipment_id,equipment(name)').gte('cost_date',from).lte('cost_date',to).limit(8000));
+  let reqs=await fetchSafe(db.from('repair_requests').select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,equipment(name,category)').gte('created_at',from).lte('created_at',toEnd).limit(5000));
+  if(!reqs.length){reqs=await fetchSafe(db.from('repair_requests').select('request_id,department,equipment_id,status,created_at,equipment(name)').gte('created_at',from).lte('created_at',toEnd).limit(5000));}
+  let ords=await fetchSafe(db.from('maintenance_orders').select('order_id,request_id,assignee_id,status,start_time,finish_time,created_at,expected_finish,fault_cause,labor_hours,vendor,users:assignee_id(name)').gte('created_at',from).lte('created_at',toEnd).limit(5000));
+  let costs=await fetchSafe(db.from('cost_records').select('cost_type,amount,vendor,cost_date,equipment_id,equipment(name)').gte('cost_date',from).lte('cost_date',to).limit(5000));
   build(reqs,ords,costs,from,to);
 }
 

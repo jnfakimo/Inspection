@@ -118,15 +118,14 @@ alter table cost_records        enable row level security;
 alter table audit_logs          enable row level security;
 alter table inspection_cycles   enable row level security;
 
--- Allow anon/service role to select (lock down properly in prod)
-create policy "allow_all_for_now" on users               for all using (true);
-create policy "allow_all_for_now" on equipment           for all using (true);
-create policy "allow_all_for_now" on inspection_records  for all using (true);
-create policy "allow_all_for_now" on repair_requests     for all using (true);
-create policy "allow_all_for_now" on maintenance_orders  for all using (true);
-create policy "allow_all_for_now" on cost_records        for all using (true);
-create policy "allow_all_for_now" on audit_logs          for all using (true);
-create policy "allow_all_for_now" on inspection_cycles   for all using (true);
+-- Bootstrap access is restricted to signed-in users and remains idempotent.
+-- full_commercial_hardening.sql replaces these temporary policies with row-scoped rules.
+do $$ declare t text; begin
+  foreach t in array array['users','equipment','inspection_records','repair_requests','maintenance_orders','cost_records','audit_logs','inspection_cycles'] loop
+    execute format('drop policy if exists allow_all_for_now on public.%I',t);
+    execute format('create policy allow_all_for_now on public.%I for all to authenticated using (true) with check (true)',t);
+  end loop;
+end $$;
 
 -- ============================================================
 -- Seed demo data

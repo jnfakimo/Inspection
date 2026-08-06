@@ -28,27 +28,12 @@ drop policy if exists "patrol_timeout_admin_read" on patrol_timeout_notification
 create policy "patrol_timeout_admin_read" on patrol_timeout_notifications
   for select using (auth.uid() is not null);
 
--- 每五分鐘檢查一次。若既有同名排程，先安全移除。
+-- 排程由 .github/workflows/patrol-line-notify.yml 執行，並以 CRON_SECRET
+-- 驗證。這裡只移除舊的資料庫排程，避免重新執行本檔時恢復匿名觸發。
 create extension if not exists pg_cron;
-create extension if not exists pg_net;
 do $$
 declare job_id bigint;
 begin
   select jobid into job_id from cron.job where jobname='patrol-timeout-line-check' limit 1;
   if job_id is not null then perform cron.unschedule(job_id); end if;
 end $$;
-
-select cron.schedule(
-  'patrol-timeout-line-check',
-  '*/5 * * * *',
-  $job$
-  select net.http_post(
-    url := 'https://qztffronusdhgxhjjubt.supabase.co/functions/v1/patrol-timeout-check',
-    headers := jsonb_build_object(
-      'Content-Type','application/json',
-      'Authorization','Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA'
-    ),
-    body := '{"scheduled":true}'::jsonb
-  );
-  $job$
-);

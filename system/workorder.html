@@ -2,14 +2,15 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>報修系統 — 報修派工管理系統</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;
@@ -142,7 +143,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
 .toast.show{opacity:1}
 
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -290,7 +291,7 @@ const ROLE_PERMISSION_PRESETS={
   duty:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true},
   dispatcher:{maintenance:true,repair:true,read:true,create:true,update:true,dispatch:true,export:true},
   technician:{maintenance:true,read:true,update:true,dispatch:true},
-  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,dispatch:true,close:true,sign:true,export:true},
+  unit_supervisor:{maintenance:true,handover:true,repair:true,read:true,create:true,close:true,sign:true,export:true},
   mgmt_supervisor:{maintenance:true,handover:true,read:true,close:true,sign:true,export:true},
   sysadmin:{inspector:true,maintenance:true,handover:true,repair:true,read:true,create:true,update:true,delete:true,dispatch:true,close:true,sign:true,export:true,admin:true}
 };
@@ -816,6 +817,10 @@ async function submitCreate(){
   if(!mobile){msg.textContent='請填寫手機號碼';msg.className='msg err';return;}
   if(!locationPhoto){msg.textContent='請上傳一張故障位置照片';msg.className='msg err';return;}
   if(!desc){msg.textContent='請填寫故障描述';msg.className='msg err';return;}
+  const allFiles=[locationPhoto,...document.getElementById('c-files').files];
+  const allowed=/^(image\/(jpeg|png|webp|heic)|video\/mp4|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))$/i;
+  const invalid=allFiles.find(f=>f.size>10*1024*1024||!allowed.test(f.type));
+  if(invalid){msg.textContent=`附件不符合限制：${invalid.name}（僅接受指定照片/MP4/PDF/Word/Excel，每檔 10MB）`;msg.className='msg err';return;}
   setCreateSubmitting(true);
   msg.textContent='送出中…';msg.className='msg';
   let requestCreated=false;
@@ -837,7 +842,7 @@ async function submitCreate(){
     const photoUp=await uploadRepairFile(photoPath,locationPhoto);
     if(photoUp.error)throw new Error('故障位置照片上傳失敗：'+uploadErrorMessage(photoUp.error));
     const photoMeta=await db.from('repair_attachments').insert({request_id:data.request_id,kind:'location_photo',file_path:photoPath,file_name:locationPhoto.name,uploaded_by:me_.user_id});
-    if(photoMeta.error)throw new Error('故障位置照片紀錄失敗：'+translateError(photoMeta.error.message));
+    if(photoMeta.error){await db.storage.from('repair-files').remove([photoPath]);throw new Error('故障位置照片紀錄失敗：'+translateError(photoMeta.error.message));}
 
     const attachmentErrors=[];
     for(const f of document.getElementById('c-files').files){
@@ -845,7 +850,7 @@ async function submitCreate(){
       const up=await uploadRepairFile(path,f);
       if(up.error){attachmentErrors.push(f.name);continue;}
       const meta=await db.from('repair_attachments').insert({request_id:data.request_id,kind,file_path:path,file_name:f.name,uploaded_by:me_.user_id});
-      if(meta.error)attachmentErrors.push(f.name);
+      if(meta.error){await db.storage.from('repair-files').remove([path]);attachmentErrors.push(f.name);}
     }
     await logStatus(data.request_id,null,null,'pending','建立報修');
     await notifyLineRepair({...rec,...data});
@@ -895,6 +900,12 @@ async function openDetail(id){
   ]);
   if(seq!==detailRequestSeq)return;
   if(logsErr||attsErr) console.warn('case detail logs/attachments query failed',{logsErr,attsErr});
+  if(atts?.length){
+    const {data:signed,error:signedErr}=await db.storage.from('repair-files').createSignedUrls(atts.map(a=>a.file_path),3600);
+    if(signedErr)console.warn('repair attachment signed URL query failed',signedErr);
+    const signedMap=new Map((signed||[]).map(x=>[x.path,x.signedUrl]));
+    atts.forEach(a=>a.signed_url=signedMap.get(a.file_path)||'');
+  }
   const loc=locs.find(l=>l.location_id===curReq.location_id);
   const eqName=curReq.equipment?.name||'—';
   body.innerHTML=`
@@ -922,9 +933,10 @@ async function openDetail(id){
   renderActions(curReq,o);
 }
 function attHtml(a){
-  const url=`${SUPA_URL}/storage/v1/object/public/repair-files/${(a.file_path||'').split('/').map(encodeURIComponent).join('/')}`;
-  if(a.kind==='photo'||a.kind==='location_photo') return `<a class="att" href="${escHtml(url)}" target="_blank"><img src="${escHtml(url)}" alt=""></a>`;
-  return `<a class="att" href="${escHtml(url)}" target="_blank">📎 ${escHtml(a.file_name||a.kind)}</a>`;
+  const url=a.signed_url||'';
+  if(!url)return `<span class="att">附件暫時無法開啟</span>`;
+  if(a.kind==='photo'||a.kind==='location_photo') return `<a class="att" href="${escHtml(url)}" target="_blank" rel="noopener"><img src="${escHtml(url)}" alt="${escHtml(a.file_name||'附件照片')}"></a>`;
+  return `<a class="att" href="${escHtml(url)}" target="_blank" rel="noopener">📎 ${escHtml(a.file_name||a.kind)}</a>`;
 }
 
 // ─── Actions (status-driven) ───

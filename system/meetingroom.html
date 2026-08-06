@@ -2,13 +2,14 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260805-4"></script>
+<script src="theme.js?v=20260806-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>會議室預約系統 — 臺北農產公司</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260806-1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#9b5cff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--weekend-bg:rgba(255,128,168,.12);--weekend-head:rgba(255,128,168,.2);--font-head:'Rajdhani','Noto Sans TC',sans-serif}
 :root[data-theme="light"]{--bg:#f4f6fa;--surface:#f8fafc;--panel:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#334155;--text-hi:#0f172a;--text-dim:#64748b;--weekend-bg:#fff1f5;--weekend-head:#ffe4ec}
@@ -108,7 +109,7 @@ table.mytable td{padding:8px;border-bottom:1px solid rgba(12,40,64,.55)}
 @media(max-width:700px){.request-columns{grid-template-columns:1fr}}
 @media(max-width:600px){.row2{grid-template-columns:1fr}.modal-bg{padding:8px}.modal-body{padding:13px}.modal-foot{padding:12px 13px}}
 </style>
-<link rel="stylesheet" href="light-mode-fix.css">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
@@ -549,7 +550,7 @@ async function checkConflictNow(){
   }catch(e){activeConflict=null;alertEl.textContent=e.message||'時段稽核失敗';alertEl.classList.add('show');}
 }
 
-async function saveBooking(){
+async function saveBookingUnsafe(){
   const roomId=document.getElementById('bkRoom').value;
   const dateStr=document.getElementById('bkDate').value;
   const start=selectedTime('Start');
@@ -626,7 +627,9 @@ async function checkIn(bookingId){
   await loadWeek();await loadMyBookings();
 }
 
-async function cancelBooking(bookingId){
+async function saveBooking(){if(!beginSystemAction('meeting.saveBooking'))return;try{return await saveBookingUnsafe();}finally{endSystemAction('meeting.saveBooking');}}
+
+async function cancelBookingUnsafe(bookingId){
   if(!confirm('確定要取消這筆預約？'))return;
   const {error}=await db.rpc('cancel_own_meeting_booking',{p_booking_id:bookingId});
   if(error){toast('取消失敗：'+translateError(error.message),true);return;}
@@ -666,7 +669,9 @@ async function openChangeRequestModal(bookingId,fromConflict){
   openModal('changeRequestModal');
 }
 
-async function submitChangeRequest(){
+async function cancelBooking(bookingId){if(!beginSystemAction('meeting.cancelBooking'))return;try{return await cancelBookingUnsafe(bookingId);}finally{endSystemAction('meeting.cancelBooking');}}
+
+async function submitChangeRequestUnsafe(){
   const meetingName=document.getElementById('crMeetingName').value.trim();
   const contactPhone=document.getElementById('crContactPhone').value.trim();
   const reason=document.getElementById('crReason').value.trim();
@@ -721,6 +726,8 @@ function requestTargetText(r){
   if(!b)return '原預約資料讀取失敗';
   return `${b.booking_no||'未編號'}｜${b.booking_date} ${b.start_time.slice(0,5)}-${b.end_time.slice(0,5)}｜${b.meeting_rooms?.name||'會議室未設定'}`;
 }
+async function submitChangeRequest(){if(!beginSystemAction('meeting.submitChangeRequest'))return;try{return await submitChangeRequestUnsafe();}finally{endSystemAction('meeting.submitChangeRequest');}}
+
 function renderChangeRequests(incoming,outgoing){
   const box=document.getElementById('requestBox');
   const incomingHtml=incoming.length?incoming.map(r=>{
@@ -783,7 +790,7 @@ function editRoom(roomId){
   document.getElementById('rmSaveBtn').textContent='儲存修改';
   document.getElementById('rmCancelEditBtn').style.display='inline-flex';
 }
-async function saveRoom(){
+async function saveRoomUnsafe(){
   if(!isAdmin())return;
   const name=document.getElementById('rmName').value.trim();
   if(!name){toast('請輸入會議室名稱',true);return;}
@@ -816,6 +823,7 @@ async function saveRoom(){
     toast('儲存失敗：'+translateError(e.message||String(e)),true);
   }
 }
+async function saveRoom(){if(!beginSystemAction('meeting.saveRoom'))return;try{return await saveRoomUnsafe();}finally{endSystemAction('meeting.saveRoom');}}
 </script>
 </body>
 </html>

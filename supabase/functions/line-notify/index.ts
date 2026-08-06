@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +38,7 @@ async function validLineSignature(rawBody: string, signature: string | null) {
 }
 
 type ActiveProfile = {
+  user_id: string;
   role: string | null;
   rbac_role: string | null;
   status: string | null;
@@ -49,7 +50,7 @@ async function authenticatedProfile(req: Request, db: any): Promise<ActiveProfil
   const { data: { user } } = await db.auth.getUser(bearer);
   if (!user) return null;
   const { data } = await db.from("users")
-    .select("role,rbac_role,status")
+    .select("user_id,role,rbac_role,status")
     .eq("auth_id", user.id)
     .maybeSingle();
   const profile = data as ActiveProfile | null;
@@ -118,6 +119,16 @@ Deno.serve(async (req) => {
       if (!profile && !trustedWebhook) return json({ ok: false, msg: "Unauthorized" }, 401);
       const canonical = await loadCanonicalRecord(db, payload.table, payload.record);
       if (!canonical) return json({ ok: false, msg: "Notification record was not found" }, 404);
+      const isAdmin = !!profile && (profile.role === "admin" || ["admin", "sysadmin"].includes(profile.rbac_role || ""));
+      const ownerColumn: Record<string, string> = {
+        inspection_records: "inspector_id",
+        repair_requests: "created_by",
+        handover_cases: "created_by",
+      };
+      const owner = ownerColumn[payload.table];
+      if (profile && !isAdmin && (!owner || canonical[owner] !== profile.user_id)) {
+        return json({ ok: false, msg: "Forbidden" }, 403);
+      }
       payload.record = canonical;
     }
 
@@ -200,13 +211,13 @@ Deno.serve(async (req) => {
     if (!lineRes.ok) {
       const errBody = await lineRes.text();
       console.error("LINE push error:", lineRes.status, errBody);
-      return json({ ok: false, msg: errBody }, 500);
+      return json({ ok: false, msg: "LINE delivery failed" }, 502);
     }
 
     return json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("Edge function error:", msg);
-    return json({ ok: false, msg }, 500);
+    return json({ ok: false, msg: "Notification service unavailable" }, 500);
   }
 });
