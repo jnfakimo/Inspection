@@ -160,7 +160,9 @@ async function saveVersion(publish){
   const {data,error}=await db.rpc('save_dashboard_layout_version',{p_layout_id:layoutRow.layout_id,p_items:currentPayload(),p_note:note,p_publish:publish});
   toggleButtons(false);if(error){setState('儲存失敗：'+error.message,'err');return;}
   dirty=false;setState(publish?'新版已發布，前台重新整理後即會套用。':'草稿已儲存。','ok');
-  const {data:fresh}=await db.from('dashboard_layouts').select('*').eq('layout_id',layoutRow.layout_id).single();if(fresh)layoutRow=fresh;
+  const {data:fresh,error:freshErr}=await db.from('dashboard_layouts').select('*').eq('layout_id',layoutRow.layout_id).single();
+  if(freshErr) console.warn('dashboard_layouts refresh after save failed',freshErr);
+  if(fresh)layoutRow=fresh;
   await loadVersions();document.getElementById('versionSelect').value=data;updateVersionMeta();
 }
 async function restoreVersion(){
