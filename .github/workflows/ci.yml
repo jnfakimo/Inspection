@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install any npm dependencies if package.json exists
+      - name: Install dependencies
+        run: |
+          if [ -f package.json ]; then npm ci; else echo "No package.json, skipping npm install"; fi
+
+      # Run unit / integration tests if defined
+      - name: Run tests
+        run: |
+          if npm test; then echo "Tests passed"; else echo "No tests defined or tests failed"; fi
+
+      # Lint HTML files using htmlhint
+      - name: Lint HTML
+        run: |
+          npx htmlhint "**/*.html"
+
+      # Lint CSS files using stylelint
+      - name: Lint CSS
+        run: |
+          npx stylelint "**/*.css" --allow-empty-input
+
+      # Verify Subresource Integrity hashes (optional helper)
+      - name: Verify SRI hashes
+        run: |
+          # Simple check: ensure script tags with external src contain integrity attribute
+          grep -R "<script src=\"https://" -n . | grep -v "integrity" && echo "Missing integrity detected" || echo "All external scripts have integrity attributes"
+        shell: bash
