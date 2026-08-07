@@ -6,7 +6,7 @@
   <title>動態互動組織樹 - 專案關聯地圖</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('siteTheme') || 'tech');</script>
-<script src="theme.js?v=20260807-alert1"></script>
+<script src="theme.js?v=20260807-resize1"></script>
   <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
 
@@ -119,15 +119,18 @@
 
     /* Layout Wrapper */
     .app-container {
-      flex: 1;
+      flex: 1 1 auto;
       display: flex;
       position: relative;
-      height: calc(100vh - 60px);
+      min-height: 0;
+      height: auto;
     }
 
     /* Network Canvas Container */
     #network-canvas {
-      flex: 1;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
       height: 100%;
       outline: none;
       cursor: grab;

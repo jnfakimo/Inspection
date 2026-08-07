@@ -4,7 +4,7 @@
   (function(){
     if(document.querySelector('script[src^="error-tracker.js"]'))return;
     var s=document.createElement('script');
-    s.src='error-tracker.js?v=20260806-1';
+    s.src='error-tracker.js?v=20260807-resize1';
     document.head.appendChild(s);
   })();
   var KEY='siteTheme';
@@ -861,12 +861,24 @@
         }
       });
     }
-    function syncHeight(){
+    var heightFrame=0;
+    var lastHeight=0;
+    function applyHeight(){
+      heightFrame=0;
+      if(!shell.isConnected)return;
       var height=Math.max(50,Math.ceil(shell.getBoundingClientRect().height));
+      if(height===lastHeight)return;
+      lastHeight=height;
       document.documentElement.style.setProperty('--system-header-height',height+'px');
     }
+    function syncHeight(){
+      if(heightFrame)return;
+      heightFrame=window.requestAnimationFrame
+        ? window.requestAnimationFrame(applyHeight)
+        : window.setTimeout(applyHeight,0);
+    }
     captureOffsets();
-    syncHeight();
+    applyHeight();
     if(window.ResizeObserver){new ResizeObserver(syncHeight).observe(shell);}
     var timer=0;
     window.addEventListener('resize',function(){

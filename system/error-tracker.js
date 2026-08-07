@@ -58,7 +58,18 @@
     } catch (e) { /* 錯誤回報本身不可以拋出例外 */ }
   }
 
+  // 瀏覽器在同一影格內延後 ResizeObserver 通知時會送出此非致命警告。
+  // 版面仍會在下一影格完成更新，不應當成應用程式錯誤重複寫入系統紀錄。
+  function isBenignResizeObserverWarning(message) {
+    return /^ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)\.?$/i
+      .test(String(message || '').trim());
+  }
+
   window.addEventListener('error', function (ev) {
+    if (isBenignResizeObserverWarning(ev.message)) {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      return;
+    }
     report('js_error', ev.message, {
       source: ev.filename, line: ev.lineno, col: ev.colno,
       stack: ev.error && ev.error.stack
