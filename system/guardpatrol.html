@@ -210,10 +210,12 @@ let lastResult=null,lastDutyResult=null;
 let floorKeys=[];
 const expandedFloors=new Set();
 
-function canonicalFloor(value){
+// 使用區域詞法繫結，避免覆蓋 theme.js 提供給 FloorUtils 的全域正規化函式。
+// 若使用 function 宣告，FloorUtils.canonicalFloor 會再次呼叫本函式而形成無限遞迴。
+const canonicalFloor = function(value){
   if(value==null||String(value).trim()==='')return '未分類';
   return window.FloorUtils.canonicalFloor(value);
-}
+};
 function floorOrder(value){
   const floor=canonicalFloor(value);
   if(floor==='B1')return -100;
