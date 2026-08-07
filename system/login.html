@@ -47,9 +47,14 @@ input:focus{border-color:#6366f1}
 .bottom-nav{flex-shrink:0;min-height:44px;display:flex;align-items:center;justify-content:center;padding:9px 16px calc(9px + env(safe-area-inset-bottom));background:transparent;border:0;text-align:center}
 .bottom-nav-label{display:inline-block;padding:2px 5px;background:transparent;color:#60a5fa;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.72rem;font-weight:700;line-height:1.25;letter-spacing:.04em;white-space:nowrap}
 
-/* ── 手機／平板桌面捷徑安裝卡 ───────────────────────────────────────────── */
-.install-card{width:100%;max-width:400px;background:#1e293b;border:1px solid #334155;border-radius:20px;padding:22px 24px;box-shadow:0 25px 50px rgba(0,0,0,.35)}
-.install-card[hidden]{display:none}
+/* ── 手機／平板桌面捷徑安裝 ─────────────────────────────────────────────── */
+/* 入口按鈕：登入卡下方，樣式沿用人臉辨識系統的「APP捷徑下載」 */
+.install-trigger{width:100%;max-width:400px;padding:12px 14px;background:transparent;border:1px solid #6366f1;border-radius:10px;color:#818cf8;font-family:inherit;font-size:.95rem;font-weight:700;text-align:center;cursor:pointer;transition:background .2s}
+.install-trigger:hover{background:rgba(99,102,241,.12)}
+.install-trigger[hidden]{display:none}
+/* 子畫面：放在 .overlay 裡，沿用忘記密碼那組 modal 樣式 */
+/* 展開安裝步驟後在矮螢幕（例如手機橫放）會超出視窗，所以卡片自己要能捲 */
+.install-card{max-width:400px;padding:24px 24px 20px;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
 .install-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .install-head img{width:44px;height:44px;border-radius:11px;flex-shrink:0;object-fit:cover;background:#0f172a}
 .install-title{font-size:.98rem;font-weight:700;color:#f8fafc;line-height:1.3}
@@ -67,7 +72,8 @@ input:focus{border-color:#6366f1}
 .install-steps ol{margin:10px 0 0;padding-left:1.35em;font-size:.78rem;color:#94a3b8;line-height:1.75}
 .install-note{margin-top:10px;font-size:.72rem;color:#64748b;line-height:1.55}
 
-:root[data-theme="light"] .install-card{background:#fff;border-color:#e2e8f0;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+:root[data-theme="light"] .install-trigger{border-color:#4f46e5;color:#4f46e5}
+:root[data-theme="light"] .install-trigger:hover{background:rgba(79,70,229,.08)}
 :root[data-theme="light"] .install-title{color:#0f172a}
 :root[data-theme="light"] .install-desc{color:#64748b}
 :root[data-theme="light"] .install-btn.alt{border-color:#cbd5e1;color:#64748b}
@@ -121,36 +127,42 @@ input:focus{border-color:#6366f1}
   <div class="err" id="errMsg"></div>
 </div>
 
-<!-- 手機／平板桌面捷徑安裝 -->
-<section class="install-card" id="installCard" hidden aria-label="安裝桌面捷徑">
-  <div class="install-head">
-    <img src="icons/app-icon-180.png?v=20260807-1" width="180" height="180" alt="">
-    <div>
-      <div class="install-title">把巡檢系統放到桌面</div>
-      <div class="install-desc" id="installDesc">安裝後點桌面圖示，直接開啟巡檢系統。</div>
-    </div>
-  </div>
-
-  <div class="install-warn" id="installWarn" hidden>
-    <span aria-hidden="true">⚠</span>
-    <span id="installWarnText"></span>
-  </div>
-
-  <button type="button" class="install-btn" id="installBtn">
-    <span aria-hidden="true">⬇</span><span id="installBtnText">下載並安裝描述檔</span>
-  </button>
-
-  <details class="install-steps" id="installSteps">
-    <summary id="installStepsTitle">安裝步驟</summary>
-    <ol id="installStepsList"></ol>
-  </details>
-  <p class="install-note" id="installNote"></p>
-</section>
+<!-- 手機／平板桌面捷徑：入口按鈕，點了才開子畫面 -->
+<button type="button" class="install-trigger" id="installTrigger" hidden>APP捷徑下載</button>
 </div>
 
 <footer class="bottom-nav" aria-label="系統資訊">
   <span class="bottom-nav-label">臺北農產運銷股份有限公司 第一果菜市場 ｜ 整合管理系統 ｜ v2.0</span>
 </footer>
+
+<!-- 桌面捷徑安裝 modal（由「APP捷徑下載」開啟） -->
+<div class="overlay" id="installOverlay">
+  <section class="card install-card" aria-label="安裝桌面捷徑">
+    <div class="install-head">
+      <img src="icons/app-icon-180.png?v=20260807-1" width="180" height="180" alt="">
+      <div>
+        <div class="install-title">把巡檢系統放到桌面</div>
+        <div class="install-desc" id="installDesc">安裝後點桌面圖示，直接開啟巡檢系統。</div>
+      </div>
+    </div>
+
+    <div class="install-warn" id="installWarn" hidden>
+      <span aria-hidden="true">⚠</span>
+      <span id="installWarnText"></span>
+    </div>
+
+    <button type="button" class="install-btn" id="installBtn">
+      <span aria-hidden="true">⬇</span><span id="installBtnText">下載並安裝描述檔</span>
+    </button>
+    <button type="button" class="install-btn alt" id="installCloseBtn">關閉</button>
+
+    <details class="install-steps" id="installSteps">
+      <summary id="installStepsTitle">安裝步驟</summary>
+      <ol id="installStepsList"></ol>
+    </details>
+    <p class="install-note" id="installNote"></p>
+  </section>
+</div>
 
 <!-- 忘記密碼 modal -->
 <div class="overlay" id="forgotOverlay">
@@ -464,6 +476,7 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
 
 <script>
 // ── 手機／平板桌面捷徑安裝 ─────────────────────────────────────────────────
+// 登入卡下方放一顆「APP捷徑下載」，點了才開子畫面（沿用忘記密碼那組 overlay）。
 // iOS：下載 Web Clip 描述檔（.mobileconfig），安裝後主畫面出現圖示。
 // Android：走 PWA，用 beforeinstallprompt 一鍵加入主畫面。
 // LINE / FB 等 App 內建瀏覽器都裝不了，一律導引到系統瀏覽器。
@@ -485,7 +498,9 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
   const isIOSAltBrowser = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
   const blocked = isLine || isOtherApp || isIOSAltBrowser;
 
-  const card      = document.getElementById('installCard');
+  const trigger   = document.getElementById('installTrigger');
+  const overlay   = document.getElementById('installOverlay');
+  const closeBtn  = document.getElementById('installCloseBtn');
   const desc      = document.getElementById('installDesc');
   const warn      = document.getElementById('installWarn');
   const warnText  = document.getElementById('installWarnText');
@@ -502,6 +517,14 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
       stepsList.appendChild(li);
     });
   }
+
+  function closeOverlay() { overlay.classList.remove('show'); }
+  trigger.addEventListener('click', function () { overlay.classList.add('show'); });
+  closeBtn.addEventListener('click', closeOverlay);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay.classList.contains('show')) closeOverlay();
+  });
 
   // LINE 支援用 openExternalBrowser=1 直接跳出系統瀏覽器
   function externalBrowserUrl() {
@@ -539,7 +562,7 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
       ? ['點右上角「⋯」或分享鈕。', '選「用 Safari 開啟」。', '回到本頁後點「下載並安裝描述檔」。']
       : ['點右上角「⋯」。', '選「用其他瀏覽器開啟」→ Chrome。', '回到本頁後點「加入主畫面」。']);
     note.textContent = '這是網頁捷徑，不是應用程式商店的 App，不會存取裝置上的個人資料。';
-    card.hidden = false;
+    trigger.hidden = false;
     return;
   }
 
@@ -585,7 +608,7 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
       setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
     });
 
-    card.hidden = false;
+    trigger.hidden = false;
     return;
   }
 
@@ -605,7 +628,7 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
     e.preventDefault();
     deferredPrompt = e;
   });
-  window.addEventListener('appinstalled', function () { card.hidden = true; });
+  window.addEventListener('appinstalled', function () { trigger.hidden = true; closeOverlay(); });
 
   btn.addEventListener('click', function () {
     if (deferredPrompt) {
@@ -626,7 +649,7 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
     });
   }
 
-  card.hidden = false;
+  trigger.hidden = false;
 })();
 </script>
 </body>
