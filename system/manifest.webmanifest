@@ -1,0 +1,34 @@
+{
+  "id": "./login.html",
+  "name": "第一果菜市場 設備巡檢維修系統",
+  "short_name": "北農巡檢",
+  "description": "臺北農產運銷股份有限公司 第一果菜市場 設備巡檢維修系統",
+  "lang": "zh-Hant-TW",
+  "dir": "ltr",
+  "start_url": "./login.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./icons/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/app-icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

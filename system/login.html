@@ -5,8 +5,16 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260807-audit1"></script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>臺北農產公司 第一果菜市場 設備巡檢維修系統</title>
+<link rel="manifest" href="manifest.webmanifest?v=20260807-1">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="北農巡檢">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/app-icon-180.png?v=20260807-1">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/app-icon-192.png?v=20260807-1">
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
 <style>
@@ -16,7 +24,7 @@ html,body{overflow-x:hidden;max-width:100%}
 :root[data-theme="light"]{--surface:#ffffff;--border:#e2e8f0;--text:#1e293b;--text-dim:#64748b;--cyan:#4f46e5;--green:#16a34a;--red:#dc2626}
 body{font-family:'Noto Sans TC',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;flex-direction:column}
 .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 16px;min-height:48px;flex-shrink:0}
-.page{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.page{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px}
 .card{background:#1e293b;border:1px solid #334155;border-radius:20px;padding:40px 36px;width:100%;max-width:400px;box-shadow:0 25px 50px rgba(0,0,0,.5)}
 h1{font-size:1.5rem;font-weight:700;color:#f8fafc;margin-bottom:6px;text-align:center}
 .subtitle{font-size:.85rem;color:#64748b;text-align:center;margin-bottom:32px}
@@ -38,6 +46,37 @@ input:focus{border-color:#6366f1}
 .overlay.show{display:flex}
 .bottom-nav{flex-shrink:0;min-height:44px;display:flex;align-items:center;justify-content:center;padding:9px 16px calc(9px + env(safe-area-inset-bottom));background:transparent;border:0;text-align:center}
 .bottom-nav-label{display:inline-block;padding:2px 5px;background:transparent;color:#60a5fa;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.72rem;font-weight:700;line-height:1.25;letter-spacing:.04em;white-space:nowrap}
+
+/* ── 手機／平板桌面捷徑安裝卡 ───────────────────────────────────────────── */
+.install-card{width:100%;max-width:400px;background:#1e293b;border:1px solid #334155;border-radius:20px;padding:22px 24px;box-shadow:0 25px 50px rgba(0,0,0,.35)}
+.install-card[hidden]{display:none}
+.install-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.install-head img{width:44px;height:44px;border-radius:11px;flex-shrink:0;object-fit:cover;background:#0f172a}
+.install-title{font-size:.98rem;font-weight:700;color:#f8fafc;line-height:1.3}
+.install-desc{font-size:.76rem;color:#94a3b8;margin-top:3px;line-height:1.45}
+.install-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:.95rem;font-weight:600;font-family:inherit;cursor:pointer;text-decoration:none;transition:background .2s}
+.install-btn:hover{background:#4f46e5}
+.install-btn.alt{background:transparent;border:1px solid #334155;color:#94a3b8;font-size:.85rem;padding:10px;margin-top:8px}
+.install-btn.alt:hover{background:rgba(255,255,255,.05)}
+.install-warn{display:flex;gap:9px;padding:11px 13px;margin-bottom:13px;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.35);border-radius:10px;font-size:.78rem;color:#fca5a5;line-height:1.5}
+.install-steps{margin-top:14px;border-top:1px solid #334155;padding-top:12px}
+.install-steps summary{font-size:.8rem;color:#818cf8;cursor:pointer;list-style:none;user-select:none}
+.install-steps summary::-webkit-details-marker{display:none}
+.install-steps summary::before{content:"▸ ";display:inline-block;transition:transform .2s}
+.install-steps[open] summary::before{content:"▾ "}
+.install-steps ol{margin:10px 0 0;padding-left:1.35em;font-size:.78rem;color:#94a3b8;line-height:1.75}
+.install-note{margin-top:10px;font-size:.72rem;color:#64748b;line-height:1.55}
+
+:root[data-theme="light"] .install-card{background:#fff;border-color:#e2e8f0;box-shadow:0 10px 30px rgba(15,23,42,.08)}
+:root[data-theme="light"] .install-title{color:#0f172a}
+:root[data-theme="light"] .install-desc{color:#64748b}
+:root[data-theme="light"] .install-btn.alt{border-color:#cbd5e1;color:#64748b}
+:root[data-theme="light"] .install-btn.alt:hover{background:rgba(0,0,0,.04)}
+:root[data-theme="light"] .install-warn{background:rgba(220,38,38,.07);border-color:rgba(220,38,38,.3);color:#b91c1c}
+:root[data-theme="light"] .install-steps{border-top-color:#e2e8f0}
+:root[data-theme="light"] .install-steps summary{color:#4f46e5}
+:root[data-theme="light"] .install-steps ol{color:#64748b}
+:root[data-theme="light"] .install-note{color:#94a3b8}
 
 :root[data-theme="light"] body{background:#f4f6fa;color:#1e293b}
 :root[data-theme="light"] .card{background:#ffffff;border-color:#e2e8f0;box-shadow:0 10px 30px rgba(15,23,42,.08)}
@@ -81,6 +120,32 @@ input:focus{border-color:#6366f1}
   <button type="button" class="forgot-link" id="forgotLink">忘記密碼？</button>
   <div class="err" id="errMsg"></div>
 </div>
+
+<!-- 手機／平板桌面捷徑安裝 -->
+<section class="install-card" id="installCard" hidden aria-label="安裝桌面捷徑">
+  <div class="install-head">
+    <img src="icons/app-icon-180.png?v=20260807-1" width="180" height="180" alt="">
+    <div>
+      <div class="install-title">把巡檢系統放到桌面</div>
+      <div class="install-desc" id="installDesc">安裝後點桌面圖示，直接開啟巡檢系統。</div>
+    </div>
+  </div>
+
+  <div class="install-warn" id="installWarn" hidden>
+    <span aria-hidden="true">⚠</span>
+    <span id="installWarnText"></span>
+  </div>
+
+  <button type="button" class="install-btn" id="installBtn">
+    <span aria-hidden="true">⬇</span><span id="installBtnText">下載並安裝描述檔</span>
+  </button>
+
+  <details class="install-steps" id="installSteps">
+    <summary id="installStepsTitle">安裝步驟</summary>
+    <ol id="installStepsList"></ol>
+  </details>
+  <p class="install-note" id="installNote"></p>
+</section>
 </div>
 
 <footer class="bottom-nav" aria-label="系統資訊">
@@ -289,33 +354,26 @@ async function doLogin() {
   if (!identifier || !password) { err.textContent = '請填寫帳號與密碼'; return; }
   btn.disabled = true; btn.textContent = '登入中…';
 
-  let sessionUser = null;
-  // Email 可直接交給 Supabase Auth；一般帳號由 Edge Function 在伺服器端
-  // 解析 Email，避免重新開放匿名 Email 查詢 RPC。
-  if (identifier.includes('@')) {
-    const { data, error } = await db.auth.signInWithPassword({ email: identifier, password });
-    if (error || !data.session || !data.user) {
-      err.textContent = error?.message ? translateError(error.message) : '帳號或密碼錯誤';
-      btn.disabled = false; btn.textContent = '登入';
-      return;
-    }
-    sessionUser = data.user;
-  } else {
-    // 未登入狀態不可查詢 users.email；改由伺服器端完成帳號驗證。
-    const { data: loginResult, error: loginError } = await db.functions.invoke('username-login', { body: { username: identifier, password } });
-    if (loginError || !loginResult?.access_token || !loginResult?.refresh_token) {
-      err.textContent = loginResult?.message || '帳號或密碼錯誤';
-      btn.disabled = false; btn.textContent = '登入';
-      return;
-    }
-    const setResult = await db.auth.setSession({ access_token: loginResult.access_token, refresh_token: loginResult.refresh_token });
-    if (setResult.error) {
-      err.textContent = '登入狀態建立失敗，請稍後重試';
-      btn.disabled = false; btn.textContent = '登入';
-      return;
-    }
-    sessionUser = setResult.data?.user;
+  // 帳號與 Email 統一交由伺服器驗證。伺服器會記錄每一次成功、失敗或被阻擋的
+  // 登入嘗試，並由請求本身取得來源網路位址與瀏覽器資訊。
+  const { data: loginResult, error: loginError } = await db.functions.invoke('username-login', {
+    body: { identifier, password }
+  });
+  if (loginError || !loginResult?.access_token || !loginResult?.refresh_token) {
+    err.textContent = loginResult?.message || '帳號或密碼錯誤';
+    btn.disabled = false; btn.textContent = '登入';
+    return;
   }
+  const setResult = await db.auth.setSession({
+    access_token: loginResult.access_token,
+    refresh_token: loginResult.refresh_token
+  });
+  if (setResult.error) {
+    err.textContent = '登入狀態建立失敗，請稍後重試';
+    btn.disabled = false; btn.textContent = '登入';
+    return;
+  }
+  const sessionUser = setResult.data?.user;
 
   if (!sessionUser) {
     err.textContent = '登入狀態建立失敗，請稍後重試';
@@ -342,8 +400,7 @@ async function doLogin() {
     if (profile.department) sessionStorage.setItem('user_department', profile.department);
     if (profile.phone) sessionStorage.setItem('user_phone', profile.phone);
   }
-  // 必須等稽核寫入完成後再導頁，否則瀏覽器切頁會中止請求，造成一般帳號（如 james）漏記。
-  await logAuthEvent('login', profile);
+  // 登入嘗試已由伺服器在發出登入憑證前完成稽核，避免切頁造成漏記或重複紀錄。
   window.location.href = getRedirectTarget(profile);
 }
 
@@ -403,6 +460,174 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
     }, 2000);
   }
 });
+</script>
+
+<script>
+// ── 手機／平板桌面捷徑安裝 ─────────────────────────────────────────────────
+// iOS：下載 Web Clip 描述檔（.mobileconfig），安裝後主畫面出現圖示。
+// Android：走 PWA，用 beforeinstallprompt 一鍵加入主畫面。
+// LINE / FB 等 App 內建瀏覽器都裝不了，一律導引到系統瀏覽器。
+(function () {
+  const PROFILE_URL = 'beinong-patrol.mobileconfig?v=20260807-1';
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/i.test(ua);
+  if (!isIOS && !isAndroid) return;               // 桌機不顯示安裝卡
+
+  // 已經從桌面圖示開啟，就不用再勸安裝
+  const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                     window.navigator.standalone === true;
+  if (standalone) return;
+
+  const isLine     = /\bLine\//i.test(ua);
+  const isOtherApp = /FBAN|FBAV|FB_IAB|Instagram|MicroMessenger|DingTalk|KAKAOTALK/i.test(ua);
+  const isIOSAltBrowser = isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+  const blocked = isLine || isOtherApp || isIOSAltBrowser;
+
+  const card      = document.getElementById('installCard');
+  const desc      = document.getElementById('installDesc');
+  const warn      = document.getElementById('installWarn');
+  const warnText  = document.getElementById('installWarnText');
+  const btn       = document.getElementById('installBtn');
+  const btnText   = document.getElementById('installBtnText');
+  const stepsList = document.getElementById('installStepsList');
+  const note      = document.getElementById('installNote');
+
+  function setSteps(items) {
+    stepsList.textContent = '';
+    items.forEach(function (t) {
+      const li = document.createElement('li');
+      li.textContent = t;
+      stepsList.appendChild(li);
+    });
+  }
+
+  // LINE 支援用 openExternalBrowser=1 直接跳出系統瀏覽器
+  function externalBrowserUrl() {
+    const u = new URL(window.location.href);
+    u.searchParams.set('openExternalBrowser', '1');
+    return u.toString();
+  }
+
+  // ── 情境一：App 內建瀏覽器（LINE / FB / IG…）或 iOS 上的非 Safari 瀏覽器 ──
+  if (blocked) {
+    const target = isIOS ? 'Safari' : 'Chrome';
+    desc.textContent = '目前的瀏覽器無法安裝桌面圖示。';
+    warn.hidden = false;
+    warnText.textContent = isLine
+      ? '偵測到 LINE 內建瀏覽器，請先切換到 ' + target + ' 才能安裝。'
+      : '請先用 ' + target + ' 開啟本頁，才能安裝桌面圖示。';
+    btnText.textContent = '用 ' + target + ' 開啟本頁';
+    btn.firstElementChild.textContent = '↗';
+
+    if (isLine) {
+      btn.addEventListener('click', function () { window.location.href = externalBrowserUrl(); });
+    } else if (isIOSAltBrowser) {
+      // Chrome for iOS 支援 x-safari- 前綴切換到 Safari
+      btn.addEventListener('click', function () {
+        window.location.href = 'x-safari-' + window.location.href;
+      });
+    } else {
+      btn.addEventListener('click', function () {
+        try { navigator.clipboard.writeText(window.location.href); } catch (e) { /* 忽略 */ }
+        warnText.textContent = '網址已複製，請貼到 ' + target + ' 開啟。';
+      });
+    }
+
+    setSteps(isIOS
+      ? ['點右上角「⋯」或分享鈕。', '選「用 Safari 開啟」。', '回到本頁後點「下載並安裝描述檔」。']
+      : ['點右上角「⋯」。', '選「用其他瀏覽器開啟」→ Chrome。', '回到本頁後點「加入主畫面」。']);
+    note.textContent = '這是網頁捷徑，不是應用程式商店的 App，不會存取裝置上的個人資料。';
+    card.hidden = false;
+    return;
+  }
+
+  // ── 情境二：iOS Safari → 下載描述檔 ──────────────────────────────────────
+  if (isIOS) {
+    desc.textContent = '安裝描述檔後，主畫面會出現「北農巡檢」圖示。';
+    btnText.textContent = '下載並安裝描述檔';
+    setSteps([
+      '點「下載並安裝描述檔」，出現提示時選「允許」。',
+      '開啟「設定」App，最上方會出現「已下載描述檔」。',
+      '點進去 →「安裝」→ 輸入螢幕鎖定密碼 →「安裝」。',
+      '完成後回到主畫面，即可看到「北農巡檢」圖示。'
+    ]);
+    note.textContent = 'iOS 未簽署的描述檔會顯示「未簽署」提示，屬正常現象。' +
+                       '若「設定」裡找不到，請到「一般」→「VPN 與裝置管理」。';
+
+    // 先把描述檔抓進記憶體，點擊時才能在同一個使用者手勢內完成導向。
+    // 直接連檔案的話 GitHub Pages 會送出 application/octet-stream，
+    // Safari 只會存檔而不會觸發描述檔安裝流程。
+    let profileText = null;
+    fetch(PROFILE_URL, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (t) { profileText = t; })
+      .catch(function () { /* 失敗就走直接下載 */ });
+
+    // 把描述檔裡建置期寫死的網址換成「目前這一頁」的網址，
+    // 這樣不論部署在 GitHub Pages、自架網域或區網 IP，裝出來的圖示都指得對。
+    function withCurrentUrl(text) {
+      const here = new URL('login.html', window.location.href).href
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      return text.replace(
+        /(<key>URL<\/key>\s*<string>)[^<]*(<\/string>)/,
+        function (_m, open, close) { return open + here + close; }
+      );
+    }
+
+    btn.addEventListener('click', function () {
+      if (!profileText) { window.location.href = PROFILE_URL; return; }
+      const url = URL.createObjectURL(
+        new Blob([withCurrentUrl(profileText)], { type: 'application/x-apple-aspen-config' })
+      );
+      window.location.href = url;
+      setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+    });
+
+    card.hidden = false;
+    return;
+  }
+
+  // ── 情境三：Android → PWA 加入主畫面 ────────────────────────────────────
+  desc.textContent = '加入主畫面後，點圖示即可全螢幕開啟巡檢系統。';
+  btnText.textContent = '加入主畫面';
+  setSteps([
+    '點「加入主畫面」。',
+    '若沒有跳出視窗，請點瀏覽器右上角「⋮」。',
+    '選「加到主畫面」或「安裝應用程式」。',
+    '完成後桌面會出現「北農巡檢」圖示。'
+  ]);
+  note.textContent = '這是網頁捷徑（PWA），不需要經過 Google Play 安裝。';
+
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+  window.addEventListener('appinstalled', function () { card.hidden = true; });
+
+  btn.addEventListener('click', function () {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(function () { deferredPrompt = null; });
+      return;
+    }
+    // 沒有安裝提示（例如已安裝、或瀏覽器不支援）就展開手動步驟
+    document.getElementById('installSteps').open = true;
+  });
+
+  // Chrome 要有 Service Worker 才會觸發 beforeinstallprompt；只在 Android 註冊，
+  // 避免影響 iOS Safari 的既有行為。
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('patrol-service-worker.js', { scope: './' })
+        .catch(function () { /* 註冊失敗就只走手動步驟 */ });
+    });
+  }
+
+  card.hidden = false;
+})();
 </script>
 </body>
 </html>

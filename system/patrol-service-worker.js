@@ -1,4 +1,4 @@
-const CACHE='patrol-checkin-v4';
+const CACHE='patrol-checkin-v5';
 const SHELL=[
   './patrolcheckin.html','./patrol-offline.js?v=20260717-1','./patrolcheckin-app.js?v=20260717-1','./theme.js?v=20260717-3',
   './light-mode-fix.css','./mobile-unified.css?v=20260717-1',
@@ -22,9 +22,17 @@ self.addEventListener('fetch',event=>{
   // behind the patrol offline cache.
   if(event.request.mode==='navigate')return;
   if(url.origin===location.origin){
-    event.respondWith(caches.match(event.request).then(hit=>hit||fetch(event.request).then(response=>{
-      if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}
-      return response;
-    })));
+    // stale-while-revalidate：有快取就秒回（地下室弱網也不卡），
+    // 同時背景抓新版寫回快取，下一次開啟就是最新的。
+    // 舊的 cache-first 一旦命中就永遠不回網路，部署後會卡住舊版 JS/CSS。
+    event.respondWith(caches.match(event.request).then(hit=>{
+      const fresh=fetch(event.request).then(response=>{
+        if(response.ok){const copy=response.clone();caches.open(CACHE).then(cache=>cache.put(event.request,copy));}
+        return response;
+      }).catch(err=>{if(hit)return hit;throw err;});
+      // 命中快取時回應已經送出，要靠 waitUntil 撐住背景更新不被 SW 回收。
+      if(hit)event.waitUntil(fresh);
+      return hit||fresh;
+    }));
   }
 });
