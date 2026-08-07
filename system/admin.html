@@ -588,6 +588,10 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 .audit-alert-meta{margin-top:5px;color:var(--text-dim);font-family:var(--font-mono);font-size:.9rem;line-height:1.4}
 .audit-alert-ack{align-self:center;white-space:nowrap;border-color:var(--red)!important;color:var(--red)!important;font-size:.9rem!important}
 .audit-alert-card.warning .audit-alert-ack{border-color:var(--amber)!important;color:var(--amber)!important}
+#page-syshealth .health-message{line-height:1.55;color:var(--text-hi)}
+#page-syshealth .health-tech-details{margin-top:5px;color:var(--text-dim);font-size:.72rem}
+#page-syshealth .health-tech-details summary{cursor:pointer;color:var(--cyan);font-weight:700}
+#page-syshealth .health-tech-original{display:block;margin-top:5px;padding:6px 8px;border-left:3px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 4%,var(--surface));white-space:normal;word-break:break-word;font-family:var(--font-mono);line-height:1.45}
 @media(max-width:1180px){
   #page-audit .audit-filter-bar{flex-wrap:wrap}
   #page-audit .audit-filter-control{flex:1 1 145px}
@@ -1256,21 +1260,21 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 
     <!-- SYSTEM HEALTH -->
     <div class="page-section" id="page-syshealth">
-      <div class="page-header"><h2><span class="section-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統健康</h2><p>前端自動回報的 JS 錯誤與未捕捉例外，供維運排查（system/error-tracker.js）</p></div>
+      <div class="page-header"><h2><span class="section-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統健康</h2><p>前端自動回報的程式錯誤、非同步處理錯誤與系統介接異常，供系統維運查核。</p></div>
       <div class="panel">
         <div class="search-bar">
           <select id="healthKindFilter" onchange="loadSystemHealth()">
             <option value="">全部類型</option>
-            <option value="js_error">JS 錯誤</option>
-            <option value="unhandled_rejection">未捕捉 Promise</option>
+            <option value="js_error">前端程式錯誤</option>
+            <option value="unhandled_rejection">未處理的非同步錯誤</option>
             <option value="manual">頁面主動回報</option>
-            <option value="api_error">API 失敗</option>
+            <option value="api_error">系統介接失敗</option>
           </select>
           <button class="btn" onclick="loadSystemHealth()">重新整理</button>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>時間</th><th>類型</th><th>頁面</th><th>訊息</th><th>使用者</th></tr></thead>
+            <thead><tr><th>發生時間</th><th>錯誤類型</th><th>發生頁面</th><th>錯誤訊息</th><th>操作人員</th></tr></thead>
             <tbody id="syshealthTbody"><tr><td colspan="5" class="empty">載入中…</td></tr></tbody>
           </table>
         </div>
@@ -3077,6 +3081,7 @@ const AUDIT_PAGE_LABEL = {
   'meetingroom.html':'會議室預約系統',
   'equipment.html':'設備建置管理',
   'structure_map.html':'專案關係地圖',
+  'b1_integrated_marker_system.html':'地下一樓整合標記系統',
   'b1plan.html':'二維圖面',
   'floor3d.html':'三維樓層模型',
   'modeler.html':'圖面建模系統',
@@ -3389,6 +3394,58 @@ function auditContentHtml(row, item) {
   </div>`;
 }
 
+function healthPageLabel(value) {
+  const label = auditPageName(value);
+  return label && !/\.html(?:$|[?#])/i.test(label) ? label : '未識別的系統頁面';
+}
+
+function translateHealthMessage(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '未提供錯誤說明。';
+  const text = raw.toLowerCase();
+  if (/resizeobserver loop (completed with undelivered notifications|limit exceeded)/i.test(raw)) {
+    return '版面尺寸監測完成，但仍有尚未送出的更新通知。';
+  }
+  if (text.includes('maximum call stack size exceeded')) {
+    return '程式呼叫層級過深，已超過系統允許的上限。';
+  }
+  if (text.includes('failed to fetch') || text.includes('networkerror') || text.includes('network request failed')) {
+    return '網路連線失敗，無法取得系統資料。';
+  }
+  if (text.includes('load failed') || text.includes('loading chunk') || text.includes('failed to load resource')) {
+    return '頁面所需的程式或資源載入失敗。';
+  }
+  if (text.includes('cannot read properties of') || text.includes('cannot read property')) {
+    return '程式嘗試讀取尚未建立或不存在的資料欄位。';
+  }
+  if (text.includes('cannot set properties of') || text.includes('cannot set property')) {
+    return '程式嘗試寫入尚未建立或不存在的資料欄位。';
+  }
+  if (text.includes('is not a function')) {
+    return '程式呼叫了不存在或尚未載入的功能。';
+  }
+  if (text.includes('is not defined')) {
+    return '頁面所需的程式變數尚未載入或不存在。';
+  }
+  if (text.includes('unexpected token') || text.includes('json.parse') || text.includes('invalid json')) {
+    return '系統回傳的資料格式錯誤，無法完成解析。';
+  }
+  if (text.includes('quota exceeded') || text.includes('quotaexceedederror')) {
+    return '瀏覽器可用的儲存空間已達上限。';
+  }
+  if (text.includes('permission denied') || text.includes('not allowed') || text.includes('notallowederror')) {
+    return '目前帳號或瀏覽器沒有執行此操作的權限。';
+  }
+  if (text.includes('timeout') || text.includes('timed out')) {
+    return '系統等待回應逾時，操作未能完成。';
+  }
+  if (text.includes('aborterror') || text.includes('aborted')) {
+    return '操作已中止，資料尚未完成載入。';
+  }
+  if (/[\u3400-\u9fff]/.test(raw)) return raw;
+  return '系統發生未分類的程式錯誤，請展開技術原文供維運人員查核。';
+}
+
 async function loadSystemHealth() {
   const kindFilter = document.getElementById('healthKindFilter')?.value || '';
   const tbody = document.getElementById('syshealthTbody');
@@ -3397,19 +3454,31 @@ async function loadSystemHealth() {
   if (kindFilter) query = query.eq('kind', kindFilter);
   const { data, error } = await query;
   if (error) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red)">載入失敗：${escHtml(translateError(error.message))}<br><small>請確認已在 Supabase SQL Editor 執行 system/sql/error_logging.sql</small></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red)">載入失敗：${escHtml(translateError(error.message))}<br><small>請確認系統健康紀錄的資料庫設定已完成。</small></td></tr>`;
     return;
   }
   const rows = data || [];
   if (!rows.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">目前沒有錯誤紀錄。</td></tr>'; return; }
-  const KIND_LABEL = { js_error: 'JS 錯誤', unhandled_rejection: '未捕捉 Promise', manual: '頁面主動回報', api_error: 'API 失敗' };
-  tbody.innerHTML = rows.map(r => `<tr>
-    <td>${escHtml(SystemDate.formatDateTime(r.occurred_at))}</td>
-    <td>${escHtml(KIND_LABEL[r.kind] || r.kind)}</td>
-    <td>${escHtml(r.page || '—')}</td>
-    <td style="max-width:420px;white-space:normal;word-break:break-word">${escHtml(r.message)}</td>
-    <td>${escHtml(r.users?.name || '—')}</td>
-  </tr>`).join('');
+  const KIND_LABEL = {
+    js_error:'前端程式錯誤',
+    unhandled_rejection:'未處理的非同步錯誤',
+    manual:'頁面主動回報',
+    api_error:'系統介接失敗'
+  };
+  tbody.innerHTML = rows.map(r => {
+    const originalMessage = String(r.message || '').trim();
+    const translatedMessage = translateHealthMessage(originalMessage);
+    const technicalOriginal = originalMessage && originalMessage !== translatedMessage
+      ? `<details class="health-tech-details"><summary>查看技術原文</summary><code class="health-tech-original">${escHtml(originalMessage)}</code></details>`
+      : '';
+    return `<tr>
+      <td>${escHtml(SystemDate.formatDateTime(r.occurred_at))}</td>
+      <td>${escHtml(KIND_LABEL[r.kind] || '其他系統錯誤')}</td>
+      <td>${escHtml(healthPageLabel(r.page))}</td>
+      <td style="max-width:420px;white-space:normal;word-break:break-word"><div class="health-message">${escHtml(translatedMessage)}</div>${technicalOriginal}</td>
+      <td>${escHtml(r.users?.name || '未識別')}</td>
+    </tr>`;
+  }).join('');
 }
 let auditPage = 1;
 const AUDIT_PAGE_SIZE = 10;
