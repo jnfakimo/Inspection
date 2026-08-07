@@ -491,13 +491,14 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 .audit-action-login{color:var(--green)}
 .audit-action-logout{color:var(--text-dim)}
 .audit-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
-.audit-detail-table{width:100%;min-width:1450px;border-collapse:collapse;table-layout:fixed;background:var(--surface)}
+.audit-detail-table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;background:var(--surface)}
 .audit-detail-table th{padding:9px 8px;border-bottom:1px solid var(--border-hi);background:color-mix(in srgb,var(--cyan) 8%,var(--surface));color:var(--cyan);font-family:var(--font-head);font-size:1.1rem;letter-spacing:.04em;text-align:left;white-space:nowrap}
 .audit-detail-table td{padding:9px 8px;border-bottom:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1.15rem;line-height:1.32;vertical-align:top;word-break:break-word}
 .audit-detail-table tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--bg) 55%,var(--surface))}
 .audit-detail-table tbody tr:hover td{background:color-mix(in srgb,var(--cyan) 5%,var(--surface))}
 .audit-detail-table tbody tr:last-child td{border-bottom:0}
-.audit-col-time{width:10%}.audit-col-account{width:15%}.audit-col-role{width:12%}.audit-col-action{width:11%}.audit-col-content{width:31%}.audit-col-ip{width:9%}.audit-col-device{width:12%}
+.audit-col-time{width:13%}.audit-col-account{width:16%}.audit-col-role{width:12%}.audit-col-action{width:10%}.audit-col-content{width:25%}.audit-col-ip{width:11%}.audit-col-device{width:13%}
+.audit-detail-table td:nth-child(6){white-space:nowrap}
 .audit-primary{display:block;color:var(--text-hi);font-weight:700;line-height:1.3;white-space:normal}
 .audit-secondary{margin-top:3px;color:var(--text-dim);font-family:var(--font-mono);font-size:.96rem;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
 .audit-detail-lines{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
@@ -591,7 +592,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   #page-audit .audit-filter-bar{flex-wrap:wrap}
   #page-audit .audit-filter-control{flex:1 1 145px}
   .audit-table-wrap{overflow-x:auto}
-  .audit-detail-table{min-width:980px}
+  .audit-detail-table{min-width:1100px}
 }
 @media(max-width:900px){
   .audit-filter-control{max-width:none}
