@@ -97,7 +97,7 @@ async function saveSecurityAlert(
     return { alert_id: existing.alert_id, alert_type: spec.alertType, updated: true };
   }
 
-  const { data, error } = await admin.from("security_alerts").insert({
+  const newAlert = {
     alert_type: spec.alertType,
     severity: spec.severity,
     title: spec.title,
@@ -111,7 +111,32 @@ async function saveSecurityAlert(
     details: spec.details,
     detected_at: now.toISOString(),
     last_seen_at: now.toISOString()
-  }).select("alert_id").single();
+  };
+  const { data, error } = await admin.from("security_alerts").insert(newAlert).select("alert_id").single();
+  if (error?.code === "23505") {
+    const { data: concurrent, error: concurrentError } = await admin.from("security_alerts")
+      .select("alert_id,event_count")
+      .eq("alert_type", spec.alertType)
+      .eq("operator_id", profile.user_id)
+      .eq("status", "open")
+      .maybeSingle();
+    if (concurrentError) throw concurrentError;
+    if (concurrent?.alert_id) {
+      const { error: updateError } = await admin.from("security_alerts").update({
+        severity: spec.severity,
+        title: spec.title,
+        message: spec.message,
+        ip_address: ipAddress,
+        resource: spec.resource,
+        event_count: Math.max(Number(concurrent.event_count) || 1, spec.eventCount),
+        window_minutes: spec.windowMinutes,
+        details: spec.details,
+        last_seen_at: now.toISOString()
+      }).eq("alert_id", concurrent.alert_id);
+      if (updateError) throw updateError;
+      return { alert_id: concurrent.alert_id, alert_type: spec.alertType, updated: true };
+    }
+  }
   if (error) throw error;
   return { alert_id: data.alert_id, alert_type: spec.alertType, updated: false };
 }
