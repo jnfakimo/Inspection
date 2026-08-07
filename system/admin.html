@@ -9,7 +9,7 @@ if (location.hash === '#repairs') {
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260806-1"></script>
+<script src="theme.js?v=20260807-audit1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -490,6 +490,27 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 .audit-action-status_change{color:var(--amber)}
 .audit-action-login{color:var(--green)}
 .audit-action-logout{color:var(--text-dim)}
+.audit-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:rgba(2,8,20,.35)}
+.audit-detail-table{width:100%;min-width:1480px;border-collapse:collapse;table-layout:fixed}
+.audit-detail-table th{padding:12px 14px;border-bottom:1px solid var(--border-hi);background:rgba(2,132,199,.07);color:var(--cyan);font-family:var(--font-head);font-size:.76rem;letter-spacing:.06em;text-align:left;white-space:nowrap}
+.audit-detail-table td{padding:13px 14px;border-bottom:1px solid rgba(12,40,64,.48);color:var(--text);font-size:.8rem;line-height:1.55;vertical-align:top;word-break:break-word}
+.audit-detail-table tbody tr:hover{background:rgba(0,212,255,.025)}
+.audit-detail-table tbody tr:last-child td{border-bottom:0}
+.audit-col-time{width:150px}.audit-col-account{width:205px}.audit-col-role{width:160px}.audit-col-action{width:125px}.audit-col-content{width:390px}.audit-col-ip{width:135px}.audit-col-device{width:250px}
+.audit-primary{color:var(--text-hi);font-weight:700}
+.audit-secondary{margin-top:2px;color:var(--text-dim);font-family:var(--font-mono);font-size:.7rem;line-height:1.5}
+.audit-detail-lines{display:flex;flex-direction:column;gap:3px}
+.audit-detail-lines>span{display:block}
+.audit-detail-lines .audit-source{color:var(--text-dim);font-family:var(--font-mono);font-size:.69rem}
+.audit-ua-details{margin-top:5px;color:var(--text-dim);font-size:.68rem}
+.audit-ua-details summary{cursor:pointer;color:var(--cyan)}
+.audit-ua-raw{margin-top:4px;max-width:240px;white-space:normal;word-break:break-all;font-family:var(--font-mono);font-size:.62rem;line-height:1.45}
+.audit-pagination{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.audit-pagination button{min-width:36px;height:34px;padding:0 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text-dim);cursor:pointer}
+.audit-pagination button:hover:not(:disabled),.audit-pagination button.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.08)}
+.audit-pagination button:disabled{opacity:.42;cursor:not-allowed}
+.audit-pagination-label{color:var(--text-dim);font-family:var(--font-mono);font-size:.72rem}
+.audit-empty{padding:30px!important;text-align:center;color:var(--text-dim)!important;font-family:var(--font-mono)}
 
 /* ===== SEARCH BAR ===== */
 .search-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -990,21 +1011,33 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
         <div class="search-bar audit-filter-bar">
           <div class="audit-filter-control">
             <label for="auditTableFilter">資料類型</label>
-            <select id="auditTableFilter" onchange="loadAudit()">
+            <select id="auditTableFilter" onchange="loadAudit(true)">
               <option value="">全部資料表</option>
+              <option value="system_usage">系統／功能使用</option>
               <option value="users">帳號</option>
               <option value="equipment">設備</option>
               <option value="inspection_records">巡檢記錄</option>
+              <option value="checkin_logs">巡檢打卡</option>
+              <option value="patrol_shifts">巡檢班別</option>
               <option value="repair_requests">報修單</option>
               <option value="maintenance_orders">維修單</option>
               <option value="cost_records">費用</option>
+              <option value="handover_records">電子交接簿</option>
+              <option value="handover_cases">交接案件</option>
+              <option value="vehicle_dispatch_requests">公務車派車</option>
+              <option value="meeting_bookings">會議室預約</option>
+              <option value="meeting_booking_change_requests">預約變更申請</option>
+              <option value="floor_spaces">專案空間</option>
+              <option value="plan_markers">圖面標記</option>
               <option value="auth">登入/登出</option>
             </select>
           </div>
           <div class="audit-filter-control">
             <label for="auditActionFilter">操作類型</label>
-            <select id="auditActionFilter" onchange="loadAudit()">
+            <select id="auditActionFilter" onchange="loadAudit(true)">
               <option value="">全部動作</option>
+              <option value="page_view">進入系統</option>
+              <option value="function_use">使用功能</option>
               <option value="insert">新增</option>
               <option value="update">修改</option>
               <option value="status_change">狀態變更</option>
@@ -1024,6 +1057,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
         </div>
         <div id="auditFilterSummary" class="audit-filter-summary"></div>
         <div id="auditList"><div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">載入中…</div></div>
+        <div id="auditPagination" class="audit-pagination"></div>
       </div>
     </div>
 
@@ -1759,8 +1793,8 @@ renderPermissionList('e', defaultPermsForRole('reporter'));
   DTP.init('inspDateTo-dtp','date',loadInspections);
   DTP.init('cost-date-dtp','date');
   DTP.init('edit-eq-date-dtp','date');
-  DTP.init('auditDateFrom-dtp','date',loadAudit);
-  DTP.init('auditDateTo-dtp','date',loadAudit);
+  DTP.init('auditDateFrom-dtp','date',() => loadAudit(true));
+  DTP.init('auditDateTo-dtp','date',() => loadAudit(true));
   await loadAll();
   activateAdminPage(getAdminInitialPage(), { persist:false });
   // 載入系統設定並套用名稱
@@ -2938,32 +2972,57 @@ function exportCostCsv() {   // 統一標準：匯出 XLSX
   XLSX.writeFile(wb, `費用報表_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除', login:'登入', logout:'登出' };
+const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除', login:'登入系統', logout:'登出系統', page_view:'進入系統', function_use:'使用功能', data_action:'資料操作' };
 const AUDIT_TABLE_LABEL = {
+  system_usage:'系統／功能使用',
   users:'帳號',
   equipment:'設備',
   departments:'部門',
   inspection_cycles:'巡檢週期',
+  inspection_records:'巡檢記錄',
+  checkin_logs:'巡檢打卡',
+  patrol_shifts:'巡檢班別',
   cost_records:'費用紀錄',
   repair_requests:'報修單',
   maintenance_orders:'維修單',
+  handover_records:'電子交接簿',
+  handover_cases:'交接案件',
+  handover_case_logs:'交接案件歷程',
+  vehicle_dispatch_requests:'公務車派車',
+  vehicle_dispatch_logs:'派車流程歷程',
+  meeting_bookings:'會議室預約',
+  meeting_booking_change_requests:'預約變更申請',
+  meeting_booking_notifications:'會議室通知',
+  floor_spaces:'專案空間',
+  plan_markers:'圖面標記',
+  materials:'材料主檔',
+  notifications:'系統通知',
   auth:'登入/登出'
 };
-// 把冗長的瀏覽器 User-Agent 字串簡化成好讀的「作業系統 · 瀏覽器」
-function summarizeUserAgent(ua) {
-  if (!ua) return '';
-  let os = '未知裝置';
-  if (/iPhone|iPad/.test(ua)) os = 'iOS';
+// 把 User-Agent 拆成「裝置類型 · 作業系統 · 瀏覽器」，並保留完整字串供展開查核。
+function parseAuditUserAgent(ua) {
+  if (!ua) return { device:'未知裝置', os:'未知系統', browser:'未知瀏覽器', label:'未知裝置' };
+  const isTablet = /iPad|Tablet|PlayBook|Silk/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua));
+  const isMobile = !isTablet && /Mobile|iPhone|iPod|Android|IEMobile|Opera Mini/i.test(ua);
+  const device = isTablet ? '平板' : isMobile ? '手機' : '電腦';
+  let os = '未知系統';
+  if (/iPhone|iPod/.test(ua)) os = 'iOS';
+  else if (/iPad/.test(ua)) os = 'iPadOS';
   else if (/Android/.test(ua)) os = 'Android';
   else if (/Windows/.test(ua)) os = 'Windows';
-  else if (/Macintosh|Mac OS/.test(ua)) os = 'Mac';
+  else if (/Macintosh|Mac OS/.test(ua)) os = 'macOS';
+  else if (/CrOS/.test(ua)) os = 'ChromeOS';
   else if (/Linux/.test(ua)) os = 'Linux';
-  let browser = '瀏覽器';
-  if (/Edg\//.test(ua)) browser = 'Edge';
-  else if (/Chrome\//.test(ua)) browser = 'Chrome';
-  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
-  else if (/Firefox\//.test(ua)) browser = 'Firefox';
-  return `${os} · ${browser}`;
+  let browser = '未知瀏覽器';
+  if (/EdgA?\/|EdgiOS\//.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera\//.test(ua)) browser = 'Opera';
+  else if (/CriOS\/|Chrome\//.test(ua)) browser = 'Chrome';
+  else if (/FxiOS\/|Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/Safari\//.test(ua)) browser = 'Safari';
+  return { device, os, browser, label:`${device} · ${os} · ${browser}` };
+}
+function summarizeUserAgent(ua) {
+  return parseAuditUserAgent(ua).label;
 }
 const AUDIT_FIELD_LABEL = {
   name:'名稱',
@@ -3102,18 +3161,34 @@ function auditInsertHighlights(table, after) {
 }
 
 function formatAuditRecord(row) {
+  const changes = auditParseChanges(row.changes);
+  const eventType = changes.event_type || changes.event || '';
   const tableLabel = AUDIT_TABLE_LABEL[row.table_name] || row.table_name;
-  const actionLabel = AUDIT_ACTION_LABEL[row.action] || row.action;
+  const actionLabel = AUDIT_ACTION_LABEL[eventType] || AUDIT_ACTION_LABEL[row.action] || row.action;
 
   if (row.table_name === 'auth' && (row.action === 'login' || row.action === 'logout')) {
-    const opName = row.users?.name || '未知使用者';
+    const opName = row.users?.name || changes.actor?.name || '未知使用者';
     const chips = [];
-    if (row.ip_address) chips.push(`IP：${row.ip_address}`);
-    if (row.user_agent) chips.push(`裝置：${summarizeUserAgent(row.user_agent)}`);
+    const role = row.users?.rbac_role || changes.actor?.rbac_role || row.users?.role || changes.actor?.role;
+    if (role) chips.push(`角色：${role}`);
+    if (changes.details?.login_method) chips.push(`登入方式：${changes.details.login_method === 'username' ? '系統帳號' : '電子郵件'}`);
+    if (changes.details?.result) chips.push(`結果：${changes.details.result}`);
     return { tableLabel, actionLabel, summary: `${opName} ${actionLabel}。`, chips };
   }
 
-  const changes = auditParseChanges(row.changes);
+  if (row.table_name === 'system_usage' || eventType === 'page_view' || eventType === 'function_use') {
+    const detail = changes.details || {};
+    const page = changes.page || {};
+    const feature = detail.feature || detail.destination || page.page || page.path || '未命名功能';
+    const summary = eventType === 'page_view' ? `進入「${feature}」。` : `使用「${feature}」。`;
+    const chips = [];
+    if (detail.destination && detail.destination !== feature) chips.push(`目的地：${detail.destination}`);
+    if (detail.result) chips.push(`結果：${detail.result}`);
+    if (detail.element_id) chips.push(`元件：${detail.element_id}`);
+    if (page.url) chips.push(`頁面：${page.url}`);
+    return { tableLabel, actionLabel, summary, chips };
+  }
+
   const before = changes.before || null;
   const after = changes.after || null;
   const recordName = auditRecordName(row.table_name, before, after, row.record_id);
@@ -3139,6 +3214,45 @@ function formatAuditRecord(row) {
   return { tableLabel, actionLabel, summary, chips };
 }
 
+function auditActorSnapshot(row) {
+  const changes = auditParseChanges(row.changes);
+  const snap = changes.actor || {};
+  return {
+    name: row.users?.name || snap.name || '系統',
+    username: row.users?.username || snap.username || '',
+    email: row.users?.email || snap.email || '',
+    role: row.users?.role || snap.role || '',
+    rbac_role: row.users?.rbac_role || snap.rbac_role || '',
+    department: row.users?.department || snap.department || ''
+  };
+}
+
+function auditFormatDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+  }).format(date).replace(',', '');
+}
+
+function auditRoleDisplay(actor) {
+  const raw = actor.rbac_role || actor.role || '';
+  return { label: raw ? (ROLE_LABEL[normalizeRoleId(raw)] || raw) : '未設定角色', raw };
+}
+
+function auditContentHtml(row, item) {
+  const changes = auditParseChanges(row.changes);
+  const lines = [item.summary, ...item.chips];
+  const source = changes.page?.url || row.source || '';
+  return `<div class="audit-detail-lines">
+    ${lines.filter(Boolean).map(line => `<span>${escHtml(line)}</span>`).join('')}
+    ${source ? `<span class="audit-source">來源：${escHtml(source)}</span>` : ''}
+    ${row.record_id ? `<span class="audit-source">紀錄編號：${escHtml(row.record_id)}</span>` : ''}
+  </div>`;
+}
+
 async function loadSystemHealth() {
   const kindFilter = document.getElementById('healthKindFilter')?.value || '';
   const tbody = document.getElementById('syshealthTbody');
@@ -3161,7 +3275,32 @@ async function loadSystemHealth() {
     <td>${escHtml(r.users?.name || '—')}</td>
   </tr>`).join('');
 }
-async function loadAudit() {
+let auditPage = 1;
+const AUDIT_PAGE_SIZE = 10;
+
+function renderAuditPagination(total) {
+  const host = document.getElementById('auditPagination');
+  const pages = Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE));
+  if (!total) { host.innerHTML = ''; return; }
+  const start = Math.max(1, auditPage - 2);
+  const end = Math.min(pages, start + 4);
+  const buttons = [];
+  buttons.push(`<button type="button" data-audit-ignore="true" onclick="auditGoPage(${auditPage - 1})" ${auditPage <= 1 ? 'disabled' : ''}>‹ 上頁</button>`);
+  for (let page = start; page <= end; page++) {
+    buttons.push(`<button type="button" data-audit-ignore="true" class="${page === auditPage ? 'active' : ''}" onclick="auditGoPage(${page})">${page}</button>`);
+  }
+  buttons.push(`<button type="button" data-audit-ignore="true" onclick="auditGoPage(${auditPage + 1})" ${auditPage >= pages ? 'disabled' : ''}>下頁 ›</button>`);
+  buttons.push(`<span class="audit-pagination-label">第 ${auditPage} / ${pages} 頁</span>`);
+  host.innerHTML = buttons.join('');
+}
+
+function auditGoPage(page) {
+  auditPage = Math.max(1, Number(page) || 1);
+  loadAudit(false);
+}
+
+async function loadAudit(resetPage = false) {
+  if (resetPage) auditPage = 1;
   const tableFilter = document.getElementById('auditTableFilter').value;
   const actionFilter = document.getElementById('auditActionFilter').value;
   const dateFrom = DTP.getValue('auditDateFrom-dtp');
@@ -3171,36 +3310,61 @@ async function loadAudit() {
   if (dateFrom && dateTo && dateFrom > dateTo) {
     summaryEl.textContent = '日期區間錯誤：起始日期不可晚於結束日期。';
     listEl.innerHTML = '<div style="color:var(--red);font-size:.85rem;font-family:var(--font-mono)">請重新選擇正確的日期區間。</div>';
+    document.getElementById('auditPagination').innerHTML = '';
     return;
   }
-  let query = db.from('audit_logs').select('*,users(name)').order('operated_at',{ascending:false}).limit(200);
+  const from = (auditPage - 1) * AUDIT_PAGE_SIZE;
+  const to = from + AUDIT_PAGE_SIZE - 1;
+  let query = db.from('audit_logs')
+    .select('*,users(name,username,email,role,rbac_role,department,dept_id)', { count:'exact' })
+    .order('operated_at',{ascending:false})
+    .range(from, to);
   if (tableFilter) query = query.eq('table_name', tableFilter);
-  if (actionFilter) query = query.eq('action', actionFilter);
+  if (actionFilter === 'page_view' || actionFilter === 'function_use') query = query.contains('changes', { event_type:actionFilter });
+  else if (actionFilter) query = query.eq('action', actionFilter);
   if (dateFrom) query = query.gte('operated_at', dateFrom + 'T00:00:00+08:00');
   if (dateTo) query = query.lte('operated_at', dateTo + 'T23:59:59.999+08:00');
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) {
     summaryEl.textContent = '';
     listEl.innerHTML = `<div style="color:var(--red);font-size:.85rem;font-family:var(--font-mono)">載入失敗：${escHtml(error.message)}</div>`;
+    document.getElementById('auditPagination').innerHTML = '';
     return;
   }
   const rows = data || [];
+  const total = count ?? rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / AUDIT_PAGE_SIZE));
+  if (auditPage > totalPages) { auditPage = totalPages; return loadAudit(false); }
   const dateLabel = dateFrom || dateTo
     ? `${dateFrom || '最早'} ～ ${dateTo || '今日'}`
     : '全部日期';
-  summaryEl.textContent = `${dateLabel}｜共 ${rows.length} 筆${rows.length === 200 ? '（已達單次顯示上限 200 筆）' : ''}`;
-  listEl.innerHTML = rows.length ? rows.map(r => {
+  summaryEl.textContent = `${dateLabel}｜共 ${total.toLocaleString('zh-TW')} 筆｜每頁 ${AUDIT_PAGE_SIZE} 筆`;
+  const body = rows.length ? rows.map(r => {
     const item = formatAuditRecord(r);
-    return `<div class="audit-row">
-      <div class="audit-head">
-        <span class="audit-action-${r.action}">[${escHtml(item.actionLabel)}]</span>
-        <span class="audit-table-label">${escHtml(item.tableLabel)}</span>
-        <span class="audit-time">操作人：${escHtml(r.users?.name || '系統')} · ${SystemDate.formatDateTime(r.operated_at)}</span>
-      </div>
-      <div class="audit-summary">${escHtml(item.summary)}</div>
-      ${item.chips.length ? `<div class="audit-changes">${item.chips.map(x => `<span class="audit-chip">${escHtml(x)}</span>`).join('')}</div>` : ''}
-    </div>`;
-  }).join('') : '<div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">目前無系統紀錄</div>';
+    const actor = auditActorSnapshot(r);
+    const role = auditRoleDisplay(actor);
+    const changes = auditParseChanges(r.changes);
+    const ua = r.user_agent || changes.client?.user_agent || '';
+    const client = parseAuditUserAgent(ua);
+    const ip = r.ip_address || changes.client?.ip_address || '—';
+    const accountLines = [actor.username, actor.email].filter(Boolean);
+    return `<tr>
+      <td>${escHtml(auditFormatDateTime(r.operated_at))}</td>
+      <td><div class="audit-primary">${escHtml(actor.name)}</div><div class="audit-secondary">${accountLines.length ? accountLines.map(escHtml).join('<br>') : '無帳號快照'}</div></td>
+      <td><div class="audit-primary">${escHtml(role.label)}</div>${actor.department ? `<div class="audit-secondary">${escHtml(actor.department)}</div>` : ''}${role.raw ? `<div class="audit-secondary">${escHtml(role.raw)}</div>` : ''}</td>
+      <td><div class="audit-action-${escHtml(r.action)} audit-primary">${escHtml(item.actionLabel)}</div><div class="audit-secondary">${escHtml(item.tableLabel)}</div></td>
+      <td>${auditContentHtml(r, item)}</td>
+      <td style="font-family:var(--font-mono)">${escHtml(ip)}</td>
+      <td><div class="audit-primary">${escHtml(client.label)}</div>${ua ? `<details class="audit-ua-details"><summary>完整 User-Agent</summary><div class="audit-ua-raw">${escHtml(ua)}</div></details>` : '<div class="audit-secondary">未取得裝置資訊</div>'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="audit-empty">目前無符合條件的系統紀錄</td></tr>';
+  listEl.innerHTML = `<div class="audit-table-wrap"><table class="audit-detail-table">
+    <thead><tr>
+      <th class="audit-col-time">時間</th><th class="audit-col-account">操作帳號</th><th class="audit-col-role">部門／角色</th>
+      <th class="audit-col-action">動作</th><th class="audit-col-content">內容</th><th class="audit-col-ip">IP</th><th class="audit-col-device">使用載具</th>
+    </tr></thead><tbody>${body}</tbody>
+  </table></div>`;
+  renderAuditPagination(total);
 }
 
 function clearAuditFilters() {
@@ -3208,7 +3372,7 @@ function clearAuditFilters() {
   document.getElementById('auditActionFilter').value = '';
   DTP.setValue('auditDateFrom-dtp', null);
   DTP.setValue('auditDateTo-dtp', null);
-  loadAudit();
+  loadAudit(true);
 }
 
 async function loadCycles() {
@@ -3580,12 +3744,30 @@ async function changePassword() {
 
 async function writeAudit(table, recordId, action, before, after) {
   if (!currentUser) return;
-  await db.from('audit_logs').insert({ table_name: table, record_id: String(recordId), action, changes: { before, after }, operator_id: currentUser.user_id });
+  await db.from('audit_logs').insert({
+    table_name: table,
+    record_id: String(recordId),
+    action,
+    changes: {
+      before,
+      after,
+      actor: {
+        user_id: currentUser.user_id, username: currentUser.username, email: currentUser.email,
+        name: currentUser.name, role: currentUser.role, rbac_role: currentUser.rbac_role,
+        department: currentUser.department
+      },
+      page: { path:'admin.html', hash:location.hash, url:location.pathname + location.search + location.hash }
+    },
+    operator_id: currentUser.user_id,
+    user_agent: navigator.userAgent,
+    source: 'admin.html'
+  });
 }
 
 // 記錄登入/登出事件與裝置資訊；IP 應由受控後端擷取，失敗不影響登出流程本身
 async function logAuthEvent(action, userId) {
   try {
+    if (window.SystemAudit?.record) return await window.SystemAudit.record(action, { feature:action === 'logout' ? '登出系統' : '登入系統', result:'成功' });
     await db.from('audit_logs').insert({
       table_name: 'auth', record_id: String(userId), action,
       changes: { event: action }, operator_id: userId,
@@ -3812,6 +3994,7 @@ function laToggle(key) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function logout() {
+  if (window.SystemAccountActions?.logout) return window.SystemAccountActions.logout();
   if (currentUser) await logAuthEvent('logout', currentUser.user_id);
   if (window.SystemUserProfile) window.SystemUserProfile.clear();
   await db.auth.signOut();

@@ -11,7 +11,7 @@
   var PROFILE_KEY='inspectionSystemUserProfile';
   var SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
   var SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-  var PROFILE_FIELDS=['user_id','username','name','role','rbac_role','dept_id','department','phone'];
+  var PROFILE_FIELDS=['user_id','username','email','name','role','rbac_role','dept_id','department','phone'];
   // Shared floor normalization keeps B1/B1F and numeric floors consistent
   // across equipment, patrol and marker pages.
   window.canonicalFloor=function(value){
@@ -51,7 +51,7 @@
     var clean={};
     PROFILE_FIELDS.forEach(function(key){if(profile[key]!=null&&profile[key]!=='')clean[key]=profile[key];});
     sessionStorage.setItem(PROFILE_KEY,JSON.stringify(clean));
-    var keyMap={user_id:'user_id',username:'user_username',name:'user_name',role:'user_role',rbac_role:'user_rbac_role',dept_id:'user_dept_id',department:'user_department',phone:'user_phone'};
+    var keyMap={user_id:'user_id',username:'user_username',email:'user_email',name:'user_name',role:'user_role',rbac_role:'user_rbac_role',dept_id:'user_dept_id',department:'user_department',phone:'user_phone'};
     Object.keys(keyMap).forEach(function(key){
       if(clean[key]!=null&&clean[key]!=='')sessionStorage.setItem(keyMap[key],clean[key]);
       else sessionStorage.removeItem(keyMap[key]);
@@ -61,7 +61,7 @@
   function clearProfile(){
     sessionStorage.removeItem(PROFILE_KEY);
     localStorage.removeItem(PROFILE_KEY);
-    ['user_id','user_username','user_name','user_role','user_rbac_role','user_dept_id','user_department','user_phone'].forEach(function(key){sessionStorage.removeItem(key);});
+    ['user_id','user_username','user_email','user_name','user_role','user_rbac_role','user_dept_id','user_department','user_phone'].forEach(function(key){sessionStorage.removeItem(key);});
   }
   window.SystemUserProfile={read:readProfile,save:saveProfile,clear:clearProfile};
   var LEGACY_TO_RBAC={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
@@ -77,7 +77,7 @@
     }catch(e){return null;}
   }
   function fetchUserRowForAccess(authId,token){
-    var url=SUPABASE_URL+'/rest/v1/users?select=user_id,name,role,rbac_role,dept_id,department&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
+    var url=SUPABASE_URL+'/rest/v1/users?select=user_id,username,email,name,role,rbac_role,dept_id,department&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
     return fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}})
       .then(function(r){return r.ok?r.json():[];})
       .then(function(rows){return rows&&rows[0]?rows[0]:null;})
@@ -251,14 +251,140 @@
     isSysadminAccess().then(function(result){resolved=true;allowed=result;sync();}).catch(function(){resolved=true;allowed=false;sync();});
   }
 
+  // 全站共用稽核：登入／登出、進入子系統、使用主要按鈕與功能都由同一入口記錄。
+  // Edge Function 會以 JWT 驗證操作者並由伺服器取得 IP / User-Agent；若函式尚未部署，
+  // 仍會以 RLS 限制的 audit_logs 寫入作為備援，避免導頁造成事件遺失。
+  var auditRecentActions=Object.create(null);
+  function auditSafeText(value,max){
+    return String(value==null?'':value).replace(/\s+/g,' ').trim().slice(0,max||240);
+  }
+  function auditSafeDetails(value,depth){
+    depth=depth||0;
+    if(depth>3)return '[內容過深]';
+    if(value==null||typeof value==='boolean'||typeof value==='number')return value;
+    if(typeof value==='string')return auditSafeText(value,500);
+    if(Array.isArray(value))return value.slice(0,20).map(function(item){return auditSafeDetails(item,depth+1);});
+    if(typeof value==='object'){
+      var out={};
+      Object.keys(value).slice(0,40).forEach(function(key){
+        if(/password|passwd|token|secret|authorization|cookie|credential/i.test(key))return;
+        out[auditSafeText(key,80)]=auditSafeDetails(value[key],depth+1);
+      });
+      return out;
+    }
+    return auditSafeText(value,500);
+  }
+  function auditPageInfo(){
+    var path=location.pathname.split('/').pop()||'index.html';
+    var title=(document.querySelector('.nav-title')||{}).textContent||document.title||path;
+    return {
+      system:path.replace(/\.html$/i,''),
+      page:auditSafeText(title,160),
+      path:path,
+      hash:auditSafeText(location.hash,160),
+      url:auditSafeText(location.pathname+location.search+location.hash,500)
+    };
+  }
+  function auditEventPayload(eventType,details,profile){
+    var page=auditPageInfo();
+    var id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2);
+    var actor={
+      user_id:profile.user_id||'',username:profile.username||'',email:profile.email||'',
+      name:profile.name||'',role:profile.role||'',rbac_role:profile.rbac_role||'',
+      department:profile.department||'',dept_id:profile.dept_id||''
+    };
+    return {
+      event_id:id,event_type:eventType,details:auditSafeDetails(details||{}),page:page,actor:actor,
+      occurred_at:new Date().toISOString()
+    };
+  }
+  function auditFallbackInsert(token,profile,payload){
+    var isAuth=payload.event_type==='login'||payload.event_type==='logout';
+    var row={
+      table_name:isAuth?'auth':'system_usage',
+      record_id:isAuth?String(profile.user_id):payload.event_id,
+      action:isAuth?payload.event_type:'insert',
+      changes:payload,
+      operator_id:profile.user_id,
+      ip_address:null,
+      user_agent:navigator.userAgent,
+      source:payload.page.path
+    };
+    return fetch(SUPABASE_URL+'/rest/v1/audit_logs',{
+      method:'POST',keepalive:true,
+      headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify(row)
+    }).then(function(response){return response.ok;}).catch(function(){return false;});
+  }
+  function sendSystemAudit(eventType,details){
+    var auth=storedAuthSessionForAccess();
+    var token=auth&&auth.access_token;
+    if(!token)return Promise.resolve(false);
+    function send(profile){
+      if(!profile||!profile.user_id)return false;
+      var payload=auditEventPayload(eventType,details,profile);
+      var controller=window.AbortController?new AbortController():null;
+      var timer=controller?setTimeout(function(){controller.abort();},2200):null;
+      return fetch(SUPABASE_URL+'/functions/v1/audit-event',{
+        method:'POST',keepalive:true,signal:controller?controller.signal:undefined,
+        headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      }).then(function(response){
+        if(timer)clearTimeout(timer);
+        if(response.ok)return true;
+        return auditFallbackInsert(token,profile,payload);
+      }).catch(function(){
+        if(timer)clearTimeout(timer);
+        return auditFallbackInsert(token,profile,payload);
+      });
+    }
+    var profile=readProfile();
+    return profile&&profile.user_id?Promise.resolve(send(profile)):resolveCurrentProfileForAccess().then(send).catch(function(){return false;});
+  }
+  window.SystemAudit={
+    record:function(eventType,details){return sendSystemAudit(eventType,details||{});},
+    pageInfo:auditPageInfo
+  };
+  function installSystemAudit(){
+    var page=auditPageInfo();
+    sendSystemAudit('page_view',{feature:'進入系統頁面',destination:page.page});
+    document.addEventListener('click',function(event){
+      var target=event.target&&event.target.closest?event.target.closest('a[href],button,[role="button"],input[type="submit"],input[type="button"]'):null;
+      if(!target||target.disabled||target.dataset.auditIgnore==='true')return;
+      var meaningful=target.matches('a[href],button.btn,button[onclick],[role="button"],input[type="submit"],input[type="button"],.system-action-unified,.nav-item,.scard,[data-audit-feature]');
+      if(!meaningful)return;
+      var label=auditSafeText(target.dataset.auditFeature||target.getAttribute('aria-label')||target.title||target.value||target.textContent||target.id,120);
+      if(!label||/密碼|password/i.test(label)&&target.closest('#loginCard'))return;
+      var key=page.path+'|'+label+'|'+auditSafeText(target.getAttribute('href')||'',160);
+      var now=Date.now();
+      if(auditRecentActions[key]&&now-auditRecentActions[key]<1200)return;
+      auditRecentActions[key]=now;
+      sendSystemAudit('function_use',{
+        feature:label,
+        element_id:target.id||'',
+        destination:auditSafeText(target.getAttribute('href')||'',300),
+        handler:auditSafeText(target.getAttribute('onclick')||'',200),
+        result:'已操作'
+      });
+    },true);
+    document.addEventListener('submit',function(event){
+      var form=event.target;
+      if(!form||form.dataset.auditIgnore==='true')return;
+      var label=auditSafeText(form.dataset.auditFeature||form.getAttribute('aria-label')||form.id||'送出表單',120);
+      sendSystemAudit('function_use',{feature:label,result:'已送出',form_id:form.id||''});
+    },true);
+    window.addEventListener('hashchange',function(){
+      sendSystemAudit('page_view',{feature:'切換系統功能頁',destination:auditSafeText(location.hash,160)});
+    });
+  }
+
   // 共用「登出」／「更改密碼」動作，供頂部導覽列的按鈕使用（全站共用元件）
-  function performLogout(){
+  async function performLogout(){
+    var auth=storedAuthSessionForAccess();
+    var token=auth&&auth.access_token;
+    try{await sendSystemAudit('logout',{feature:'登出系統',result:'成功'});}catch(e){}
     try{
-      var auth=storedAuthSessionForAccess();
-      var token=auth&&auth.access_token;
-      if(token){
-        fetch(SUPABASE_URL+'/auth/v1/logout?scope=global',{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}}).catch(function(){});
-      }
+      if(token)await fetch(SUPABASE_URL+'/auth/v1/logout?scope=global',{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}});
     }catch(e){}
     clearProfile();
     try{sessionStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');}catch(e){}
@@ -489,7 +615,7 @@
       var authId=auth&&auth.user&&auth.user.id;
       if(!token||!authId)return;
       authLookupStarted=true;
-      var url=SUPABASE_URL+'/rest/v1/users?select=user_id,username,name,role,rbac_role,dept_id,department,phone&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
+      var url=SUPABASE_URL+'/rest/v1/users?select=user_id,username,email,name,role,rbac_role,dept_id,department,phone&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
       fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}})
         .then(function(r){return r.ok?r.json():[];})
         .then(function(rows){if(rows&&rows[0]){saveProfile(rows[0]);updateUser();}})
@@ -797,6 +923,7 @@
     installDialogKeyboard();
     installSegmentedTimeInputs();
     installSysadminOnlyAccess();
+    installSystemAudit();
     installSystemMeta();
     installBrandBar();
     installResponsiveHeaderLayout();

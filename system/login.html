@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260806-1"></script>
+<script src="theme.js?v=20260807-audit1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>臺北農產公司 第一果菜市場 設備巡檢維修系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
@@ -204,14 +204,27 @@ function getLoginRoute(profile) {
 
 // 記錄登入/登出事件到系統紀錄；IP 應由受控後端依請求取得，
 // 前端不可把使用者 IP 傳送給未列入系統契約的第三方服務。
-async function logAuthEvent(action, userId) {
+async function logAuthEvent(action, profile) {
   try {
+    if (window.SystemAudit?.record) {
+      return await window.SystemAudit.record(action, {
+        feature: action === 'login' ? '登入系統' : '登出系統',
+        result: '成功',
+        login_method: document.getElementById('username').value.includes('@') ? 'email' : 'username'
+      });
+    }
     await db.from('audit_logs').insert({
-      table_name: 'auth', record_id: String(userId), action,
-      changes: { event: action }, operator_id: userId,
+      table_name: 'auth', record_id: String(profile.user_id), action,
+      changes: {
+        event_type: action,
+        actor: { user_id: profile.user_id, username: profile.username, email: profile.email, name: profile.name, role: profile.role, rbac_role: profile.rbac_role, department: profile.department },
+        details: { result: '成功', login_method: document.getElementById('username').value.includes('@') ? 'email' : 'username' }
+      },
+      operator_id: profile.user_id,
       ip_address: null, user_agent: navigator.userAgent
     });
-  } catch (e) {}
+    return true;
+  } catch (e) { return false; }
 }
 
 function translateError(msg) {
@@ -310,7 +323,7 @@ async function doLogin() {
     return;
   }
 
-  const { data: profile } = await db.from('users').select('user_id,username,role,rbac_role,name,phone,permissions,dept_id,department').eq('auth_id', sessionUser?.id).single();
+  const { data: profile } = await db.from('users').select('user_id,username,email,role,rbac_role,name,phone,permissions,dept_id,department').eq('auth_id', sessionUser?.id).single();
   if (!profile) {
     err.textContent = '找不到使用者資料，請聯絡管理員';
     btn.disabled = false; btn.textContent = '登入';
@@ -329,7 +342,8 @@ async function doLogin() {
     if (profile.department) sessionStorage.setItem('user_department', profile.department);
     if (profile.phone) sessionStorage.setItem('user_phone', profile.phone);
   }
-  logAuthEvent('login', profile.user_id);
+  // 必須等稽核寫入完成後再導頁，否則瀏覽器切頁會中止請求，造成一般帳號（如 james）漏記。
+  await logAuthEvent('login', profile);
   window.location.href = getRedirectTarget(profile);
 }
 

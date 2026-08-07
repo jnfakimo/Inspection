@@ -13,3 +13,6 @@ verify_jwt = false
 
 [functions.username-login]
 verify_jwt = false
+
+[functions.audit-event]
+verify_jwt = true

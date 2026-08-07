@@ -165,14 +165,23 @@ function setMessage(text) {
 }
 
 // 記錄登入事件與裝置資訊；IP 應由受控後端擷取，失敗不影響登入流程本身
-async function logAuthEvent(action, userId) {
+async function logAuthEvent(action, profile) {
   try {
+    const { error } = await db.functions.invoke('audit-event', { body: {
+      event_type: action,
+      event_id: crypto.randomUUID(),
+      page: { system:'handover', page:'電子交接簿登入', path:'handover-login.html', url:location.pathname },
+      details: { feature:'登入電子交接簿', result:'成功', login_method:'username' }
+    }});
+    if (!error) return true;
     await db.from('audit_logs').insert({
-      table_name: 'auth', record_id: String(userId), action,
-      changes: { event: action }, operator_id: userId,
+      table_name: 'auth', record_id: String(profile.user_id), action,
+      changes: { event_type: action, actor:profile, details:{ feature:'登入電子交接簿', result:'成功', login_method:'username' } },
+      operator_id: profile.user_id,
       ip_address: null, user_agent: navigator.userAgent
     });
-  } catch (e) {}
+    return true;
+  } catch (e) { return false; }
 }
 
 function setBusy(isBusy) {
@@ -203,8 +212,8 @@ form.addEventListener('submit', async (event) => {
     const { data: signInData, error } = await db.auth.signInWithPassword({ email: loginEmail, password });
     if (error) throw new Error('帳號或密碼錯誤。');
 
-    const { data: profile } = await db.from('users').select('user_id').eq('auth_id', signInData.user.id).single();
-    if (profile) logAuthEvent('login', profile.user_id);
+    const { data: profile } = await db.from('users').select('user_id,username,email,name,role,rbac_role,department,dept_id').eq('auth_id', signInData.user.id).single();
+    if (profile) await logAuthEvent('login', profile);
 
     location.href = HANDOVER_TARGET;
   } catch (err) {
