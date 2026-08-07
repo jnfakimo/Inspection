@@ -9,7 +9,7 @@ if (location.hash === '#repairs') {
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260807-audit2"></script>
+<script src="theme.js?v=20260807-alert1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -490,26 +490,25 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 .audit-action-status_change{color:var(--amber)}
 .audit-action-login{color:var(--green)}
 .audit-action-logout{color:var(--text-dim)}
-.audit-table-wrap{overflow:hidden;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
-.audit-detail-table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;background:var(--surface)}
-.audit-detail-table th{padding:5px 6px;border-bottom:1px solid var(--border-hi);background:color-mix(in srgb,var(--cyan) 8%,var(--surface));color:var(--cyan);font-family:var(--font-head);font-size:.63rem;letter-spacing:.04em;text-align:left;white-space:nowrap}
-.audit-detail-table td{height:34px;padding:3px 6px;border-bottom:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.64rem;line-height:1.08;vertical-align:middle;word-break:break-word}
+.audit-table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:var(--surface)}
+.audit-detail-table{width:100%;min-width:1450px;border-collapse:collapse;table-layout:fixed;background:var(--surface)}
+.audit-detail-table th{padding:9px 8px;border-bottom:1px solid var(--border-hi);background:color-mix(in srgb,var(--cyan) 8%,var(--surface));color:var(--cyan);font-family:var(--font-head);font-size:1.1rem;letter-spacing:.04em;text-align:left;white-space:nowrap}
+.audit-detail-table td{padding:9px 8px;border-bottom:1px solid var(--border);background:var(--surface);color:var(--text);font-size:1.15rem;line-height:1.32;vertical-align:top;word-break:break-word}
 .audit-detail-table tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--bg) 55%,var(--surface))}
 .audit-detail-table tbody tr:hover td{background:color-mix(in srgb,var(--cyan) 5%,var(--surface))}
 .audit-detail-table tbody tr:last-child td{border-bottom:0}
 .audit-col-time{width:10%}.audit-col-account{width:15%}.audit-col-role{width:12%}.audit-col-action{width:11%}.audit-col-content{width:31%}.audit-col-ip{width:9%}.audit-col-device{width:12%}
-.audit-primary{display:block;color:var(--text-hi);font-weight:700;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.audit-secondary{margin-top:0;color:var(--text-dim);font-family:var(--font-mono);font-size:.54rem;line-height:1.08;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.audit-detail-lines{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:4px;min-width:0}
-.audit-summary-line{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-hi)}
-.audit-detail-lines .audit-source{color:var(--text-dim);font-family:var(--font-mono);font-size:.69rem}
-.audit-record-details{margin-top:0;color:var(--text-dim);font-size:.53rem}
-.audit-record-details summary{cursor:pointer;color:var(--cyan);line-height:1;white-space:nowrap}
-.audit-record-details[open]{grid-column:1/-1}
-.audit-record-details-body{position:absolute;z-index:20;display:flex;flex-direction:column;gap:2px;width:min(420px,38vw);margin-top:3px;padding:5px 7px;border:1px solid var(--border);border-left:2px solid var(--cyan);border-radius:4px;background:var(--surface);box-shadow:0 8px 24px rgba(15,23,42,.18)}
-.audit-ua-details{margin-top:0;color:var(--text-dim);font-size:.53rem;white-space:nowrap}
-.audit-ua-details summary{cursor:pointer;color:var(--cyan);line-height:1;overflow:hidden;text-overflow:ellipsis}
-.audit-ua-raw{position:absolute;right:8px;z-index:20;width:300px;margin-top:3px;padding:6px;border:1px solid var(--border);border-radius:4px;background:var(--surface);box-shadow:0 8px 24px rgba(15,23,42,.18);white-space:normal;word-break:break-all;font-family:var(--font-mono);font-size:.58rem;line-height:1.35}
+.audit-primary{display:block;color:var(--text-hi);font-weight:700;line-height:1.3;white-space:normal}
+.audit-secondary{margin-top:3px;color:var(--text-dim);font-family:var(--font-mono);font-size:.96rem;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+.audit-detail-lines{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
+.audit-summary-line{display:block;min-width:0;color:var(--text-hi);white-space:normal}
+.audit-detail-lines .audit-source{color:var(--text-dim);font-family:var(--font-mono);font-size:1rem}
+.audit-record-details{width:100%;margin-top:0;color:var(--text-dim);font-size:.96rem}
+.audit-record-details summary{cursor:pointer;color:var(--cyan);line-height:1.3;white-space:normal;font-weight:700}
+.audit-record-details-body{display:flex;flex-direction:column;gap:6px;width:calc(100% - 18px);margin:7px 0 0 18px;padding:8px 10px;border-left:3px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 4%,var(--surface));line-height:1.4}
+.audit-ua-details{margin-top:5px;color:var(--text-dim);font-size:.9rem;white-space:normal}
+.audit-ua-details summary{cursor:pointer;color:var(--cyan);line-height:1.3;overflow-wrap:anywhere}
+.audit-ua-raw{width:calc(100% - 18px);margin:7px 0 0 18px;padding:8px 10px;border-left:3px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 4%,var(--surface));white-space:normal;word-break:break-all;font-family:var(--font-mono);font-size:.85rem;line-height:1.4}
 .audit-pagination{display:flex;justify-content:center;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap}
 .audit-pagination button{min-width:30px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text-dim);cursor:pointer;font-size:.68rem}
 .audit-pagination button:hover:not(:disabled),.audit-pagination button.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.08)}
@@ -547,6 +546,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   font-family:var(--font-head);font-weight:700;letter-spacing:.06em;
 }
 .audit-filter-control select,
+.audit-filter-control input,
 .audit-filter-control [id$="-dtp"]>button{
   box-sizing:border-box!important;width:100%!important;height:50px!important;min-height:50px!important;
   margin:0!important;padding:0 14px!important;background:var(--surface)!important;
@@ -554,6 +554,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   color:var(--text-hi)!important;font-size:.86rem!important;font-family:var(--font-mono)!important;
 }
 .audit-filter-control select:focus,
+.audit-filter-control input:focus,
 .audit-filter-control [id$="-dtp"]>button:focus-visible{
   border-color:var(--cyan)!important;box-shadow:0 0 0 2px rgba(2,132,199,.12)!important;outline:none!important;
 }
@@ -564,16 +565,28 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
 }
 .audit-filter-clear:hover{border-color:var(--cyan)!important;color:var(--cyan)!important}
 #page-audit>.page-header{margin-bottom:7px}
-#page-audit>.page-header h2{margin-bottom:2px;font-size:1.05rem}
-#page-audit>.page-header p{font-size:.66rem;line-height:1.2}
+#page-audit>.page-header h2{margin-bottom:3px;font-size:1.45rem}
+#page-audit>.page-header p{font-size:1rem;line-height:1.35}
 #page-audit>.panel{padding:8px 10px}
 #page-audit .audit-filter-bar{padding:7px 9px;margin-bottom:5px;gap:8px;flex-wrap:nowrap}
 #page-audit .audit-filter-control{min-width:0;max-width:none;flex:1 1 0;gap:3px}
-#page-audit .audit-filter-control label{font-size:.62rem}
+#page-audit .audit-filter-control label{font-size:.95rem}
 #page-audit .audit-filter-control select,
-#page-audit .audit-filter-control [id$="-dtp"]>button{height:34px!important;min-height:34px!important;padding:0 9px!important;font-size:.7rem!important}
-#page-audit .audit-filter-clear{height:34px;min-height:34px;padding:0 10px!important;font-size:.66rem}
-#page-audit .audit-filter-summary{margin:0 0 5px;font-size:.64rem}
+#page-audit .audit-filter-control input,
+#page-audit .audit-filter-control [id$="-dtp"]>button{height:46px!important;min-height:46px!important;padding:0 11px!important;font-size:1rem!important}
+#page-audit .audit-filter-clear{height:46px;min-height:46px;padding:0 12px!important;font-size:.95rem}
+#page-audit .audit-filter-summary{margin:0 0 8px;font-size:.95rem}
+.audit-security-alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.audit-security-alerts[hidden]{display:none}
+.audit-alert-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 14px;border:1px solid rgba(255,59,59,.55);border-left:5px solid var(--red);border-radius:6px;background:rgba(255,59,59,.08)}
+.audit-alert-card.warning{border-color:rgba(255,179,0,.6);border-left-color:var(--amber);background:rgba(255,179,0,.09)}
+.audit-alert-icon{font-size:1.35rem;line-height:1}
+.audit-alert-title{color:var(--red);font-size:1.08rem;font-weight:800;line-height:1.3}
+.audit-alert-card.warning .audit-alert-title{color:var(--amber)}
+.audit-alert-message{margin-top:3px;color:var(--text-hi);font-size:1rem;line-height:1.45}
+.audit-alert-meta{margin-top:5px;color:var(--text-dim);font-family:var(--font-mono);font-size:.9rem;line-height:1.4}
+.audit-alert-ack{align-self:center;white-space:nowrap;border-color:var(--red)!important;color:var(--red)!important;font-size:.9rem!important}
+.audit-alert-card.warning .audit-alert-ack{border-color:var(--amber)!important;color:var(--amber)!important}
 @media(max-width:1180px){
   #page-audit .audit-filter-bar{flex-wrap:wrap}
   #page-audit .audit-filter-control{flex:1 1 145px}
@@ -587,6 +600,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   .audit-filter-bar{padding:12px;gap:10px}
   .audit-filter-control{flex-basis:100%;width:100%;max-width:none}
   .audit-filter-clear{width:100%}
+  .audit-alert-card{grid-template-columns:auto 1fr}
+  .audit-alert-ack{grid-column:1/-1;width:100%}
 }
 
 /* ===== COST ===== */
@@ -1030,6 +1045,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
     <div class="page-section" id="page-audit">
       <div class="page-header"><h2><span class="section-icon"><img src="../assets/system-icons/audit-icon.png" alt=""></span> 系統紀錄</h2><p>系統操作紀錄—永久保存、不可竄改</p></div>
       <div class="panel">
+        <div id="auditSecurityAlerts" class="audit-security-alerts" hidden></div>
         <div class="search-bar audit-filter-bar">
           <div class="audit-filter-control">
             <label for="auditTableFilter">資料類型</label>
@@ -1074,10 +1090,10 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
           </div>
           <div class="audit-filter-control">
             <label for="auditOperatorFilter">操作帳號</label>
-            <select id="auditOperatorFilter" onchange="loadAudit(true)">
-              <option value="">全部操作帳號</option>
-              <option value="__unidentified__">未識別／不存在的帳號</option>
-            </select>
+            <input id="auditOperatorFilter" type="search" list="auditOperatorOptions"
+              placeholder="輸入帳號、姓名或電子郵件" autocomplete="off"
+              oninput="scheduleAuditOperatorFilter()">
+            <datalist id="auditOperatorOptions"></datalist>
           </div>
           <div class="audit-filter-control">
             <label>起始日期</label>
@@ -1841,6 +1857,8 @@ renderPermissionList('e', defaultPermsForRole('reporter'));
     if (activePage && activePage.id === 'page-dashboard') {
       await loadAll();
       loadDashboard();
+    } else if (activePage && activePage.id === 'page-audit') {
+      loadSecurityAlerts();
     }
   }, 60000);
 })();
@@ -1878,7 +1896,11 @@ function activateAdminPage(page, opts = {}) {
   else if (page === 'inspections') { populateEqFilter('inspEqFilter'); loadInspections(); }
   else if (page === 'repairs') loadRepairs();
   else if (page === 'costs') { populateEqFilter('costEqFilter'); populateEqFilter('cost-eq'); loadCostAdmin(); loadCostByEq(); }
-  else if (page === 'audit') loadAudit();
+  else if (page === 'audit') {
+    loadSecurityAlerts();
+    loadAudit();
+    setTimeout(loadSecurityAlerts, 3000);
+  }
   else if (page === 'syshealth') loadSystemHealth();
   else if (page === 'cycles') loadCycles();
   else if (page === 'locanalysis') loadLocationAnalysis();
@@ -3412,24 +3434,112 @@ function auditGoPage(page) {
   loadAudit(false);
 }
 
+let auditOperatorFilterTimer = null;
+
+function scheduleAuditOperatorFilter() {
+  clearTimeout(auditOperatorFilterTimer);
+  auditOperatorFilterTimer = setTimeout(() => loadAudit(true), 350);
+}
+
 function populateAuditOperatorFilter() {
-  const select = document.getElementById('auditOperatorFilter');
-  if (!select) return;
-  const selected = select.value;
-  const options = [
-    '<option value="">全部操作帳號</option>',
-    '<option value="__unidentified__">未識別／不存在的帳號</option>'
-  ];
+  const list = document.getElementById('auditOperatorOptions');
+  if (!list) return;
+  const options = ['<option value="未識別／不存在的帳號">無對應系統帳號的登入嘗試</option>'];
+  const used = new Set();
   [...allUsers]
     .sort((a, b) => String(a.name || a.username || '').localeCompare(String(b.name || b.username || ''), 'zh-Hant'))
     .forEach(user => {
       if (!user.user_id) return;
       const identity = user.username || user.email || '未設定帳號';
       const inactive = user.status === 'inactive' ? '／已停用' : '';
-      options.push(`<option value="${escHtml(user.user_id)}">${escHtml(user.name || '未命名')}（${escHtml(identity)}${inactive}）</option>`);
+      [user.username, user.email, user.name].filter(Boolean).forEach(value => {
+        const key = String(value).toLocaleLowerCase('zh-Hant');
+        if (used.has(key)) return;
+        used.add(key);
+        options.push(`<option value="${escHtml(value)}">${escHtml(user.name || '未命名')}（${escHtml(identity)}${inactive}）</option>`);
+      });
     });
-  select.innerHTML = options.join('');
-  if ([...select.options].some(option => option.value === selected)) select.value = selected;
+  list.innerHTML = options.join('');
+}
+
+function auditOperatorUserIds(searchText) {
+  const needle = String(searchText || '').trim().toLocaleLowerCase('zh-Hant');
+  if (!needle) return [];
+  const matches = allUsers.filter(user =>
+    [user.username, user.email, user.name].filter(Boolean)
+      .some(value => String(value).toLocaleLowerCase('zh-Hant').includes(needle))
+  );
+  const exact = matches.filter(user =>
+    [user.username, user.email, user.name].filter(Boolean)
+      .some(value => String(value).toLocaleLowerCase('zh-Hant') === needle)
+  );
+  return [...new Set((exact.length ? exact : matches).map(user => user.user_id).filter(Boolean))];
+}
+
+async function loadSecurityAlerts() {
+  const host = document.getElementById('auditSecurityAlerts');
+  if (!host) return;
+  const { data, error } = await db.from('security_alerts').select('*')
+    .eq('status', 'open')
+    .order('detected_at', { ascending:false })
+    .limit(20);
+  if (error) {
+    host.hidden = true;
+    console.warn('security alerts unavailable', error);
+    return;
+  }
+  const alerts = data || [];
+  if (!alerts.length) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML = alerts.map(alert => {
+    const actor = userMap[alert.operator_id] || {};
+    const account = alert.actor_identifier || actor.username || actor.email || actor.name || '未識別帳號';
+    const severityLabel = alert.severity === 'critical' ? '重大告警' : '安全提醒';
+    const meta = [
+      `等級：${severityLabel}`,
+      `操作帳號：${account}`,
+      alert.ip_address ? `來源位址：${alert.ip_address}` : '',
+      `事件次數：${alert.event_count || 1}`,
+      `最後發生：${auditFormatDateTime(alert.last_seen_at || alert.detected_at)}`
+    ].filter(Boolean).join('｜');
+    return `<div class="audit-alert-card ${alert.severity === 'critical' ? 'critical' : 'warning'}">
+      <div class="audit-alert-icon" aria-hidden="true">⚠</div>
+      <div>
+        <div class="audit-alert-title">${escHtml(alert.title || '安全告警')}</div>
+        <div class="audit-alert-message">${escHtml(alert.message || '偵測到需要確認的存取行為。')}</div>
+        <div class="audit-alert-meta">${escHtml(meta)}</div>
+      </div>
+      <button type="button" class="btn btn-sm audit-alert-ack" data-audit-ignore="true" onclick="acknowledgeSecurityAlert('${escHtml(alert.alert_id)}')">標記已處理</button>
+    </div>`;
+  }).join('');
+
+  const latestId = alerts[0]?.alert_id || '';
+  const shownId = sessionStorage.getItem('tcfm.audit.lastSecurityAlert') || '';
+  if (latestId && latestId !== shownId) {
+    sessionStorage.setItem('tcfm.audit.lastSecurityAlert', latestId);
+    showToast(`安全告警：${alerts[0].title || '偵測到異常存取行為'}`, true);
+  }
+}
+
+async function acknowledgeSecurityAlert(alertId) {
+  if (!alertId || !currentUser?.user_id) return;
+  const now = new Date().toISOString();
+  const { error } = await db.from('security_alerts').update({
+    status:'acknowledged', acknowledged_at:now, acknowledged_by:currentUser.user_id
+  }).eq('alert_id', alertId).eq('status', 'open');
+  if (error) {
+    showToast('安全告警標記失敗：' + translateError(error.message), true);
+    return;
+  }
+  window.SystemAudit?.record('function_use', {
+    feature:'標記安全告警已處理', alert_id:alertId, result:'已處理'
+  });
+  showToast('安全告警已標記為已處理');
+  loadSecurityAlerts();
 }
 
 async function loadAudit(resetPage = false) {
@@ -3437,7 +3547,7 @@ async function loadAudit(resetPage = false) {
   populateAuditOperatorFilter();
   const tableFilter = document.getElementById('auditTableFilter').value;
   const actionFilter = document.getElementById('auditActionFilter').value;
-  const operatorFilter = document.getElementById('auditOperatorFilter').value;
+  const operatorFilter = document.getElementById('auditOperatorFilter').value.trim();
   const dateFrom = DTP.getValue('auditDateFrom-dtp');
   const dateTo = DTP.getValue('auditDateTo-dtp');
   const summaryEl = document.getElementById('auditFilterSummary');
@@ -3457,8 +3567,13 @@ async function loadAudit(resetPage = false) {
   if (tableFilter) query = query.eq('table_name', tableFilter);
   if (['page_view','function_use','data_read','file_read','access_denied'].includes(actionFilter)) query = query.contains('changes', { event_type:actionFilter });
   else if (actionFilter) query = query.eq('action', actionFilter);
-  if (operatorFilter === '__unidentified__') query = query.is('operator_id', null);
-  else if (operatorFilter) query = query.eq('operator_id', operatorFilter);
+  if (operatorFilter === '__unidentified__' || operatorFilter === '未識別／不存在的帳號') {
+    query = query.is('operator_id', null);
+  } else if (operatorFilter) {
+    const operatorIds = auditOperatorUserIds(operatorFilter);
+    if (operatorIds.length) query = query.in('operator_id', operatorIds);
+    else query = query.contains('changes', { details:{ attempted_identifier:operatorFilter } });
+  }
   if (dateFrom) query = query.gte('operated_at', dateFrom + 'T00:00:00+08:00');
   if (dateTo) query = query.lte('operated_at', dateTo + 'T23:59:59.999+08:00');
   const { data, error, count } = await query;
@@ -3475,7 +3590,8 @@ async function loadAudit(resetPage = false) {
   const dateLabel = dateFrom || dateTo
     ? `${dateFrom || '最早'} ～ ${dateTo || '今日'}`
     : '全部日期';
-  summaryEl.textContent = `${dateLabel}｜共 ${total.toLocaleString('zh-TW')} 筆｜每頁 ${AUDIT_PAGE_SIZE} 筆`;
+  const operatorLabel = operatorFilter ? `｜操作帳號：${operatorFilter}` : '';
+  summaryEl.textContent = `${dateLabel}${operatorLabel}｜共 ${total.toLocaleString('zh-TW')} 筆｜每頁 ${AUDIT_PAGE_SIZE} 筆`;
   const body = rows.length ? rows.map(r => {
     const item = formatAuditRecord(r);
     const actor = auditActorSnapshot(r);

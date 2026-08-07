@@ -360,7 +360,7 @@
     var rest=url.pathname.match(/\/rest\/v1\/([^/]+)/i);
     if(rest){
       var table=auditDecodePath(rest[1]);
-      if(!table||table==='audit_logs')return null;
+      if(!table||table==='audit_logs'||table==='security_alerts')return null;
       return {kind:'data',resource:table,method:method,path:url.pathname,suspicious:false};
     }
     var marker='/storage/v1/object/';
