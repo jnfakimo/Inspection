@@ -9,7 +9,7 @@ if (location.hash === '#repairs') {
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260807-audit1"></script>
+<script src="theme.js?v=20260807-audit2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1051,6 +1051,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
               <option value="meeting_booking_change_requests">預約變更申請</option>
               <option value="floor_spaces">專案空間</option>
               <option value="plan_markers">圖面標記</option>
+              <option value="data_access">資料讀取</option>
+              <option value="file_access">檔案存取</option>
               <option value="auth">登入／登出</option>
             </select>
           </div>
@@ -1060,11 +1062,21 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
               <option value="">全部動作</option>
               <option value="page_view">進入系統</option>
               <option value="function_use">使用功能</option>
+              <option value="data_read">讀取資料</option>
+              <option value="file_read">讀取檔案</option>
+              <option value="access_denied">拒絕存取</option>
               <option value="insert">新增</option>
               <option value="update">修改</option>
               <option value="status_change">狀態變更</option>
               <option value="login">登入</option>
               <option value="logout">登出</option>
+            </select>
+          </div>
+          <div class="audit-filter-control">
+            <label for="auditOperatorFilter">操作帳號</label>
+            <select id="auditOperatorFilter" onchange="loadAudit(true)">
+              <option value="">全部操作帳號</option>
+              <option value="__unidentified__">未識別／不存在的帳號</option>
             </select>
           </div>
           <div class="audit-filter-control">
@@ -2994,9 +3006,11 @@ function exportCostCsv() {   // 統一標準：匯出 XLSX
   XLSX.writeFile(wb, `費用報表_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
-const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除', login:'登入系統', logout:'登出系統', page_view:'進入系統', function_use:'使用功能', data_action:'資料操作' };
+const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除', login:'登入系統', logout:'登出系統', login_attempt:'嘗試登入', page_view:'進入系統', function_use:'使用功能', data_action:'資料操作', data_read:'讀取資料', file_read:'讀取檔案', access_denied:'拒絕存取' };
 const AUDIT_TABLE_LABEL = {
   system_usage:'系統／功能使用',
+  data_access:'資料讀取',
+  file_access:'檔案存取',
   users:'帳號',
   equipment:'設備',
   departments:'部門',
@@ -3249,7 +3263,29 @@ function formatAuditRecord(row) {
     if (role) chips.push(`角色：${ROLE_LABEL[normalizeRoleId(role)] || role}`);
     if (changes.details?.login_method) chips.push(`登入方式：${changes.details.login_method === 'username' ? '系統帳號' : '電子郵件'}`);
     if (changes.details?.result) chips.push(`結果：${changes.details.result}`);
+    if (changes.details?.reason) chips.push(`原因：${changes.details.reason}`);
+    if (changes.details?.attempted_identifier) chips.push(`嘗試帳號：${changes.details.attempted_identifier}`);
+    if (changes.details?.recent_attempts_from_ip) chips.push(`來源位址近十分鐘嘗試次數：${changes.details.recent_attempts_from_ip}`);
+    if (changes.details?.risk_level) chips.push(`風險等級：${changes.details.risk_level}`);
     return { tableLabel, actionLabel, summary: `${opName} ${actionLabel}。`, chips };
+  }
+
+  if (row.table_name === 'data_access' || row.table_name === 'file_access' || ['data_read','file_read','access_denied'].includes(eventType)) {
+    const detail = changes.details || {};
+    const kindLabel = detail.access_kind === 'file' || row.table_name === 'file_access' ? '檔案' : '資料';
+    const resource = detail.resource || '未識別資源';
+    const denied = eventType === 'access_denied';
+    const summary = denied
+      ? `嘗試讀取${kindLabel}「${resource}」，已遭系統拒絕。`
+      : `讀取${kindLabel}「${resource}」。`;
+    const chips = [];
+    if (detail.result) chips.push(`結果：${detail.result}`);
+    if (detail.http_status) chips.push(`網路狀態碼：${detail.http_status}`);
+    if (detail.method) chips.push(`讀取方式：${detail.method}`);
+    if (detail.response_range) chips.push(`資料範圍：${detail.response_range}`);
+    if (detail.reason) chips.push(`原因：${detail.reason}`);
+    if (detail.risk_level) chips.push(`風險等級：${detail.risk_level}`);
+    return { tableLabel, actionLabel, summary, chips };
   }
 
   if (row.table_name === 'system_usage' || eventType === 'page_view' || eventType === 'function_use') {
@@ -3376,10 +3412,32 @@ function auditGoPage(page) {
   loadAudit(false);
 }
 
+function populateAuditOperatorFilter() {
+  const select = document.getElementById('auditOperatorFilter');
+  if (!select) return;
+  const selected = select.value;
+  const options = [
+    '<option value="">全部操作帳號</option>',
+    '<option value="__unidentified__">未識別／不存在的帳號</option>'
+  ];
+  [...allUsers]
+    .sort((a, b) => String(a.name || a.username || '').localeCompare(String(b.name || b.username || ''), 'zh-Hant'))
+    .forEach(user => {
+      if (!user.user_id) return;
+      const identity = user.username || user.email || '未設定帳號';
+      const inactive = user.status === 'inactive' ? '／已停用' : '';
+      options.push(`<option value="${escHtml(user.user_id)}">${escHtml(user.name || '未命名')}（${escHtml(identity)}${inactive}）</option>`);
+    });
+  select.innerHTML = options.join('');
+  if ([...select.options].some(option => option.value === selected)) select.value = selected;
+}
+
 async function loadAudit(resetPage = false) {
   if (resetPage) auditPage = 1;
+  populateAuditOperatorFilter();
   const tableFilter = document.getElementById('auditTableFilter').value;
   const actionFilter = document.getElementById('auditActionFilter').value;
+  const operatorFilter = document.getElementById('auditOperatorFilter').value;
   const dateFrom = DTP.getValue('auditDateFrom-dtp');
   const dateTo = DTP.getValue('auditDateTo-dtp');
   const summaryEl = document.getElementById('auditFilterSummary');
@@ -3397,8 +3455,10 @@ async function loadAudit(resetPage = false) {
     .order('operated_at',{ascending:false})
     .range(from, to);
   if (tableFilter) query = query.eq('table_name', tableFilter);
-  if (actionFilter === 'page_view' || actionFilter === 'function_use') query = query.contains('changes', { event_type:actionFilter });
+  if (['page_view','function_use','data_read','file_read','access_denied'].includes(actionFilter)) query = query.contains('changes', { event_type:actionFilter });
   else if (actionFilter) query = query.eq('action', actionFilter);
+  if (operatorFilter === '__unidentified__') query = query.is('operator_id', null);
+  else if (operatorFilter) query = query.eq('operator_id', operatorFilter);
   if (dateFrom) query = query.gte('operated_at', dateFrom + 'T00:00:00+08:00');
   if (dateTo) query = query.lte('operated_at', dateTo + 'T23:59:59.999+08:00');
   const { data, error, count } = await query;
@@ -3447,6 +3507,7 @@ async function loadAudit(resetPage = false) {
 function clearAuditFilters() {
   document.getElementById('auditTableFilter').value = '';
   document.getElementById('auditActionFilter').value = '';
+  document.getElementById('auditOperatorFilter').value = '';
   DTP.setValue('auditDateFrom-dtp', null);
   DTP.setValue('auditDateTo-dtp', null);
   loadAudit(true);

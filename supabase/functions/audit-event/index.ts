@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const eventType = cleanText(body.event_type, 40);
-    if (!["login", "logout", "page_view", "function_use", "data_action"].includes(eventType)) {
+    if (!["login", "logout", "page_view", "function_use", "data_action", "data_read", "file_read", "access_denied"].includes(eventType)) {
       return reply(req, { ok: false, message: "不支援的稽核事件" }, 400);
     }
 
@@ -77,6 +77,7 @@ Deno.serve(async (req) => {
     const ipAddress = clientIp(req);
     const userAgent = cleanText(req.headers.get("user-agent"), 1000) || null;
     const page = cleanValue(body.page || {});
+    const details = cleanValue(body.details || {}) as Record<string, unknown>;
     const changes = {
       event_id: eventId,
       event_type: eventType,
@@ -93,12 +94,14 @@ Deno.serve(async (req) => {
       },
       client: { ip_address: ipAddress, user_agent: userAgent },
       page,
-      details: cleanValue(body.details || {})
+      details
     };
 
     const source = cleanText((page as Record<string, unknown>)?.path || "system", 160) || "system";
+    const isFileAccess = eventType === "file_read" || (eventType === "access_denied" && details.access_kind === "file");
+    const isDataAccess = eventType === "data_read" || (eventType === "access_denied" && details.access_kind === "data");
     const { data: inserted, error: insertError } = await admin.from("audit_logs").insert({
-      table_name: isAuth ? "auth" : "system_usage",
+      table_name: isAuth ? "auth" : (isFileAccess ? "file_access" : (isDataAccess ? "data_access" : "system_usage")),
       record_id: isAuth ? String(profile.user_id) : eventId,
       action: isAuth ? eventType : "insert",
       changes,

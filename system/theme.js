@@ -251,7 +251,8 @@
     isSysadminAccess().then(function(result){resolved=true;allowed=result;sync();}).catch(function(){resolved=true;allowed=false;sync();});
   }
 
-  // 全站共用稽核：登入／登出、進入子系統、使用主要按鈕與功能都由同一入口記錄。
+  // 全站共用稽核：登入／登出、進入子系統、使用主要按鈕、資料讀取與檔案存取
+  // 都由同一入口記錄。
   // Edge Function 會以 JWT 驗證操作者並由伺服器取得 IP / User-Agent；若函式尚未部署，
   // 仍會以 RLS 限制的 audit_logs 寫入作為備援，避免導頁造成事件遺失。
   var auditRecentActions=Object.create(null);
@@ -300,8 +301,10 @@
   }
   function auditFallbackInsert(token,profile,payload){
     var isAuth=payload.event_type==='login'||payload.event_type==='logout';
+    var isFile=payload.event_type==='file_read'||(payload.event_type==='access_denied'&&payload.details&&payload.details.access_kind==='file');
+    var isData=payload.event_type==='data_read'||(payload.event_type==='access_denied'&&payload.details&&payload.details.access_kind==='data');
     var row={
-      table_name:isAuth?'auth':'system_usage',
+      table_name:isAuth?'auth':(isFile?'file_access':(isData?'data_access':'system_usage')),
       record_id:isAuth?String(profile.user_id):payload.event_id,
       action:isAuth?payload.event_type:'insert',
       changes:payload,
@@ -341,6 +344,90 @@
     var profile=readProfile();
     return profile&&profile.user_id?Promise.resolve(send(profile)):resolveCurrentProfileForAccess().then(send).catch(function(){return false;});
   }
+  var auditRecentReads=Object.create(null);
+  function auditDecodePath(value){
+    try{return decodeURIComponent(value);}catch(e){return String(value||'');}
+  }
+  function auditReadMeta(input,init){
+    var raw=typeof input==='string'?input:(input&&input.url)||'';
+    var url;
+    try{url=new URL(raw,location.href);}catch(e){return null;}
+    var api;
+    try{api=new URL(SUPABASE_URL);}catch(e){return null;}
+    if(url.origin!==api.origin)return null;
+    var method=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();
+    if(method!=='GET'&&method!=='HEAD')return null;
+    var rest=url.pathname.match(/\/rest\/v1\/([^/]+)/i);
+    if(rest){
+      var table=auditDecodePath(rest[1]);
+      if(!table||table==='audit_logs')return null;
+      return {kind:'data',resource:table,method:method,path:url.pathname,suspicious:false};
+    }
+    var marker='/storage/v1/object/';
+    var pos=url.pathname.indexOf(marker);
+    if(pos<0)return null;
+    var storagePath=auditDecodePath(url.pathname.slice(pos+marker.length));
+    var parts=storagePath.split('/').filter(Boolean);
+    if(['public','sign','authenticated'].indexOf(parts[0])>=0)parts.shift();
+    var bucket=parts.shift()||'未知儲存區';
+    var objectPath=parts.join('/');
+    var suspicious=/(^|\/)\.\.(\/|$)/.test(storagePath)||/(^|\/)(?:\.env|\.git|id_rsa|service[_-]?role|private[_-]?key)(?:\/|$)/i.test(storagePath);
+    return {kind:'file',resource:bucket+(objectPath?'/'+objectPath:''),method:method,path:url.pathname,suspicious:suspicious};
+  }
+  function recordReadAccess(meta,response,error){
+    if(!meta)return;
+    var status=response?Number(response.status)||0:0;
+    var denied=meta.suspicious||status===401||status===403;
+    var eventType=denied?'access_denied':(meta.kind==='file'?'file_read':'data_read');
+    var result=meta.suspicious?'系統已阻擋可疑路徑':(response?(response.ok?'讀取成功':'讀取失敗'):'網路錯誤');
+    var key=[auditPageInfo().path,eventType,meta.kind,meta.resource,status].join('|');
+    var now=Date.now();
+    if(auditRecentReads[key]&&now-auditRecentReads[key]<1200)return;
+    auditRecentReads[key]=now;
+    var range=response&&response.headers?response.headers.get('content-range'):'';
+    setTimeout(function(){
+      sendSystemAudit(eventType,{
+        feature:meta.kind==='file'?'讀取檔案':'讀取資料',
+        access_kind:meta.kind,
+        resource:auditSafeText(meta.resource,320),
+        request_path:auditSafeText(meta.path,500),
+        method:meta.method,
+        http_status:status||null,
+        result:result,
+        response_range:auditSafeText(range,80),
+        reason:meta.suspicious?'偵測到目錄跳脫或敏感檔名':(denied?'權限驗證拒絕':auditSafeText(error&&error.message,160)),
+        risk_level:denied?'高風險':'一般'
+      });
+    },0);
+  }
+  function installReadAccessAudit(){
+    if(window.__systemReadAccessAuditInstalled||typeof window.fetch!=='function')return;
+    window.__systemReadAccessAuditInstalled=true;
+    var nativeFetch=window.fetch.bind(window);
+    window.fetch=function(input,init){
+      var meta=auditReadMeta(input,init);
+      if(meta&&meta.suspicious){
+        var deniedResponse=new Response(JSON.stringify({message:'系統已阻擋可疑檔案路徑'}),{status:403,headers:{'Content-Type':'application/json'}});
+        recordReadAccess(meta,deniedResponse,null);
+        return Promise.resolve(deniedResponse);
+      }
+      return nativeFetch(input,init).then(function(response){
+        if(meta)recordReadAccess(meta,response,null);
+        return response;
+      },function(error){
+        if(meta)recordReadAccess(meta,null,error);
+        throw error;
+      });
+    };
+  }
+  function auditFileHref(href){
+    if(!href)return '';
+    var url;
+    try{url=new URL(href,location.href);}catch(e){return '';}
+    if(url.pathname.indexOf('/storage/v1/object/')>=0||/\.(?:pdf|xlsx?|csv|docx?|pptx?|zip|png|jpe?g|webp)$/i.test(url.pathname))return auditDecodePath(url.pathname);
+    return '';
+  }
+  installReadAccessAudit();
   window.SystemAudit={
     record:function(eventType,details){return sendSystemAudit(eventType,details||{});},
     pageInfo:auditPageInfo
@@ -355,6 +442,13 @@
       if(!meaningful)return;
       var label=auditSafeText(target.dataset.auditFeature||target.getAttribute('aria-label')||target.title||target.value||target.textContent||target.id,120);
       if(!label||/密碼|password/i.test(label)&&target.closest('#loginCard'))return;
+      var filePath=auditFileHref(target.getAttribute('href')||'');
+      if(filePath){
+        sendSystemAudit('file_read',{
+          feature:'開啟或下載檔案',access_kind:'file',resource:auditSafeText(filePath,320),
+          request_path:auditSafeText(filePath,500),method:'導覽',result:'使用者要求開啟',risk_level:'一般'
+        });
+      }
       var key=page.path+'|'+label+'|'+auditSafeText(target.getAttribute('href')||'',160);
       var now=Date.now();
       if(auditRecentActions[key]&&now-auditRecentActions[key]<1200)return;
