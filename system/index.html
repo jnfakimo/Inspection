@@ -133,6 +133,9 @@
     gap:24px;
     flex-wrap:wrap;
   }
+  /* 系統權限尚未解析完成前不顯示任何圖卡，避免非管理員先看到未開放功能。 */
+  .cards-area{visibility:hidden}
+  .cards-area.system-access-ready{visibility:visible}
 
   /* ── SYSTEM CARD ── */
   .sys-card {
@@ -413,13 +416,20 @@
 
 <script>
   const db = createDb();
+  const cardsArea = document.querySelector('.cards-area');
+  function revealSystemCards(){
+    if(!cardsArea)return;
+    cardsArea.classList.add('system-access-ready');
+    cardsArea.removeAttribute('aria-busy');
+  }
   (async()=>{
     const {data:{session}}=await db.auth.getSession();
     if(!session){location.href='login.html';return;}
-    applySystemAccess();
+    await applySystemAccess();
   })();
   const SYSTEM_LABELS={admin:'後台管理系統',workorder:'報修/派工/完工系統',guardpatrol:'駐衛警巡檢系統',handover:'電子交接簿',equipment:'設備建置系統',structuremap:'專案核心樹狀關係圖',vehicle:'公務車派車管理'};
   function applySystemAccess(){
+    if(cardsArea)cardsArea.setAttribute('aria-busy','true');
     const params=new URLSearchParams(location.search);
     const denied=params.get('denied');
     if(denied){
@@ -428,13 +438,18 @@
       el.classList.add('show');
       setTimeout(()=>el.classList.remove('show'),3200);
     }
-    if(!window.SystemAccess||typeof window.SystemAccess.allowedSystems!=='function')return;
-    window.SystemAccess.allowedSystems().then((allowed)=>{
+    if(!window.SystemAccess||typeof window.SystemAccess.allowedSystems!=='function'){
+      document.querySelectorAll('.sys-card[data-system-key]').forEach((card)=>{card.style.display='none';});
+      const error=document.getElementById('portalToast');
+      if(error){error.textContent='目前無法取得系統權限，請重新整理頁面';error.classList.add('show');}
+      return Promise.resolve();
+    }
+    return Promise.resolve().then(()=>window.SystemAccess.allowedSystems()).catch(()=>new Set()).then((allowed)=>{
       document.querySelectorAll('.sys-card[data-system-key]').forEach((card)=>{
         const key=card.getAttribute('data-system-key');
         if(allowed!==null&&!allowed.has(key))card.style.display='none';
       });
-    });
+    }).finally(revealSystemCards);
   }
   db.from('system_settings').select('key,value').then(({ data }) => {
     if (!data) return;
