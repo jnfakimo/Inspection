@@ -112,6 +112,8 @@ Deno.serve(async (req) => {
         .eq("table_name", "auth")
         .eq("action", "login")
         .eq("ip_address", ipAddress)
+        .eq("changes->>event_type", "login_attempt")
+        .neq("changes->details->>result", "成功")
         .gte("operated_at", since);
       recentAttempts = count || 0;
     }
