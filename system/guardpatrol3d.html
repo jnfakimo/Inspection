@@ -725,7 +725,9 @@ async function applyCustomModels(){
         if(!m.image_path) return;
         const fl=FLOORS.find(f=>f.id===m.floor_id);
         const t=encodeURIComponent(m.updated_at||'');
-        const url=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
+        const base=`${SUPA_URL}/storage/v1/object/public/floorplans`;
+        const url=`${base}/${m.image_path}?t=${t}`;
+        const mobileUrl=`${base}/mobile/${m.image_path}?t=${t}`;
         if(fl){
           // 已有本地貼圖的樓層（B1〜3F）：手機維持 plans/tex/mobile/ 縮圖，不用 Storage 原圖覆蓋。
           if(!MOBILE_MODEL){
@@ -736,7 +738,10 @@ async function applyCustomModels(){
           // 沒有本地貼圖的樓層（4F/5F/RF 等後來上傳的）只有 Storage 這一個來源。
           // 原本這裡的條件是 (!MOBILE_MODEL && fl && …)，那個 fl 代表「只覆蓋、從不新增」，
           // 所以這些樓層在桌機也一樣看不到，不只是手機。
-          FLOORS.push({ id:m.floor_id, label:m.name||m.floor_id, tex:url, fallbackTex:null,
+          // 手機優先抓 modeler.html 一併上傳的 mobile/ 縮圖；舊資料沒有縮圖時
+          // 載入失敗，由下方既有的 fallbackTex 重試機制退回 2400px 原圖。
+          FLOORS.push({ id:m.floor_id, label:m.name||m.floor_id,
+                        tex:MOBILE_MODEL?mobileUrl:url, fallbackTex:url,
                         level:floorLevelOf(m.floor_id), mesh:null, frame:null, visible:true,
                         remoteTex:true, modelUpdatedAt:m.updated_at||null });
         }
@@ -833,7 +838,9 @@ async function applyModelUpdates(){
   for(const m of updates){
     const fl=FLOORS.find(f=>f.id===m.floor_id); if(!fl) continue;
     const t=encodeURIComponent(m.updated_at||'');
-    const url=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
+    const base=`${SUPA_URL}/storage/v1/object/public/floorplans`;
+    // 與初次載入一致：手機的遠端樓層優先抓 mobile/ 縮圖。
+    const url=(MOBILE_MODEL&&fl.remoteTex)?`${base}/mobile/${m.image_path}?t=${t}`:`${base}/${m.image_path}?t=${t}`;
     await new Promise(resolve=>{
       loader.load(url, tex=>{
         if(MOBILE_MODEL&&fl.remoteTex) downscaleTexture(tex,1200);

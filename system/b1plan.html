@@ -282,13 +282,18 @@ async function buildSources(){
         // 但 supabase-js v2 回傳的欄位叫 signedUrl，取到的永遠是 undefined，
         // 而 fl.src 又已被指派成物件，下方的 fallbackSrc 補救也不會生效。
         const t = encodeURIComponent(m.updated_at || '');
-        const url = `${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
+        const base = `${SUPA_URL}/storage/v1/object/public/floorplans`;
+        const url = `${base}/${m.image_path}?t=${t}`;
+        const mobileUrl = `${base}/mobile/${m.image_path}?t=${t}`;
         if (fl) {
           fl.src = { type: 'image', url };
         } else {
           // 沒有本地圖檔的樓層（4F/5F/RF 等後來上傳的）只有 Storage 這一個來源，
-          // 手機若一併跳過就整層不會出現。
-          FLOORS.push({ id: m.floor_id, label: m.name || m.floor_id, file: null, src: { type: 'image', url }, fallbackSrc: null });
+          // 手機若一併跳過就整層不會出現。手機優先抓 modeler.html 一併上傳的
+          // mobile/ 縮圖；舊資料沒有縮圖時 open-failed 會退回 fallbackSrc 的原圖。
+          FLOORS.push({ id: m.floor_id, label: m.name || m.floor_id, file: null,
+                        src: { type: 'image', url: mobileModel ? mobileUrl : url },
+                        fallbackSrc: { type: 'image', url } });
         }
       });
     }
