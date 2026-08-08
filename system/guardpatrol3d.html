@@ -303,6 +303,23 @@ function floorFrame(y){
   return g;
 }
 
+// modeler.html 產出的 Storage 原圖長邊固定 2400px，一張上 GPU 約佔 24MB 顯存。
+// 本地貼圖有 plans/tex/mobile/ 縮圖版，Storage 原圖沒有，所以在行動裝置上
+// 改用 canvas 先縮到 1200px 再交給 WebGL，避免多層疊加把分頁記憶體吃爆。
+function downscaleTexture(tex,maxSide){
+  const img=tex.image;
+  const w=img&&(img.naturalWidth||img.width), h=img&&(img.naturalHeight||img.height);
+  if(!w||!h) return;
+  const scale=maxSide/Math.max(w,h);
+  if(scale>=1) return;
+  try{
+    const cv=document.createElement('canvas');
+    cv.width=Math.max(1,Math.round(w*scale)); cv.height=Math.max(1,Math.round(h*scale));
+    cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+    tex.image=cv; tex.needsUpdate=true;
+  }catch(e){ /* 縮圖失敗就照原尺寸用 */ }
+}
+
 function buildFloors(){
   const loader=new THREE.TextureLoader();
   let done=0,finished=false;
@@ -317,6 +334,7 @@ function buildFloors(){
   const loadFloorTex=(fl,timer)=>{
     loader.load(fl.tex, tex=>{
       clearTimeout(timer);
+      if(MOBILE_MODEL&&fl.remoteTex) downscaleTexture(tex,1200);
       tex.minFilter=THREE.LinearFilter; tex.magFilter=THREE.LinearFilter;
       tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
       const mat=new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,side:THREE.DoubleSide});
@@ -331,7 +349,8 @@ function buildFloors(){
     }, undefined, ()=>{
       // A custom Storage model can go stale (renamed/deleted); fall back to
       // the known-good static texture instead of leaving the floor blank.
-      if(fl.tex!==fl.fallbackTex){ fl.tex=fl.fallbackTex; loadFloorTex(fl,timer); return; }
+      // 動態加進來的樓層沒有靜態貼圖（fallbackTex 為 null），不能拿 null 再載一次。
+      if(fl.fallbackTex&&fl.tex!==fl.fallbackTex){ fl.tex=fl.fallbackTex; loadFloorTex(fl,timer); return; }
       clearTimeout(timer);markDone(fl,'部分貼圖無法載入，先開啟場景…');
     });
   };
@@ -675,6 +694,25 @@ function setExplode(v){ EXPLODE=parseFloat(v); document.getElementById('explode'
 function resetView(){ yOffset=0;orb.theta=-0.6;orb.phi=1.02;orb.r=640;orb.tx=0;orb.ty=viewY();orb.tz=0;syncXPanUI();syncYPanUI(); }
 function topView(){ orb.theta=0;orb.phi=0.06;orb.r=560;orb.tx=0;orb.ty=viewY();orb.tz=0;syncXPanUI();syncYPanUI(); }
 
+// floor_id 例如 "4F"/"B2" -> 疊放層級，與靜態的 B1=0,1F=1,2F=2,3F=3 一致。
+// 無法解析的代號（例如 "RF"）疊在目前最高層之上。
+function floorLevelOf(id){
+  let m=/^B(\d+)$/i.exec(id);
+  if(m) return -(parseInt(m[1],10)-1);
+  m=/^(\d+)F$/i.exec(id);
+  if(m) return parseInt(m[1],10);
+  return Math.max(...FLOORS.map(f=>f.level))+1;
+}
+
+// 樓層按鈕原本寫死在 HTML 只有 B1〜3F；動態加進來的樓層要一併出現在選單裡。
+function renderFloorButtons(){
+  const host=document.getElementById('floors');
+  if(!host) return;
+  host.innerHTML=[...FLOORS].sort((a,b)=>b.level-a.level).map(fl=>
+    `<button class="fbtn ${fl.visible?'on':'off'}" id="t-${fl.id}" onclick="toggleFloor('${fl.id}')">${fl.label}</button>`
+  ).join('');
+}
+
 // fetch any updated floor models from Storage (override static textures)
 async function applyCustomModels(){
   try{
@@ -684,13 +722,26 @@ async function applyCustomModels(){
     if(error) console.warn('floor_models query failed or timed out, using static textures only',error);
     if(data&&data.length){
       data.forEach(m=>{
+        if(!m.image_path) return;
         const fl=FLOORS.find(f=>f.id===m.floor_id);
-        if(!MOBILE_MODEL&&fl&&m.image_path){
-          const t=encodeURIComponent(m.updated_at||'');
-          fl.tex=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
-          fl.modelUpdatedAt=m.updated_at||null;    // baseline version we just loaded, for later update checks
+        const t=encodeURIComponent(m.updated_at||'');
+        const url=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
+        if(fl){
+          // 已有本地貼圖的樓層（B1〜3F）：手機維持 plans/tex/mobile/ 縮圖，不用 Storage 原圖覆蓋。
+          if(!MOBILE_MODEL){
+            fl.tex=url;
+            fl.modelUpdatedAt=m.updated_at||null;  // baseline version we just loaded, for later update checks
+          }
+        }else{
+          // 沒有本地貼圖的樓層（4F/5F/RF 等後來上傳的）只有 Storage 這一個來源。
+          // 原本這裡的條件是 (!MOBILE_MODEL && fl && …)，那個 fl 代表「只覆蓋、從不新增」，
+          // 所以這些樓層在桌機也一樣看不到，不只是手機。
+          FLOORS.push({ id:m.floor_id, label:m.name||m.floor_id, tex:url, fallbackTex:null,
+                        level:floorLevelOf(m.floor_id), mesh:null, frame:null, visible:true,
+                        remoteTex:true, modelUpdatedAt:m.updated_at||null });
         }
       });
+      renderFloorButtons();
     }
   }catch(e){ /* 查詢逾時或失敗時直接使用內建貼圖 */ }
 }
@@ -751,7 +802,10 @@ async function checkModelUpdates(){
     if(!data) return;
     data.forEach(m=>{
       const fl=FLOORS.find(f=>f.id===m.floor_id);
-      if(MOBILE_MODEL||!fl||!m.image_path) return;
+      if(!fl||!m.image_path) return;
+      // 手機上 B1〜3F 用的是本地縮圖，Storage 有新版也不該換掉；
+      // 但只有 Storage 來源的樓層（4F/5F/RF）手機本來就在用它，更新要照常提示。
+      if(MOBILE_MODEL&&!fl.remoteTex) return;
       if(m.updated_at && m.updated_at!==fl.modelUpdatedAt) pendingModelUpdates.set(m.floor_id,m);
     });
     updateModelUpdateBtn();
@@ -782,6 +836,7 @@ async function applyModelUpdates(){
     const url=`${SUPA_URL}/storage/v1/object/public/floorplans/${m.image_path}?t=${t}`;
     await new Promise(resolve=>{
       loader.load(url, tex=>{
+        if(MOBILE_MODEL&&fl.remoteTex) downscaleTexture(tex,1200);
         tex.minFilter=THREE.LinearFilter; tex.magFilter=THREE.LinearFilter;
         tex.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
         if(fl.mesh) ModelTheme.registerFloor(THREE,fl,tex,renderer);
