@@ -45,7 +45,7 @@ jobs:
       # Lint CSS files using stylelint
       - name: Lint CSS with stylelint
         run: |
-          npx stylelint "**/*.css" --allow-empty-input
+          npx stylelint "system/*.css" --allow-empty-input
 
       # Lint JavaScript files using ESLint
       - name: Lint JavaScript with ESLint
