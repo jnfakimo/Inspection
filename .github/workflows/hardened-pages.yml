@@ -33,6 +33,14 @@ jobs:
 
       - name: Build restricted and minified site artifact
         run: npm run build:pages
+        env:
+          PROVENANCE_PRIVATE_KEY: ${{ secrets.PROVENANCE_PRIVATE_KEY }}
+
+      - name: Verify signed provenance manifest
+        run: npm run verify:provenance
+
+      - name: Scan every website page
+        run: npm run scan:pages
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
@@ -49,7 +57,27 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy restricted artifact
         id: deployment
         uses: actions/deploy-pages@v4
+
+  verify-deployment:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Scan every deployed website page
+        run: node tools/scan-all-pages.mjs "${{ needs.deploy.outputs.page_url }}"
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}

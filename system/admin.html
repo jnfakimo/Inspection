@@ -9,7 +9,7 @@ if (location.hash === '#repairs') {
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260807-alert1"></script>
+<script src="theme.js?v=20260808-security2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -3574,6 +3574,7 @@ async function loadSecurityAlerts() {
       `操作帳號：${account}`,
       alert.ip_address ? `來源位址：${alert.ip_address}` : '',
       `事件次數：${alert.event_count || 1}`,
+      alert.alert_type === 'bulk_read' ? '系統處置：已中止該次工作階段並阻擋後續讀取' : '',
       `最後發生：${auditFormatDateTime(alert.last_seen_at || alert.detected_at)}`
     ].filter(Boolean).join('｜');
     return `<div class="audit-alert-card ${alert.severity === 'critical' ? 'critical' : 'warning'}">

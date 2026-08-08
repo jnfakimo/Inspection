@@ -68,6 +68,9 @@
   function resolveRbacRole(profile){
     return (profile&&(profile.rbac_role||LEGACY_TO_RBAC[profile.role]))||null;
   }
+  function isSysadminProfile(profile){
+    return !!profile&&(profile.rbac_role==='sysadmin'||profile.role==='admin');
+  }
   function storedAuthSessionForAccess(){
     try{
       var raw=sessionStorage.getItem('sb-qztffronusdhgxhjjubt-auth-token');
@@ -116,7 +119,6 @@
     var auth=storedAuthSessionForAccess();
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
-    function isSysadminProfile(profile){return !!profile&&(profile.rbac_role==='sysadmin'||profile.role==='admin');}
     if(!token||!authId){clearProfile();return Promise.resolve(false);}
     return fetchUserRowForAccess(authId,token).then(function(profile){
       if(!profile)return false;
@@ -319,6 +321,21 @@
       body:JSON.stringify(row)
     }).then(function(response){return response.ok;}).catch(function(){return false;});
   }
+  function enforceSecurityLogout(action,profile){
+    if(!action||action.force_logout!==true||isSysadminProfile(profile)||window.__securityLogoutInProgress)return;
+    window.__securityLogoutInProgress=true;
+    var message=auditSafeText(action.message,300)||'系統偵測到大量資料讀取，已中止目前連線並通知系統管理員。';
+    try{sessionStorage.setItem('securityLogoutMessage',message);}catch(e){}
+    clearProfile();
+    try{
+      sessionStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');
+      localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');
+    }catch(e){}
+    setTimeout(function(){
+      try{window.alert(message);}catch(e){}
+      location.replace('login.html?security=bulk-read');
+    },0);
+  }
   function sendSystemAudit(eventType,details){
     var auth=storedAuthSessionForAccess();
     var token=auth&&auth.access_token;
@@ -327,15 +344,22 @@
       if(!profile||!profile.user_id)return false;
       var payload=auditEventPayload(eventType,details,profile);
       var controller=window.AbortController?new AbortController():null;
-      var timer=controller?setTimeout(function(){controller.abort();},2200):null;
+      var timer=controller?setTimeout(function(){controller.abort();},8000):null;
       return fetch(SUPABASE_URL+'/functions/v1/audit-event',{
         method:'POST',keepalive:true,signal:controller?controller.signal:undefined,
         headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},
         body:JSON.stringify(payload)
       }).then(function(response){
         if(timer)clearTimeout(timer);
-        if(response.ok)return true;
-        return auditFallbackInsert(token,profile,payload);
+        return response.text().then(function(text){
+          var body=null;
+          try{body=text?JSON.parse(text):null;}catch(e){}
+          if(response.ok){
+            if(body&&body.security_action)enforceSecurityLogout(body.security_action,profile);
+            return true;
+          }
+          return auditFallbackInsert(token,profile,payload);
+        });
       }).catch(function(){
         if(timer)clearTimeout(timer);
         return auditFallbackInsert(token,profile,payload);

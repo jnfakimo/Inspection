@@ -45,6 +45,8 @@ type AuditProfile = {
   username?: string | null;
   email?: string | null;
   name?: string | null;
+  role?: string | null;
+  rbac_role?: string | null;
 };
 
 type AlertSpec = {
@@ -60,6 +62,68 @@ type AlertSpec = {
 
 const alertActor = (profile: AuditProfile) =>
   cleanText(profile.username || profile.email || profile.name || profile.user_id, 160);
+
+const isSysadminProfile = (profile: AuditProfile) =>
+  profile.rbac_role === "sysadmin" || profile.role === "admin";
+
+const sessionIdFromToken = (token: string) => {
+  try {
+    const encoded = token.split(".")[1] || "";
+    const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const claims = JSON.parse(atob(padded)) as Record<string, unknown>;
+    const sessionId = cleanText(claims.session_id, 80);
+    return /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(sessionId) ? sessionId : null;
+  } catch {
+    return null;
+  }
+};
+
+async function enforceBulkReadCutoff(
+  admin: SupabaseClient,
+  profile: AuditProfile,
+  token: string,
+  alert: { alert_id: string; alert_type: string }
+) {
+  const sessionId = sessionIdFromToken(token);
+  let databaseBlocked = false;
+  let authSessionRevoked = false;
+  const errors: string[] = [];
+
+  if (sessionId) {
+    const { error } = await admin.from("security_session_blocks").upsert({
+      session_id: sessionId,
+      user_id: profile.user_id,
+      alert_id: alert.alert_id,
+      reason: "non_admin_bulk_read",
+      details: {
+        alert_type: alert.alert_type,
+        enforcement: "force_logout_current_session",
+        actor: alertActor(profile)
+      },
+      blocked_at: new Date().toISOString()
+    }, { onConflict: "session_id" });
+    if (error) errors.push(`資料庫阻擋失敗：${cleanText(error.message, 180)}`);
+    else databaseBlocked = true;
+  } else {
+    errors.push("JWT 缺少 session_id，無法建立資料庫阻擋紀錄");
+  }
+
+  const { error: signOutError } = await admin.auth.admin.signOut(token, "local");
+  if (signOutError) errors.push(`工作階段撤銷失敗：${cleanText(signOutError.message, 180)}`);
+  else authSessionRevoked = true;
+
+  return {
+    force_logout: true,
+    reason: "non_admin_bulk_read",
+    message: "系統偵測到非管理員大量讀取資料，已中止目前連線並通知系統管理員。",
+    alert_id: alert.alert_id,
+    session_id: sessionId,
+    database_blocked: databaseBlocked,
+    auth_session_revoked: authSessionRevoked,
+    errors
+  };
+}
 
 async function saveSecurityAlert(
   admin: SupabaseClient,
@@ -193,6 +257,9 @@ async function detectSecurityAlert(
   }
 
   if (eventType === "data_read" || eventType === "file_read") {
+    // 系統管理員執行稽核、匯出或全站檢查時可能合法讀取大量資料；
+    // 大量讀取的自動斷線只套用在其他角色，可疑檔案與拒絕存取仍照常告警。
+    if (isSysadminProfile(profile)) return null;
     const since = new Date(Date.now() - 5 * 60_000).toISOString();
     const { data: recent, error } = await admin.from("audit_logs")
       .select("changes")
@@ -219,9 +286,9 @@ async function detectSecurityAlert(
       const resourceSummary = resources.slice(0, 8).join("、");
       return saveSecurityAlert(admin, profile, ipAddress, {
         alertType: "bulk_read",
-        severity: repeatedRead && resources.length >= 8 ? "critical" : "warning",
-        title: "偵測到大量資料讀取",
-        message: `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源，請確認是否為正常操作。`,
+        severity: "critical",
+        title: "非管理員大量讀取，已中止連線",
+        message: `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源；系統已啟動目前工作階段的強制離線處置。`,
         resource: resourceSummary || resource,
         eventCount: readCount,
         windowMinutes: 5,
@@ -230,7 +297,9 @@ async function detectSecurityAlert(
           unique_resource_threshold: 8,
           read_count: readCount,
           unique_resource_count: resources.length,
-          resources: resources.slice(0, 20)
+          resources: resources.slice(0, 20),
+          enforcement: "force_logout_current_session",
+          sysadmin_exempt: true
         }
       });
     }
@@ -311,15 +380,19 @@ Deno.serve(async (req) => {
     if (insertError) throw insertError;
 
     let alert = null;
+    let securityAction = null;
     if (["data_read", "file_read", "access_denied"].includes(eventType)) {
       try {
         alert = await detectSecurityAlert(admin, profile, ipAddress, eventType, details);
+        if (alert?.alert_type === "bulk_read" && !isSysadminProfile(profile)) {
+          securityAction = await enforceBulkReadCutoff(admin, profile, token, alert);
+        }
       } catch (alertError) {
         console.error("Security alert detection failed", alertError instanceof Error ? alertError.message : String(alertError));
       }
     }
 
-    return reply(req, { ok: true, audit_id: inserted.audit_id, alert });
+    return reply(req, { ok: true, audit_id: inserted.audit_id, alert, security_action: securityAction });
   } catch (error) {
     console.error("Audit event failed", error instanceof Error ? error.message : String(error));
     return reply(req, { ok: false, message: "系統紀錄寫入失敗" }, 500);

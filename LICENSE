@@ -1,0 +1,23 @@
+專有軟體權利聲明／PROPRIETARY SOFTWARE NOTICE
+
+Copyright © 2026 jnfakimo. All rights reserved.
+
+本專案及其原始碼、目的碼、畫面設計、資料結構、流程設計、文件與數位來源標記，
+均為專有成果。除法律另有規定、既有書面契約另有約定，或事前取得權利人書面授權外，
+不得以任何形式重製、散布、公開傳輸、改作、反向工程、移除權利標記、建立衍生系統，
+或將全部或部分內容用於其他產品、服務、投標、展示、教學、訓練模型或商業開發。
+
+取得網站、儲存庫、檔案或系統帳號的存取權，不代表取得任何著作權、專利權、授權、
+所有權或再授權權利。經授權使用者僅得於核准範圍及目的內使用。
+
+本專案的正式部署產物含有頁面級隱藏指紋、執行階段標記、檔案雜湊清單及 Ed25519
+數位簽章，用於辨識來源、版本與未授權重製。故意移除或變造標記不構成任何授權。
+
+專利權如有，應以實際提出申請並經主管機關核准公告的範圍為準；本聲明不取代專利申請、
+契約或專業法律意見。著作權及其他權利歸屬如另有僱傭、委任或出資契約，從其約定及
+適用法律認定。
+
+This software is proprietary and is not offered under an open-source license.
+No rights are granted by access, possession, viewing, or use of the deployed service.
+Unauthorized copying, modification, redistribution, derivative development, removal of
+provenance marks, or commercial use is prohibited to the fullest extent permitted by law.

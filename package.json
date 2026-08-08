@@ -5,6 +5,8 @@
   "description": "Production-only hardened GitHub Pages packaging for the Beinong Market static system.",
   "scripts": {
     "build:pages": "node tools/build-hardened-pages.mjs",
+    "scan:pages": "node tools/scan-all-pages.mjs",
+    "verify:provenance": "node tools/verify-provenance.mjs",
     "test": "node --check tools/build-hardened-pages.mjs"
   },
   "devDependencies": {

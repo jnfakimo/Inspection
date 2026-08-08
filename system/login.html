@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260807-alert1"></script>
+<script src="theme.js?v=20260808-security2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>臺北農產公司 第一果菜市場 設備巡檢維修系統</title>
 <link rel="manifest" href="manifest.webmanifest?v=20260807-1">
@@ -203,6 +203,22 @@ input:focus{border-color:#6366f1}
 
 <script>
 const db = createDb();
+
+// 非管理員大量讀取觸發安全斷線後，在登入頁保留明確原因，避免只看到一般登出畫面。
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('security') !== 'bulk-read') return;
+  const fallback = '系統偵測到大量資料讀取，已中止目前連線並通知系統管理員。';
+  let message = fallback;
+  try {
+    message = sessionStorage.getItem('securityLogoutMessage') || fallback;
+    sessionStorage.removeItem('securityLogoutMessage');
+  } catch (e) {}
+  document.getElementById('errMsg').textContent = message;
+  params.delete('security');
+  const query = params.toString();
+  history.replaceState(null, '', window.location.pathname + (query ? `?${query}` : '') + window.location.hash);
+})();
 
 const ROLE_ROUTES = {
   admin:       'admin.html',
