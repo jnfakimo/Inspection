@@ -326,7 +326,9 @@ async function sendSecurityAlertLine(
     hour12: false
   });
   const action = alert.alert_type === "bulk_read"
-    ? "已強制中止該使用者目前工作階段"
+    ? (isSysadminProfile(profile)
+      ? "已保留異常紀錄並通知；系統管理員工作階段未中止"
+      : "已強制中止該使用者目前工作階段")
     : "已建立高風險告警並保留完整系統紀錄";
   const text = [
     "🚨 北農系統資安告警",
@@ -416,9 +418,9 @@ async function detectSecurityAlert(
   }
 
   if (eventType === "data_read" || eventType === "file_read") {
-    // 系統管理員執行稽核、匯出或全站檢查時可能合法讀取大量資料；
-    // 大量讀取的自動斷線只套用在其他角色，可疑檔案與拒絕存取仍照常告警。
-    if (isSysadminProfile(profile)) return null;
+    // 系統管理員執行稽核、匯出或全站檢查時仍須留下大量讀取告警；
+    // 僅豁免強制離線，不能豁免異常紀錄與 LINE 通知。
+    const sysadminRead = isSysadminProfile(profile);
     const since = new Date(Date.now() - 5 * 60_000).toISOString();
     const { data: recent, error } = await admin.from("audit_logs")
       .select("changes")
@@ -446,8 +448,10 @@ async function detectSecurityAlert(
       return saveSecurityAlert(admin, profile, ipAddress, {
         alertType: "bulk_read",
         severity: "critical",
-        title: "非管理員大量讀取，已中止連線",
-        message: `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源；系統已啟動目前工作階段的強制離線處置。`,
+        title: sysadminRead ? "系統管理員大量讀取資料" : "非管理員大量讀取，已中止連線",
+        message: sysadminRead
+          ? `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源；系統已保留異常紀錄並發送通知，管理員工作階段不強制中止。`
+          : `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源；系統已啟動目前工作階段的強制離線處置。`,
         resource: resourceSummary || resource,
         eventCount: readCount,
         windowMinutes: 5,
@@ -457,8 +461,8 @@ async function detectSecurityAlert(
           read_count: readCount,
           unique_resource_count: resources.length,
           resources: resources.slice(0, 20),
-          enforcement: "force_logout_current_session",
-          sysadmin_exempt: true
+          enforcement: sysadminRead ? "audit_and_notify_only" : "force_logout_current_session",
+          sysadmin_exempt_from_logout: sysadminRead
         }
       });
     }

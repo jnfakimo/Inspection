@@ -3578,7 +3578,11 @@ async function loadSecurityAlerts() {
       `操作帳號：${account}`,
       alert.ip_address ? `來源位址：${alert.ip_address}` : '',
       `事件次數：${alert.event_count || 1}`,
-      alert.alert_type === 'bulk_read' ? '系統處置：已中止該次工作階段並阻擋後續讀取' : '',
+      alert.alert_type === 'bulk_read'
+        ? (alert.details?.enforcement === 'audit_and_notify_only'
+          ? '系統處置：已記錄並通知；系統管理員工作階段未中止'
+          : '系統處置：已中止該次工作階段並阻擋後續讀取')
+        : '',
       `最後發生：${auditFormatDateTime(alert.last_seen_at || alert.detected_at)}`
     ].filter(Boolean).join('｜');
     return `<div class="audit-alert-card ${alert.severity === 'critical' ? 'critical' : 'warning'}">
