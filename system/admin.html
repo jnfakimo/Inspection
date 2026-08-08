@@ -1459,6 +1459,10 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
                   <span style="font-size:.85rem;color:var(--text-hi)">📋 &nbsp;異常案件通知</span>
                   <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-case"><span class="line-toggle-slider"></span></label>
                 </label>
+                <label style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border:1px solid rgba(255,59,59,.32);border-radius:4px;cursor:pointer;background:rgba(255,59,59,.06)">
+                  <span style="font-size:.85rem;color:var(--text-hi)">🚨 &nbsp;資安告警（大量讀取／系統探測）</span>
+                  <label class="line-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="line-notify-security"><span class="line-toggle-slider"></span></label>
+                </label>
               </div>
             </div>
             <div id="patrol-timeout-settings" style="margin-bottom:16px"></div>
@@ -3761,6 +3765,7 @@ async function loadSettings() {
   document.getElementById('line-notify-inspect').checked = sysSettings.line_notify_inspect === 'true';
   document.getElementById('line-notify-repair').checked  = sysSettings.line_notify_repair  === 'true';
   document.getElementById('line-notify-case').checked    = sysSettings.line_notify_case    === 'true';
+  document.getElementById('line-notify-security').checked = sysSettings.line_notify_security_alerts !== 'false';
   window.dispatchEvent(new Event('system-settings-loaded'));
 }
 
@@ -3825,22 +3830,25 @@ async function saveLineSettings() {
   const token   = document.getElementById('line-token').value.trim();
   const groupId = document.getElementById('line-group-id').value.trim();
   if (!token || !groupId) { showToast('請填寫 Token 與 Group ID', true); return; }
-  const notifyInspect = document.getElementById('line-notify-inspect').checked;
-  const notifyRepair  = document.getElementById('line-notify-repair').checked;
-  const notifyCase    = document.getElementById('line-notify-case').checked;
+  const notifyInspect  = document.getElementById('line-notify-inspect').checked;
+  const notifyRepair   = document.getElementById('line-notify-repair').checked;
+  const notifyCase     = document.getElementById('line-notify-case').checked;
+  const notifySecurity = document.getElementById('line-notify-security').checked;
   const { error } = await db.from('system_settings').upsert([
     { key: 'line_channel_token',  value: token },
     { key: 'line_group_id',       value: groupId },
     { key: 'line_notify_inspect', value: String(notifyInspect) },
-    { key: 'line_notify_repair',  value: String(notifyRepair) },
-    { key: 'line_notify_case',    value: String(notifyCase) },
+    { key: 'line_notify_repair',          value: String(notifyRepair) },
+    { key: 'line_notify_case',            value: String(notifyCase) },
+    { key: 'line_notify_security_alerts', value: String(notifySecurity) },
   ], { onConflict: 'key' });
   if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
   Object.assign(sysSettings, {
     line_channel_token:  token, line_group_id: groupId,
     line_notify_inspect: String(notifyInspect),
-    line_notify_repair:  String(notifyRepair),
-    line_notify_case:    String(notifyCase),
+    line_notify_repair:          String(notifyRepair),
+    line_notify_case:            String(notifyCase),
+    line_notify_security_alerts: String(notifySecurity),
   });
   showToast('LINE 設定已儲存');
 }

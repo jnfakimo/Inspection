@@ -22,6 +22,147 @@ const clientIp = (req: Request) => {
     req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
   return cleanText(raw.split(",")[0], 80) || null;
 };
+const CAPTCHA_TTL_SECONDS = 300;
+const CAPTCHA_LENGTH = 6;
+const CAPTCHA_RATE_LIMIT = 30;
+const CAPTCHA_SEGMENTS: Record<string, string[]> = {
+  "0": ["a", "b", "c", "d", "e", "f"],
+  "1": ["b", "c"],
+  "2": ["a", "b", "d", "e", "g"],
+  "3": ["a", "b", "c", "d", "g"],
+  "4": ["b", "c", "f", "g"],
+  "5": ["a", "c", "d", "f", "g"],
+  "6": ["a", "c", "d", "e", "f", "g"],
+  "7": ["a", "b", "c"],
+  "8": ["a", "b", "c", "d", "e", "f", "g"],
+  "9": ["a", "b", "c", "d", "f", "g"]
+};
+const CAPTCHA_PATHS: Record<string, string> = {
+  a: "M4 2H20L17 5H7Z",
+  b: "M21 4V18L18 21V7Z",
+  c: "M21 22V36L18 33V25Z",
+  d: "M4 38H20L17 35H7Z",
+  e: "M3 22V36L6 33V25Z",
+  f: "M3 4V18L6 21V7Z",
+  g: "M4 20H20L17 23H7Z"
+};
+
+const randomCode = () => {
+  const bytes = new Uint8Array(CAPTCHA_LENGTH);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => String(byte % 10)).join("");
+};
+
+const hmacHex = async (challengeId: string, answer: string) => {
+  const secret = Deno.env.get("CAPTCHA_SECRET") || "";
+  if (secret.length < 32) throw new Error("CAPTCHA_SECRET is not configured");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const digest = new Uint8Array(await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${challengeId}:${answer}`)
+  ));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+
+const safeEqual = (left: string, right: string) => {
+  if (!left || !right || left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+};
+
+const captchaImage = (code: string) => {
+  const random = new Uint8Array(32);
+  crypto.getRandomValues(random);
+  const digits = code.split("").map((digit, index) => {
+    const paths = (CAPTCHA_SEGMENTS[digit] || []).map((segment) => CAPTCHA_PATHS[segment]).join(" ");
+    const x = 12 + index * 34 + (random[index] % 5) - 2;
+    const y = 12 + (random[index + 6] % 7) - 3;
+    const rotate = (random[index + 12] % 15) - 7;
+    return `<g transform="translate(${x} ${y}) rotate(${rotate} 12 20)"><path d="${paths}"/></g>`;
+  }).join("");
+  const noiseLines = Array.from({ length: 8 }, (_, index) => {
+    const x1 = random[index * 2] % 220;
+    const y1 = random[index * 2 + 1] % 70;
+    const x2 = random[index * 2 + 8] % 220;
+    const y2 = random[index * 2 + 9] % 70;
+    return `<path d="M${x1} ${y1}L${x2} ${y2}"/>`;
+  }).join("");
+  const dots = Array.from({ length: 18 }, (_, index) => {
+    const x = (random[index % random.length] * (index + 7)) % 220;
+    const y = (random[(index + 11) % random.length] * (index + 3)) % 70;
+    const radius = 1 + (random[(index + 19) % random.length] % 2);
+    return `<circle cx="${x}" cy="${y}" r="${radius}"/>`;
+  }).join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="70" viewBox="0 0 220 70" role="img"><defs><filter id="w"><feTurbulence type="fractalNoise" baseFrequency=".012 .035" numOctaves="1" seed="${random[31]}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2"/></filter></defs><rect width="220" height="70" rx="10" fill="#f8fafc"/><g fill="none" stroke="#94a3b8" stroke-width="1" opacity=".42">${noiseLines}</g><g fill="#6366f1" opacity=".28">${dots}</g><g fill="#172554" filter="url(#w)">${digits}</g><rect x="1" y="1" width="218" height="68" rx="9" fill="none" stroke="#cbd5e1" stroke-width="2"/></svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+async function issueCaptcha(admin: ReturnType<typeof createClient>, req: Request) {
+  const ipAddress = clientIp(req);
+  if (ipAddress) {
+    const since = new Date(Date.now() - 10 * 60_000).toISOString();
+    const { count, error } = await admin.from("login_captcha_challenges")
+      .select("challenge_id", { count: "exact", head: true })
+      .eq("ip_address", ipAddress)
+      .gte("created_at", since);
+    if (error) throw error;
+    if ((count || 0) >= CAPTCHA_RATE_LIMIT) {
+      return reply(req, { ok: false, message: "驗證碼索取過於頻繁，請稍後再試" }, 429);
+    }
+  }
+
+  const challengeId = crypto.randomUUID();
+  const answer = randomCode();
+  const now = Date.now();
+  const { error } = await admin.from("login_captcha_challenges").insert({
+    challenge_id: challengeId,
+    answer_hash: await hmacHex(challengeId, answer),
+    ip_address: ipAddress,
+    expires_at: new Date(now + CAPTCHA_TTL_SECONDS * 1000).toISOString()
+  });
+  if (error) throw error;
+  return reply(req, {
+    ok: true,
+    challenge_id: challengeId,
+    image: captchaImage(answer),
+    expires_in: CAPTCHA_TTL_SECONDS
+  });
+}
+
+async function consumeCaptcha(
+  admin: ReturnType<typeof createClient>,
+  req: Request,
+  challengeIdValue: unknown,
+  answerValue: unknown
+) {
+  const challengeId = cleanText(challengeIdValue, 80);
+  const answer = cleanText(answerValue, 20).replace(/\s+/g, "");
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(challengeId) || !/^\d{6}$/.test(answer)) return false;
+
+  const consumedAt = new Date().toISOString();
+  let query = admin.from("login_captcha_challenges")
+    .update({ consumed_at: consumedAt, attempt_count: 1 })
+    .eq("challenge_id", challengeId)
+    .is("consumed_at", null)
+    .gt("expires_at", consumedAt);
+  const ipAddress = clientIp(req);
+  query = ipAddress ? query.eq("ip_address", ipAddress) : query.is("ip_address", null);
+  const { data, error } = await query.select("answer_hash").maybeSingle();
+  if (error) throw error;
+  if (!data?.answer_hash) return false;
+  return safeEqual(data.answer_hash, await hmacHex(challengeId, answer));
+}
+
 
 type LoginProfile = {
   user_id: string;
@@ -93,16 +234,18 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const identifier = cleanText(body.identifier || body.username, 120);
-    const password = String(body.password || "");
-    const isEmail = /^[^\s@%]+@[^\s@%]+\.[^\s@%]+$/.test(identifier);
-    const isUsername = /^[\p{L}0-9._-]{2,80}$/u.test(identifier);
-    const method: "username" | "email" | "unknown" = isEmail ? "email" : (isUsername ? "username" : "unknown");
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false, autoRefreshToken: false } }
     );
+    if (body.action === "captcha") return await issueCaptcha(admin, req);
+
+    const identifier = cleanText(body.identifier || body.username, 120);
+    const password = String(body.password || "");
+    const isEmail = /^[^\s@%]+@[^\s@%]+\.[^\s@%]+$/.test(identifier);
+    const isUsername = /^[\p{L}0-9._-]{2,80}$/u.test(identifier);
+    const method: "username" | "email" | "unknown" = isEmail ? "email" : (isUsername ? "username" : "unknown");
     const ipAddress = clientIp(req);
     let recentAttempts = 0;
     if (ipAddress) {
@@ -122,6 +265,12 @@ Deno.serve(async (req) => {
       const audited = await writeLoginAttempt(admin, req, identifier || "未提供", method, null, "已阻擋", "短時間登入嘗試次數過多", recentAttempts);
       if (!audited) return reply(req, { ok: false, message: "登入稽核服務暫時無法使用" }, 503);
       return reply(req, { ok: false, message: "登入嘗試過於頻繁，請稍後再試" }, 429);
+    }
+    const captchaValid = await consumeCaptcha(admin, req, body.captcha_id, body.captcha_answer);
+    if (!captchaValid) {
+      const audited = await writeLoginAttempt(admin, req, identifier || "未提供", method, null, "失敗", "驗證碼錯誤、逾時、來源不符或已使用", recentAttempts);
+      if (!audited) return reply(req, { ok: false, message: "登入稽核服務暫時無法使用" }, 503);
+      return reply(req, { ok: false, message: "驗證碼錯誤或已過期，請重新輸入" }, 400);
     }
     if (method === "unknown" || password.length < 8 || password.length > 200) {
       const audited = await writeLoginAttempt(admin, req, identifier || "未提供", method, null, "失敗", "帳號格式或密碼長度不符", recentAttempts);

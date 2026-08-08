@@ -60,6 +60,24 @@ type AlertSpec = {
   details: Record<string, unknown>;
 };
 
+type LineNotificationState = {
+  status?: string;
+  attempted_at?: string;
+  sent_at?: string | null;
+};
+
+type SavedSecurityAlert = {
+  alert_id: string;
+  alert_type: AlertSpec["alertType"];
+  updated: boolean;
+  severity: AlertSpec["severity"];
+  title: string;
+  message: string;
+  resource: string | null;
+  event_count: number;
+  line_notification: LineNotificationState | null;
+};
+
 const alertActor = (profile: AuditProfile) =>
   cleanText(profile.username || profile.email || profile.name || profile.user_id, 160);
 
@@ -135,7 +153,7 @@ async function saveSecurityAlert(
   const dedupeMinutes = Math.max(spec.windowMinutes, 10);
   const dedupeSince = new Date(now.getTime() - dedupeMinutes * 60_000).toISOString();
   const { data: existing, error: existingError } = await admin.from("security_alerts")
-    .select("alert_id,event_count")
+    .select("alert_id,event_count,details")
     .eq("alert_type", spec.alertType)
     .eq("operator_id", profile.user_id)
     .eq("status", "open")
@@ -154,11 +172,27 @@ async function saveSecurityAlert(
       resource: spec.resource,
       event_count: Math.max(Number(existing.event_count) || 1, spec.eventCount),
       window_minutes: spec.windowMinutes,
-      details: spec.details,
+      details: {
+        ...((existing.details && typeof existing.details === "object") ? existing.details : {}),
+        ...spec.details
+      },
       last_seen_at: now.toISOString()
     }).eq("alert_id", existing.alert_id);
     if (error) throw error;
-    return { alert_id: existing.alert_id, alert_type: spec.alertType, updated: true };
+    const existingDetails = (existing.details && typeof existing.details === "object")
+      ? existing.details as Record<string, unknown>
+      : {};
+    return {
+      alert_id: existing.alert_id,
+      alert_type: spec.alertType,
+      updated: true,
+      severity: spec.severity,
+      title: spec.title,
+      message: spec.message,
+      resource: spec.resource,
+      event_count: spec.eventCount,
+      line_notification: (existingDetails.line_notification as LineNotificationState) || null
+    } satisfies SavedSecurityAlert;
   }
 
   const newAlert = {
@@ -179,7 +213,7 @@ async function saveSecurityAlert(
   const { data, error } = await admin.from("security_alerts").insert(newAlert).select("alert_id").single();
   if (error?.code === "23505") {
     const { data: concurrent, error: concurrentError } = await admin.from("security_alerts")
-      .select("alert_id,event_count")
+      .select("alert_id,event_count,details")
       .eq("alert_type", spec.alertType)
       .eq("operator_id", profile.user_id)
       .eq("status", "open")
@@ -194,17 +228,142 @@ async function saveSecurityAlert(
         resource: spec.resource,
         event_count: Math.max(Number(concurrent.event_count) || 1, spec.eventCount),
         window_minutes: spec.windowMinutes,
-        details: spec.details,
+        details: {
+          ...((concurrent.details && typeof concurrent.details === "object") ? concurrent.details : {}),
+          ...spec.details
+        },
         last_seen_at: now.toISOString()
       }).eq("alert_id", concurrent.alert_id);
       if (updateError) throw updateError;
-      return { alert_id: concurrent.alert_id, alert_type: spec.alertType, updated: true };
+      const concurrentDetails = (concurrent.details && typeof concurrent.details === "object")
+        ? concurrent.details as Record<string, unknown>
+        : {};
+      return {
+        alert_id: concurrent.alert_id,
+        alert_type: spec.alertType,
+        updated: true,
+        severity: spec.severity,
+        title: spec.title,
+        message: spec.message,
+        resource: spec.resource,
+        event_count: spec.eventCount,
+        line_notification: (concurrentDetails.line_notification as LineNotificationState) || null
+      } satisfies SavedSecurityAlert;
     }
   }
   if (error) throw error;
-  return { alert_id: data.alert_id, alert_type: spec.alertType, updated: false };
+  return {
+    alert_id: data.alert_id,
+    alert_type: spec.alertType,
+    updated: false,
+    severity: spec.severity,
+    title: spec.title,
+    message: spec.message,
+    resource: spec.resource,
+    event_count: spec.eventCount,
+    line_notification: null
+  } satisfies SavedSecurityAlert;
 }
 
+async function recordSecurityLineDelivery(
+  admin: SupabaseClient,
+  alertId: string,
+  status: "sent" | "failed" | "disabled" | "not_configured",
+  httpStatus: number | null,
+  response: string
+) {
+  const { error } = await admin.rpc("record_security_alert_line_delivery", {
+    p_alert_id: alertId,
+    p_status: status,
+    p_http_status: httpStatus,
+    p_response: cleanText(response, 500)
+  });
+  if (error) console.error("Security LINE delivery audit failed", error.message);
+}
+
+async function sendSecurityAlertLine(
+  admin: SupabaseClient,
+  profile: AuditProfile,
+  ipAddress: string | null,
+  alert: SavedSecurityAlert
+) {
+  const previous = alert.line_notification;
+  if (previous?.status === "sent") return { status: "already_sent" };
+  if (previous?.attempted_at) {
+    const attemptedAt = new Date(previous.attempted_at).getTime();
+    if (Number.isFinite(attemptedAt) && Date.now() - attemptedAt < 5 * 60_000) {
+      return { status: "cooldown" };
+    }
+  }
+
+  const { data: rows, error: settingsError } = await admin.from("system_settings")
+    .select("key,value")
+    .in("key", ["line_notify_security_alerts", "line_channel_token", "line_group_id"]);
+  if (settingsError) throw settingsError;
+  const settings: Record<string, string> = {};
+  (rows || []).forEach((row) => {
+    settings[String(row.key)] = String(row.value ?? "");
+  });
+
+  if (settings.line_notify_security_alerts !== "true") {
+    await recordSecurityLineDelivery(admin, alert.alert_id, "disabled", null, "資安告警 LINE 推播已關閉");
+    return { status: "disabled" };
+  }
+  const token = settings.line_channel_token;
+  const groupId = settings.line_group_id;
+  if (!token || !groupId) {
+    await recordSecurityLineDelivery(admin, alert.alert_id, "not_configured", null, "LINE Token 或 Group ID 尚未設定");
+    return { status: "not_configured" };
+  }
+
+  const typeLabel: Record<string, string> = {
+    bulk_read: "大量資料讀取",
+    repeated_denied: "重複未授權存取",
+    suspicious_file: "可疑檔案讀取"
+  };
+  const taipeiTime = new Date().toLocaleString("zh-TW", {
+    timeZone: "Asia/Taipei",
+    hour12: false
+  });
+  const action = alert.alert_type === "bulk_read"
+    ? "已強制中止該使用者目前工作階段"
+    : "已建立高風險告警並保留完整系統紀錄";
+  const text = [
+    "🚨 北農系統資安告警",
+    `類型：${typeLabel[alert.alert_type] || alert.alert_type}`,
+    `帳號：${alertActor(profile)}`,
+    `來源 IP：${ipAddress || "無法取得"}`,
+    `時間：${taipeiTime}`,
+    `事件數：${alert.event_count}`,
+    `處置：${action}`,
+    `說明：${alert.message}`,
+    alert.resource ? `資源：${cleanText(alert.resource, 300)}` : ""
+  ].filter(Boolean).join("\n");
+
+  try {
+    const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        to: groupId,
+        messages: [{ type: "text", text }]
+      })
+    });
+    const responseText = await lineResponse.text();
+    const status = lineResponse.ok ? "sent" : "failed";
+    await recordSecurityLineDelivery(admin, alert.alert_id, status, lineResponse.status, responseText);
+    if (!lineResponse.ok) console.error("Security LINE push failed", lineResponse.status, responseText);
+    return { status, http_status: lineResponse.status };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await recordSecurityLineDelivery(admin, alert.alert_id, "failed", null, message);
+    console.error("Security LINE push failed", message);
+    return { status: "failed" };
+  }
+}
 async function detectSecurityAlert(
   admin: SupabaseClient,
   profile: AuditProfile,
@@ -379,20 +538,24 @@ Deno.serve(async (req) => {
     }).select("audit_id").single();
     if (insertError) throw insertError;
 
-    let alert = null;
+    let alert: SavedSecurityAlert | null = null;
     let securityAction = null;
+    let lineNotification = null;
     if (["data_read", "file_read", "access_denied"].includes(eventType)) {
       try {
         alert = await detectSecurityAlert(admin, profile, ipAddress, eventType, details);
         if (alert?.alert_type === "bulk_read" && !isSysadminProfile(profile)) {
           securityAction = await enforceBulkReadCutoff(admin, profile, token, alert);
         }
+        if (alert) {
+          lineNotification = await sendSecurityAlertLine(admin, profile, ipAddress, alert);
+        }
       } catch (alertError) {
         console.error("Security alert detection failed", alertError instanceof Error ? alertError.message : String(alertError));
       }
     }
 
-    return reply(req, { ok: true, audit_id: inserted.audit_id, alert, security_action: securityAction });
+    return reply(req, { ok: true, audit_id: inserted.audit_id, alert, security_action: securityAction, line_notification: lineNotification });
   } catch (error) {
     console.error("Audit event failed", error instanceof Error ? error.message : String(error));
     return reply(req, { ok: false, message: "系統紀錄寫入失敗" }, 500);

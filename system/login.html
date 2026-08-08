@@ -32,6 +32,12 @@ h1{font-size:1.5rem;font-weight:700;color:#f8fafc;margin-bottom:6px;text-align:c
 label{display:block;font-size:.82rem;color:#94a3b8;margin-bottom:6px;font-weight:500}
 input{width:100%;padding:12px 16px;background:#0f172a;border:2px solid #334155;border-radius:10px;color:#f1f5f9;font-size:1rem;outline:none;transition:border-color .2s}
 input:focus{border-color:#6366f1}
+.captcha-visual{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch;margin-bottom:8px}
+.captcha-image{display:block;width:100%;height:64px;min-width:0;object-fit:fill;border-radius:10px;background:#f8fafc;border:1px solid #475569}
+.captcha-refresh{min-width:96px;padding:8px 10px;border:1px solid #475569;border-radius:10px;background:#0f172a;color:#cbd5e1;font-family:inherit;font-size:.8rem;font-weight:700;cursor:pointer;line-height:1.35}
+.captcha-refresh:hover{border-color:#818cf8;color:#fff}
+.captcha-refresh:disabled{opacity:.5;cursor:not-allowed}
+.captcha-status{min-height:18px;margin-top:5px;color:#94a3b8;font-size:.72rem;line-height:1.4}
 .btn{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:background .2s;margin-top:8px}
 .btn:hover{background:#4f46e5}
 .btn:disabled{opacity:.5;cursor:not-allowed}
@@ -90,6 +96,9 @@ input:focus{border-color:#6366f1}
 :root[data-theme="light"] .subtitle{color:#64748b}
 :root[data-theme="light"] label{color:#64748b}
 :root[data-theme="light"] input{background:#f8fafc;border-color:#cbd5e1;color:#1e293b}
+:root[data-theme="light"] .captcha-refresh{background:#eef2ff;border-color:#c7d2fe;color:#4338ca}
+:root[data-theme="light"] .captcha-refresh:hover{background:#e0e7ff;border-color:#818cf8;color:#312e81}
+:root[data-theme="light"] .captcha-status{color:#64748b}
 :root[data-theme="light"] .btn-ghost{border-color:#cbd5e1;color:#64748b}
 :root[data-theme="light"] .btn-ghost:hover{background:rgba(0,0,0,.04)}
 :root[data-theme="light"] .err{color:#dc2626}
@@ -121,6 +130,15 @@ input:focus{border-color:#6366f1}
   <div class="field">
     <label for="password">密碼</label>
     <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <div class="field">
+    <label for="captchaAnswer">安全驗證碼（六位數字）</label>
+    <div class="captcha-visual">
+      <img id="captchaImage" class="captcha-image" alt="圖形驗證碼，請輸入下方六位數字">
+      <button type="button" id="captchaRefreshBtn" class="captcha-refresh" aria-label="重新產生安全驗證碼">↻ 重新產生</button>
+    </div>
+    <input id="captchaAnswer" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="輸入圖中六位數字" autocomplete="off" aria-describedby="captchaStatus">
+    <div id="captchaStatus" class="captcha-status" aria-live="polite">驗證碼載入中…</div>
   </div>
   <button type="button" class="btn" id="loginBtn">登入</button>
   <button type="button" class="forgot-link" id="forgotLink">忘記密碼？</button>
@@ -344,6 +362,50 @@ function translateError(msg) {
   return '操作失敗，請稍後再試或聯絡系統管理員';
 }
 
+let captchaChallengeId = '';
+let captchaLoading = false;
+
+async function edgeFunctionMessage(error, data, fallback) {
+  if (data?.message) return data.message;
+  const response = error?.context;
+  if (response && typeof response.clone === 'function') {
+    try {
+      const payload = await response.clone().json();
+      if (payload?.message) return payload.message;
+    } catch (_) {}
+  }
+  return fallback;
+}
+
+async function loadCaptcha() {
+  if (captchaLoading) return;
+  captchaLoading = true;
+  captchaChallengeId = '';
+  const image = document.getElementById('captchaImage');
+  const answer = document.getElementById('captchaAnswer');
+  const refresh = document.getElementById('captchaRefreshBtn');
+  const status = document.getElementById('captchaStatus');
+  refresh.disabled = true;
+  image.removeAttribute('src');
+  answer.value = '';
+  status.textContent = '驗證碼載入中…';
+
+  const { data, error } = await db.functions.invoke('username-login', {
+    body: { action: 'captcha' }
+  });
+  if (error || !data?.challenge_id || !data?.image) {
+    status.textContent = await edgeFunctionMessage(error, data, '驗證碼載入失敗，請重新產生');
+    captchaLoading = false;
+    refresh.disabled = false;
+    return;
+  }
+
+  captchaChallengeId = data.challenge_id;
+  image.src = data.image;
+  status.textContent = '5 分鐘內有效，送出後即失效';
+  captchaLoading = false;
+  refresh.disabled = false;
+}
 // ── Handle password-reset link (#type=recovery / #error=...) ──────────────────
 (async () => {
   const hash = window.location.hash;
@@ -357,6 +419,7 @@ function translateError(msg) {
     const desc = params.get('error_description') || params.get('error_code') || params.get('error') || '';
     document.getElementById('errMsg').textContent = translateError(desc.replace(/\+/g, ' '));
     window.location.hash = '';
+    await loadCaptcha();
     return;
   }
 
@@ -366,29 +429,44 @@ function translateError(msg) {
     const { data: profile } = await db.from('users').select('role,rbac_role,permissions').eq('auth_id', session.user.id).single();
     if (profile) { window.location.href = getRedirectTarget(profile); return; }
   }
+  await loadCaptcha();
 })();
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 document.getElementById('loginBtn').addEventListener('click', doLogin);
+document.getElementById('captchaRefreshBtn').addEventListener('click', loadCaptcha);
 document.getElementById('username').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password').focus(); });
-document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('captchaAnswer').focus(); });
+document.getElementById('captchaAnswer').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); });
+document.getElementById('captchaAnswer').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
 async function doLogin() {
   const identifier = document.getElementById('username').value.trim();
   const password = document.getElementById('password').value;
+  const captchaAnswer = document.getElementById('captchaAnswer').value.trim();
   const btn = document.getElementById('loginBtn');
   const err = document.getElementById('errMsg');
   err.textContent = '';
   if (!identifier || !password) { err.textContent = '請填寫帳號與密碼'; return; }
+  if (!captchaChallengeId || !/^\d{6}$/.test(captchaAnswer)) {
+    err.textContent = captchaChallengeId ? '請輸入圖中的六位數字驗證碼' : '驗證碼尚未載入，請重新產生';
+    return;
+  }
   btn.disabled = true; btn.textContent = '登入中…';
 
   // 帳號與 Email 統一交由伺服器驗證。伺服器會記錄每一次成功、失敗或被阻擋的
   // 登入嘗試，並由請求本身取得來源網路位址與瀏覽器資訊。
   const { data: loginResult, error: loginError } = await db.functions.invoke('username-login', {
-    body: { identifier, password }
+    body: {
+      identifier,
+      password,
+      captcha_id: captchaChallengeId,
+      captcha_answer: captchaAnswer
+    }
   });
   if (loginError || !loginResult?.access_token || !loginResult?.refresh_token) {
-    err.textContent = loginResult?.message || '帳號或密碼錯誤';
+    err.textContent = await edgeFunctionMessage(loginError, loginResult, '帳號、密碼或驗證碼錯誤');
+    await loadCaptcha();
     btn.disabled = false; btn.textContent = '登入';
     return;
   }
@@ -398,6 +476,7 @@ async function doLogin() {
   });
   if (setResult.error) {
     err.textContent = '登入狀態建立失敗，請稍後重試';
+    await loadCaptcha();
     btn.disabled = false; btn.textContent = '登入';
     return;
   }
@@ -405,6 +484,7 @@ async function doLogin() {
 
   if (!sessionUser) {
     err.textContent = '登入狀態建立失敗，請稍後重試';
+    await loadCaptcha();
     btn.disabled = false; btn.textContent = '登入';
     return;
   }
@@ -412,8 +492,9 @@ async function doLogin() {
   const { data: profile } = await db.from('users').select('user_id,username,email,role,rbac_role,name,phone,permissions,dept_id,department').eq('auth_id', sessionUser?.id).single();
   if (!profile) {
     err.textContent = '找不到使用者資料，請聯絡管理員';
-    btn.disabled = false; btn.textContent = '登入';
     await db.auth.signOut();
+    await loadCaptcha();
+    btn.disabled = false; btn.textContent = '登入';
     return;
   }
 
