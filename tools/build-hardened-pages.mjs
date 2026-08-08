@@ -36,7 +36,7 @@ const requiredOutputFiles = [
   'system/admin.html',
   'system/theme.js',
   'system/supabase-config.js',
-  '.well-known/provenance-public-key.pem',
+  'provenance-public-key.pem',
   'proprietary-notice.txt',
   'provenance.json',
   'provenance.sig',
@@ -159,9 +159,7 @@ async function sha256File(file) {
 
 async function writeSignedProvenance() {
   const publicKey = await readFile(publicKeySource, 'utf8');
-  const wellKnownDirectory = path.join(outputRoot, '.well-known');
-  await mkdir(wellKnownDirectory, { recursive: true });
-  await writeFile(path.join(wellKnownDirectory, 'provenance-public-key.pem'), publicKey, 'utf8');
+  await writeFile(path.join(outputRoot, 'provenance-public-key.pem'), publicKey, 'utf8');
 
   const files = (await listFiles(outputRoot))
     .filter((file) => !['provenance.json', 'provenance.sig'].includes(path.basename(file)));

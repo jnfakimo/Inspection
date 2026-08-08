@@ -148,7 +148,7 @@ async function scanRemoteArtifact(pagePaths) {
 
   const manifestUrl = new URL('provenance.json', remoteBaseUrl);
   const signatureUrl = new URL('provenance.sig', remoteBaseUrl);
-  const publicKeyUrl = new URL('.well-known/provenance-public-key.pem', remoteBaseUrl);
+  const publicKeyUrl = new URL('provenance-public-key.pem', remoteBaseUrl);
   [manifestUrl, signatureUrl, publicKeyUrl].forEach((url) => url.searchParams.set('provenance-scan', scanToken));
   const [manifestResponse, signatureResponse, publicKeyResponse] = await Promise.all([
     fetchWithRetry(manifestUrl, 200),

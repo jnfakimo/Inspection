@@ -11,11 +11,11 @@
 <script src="supabase-config.js?v=20260806-1"></script>
 
   <!-- Vis.js Network CDN -->
-  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js" integrity="sha384-Kp7cMaDnHOrgpE8FT6l7tUuGIo7kBcBVcttockpXN/whrsQBcy9ZcpKmr/1a/nMo" crossorigin="anonymous"></script>
-  
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js" integrity="sha384-Kp7cMaDnHOrgpE8FT6l7tUuGIo7kBcBVcttockpXN/whrsQBcy9ZcpKmr/1a/nMo" crossorigin="anonymous"></script>
+
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  
+
   <style>
     :root {
       --bg: #020b18;
@@ -37,7 +37,7 @@
       --glass-bg: rgba(4, 17, 31, 0.6);
       --glass-border: rgba(0, 212, 255, 0.15);
     }
-    
+
     :root[data-theme="light"] {
       --bg: #f4f6fa;
       --surface: rgba(255, 255, 255, 0.85);
@@ -298,7 +298,7 @@
       border-radius: 4px !important;
       box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
     }
-    
+
     /* Interactive Editor Panel elements */
     .form-group {
       display: flex;
@@ -343,14 +343,14 @@
   <!-- Navbar -->
   <nav class="navbar">
     <div class="nav-title">
-      <span style="font-size: 1.5rem;">❖</span> 專案核心樹狀關係圖 (DRAG & DROP MAP)
+      <span style="font-size: 1.5rem;">❖</span> 專案核心樹狀關係圖 (DRAG &amp; DROP MAP)
     </div>
     <a href="admin.html" class="btn-back">返回後台</a>
   </nav>
 
   <!-- App Container -->
   <div class="app-container">
-    
+
     <!-- Floating controls -->
     <div class="control-hud">
       <button class="ctrl-btn active" id="btn-physics" onclick="togglePhysics()">彈性物理模擬: ON</button>
@@ -395,7 +395,7 @@
         </div>
         <button class="ctrl-btn" style="margin-top: 12px; width: 100%; border-color: var(--cyan); color: var(--cyan);" onclick="executeReassociation()">套用搬移關聯</button>
       </div>
-      
+
     </div>
   </div>
 
@@ -442,7 +442,7 @@
       { from: "admin", to: "repairs", label: "模組" },
       { from: "admin", to: "costs", label: "模組" },
       { from: "admin", to: "audit", label: "模組" },
-      
+
       // Correlations
       { from: "dashboard", to: "guardpatrol", label: "顯示巡檢數據", style: "dashed", color: {color: "var(--cyan)"} },
       { from: "dashboard", to: "repairs", label: "統計維修進度", style: "dashed", color: {color: "var(--cyan)"} },
@@ -729,7 +729,7 @@
     function updateHUDPanel(nodeId) {
       const node = nodesDataset.get(nodeId);
       const detailCard = document.getElementById("detail-card");
-      
+
       const typeLabels = {
         root: "專案根目錄 (Root)",
         folder: "靜態資料夾 (Folder)",
@@ -811,7 +811,7 @@
     function executeReassociation() {
       if (!selectedNodeId) return;
       const newParentId = document.getElementById("parent-select").value;
-      
+
       // Find existing hierarchical edges for this node
       const existingEdges = edgesDataset.get({
         filter: function(edge) {
@@ -834,13 +834,13 @@
       // Update absolute path visually for display demonstration
       const node = nodesDataset.get(selectedNodeId);
       const parentNode = nodesDataset.get(newParentId);
-      
+
       // Calculate fake display directory
       let newDir = parentNode.dir + "/" + selectedNodeId;
       if (node.group === "anchor") {
         newDir = parentNode.id + ".html" + node.dir.substring(node.dir.indexOf("#"));
       }
-      
+
       nodesDataset.update({
         id: selectedNodeId,
         dir: newDir

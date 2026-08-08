@@ -59,21 +59,25 @@ td{padding:7px 9px;border-bottom:1px solid rgba(12,40,64,.4);vertical-align:top}
 
 <h2>一、連線資訊</h2>
 <table>
+  <tbody>
   <tr><th>項目</th><th>值</th></tr>
   <tr><td>API 基礎網址</td><td><code>https://qztffronusdhgxhjjubt.supabase.co/rest/v1</code></td></tr>
   <tr><td>驗證方式</td><td>HTTP Header：<code>apikey</code> + <code>Authorization: Bearer &lt;JWT&gt;</code></td></tr>
   <tr><td>資料格式</td><td>JSON</td></tr>
+  </tbody>
 </table>
 <div class="warn">⚠ 外部系統整合請使用獨立的 <b>service_role</b> 或為整合對象建立專屬 API 金鑰與 RLS 政策，勿外流前端 anon 金鑰。</div>
 
 <h2>二、共用主鍵（跨系統一致）</h2>
 <table>
+  <tbody>
   <tr><th>識別碼</th><th>欄位</th><th>說明</th></tr>
   <tr><td>設備編號</td><td><code>equipment.equipment_id</code> / <code>asset_code</code></td><td>UUID 為內部關聯主鍵；asset_code 為 QR 與外部系統穩定設備編號</td></tr>
   <tr><td>報修單號</td><td><code>repair_requests.req_no</code></td><td>RPyyyymmdd-NNNN</td></tr>
   <tr><td>派工單號</td><td><code>maintenance_orders.wo_no</code></td><td>WOyyyymmdd-NNNN</td></tr>
   <tr><td>位置編號</td><td><code>locations.location_id</code></td><td>市場→樓層→區域→細部</td></tr>
   <tr><td>部門編號</td><td><code>departments.dept_id</code></td><td>組織樹</td></tr>
+  </tbody>
 </table>
 
 <h2>三、主要端點</h2>
@@ -118,6 +122,7 @@ GET /rest/v1/equipment?select=equipment_id,name,category,status</pre>
 
 <h2>四、可整合系統對應</h2>
 <table>
+  <tbody>
   <tr><th>#</th><th>外部系統</th><th>共用資料 / 整合方式</th></tr>
   <tr><td>1</td><td>電子交接簿系統</td><td>共用 案件編號 / 設備編號；交接時帶入未結案件（handover_cases ⇄ repair_requests）</td></tr>
   <tr><td>2</td><td>巡檢管理系統</td><td><code>inspection_records</code> 異常可直接轉報修（source=inspection）</td></tr>
@@ -129,6 +134,7 @@ GET /rest/v1/equipment?select=equipment_id,name,category,status</pre>
   <tr><td>8</td><td>採購系統</td><td>等待料件狀態觸發請購；零件對應 cost_records(parts)</td></tr>
   <tr><td>9</td><td>倉儲庫存系統</td><td>更換零件扣庫；parts_used 對應庫存品項</td></tr>
   <tr><td>10</td><td>BI 戰情儀表板</td><td>直接讀取本系統 REST 或 SQL view 供 BI 彙整</td></tr>
+  </tbody>
   <tr><td>11</td><td>中央監控 BMS / SCADA</td><td>以 <code>external_equipment_key</code> 與 <code>point_code</code> 對照；告警事件可自動建立報修</td></tr>
 </table>
 
