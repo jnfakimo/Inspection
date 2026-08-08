@@ -38,7 +38,9 @@ jobs:
       # Validate HTML semantics using html-validate
       - name: Validate HTML semantics
         run: |
-          npx -y html-validate "**/*.html"
+          # 只驗證本專案的 38 個正式網站頁面，避免把 npm 套件內附的範例 HTML
+          # 誤判成本站頁面（例如 node_modules/terser/tools/props.html）。
+          npx -y html-validate "index.html" "system/*.html"
 
       # Lint CSS files using stylelint
       - name: Lint CSS with stylelint
