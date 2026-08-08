@@ -891,18 +891,31 @@
       collapseStyle.textContent=`
         #systemHeaderCollapseBtn{
           position:fixed;right:10px;z-index:100001;
-          top:calc(var(--system-header-height,50px) - 26px);
-          display:inline-flex;align-items:center;height:22px;padding:0 9px;
+          /* 按鈕高 28px，收在頁首下緣往上 34px 處 → 底邊離頁首邊界還有 6px。
+             各檢視頁的固定控制列（樓層顯示／標記顯示／立體控制）都落在
+             header+12，所以兩者不會互相覆蓋。改動高度時要同步改這個 34。 */
+          top:calc(var(--system-header-height,50px) - 34px);
+          display:inline-flex;align-items:center;justify-content:center;
+          /* 高度必須釘死：mobile-unified.css 有 button{min-height:40px} 的觸控目標
+             規則，被撐高就會凸到頁首外面壓到下面的控制列。 */
+          height:28px!important;min-height:28px!important;padding:0 10px!important;
           border-radius:4px;cursor:pointer;white-space:nowrap;
-          font:700 11px/1 inherit;letter-spacing:.04em;
+          /* 用長寫法：font 簡寫不接受 inherit 當字型家族，整條會被瀏覽器丟棄。 */
+          font-family:inherit;font-size:11px;font-weight:700;line-height:1;letter-spacing:.04em;
           background:var(--panel,rgba(4,20,40,.95));
           border:1px solid var(--border,#0a3a5a);
           color:var(--cyan,#00d4ff);
           /* 不要對 top 做 transition：top 由 --system-header-height 推導，
              過渡會讓算出來的位置卡在起始值，按鈕就不會跟著頁首移動。 */
         }
-        html.system-header-collapsed .system-header-unified-shell{display:none!important}
-        html.system-header-collapsed #systemHeaderCollapseBtn{top:4px}
+        /* 用 visibility 而不是 display:none。iOS Safari 對「底下疊著 position:fixed
+           元素的區域」用 display:none 抽掉時常常不重繪，會在畫面上方留下一顆標籤
+           還停在收合狀態的殘影按鈕（實際 DOM 只有一顆）。visibility 保留合成層，
+           不會有這個問題；高度由 --system-header-height 控制，與這裡無關。 */
+        html.system-header-collapsed .system-header-unified-shell{
+          visibility:hidden!important;pointer-events:none!important;
+        }
+        html.system-header-collapsed #systemHeaderCollapseBtn{top:1px}
       `;
       document.head.appendChild(collapseStyle);
       collapseBtn=document.createElement('button');
