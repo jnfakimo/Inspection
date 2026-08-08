@@ -827,6 +827,13 @@
         white-space:normal!important;
       }
       .system-action-unified{min-width:0;max-width:100%;white-space:nowrap}
+      #topbar.system-header-unified-shell{padding:6px 10px!important;row-gap:6px!important}
+      #topbar.system-header-unified-shell .tb-logo,#topbar.system-header-unified-shell .tb-title,#topbar.system-header-unified-shell .tb-back{min-width:0!important;max-width:100%!important;flex:0 1 auto!important}
+      #topbar.system-header-unified-shell .tb-logo{white-space:nowrap!important}
+      #topbar.system-header-unified-shell .tb-space{flex:1 1 18px!important;min-width:12px!important}
+      #topbar.system-header-unified-shell .system-actions-unified{flex:1 1 520px!important;justify-content:flex-end!important}
+      #topbar.system-header-unified-shell .system-meta-unified{flex:1 1 440px!important;justify-content:flex-end!important}
+
       .system-meta-unified{
         flex:1 1 440px!important;
         min-width:0!important;
@@ -846,9 +853,20 @@
         .brand-bar-unified{flex-basis:100%!important}
         .system-actions-unified{flex-basis:100%!important;justify-content:flex-start!important}
         .system-meta-unified{flex-basis:100%!important;justify-content:flex-start!important}
+        #topbar.system-header-unified-shell .tb-space{display:none!important}
+        #topbar.system-header-unified-shell .tb-logo{flex:1 1 240px!important}
+        #topbar.system-header-unified-shell .tb-title{flex:1 1 180px!important}
+        #topbar.system-header-unified-shell .system-actions-unified{flex-basis:100%!important;justify-content:flex-start!important}
+        #topbar.system-header-unified-shell .system-meta-unified{flex-basis:100%!important;justify-content:flex-start!important}
+
       }
       @media(max-width:720px){
         .system-header-unified-shell{padding-left:8px!important;padding-right:8px!important;gap:6px!important}
+        #topbar.system-header-unified-shell .tb-logo{flex-basis:100%!important;font-size:.78rem!important}
+        #topbar.system-header-unified-shell .tb-sep{display:none!important}
+        #topbar.system-header-unified-shell .tb-title{flex-basis:100%!important;font-size:.7rem!important}
+        #topbar.system-header-unified-shell .tb-back{flex:1 1 calc(50% - 6px)!important;min-height:40px!important;white-space:normal!important;text-align:center}
+
         .system-header-unified-host{gap:6px!important}
         .system-actions-unified{
           width:100%!important;
