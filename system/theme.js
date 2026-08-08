@@ -872,6 +872,62 @@
     if(!fixed)return;
     document.documentElement.classList.add('system-has-fixed-topbar');
 
+    // ── 頁首收合（3D／平面等全螢幕檢視頁）────────────────────────────────
+    // 這些頁的可視區是 inset:50px 的固定畫布。頁首在手機上會折成三、四列，
+    // 吃掉將近四成螢幕，檢視區只剩一小塊。收合後只留一條細列放展開鈕，
+    // --system-header-height 跟著變小，畫布與所有 .system-fixed-below-header
+    // 元件（樓層顯示、立體控制…）都會自動往上補。
+    // 只有 <body data-collapsible-header> 的頁面會啟用，其他頁面完全不受影響。
+    var COLLAPSED_HEIGHT=30;
+    var COLLAPSE_KEY='systemHeaderCollapsed';
+    var collapsed=false;
+    var collapseBtn=null;
+    var collapsible=document.body.hasAttribute('data-collapsible-header')
+      && getComputedStyle(shell).display!=='none';   // 嵌入模式（embed-mode）頁首本來就藏起來，不需要收合鈕
+    if(collapsible){
+      try{collapsed=localStorage.getItem(COLLAPSE_KEY)==='1';}catch(e){}
+      var collapseStyle=document.createElement('style');
+      collapseStyle.id='system-header-collapse-style';
+      collapseStyle.textContent=`
+        #systemHeaderCollapseBtn{
+          position:fixed;right:10px;z-index:100001;
+          top:calc(var(--system-header-height,50px) - 26px);
+          display:inline-flex;align-items:center;height:22px;padding:0 9px;
+          border-radius:4px;cursor:pointer;white-space:nowrap;
+          font:700 11px/1 inherit;letter-spacing:.04em;
+          background:var(--panel,rgba(4,20,40,.95));
+          border:1px solid var(--border,#0a3a5a);
+          color:var(--cyan,#00d4ff);
+          /* 不要對 top 做 transition：top 由 --system-header-height 推導，
+             過渡會讓算出來的位置卡在起始值，按鈕就不會跟著頁首移動。 */
+        }
+        html.system-header-collapsed .system-header-unified-shell{display:none!important}
+        html.system-header-collapsed #systemHeaderCollapseBtn{top:4px}
+      `;
+      document.head.appendChild(collapseStyle);
+      collapseBtn=document.createElement('button');
+      collapseBtn.id='systemHeaderCollapseBtn';
+      collapseBtn.type='button';
+      document.body.appendChild(collapseBtn);
+      collapseBtn.addEventListener('click',function(){setCollapsed(!collapsed);});
+      document.documentElement.classList.toggle('system-header-collapsed',collapsed);
+      paintCollapse();
+    }
+    function paintCollapse(){
+      if(!collapseBtn)return;
+      collapseBtn.textContent=collapsed?'▾ 顯示選單':'▴ 隱藏選單';
+      collapseBtn.title=collapsed?'展開上方選單':'收合上方選單，放大檢視區';
+      collapseBtn.setAttribute('aria-expanded',collapsed?'false':'true');
+    }
+    function setCollapsed(next){
+      collapsed=!!next;
+      document.documentElement.classList.toggle('system-header-collapsed',collapsed);
+      try{localStorage.setItem(COLLAPSE_KEY,collapsed?'1':'0');}catch(e){}
+      paintCollapse();
+      lastHeight=-1;      // 強制重算，收合前後高度不同
+      applyHeight();
+    }
+
     var offsetSelectors='#c3d,#osd,#panel,#panelToggle,#floorsToggle,#floors,#mkToggle,#mkpanel,#tools,#focusNotice';
     var observed=Array.prototype.slice.call(document.querySelectorAll(offsetSelectors));
     function captureOffsets(){
@@ -890,7 +946,7 @@
     function applyHeight(){
       heightFrame=0;
       if(!shell.isConnected)return;
-      var height=Math.max(50,Math.ceil(shell.getBoundingClientRect().height));
+      var height=collapsed?COLLAPSED_HEIGHT:Math.max(50,Math.ceil(shell.getBoundingClientRect().height));
       if(height===lastHeight)return;
       lastHeight=height;
       document.documentElement.style.setProperty('--system-header-height',height+'px');
