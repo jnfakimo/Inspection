@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https: http://127.0.0.1:8091; connect-src 'self' https: wss: http://127.0.0.1:8091; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260808-collapse2"></script>
+<script src="theme.js?v=20260808-layout1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>整合 API 文件 — 報修派工管理系統</title>
 <style>
@@ -37,6 +37,12 @@ th{text-align:left;color:var(--text-dim);padding:7px 9px;border-bottom:1px solid
 td{padding:7px 9px;border-bottom:1px solid rgba(12,40,64,.4);vertical-align:top}
 .note{background:rgba(0,212,255,.05);border-left:3px solid var(--cyan);padding:10px 14px;border-radius:0 4px 4px 0;margin:10px 0;font-size:.8rem}
 .warn{background:rgba(255,179,0,.06);border-left:3px solid var(--amber);padding:10px 14px;border-radius:0 4px 4px 0;margin:10px 0;font-size:.8rem;color:var(--amber)}
+@media(max-width:600px){
+  .wrap{width:100%;padding:14px 12px 48px;overflow-x:hidden}
+  table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  pre{max-width:100%;white-space:pre;overflow-x:auto}
+  p code,.note code,.warn code,td code{overflow-wrap:anywhere;word-break:break-word}
+}
 
 </style>
 <link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">

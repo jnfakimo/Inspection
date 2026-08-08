@@ -653,7 +653,7 @@
     if(!container)return; // #topbar 這類固定式圖示工具列（平面圖/3D）版面較窄，不強加品牌列
 
     var style=document.createElement('style');
-    style.textContent='.brand-bar-unified{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.72rem;letter-spacing:.05em;line-height:1.3}.brand-bar-unified .sys-tag-unified{color:var(--cyan,#0284c7);font-weight:700;white-space:nowrap}.brand-bar-unified .brand-org-unified,.brand-bar-unified .brand-site-unified,.brand-bar-unified .brand-sep-unified{color:var(--text-dim,#64748b)}@media(max-width:720px){.brand-bar-unified{font-size:.62rem;gap:4px}}';
+    style.textContent='.brand-bar-unified{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;max-width:100%;font-size:.72rem;letter-spacing:.05em;line-height:1.3}.brand-bar-unified .sys-tag-unified{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;color:var(--cyan,#0284c7);font-weight:700;white-space:nowrap}.brand-bar-unified .brand-org-unified,.brand-bar-unified .brand-site-unified,.brand-bar-unified .brand-sep-unified{color:var(--text-dim,#64748b)}@media(max-width:720px){.brand-bar-unified{font-size:.62rem;gap:4px}}';
     document.head.appendChild(style);
 
     var label=pageBrandLabel();
@@ -795,6 +795,7 @@
         min-width:0!important;
         max-width:100%!important;
       }
+      html.embed-mode .system-header-unified-shell{display:none!important}
       .system-header-unified-shell{
         width:100%!important;
         height:auto!important;
