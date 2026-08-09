@@ -76,6 +76,7 @@ type SavedSecurityAlert = {
   resource: string | null;
   event_count: number;
   line_notification: LineNotificationState | null;
+  details: Record<string, unknown>;
 };
 
 const alertActor = (profile: AuditProfile) =>
@@ -101,8 +102,16 @@ async function enforceBulkReadCutoff(
   admin: SupabaseClient,
   profile: AuditProfile,
   token: string,
-  alert: { alert_id: string; alert_type: string }
+  alert: {
+    alert_id: string;
+    alert_type: string;
+    details?: Record<string, unknown>;
+  }
 ) {
+  const signal = alert.details || {};
+  const readCount = Number(signal.read_count) || 0;
+  const automatedReadCount = Number(signal.automated_read_count) || 0;
+  const uniqueResourceCount = Number(signal.unique_resource_count) || 0;
   const sessionId = sessionIdFromToken(token);
   let databaseBlocked = false;
   let authSessionRevoked = false;
@@ -130,11 +139,20 @@ async function enforceBulkReadCutoff(
   const { error: signOutError } = await admin.auth.admin.signOut(token, "local");
   if (signOutError) errors.push(`工作階段撤銷失敗：${cleanText(signOutError.message, 180)}`);
   else authSessionRevoked = true;
+  const enforcementSucceeded = databaseBlocked || authSessionRevoked;
 
   return {
-    force_logout: true,
+    force_logout: enforcementSucceeded,
+    // 僅在具備完整的非互動高頻存取證據，且後端確實完成處置時，前端才允許強制離線。
+    confirmed_automated_access: true,
+    detection_basis: "non_interactive_high_rate",
+    read_count: readCount,
+    automated_read_count: automatedReadCount,
+    unique_resource_count: uniqueResourceCount,
     reason: "non_admin_bulk_read",
-    message: "系統偵測到非管理員大量讀取資料，已中止目前連線並通知系統管理員。",
+    message: enforcementSucceeded
+      ? "系統確認目前工作階段出現非互動高頻資料存取（" + automatedReadCount + " 次、" + uniqueResourceCount + " 個資源），已中止目前連線並通知系統管理員。"
+      : "系統確認目前工作階段出現非互動高頻資料存取（" + automatedReadCount + " 次、" + uniqueResourceCount + " 個資源），已建立告警；後端未能立即中止連線，請系統管理員處理。",
     alert_id: alert.alert_id,
     session_id: sessionId,
     database_blocked: databaseBlocked,
@@ -191,7 +209,8 @@ async function saveSecurityAlert(
       message: spec.message,
       resource: spec.resource,
       event_count: spec.eventCount,
-      line_notification: (existingDetails.line_notification as LineNotificationState) || null
+      line_notification: (existingDetails.line_notification as LineNotificationState) || null,
+      details: { ...existingDetails, ...spec.details }
     } satisfies SavedSecurityAlert;
   }
 
@@ -247,7 +266,8 @@ async function saveSecurityAlert(
         message: spec.message,
         resource: spec.resource,
         event_count: spec.eventCount,
-        line_notification: (concurrentDetails.line_notification as LineNotificationState) || null
+        line_notification: (concurrentDetails.line_notification as LineNotificationState) || null,
+        details: { ...concurrentDetails, ...spec.details }
       } satisfies SavedSecurityAlert;
     }
   }
@@ -261,7 +281,8 @@ async function saveSecurityAlert(
     message: spec.message,
     resource: spec.resource,
     event_count: spec.eventCount,
-    line_notification: null
+    line_notification: null,
+    details: spec.details
   } satisfies SavedSecurityAlert;
 }
 
@@ -418,55 +439,68 @@ async function detectSecurityAlert(
   }
 
   if (eventType === "data_read" || eventType === "file_read") {
-    // 系統管理員執行稽核、匯出或全站檢查時仍須留下大量讀取告警；
-    // 僅豁免強制離線，不能豁免異常紀錄與 LINE 通知。
     const sysadminRead = isSysadminProfile(profile);
     const since = new Date(Date.now() - 5 * 60_000).toISOString();
     const { data: recent, error } = await admin.from("audit_logs")
-      .select("changes")
+      .select("changes,ip_address,operated_at,user_agent")
       .eq("operator_id", profile.user_id)
       .gte("operated_at", since)
       .in("table_name", ["data_access", "file_access"])
       .order("operated_at", { ascending: false })
-      .limit(200);
+      .limit(240);
     if (error) throw error;
 
-    const readEvents = (recent || []).filter((row) => {
+    // 只有新稽核格式明確標記為 page_load 的事件，才可作為自動化讀取訊號；
+    // 缺少標記的舊資料不列入，避免歷史紀錄或舊快取造成誤判。
+    const automatedEvents = (recent || []).filter((row) => {
       const item = row.changes as Record<string, unknown> | null;
       const itemDetails = item?.details as Record<string, unknown> | undefined;
-      // 頁面載入、背景輪詢與預載入仍需稽核，但不應被視為使用者大量讀取。
-      return (item?.event_type === "data_read" || item?.event_type === "file_read") &&
-        itemDetails?.user_initiated === true;
+      const sameSource = !ipAddress || row.ip_address === ipAddress;
+      return sameSource &&
+        (item?.event_type === "data_read" || item?.event_type === "file_read") &&
+        itemDetails?.user_initiated === false &&
+        itemDetails?.access_origin === "page_load";
     });
-    const resources = [...new Set(readEvents.map((row) => {
+    const readCount = automatedEvents.length;
+    const resources = [...new Set(automatedEvents.map((row) => {
       const item = row.changes as Record<string, unknown>;
       const itemDetails = item.details as Record<string, unknown> | undefined;
       return cleanText(itemDetails?.resource, 320);
     }).filter(Boolean))];
-    const readCount = readEvents.length;
-    // 兩個訊號必須同時成立：至少 25 次「使用者操作後」讀取，且涉及至少 8 個資源。
-    // 單純開啟頁面造成的初始化查詢、背景輪詢或少量跨表查詢不發出告警。
-    const broadRead = resources.length >= 8;
-    const repeatedRead = readCount >= 25;
-    if (broadRead && repeatedRead) {
+    const userAgentSet = [...new Set(automatedEvents.map((row) =>
+      cleanText(row.user_agent, 320)
+    ).filter(Boolean))];
+    const uniqueResourceCount = resources.length;
+
+    // 正常頁面載入通常是少量查詢；只有同一來源在短時間內持續非互動讀取，
+    // 且同時跨越多個資源，才視為可能由外部程式或自動化工具大量存取。
+    const automatedReadThreshold = 40;
+    const resourceThreshold = 8;
+    const automationSuspected = readCount >= automatedReadThreshold &&
+      uniqueResourceCount >= resourceThreshold;
+    if (automationSuspected) {
       const resourceSummary = resources.slice(0, 8).join("、");
       return saveSecurityAlert(admin, profile, ipAddress, {
         alertType: "bulk_read",
         severity: "critical",
-        title: sysadminRead ? "系統管理員大量讀取資料" : "非管理員大量讀取，已中止連線",
+        title: sysadminRead ? "系統管理員非互動高頻讀取" : "疑似非互動高頻讀取，待處置",
         message: sysadminRead
-          ? `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源；系統已保留異常紀錄並發送通知，管理員工作階段不強制中止。`
-          : `${alertActor(profile)} 在 5 分鐘內讀取 ${readCount} 次，涉及 ${resources.length} 個不同資源；系統已啟動目前工作階段的強制離線處置。`,
+          ? alertActor(profile) + " 在 5 分鐘內出現 " + readCount + " 次非互動讀取，涉及 " + uniqueResourceCount + " 個不同資源；系統已保留紀錄並通知，管理員工作階段不強制中止。"
+          : alertActor(profile) + " 在 5 分鐘內出現 " + readCount + " 次非互動讀取，涉及 " + uniqueResourceCount + " 個不同資源；系統確認可能存在外部程式或自動化工具，將依後端處置結果決定是否中止目前工作階段。",
         resource: resourceSummary || resource,
         eventCount: readCount,
         windowMinutes: 5,
         details: {
-          event_threshold: 25,
-          user_initiated_only: true,
-          unique_resource_threshold: 8,
+          detection_basis: "non_interactive_high_rate",
+          automation_suspected: true,
+          automated_event_threshold: automatedReadThreshold,
+          unique_resource_threshold: resourceThreshold,
           read_count: readCount,
-          unique_resource_count: resources.length,
+          automated_read_count: readCount,
+          unique_resource_count: uniqueResourceCount,
+          user_initiated_read_count: 0,
           resources: resources.slice(0, 20),
+          observed_user_agents: userAgentSet.slice(0, 5),
           enforcement: sysadminRead ? "audit_and_notify_only" : "force_logout_current_session",
           sysadmin_exempt_from_logout: sysadminRead
         }

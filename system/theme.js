@@ -322,9 +322,10 @@
     }).then(function(response){return response.ok;}).catch(function(){return false;});
   }
   function enforceSecurityLogout(action,profile){
-    if(!action||action.force_logout!==true||isSysadminProfile(profile)||window.__securityLogoutInProgress)return;
+    var confirmedAutomation=action&&action.confirmed_automated_access===true&&action.detection_basis==='non_interactive_high_rate'&&Number(action.automated_read_count)>=40&&Number(action.unique_resource_count)>=8&&Number(action.user_initiated_read_count||0)===0;
+    if(!action||action.force_logout!==true||isSysadminProfile(profile)||window.__securityLogoutInProgress||!confirmedAutomation)return;
     window.__securityLogoutInProgress=true;
-    var message=auditSafeText(action.message,300)||'系統偵測到大量資料讀取，已中止目前連線並通知系統管理員。';
+    var message=auditSafeText(action.message,300)||'系統確認目前工作階段出現非互動高頻資料存取，已中止目前連線並通知系統管理員。';
     try{sessionStorage.setItem('securityLogoutMessage',message);}catch(e){}
     clearProfile();
     try{
