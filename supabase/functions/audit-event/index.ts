@@ -433,7 +433,10 @@ async function detectSecurityAlert(
 
     const readEvents = (recent || []).filter((row) => {
       const item = row.changes as Record<string, unknown> | null;
-      return item?.event_type === "data_read" || item?.event_type === "file_read";
+      const itemDetails = item?.details as Record<string, unknown> | undefined;
+      // 頁面載入、背景輪詢與預載入仍需稽核，但不應被視為使用者大量讀取。
+      return (item?.event_type === "data_read" || item?.event_type === "file_read") &&
+        itemDetails?.user_initiated === true;
     });
     const resources = [...new Set(readEvents.map((row) => {
       const item = row.changes as Record<string, unknown>;
@@ -441,9 +444,11 @@ async function detectSecurityAlert(
       return cleanText(itemDetails?.resource, 320);
     }).filter(Boolean))];
     const readCount = readEvents.length;
+    // 兩個訊號必須同時成立：至少 25 次「使用者操作後」讀取，且涉及至少 8 個資源。
+    // 單純開啟頁面造成的初始化查詢、背景輪詢或少量跨表查詢不發出告警。
     const broadRead = resources.length >= 8;
     const repeatedRead = readCount >= 25;
-    if (broadRead || repeatedRead) {
+    if (broadRead && repeatedRead) {
       const resourceSummary = resources.slice(0, 8).join("、");
       return saveSecurityAlert(admin, profile, ipAddress, {
         alertType: "bulk_read",
@@ -457,6 +462,7 @@ async function detectSecurityAlert(
         windowMinutes: 5,
         details: {
           event_threshold: 25,
+          user_initiated_only: true,
           unique_resource_threshold: 8,
           read_count: readCount,
           unique_resource_count: resources.length,

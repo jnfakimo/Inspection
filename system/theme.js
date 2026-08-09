@@ -369,6 +369,10 @@
     return profile&&profile.user_id?Promise.resolve(send(profile)):resolveCurrentProfileForAccess().then(send).catch(function(){return false;});
   }
   var auditRecentReads=Object.create(null);
+  // 只有使用者明確操作後觸發的讀取，才會納入大量讀取告警；頁面啟動時的預載入仍會完整稽核，但不視為可疑大量讀取。
+  var auditLastUserActivityAt=0;
+  function markAuditUserActivity(){auditLastUserActivityAt=Date.now();}
+  function isAuditUserInitiatedRead(){return auditLastUserActivityAt>0&&Date.now()-auditLastUserActivityAt<=10000;}
   function auditDecodePath(value){
     try{return decodeURIComponent(value);}catch(e){return String(value||'');}
   }
@@ -409,6 +413,7 @@
     if(auditRecentReads[key]&&now-auditRecentReads[key]<1200)return;
     auditRecentReads[key]=now;
     var range=response&&response.headers?response.headers.get('content-range'):'';
+    var userInitiated=isAuditUserInitiatedRead();
     setTimeout(function(){
       sendSystemAudit(eventType,{
         feature:meta.kind==='file'?'讀取檔案':'讀取資料',
@@ -419,6 +424,8 @@
         http_status:status||null,
         result:result,
         response_range:auditSafeText(range,80),
+        user_initiated:userInitiated,
+        access_origin:userInitiated?'user_action':'page_load',
         reason:meta.suspicious?'偵測到目錄跳脫或敏感檔名':(denied?'權限驗證拒絕':auditSafeText(error&&error.message,160)),
         risk_level:denied?'高風險':'一般'
       });
@@ -427,6 +434,9 @@
   function installReadAccessAudit(){
     if(window.__systemReadAccessAuditInstalled||typeof window.fetch!=='function')return;
     window.__systemReadAccessAuditInstalled=true;
+    ['pointerdown','keydown','touchstart','change','submit'].forEach(function(type){
+      document.addEventListener(type,markAuditUserActivity,true);
+    });
     var nativeFetch=window.fetch.bind(window);
     window.fetch=function(input,init){
       var meta=auditReadMeta(input,init);
@@ -470,7 +480,7 @@
       if(filePath){
         sendSystemAudit('file_read',{
           feature:'開啟或下載檔案',access_kind:'file',resource:auditSafeText(filePath,320),
-          request_path:auditSafeText(filePath,500),method:'導覽',result:'使用者要求開啟',risk_level:'一般'
+          request_path:auditSafeText(filePath,500),method:'導覽',result:'使用者要求開啟',risk_level:'一般',user_initiated:true,access_origin:'user_action'
         });
       }
       var key=page.path+'|'+label+'|'+auditSafeText(target.getAttribute('href')||'',160);
