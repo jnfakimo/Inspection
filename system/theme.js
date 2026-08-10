@@ -371,9 +371,14 @@
   }
   var auditRecentReads=Object.create(null);
   // 只有使用者明確操作後觸發的讀取，才會納入大量讀取告警；頁面啟動時的預載入仍會完整稽核，但不視為可疑大量讀取。
-  var auditLastUserActivityAt=0;
-  function markAuditUserActivity(){auditLastUserActivityAt=Date.now();}
-  function isAuditUserInitiatedRead(){return auditLastUserActivityAt>0&&Date.now()-auditLastUserActivityAt<=10000;}
+  var auditLastUserActivityAt=(function(){
+    try{return Number(sessionStorage.getItem('systemAuditLastUserActivityAt'))||0;}catch(e){return 0;}
+  })();
+  function markAuditUserActivity(){
+    auditLastUserActivityAt=Date.now();
+    try{sessionStorage.setItem('systemAuditLastUserActivityAt',String(auditLastUserActivityAt));}catch(e){}
+  }
+  function isAuditUserInitiatedRead(){return auditLastUserActivityAt>0&&Date.now()-auditLastUserActivityAt<=15000;}
   function auditDecodePath(value){
     try{return decodeURIComponent(value);}catch(e){return String(value||'');}
   }
