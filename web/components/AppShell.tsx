@@ -25,11 +25,14 @@ function taipeiClock() {
 export function AppShell({ profile, title, children }: { profile: Profile; title: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
+  const [theme, setTheme] = useState('tech');
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
 
   useEffect(() => {
-    document.documentElement.dataset.theme = localStorage.getItem('siteTheme') || 'tech';
+    const savedTheme = localStorage.getItem('siteTheme') === 'light' ? 'light' : 'tech';
+    document.documentElement.dataset.theme = savedTheme;
+    setTheme(savedTheme);
     const timer = window.setInterval(() => setClock(taipeiClock()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -38,6 +41,12 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   async function logout() {
     await getSupabase().auth.signOut({ scope: 'local' });
     location.replace('/word-cloud/v2/login/');
+  }
+  function toggleTheme() {
+    const nextTheme = theme === 'light' ? 'tech' : 'light';
+    document.documentElement.dataset.theme = nextTheme;
+    localStorage.setItem('siteTheme', nextTheme);
+    setTheme(nextTheme);
   }
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,6 +71,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
         <span>{profile.department || '未設定單位'}｜{profile.name}</span>
         <i><em />系統連線中</i>
         <time>{clock}</time>
+        <button onClick={toggleTheme}>{theme === 'light' ? '科技版' : '一般版'}</button>
         <button onClick={() => { setPasswordMessage(''); setPasswordOpen(true); }}>更改密碼</button>
         <button onClick={logout}>登出</button>
       </div>
