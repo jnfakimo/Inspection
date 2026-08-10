@@ -45,6 +45,55 @@ async function countQuery(query: PromiseLike<{ count: number | null; error: { me
   return result.error ? 0 : (result.count || 0);
 }
 
+type ModuleSource={table:string;permission:string;title:string;order?:string;columns:Array<[string,string]>;filter?:[string,string]};
+const source=(table:string,permission:string,title:string,columns:Array<[string,string]>,order?:string,filter?:[string,string]):ModuleSource=>({table,permission,title,columns,order,filter});
+const MODULE_SOURCES:Record<string,ModuleSource>={
+  'admin/users':source('users','admin','人員帳號',[['username','帳號'],['name','姓名'],['department','單位'],['role','基本角色'],['rbac_role','RBAC 角色'],['status','狀態'],['created_at','建立時間']],'created_at'),
+  'admin/permissions':source('role_permissions','admin','角色權限',[['role_id','角色'],['perm','權限代碼'],['allowed','允許']]),
+  'admin/locations':source('locations','admin','場域位置',[['floor','樓層'],['area','區域'],['detail','細部位置'],['status','狀態'],['created_at','建立時間']],'floor_order'),
+  'admin/audit':source('audit_logs','admin','操作稽核',[['operated_at','操作時間'],['table_name','資源'],['action','動作'],['source','來源'],['operator_id','操作人員']],'operated_at'),
+  'admin/alerts':source('security_alerts','admin','資安告警',[['last_seen_at','最後發生'],['severity','等級'],['title','標題'],['actor_identifier','操作帳號'],['event_count','次數'],['status','狀態']],'last_seen_at'),
+  'admin/notices':source('notifications','admin','通知中心',[['created_at','時間'],['title','標題'],['body','內容'],['is_read','已讀']],'created_at'),
+  'admin/layouts':source('dashboard_layouts','admin','戰情版面',[['layout_code','版面代碼'],['layout_name','版面名稱'],['status','狀態'],['updated_at','更新時間']],'updated_at'),
+  'workorder/requests':source('repair_requests','workorder','報修案件',[['created_at','報修時間'],['req_no','案件編號'],['reporter','報修人'],['department','單位'],['fault_location','故障位置'],['fault_desc','故障說明'],['urgency','急迫度'],['status','狀態']],'created_at'),
+  'workorder/dispatch':source('repair_requests','workorder','派工作業',[['updated_at','更新時間'],['req_no','案件編號'],['fault_location','位置'],['fault_desc','故障說明'],['assignee_id','指派人員'],['desired_finish','期望完成'],['status','狀態']],'updated_at'),
+  'workorder/orders':source('maintenance_orders','workorder','維修工單',[['created_at','建立時間'],['order_id','工單 ID'],['request_id','報修 ID'],['assignee_id','維修人員'],['start_time','開始'],['finish_time','完成'],['status','狀態'],['result_desc','處理結果']],'created_at'),
+  'workorder/attachments':source('repair_attachments','workorder','維修附件',[['uploaded_at','上傳時間'],['request_id','報修 ID'],['order_id','工單 ID'],['file_name','檔名'],['file_path','儲存路徑'],['kind','類型']],'uploaded_at'),
+  'workorder/analytics':source('repair_requests','workorder','維修分析資料',[['created_at','報修時間'],['req_no','案件編號'],['department','單位'],['fault_type','故障類型'],['urgency','急迫度'],['status','狀態']],'created_at'),
+  'guardpatrol/checkins':source('checkin_logs','guardpatrol','巡邏打卡',[['checkin_at','打卡時間'],['user_name','巡檢人員'],['floor_id','樓層'],['label','巡邏點'],['target_type','類型']],'checkin_at'),
+  'guardpatrol/points':source('plan_markers','guardpatrol','巡邏點清單',[['floor_id','樓層'],['label','巡邏點'],['kind','類型'],['note','巡檢說明'],['status','狀態'],['updated_at','更新時間']],'updated_at',['kind','patrol']),
+  'guardpatrol/shifts':source('patrol_shifts','guardpatrol','巡檢排班',[['shift_date','日期'],['name','班別'],['start_time','開始'],['end_time','結束'],['assigned_user_ids','排定人員']],'shift_date'),
+  'guardpatrol/notifications':source('patrol_timeout_notifications','guardpatrol','逾時推播',[['shift_date','日期'],['shift_name','班別'],['expected_count','應巡'],['checked_count','已巡'],['unchecked_count','未巡'],['status','狀態'],['sent_at','發送時間']],'shift_date'),
+  'guardpatrol/records':source('inspection_records','guardpatrol','設備巡檢',[['inspect_time','巡檢時間'],['equipment_id','設備'],['inspector_id','巡檢人員'],['location_point','位置'],['run_status','結果'],['abnormal_note','異常說明']],'inspect_time'),
+  'guardpatrol/map3d':source('plan_markers','guardpatrol','3D 巡檢點',[['floor_id','樓層'],['label','名稱'],['kind','類型'],['x','X'],['y','Y'],['status','狀態']],'floor_id'),
+  'handover/records':source('handover_records','handover','交接紀錄',[['shift_date','日期'],['shift_type','班別'],['issues','異常事項'],['pending','待辦'],['notes','備註'],['status','狀態'],['created_at','建立時間']],'shift_date'),
+  'handover/open-items':source('handover_records','handover','未結事項',[['shift_date','日期'],['shift_type','班別'],['pending','待辦'],['issues','異常事項'],['status','狀態']],'shift_date'),
+  'handover/equipment':source('equipment','handover','設備概況',[['asset_code','資產碼'],['name','設備'],['floor','樓層'],['category','分類'],['status','狀態'],['next_maintenance_on','下次保養']],'name'),
+  'equipment/assets':source('equipment','equipment','設備主檔',[['asset_code','資產碼'],['name','設備名稱'],['category','分類'],['floor','樓層'],['brand','廠牌'],['model','型號'],['criticality','關鍵度'],['status','狀態']],'name'),
+  'equipment/plans':source('equipment_maintenance_plans','equipment','保養排程',[['equipment_id','設備'],['item_name','保養項目'],['maintenance_type','類型'],['cycle_text','週期'],['next_due_on','下次日期'],['responsible_name','負責人'],['status','狀態']],'next_due_on'),
+  'equipment/records':source('equipment_maintenance_records','equipment','維修履歷',[['performed_on','日期'],['equipment_id','設備'],['record_type','類型'],['technician','技術人員'],['maintenance_cost','維護費用'],['result','結果']],'performed_on'),
+  'equipment/contracts':source('equipment_contracts','equipment','維護合約',[['equipment_id','設備'],['contract_no','合約編號'],['vendor','廠商'],['starts_on','開始'],['ends_on','結束'],['status','狀態']],'ends_on'),
+  'equipment/documents':source('equipment_documents','equipment','設備文件',[['equipment_id','設備'],['document_type','類型'],['title','文件'],['file_url','檔案位置'],['created_at','建立時間']],'created_at'),
+  'equipment/costs':source('equipment_annual_costs','equipment','年度成本',[['fiscal_year','年度'],['equipment_id','設備'],['repair_cost','維修費'],['maintenance_cost','保養費'],['parts_cost','零件費'],['downtime_loss','停機損失']],'fiscal_year'),
+  'equipment/monitoring':source('equipment_monitor_events','equipment','中央監控事件',[['occurred_at','發生時間'],['equipment_id','設備'],['event_code','事件代碼'],['title','事件'],['severity','等級'],['message','內容'],['event_state','狀態']],'occurred_at'),
+  'equipment/materials':source('materials','equipment','材料主檔',[['material_code','材料碼'],['material_name','材料名稱'],['category_id','分類'],['unit','單位'],['current_stock','庫存'],['status','狀態'],['updated_at','更新時間']],'material_name'),
+  'structuremap/areas':source('floor_spaces','structuremap','區域位置表',[['floor','樓層'],['space_name','空間'],['note','備註'],['status','狀態'],['updated_at','更新時間']],'floor_order'),
+  'structuremap/markers':source('plan_markers','structuremap','整合標記',[['floor_id','樓層'],['kind','類型'],['label','名稱'],['equipment_id','設備'],['repair_id','報修'],['status','狀態']],'floor_id'),
+  'structuremap/floor2d':source('plan_markers','structuremap','2D 平面標記',[['floor_id','樓層'],['label','名稱'],['kind','類型'],['x','X'],['y','Y'],['color','顏色']],'floor_id'),
+  'structuremap/floor3d':source('floor_models','structuremap','3D 樓層模型',[['floor_id','樓層'],['name','模型名稱'],['image_path','平面材質'],['level','樓層高度'],['updated_at','更新時間']],'floor_id'),
+  'structuremap/models':source('floor_models','structuremap','模型管理',[['floor_id','樓層'],['name','模型名稱'],['image_path','平面材質'],['bbox','模型範圍'],['updated_at','更新時間']],'updated_at'),
+  'structuremap/relations':source('locations','structuremap','專案關係資料',[['floor','樓層'],['area','區域'],['detail','細部位置'],['status','狀態']],'floor_order'),
+  'vehicle/requests':source('vehicle_dispatch_requests','vehicle','派車申請',[['application_date','申請日'],['request_no','申請編號'],['applicant_name','申請人'],['trip_date','用車日'],['destination_location','目的地'],['trip_purpose','用途'],['plate_no','車號'],['driver_name','駕駛'],['status','狀態']],'application_date'),
+  'vehicle/vehicles':source('official_vehicles','vehicle','公務車輛',[['plate_no','車號'],['vehicle_name','車名'],['brand','廠牌'],['model','型號'],['seats','座位'],['current_odometer','目前里程'],['status','狀態']],'plate_no'),
+  'vehicle/drivers':source('vehicle_dispatch_drivers','vehicle','駕駛人員',[['user_id','人員 ID'],['active','啟用'],['assigned_by','設定人員'],['assigned_at','設定時間'],['updated_at','更新時間']],'updated_at'),
+  'vehicle/managers':source('vehicle_dispatch_managers','vehicle','派車管理員',[['user_id','人員 ID'],['active','啟用'],['assigned_by','設定人員'],['assigned_at','設定時間'],['updated_at','更新時間']],'updated_at'),
+  'vehicle/logs':source('vehicle_dispatch_logs','vehicle','派車紀錄',[['created_at','時間'],['request_id','申請 ID'],['from_status','原狀態'],['to_status','新狀態'],['action','動作'],['note','備註']],'created_at'),
+  'meetingroom/bookings':source('meeting_bookings','meetingroom','會議預約',[['booking_date','日期'],['booking_no','預約編號'],['purpose','用途'],['start_time','開始'],['end_time','結束'],['status','狀態'],['created_at','建立時間']],'booking_date'),
+  'meetingroom/rooms':source('meeting_rooms','meetingroom','會議室主檔',[['name','會議室'],['capacity','容量'],['floor','樓層'],['note','備註'],['status','狀態']],'name'),
+  'meetingroom/changes':source('meeting_booking_change_requests','meetingroom','變更申請',[['created_at','申請時間'],['target_booking_id','原預約'],['requested_meeting_name','申請會議'],['reason','原因'],['status','狀態']],'created_at'),
+  'meetingroom/notifications':source('meeting_booking_notifications','meetingroom','預約提醒',[['created_at','建立時間'],['booking_id','預約'],['notification_type','類型'],['sent_at','發送時間'],['status','狀態']],'created_at'),
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return reply(req, { ok: false, message: 'Method not allowed' }, 405);
@@ -78,6 +127,23 @@ Deno.serve(async (req) => {
 
     if (action === 'profile') {
       return reply(req, { ok: true, data: { ...profile, allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
+    }
+
+    if (action === 'module_data') {
+      const systemKey=text(body.system,40),moduleKey=text(body.module,40);
+      const config=MODULE_SOURCES[`${systemKey}/${moduleKey}`];
+      if(!config)return reply(req,{ok:false,message:'找不到指定的 V2 子系統'},404);
+      if(!can(config.permission))return reply(req,{ok:false,message:'目前角色沒有此系統權限'},403);
+      let query=userDb.from(config.table).select(config.columns.map(column=>column[0]).join(',')).limit(500);
+      if(config.filter)query=query.eq(config.filter[0],config.filter[1]);
+      if(config.order)query=query.order(config.order,{ascending:false});
+      const {data,error}=await query;
+      if(error){console.error('module_data query failed',config.table,error.message);return reply(req,{ok:false,message:`${config.title}資料讀取失敗`},500);}
+      const rows=(data||[]) as unknown as Array<Record<string,unknown>>;
+      const statusCounts=new Map<string,number>();
+      rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
+      const summary=[{label:'目前資料',value:rows.length},...[...statusCounts.entries()].slice(0,3).map(([label,value])=>({label,value}))];
+      return reply(req,{ok:true,data:{title:config.title,table:config.table,columns:config.columns.map(([key,label])=>({key,label})),rows,summary}});
     }
 
     if (action === 'dashboard') {

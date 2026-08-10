@@ -3,22 +3,22 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getSupabase } from '@/lib/supabase';
-import { LEGACY_BASE } from '@/lib/config';
 import type { Profile } from '@/types/app';
 
 const primary = [
   { href: '/', label: '戰情儀表板', icon: '/word-cloud/assets/system-icons/admin-icon.png' },
+  { href: '/systems/', label: '全系統總覽', icon: '/word-cloud/assets/system-icons/home-icon.svg' },
   { href: '/inspections/', label: '巡檢作業', icon: '/word-cloud/assets/system-icons/guardpatrol-icon.png' },
   { href: '/equipment-map/', label: '設備圖臺', icon: '/word-cloud/assets/system-icons/equipment-icon.png' },
-  { href: '/mobile/', label: '手機操作', icon: '/word-cloud/assets/system-icons/account-icon.png' },
 ];
 
-const legacy = [
-  { href: `${LEGACY_BASE}/index.html`, label: '首頁', icon: '/word-cloud/assets/system-icons/home-icon.svg' },
-  { href: `${LEGACY_BASE}/admin.html?v=8f9d41c#repairs`, label: '維修／派完工', icon: '/word-cloud/assets/system-icons/maintenance-icon.png' },
-  { href: `${LEGACY_BASE}/guardpatrol-index.html`, label: '駐衛警巡檢', icon: '/word-cloud/assets/system-icons/guardpatrol-icon.png' },
-  { href: `${LEGACY_BASE}/handover.html`, label: '電子交接簿', icon: '/word-cloud/assets/system-icons/handover-icon.png' },
-  { href: `${LEGACY_BASE}/admin.html`, label: '後台', icon: '/word-cloud/assets/system-icons/admin-icon.png' },
+const sharedActions = [
+  { href: '/systems/', label: '首頁', icon: '/word-cloud/assets/system-icons/home-icon.svg' },
+  { href: '/', label: '戰情儀表板', icon: '/word-cloud/assets/system-icons/admin-icon.png' },
+  { href: '/systems/workorder/', label: '維修／派完工', icon: '/word-cloud/assets/system-icons/maintenance-icon.png' },
+  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/word-cloud/assets/system-icons/guardpatrol-icon.png' },
+  { href: '/systems/handover/', label: '電子交接簿', icon: '/word-cloud/assets/system-icons/handover-icon.png' },
+  { href: '/systems/admin/', label: '後台', icon: '/word-cloud/assets/system-icons/admin-icon.png' },
 ];
 
 export function AppShell({ profile, title, children }: { profile: Profile; title: string; children: React.ReactNode }) {
@@ -38,7 +38,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
             </Link>
           ))}
         </nav>
-        <div className="legacy-links"><span>既有系統</span>{legacy.map(item => <a key={item.href} href={item.href}><img src={item.icon} alt="" />{item.label}</a>)}</div>
+        <div className="legacy-links"><span>六大系統入口</span>{sharedActions.map(item => <Link key={item.href} href={item.href}><img src={item.icon} alt="" />{item.label}</Link>)}</div>
       </aside>
       <section className="workspace">
         <header className="topbar">
