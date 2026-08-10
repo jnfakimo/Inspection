@@ -23,7 +23,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
   const { data, error } = await getSupabase().functions.invoke('app-api', {
     body: { action, ...payload },
   });
-  if (error) throw new Error(error.message || 'API 呼叫失敗');
-  if (!data?.ok) throw new Error(data?.message || 'API 回傳失敗');
+  if (error) throw new Error('系統服務連線失敗，請稍後再試');
+  if (!data?.ok) throw new Error(data?.message || '系統服務回傳失敗');
   return data.data as T;
 }

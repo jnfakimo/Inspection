@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { MetricCard } from '@/components/MetricCard';
 import { invokeAppApi } from '@/lib/supabase';
+import { zhValue } from '@/lib/zh-tw';
 import type { DashboardData, Profile } from '@/types/app';
 
 function Dashboard({ profile }: { profile: Profile }) {
@@ -31,7 +32,7 @@ function Dashboard({ profile }: { profile: Profile }) {
 
 function DataList({ rows, empty }: { rows: Array<Record<string, unknown>>; empty: string }) {
   if (!rows.length) return <p className="empty">{empty}</p>;
-  return <div className="data-list">{rows.map((row, index) => <div key={String(row.request_id || row.record_id || index)}><strong>{String(row.req_no || row.equipment_name || row.fault_location || '系統紀錄')}</strong><span>{String(row.status || row.run_status || '')}</span><small>{new Date(String(row.created_at || row.inspect_time || Date.now())).toLocaleString('zh-TW',{hour12:false})}</small></div>)}</div>;
+  return <div className="data-list">{rows.map((row, index) => <div key={String(row.request_id || row.record_id || index)}><strong>{String(row.req_no || row.equipment_name || row.fault_location || '系統紀錄')}</strong><span>{zhValue(row.status || row.run_status || '')}</span><small>{new Date(String(row.created_at || row.inspect_time || Date.now())).toLocaleString('zh-TW',{hour12:false})}</small></div>)}</div>;
 }
 
 export default function Page() { return <AuthGate>{profile => <Dashboard profile={profile} />}</AuthGate>; }

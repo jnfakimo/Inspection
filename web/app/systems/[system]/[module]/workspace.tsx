@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { LEGACY_BASE } from '@/lib/config';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { zhValue } from '@/lib/zh-tw';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -22,14 +23,14 @@ function display(value: unknown): string {
   if (Array.isArray(value)) return value.map(display).join('、');
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>;
-    return String(obj.name || obj.title || obj.label || obj.username || JSON.stringify(obj));
+    return String(obj.name || obj.title || obj.label || obj.username || Object.values(obj).map(display).filter(Boolean).join('、'));
   }
   const raw = String(value);
   if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) {
     const date = new Date(raw);
     if (!Number.isNaN(date.getTime())) return date.toLocaleString('zh-TW', { hour12: false });
   }
-  return raw;
+  return zhValue(raw);
 }
 
 export function ModuleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
@@ -74,11 +75,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
           <button className="primary-btn compact" onClick={load} disabled={syncing}>{syncing ? '同步中…' : '重新同步'}</button>
         </div>
       </div>
-      <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與 RLS 保護。</div>
-      {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{item.label}</span><strong>{item.value}</strong></article>)}</section>}
+      <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
+      {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
       <section className="panel table-panel">
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋目前資料" /><span>{rows.length} 筆</span></div></div>
-        {!data && !error ? <div className="loading-panel">正在透過安全 API 載入資料…</div> : <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{column.label}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)}>{data?.columns.map(column => <td key={column.key}>{display(row[column.key])}</td>)}</tr>)}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>}
+        {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)}>{data?.columns.map(column => <td key={column.key}>{display(row[column.key])}</td>)}</tr>)}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>}
       </section>
     </AppShell>;
   }

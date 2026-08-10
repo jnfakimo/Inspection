@@ -56,7 +56,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     if (password.length < 8) return setPasswordMessage('密碼至少需要 8 個字元');
     if (password !== confirm) return setPasswordMessage('兩次輸入的密碼不一致');
     const { error } = await getSupabase().auth.updateUser({ password });
-    if (error) return setPasswordMessage(error.message || '密碼更新失敗');
+    if (error) return setPasswordMessage('密碼更新失敗，請確認密碼格式後再試');
     setPasswordMessage('密碼已更改');
     window.setTimeout(() => setPasswordOpen(false), 900);
   }
