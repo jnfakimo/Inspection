@@ -1,6 +1,9 @@
 /* V2 沿用第一版視覺與橫向操作版型；資料層仍使用 React + Supabase 安全 API。 */
 :root[data-theme="light"]{color-scheme:light;--bg:#f4f6fa;--panel:#fff;--panel2:#fff;--line:#dbe4ee;--text:#1e293b;--dim:#64748b;--cyan:#0284c7;--green:#059669;--amber:#b45309;--red:#dc2626;--violet:#7c3aed}
 :root[data-theme="light"] body{background-image:none}
+:root[data-theme="light"] .panel,:root[data-theme="light"] .metric-card,:root[data-theme="light"] .mobile-hero,:root[data-theme="light"] .quick-grid a,:root[data-theme="light"] .module-hero,:root[data-theme="light"] .module-grid a{background:#fff;color:var(--text)}
+:root[data-theme="light"] .table-tools input,:root[data-theme="light"] .inspection-form input,:root[data-theme="light"] .inspection-form select,:root[data-theme="light"] .inspection-form textarea,:root[data-theme="light"] .login-card input{background:#fff;color:var(--text)}
+:root[data-theme="light"] .floor-canvas{background:#eef4f8}:root[data-theme="light"] .equipment-marker{background:#fff;color:var(--text)}
 .app-shell.v1-shell{display:block;min-height:100vh}
 .v1-navbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 14px;border-bottom:1px solid var(--line);background:rgba(3,10,22,.97);box-shadow:0 2px 12px rgba(0,0,0,.08)}
 :root[data-theme="light"] .v1-navbar{background:rgba(255,255,255,.97)}
