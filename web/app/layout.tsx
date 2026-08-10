@@ -15,7 +15,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-Hant">
+    <html lang="zh-Hant" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: "document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech')" }} /></head>
       <body>{children}</body>
     </html>
   );
