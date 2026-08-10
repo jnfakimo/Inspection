@@ -19,6 +19,8 @@ Thumbs.db
 supabase/.temp/
 _site/
 node_modules/
+web/.next/
+web/out/
 
 # Python .venv (ai-agent-ep03)
 .venv/

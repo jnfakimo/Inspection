@@ -12,6 +12,8 @@ const projectRoot = process.cwd();
 const outputRoot = path.join(projectRoot, '_site');
 const systemRoot = path.join(projectRoot, 'system');
 const outputSystemRoot = path.join(outputRoot, 'system');
+const nextExportRoot = path.join(projectRoot, 'web', 'out');
+const outputV2Root = path.join(outputRoot, 'v2');
 const publicKeySource = path.join(projectRoot, 'security', 'provenance-public-key.pem');
 const provenanceNamespace = 'com.jnfakimo.word-cloud.provenance';
 const provenanceOwner = 'jnfakimo';
@@ -67,6 +69,7 @@ async function copyRuntimeFiles() {
   await cp(path.join(projectRoot, 'index.html'), path.join(outputRoot, 'index.html'));
   await cp(path.join(projectRoot, 'LICENSE'), path.join(outputRoot, 'proprietary-notice.txt'));
   await cp(path.join(projectRoot, 'assets'), path.join(outputRoot, 'assets'), { recursive: true });
+  await cp(nextExportRoot, outputV2Root, { recursive: true });
 
   const systemEntries = await readdir(systemRoot, { withFileTypes: true });
   for (const entry of systemEntries) {
@@ -117,8 +120,16 @@ async function minifyRuntimeCode() {
   for (const file of files) {
     const extension = path.extname(file).toLowerCase();
     const relative = toPosix(path.relative(outputRoot, file));
+    const isNextArtifact = relative.startsWith('v2/');
     if (extension === '.html') {
       const source = addHtmlDirectives(await readFile(file, 'utf8'), relative);
+      // Next.js 的靜態 HTML 內含 React Server Component / hydration 對照資料。
+      // 二次折疊空白會令瀏覽器端樹狀結構與建置時不同，因此只加入安全標記，
+      // 不再對 Next 已最佳化的輸出進行第二次 HTML 壓縮。
+      if (isNextArtifact) {
+        await writeFile(file, source, 'utf8');
+        continue;
+      }
       const result = await minifyHtml(source, {
         caseSensitive: true,
         collapseBooleanAttributes: false,
@@ -142,6 +153,10 @@ async function minifyRuntimeCode() {
       await writeFile(file, result, 'utf8');
     } else if (extension === '.js' && !toPosix(file).includes('/vendor/')) {
       const source = addJavaScriptProvenance(await readFile(file, 'utf8'), relative);
+      if (isNextArtifact) {
+        await writeFile(file, source, 'utf8');
+        continue;
+      }
       const result = await minifyJs(source, {
         compress: { passes: 2 },
         format: { comments: false },

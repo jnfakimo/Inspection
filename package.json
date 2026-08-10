@@ -4,13 +4,25 @@
   "version": "1.0.0",
   "description": "Production-only hardened GitHub Pages packaging for the Beinong Market static system.",
   "scripts": {
-    "build:pages": "node tools/build-hardened-pages.mjs",
+    "dev:v2": "next dev web",
+    "build:v2": "next build web",
+    "build:pages": "npm run build:v2 && node tools/build-hardened-pages.mjs",
     "scan:pages": "node tools/scan-all-pages.mjs",
     "verify:provenance": "node tools/verify-provenance.mjs",
     "test": "node --check tools/build-hardened-pages.mjs"
   },
+  "dependencies": {
+    "@supabase/supabase-js": "2.112.2",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
   "devDependencies": {
+    "@types/node": "24.10.2",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
     "html-minifier-terser": "7.2.0",
-    "terser": "5.49.2"
+    "terser": "5.49.2",
+    "typescript": "5.9.3"
   }
 }
