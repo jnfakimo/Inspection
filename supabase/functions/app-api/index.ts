@@ -31,6 +31,12 @@ function text(value: unknown, max = 500) {
   return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 }
 
+function relationName(value: unknown) {
+  const relation = Array.isArray(value) ? value[0] : value;
+  if (!relation || typeof relation !== 'object' || !('name' in relation)) return '';
+  return text((relation as { name?: unknown }).name, 200);
+}
+
 function canonicalFloor(value: unknown) {
   const raw = text(value, 20).toUpperCase().replace(/\s+/g, '');
   if (raw === 'B1' || raw === 'B1F') return 'B1F';
@@ -145,10 +151,8 @@ Deno.serve(async (req) => {
       if(error){console.error('module_data query failed',config.table,error.message);return reply(req,{ok:false,message:`${config.title}資料讀取失敗`},500);}
       const rows=((data||[]) as unknown as Array<Record<string,unknown>>).map(row=>{
         if(systemKey!=='guardpatrol'||moduleKey!=='records')return row;
-        const equipment=Array.isArray(row.equipment)?row.equipment[0]:row.equipment;
-        const inspector=Array.isArray(row.users)?row.users[0]:row.users;
-        const equipmentName=equipment&&typeof equipment==='object'?'name' in equipment?String(equipment.name||''):'';
-        const inspectorName=inspector&&typeof inspector==='object'?'name' in inspector?String(inspector.name||''):'';
+        const equipmentName=relationName(row.equipment);
+        const inspectorName=relationName(row.users);
         return {...row,equipment_id:equipmentName||row.equipment_id,inspector_id:inspectorName||row.inspector_id};
       });
       const statusCounts=new Map<string,number>();
