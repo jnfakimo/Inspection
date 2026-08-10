@@ -134,12 +134,23 @@ Deno.serve(async (req) => {
       const config=MODULE_SOURCES[`${systemKey}/${moduleKey}`];
       if(!config)return reply(req,{ok:false,message:'找不到指定的 V2 子系統'},404);
       if(!can(config.permission))return reply(req,{ok:false,message:'目前角色沒有此系統權限'},403);
-      let query=userDb.from(config.table).select(config.columns.map(column=>column[0]).join(',')).limit(500);
+      const selectColumns=config.columns.map(column=>column[0]);
+      if(systemKey==='guardpatrol'&&moduleKey==='records'){
+        selectColumns.push('equipment(name)','users!inspection_records_inspector_id_fkey(name)');
+      }
+      let query=userDb.from(config.table).select(selectColumns.join(',')).limit(500);
       if(config.filter)query=query.eq(config.filter[0],config.filter[1]);
       if(config.order)query=query.order(config.order,{ascending:false});
       const {data,error}=await query;
       if(error){console.error('module_data query failed',config.table,error.message);return reply(req,{ok:false,message:`${config.title}資料讀取失敗`},500);}
-      const rows=(data||[]) as unknown as Array<Record<string,unknown>>;
+      const rows=((data||[]) as unknown as Array<Record<string,unknown>>).map(row=>{
+        if(systemKey!=='guardpatrol'||moduleKey!=='records')return row;
+        const equipment=Array.isArray(row.equipment)?row.equipment[0]:row.equipment;
+        const inspector=Array.isArray(row.users)?row.users[0]:row.users;
+        const equipmentName=equipment&&typeof equipment==='object'?'name' in equipment?String(equipment.name||''):'';
+        const inspectorName=inspector&&typeof inspector==='object'?'name' in inspector?String(inspector.name||''):'';
+        return {...row,equipment_id:equipmentName||row.equipment_id,inspector_id:inspectorName||row.inspector_id};
+      });
       const statusCounts=new Map<string,number>();
       rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
       const summary=[{label:'目前資料',value:rows.length},...[...statusCounts.entries()].slice(0,3).map(([label,value])=>({label,value}))];

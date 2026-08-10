@@ -8,7 +8,7 @@ const valueLabels: Record<string, string> = {
   open: '未結案', draft: '草稿', booked: '已預約', confirmed: '已確認', cancel_pending: '待取消',
   normal: '正常', abnormal: '異常', urgent: '緊急', critical: '重大', high: '高', medium: '中', low: '低',
   major: '重大', minor: '一般', warning: '警告', info: '資訊', online: '連線中', offline: '離線',
-  success: '成功', failed: '失敗', sent: '已發送', unsent: '未發送', scheduled: '已排程', overdue: '已逾期',
+  success: '成功', failed: '失敗', sent: '已發送', unsent: '未發送', skipped: '已略過', scheduled: '已排程', overdue: '已逾期',
   read: '已讀', unread: '未讀', published: '已發布', requested: '申請中', checked_in: '已報到',
   no_show: '未報到', released: '已釋出', available: '可使用', unavailable: '不可使用',
   red: '紅燈', green: '綠燈', patrol: '巡邏', manual: '手動', automatic: '自動',
