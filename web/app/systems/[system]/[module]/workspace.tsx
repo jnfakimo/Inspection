@@ -71,6 +71,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       <div className="page-actions">
         <div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div>
         <div className="action-cluster">
+          {system.key === 'workorder' && module.key === 'requests' && module.legacy && <a className="primary-btn compact" href={`${LEGACY_BASE}/${module.legacy}`}>＋ 新增報修</a>}
           {module.legacy && <a className="secondary-btn" href={`${LEGACY_BASE}/${module.legacy}`}>專業圖臺／進階作業</a>}
           <button className="primary-btn compact" onClick={load} disabled={syncing}>{syncing ? '同步中…' : '重新同步'}</button>
         </div>
