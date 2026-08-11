@@ -100,7 +100,9 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         const now = new Date();
         const day = now.toISOString().slice(0, 10);
         const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        const reqNo = `${day}-${String(Date.now()).slice(-3)}`;
+        const dayKey = day.replace(/-/g, '');
+        const todayCount = data?.rows.filter(row => String(row.created_at || '').startsWith(day)).length || 0;
+        const reqNo = `${dayKey}-${String(todayCount + 1).padStart(3, '0')}`;
         const faultDesc = [form.location.trim() ? `故障位置：${form.location.trim()}` : '', form.mobile.trim() ? `聯絡手機：${form.mobile.trim()}` : '', `故障描述：${form.description.trim()}`].filter(Boolean).join('\n');
         if (!form.mobile.trim()) { setFormMessage('請填寫手機號碼'); setSaving(false); return; }
         if (!locationPhoto) { setFormMessage('請上傳一張故障位置照片'); setSaving(false); return; }
