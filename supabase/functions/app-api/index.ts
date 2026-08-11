@@ -62,7 +62,7 @@ const MODULE_SOURCES:Record<string,ModuleSource>={
   'admin/notices':source('notifications','admin','通知中心',[['created_at','時間'],['title','標題'],['body','內容'],['is_read','已讀']],'created_at'),
   'admin/layouts':source('dashboard_layouts','admin','戰情版面',[['layout_code','版面代碼'],['layout_name','版面名稱'],['status','狀態'],['updated_at','更新時間']],'updated_at'),
   'workorder/requests':source('repair_requests','workorder','報修案件',[['created_at','報修時間'],['req_no','案件編號'],['reporter','報修人'],['department','單位'],['fault_location','故障位置'],['fault_desc','故障說明'],['urgency','急迫度'],['status','狀態']],'created_at'),
-  'workorder/dispatch':source('repair_requests','workorder','派工作業',[['updated_at','更新時間'],['req_no','案件編號'],['fault_location','位置'],['fault_desc','故障說明'],['assignee_id','指派人員'],['desired_finish','期望完成'],['status','狀態']],'updated_at'),
+  'workorder/dispatch':source('repair_requests','workorder','派工作業',[['request_id','案件識別碼'],['updated_at','更新時間'],['req_no','案件編號'],['fault_location','位置'],['fault_desc','故障說明'],['assignee_id','指派人員'],['desired_finish','期望完成'],['status','狀態']],'updated_at'),
   'workorder/orders':source('maintenance_orders','workorder','維修工單',[['created_at','建立時間'],['order_id','工單 ID'],['request_id','報修 ID'],['assignee_id','維修人員'],['start_time','開始'],['finish_time','完成'],['status','狀態'],['result_desc','處理結果']],'created_at'),
   'workorder/attachments':source('repair_attachments','workorder','維修附件',[['uploaded_at','上傳時間'],['request_id','報修 ID'],['order_id','工單 ID'],['file_name','檔名'],['file_path','儲存路徑'],['kind','類型']],'uploaded_at'),
   'workorder/analytics':source('repair_requests','workorder','維修分析資料',[['created_at','報修時間'],['req_no','案件編號'],['department','單位'],['fault_type','故障類型'],['urgency','急迫度'],['status','狀態']],'created_at'),
