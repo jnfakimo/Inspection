@@ -57,6 +57,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       } catch (caught) { setError(caught instanceof Error ? `狀態更新失敗：${caught.message}` : '狀態更新失敗'); }
     };
 
+    const nextRepairAction = (status: string) => ({ pending: ['assigned', '派工'], assigned: ['in_progress', '開始處理'], in_progress: ['pending_review', '送驗收'], pending_review: ['closed', '結案'] } as Record<string, [string, string]>)[status];
+
     const load = useCallback(async () => {
       setSyncing(true);
       setError('');
@@ -118,7 +120,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
       <section className="panel table-panel">
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋目前資料" /><span>{rows.length} 筆</span></div></div>
-        {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{system.key === 'workorder' && module.key === 'dispatch' && <th>操作</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)}>{data?.columns.map(column => <td key={column.key}>{display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><select aria-label="更新案件狀態" value={String(row.status || 'pending')} onChange={event => updateRepairStatus(row, event.target.value)}><option value="pending">待處理</option><option value="assigned">已指派</option><option value="in_progress">處理中</option><option value="pending_review">待驗收</option><option value="closed">已結案</option></select></td>}</tr>)}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>}
+        {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{system.key === 'workorder' && module.key === 'dispatch' && <th>操作</th>}</tr></thead><tbody>{rows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)}>{data?.columns.map(column => <td key={column.key}>{display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td>{action ? <button className="secondary-btn" onClick={() => updateRepairStatus(row, action[0])}>{action[1]}</button> : <span>—</span>}</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>}
       </section>
       {showCreate && <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(2,11,24,.45)', display: 'grid', placeItems: 'center', padding: 16 }}>
         <section className="panel" style={{ width: 'min(680px, 100%)', maxHeight: '90vh', overflow: 'auto', background: '#fff' }}>
