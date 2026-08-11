@@ -46,10 +46,12 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
 
     const updateRepairStatus = async (row: Record<string, unknown>, status: string) => {
       const requestId = String(row.request_id || row.id || '');
-      if (!requestId) return;
+      const requestNo = String(row.req_no || '');
+      if (!requestId && !requestNo) return;
       setError('');
       try {
-        const { error: updateError } = await getSupabase().from('repair_requests').update({ status, updated_at: new Date().toISOString() }).eq('request_id', requestId);
+        const query = getSupabase().from('repair_requests').update({ status, updated_at: new Date().toISOString() });
+        const { error: updateError } = requestId ? await query.eq('request_id', requestId) : await query.eq('req_no', requestNo);
         if (updateError) throw updateError;
         await load();
       } catch (caught) { setError(caught instanceof Error ? `狀態更新失敗：${caught.message}` : '狀態更新失敗'); }
