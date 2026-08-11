@@ -98,8 +98,8 @@ function Pilot({ profile }: { profile: Profile }) {
     persist(records.map(row => row.record_id === current.record_id ? { ...row, ...patch, updated_at: new Date().toISOString() } : row));
   }
 
-  async function syncToSupabase(record: HandoverRecord) {
-    if (!online) return false;
+  async function syncToSupabase(record: HandoverRecord): Promise<{ ok: boolean; error?: string }> {
+    if (!online) return { ok: false, error: '目前離線' };
     const payload: Record<string, unknown> = {
       record_date: record.record_date, shift_code: record.shift_code,
       shift_start: record.shift_start, shift_end: record.shift_end, handover_by: null,
@@ -108,8 +108,16 @@ function Pilot({ profile }: { profile: Profile }) {
       attachments: record.attachments, status: record.status, updated_at: record.updated_at,
     };
     if (!record.record_id.startsWith('seed-') && !record.record_id.startsWith('local-')) payload.record_id = record.record_id;
-    const { error } = await getSupabase().from('handover_field_pilot_records').upsert(payload, { onConflict: 'record_date,shift_code' });
-    return !error;
+    try {
+      const { error } = await getSupabase().from('handover_field_pilot_records').upsert(payload, { onConflict: 'record_date,shift_code' });
+      if (!error) return { ok: true };
+      const detail = error.message.includes('handover_field_pilot_records')
+        ? '尚未建立現場試用資料表，請先執行 handover_field_pilot_schema.sql'
+        : error.message;
+      return { ok: false, error: detail };
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Supabase 連線失敗' };
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -118,7 +126,10 @@ function Pilot({ profile }: { profile: Profile }) {
     const next = records.map(row => row.record_id === current.record_id ? { ...row, status: 'submitted' as RecordStatus, updated_at: new Date().toISOString() } : row);
     persist(next, online ? '交接已送出，等待主管批示' : '目前離線，交接已放入待同步佇列');
     const saved = next.find(row => row.record_id === current.record_id);
-    if (saved && await syncToSupabase(saved)) setMessage('交接已送出並同步 Supabase');
+    if (saved) {
+      const result = await syncToSupabase(saved);
+      setMessage(result.ok ? '交接已送出並同步 Supabase' : `本機已儲存；雲端尚未同步：${result.error}`);
+    }
     setTab('board');
   }
 
@@ -128,7 +139,10 @@ function Pilot({ profile }: { profile: Profile }) {
     const next = records.map(row => row.record_id === current.record_id ? { ...row, status: 'reviewed' as RecordStatus, updated_at: new Date().toISOString() } : row);
     persist(next, online ? '主管批示已儲存' : '主管批示已暫存，待連線後同步');
     const saved = next.find(row => row.record_id === current.record_id);
-    if (saved && await syncToSupabase(saved)) setMessage('主管批示已同步 Supabase');
+    if (saved) {
+      const result = await syncToSupabase(saved);
+      setMessage(result.ok ? '主管批示已同步 Supabase' : `本機已儲存；雲端尚未同步：${result.error}`);
+    }
   }
 
   function addItem() {
