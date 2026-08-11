@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import './handover-pilot/pilot.css';
 
 export const metadata: Metadata = {
   title: '北農智慧巡檢平台',

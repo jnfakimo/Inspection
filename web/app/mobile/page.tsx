@@ -7,6 +7,7 @@ import type { Profile } from '@/types/app';
 
 const actions = [
   { href: '/word-cloud/v2/inspections/', title: '開始巡檢', text: '選擇設備並立即回報正常或異常', tone: 'cyan' },
+  { href: '/word-cloud/v2/handover-pilot/', title: '交接簿現場試用', text: '以單班卡片填寫、附檔與送出批示', tone: 'violet' },
   { href: `${LEGACY_BASE}/app.html`, title: '掃描設備二維碼', text: '使用既有二維碼巡檢與報修流程', tone: 'green' },
   { href: `${LEGACY_BASE}/repair.html`, title: '快速報修', text: '拍照、描述故障並建立報修單', tone: 'amber' },
   { href: `${LEGACY_BASE}/handover.html`, title: '電子交接', text: '查看本班交辦、異常與待辦事項', tone: 'violet' },
