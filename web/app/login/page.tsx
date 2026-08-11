@@ -10,7 +10,7 @@ export default function LoginPage() {
   function nextPath() {
     const requested = new URLSearchParams(window.location.search).get('next');
     return requested && requested.startsWith('/word-cloud/v2/') && !requested.startsWith('/word-cloud/v2/login')
-      ? requested : '/word-cloud/v2/';
+      ? requested : '/word-cloud/v2/handover-pilot/';
   }
   async function loadCaptcha() {
     setCaptcha(null);
