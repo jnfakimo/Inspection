@@ -42,8 +42,6 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [showCreate, setShowCreate] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ reporter: profile.name, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
-    const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
-    const [attachments, setAttachments] = useState<File[]>([]);
     const [formMessage, setFormMessage] = useState('');
 
     const updateRepairStatus = async (row: Record<string, unknown>, status: string) => {
@@ -100,26 +98,10 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         const day = now.toISOString().slice(0, 10);
         const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const reqNo = `${day}-${String(Date.now()).slice(-3)}`;
-        if (!form.mobile.trim()) { setFormMessage('請填寫手機號碼'); setSaving(false); return; }
-        if (!locationPhoto) { setFormMessage('請上傳一張故障位置照片'); setSaving(false); return; }
         const faultDesc = [form.location.trim() ? `故障位置：${form.location.trim()}` : '', form.mobile.trim() ? `聯絡手機：${form.mobile.trim()}` : '', `故障描述：${form.description.trim()}`].filter(Boolean).join('\n');
-        const { data: created, error: insertError } = await client.from('repair_requests').insert({ request_id: requestId, req_no: reqNo, source: 'v2', reporter: form.reporter.trim() || profile.name, phone: form.phone.trim() || null, department: form.department.trim() || profile.department || null, equipment_id: form.equipment || null, fault_location: form.location.trim() || null, fault_type: form.type.trim() || null, urgency: form.urgency, fault_desc: faultDesc, mobile: form.mobile.trim() || null, desired_finish: form.desiredFinish || null, status: 'pending', created_by: user.id }).select('request_id').single();
+        const { error: insertError } = await client.from('repair_requests').insert({ request_id: requestId, req_no: reqNo, source: 'v2', reporter: form.reporter.trim() || profile.name, phone: form.phone.trim() || null, department: form.department.trim() || profile.department || null, equipment_id: form.equipment || null, fault_location: form.location.trim() || null, fault_type: form.type.trim() || null, urgency: form.urgency, fault_desc: faultDesc, mobile: form.mobile.trim() || null, desired_finish: form.desiredFinish || null, status: 'pending', created_by: user.id });
         if (insertError) throw new Error(insertError.message);
-        const photoPath = `${created?.request_id || requestId}/${Date.now()}_location.${locationPhoto.name.split('.').pop() || 'jpg'}`;
-        const upload = await client.storage.from('repair-files').upload(photoPath, locationPhoto, { upsert: true, contentType: locationPhoto.type || 'image/jpeg' });
-        if (upload.error) throw new Error(`故障位置照片上傳失敗：${upload.error.message}`);
-        const attachment = await client.from('repair_attachments').insert({ request_id: created?.request_id || requestId, kind: 'location_photo', file_path: photoPath, file_name: locationPhoto.name, uploaded_by: user.id });
-        if (attachment.error) throw new Error(`照片紀錄失敗：${attachment.error.message}`);
-        for (const file of attachments) {
-          const path = `${created?.request_id || requestId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-          const uploadFile = await client.storage.from('repair-files').upload(path, file, { upsert: true, contentType: file.type || 'application/octet-stream' });
-          if (uploadFile.error) throw new Error(`附件上傳失敗：${file.name}`);
-          const fileRecord = await client.from('repair_attachments').insert({ request_id: created?.request_id || requestId, kind: 'attachment', file_path: path, file_name: file.name, uploaded_by: user.id });
-          if (fileRecord.error) throw new Error(`附件紀錄失敗：${file.name}`);
-        }
         setForm({ reporter: profile.name, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
-        setLocationPhoto(null);
-        setAttachments([]);
         setShowCreate(false); setFormMessage(''); await load();
       } catch (caught) { setFormMessage(caught instanceof Error ? `送出失敗：${caught.message}` : '送出失敗，請稍後再試'); }
       finally { setSaving(false); }
@@ -141,24 +123,14 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{system.key === 'workorder' && module.key === 'dispatch' && <th>操作</th>}</tr></thead><tbody>{rows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)}>{data?.columns.map(column => <td key={column.key}>{display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td>{action ? <button className="secondary-btn" onClick={() => updateRepairStatus(row, action[0])}>{action[1]}</button> : <span>—</span>}</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>}
       </section>
       {showCreate && <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(2,11,24,.45)', display: 'grid', placeItems: 'center', padding: 16 }}>
-        <section className="panel" style={{ width: 'min(860px, 100%)', maxHeight: '92vh', overflow: 'auto', background: '#fff', color: '#64748b', borderColor: '#dbe4ee' }}>
+        <section className="panel" style={{ width: 'min(680px, 100%)', maxHeight: '90vh', overflow: 'auto', background: '#fff' }}>
           <div className="panel-head"><h2>＋ 新增報修</h2><button className="secondary-btn" onClick={() => setShowCreate(false)}>關閉</button></div>
-          <div className="v1-create-form" style={{ display: 'grid', gap: 12, padding: 18 }}>
-            <div style={{ textAlign: 'right', fontSize: 12 }}>填表日期：<b style={{ color: '#0284c7' }}>{new Date().toLocaleDateString('sv-SE')}</b></div>
-            <div className="v1-create-two" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <label>報修人<input value={form.reporter} onChange={e => setForm({ ...form, reporter: e.target.value })} /></label>
-              <label>聯絡電話<input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="例如：5818" /></label>
-              <label>手機（必填）<input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="請填手機號碼" /></label>
-              <label>所屬單位<input value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /></label>
-            </div>
-            <label>關聯設備（選填）<select value={form.equipment} onChange={e => setForm({ ...form, equipment: e.target.value })}><option value="">-- 未指定設備 --</option></select></label>
-            <label>故障位置<input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="請描述故障位置，例如：第一市場 2F 配電盤旁" /></label>
-            <label>故障位置照片（必填，請上傳一張照片）<input type="file" accept="image/*" onChange={e => setLocationPhoto(e.target.files?.[0] || null)} /></label>
+          <div style={{ display: 'grid', gap: 12, padding: 18 }}>
+            <label>故障位置<input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：第一市場 2F 配電盤旁" /></label>
             <label>故障類型<input value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} placeholder="電氣／機械／漏水…" /></label>
-            <label>急迫度<select value={form.urgency} onChange={e => setForm({ ...form, urgency: e.target.value })}><option value="normal">正常</option><option value="urgent">緊急</option><option value="high">高</option></select></label>
+            <label>急迫度<select value={form.urgency} onChange={e => setForm({ ...form, urgency: e.target.value })}><option value="normal">正常</option><option value="urgent">緊急</option></select></label>
+            <label>聯絡手機<input value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="請填手機號碼" /></label>
             <label>故障描述<textarea rows={5} required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="請描述故障狀況…" /></label>
-            <label>希望完成日期<input type="date" value={form.desiredFinish} onChange={e => setForm({ ...form, desiredFinish: e.target.value })} /></label>
-            <label>其他附件（照片／影片／PDF／Word／Excel，可多選）<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={e => setAttachments(Array.from(e.target.files || []))} /></label>
             {formMessage && <span className="inline-message danger">{formMessage}</span>}
             <button className="primary-btn" disabled={saving} onClick={createRepair}>{saving ? '送出中…' : '送出報修'}</button>
           </div>
