@@ -38,6 +38,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [data, setData] = useState<ModuleData | null>(null);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [syncing, setSyncing] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -83,10 +84,10 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     }, [data?.table, load]);
 
     const rows = useMemo(() => {
-      if (!data || !query.trim()) return data?.rows || [];
+      if (!data) return [];
       const needle = query.toLowerCase();
-      return data.rows.filter(row => Object.values(row).some(value => display(value).toLowerCase().includes(needle)));
-    }, [data, query]);
+      return data.rows.filter(row => (!statusFilter || String(row.status || '') === statusFilter) && (!needle || Object.values(row).some(value => display(value).toLowerCase().includes(needle))));
+    }, [data, query, statusFilter]);
 
     const createRepair = async () => {
       if (!form.description.trim()) { setFormMessage('請填寫故障描述'); return; }
@@ -135,8 +136,9 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       </div>
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
       {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
-      <section className="panel table-panel">
-        <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋目前資料" /><span>{rows.length} 筆</span></div></div>
+      <section className={`panel table-panel ${system.key === 'workorder' && module.key === 'requests' ? 'request-v1-table' : ''}`}>
+        <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span></div></div>
+        {system.key === 'workorder' && module.key === 'requests' && <div className="request-status-chips"><button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button><button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待處理 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button><button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>已指派 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button><button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>處理中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button><button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button></div>}
         {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{system.key === 'workorder' && module.key === 'dispatch' && <th>操作</th>}</tr></thead><tbody>{rows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)}>{data?.columns.map(column => <td key={column.key}>{display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td>{action ? <button className="secondary-btn" onClick={() => updateRepairStatus(row, action[0])}>{action[1]}</button> : <span>—</span>}</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>}
       </section>
       {showCreate && <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(2,11,24,.45)', display: 'grid', placeItems: 'center', padding: 16 }}>
