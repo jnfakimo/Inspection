@@ -77,7 +77,7 @@ function Pilot({ profile }: { profile: Profile }) {
     document.documentElement.dataset.theme = 'light';
     setRecords(readLocal(date));
     setOnline(navigator.onLine);
-    const on = () => setOnline(true); const off = () => setOnline(false);
+    const on = () => { setOnline(true); setMessage('已恢復連線；請按送出或儲存草稿同步待送資料'); }; const off = () => { setOnline(false); setMessage('目前離線，資料會先儲存在本機'); };
     window.addEventListener('online', on); window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); if (previousTheme) document.documentElement.dataset.theme = previousTheme; };
   }, [date]);

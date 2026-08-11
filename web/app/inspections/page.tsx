@@ -12,7 +12,7 @@ function InspectionPage({ profile }: { profile: Profile }) {
   const [data, setData] = useState<InspectionData>({ rows: [], equipment: [] });
   const [message, setMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
-  const load = () => invokeAppApi<InspectionData>('inspections').then(setData).catch(e => setMessage(e.message));
+  const load = () => invokeAppApi<InspectionData>('inspections').then(setData).catch(e => setMessage(`巡檢資料載入失敗：${e instanceof Error ? e.message : '請稍後重試'}`));
   useEffect(() => { void load(); }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setMessage('儲存中…');
@@ -23,7 +23,7 @@ function InspectionPage({ profile }: { profile: Profile }) {
         location_point: form.get('location_point'), abnormal_note: form.get('abnormal_note'),
       });
       setMessage('巡檢紀錄已儲存'); setShowForm(false); await load();
-    } catch (error) { setMessage(error instanceof Error ? error.message : '儲存失敗'); }
+    } catch (error) { setMessage(`巡檢儲存失敗：${error instanceof Error ? error.message : '請稍後重試'}`); }
   }
   return <AppShell profile={profile} title="巡檢作業">
     <div className="page-actions"><div><p>以系統服務與資料列權限雙層驗證建立巡檢紀錄，異常結果會進入後續維修流程。</p>{message && <span className="inline-message">{message}</span>}</div><button className="primary-btn compact" onClick={() => setShowForm(v => !v)}>＋ 新增巡檢</button></div>
