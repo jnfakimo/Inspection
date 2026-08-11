@@ -20,6 +20,7 @@ type HandoverRecord = {
   instruction: string;
   items: HandoverItem[];
   notes: string;
+  supervisor_note: string;
   attachments: Attachment[];
   status: RecordStatus;
   updated_at: string;
@@ -47,6 +48,7 @@ function seededRecords(date: string): HandoverRecord[] {
     instruction: index === 0 ? '請持續留意卸貨區動線與冷藏設備狀態。' : '',
     items: index === 1 ? [{ id: uid(), text: 'B1 冷凍機房溫度持續觀察', level: 'warning', done: false }] : [],
     notes: '',
+    supervisor_note: '',
     attachments: [],
     status: index === 1 ? 'submitted' : 'draft',
     updated_at: new Date().toISOString(),
@@ -71,11 +73,13 @@ function Pilot({ profile }: { profile: Profile }) {
   const [itemLevel, setItemLevel] = useState<HandoverItem['level']>('warning');
 
   useEffect(() => {
+    const previousTheme = document.documentElement.dataset.theme;
+    document.documentElement.dataset.theme = 'light';
     setRecords(readLocal(date));
     setOnline(navigator.onLine);
     const on = () => setOnline(true); const off = () => setOnline(false);
     window.addEventListener('online', on); window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); if (previousTheme) document.documentElement.dataset.theme = previousTheme; };
   }, [date]);
 
   const current = useMemo(() => records.find(row => row.shift_code === selected) || records[0], [records, selected]);
@@ -100,6 +104,7 @@ function Pilot({ profile }: { profile: Profile }) {
       record_date: record.record_date, shift_code: record.shift_code,
       shift_start: record.shift_start, shift_end: record.shift_end, handover_by: null,
       instruction: record.instruction, items: record.items, notes: record.notes,
+      supervisor_note: record.supervisor_note, reviewed_at: record.status === 'reviewed' ? record.updated_at : null,
       attachments: record.attachments, status: record.status, updated_at: record.updated_at,
     };
     if (!record.record_id.startsWith('seed-') && !record.record_id.startsWith('local-')) payload.record_id = record.record_id;
@@ -115,6 +120,15 @@ function Pilot({ profile }: { profile: Profile }) {
     const saved = next.find(row => row.record_id === current.record_id);
     if (saved && await syncToSupabase(saved)) setMessage('交接已送出並同步 Supabase');
     setTab('board');
+  }
+
+  async function reviewCurrent(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!current || !current.supervisor_note.trim()) { setMessage('請先填寫主管批示內容'); return; }
+    const next = records.map(row => row.record_id === current.record_id ? { ...row, status: 'reviewed' as RecordStatus, updated_at: new Date().toISOString() } : row);
+    persist(next, online ? '主管批示已儲存' : '主管批示已暫存，待連線後同步');
+    const saved = next.find(row => row.record_id === current.record_id);
+    if (saved && await syncToSupabase(saved)) setMessage('主管批示已同步 Supabase');
   }
 
   function addItem() {
@@ -149,6 +163,7 @@ function Pilot({ profile }: { profile: Profile }) {
     {tab === 'edit' && current && <form className="pilot-editor" onSubmit={submit}><div className="editor-top"><div><span className="eyebrow">CURRENT SHIFT</span><h2>{shifts.find(shift => shift.code === current.shift_code)?.label}交接 <small>{current.shift_start}–{current.shift_end}</small></h2></div><span className={`pilot-status ${current.status}`}>{statusLabels[current.status]}</span></div><div className="editor-grid"><label>交接人員<input value={current.handover_by} onChange={event => updateCurrent({ handover_by: event.target.value })} placeholder="輸入姓名或選擇人員" /></label><label>現場主管<input value={profile.name} readOnly /></label><label className="wide">主任指示／現場批示<textarea value={current.instruction} onChange={event => updateCurrent({ instruction: event.target.value })} rows={3} placeholder="將紙本上的指示與重點轉成可追蹤文字" /></label><div className="wide issue-builder"><div className="section-title"><span>交接事項</span><em>可跨班追蹤</em></div><div className="item-add"><input value={itemText} onChange={event => setItemText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addItem(); } }} placeholder="例如：B1 冷凍機房持續觀察" /><select value={itemLevel} onChange={event => setItemLevel(event.target.value as HandoverItem['level'])}><option value="normal">一般</option><option value="warning">注意</option><option value="urgent">緊急</option></select><button type="button" onClick={addItem}>＋加入</button></div><div className="pilot-item-list">{current.items.length ? current.items.map(item => <div key={item.id} className={`pilot-item ${item.level} ${item.done ? 'done' : ''}`}><button type="button" onClick={() => toggleItem(item.id)} aria-label="標記完成">{item.done ? '✓' : '○'}</button><span>{item.text}</span><em>{item.level === 'urgent' ? '緊急' : item.level === 'warning' ? '注意' : '一般'}</em></div>) : <p className="empty">尚無交接事項</p>}</div></div><label className="wide">備註<textarea value={current.notes} onChange={event => updateCurrent({ notes: event.target.value })} rows={3} placeholder="其他需要說明的事項" /></label><div className="wide attachment-box"><div><strong>現場照片／附件</strong><span>斷線時先記錄檔名，連線後補送</span></div><label className="upload-btn">選取檔案<input type="file" accept="image/*,.pdf" multiple onChange={attach} /></label>{current.attachments.length > 0 && <ul>{current.attachments.map(file => <li key={`${file.name}-${file.size}`}>{file.name}<small>{Math.ceil(file.size / 1024)} KB</small></li>)}</ul>}</div></div><div className="editor-actions"><button type="button" className="secondary-btn" onClick={() => setTab('board')}>返回看板</button><button type="button" className="secondary-btn" onClick={() => persist(records, '草稿已儲存於本機')}>儲存草稿</button><button className="primary-btn">送出交接，等待批示</button></div></form>}
 
     {tab === 'audit' && <section className="audit-layout"><article className="panel"><div className="panel-head"><h2>狀態流程</h2><span>第一版流程雛形</span></div><div className="status-flow"><div className="done"><i>1</i><span>填寫草稿</span></div><div className="active"><i>2</i><span>送出交接</span></div><div><i>3</i><span>主管批示</span></div><div><i>4</i><span>封存留痕</span></div></div><p className="muted">此頁面先用清楚的狀態與時間軸驗證現場流程；正式簽核角色與通知規則將依試用回饋調整。</p></article><article className="panel"><div className="panel-head"><h2>最近操作</h2><span>本機試用紀錄</span></div><div className="audit-list">{records.map(row => <div key={row.record_id}><i className={`audit-dot ${row.status}`} /><p><strong>{shifts.find(shift => shift.code === row.shift_code)?.label}交接｜{statusLabels[row.status]}</strong><small>{row.updated_at ? new Date(row.updated_at).toLocaleString('zh-TW', { hour12: false }) : '尚無時間'}　·　{row.handover_by || '未填交接人'}</small></p></div>)}</div></article></section>}
+    {current && <section className="panel supervisor-inline"><div className="panel-head"><h2>主管批示</h2><span>{statusLabels[current.status]}</span></div><form className="review-form" onSubmit={reviewCurrent}><p className="muted">針對目前選取班次補充現場處置、追蹤要求或核准意見。</p><textarea value={current.supervisor_note} onChange={event => updateCurrent({ supervisor_note: event.target.value })} rows={4} placeholder="請輸入主管批示內容" /><div className="review-actions"><span className={`pilot-status ${current.status}`}>{current.status === 'submitted' ? '待批示' : statusLabels[current.status]}</span><button className="primary-btn compact" disabled={current.status === 'closed'}>{current.status === 'reviewed' ? '更新主管批示' : '儲存主管批示'}</button></div></form></section>}
   </AppShell>;
 }
 

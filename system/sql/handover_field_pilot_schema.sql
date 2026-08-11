@@ -12,6 +12,7 @@ create table if not exists handover_field_pilot_records (
   instruction text not null default '',
   items jsonb not null default '[]'::jsonb,
   notes text not null default '',
+  supervisor_note text not null default '',
   attachments jsonb not null default '[]'::jsonb,
   status text not null default 'draft' check (status in ('draft','submitted','reviewed','closed')),
   submitted_at timestamptz,
@@ -22,6 +23,9 @@ create table if not exists handover_field_pilot_records (
   updated_at timestamptz not null default now(),
   unique (record_date, shift_code)
 );
+
+alter table handover_field_pilot_records
+  add column if not exists supervisor_note text not null default '';
 
 create index if not exists idx_hfp_date on handover_field_pilot_records(record_date desc);
 create index if not exists idx_hfp_status on handover_field_pilot_records(status);
