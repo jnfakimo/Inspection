@@ -43,6 +43,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState({ reporter: profile.name, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
     const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
+    const [attachments, setAttachments] = useState<File[]>([]);
     const [formMessage, setFormMessage] = useState('');
 
     const updateRepairStatus = async (row: Record<string, unknown>, status: string) => {
@@ -109,8 +110,16 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         if (upload.error) throw new Error(`故障位置照片上傳失敗：${upload.error.message}`);
         const attachment = await client.from('repair_attachments').insert({ request_id: created?.request_id || requestId, kind: 'location_photo', file_path: photoPath, file_name: locationPhoto.name, uploaded_by: user.id });
         if (attachment.error) throw new Error(`照片紀錄失敗：${attachment.error.message}`);
+        for (const file of attachments) {
+          const path = `${created?.request_id || requestId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+          const uploadFile = await client.storage.from('repair-files').upload(path, file, { upsert: true, contentType: file.type || 'application/octet-stream' });
+          if (uploadFile.error) throw new Error(`附件上傳失敗：${file.name}`);
+          const fileRecord = await client.from('repair_attachments').insert({ request_id: created?.request_id || requestId, kind: 'attachment', file_path: path, file_name: file.name, uploaded_by: user.id });
+          if (fileRecord.error) throw new Error(`附件紀錄失敗：${file.name}`);
+        }
         setForm({ reporter: profile.name, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
         setLocationPhoto(null);
+        setAttachments([]);
         setShowCreate(false); setFormMessage(''); await load();
       } catch (caught) { setFormMessage(caught instanceof Error ? `送出失敗：${caught.message}` : '送出失敗，請稍後再試'); }
       finally { setSaving(false); }
@@ -149,6 +158,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             <label>急迫度<select value={form.urgency} onChange={e => setForm({ ...form, urgency: e.target.value })}><option value="normal">正常</option><option value="urgent">緊急</option><option value="high">高</option></select></label>
             <label>故障描述<textarea rows={5} required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="請描述故障狀況…" /></label>
             <label>希望完成日期<input type="date" value={form.desiredFinish} onChange={e => setForm({ ...form, desiredFinish: e.target.value })} /></label>
+            <label>其他附件（照片／影片／PDF／Word／Excel，可多選）<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={e => setAttachments(Array.from(e.target.files || []))} /></label>
             {formMessage && <span className="inline-message danger">{formMessage}</span>}
             <button className="primary-btn" disabled={saving} onClick={createRepair}>{saving ? '送出中…' : '送出報修'}</button>
           </div>
