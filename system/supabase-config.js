@@ -5,14 +5,67 @@
 //
 // 用法：頁面在建立 client 前載入本檔（<script src="supabase-config.js">，需排在
 // @supabase/supabase-js 之後），改用 window.createDb() 取代原本的
-// supabase.createClient(SUPA_URL, SUPA_KEY)。登入憑證只放 sessionStorage，
-// 關閉分頁後即清除，避免共用電腦殘留長效 refresh token。
+// supabase.createClient(SUPA_URL, SUPA_KEY)。一般登入憑證只放 sessionStorage；
+// 巡檢 QR 另有最長 2 小時的跨分頁橋接，供手機掃碼開新分頁時恢復工作階段。
 window.SUPA_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 window.SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+
+window.PatrolSessionBridge = (function () {
+  var KEY='beinongPatrolTrustedSessionV1';
+  var MAX_AGE_MS=2*60*60*1000;
+  function clear(){try{localStorage.removeItem(KEY);}catch(_e){}}
+  function read(){
+    try{
+      var value=JSON.parse(localStorage.getItem(KEY)||'null');
+      if(!value||value.version!==1||!value.access_token||!value.refresh_token||!value.user_id||Number(value.valid_until)<=Date.now()){clear();return null;}
+      return value;
+    }catch(_e){clear();return null;}
+  }
+  function save(session){
+    if(!session||!session.access_token||!session.refresh_token||!session.user||!session.user.id)return false;
+    try{
+      var existing=read();
+      var sameUser=existing&&existing.user_id===session.user.id;
+      var validUntil=sameUser?Number(existing.valid_until):Date.now()+MAX_AGE_MS;
+      if(!Number.isFinite(validUntil)||validUntil<=Date.now()){clear();return false;}
+      localStorage.setItem(KEY,JSON.stringify({version:1,user_id:session.user.id,access_token:session.access_token,refresh_token:session.refresh_token,valid_until:validUntil}));
+      return true;
+    }catch(_e){return false;}
+  }
+  function update(session){
+    var existing=read();
+    if(!existing||!session||!session.user||existing.user_id!==session.user.id||!session.access_token||!session.refresh_token)return false;
+    try{
+      localStorage.setItem(KEY,JSON.stringify({version:1,user_id:existing.user_id,access_token:session.access_token,refresh_token:session.refresh_token,valid_until:existing.valid_until}));
+      return true;
+    }catch(_e){return false;}
+  }
+  async function restore(client){
+    var value=read();
+    if(!value||!client||!client.auth)return null;
+    try{
+      var result=await client.auth.setSession({access_token:value.access_token,refresh_token:value.refresh_token});
+      var session=result&&result.data&&result.data.session;
+      if(result.error||!session||!session.user||session.user.id!==value.user_id||Number(value.valid_until)<=Date.now()){clear();return null;}
+      save(session);
+      return session;
+    }catch(_e){clear();return null;}
+  }
+  return {save:save,update:update,restore:restore,clear:clear,read:read,maxAgeMs:MAX_AGE_MS};
+})();
+
 window.createDb = function (options) {
   var config=Object.assign({},options||{});
   config.auth=Object.assign({persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.sessionStorage},config.auth||{});
-  return supabase.createClient(window.SUPA_URL, window.SUPA_KEY, config);
+  var client=supabase.createClient(window.SUPA_URL, window.SUPA_KEY, config);
+  if(client.auth&&client.auth.onAuthStateChange){
+    client.auth.onAuthStateChange(function(event,session){
+      if(event==='SIGNED_OUT'||event==='USER_DELETED')window.PatrolSessionBridge.clear();
+      else if(session&&event==='SIGNED_IN')window.PatrolSessionBridge.save(session);
+      else if(session&&['INITIAL_SESSION','TOKEN_REFRESHED','USER_UPDATED','MFA_CHALLENGE_VERIFIED'].indexOf(event)>=0)window.PatrolSessionBridge.update(session);
+    });
+  }
+  return client;
 };
 window.safeDbError = function (error) {
   var code=String(error&&error.code||'');

@@ -331,6 +331,8 @@
     try{
       sessionStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');
       localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');
+      localStorage.removeItem('beinongPatrolTrustedSessionV1');
+      if(window.PatrolSessionBridge)window.PatrolSessionBridge.clear();
     }catch(e){}
     setTimeout(function(){
       try{window.alert(message);}catch(e){}
@@ -521,7 +523,7 @@
       if(token)await fetch(SUPABASE_URL+'/auth/v1/logout?scope=global',{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}});
     }catch(e){}
     clearProfile();
-    try{sessionStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');}catch(e){}
+    try{sessionStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');localStorage.removeItem('sb-qztffronusdhgxhjjubt-auth-token');localStorage.removeItem('beinongPatrolTrustedSessionV1');if(window.PatrolSessionBridge)window.PatrolSessionBridge.clear();}catch(e){}
     location.href='login.html';
   }
   function ensureChangePwModal(){

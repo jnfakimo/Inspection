@@ -25,7 +25,7 @@ const clientIp = (req: Request) => {
   return cleanText(raw.split(",")[0], 80) || null;
 };
 
-type JwtClaims = { aal?: string; amr?: Array<{ method?: string } | string>; session_id?: string };
+type JwtClaims = { aal?: string; amr?: Array<{ method?: string; timestamp?: number } | string>; session_id?: string; iat?: number };
 const decodeClaims = (token: string): JwtClaims => {
   try {
     const encoded = token.split(".")[1] || "";
@@ -40,6 +40,13 @@ const hasAal2 = (claims: JwtClaims) => claims.aal === "aal2" ||
   (Array.isArray(claims.amr) && claims.amr.some((item) =>
     typeof item === "string" ? /^(totp|otp|passkey)$/i.test(item) : /^(totp|otp|passkey)$/i.test(String(item?.method || ""))
   ));
+const patrolSessionAgeSeconds = (claims: JwtClaims) => {
+  const timestamps = (claims.amr || []).map((item) =>
+    typeof item === "string" ? 0 : Number(item?.timestamp) || 0
+  ).filter((value) => value > 0);
+  if (!timestamps.length) return null;
+  return Math.floor(Date.now() / 1000) - Math.min(...timestamps);
+};
 
 type Profile = {
   user_id: string;
@@ -83,6 +90,10 @@ Deno.serve(async (req) => {
     if (!hasAal2(claims)) {
       return reply(req, { ok: false, code: "mfa_required", message: "巡檢簽到需要完成多因素驗證，請輸入驗證器代碼" }, 403);
     }
+    const sessionAge = patrolSessionAgeSeconds(claims);
+    if (sessionAge === null || sessionAge < -60 || sessionAge > 2 * 60 * 60) {
+      return reply(req, { ok: false, code: "patrol_session_expired", message: "巡檢登入已超過兩小時，請重新登入後再簽到" }, 401);
+    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -96,6 +107,16 @@ Deno.serve(async (req) => {
       .select("user_id,username,email,name,role,rbac_role,status")
       .eq("auth_id", authData.user.id).eq("status", "active").maybeSingle();
     if (profileError || !profile?.user_id) return reply(req, { ok: false, code: "inactive_account", message: "找不到啟用中的系統帳號" }, 403);
+
+    const authorizedClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } }
+    );
+    const { data: patrolAllowed, error: patrolAccessError } = await authorizedClient.rpc("has_system_access", { p_permission: "sys_guardpatrol" });
+    if (patrolAccessError || patrolAllowed !== true) {
+      return reply(req, { ok: false, code: "forbidden", message: "此帳號沒有駐衛警巡檢系統權限" }, 403);
+    }
 
     const body = await req.json().catch(() => ({}));
     const targetType = cleanText(body.target_type, 20);
