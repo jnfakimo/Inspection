@@ -1,6 +1,6 @@
-const CACHE='patrol-checkin-v10-mfa-reset';
+const CACHE='patrol-checkin-v11-password-session';
 const SHELL=[
-  './patrolcheckin.html','./patrolcheckin-app.js?v=20260814-mfa-reset2','./theme.js?v=20260814-patrol-session1',
+  './patrolcheckin.html','./patrolcheckin-app.js?v=20260814-password-session1','./theme.js?v=20260814-patrol-session1',
   './light-mode-fix.css','./mobile-unified.css?v=20260717-1','./supabase-config.js?v=20260814-patrol-session1',
   './vendor/supabase-js-2.min.js'
 ];

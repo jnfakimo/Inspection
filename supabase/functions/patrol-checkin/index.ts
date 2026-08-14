@@ -36,16 +36,13 @@ const decodeClaims = (token: string): JwtClaims => {
     return {};
   }
 };
-const hasAal2 = (claims: JwtClaims) => claims.aal === "aal2" ||
-  (Array.isArray(claims.amr) && claims.amr.some((item) =>
-    typeof item === "string" ? /^(totp|otp|passkey)$/i.test(item) : /^(totp|otp|passkey)$/i.test(String(item?.method || ""))
-  ));
 const patrolSessionAgeSeconds = (claims: JwtClaims) => {
   const timestamps = (claims.amr || []).map((item) =>
     typeof item === "string" ? 0 : Number(item?.timestamp) || 0
   ).filter((value) => value > 0);
-  if (!timestamps.length) return null;
-  return Math.floor(Date.now() / 1000) - Math.min(...timestamps);
+  const startedAt = timestamps.length ? Math.min(...timestamps) : Number(claims.iat) || 0;
+  if (!startedAt) return null;
+  return Math.floor(Date.now() / 1000) - startedAt;
 };
 
 type Profile = {
@@ -87,9 +84,6 @@ Deno.serve(async (req) => {
     if (!token) return reply(req, { ok: false, code: "unauthorized", message: "請先登入系統" }, 401);
 
     const claims = decodeClaims(token);
-    if (!hasAal2(claims)) {
-      return reply(req, { ok: false, code: "mfa_required", message: "巡檢簽到需要完成多因素驗證，請輸入驗證器代碼" }, 403);
-    }
     const sessionAge = patrolSessionAgeSeconds(claims);
     if (sessionAge === null || sessionAge < -60 || sessionAge > 2 * 60 * 60) {
       return reply(req, { ok: false, code: "patrol_session_expired", message: "巡檢登入已超過兩小時，請重新登入後再簽到" }, 401);
@@ -171,8 +165,8 @@ Deno.serve(async (req) => {
       user_id: profile.user_id,
       user_name: actorName(profile),
       checkin_at: new Date().toISOString(),
-      auth_level: "aal2",
-      verification_method: "totp_or_passkey",
+      auth_level: claims.aal || "aal1",
+      verification_method: "password_session",
       source_ip: clientIp(req),
       user_agent: cleanText(req.headers.get("user-agent"), 1000) || null,
       checkin_source: "qr"
