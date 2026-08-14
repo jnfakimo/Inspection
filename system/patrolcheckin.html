@@ -23,6 +23,6 @@
 if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});}
 if('caches' in window){caches.keys().then(keys=>keys.filter(k=>/^patrol-checkin-/i.test(k)).forEach(k=>caches.delete(k))).catch(()=>{});}
 </script>
-<script src="patrolcheckin-app.js?v=20260814-patrol-session1"></script>
+<script src="patrolcheckin-app.js?v=20260814-patrol-session2"></script>
 </body>
 </html>
