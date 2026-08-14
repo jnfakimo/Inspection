@@ -32,25 +32,14 @@
   function notify(detail){
     window.dispatchEvent(new CustomEvent('patrol-offline-change',{detail:Object.assign({pending:pendingCount()},detail||{})}));
   }
-  async function sync(db){
-    if(syncing||!navigator.onLine||!db)return {synced:0,pending:pendingCount()};
-    syncing=true;let synced=0,rows=queue(),remaining=[];
-    for(let i=0;i<rows.length;i++){
-      const item=rows[i];
-      const payload={
-        checkin_id:item.checkin_id,target_type:item.target_type,target_id:item.target_id,
-        floor_id:item.floor_id||null,label:item.label||null,user_id:item.user_id||null,
-        user_name:item.user_name||null,checkin_at:item.checkin_at
-      };
-      try{
-        const {error}=await db.from('checkin_logs').insert(payload);
-        if(!error||error.code==='23505'){synced++;continue;}
-        if(isNetworkError(error)){remaining.push(...rows.slice(i));break;}
-        item.last_error=error.message||'sync failed';remaining.push(item);
-      }catch(error){remaining.push(...rows.slice(i));break;}
-    }
-    write(QUEUE_KEY,remaining);syncing=false;
-    const result={synced,pending:remaining.length};notify(result);return result;
+  // QR 簽到已改為「線上 + MFA + Edge Function」流程。保留此 API 僅為
+  // 舊版 service worker 相容，但絕不再由瀏覽器直接寫入 checkin_logs。
+  // 舊佇列會被清除，避免部署後重試舊的未驗證資料。
+  async function sync(_db){
+    const pending=pendingCount();
+    if(pending)write(QUEUE_KEY,[]);
+    syncing=false;notify({synced:0,discarded:pending,pending:0});
+    return {synced:0,discarded:pending,pending:0};
   }
   function registerServiceWorker(){
     if('serviceWorker' in navigator){

@@ -1,7 +1,7 @@
-const CACHE='patrol-checkin-v5';
+const CACHE='patrol-checkin-v6-secure';
 const SHELL=[
-  './patrolcheckin.html','./patrol-offline.js?v=20260717-1','./patrolcheckin-app.js?v=20260717-1','./theme.js?v=20260717-3',
-  './light-mode-fix.css','./mobile-unified.css?v=20260717-1',
+  './patrolcheckin.html','./patrolcheckin-app.js?v=20260814-mfa1','./theme.js?v=20260809-readfix2',
+  './light-mode-fix.css','./mobile-unified.css?v=20260717-1','./supabase-config.js?v=20260806-1',
   './vendor/supabase-js-2.min.js'
 ];
 self.addEventListener('install',event=>{

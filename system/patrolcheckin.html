@@ -6,197 +6,23 @@
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260809-readfix2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>巡邏點簽到 — 臺北農產巡檢系統</title>
-<script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
-<script src="patrol-offline.js?v=20260717-1"></script>
+<script src="vendor/supabase-js-2.min.js"></script><script src="supabase-config.js?v=20260806-1"></script>
 <style>
-:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;
-  --patrol:#c77dff;--green:#00ff9d;--red:#ff5470;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;
-  --font-head:'Rajdhani',sans-serif}
-:root[data-theme="light"]{--bg:#f4f6fa;--surface:#ffffff;--panel:#ffffff;--border:#dbe4ee;--patrol:#9333ea;--green:#059669;--red:#dc2626;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);
-  min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px}
-.card{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--border);
-  border-radius:8px;padding:26px 22px;text-align:center}
-.icon{font-size:2.6rem;margin-bottom:10px}
-.icon.ok{color:var(--green);text-shadow:0 0 18px rgba(0,255,157,.5)}
-.icon.err{color:var(--red);text-shadow:0 0 18px rgba(255,84,112,.5)}
-.icon.load{color:var(--patrol);text-shadow:0 0 18px rgba(199,125,255,.5)}
-h1{font-family:var(--font-head);font-size:1.2rem;color:var(--text-hi);letter-spacing:.04em;margin-bottom:6px}
-.sub{font-size:.8rem;color:var(--text-dim);margin-bottom:18px}
-.detail{background:var(--surface);border:1px solid var(--border);border-radius:4px;
-  padding:14px;text-align:left;font-size:.82rem;line-height:2;margin-bottom:18px}
-.detail b{color:var(--text-hi)}
-.detail .k{color:var(--text-dim);display:inline-block;width:70px}
-.btn{display:inline-block;padding:10px 20px;border-radius:3px;font-size:.8rem;
-  font-family:var(--font-head);letter-spacing:.05em;border:1px solid var(--patrol);
-  color:var(--patrol);background:rgba(199,125,255,.1);cursor:pointer;text-decoration:none}
-.btn:hover{background:rgba(199,125,255,.2)}
-.hist{margin-top:20px;text-align:left}
-.hist-t{font-size:.72rem;color:var(--text-dim);margin-bottom:8px;letter-spacing:.04em}
-.hist-row{display:flex;justify-content:space-between;font-size:.76rem;color:var(--text);
-  padding:6px 0;border-top:1px solid rgba(12,40,64,.6)}
-.hist-row .u{color:var(--text-dim)}
-.hist-empty,.hist-error{padding:12px 0;border-top:1px solid rgba(12,40,64,.6);
-  color:var(--text-dim);font-size:.76rem;text-align:center}
-.hist-error{color:var(--red)}
-.hist-pages{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px}
-.hist-page-btn{min-width:72px;padding:8px 10px;border:1px solid var(--border);border-radius:4px;
-  background:var(--surface);color:var(--text-hi);font:inherit;cursor:pointer}
-.hist-page-btn:not(:disabled):hover{border-color:var(--patrol);color:var(--patrol)}
-.hist-page-btn:disabled{opacity:.4;cursor:not-allowed}
-.hist-page-info{min-width:72px;text-align:center;color:var(--text-dim);font-size:.72rem}
-.queue-badge{position:fixed;right:14px;top:14px;z-index:10;padding:7px 10px;border:1px solid var(--patrol);
-  border-radius:999px;background:var(--panel);color:var(--patrol);font-size:.72rem;box-shadow:0 4px 16px rgba(0,0,0,.18)}
-@media(max-width:480px){
-  .hist-row{font-size:.72rem;gap:10px}.hist-row span:last-child{white-space:nowrap}
-  .hist-pages{gap:8px}.hist-page-btn{min-width:68px;min-height:40px}
-}
-
+:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--patrol:#c77dff;--green:#00ff9d;--red:#ff5470;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;--font-head:'Rajdhani',sans-serif}
+:root[data-theme="light"]{--bg:#f4f6fa;--surface:#fff;--panel:#fff;--border:#dbe4ee;--patrol:#9333ea;--green:#059669;--red:#dc2626;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px}.card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:26px 22px;text-align:center}.icon{font-size:2.6rem;margin-bottom:10px}.icon.ok{color:var(--green);text-shadow:0 0 18px rgba(0,255,157,.5)}.icon.err{color:var(--red);text-shadow:0 0 18px rgba(255,84,112,.5)}.icon.load{color:var(--patrol);text-shadow:0 0 18px rgba(199,125,255,.5)}h1{font-family:var(--font-head);font-size:1.2rem;color:var(--text-hi);letter-spacing:.04em;margin-bottom:6px}.sub{font-size:.8rem;color:var(--text-dim);margin-bottom:18px}.detail{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px;text-align:left;font-size:.82rem;line-height:2;margin-bottom:18px}.detail b{color:var(--text-hi)}.detail .k{color:var(--text-dim);display:inline-block;width:86px}.btn{display:inline-block;padding:10px 20px;margin:4px;border-radius:3px;font-size:.8rem;font-family:var(--font-head);letter-spacing:.05em;border:1px solid var(--patrol);color:var(--patrol);background:rgba(199,125,255,.1);cursor:pointer;text-decoration:none}.btn:hover{background:rgba(199,125,255,.2)}.btn:disabled{opacity:.55;cursor:wait}.btn.secondary{border-color:var(--border);color:var(--text-dim);background:transparent}.mfa-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:16px;text-align:left}.mfa-help{font-size:.78rem;line-height:1.7;color:var(--text-dim);margin-bottom:12px}.mfa-qr{display:block;width:180px;height:180px;object-fit:contain;margin:0 auto 12px;background:#fff;border-radius:4px}.mfa-secret{font-size:.7rem;color:var(--text-dim);word-break:break-all;margin-bottom:12px}.mfa-secret code{color:var(--text-hi)}.mfa-label{display:block;font-size:.8rem;color:var(--text-dim);margin-bottom:6px}.mfa-code{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:4px;background:var(--panel);color:var(--text-hi);font-size:1.1rem;letter-spacing:.25em;text-align:center}.mfa-error{color:var(--red);font-size:.76rem;margin-top:8px;text-align:center}.hist{margin-top:20px;text-align:left}.hist-t{font-size:.72rem;color:var(--text-dim);margin-bottom:8px;letter-spacing:.04em}.hist-row{display:flex;justify-content:space-between;font-size:.76rem;color:var(--text);padding:6px 0;border-top:1px solid rgba(12,40,64,.6)}.hist-row .u{color:var(--text-dim)}.hist-empty,.hist-error{padding:12px 0;border-top:1px solid rgba(12,40,64,.6);color:var(--text-dim);font-size:.76rem;text-align:center}.hist-error{color:var(--red)}
+@media(max-width:480px){body{padding:18px 10px}.card{padding:22px 14px}.mfa-qr{width:160px;height:160px}.detail{font-size:.78rem}}
 </style>
-<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
-<link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
+<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1"><link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
-<body>
-<div class="queue-badge" id="offlineQueueBadge" hidden></div>
-<div class="card" id="card">
-  <div class="icon load">◐</div>
-  <h1>處理中…</h1>
-  <div class="sub">正在確認登入狀態</div>
-</div>
-
-<script type="text/plain" id="legacy-checkin-script">
-const db=supabase.createClient(SUPA_URL,SUPA_KEY);
-function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function translateError(msg){
-  if(!msg) return '未知錯誤';
-  if(msg.includes('permission denied')||msg.includes('violates row-level security')) return '無操作權限';
-  if(msg.includes('JWT expired')) return '登入已過期，請重新整理頁面';
-  if(msg.includes('Failed to fetch')||msg.includes('NetworkError')) return '網路連線失敗，請稍後再試';
-  return '操作失敗，請稍後再試或聯絡系統管理員';
-}
-function fmt(t){
-  const d=new Date(t);
-  const p=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
-function showState(icon,iconClass,title,sub,backHref,backLabel){
-  document.getElementById('card').innerHTML=`
-    <div class="icon ${iconClass}">${icon}</div>
-    <h1>${esc(title)}</h1>
-    <div class="sub">${esc(sub)}</div>
-    <a class="btn" href="${esc(backHref||'patrollist.html')}">◀ ${esc(backLabel||'返回巡邏點清單')}</a>`;
-}
-
-(async()=>{
-  const params=new URLSearchParams(location.search);
-  const markerId=params.get('marker');
-  const spaceId=params.get('space');
-  const targetType=markerId?'marker':(spaceId?'space':null);
-  const targetId=markerId||spaceId;
-  if(!targetType){ showState('✕','err','無效的連結','缺少地點代碼，請重新掃描 QR code'); return; }
-  const backHref=targetType==='marker'?'patrollist.html':'arealist.html';
-  const backLabel=targetType==='marker'?'返回巡邏點清單':'返回區域位置表';
-
-  const {data:{session}}=await db.auth.getSession();
-  if(!session){
-    location.href='login.html?redirect='+encodeURIComponent('patrolcheckin.html'+location.search);
-    return;
-  }
-
-  const {data:profile}=await db.from('users').select('user_id,name').eq('auth_id',session.user.id).single();
-  const userId=profile?.user_id||null;
-  const userName=profile?.name||'（未知人員）';
-
-  let point; // {label, floor_id}
-  if(targetType==='marker'){
-    const {data:marker,error:mErr}=await db.from('plan_markers')
-      .select('marker_id,floor_id,label,kind,status').eq('marker_id',targetId).single();
-    if(mErr||!marker||marker.kind!=='patrol'||marker.status!=='active'){
-      showState('✕','err','找不到此巡邏點','此巡邏點可能已被刪除或停用，請聯絡管理員確認',backHref,backLabel);
-      return;
-    }
-    point={label:marker.label,floor_id:marker.floor_id};
-  }else{
-    const {data:space,error:sErr}=await db.from('floor_spaces')
-      .select('space_id,floor,space_name').eq('space_id',targetId).single();
-    if(sErr||!space){
-      showState('✕','err','找不到此空間','此空間可能已被刪除，請聯絡管理員確認',backHref,backLabel);
-      return;
-    }
-    point={label:space.space_name,floor_id:space.floor};
-  }
-
-  const {error:insErr}=await db.from('checkin_logs').insert({
-    target_type:targetType, target_id:targetId, floor_id:point.floor_id, label:point.label,
-    user_id:userId, user_name:userName
-  });
-  if(insErr){
-    showState('✕','err','簽到失敗',translateError(insErr.message),backHref,backLabel);
-    return;
-  }
-
-  const now=new Date();
-  const pointLabel=targetType==='marker'?'巡邏點':'空間';
-  document.getElementById('card').innerHTML=`
-    <div class="icon ok">✓</div>
-    <h1>簽到成功</h1>
-    <div class="sub">已記錄本次到場</div>
-    <div class="detail">
-      <div><span class="k">${esc(pointLabel)}</span><b>${esc(point.label)}</b></div>
-      <div><span class="k">樓層</span><b>${esc(point.floor_id)}</b></div>
-      <div><span class="k">人員</span><b>${esc(userName)}</b></div>
-      <div><span class="k">時間</span><b>${esc(fmt(now))}</b></div>
-    </div>
-    <a class="btn" href="${esc(backHref)}">◀ ${esc(backLabel)}</a>
-    <div class="hist" id="hist"></div>`;
-
-  const HISTORY_PAGE_SIZE=10;
-  async function loadHistory(page=1){
-    const hist=document.getElementById('hist');
-    if(!hist) return;
-    hist.innerHTML=`<div class="hist-t">此${esc(pointLabel)}最近簽到記錄</div><div class="hist-empty">載入中…</div>`;
-
-    const from=(page-1)*HISTORY_PAGE_SIZE;
-    const to=from+HISTORY_PAGE_SIZE-1;
-    const {data:recent,error:historyErr,count}=await db.from('checkin_logs')
-      .select('user_name,checkin_at',{count:'exact'})
-      .eq('target_type',targetType).eq('target_id',targetId)
-      .order('checkin_at',{ascending:false}).range(from,to);
-
-    if(historyErr){
-      hist.innerHTML=`<div class="hist-t">此${esc(pointLabel)}最近簽到記錄</div><div class="hist-error">記錄載入失敗，請稍後再試</div>`;
-      return;
-    }
-
-    const total=Number(count)||0;
-    const totalPages=Math.max(1,Math.ceil(total/HISTORY_PAGE_SIZE));
-    if(page>totalPages){ loadHistory(totalPages); return; }
-
-    const rows=(recent||[]).map(r=>
-      `<div class="hist-row"><span class="u">${esc(r.user_name||'')}</span><span>${esc(fmt(r.checkin_at))}</span></div>`
-    ).join('');
-    const empty=rows?'':'<div class="hist-empty">尚無簽到記錄</div>';
-    const pager=totalPages>1?`
-      <div class="hist-pages">
-        <button type="button" class="hist-page-btn" data-page="${page-1}" ${page<=1?'disabled':''}>上一頁</button>
-        <span class="hist-page-info">${page} / ${totalPages} 頁</span>
-        <button type="button" class="hist-page-btn" data-page="${page+1}" ${page>=totalPages?'disabled':''}>下一頁</button>
-      </div>`:'';
-    hist.innerHTML=`<div class="hist-t">此${esc(pointLabel)}最近簽到記錄（共 ${total} 筆）</div>${rows}${empty}${pager}`;
-    hist.querySelectorAll('.hist-page-btn:not(:disabled)').forEach(btn=>{
-      btn.addEventListener('click',()=>loadHistory(Number(btn.dataset.page)));
-    });
-  }
-  loadHistory();
-})();
+<body><div class="card" id="card"><div class="icon load">◐</div><h1>處理中…</h1><div class="sub">正在確認登入狀態</div></div>
+<script>
+// 舊版曾支援離線直寫；安全版 QR 簽到必須即時連線，移除舊 service worker 與快取。
+if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});}
+if('caches' in window){caches.keys().then(keys=>keys.filter(k=>/^patrol-checkin-/i.test(k)).forEach(k=>caches.delete(k))).catch(()=>{});}
 </script>
-<script src="patrolcheckin-app.js?v=20260717-1"></script>
+<script src="patrolcheckin-app.js?v=20260814-mfa1"></script>
 </body>
 </html>
