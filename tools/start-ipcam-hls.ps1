@@ -110,20 +110,20 @@ try {
       if (Test-Path $playlist) {
         $ageSeconds = ((Get-Date) - (Get-Item $playlist).LastWriteTime).TotalSeconds
         if ($ageSeconds -gt 25) {
-          Write-Warning "HLS playlist has not updated for $([int]$ageSeconds) seconds. Restarting ffmpeg..."
+#          Write-Warning "HLS playlist has not updated for $([int]$ageSeconds) seconds. Restarting ffmpeg..."
           Stop-Process -Id $ffmpegProcess.Id -Force -ErrorAction SilentlyContinue
           break
         }
       }
       elseif (((Get-Date) - $startedAt).TotalSeconds -gt 45) {
-        Write-Warning "HLS playlist was not created after 45 seconds. Restarting ffmpeg..."
+#          Write-Warning "HLS playlist was not created after 45 seconds. Restarting ffmpeg..."
         Stop-Process -Id $ffmpegProcess.Id -Force -ErrorAction SilentlyContinue
         break
       }
     }
 
     if ($ffmpegProcess.HasExited) {
-      Write-Warning "ffmpeg exited with code $($ffmpegProcess.ExitCode). Restarting in 3 seconds..."
+#      Write-Warning "ffmpeg exited with code $($ffmpegProcess.ExitCode). Restarting in 3 seconds..."
     }
     Start-Sleep -Seconds 3
   }
