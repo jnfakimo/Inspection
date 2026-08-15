@@ -22,7 +22,7 @@ export function LocationsAdmin({ profile, module }: AdminProps) {
   useEffect(() => { void load(); }, [load]);
   const run = async (action: string, payload: Row, success: string) => {
     setBusy(true); setNote('');
-    try { await invokeAdminApi(action, payload); setEditor(null); setNote(success); await load(); }
+    try { await invokeAdminApi(action, payload); setEditor(null); await load(); setNote(success); }
     catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
   const q = query.trim().toLowerCase();

@@ -19,13 +19,21 @@ export const PERMISSIONS = [
 export const SYSTEM_PERMISSIONS = [
   ['sys_admin', '後台管理'], ['sys_workorder', '維修／派工／完工'], ['sys_guardpatrol', '駐衛警巡檢'],
   ['sys_handover', '電子交接簿'], ['sys_equipment', '設備建置'], ['sys_structuremap', '設備圖臺'],
-  ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'],
+  ['sys_equipment_manage', '設備與圖臺管理'], ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'],
 ] as const;
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
   const raw = error instanceof Error ? error.message : String(error || '');
   if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(raw)) return '目前帳號沒有執行此操作的權限';
   if (/duplicate|unique/i.test(raw)) return '資料已存在，請勿重複建立';
+  if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(raw)) return '網路連線失敗，請確認連線後再試';
+  if (/jwt.*expired|token.*expired|invalid.*jwt|invalid.*token|auth session missing|refresh.*token/i.test(raw)) return '登入已過期，請重新登入';
+  if (/not authenticated|unauthorized|尚未登入|未登入|登入狀態無效/i.test(raw)) return '無法確認登入狀態，請重新登入';
+  if (/timeout|timed out|gateway timeout/i.test(raw)) return '系統回應逾時，請稍後再試';
+  if (/rate limit|too many requests|security purposes.*seconds/i.test(raw)) return '操作過於頻繁，請稍後再試';
+  if (/foreign key|violates.*reference/i.test(raw)) return '關聯資料不完整，無法完成操作';
+  if (/not-null|null value|required|cannot be blank/i.test(raw)) return '請完整填寫必填欄位';
+  if (/check constraint|invalid input|invalid format|malformed/i.test(raw)) return '輸入資料格式不正確';
   return raw || fallback;
 }
 export function fmt(value: unknown) {
@@ -37,7 +45,13 @@ export function fmt(value: unknown) {
 export function fmtTime(value: unknown) {
   if (!value) return '—';
   const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? fmt(value) : date.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+  if (Number.isNaN(date.getTime())) return fmt(value);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')} ${part('hour')}:${part('minute')}:${part('second')}`;
 }
 export function userRole(row: Row) {
   return String(row.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor', maintenance: 'technician', inspector: 'reporter' } as Row)[row.role] || 'reporter');

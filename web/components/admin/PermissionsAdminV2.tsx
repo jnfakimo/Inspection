@@ -23,11 +23,14 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const isAllowed = (role: string, permission: string) => role === 'sysadmin' || Boolean(permissions.find(row => row.role_id === role && row.permission === permission)?.allowed);
   const run = async (action: string, payload: Row, success: string) => {
     setBusy(true); setNote('');
-    try { await invokeAdminApi(action, payload); setNote(success); await load(); }
+    try { await invokeAdminApi(action, payload); await load(); setNote(success); }
     catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
   const filteredUsers = users.filter(user => { const q = query.trim().toLowerCase(); return !q || [user.name, user.username, user.email, user.department, ROLE_LABELS[userRole(user)]].some(value => String(value || '').toLowerCase().includes(q)); });
-  const matrix = (items: ReadonlyArray<readonly [string, string]>) => <div className="responsive-table permission-matrix"><table><thead><tr><th>角色</th>{items.map(item => <th key={item[0]}>{item[1]}</th>)}</tr></thead><tbody>{roles.map(role => <tr key={role.role_id}><td><strong>{role.name}</strong><small>{role.role_id}</small></td>{items.map(item => <td key={item[0]}><input aria-label={`${role.name} ${item[1]}`} type="checkbox" checked={isAllowed(role.role_id, item[0])} disabled={busy || role.role_id === 'sysadmin'} onChange={event => void run('admin_set_permission', { role_id: role.role_id, permission: item[0], allowed: event.target.checked }, '權限已更新')}/></td>)}</tr>)}</tbody></table></div>;
+  const matrix = (items: ReadonlyArray<readonly [string, string]>) => <div className="responsive-table permission-matrix"><table><thead><tr><th>角色</th>{items.map(item => <th key={item[0]}>{item[1]}</th>)}</tr></thead><tbody>{roles.map(role => <tr key={role.role_id}><td><strong>{role.name}</strong><small>{role.role_id}</small></td>{items.map(item => {
+    const reservedAdminAccess = item[0] === 'sys_admin' && role.role_id !== 'sysadmin';
+    return <td key={item[0]}><input aria-label={`${role.name} ${item[1]}`} title={reservedAdminAccess ? '後台管理不可委派給非系統管理員角色' : undefined} type="checkbox" checked={reservedAdminAccess ? false : isAllowed(role.role_id, item[0])} disabled={busy || role.role_id === 'sysadmin' || reservedAdminAccess} onChange={event => void run('admin_set_permission', { role_id: role.role_id, permission: item[0], allowed: event.target.checked }, '權限已更新')}/>{reservedAdminAccess && <small>不可委派</small>}</td>;
+  })}</tr>)}</tbody></table></div>;
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}/>
     <section className="panel admin-panel"><div className="admin-tabs"><button className={tab === 'matrix' ? 'active' : ''} onClick={() => setTab('matrix')}>功能權限矩陣</button><button className={tab === 'systems' ? 'active' : ''} onClick={() => setTab('systems')}>系統存取權限</button><button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>使用者角色指派</button></div>{tab === 'matrix' && matrix(PERMISSIONS)}{tab === 'systems' && matrix(SYSTEM_PERMISSIONS)}

@@ -23,7 +23,8 @@ const MODULES: Record<string, React.ComponentType<{ profile: Profile; module: Mo
 
 export function AdminWorkspace({ profile, module }: { profile: Profile; module: ModuleDefinition }) {
   const role = String(profile.rbac_role || profile.role || '');
-  if (role !== 'sysadmin' && role !== 'admin') return <AppShell profile={profile} title={module.title}><section className="panel admin-access-denied"><h2>無後台管理權限</h2><p>此功能僅供系統管理員使用；如需操作，請聯絡系統管理員調整角色權限。</p></section></AppShell>;
+  const isPersonalNotices = module.key === 'notices';
+  if (!isPersonalNotices && role !== 'sysadmin' && role !== 'admin') return <AppShell profile={profile} title={module.title}><section className="panel admin-access-denied"><h2>無後台管理權限</h2><p>此功能僅供系統管理員使用；如需操作，請聯絡系統管理員調整角色權限。</p></section></AppShell>;
   const Module = MODULES[module.key];
   return Module ? <Module profile={profile} module={module}/> : <AppShell profile={profile} title={module.title}><section className="panel"><p className="empty">找不到此後台模組。</p></section></AppShell>;
 }

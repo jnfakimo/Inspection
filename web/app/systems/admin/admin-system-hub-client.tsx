@@ -38,6 +38,19 @@ function AdminHub({ profile }: { profile: Profile }) {
           </section>
 
           <section className={styles.grid} aria-label="後台管理子系統">
+            <Link
+              className={styles.card}
+              href="/systems/admin/settings/"
+              style={{ '--admin-card-accent': '#00bde8' } as CSSProperties}
+            >
+              <span className={styles.badge}>系統設定</span>
+              <span className={styles.icon} aria-hidden="true">
+                <img src="/word-cloud/assets/system-icons/admin-icon.png" alt="" />
+              </span>
+              <h3>系統設定</h3>
+              <p>系統識別、組織、班別、LINE 推播及整合設定。</p>
+              <b>▶ 開啟設定中心</b>
+            </Link>
             {adminSystem.modules.map((module, index) => {
               const visual = cardVisuals[index] ?? cardVisuals[0];
               const cardStyle = { '--admin-card-accent': visual.accent } as CSSProperties;
