@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
@@ -71,6 +71,9 @@ function display(value: unknown): string {
 }
 function repairStatusLabel(value: unknown): string {
   return ({ pending: '待處理', assigned: '已派工', in_progress: '維修中', pending_review: '待驗收', closed: '已結案', cancelled: '已取消' } as Record<string, string>)[String(value)] || display(value);
+}
+function repairDispatchStatusLabel(value: unknown): string {
+  return ({ pending: '\u5f85\u6d3e\u5de5', assigned: '\u5df2\u6d3e\u5de5', in_progress: '\u7dad\u4fee\u4e2d', pending_review: '\u5f85\u9a57\u6536', closed: '\u5df2\u7d50\u6848', cancelled: '\u5df2\u53d6\u6d88' } as Record<string, string>)[String(value)] || repairStatusLabel(value);
 }
 function repairStatusClass(value: unknown): string {
   return ({ pending: 'pending', assigned: 'assigned', in_progress: 'in-progress', pending_review: 'review', closed: 'closed', cancelled: 'cancelled' } as Record<string, string>)[String(value)] || 'unknown';
@@ -152,6 +155,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         const { error: updateError } = requestId ? await query.eq('request_id', requestId) : await query.eq('req_no', requestNo);
         if (updateError) throw updateError;
         await load();
+        if (isRequestModule || isDispatchModule) void openRepairDetail({ ...row, status });
       } catch (caught) { setError(caught instanceof Error ? `狀態更新失敗：${caught.message}` : '狀態更新失敗'); }
     };
 
@@ -348,7 +352,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setAttachments([]); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {system.key === 'workorder' && module.key === 'requests' && <div className="request-status-chips"><button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button><button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待處理 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button><button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>已派工 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button><button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button><button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button></div>}
         {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <>
-          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{isDispatchModule && <th>派工</th>}{isRequestModule && <th>檢視</th>}</tr>{isRepairTableModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || '')) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
+          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{isDispatchModule && <th>派工</th>}{isRequestModule && <th>檢視</th>}</tr>{isRepairTableModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule || isDispatchModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{isDispatchModule ? repairDispatchStatusLabel(row[column.key]) : repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || '')) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
           {isRequestModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
             <span>每頁 {REQUEST_PAGE_SIZE} 筆，第 {page}／{totalPages} 頁，共 {rows.length} 筆</span>
             <div>
@@ -360,7 +364,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         </>}
       </section>
       {selectedRow && detailRequest && <div className="request-detail-backdrop" role="dialog" aria-modal="true" aria-labelledby="repair-detail-title"><section className="request-detail-modal">
-        <header><h2 id="repair-detail-title"><b>{display(detailRequest.req_no)}</b><span className={`status-pill ${repairStatusClass(detailRequest.status)}`}>{repairStatusLabel(detailRequest.status)}</span></h2><button type="button" onClick={closeRepairDetail} aria-label="關閉案件詳情">×</button></header>
+        <header><h2 id="repair-detail-title"><b>{display(detailRequest.req_no)}</b><span className={`status-pill ${repairStatusClass(detailRequest.status)}`}>{isDispatchModule ? repairDispatchStatusLabel(detailRequest.status) : repairStatusLabel(detailRequest.status)}</span></h2><button type="button" onClick={closeRepairDetail} aria-label="關閉案件詳情">×</button></header>
         {detailLoading && <div className="request-detail-loading">案件資料、附件與流程載入中…</div>}
         {detailError && <div className="request-detail-error" role="alert">{detailError}</div>}
         {!detailLoading && repairDetail && <div className="request-detail-body">
@@ -376,6 +380,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
           </div>
           {repairDetail.attachments.length > 0 && <section className="request-detail-section"><h3>附件</h3><div className="request-detail-attachments">{repairDetail.attachments.map((attachment, index) => { const url = String(attachment.signed_url || ''); const name = String(attachment.file_name || attachment.kind || `附件 ${index + 1}`); const isImage = ['photo', 'location_photo'].includes(String(attachment.kind || '')) || /\.(jpe?g|png|webp|heic)$/i.test(name); return url ? <a key={String(attachment.attach_id || index)} href={url} target="_blank" rel="noopener noreferrer" className={isImage ? 'is-image' : ''}>{isImage ? <img src={url} alt={name} /> : <>📎 {name}</>}</a> : <span key={String(attachment.attach_id || index)}>附件暫時無法開啟：{name}</span>; })}</div></section>}
           <section className="request-detail-section"><h3>處理歷程</h3>{repairDetail.logs.length ? <ol className="request-detail-timeline">{repairDetail.logs.map((log, index) => <li key={String(log.log_id || index)}><strong>{repairTimelineStatusLabel(log.to_status)}</strong>{Boolean(log.note) && <p>{display(log.note)}</p>}<small>{[log.operator_name ? display(log.operator_name) : '', display(log.created_at)].filter(Boolean).join(' · ')}</small></li>)}</ol> : <p className="request-detail-empty">尚無歷程</p>}</section>
+          {isDispatchModule && !detailLoading && <section className="request-detail-section request-dispatch-actions"><h3>{'\u6d3e\u5de5\u64cd\u4f5c'}</h3><div className="dispatch-detail-actions">{String(detailRequest.status || '') === 'pending' && <button type="button" className="dispatch-assign-button" onClick={() => void updateRepairStatus(detailRequest, 'assigned')}>{'\u6d3e\u5de5'}</button>}{!['closed', 'cancelled'].includes(String(detailRequest.status || '')) && <button type="button" className="dispatch-cancel-button" onClick={() => void updateRepairStatus(detailRequest, 'cancelled')}>{'\u53d6\u6d88\u6848\u4ef6'}</button>}</div></section>}
         </div>}
       </section></div>}
       {showCreate && <div className="repair-create-backdrop" role="dialog" aria-modal="true" aria-labelledby="repair-create-title">
@@ -407,3 +412,4 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
   }
   return <AuthGate>{profile => <Workspace profile={profile} />}</AuthGate>;
 }
+
