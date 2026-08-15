@@ -55,14 +55,6 @@ const ORDER_COLUMNS = [
 function taipeiToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 }
-function repairFileKind(file: File): string {
-  if (file.type.startsWith('image/')) return 'photo';
-  if (file.type.startsWith('video/')) return 'video';
-  if (file.type.includes('pdf')) return 'pdf';
-  if (file.type.includes('word') || /\.docx?$/i.test(file.name)) return 'doc';
-  if (file.type.includes('sheet') || /\.xlsx?$/i.test(file.name)) return 'xls';
-  return 'other';
-}
 
 function display(value: unknown): string {
   if (value == null || value === '') return '—';
@@ -118,7 +110,9 @@ function requestTimeLabel(value: unknown): string {
   if (!value) return '—';
   const date = new Date(String(value));
   if (Number.isNaN(date.getTime())) return display(value);
-  return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+  const parts = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}/${part('month')}/${part('day')}`;
 }
 type RequestFilterCellProps = { column: { key: string; label: string }; statusFilter: string; columnFilters: Record<string, string>; columnFilterOptions: Record<string, Array<{ value: string; label: string }>>; setStatusFilter: (value: string) => void; setColumnFilters: (updater: any) => void };
 function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOptions, setStatusFilter, setColumnFilters }: RequestFilterCellProps) {
@@ -140,7 +134,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const canDispatch = ['sysadmin', 'unit_supervisor', 'mgmt_supervisor', 'dispatcher', 'duty'].includes(normalizedRole);
     const canSupervisorAccept = ['sysadmin', 'unit_supervisor', 'mgmt_supervisor'].includes(normalizedRole);
     const reporterLabel = [profile.department, profile.name].filter(Boolean).join(' / ');
-    const emptyRepairForm = () => ({ reporter: reporterLabel, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
+    const [profileContact, setProfileContact] = useState({ phone: '', department: profile.department || '' });
+    const emptyRepairForm = () => ({ reporter: reporterLabel, phone: profileContact.phone, mobile: '', department: profileContact.department, equipment: '', location: '', type: '', urgency: 'normal', description: '' });
     const [data, setData] = useState<ModuleData | null>(null);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
@@ -159,7 +154,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [equipmentOptions, setEquipmentOptions] = useState<RepairEquipmentOption[]>([]);
     const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
     const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
-    const [attachments, setAttachments] = useState<File[]>([]);
+    const [equipmentPhoto, setEquipmentPhoto] = useState<File | null>(null);
     const [formMessage, setFormMessage] = useState('');
     const [dispatchTechnicians, setDispatchTechnicians] = useState<DispatchTechnician[]>([]);
     const [dispatchForm, setDispatchForm] = useState<DispatchForm>({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
@@ -440,13 +435,19 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       void Promise.all([
         client.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
         client.from('departments').select('name').eq('status', 'active').order('sort_order').limit(200),
-      ]).then(([equipmentResult, departmentResult]) => {
+        client.from('users').select('phone,department').eq('user_id', profile.user_id).maybeSingle(),
+      ]).then(([equipmentResult, departmentResult, profileResult]) => {
         if (!active) return;
         if (!equipmentResult.error) setEquipmentOptions((equipmentResult.data || []) as RepairEquipmentOption[]);
         if (!departmentResult.error) setDepartmentOptions((departmentResult.data || []).map(row => String(row.name || '')).filter(Boolean));
+        if (!profileResult.error && profileResult.data) {
+          const contact = { phone: String(profileResult.data.phone || ''), department: String(profileResult.data.department || profile.department || '') };
+          setProfileContact(contact);
+          setForm(current => ({ ...current, phone: current.phone || contact.phone, department: current.department || contact.department }));
+        }
       });
       return () => { active = false; };
-    }, [isRequestModule]);
+    }, [isRequestModule, profile.department, profile.user_id]);
     useEffect(() => {
       if (!data?.table) return;
       const channel = getSupabase().channel(`v2-${system.key}-${module.key}`)
@@ -459,20 +460,24 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       if (!data) return [];
       const needle = query.toLowerCase();
       return data.rows.filter(row => {
+        const rowStatus = String(row.status || '');
         const matchesColumns = Object.entries(columnFilters).every(([key, value]) => {
           if (!value) return true;
           if (key === 'fault_type' || key === 'department' || key === 'urgency') return String(row[key] || '').toLocaleLowerCase().includes(value.toLocaleLowerCase());
           return requestFilterValue(key, row[key]) === value;
         });
-        return matchesColumns && (!statusFilter || String(row.status || '') === statusFilter) && (!needle || Object.values(row).some(value => display(value).toLowerCase().includes(needle)));
+        const statusMatches = !statusFilter || (statusFilter === 'pending' ? ['pending', 'transferred'].includes(rowStatus) : statusFilter === 'returned' ? ['returned', 'rejected'].includes(rowStatus) : rowStatus === statusFilter);
+        const hideClosedByDefault = isRequestModule && !statusFilter && rowStatus === 'closed';
+        return !hideClosedByDefault && matchesColumns && statusMatches && (!needle || Object.values(row).some(value => display(value).toLowerCase().includes(needle)));
       });
-    }, [columnFilters, data, query, statusFilter]);
+    }, [columnFilters, data, isRequestModule, query, statusFilter]);
     const columnFilterOptions = useMemo(() => {
       const options: Record<string, Array<{ value: string; label: string }>> = {};
       for (const column of data?.columns || []) {
         const unique = new Map<string, string>();
         for (const row of data?.rows || []) {
-          const value = requestFilterValue(column.key, row[column.key]);
+          const rawValue = requestFilterValue(column.key, row[column.key]);
+          const value = column.key === 'status' && rawValue === 'transferred' ? 'pending' : column.key === 'status' && rawValue === 'rejected' ? 'returned' : rawValue;
           if (!unique.has(value)) unique.set(value, requestFilterLabel(column.key, value));
         }
         options[column.key] = [...unique].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
@@ -492,10 +497,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const createRepair = async () => {
       if (!form.mobile.trim()) { setFormMessage('請填寫手機號碼'); return; }
       if (!locationPhoto) { setFormMessage('請上傳一張故障位置照片'); return; }
+      if (!equipmentPhoto) { setFormMessage('請上傳一張維修設備照片'); return; }
       if (!form.description.trim()) { setFormMessage('請填寫故障描述'); return; }
-      const permitted = /^(image\/(jpeg|png|webp|heic)|video\/mp4|application\/pdf|application\/(msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet))$/i;
-      const invalidFile = [locationPhoto, ...attachments].find(file => file.size > 10 * 1024 * 1024 || !permitted.test(file.type));
-      if (invalidFile) { setFormMessage(`附件不符合限制：${invalidFile.name}（僅接受指定照片／MP4／PDF／Word／Excel，每檔 10MB）`); return; }
+      const permitted = /^image\/(jpeg|png|webp|heic)$/i;
+      const invalidFile = [locationPhoto, equipmentPhoto].find(file => file.size > 10 * 1024 * 1024 || !permitted.test(file.type));
+      if (invalidFile) { setFormMessage(`照片不符合限制：${invalidFile.name}（僅接受 JPEG／PNG／WebP／HEIC，單檔 10MB）`); return; }
       setSaving(true); setFormMessage('送出中…');
       try {
         const client = getSupabase();
@@ -508,7 +514,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         const reqNo = `${dayKey}-${String(todayCount + 1).padStart(3, '0')}`;
         const faultDesc = [form.location.trim() ? `故障位置：${form.location.trim()}` : '', form.mobile.trim() ? `聯絡手機：${form.mobile.trim()}` : '', `故障描述：${form.description.trim()}`].filter(Boolean).join('\n');
         const selectedEquipment = equipmentOptions.find(item => item.equipment_id === form.equipment);
-        const { error: insertError } = await client.from('repair_requests').insert({ request_id: requestId, req_no: reqNo, source: 'direct', reporter: form.reporter.trim() || profile.name, phone: form.phone.trim() || null, department: form.department.trim() || profile.department || null, equipment_id: form.equipment || null, equipment_category: selectedEquipment?.category || null, fault_location: form.location.trim() || null, fault_type: form.type.trim() || null, urgency: form.urgency, fault_desc: faultDesc, mobile: form.mobile.trim() || null, desired_finish: form.desiredFinish || null, status: 'pending', created_by: profile.user_id });
+        const { error: insertError } = await client.from('repair_requests').insert({ request_id: requestId, req_no: reqNo, source: 'direct', reporter: form.reporter.trim() || profile.name, phone: form.phone.trim() || null, department: form.department.trim() || profile.department || null, equipment_id: form.equipment || null, equipment_category: selectedEquipment?.category || null, fault_location: form.location.trim() || null, fault_type: form.type.trim() || null, urgency: form.urgency, fault_desc: faultDesc, mobile: form.mobile.trim() || null, status: 'pending', created_by: profile.user_id });
         if (insertError) throw new Error(insertError.message);
         const initialLog = await client.from('case_status_log').insert({ request_id: requestId, order_id: null, from_status: null, to_status: 'pending', note: '報修人建立報修', operator_id: profile.user_id, operator_name: profile.name });
         if (initialLog.error) console.warn('建立報修歷程失敗', initialLog.error.message);
@@ -517,15 +523,13 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         if (upload.error) throw new Error(`故障位置照片上傳失敗：${upload.error.message}`);
         const photoRecord = await client.from('repair_attachments').insert({ request_id: requestId, kind: 'location_photo', file_path: photoPath, file_name: locationPhoto.name, uploaded_by: profile.user_id });
         if (photoRecord.error) { await client.storage.from('repair-files').remove([photoPath]); throw new Error(`照片紀錄失敗：${photoRecord.error.message}`); }
-        for (const file of attachments) {
-          const path = `${requestId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-          const uploadFile = await client.storage.from('repair-files').upload(path, file, { upsert: true, contentType: file.type || 'application/octet-stream' });
-          if (uploadFile.error) throw new Error(`附件上傳失敗：${file.name}`);
-          const fileRecord = await client.from('repair_attachments').insert({ request_id: requestId, kind: repairFileKind(file), file_path: path, file_name: file.name, uploaded_by: profile.user_id });
-          if (fileRecord.error) { await client.storage.from('repair-files').remove([path]); throw new Error(`附件紀錄失敗：${file.name}`); }
-        }
+        const equipmentPath = `${requestId}/${Date.now()}_equipment.${equipmentPhoto.name.split('.').pop() || 'jpg'}`;
+        const equipmentUpload = await client.storage.from('repair-files').upload(equipmentPath, equipmentPhoto, { upsert: true, contentType: equipmentPhoto.type || 'image/jpeg' });
+        if (equipmentUpload.error) throw new Error(`維修設備照片上傳失敗：${equipmentUpload.error.message}`);
+        const equipmentRecord = await client.from('repair_attachments').insert({ request_id: requestId, kind: 'equipment_photo', file_path: equipmentPath, file_name: equipmentPhoto.name, uploaded_by: profile.user_id });
+        if (equipmentRecord.error) { await client.storage.from('repair-files').remove([equipmentPath]); throw new Error(`維修設備照片紀錄失敗：${equipmentRecord.error.message}`); }
         setForm(emptyRepairForm());
-        setLocationPhoto(null); setAttachments([]);
+        setLocationPhoto(null); setEquipmentPhoto(null);
         setShowCreate(false); setFormMessage(''); await load();
       } catch (caught) { setFormMessage(caught instanceof Error ? `送出失敗：${caught.message}` : '送出失敗，請稍後再試'); }
       finally { setSaving(false); }
@@ -553,10 +557,10 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
       {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
       <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : isDispatchModule ? 'dispatch-v1-table' : ''}`}>
-        <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setAttachments([]); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
+        <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setEquipmentPhoto(null); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {isRequestModule && <div className="request-status-chips">
-          <button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button>
-          <button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待主管派工 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button>
+          <button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.filter(row => row.status !== 'closed').length || 0}</b></button>
+          <button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待主管派工 <b>{data?.rows.filter(row => ['pending', 'transferred'].includes(String(row.status))).length || 0}</b></button>
           <button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>待接單 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button>
           <button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button>
           <button className={statusFilter === 'pending_review' ? 'active' : ''} onClick={() => setStatusFilter('pending_review')}>待報修人驗收 <b>{data?.rows.filter(row => row.status === 'pending_review').length || 0}</b></button>
@@ -618,7 +622,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             {detailOrder && <div className="full"><span>派工：</span><strong>{display(detailOrder.wo_no)} · 技師 {display(detailAssignee.name)}{detailOrder.vendor ? ` · 委外 ${display(detailOrder.vendor)}` : ''}</strong></div>}
             {detailOrder && Boolean(detailOrder.fault_cause) && <div className="full"><span>維修結果：</span><p>{[detailOrder.fault_cause, detailOrder.handle_method, detailOrder.parts_used ? `更換：${display(detailOrder.parts_used)}` : '', detailOrder.labor_hours ? `工時：${display(detailOrder.labor_hours)}h` : ''].filter(Boolean).map(display).join('｜')}</p></div>}
           </div>
-          {repairDetail.attachments.length > 0 && <section className="request-detail-section"><h3>附件</h3><div className="request-detail-attachments">{repairDetail.attachments.map((attachment, index) => { const url = String(attachment.signed_url || ''); const name = String(attachment.file_name || attachment.kind || `附件 ${index + 1}`); const isImage = ['photo', 'location_photo'].includes(String(attachment.kind || '')) || /\.(jpe?g|png|webp|heic)$/i.test(name); return url ? <a key={String(attachment.attach_id || index)} href={url} target="_blank" rel="noopener noreferrer" className={isImage ? 'is-image' : ''}>{isImage ? <img src={url} alt={name} /> : <>📎 {name}</>}</a> : <span key={String(attachment.attach_id || index)}>附件暫時無法開啟：{name}</span>; })}</div></section>}
+          {repairDetail.attachments.length > 0 && <section className="request-detail-section"><h3>附件</h3><div className="request-detail-attachments">{repairDetail.attachments.map((attachment, index) => { const url = String(attachment.signed_url || ''); const name = String(attachment.file_name || attachment.kind || `附件 ${index + 1}`); const isImage = ['photo', 'location_photo', 'equipment_photo'].includes(String(attachment.kind || '')) || /\.(jpe?g|png|webp|heic)$/i.test(name); return url ? <a key={String(attachment.attach_id || index)} href={url} target="_blank" rel="noopener noreferrer" className={isImage ? 'is-image' : ''}>{isImage ? <img src={url} alt={name} /> : <>📎 {name}</>}</a> : <span key={String(attachment.attach_id || index)}>附件暫時無法開啟：{name}</span>; })}</div></section>}
           <section className="request-detail-section"><h3>處理歷程</h3>{repairDetail.logs.length ? <ol className="request-detail-timeline">{repairDetail.logs.map((log, index) => <li key={String(log.log_id || index)}><strong>{repairTimelineStatusLabel(log.to_status)}</strong>{Boolean(log.note) && <p>{display(log.note)}</p>}<small>{[log.operator_name ? display(log.operator_name) : '', display(log.created_at)].filter(Boolean).join(' · ')}</small></li>)}</ol> : <p className="request-detail-empty">尚無歷程</p>}</section>
           {isRepairTableModule && !detailLoading && <section className="request-detail-section request-dispatch-actions">
             <h3>維修流程</h3>
@@ -683,10 +687,9 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             <label className="repair-form-field">關聯設備（選填）<select value={form.equipment} onChange={e => { const equipmentId = e.target.value; const selected = equipmentOptions.find(item => item.equipment_id === equipmentId); setForm(current => ({ ...current, equipment: equipmentId, location: current.location.trim() || selected?.location || '' })); }}><option value="">-- 未指定設備 --</option>{equipmentOptions.map(item => <option key={item.equipment_id} value={item.equipment_id}>{item.asset_code ? `${item.asset_code}｜` : ''}{item.name}</option>)}</select></label>
             <label className="repair-form-field">故障位置<input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="請描述故障位置，例如：第一市場 2F 配電盤旁" /></label>
             <label className="repair-form-field">故障位置照片（必填，請上傳一張照片）<input required type="file" accept="image/*" onChange={e => setLocationPhoto(e.target.files?.[0] || null)} /></label>
-            <label className="repair-form-field">故障類型<input list="repair-fault-type-list" value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} placeholder="電氣／機械／漏水…" /><datalist id="repair-fault-type-list"><option value="電氣" /><option value="機械" /><option value="漏水" /><option value="異音" /><option value="停機" /><option value="其他" /></datalist></label>
+            <label className="repair-form-field">故障類型<select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option value="">-- 請選擇故障類型 --</option><option value="電氣">電氣</option><option value="機械">機械</option><option value="漏水">漏水</option><option value="異音">異音</option><option value="停機">停機</option><option value="其他">其他</option></select></label>
             <label className="repair-form-field">故障描述<textarea required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="請描述故障狀況…" /></label>
-            <label className="repair-form-field">希望完成日期<input type="date" value={form.desiredFinish} onChange={e => setForm({ ...form, desiredFinish: e.target.value })} /></label>
-            <label className="repair-form-field">其他附件（照片／影片／PDF／Word／Excel，可多選）<input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={e => setAttachments(Array.from(e.target.files || []))} /></label>
+            <label className="repair-form-field">維修設備照片（必填，請上傳一張照片）<input required type="file" accept="image/*" onChange={e => setEquipmentPhoto(e.target.files?.[0] || null)} /></label>
             <div className={`repair-form-message ${formMessage ? 'show' : ''}`} role="status">{formMessage}</div>
             <button type="button" className="repair-submit-button" disabled={saving} onClick={createRepair}>{saving ? '送出中…' : '送出報修'}</button>
           </div>
