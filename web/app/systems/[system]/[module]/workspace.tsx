@@ -19,6 +19,7 @@ type ModuleData = {
 type RepairEquipmentOption = { equipment_id: string; name: string; asset_code?: string | null; location?: string | null; category?: string | null };
 type DispatchTechnician = { user_id: string; name: string; department?: string | null };
 type DispatchForm = { technician: string; vendor: string; expectedArrival: string; expectedFinish: string; workContent: string; needShutdown: boolean; needApproval: boolean };
+type CompletionForm = { faultCause: string; handleMethod: string; partsUsed: string; materials: string; laborHours: string; note: string };
 type RepairDetail = {
   request: Record<string, unknown>;
   order: Record<string, unknown> | null;
@@ -43,7 +44,14 @@ const DISPATCH_COLUMNS = [
   { key: 'status', label: '狀態' },
   { key: 'assignee_name', label: '指派人員' },
 ];
-
+const ORDER_COLUMNS = [
+  { key: 'req_no', label: '報修單號' },
+  { key: 'fault_type', label: '故障類型' },
+  { key: 'department', label: '單位' },
+  { key: 'assignee_name', label: '維修人員' },
+  { key: 'status', label: '流程狀態' },
+  { key: 'desired_finish', label: '希望完成' },
+];
 function taipeiToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 }
@@ -72,16 +80,19 @@ function display(value: unknown): string {
   return zhValue(raw);
 }
 function repairStatusLabel(value: unknown): string {
-  return ({ pending: '待處理', assigned: '已派工', in_progress: '維修中', pending_review: '待驗收', closed: '已結案', cancelled: '已取消' } as Record<string, string>)[String(value)] || display(value);
-}
-function repairDispatchStatusLabel(value: unknown): string {
-  return ({ pending: '\u5f85\u6d3e\u5de5', assigned: '\u5df2\u6d3e\u5de5', in_progress: '\u7dad\u4fee\u4e2d', pending_review: '\u5f85\u9a57\u6536', closed: '\u5df2\u7d50\u6848', cancelled: '\u5df2\u53d6\u6d88' } as Record<string, string>)[String(value)] || repairStatusLabel(value);
+  return ({ pending: '待主管派工', transferred: '待主管派工', assigned: '待工程師接單', in_progress: '維修中', waiting_parts: '等待料件', waiting_vendor: '等待廠商', pending_review: '待報修人驗收', completed: '待主管驗收', closed: '已結案', returned: '待重新派工', rejected: '待重新派工', cancelled: '已取消' } as Record<string, string>)[String(value)] || display(value);
 }
 function repairStatusClass(value: unknown): string {
-  return ({ pending: 'pending', assigned: 'assigned', in_progress: 'in-progress', pending_review: 'review', closed: 'closed', cancelled: 'cancelled' } as Record<string, string>)[String(value)] || 'unknown';
+  return ({ pending: 'pending', transferred: 'pending', assigned: 'assigned', accepted: 'assigned', in_progress: 'in-progress', waiting_parts: 'in-progress', waiting_vendor: 'in-progress', pending_review: 'review', completed: 'review', closed: 'closed', returned: 'pending', rejected: 'cancelled', cancelled: 'cancelled' } as Record<string, string>)[String(value)] || 'unknown';
 }
 function repairTimelineStatusLabel(value: unknown): string {
-  return ({ pending: '待派工', transferred: '已轉派', assigned: '待接單', accepted: '已接單', in_progress: '維修中', waiting_parts: '等待料件', waiting_vendor: '等待廠商', pending_review: '待驗收', completed: '已完成', closed: '已結案', returned: '已退回', rejected: '已拒絕', cancelled: '已取消', overdue: '已逾期' } as Record<string, string>)[String(value)] || display(value);
+  return ({ pending: '報修人建立報修', transferred: '轉交主管派工', assigned: '主管完成派工', accepted: '工程師接單', in_progress: '工程師開始維修', waiting_parts: '等待料件', waiting_vendor: '等待廠商', pending_review: '工程師完工，待報修人驗收', reporter_accepted: '報修人驗收通過', completed: '報修人驗收通過，待主管驗收', supervisor_accepted: '主管驗收通過', closed: '主管驗收結案', returned: '退回重新派工', rejected: '工程師拒絕接單', cancelled: '案件已取消', overdue: '案件已逾期' } as Record<string, string>)[String(value)] || display(value);
+}
+function repairWorkflowStatusLabel(row: Record<string, unknown>, order?: Record<string, unknown> | null): string {
+  const status = String(row.status || 'pending');
+  const orderStatus = String(order?.status || row.order_status || '');
+  if (status === 'assigned' && orderStatus === 'accepted') return '工程師已接單';
+  return repairStatusLabel(status);
 }
 function recordValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -94,7 +105,7 @@ function repairDate(value: unknown): string {
 function requestFilterValue(key: string, value: unknown): string {
   if (value == null || value === '') return EMPTY_FILTER_VALUE;
   const raw = String(value);
-  return key === 'created_at' ? raw.slice(0, 10) : raw;
+  return key === 'created_at' || key === 'desired_finish' ? raw.slice(0, 10) : raw;
 }
 function requestFilterLabel(key: string, value: string): string {
   if (value === EMPTY_FILTER_VALUE) return '未填寫';
@@ -115,7 +126,7 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
   const options = (columnFilterOptions[column.key] || []).filter(option => option.value !== EMPTY_FILTER_VALUE);
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
   if (column.key === 'fault_type' || column.key === 'department' || column.key === 'urgency') { const listId = 'request-' + column.key + '-filter-list'; return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : column.key === 'department' ? '全部單位' : '全部急迫性'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; }
-  if (column.key === 'created_at') return <th><input className='request-filter-date' type='date' value={columnFilters.created_at || ''} onChange={event => update(event.target.value)} aria-label='依報修時間篩選' /></th>;
+  if (column.key === 'created_at' || column.key === 'desired_finish') return <th><input className='request-filter-date' type='date' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
   return <th><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''>全部狀態</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
 }
 
@@ -123,7 +134,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
   function Workspace({ profile }: { profile: Profile }) {
     const isRequestModule = system.key === 'workorder' && module.key === 'requests';
     const isDispatchModule = system.key === 'workorder' && module.key === 'dispatch';
-    const isRepairTableModule = isRequestModule || isDispatchModule;
+    const isOrdersModule = system.key === 'workorder' && module.key === 'orders';
+    const isRepairTableModule = isRequestModule || isDispatchModule || isOrdersModule;
+    const normalizedRole = ({ admin: 'sysadmin', supervisor: 'unit_supervisor', maintenance: 'technician', inspector: 'reporter' } as Record<string, string>)[String(profile.rbac_role || profile.role || '')] || String(profile.rbac_role || profile.role || 'reporter');
+    const canDispatch = ['sysadmin', 'unit_supervisor', 'mgmt_supervisor', 'dispatcher', 'duty'].includes(normalizedRole);
+    const canSupervisorAccept = ['sysadmin', 'unit_supervisor', 'mgmt_supervisor'].includes(normalizedRole);
     const reporterLabel = [profile.department, profile.name].filter(Boolean).join(' / ');
     const emptyRepairForm = () => ({ reporter: reporterLabel, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
     const [data, setData] = useState<ModuleData | null>(null);
@@ -146,28 +161,27 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
     const [attachments, setAttachments] = useState<File[]>([]);
     const [formMessage, setFormMessage] = useState('');
-const [dispatchTechnicians, setDispatchTechnicians] = useState<DispatchTechnician[]>([]);
+    const [dispatchTechnicians, setDispatchTechnicians] = useState<DispatchTechnician[]>([]);
     const [dispatchForm, setDispatchForm] = useState<DispatchForm>({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
     const [showDispatchForm, setShowDispatchForm] = useState(false);
+    const [completionForm, setCompletionForm] = useState<CompletionForm>({ faultCause: '', handleMethod: '', partsUsed: '', materials: '', laborHours: '', note: '' });
+    const [showCompletionForm, setShowCompletionForm] = useState(false);
     const [dispatchSaving, setDispatchSaving] = useState(false);
     const [dispatchMessage, setDispatchMessage] = useState('');
-
-    const updateRepairStatus = async (row: Record<string, unknown>, status: string) => {
-      const requestId = String(row.request_id || row.id || '');
-      const requestNo = String(row.req_no || '');
-      if (!requestId && !requestNo) return;
-      setError('');
-      try {
-        const query = getSupabase().from('repair_requests').update({ status, updated_at: new Date().toISOString() });
-        const { error: updateError } = requestId ? await query.eq('request_id', requestId) : await query.eq('req_no', requestNo);
-        if (updateError) throw updateError;
-        await load();
-        if (isRequestModule || isDispatchModule) void openRepairDetail({ ...row, status });
-      } catch (caught) { setError(caught instanceof Error ? `狀態更新失敗：${caught.message}` : '狀態更新失敗'); }
+    const nextRepairAction = (row: Record<string, unknown>): string => {
+      const status = String(row.status || 'pending');
+      const orderStatus = String(row.order_status || '');
+      if (!row.order_id && !['closed', 'cancelled'].includes(status)) return status === 'pending' ? '派工' : '補建派工';
+      if (['pending', 'transferred', 'returned', 'rejected'].includes(status)) return '派工';
+      if (status === 'assigned' && orderStatus === 'accepted') return '開始維修';
+      if (status === 'assigned') return '接單';
+      if (status === 'in_progress') return '完工';
+      if (status === 'pending_review') return '報修人驗收';
+      if (status === 'completed') return '主管驗收';
+      return '檢視';
     };
-
-    const nextRepairAction = (status: string) => ({ pending: ['assigned', '\u6d3e\u5de5'], assigned: ['in_progress', '\u958b\u59cb\u8655\u7406'], in_progress: ['pending_review', '\u9001\u9a57\u6536'], pending_review: ['closed', '\u7d50\u6848'] } as Record<string, [string, string]>)[status];
-const startDispatch = () => {
+    const startDispatch = () => {
+      if (!canDispatch) { setDispatchMessage('僅限主管或派工管理人員派工'); return; }
       const current = repairDetail?.request || selectedRow || {};
       setDispatchForm({ technician: String(current.assignee_id || ''), vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
       setDispatchMessage('');
@@ -203,6 +217,7 @@ const startDispatch = () => {
       const requestId = String(current.request_id || current.id || '');
       const technician = dispatchForm.technician.trim();
       const vendor = dispatchForm.vendor.trim();
+      if (!canDispatch) { setDispatchMessage('僅限主管或派工管理人員派工'); return; }
       if (!requestId) { setDispatchMessage('\u6848\u4ef6\u7f3a\u5c11 request_id'); return; }
       if (!technician && !vendor) { setDispatchMessage('\u8acb\u9078\u64c7\u7dad\u4fee\u4eba\u54e1\u6216\u586b\u5beb\u59d4\u5916\u5ee0\u5546'); return; }
       const toIso = (value: string) => { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
@@ -231,12 +246,98 @@ const startDispatch = () => {
       }
     };
 
+    const openCompletionForm = () => {
+      const order = repairDetail?.order;
+      setCompletionForm({
+        faultCause: String(order?.fault_cause || ''),
+        handleMethod: String(order?.handle_method || order?.result_desc || ''),
+        partsUsed: String(order?.parts_used || ''),
+        materials: String(order?.materials || ''),
+        laborHours: order?.labor_hours == null ? '' : String(order.labor_hours),
+        note: String(order?.note || ''),
+      });
+      setDispatchMessage('');
+      setShowCompletionForm(true);
+    };
+
+    const completeRepair = async () => {
+      const current = repairDetail?.request;
+      const order = repairDetail?.order;
+      const requestId = String(current?.request_id || '');
+      const orderId = String(order?.order_id || '');
+      if (!requestId || !orderId) { setDispatchMessage('找不到報修案件或維修工單'); return; }
+      if (!completionForm.faultCause.trim()) { setDispatchMessage('請填寫故障原因'); return; }
+      if (!completionForm.handleMethod.trim()) { setDispatchMessage('請填寫處理方式'); return; }
+      setDispatchSaving(true);
+      setDispatchMessage('');
+      try {
+        const client = getSupabase();
+        const now = new Date().toISOString();
+        const laborHours = completionForm.laborHours.trim() ? Number(completionForm.laborHours) : null;
+        if (laborHours != null && (!Number.isFinite(laborHours) || laborHours < 0)) throw new Error('工時必須是零以上的數字');
+        const orderResult = await client.from('maintenance_orders').update({
+          status: 'pending_review', finish_time: now, fault_cause: completionForm.faultCause.trim(),
+          handle_method: completionForm.handleMethod.trim(), result_desc: completionForm.handleMethod.trim(),
+          parts_used: completionForm.partsUsed.trim() || null, materials: completionForm.materials.trim() || null,
+          labor_hours: laborHours, note: completionForm.note.trim() || null, updated_at: now,
+        }).eq('order_id', orderId);
+        if (orderResult.error) throw orderResult.error;
+        const requestResult = await client.from('repair_requests').update({ status: 'pending_review', updated_at: now }).eq('request_id', requestId);
+        if (requestResult.error) throw requestResult.error;
+        const logResult = await client.from('case_status_log').insert({ request_id: requestId, order_id: orderId, from_status: String(order?.status || 'in_progress'), to_status: 'pending_review', note: `維修完成：${completionForm.handleMethod.trim()}`, operator_id: profile.user_id, operator_name: profile.name });
+        if (logResult.error) throw logResult.error;
+        setShowCompletionForm(false);
+        await load();
+        void openRepairDetail({ ...current, status: 'pending_review' });
+      } catch (caught) {
+        setDispatchMessage(caught instanceof Error ? `完工回報失敗：${caught.message}` : '完工回報失敗');
+      } finally {
+        setDispatchSaving(false);
+      }
+    };
+
+    const acceptByReporter = async () => {
+      const current = repairDetail?.request;
+      const requestId = String(current?.request_id || '');
+      if (!current || !requestId || String(current.status) !== 'pending_review') return;
+      const isOwner = String(current.created_by || '') === profile.user_id;
+      if (!isOwner && normalizedRole !== 'sysadmin') { setDispatchMessage('僅限原報修人進行本階段驗收'); return; }
+      setDispatchSaving(true);
+      setDispatchMessage('');
+      try {
+        const client = getSupabase();
+        const now = new Date().toISOString();
+        const requestResult = await client.from('repair_requests').update({ status: 'completed', updated_at: now }).eq('request_id', requestId);
+        if (requestResult.error) throw requestResult.error;
+        const logResult = await client.from('case_status_log').insert({ request_id: requestId, order_id: repairDetail?.order?.order_id || null, from_status: 'pending_review', to_status: 'completed', note: '報修人驗收通過，送主管驗收', operator_id: profile.user_id, operator_name: profile.name });
+        if (logResult.error) throw logResult.error;
+        await load();
+        void openRepairDetail({ ...current, status: 'completed' });
+      } catch (caught) {
+        setDispatchMessage(caught instanceof Error ? `報修人驗收失敗：${caught.message}` : '報修人驗收失敗');
+      } finally {
+        setDispatchSaving(false);
+      }
+    };
+
+    const acceptBySupervisor = async () => {
+      const current = repairDetail?.request;
+      if (!current || String(current.status) !== 'completed') return;
+      if (!canSupervisorAccept) { setDispatchMessage('僅限主管進行最終驗收'); return; }
+      setDispatchSaving(true);
+      setDispatchMessage('');
+      await transitionRepair(current, 'closed', '主管驗收通過，案件結案', { accept_status: 'accepted' }, 'closed');
+      setDispatchSaving(false);
+    };
     const closeRepairDetail = () => {
       detailRequestSeq.current += 1;
       setSelectedRow(null);
       setRepairDetail(null);
       setDetailError('');
       setDetailLoading(false);
+      setShowDispatchForm(false);
+      setShowCompletionForm(false);
+      setDispatchMessage('');
     };
 
     const openRepairDetail = async (row: Record<string, unknown>) => {
@@ -245,6 +346,9 @@ const startDispatch = () => {
       setRepairDetail(null);
       setDetailError('');
       setDetailLoading(true);
+      setShowDispatchForm(false);
+      setShowCompletionForm(false);
+      setDispatchMessage('');
       try {
         const client = getSupabase();
         const requestId = String(row.request_id || row.id || '');
@@ -287,35 +391,48 @@ const startDispatch = () => {
       try {
         const moduleData = await invokeAppApi<ModuleData>('module_data', { system: system.key, module: module.key });
         if (isRepairTableModule) {
-          const direct = await getSupabase().from('repair_requests').select('*').order('updated_at', { ascending: false }).limit(500);
-          let repairRows = (direct.error || !direct.data?.length ? moduleData.rows : direct.data) as Array<Record<string, unknown>>;
-          if (isDispatchModule && repairRows.length) {
-            const ids = [...new Set(repairRows.map(row => String(row.assignee_id || '')).filter(Boolean))];
-            if (ids.length) {
-              const people = await getSupabase().from('users').select('user_id,name').in('user_id', ids);
-              const names = new Map((people.data || []).map(person => [String(person.user_id), String(person.name || '')]));
-              repairRows = repairRows.map(row => ({ ...row, assignee_name: names.get(String(row.assignee_id || '')) || (row.assignee_id ? display(row.assignee_id) : '') }));
+          const client = getSupabase();
+          const direct = await client.from('repair_requests').select('*').order('updated_at', { ascending: false }).limit(500);
+          let repairRows = (direct.error ? moduleData.rows : direct.data || []) as Array<Record<string, unknown>>;
+          if ((isDispatchModule || isOrdersModule) && repairRows.length) {
+            const requestIds = [...new Set(repairRows.map(row => String(row.request_id || '')).filter(Boolean))];
+            const orderResult = requestIds.length
+              ? await client.from('maintenance_orders').select('order_id,request_id,assignee_id,status,created_at').in('request_id', requestIds).order('created_at', { ascending: false }).limit(1000)
+              : { data: [], error: null };
+            const latestOrders = new Map<string, Record<string, unknown>>();
+            for (const order of (orderResult.data || []) as Array<Record<string, unknown>>) {
+              const requestId = String(order.request_id || '');
+              if (requestId && !latestOrders.has(requestId)) latestOrders.set(requestId, order);
             }
+            const assigneeIds = [...new Set([...latestOrders.values()].map(order => String(order.assignee_id || '')).filter(Boolean))];
+            const people = assigneeIds.length ? await client.from('users').select('user_id,name').in('user_id', assigneeIds) : { data: [], error: null };
+            const names = new Map((people.data || []).map(person => [String(person.user_id), String(person.name || '')]));
+            repairRows = repairRows.map(row => {
+              const order = latestOrders.get(String(row.request_id || ''));
+              const assigneeId = String(order?.assignee_id || row.assignee_id || '');
+              return { ...row, order_id: order?.order_id || null, order_status: order?.status || null, assignee_id: assigneeId || null, assignee_name: names.get(assigneeId) || '' };
+            });
           }
-          setData({ ...moduleData, columns: isDispatchModule ? DISPATCH_COLUMNS : REQUEST_COLUMNS, rows: repairRows });
+          setData({ ...moduleData, columns: isDispatchModule ? DISPATCH_COLUMNS : isOrdersModule ? ORDER_COLUMNS : REQUEST_COLUMNS, rows: repairRows });
         } else { setData(moduleData); }
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : '資料讀取失敗');
       } finally {
         setSyncing(false);
       }
-    }, [isRequestModule, module.key, system.key]);
+    }, [isDispatchModule, isOrdersModule, isRepairTableModule, module.key, system.key]);
 
     useEffect(() => { load(); }, [load]);
-useEffect(() => {
-      if (!isDispatchModule) return;
+    useEffect(() => {
+      if (!isDispatchModule && !isOrdersModule) return;
       let active = true;
-      void getSupabase().from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(500).then(result => {
+      void getSupabase().from('users').select('user_id,name,department,role,rbac_role').eq('status', 'active').order('name').limit(500).then(result => {
         if (!active || result.error) return;
-        setDispatchTechnicians((result.data || []).map(row => ({ user_id: String(row.user_id || ''), name: String(row.name || ''), department: String(row.department || '') || null })).filter(row => row.user_id && row.name));
+        const technicianRoles = new Set(['technician', 'maintenance']);
+        setDispatchTechnicians((result.data || []).filter(row => technicianRoles.has(String(row.rbac_role || row.role || ''))).map(row => ({ user_id: String(row.user_id || ''), name: String(row.name || ''), department: String(row.department || '') || null })).filter(row => row.user_id && row.name));
       });
       return () => { active = false; };
-    }, [isDispatchModule]);
+    }, [isDispatchModule, isOrdersModule]);
     useEffect(() => {
       if (!isRequestModule) return;
       let active = true;
@@ -393,6 +510,8 @@ useEffect(() => {
         const selectedEquipment = equipmentOptions.find(item => item.equipment_id === form.equipment);
         const { error: insertError } = await client.from('repair_requests').insert({ request_id: requestId, req_no: reqNo, source: 'direct', reporter: form.reporter.trim() || profile.name, phone: form.phone.trim() || null, department: form.department.trim() || profile.department || null, equipment_id: form.equipment || null, equipment_category: selectedEquipment?.category || null, fault_location: form.location.trim() || null, fault_type: form.type.trim() || null, urgency: form.urgency, fault_desc: faultDesc, mobile: form.mobile.trim() || null, desired_finish: form.desiredFinish || null, status: 'pending', created_by: profile.user_id });
         if (insertError) throw new Error(insertError.message);
+        const initialLog = await client.from('case_status_log').insert({ request_id: requestId, order_id: null, from_status: null, to_status: 'pending', note: '報修人建立報修', operator_id: profile.user_id, operator_name: profile.name });
+        if (initialLog.error) console.warn('建立報修歷程失敗', initialLog.error.message);
         const photoPath = `${requestId}/${Date.now()}_location.${locationPhoto.name.split('.').pop() || 'jpg'}`;
         const upload = await client.storage.from('repair-files').upload(photoPath, locationPhoto, { upsert: true, contentType: locationPhoto.type || 'image/jpeg' });
         if (upload.error) throw new Error(`故障位置照片上傳失敗：${upload.error.message}`);
@@ -416,11 +535,17 @@ useEffect(() => {
     const detailEquipment = recordValue(detailRequest?.equipment);
     const detailOrder = repairDetail?.order;
     const detailAssignee = recordValue(detailOrder?.users);
+    const detailStatus = String(detailRequest?.status || 'pending');
+    const detailOrderStatus = String(detailOrder?.status || '');
+    const canEngineerAct = normalizedRole === 'sysadmin' || (normalizedRole === 'technician' && String(detailOrder?.assignee_id || '') === profile.user_id);
+    const canReporterAccept = normalizedRole === 'sysadmin' || String(detailRequest?.created_by || '') === profile.user_id;
+    const workflowSteps = ['報修', '主管派工', '工程師接單', '完工', '報修人驗收', '主管驗收'];
+    const workflowIndex = detailStatus === 'closed' ? 5 : detailStatus === 'completed' ? 5 : detailStatus === 'pending_review' ? 4 : detailStatus === 'in_progress' ? 3 : detailStatus === 'assigned' && detailOrderStatus === 'accepted' ? 3 : detailStatus === 'assigned' ? 2 : 1;
 
     return <AppShell profile={profile} title={module.title}>
       <div className="page-actions">
         <div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div>
-        {!isRequestModule && !isDispatchModule && <div className="action-cluster">
+        {!isRepairTableModule && <div className="action-cluster">
           {module.legacy && <a className="secondary-btn" href={`${LEGACY_BASE}/${module.legacy}`}>專業圖臺／進階作業</a>}
           <button className="primary-btn compact" onClick={load} disabled={syncing}>{syncing ? '同步中…' : '重新同步'}</button>
         </div>}
@@ -429,9 +554,45 @@ useEffect(() => {
       {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
       <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : isDispatchModule ? 'dispatch-v1-table' : ''}`}>
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setAttachments([]); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
-        {system.key === 'workorder' && module.key === 'requests' && <div className="request-status-chips"><button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button><button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待處理 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button><button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>已派工 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button><button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button><button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button></div>}
-        {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <>
-          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{isDispatchModule && <th>派工</th>}{isRequestModule && <th>檢視</th>}</tr>{isRepairTableModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule || isDispatchModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{isDispatchModule ? repairDispatchStatusLabel(row[column.key]) : repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || '')) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (isDispatchModule) void openRepairDetail(row); else if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
+        {isRequestModule && <div className="request-status-chips">
+          <button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button>
+          <button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待主管派工 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button>
+          <button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>待接單 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button>
+          <button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button>
+          <button className={statusFilter === 'pending_review' ? 'active' : ''} onClick={() => setStatusFilter('pending_review')}>待報修人驗收 <b>{data?.rows.filter(row => row.status === 'pending_review').length || 0}</b></button>
+          <button className={statusFilter === 'completed' ? 'active' : ''} onClick={() => setStatusFilter('completed')}>待主管驗收 <b>{data?.rows.filter(row => row.status === 'completed').length || 0}</b></button>
+          <button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button>
+        </div>}        {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <>
+          <div className="responsive-table">
+            <table>
+              <thead>
+                <tr>
+                  {data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}
+                  {isDispatchModule && <th>派工</th>}
+                  {isOrdersModule && <th>處理</th>}
+                  {isRequestModule && <th>檢視</th>}
+                </tr>
+                {isRepairTableModule && <tr className="request-column-filters">
+                  {data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}
+                  <th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th>
+                </tr>}
+              </thead>
+              <tbody>{visibleRows.map((row, index) => {
+                const action = nextRepairAction(row);
+                return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRepairTableModule) void openRepairDetail(row); }}>
+                  {data?.columns.map(column => <td key={column.key}>{column.key === 'status'
+                    ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{repairWorkflowStatusLabel(row)}</span>
+                    : column.key === 'created_at' ? requestTimeLabel(row[column.key])
+                    : column.key === 'desired_finish' ? repairDate(row[column.key])
+                    : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || ''))
+                    : display(row[column.key])}</td>)}
+                  {(isDispatchModule || isOrdersModule) && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); void openRepairDetail(row); }}>{action}</button></td>}
+                  {isRequestModule && <td className="request-view-link">檢視 ›</td>}
+                </tr>;
+              })}</tbody>
+            </table>
+            {data && rows.length === 0 && <p className="empty">查無資料</p>}
+          </div>
           {isRequestModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
             <span>每頁 {REQUEST_PAGE_SIZE} 筆，第 {page}／{totalPages} 頁，共 {rows.length} 筆</span>
             <div>
@@ -443,7 +604,7 @@ useEffect(() => {
         </>}
       </section>
       {selectedRow && detailRequest && <div className="request-detail-backdrop" role="dialog" aria-modal="true" aria-labelledby="repair-detail-title"><section className="request-detail-modal">
-        <header><h2 id="repair-detail-title"><b>{display(detailRequest.req_no)}</b><span className={`status-pill ${repairStatusClass(detailRequest.status)}`}>{isDispatchModule ? repairDispatchStatusLabel(detailRequest.status) : repairStatusLabel(detailRequest.status)}</span></h2><button type="button" onClick={closeRepairDetail} aria-label="關閉案件詳情">×</button></header>
+        <header><h2 id="repair-detail-title"><b>{display(detailRequest.req_no)}</b><span className={`status-pill ${repairStatusClass(detailRequest.status)}`}>{repairWorkflowStatusLabel(detailRequest, detailOrder)}</span></h2><button type="button" onClick={closeRepairDetail} aria-label="關閉案件詳情">×</button></header>
         {detailLoading && <div className="request-detail-loading">案件資料、附件與流程載入中…</div>}
         {detailError && <div className="request-detail-error" role="alert">{detailError}</div>}
         {!detailLoading && repairDetail && <div className="request-detail-body">
@@ -459,7 +620,51 @@ useEffect(() => {
           </div>
           {repairDetail.attachments.length > 0 && <section className="request-detail-section"><h3>附件</h3><div className="request-detail-attachments">{repairDetail.attachments.map((attachment, index) => { const url = String(attachment.signed_url || ''); const name = String(attachment.file_name || attachment.kind || `附件 ${index + 1}`); const isImage = ['photo', 'location_photo'].includes(String(attachment.kind || '')) || /\.(jpe?g|png|webp|heic)$/i.test(name); return url ? <a key={String(attachment.attach_id || index)} href={url} target="_blank" rel="noopener noreferrer" className={isImage ? 'is-image' : ''}>{isImage ? <img src={url} alt={name} /> : <>📎 {name}</>}</a> : <span key={String(attachment.attach_id || index)}>附件暫時無法開啟：{name}</span>; })}</div></section>}
           <section className="request-detail-section"><h3>處理歷程</h3>{repairDetail.logs.length ? <ol className="request-detail-timeline">{repairDetail.logs.map((log, index) => <li key={String(log.log_id || index)}><strong>{repairTimelineStatusLabel(log.to_status)}</strong>{Boolean(log.note) && <p>{display(log.note)}</p>}<small>{[log.operator_name ? display(log.operator_name) : '', display(log.created_at)].filter(Boolean).join(' · ')}</small></li>)}</ol> : <p className="request-detail-empty">尚無歷程</p>}</section>
-{isDispatchModule && !detailLoading && <section className="request-detail-section request-dispatch-actions"><h3>{'\u6d3e\u5de5\u64cd\u4f5c'}</h3>{showDispatchForm ? <form className="dispatch-detail-form" onSubmit={event => { event.preventDefault(); void dispatchRepair(); }}><div className="dispatch-detail-form-grid"><label><span>{'\u7dad\u4fee\u4eba\u54e1'}</span><select value={dispatchForm.technician} onChange={event => setDispatchForm(current => ({ ...current, technician: event.target.value }))}><option value="">-- {'\u8acb\u9078\u64c7'} --</option>{dispatchTechnicians.map(item => <option key={item.user_id} value={item.user_id}>{item.name}</option>)}</select></label><label><span>{'\u59d4\u5916\u5ee0\u5546'}</span><input value={dispatchForm.vendor} onChange={event => setDispatchForm(current => ({ ...current, vendor: event.target.value }))} /></label><label><span>{'\u9810\u8a08\u5230\u5834'}</span><input type="datetime-local" value={dispatchForm.expectedArrival} onChange={event => setDispatchForm(current => ({ ...current, expectedArrival: event.target.value }))} /></label><label><span>{'\u9810\u8a08\u5b8c\u6210'}</span><input type="datetime-local" value={dispatchForm.expectedFinish} onChange={event => setDispatchForm(current => ({ ...current, expectedFinish: event.target.value }))} /></label><label className="wide"><span>{'\u5de5\u4f5c\u5167\u5bb9'}</span><textarea value={dispatchForm.workContent} onChange={event => setDispatchForm(current => ({ ...current, workContent: event.target.value }))} /></label></div><div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowDispatchForm(false)}>{'\u53d6\u6d88'}</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '\u9001\u51fa\u4e2d...' : '\u78ba\u8a8d\u6d3e\u5de5'}</button></div></form> : <div className="dispatch-detail-actions">{['pending', 'transferred', 'returned', 'rejected'].includes(String(detailRequest.status || '')) && <button type="button" className="dispatch-assign-button" onClick={startDispatch}>{'\u6d3e\u5de5'}</button>}{String(detailRequest.status || '') === 'assigned' && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'accepted', '\u6280\u5e2b\u63a5\u55ae', { accept_status: 'accepted' }, 'assigned')}>{'\u63a5\u55ae'}</button>}{String(detailRequest.status || '') === 'accepted' && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'in_progress', '\u958b\u59cb\u7dad\u4fee', { start_time: new Date().toISOString() }, 'in_progress')}>{'\u958b\u59cb\u7dad\u4fee'}</button>}{String(detailRequest.status || '') === 'in_progress' && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'pending_review', '\u7dad\u4fee\u5b8c\u6210\uff0c\u5f85\u9a57\u6536', {}, 'pending_review')}>{'\u5b8c\u6210\u7dad\u4fee'}</button>}{!['closed', 'cancelled'].includes(String(detailRequest.status || '')) && <button type="button" className="dispatch-cancel-button" onClick={() => void transitionRepair(detailRequest, 'cancelled', '\u53d6\u6d88\u6848\u4ef6', {}, 'cancelled')}>{'\u53d6\u6d88\u6848\u4ef6'}</button>}</div>}</section>}
+          {isRepairTableModule && !detailLoading && <section className="request-detail-section request-dispatch-actions">
+            <h3>維修流程</h3>
+            <ol className="repair-workflow-steps">
+              {workflowSteps.map((step, index) => <li key={step} className={index < workflowIndex || detailStatus === 'closed' ? 'done' : index === workflowIndex ? 'current' : ''}><span>{index + 1}</span><b>{step}</b></li>)}
+            </ol>
+            <h3>流程操作</h3>
+            {showDispatchForm ? <form className="dispatch-detail-form" onSubmit={event => { event.preventDefault(); void dispatchRepair(); }}>
+              <div className="dispatch-detail-form-grid">
+                <label><span>維修人員</span><select value={dispatchForm.technician} onChange={event => setDispatchForm(current => ({ ...current, technician: event.target.value }))}><option value="">-- 請選擇 --</option>{dispatchTechnicians.map(item => <option key={item.user_id} value={item.user_id}>{item.name}{item.department ? `（${item.department}）` : ''}</option>)}</select></label>
+                <label><span>委外廠商</span><input value={dispatchForm.vendor} onChange={event => setDispatchForm(current => ({ ...current, vendor: event.target.value }))} /></label>
+                <label><span>預計到場</span><input type="datetime-local" value={dispatchForm.expectedArrival} onChange={event => setDispatchForm(current => ({ ...current, expectedArrival: event.target.value }))} /></label>
+                <label><span>預計完成</span><input type="datetime-local" value={dispatchForm.expectedFinish} onChange={event => setDispatchForm(current => ({ ...current, expectedFinish: event.target.value }))} /></label>
+                <label className="wide"><span>工作內容</span><textarea value={dispatchForm.workContent} onChange={event => setDispatchForm(current => ({ ...current, workContent: event.target.value }))} /></label>
+                <label className="dispatch-check"><input type="checkbox" checked={dispatchForm.needShutdown} onChange={event => setDispatchForm(current => ({ ...current, needShutdown: event.target.checked }))} />需要停機</label>
+                <label className="dispatch-check"><input type="checkbox" checked={dispatchForm.needApproval} onChange={event => setDispatchForm(current => ({ ...current, needApproval: event.target.checked }))} />需要主管核准</label>
+              </div>
+              <div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowDispatchForm(false)}>取消</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '送出中…' : '確認派工'}</button></div>
+            </form> : showCompletionForm ? <form className="dispatch-detail-form" onSubmit={event => { event.preventDefault(); void completeRepair(); }}>
+              <div className="dispatch-detail-form-grid">
+                <label><span>故障原因（必填）</span><textarea value={completionForm.faultCause} onChange={event => setCompletionForm(current => ({ ...current, faultCause: event.target.value }))} /></label>
+                <label><span>處理方式（必填）</span><textarea value={completionForm.handleMethod} onChange={event => setCompletionForm(current => ({ ...current, handleMethod: event.target.value }))} /></label>
+                <label><span>更換零件</span><input value={completionForm.partsUsed} onChange={event => setCompletionForm(current => ({ ...current, partsUsed: event.target.value }))} /></label>
+                <label><span>使用材料</span><input value={completionForm.materials} onChange={event => setCompletionForm(current => ({ ...current, materials: event.target.value }))} /></label>
+                <label><span>工時（小時）</span><input type="number" min="0" step="0.5" value={completionForm.laborHours} onChange={event => setCompletionForm(current => ({ ...current, laborHours: event.target.value }))} /></label>
+                <label><span>完工備註</span><input value={completionForm.note} onChange={event => setCompletionForm(current => ({ ...current, note: event.target.value }))} /></label>
+              </div>
+              <div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowCompletionForm(false)}>取消</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '送出中…' : '送出完工'}</button></div>
+            </form> : <div className="dispatch-detail-actions">
+              {(!detailOrder || ['pending', 'transferred', 'returned', 'rejected'].includes(detailStatus)) && canDispatch && !['closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-assign-button" onClick={startDispatch}>{detailOrder ? '主管派工' : detailStatus === 'pending' ? '主管派工' : '建立／補建派工'}</button>}
+              {detailStatus === 'assigned' && detailOrderStatus === 'assigned' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'accepted', '工程師接單', { accept_status: 'accepted', arrival_time: new Date().toISOString() }, 'assigned')}>工程師接單</button>}
+              {detailStatus === 'assigned' && detailOrderStatus === 'accepted' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'in_progress', '工程師開始維修', { start_time: new Date().toISOString() }, 'in_progress')}>開始維修</button>}
+              {detailStatus === 'in_progress' && Boolean(detailOrder) && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={openCompletionForm}>完工回報</button>}
+              {detailStatus === 'pending_review' && canReporterAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptByReporter()}>報修人驗收通過</button>}
+              {detailStatus === 'completed' && canSupervisorAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptBySupervisor()}>主管驗收並結案</button>}
+              {!detailOrder && !canDispatch && !['closed', 'cancelled'].includes(detailStatus) && <p className="workflow-waiting">尚未建立維修工單，等待主管派工。</p>}
+              {Boolean(detailOrder) && ['pending', 'transferred', 'returned', 'rejected'].includes(detailStatus) && !canDispatch && <p className="workflow-waiting">等待主管派工。</p>}
+              {detailStatus === 'assigned' && !canEngineerAct && <p className="workflow-waiting">等待已指派工程師接單或開始維修。</p>}
+              {detailStatus === 'in_progress' && !canEngineerAct && <p className="workflow-waiting">等待已指派工程師完成維修回報。</p>}
+              {detailStatus === 'pending_review' && !canReporterAccept && <p className="workflow-waiting">等待原報修人驗收。</p>}
+              {detailStatus === 'completed' && !canSupervisorAccept && <p className="workflow-waiting">報修人已驗收，等待主管最終驗收。</p>}
+              {detailStatus === 'closed' && <p className="workflow-finished">主管驗收完成，案件已結案。</p>}
+              {canDispatch && !['pending_review', 'completed', 'closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-cancel-button" onClick={() => void transitionRepair(detailRequest, 'cancelled', '主管取消案件', {}, 'cancelled')}>取消案件</button>}
+            </div>}
+            {dispatchMessage && <p className="dispatch-detail-message" role="alert">{dispatchMessage}</p>}
+          </section>}
         </div>}
       </section></div>}
       {showCreate && <div className="repair-create-backdrop" role="dialog" aria-modal="true" aria-labelledby="repair-create-title">

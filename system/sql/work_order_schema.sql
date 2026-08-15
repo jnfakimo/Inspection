@@ -157,6 +157,11 @@ begin
     end loop;
   end loop;
 end $$;
+-- 維修流程由主管派工；既有資料庫必須覆寫舊的 false 權限，而非僅 do nothing。
+insert into role_permissions(role_id,perm,allowed) values
+  ('unit_supervisor','dispatch',true),
+  ('mgmt_supervisor','dispatch',true)
+on conflict(role_id,perm) do update set allowed=excluded.allowed;
 
 -- ── 8. 通知（站內 §九）──────────────────────────────────────
 create table if not exists notifications (
