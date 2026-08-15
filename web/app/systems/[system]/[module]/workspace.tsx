@@ -183,64 +183,60 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setShowDispatchForm(true);
     };
 
-    const transitionRepair = async (row: Record<string, unknown>, nextStatus: string, note: string, orderPatch: Record<string, unknown> = {}, requestStatus = nextStatus) => {
+    const runRepairWorkflow = async (row: Record<string, unknown>, action: string, nextStatus: string, payload: Record<string, unknown> = {}) => {
       const requestId = String(row.request_id || row.id || '');
-      if (!requestId) { setError('\u6848\u4ef6\u7f3a\u5c11 request_id'); return; }
-      const orderId = String(repairDetail?.order?.order_id || row.order_id || '');
-      const fromStatus = String(row.status || repairDetail?.request.status || 'pending');
-      const now = new Date().toISOString();
+      if (!requestId) { setDispatchMessage('案件缺少 request_id'); return; }
+      setDispatchSaving(true);
+      setDispatchMessage('');
       try {
         const client = getSupabase();
-        if (orderId) {
-          const orderResult = await client.from('maintenance_orders').update({ ...orderPatch, status: nextStatus, updated_at: now }).eq('order_id', orderId);
-          if (orderResult.error) throw orderResult.error;
-        }
-        const payload: Record<string, unknown> = { status: requestStatus, updated_at: now };
-        if (['pending', 'cancelled'].includes(requestStatus)) payload.assignee_id = null;
-        const requestResult = await client.from('repair_requests').update(payload).eq('request_id', requestId);
-        if (requestResult.error) throw requestResult.error;
-        await client.from('case_status_log').insert({ request_id: requestId, order_id: orderId || null, from_status: fromStatus, to_status: nextStatus, note, operator_id: profile.user_id, operator_name: profile.name });
+        const result = await client.rpc('apply_repair_workflow', { p_request_id: requestId, p_action: action, p_payload: payload });
+        if (result.error) throw result.error;
         await load();
-        void openRepairDetail({ ...row, request_id: requestId, status: requestStatus });
+        void openRepairDetail({ ...row, request_id: requestId, status: nextStatus });
       } catch (caught) {
-        setError(caught instanceof Error ? '\u6d41\u7a0b\u66f4\u65b0\u5931\u6557\uff1a' + caught.message : '\u6d41\u7a0b\u66f4\u65b0\u5931\u6557');
+        setDispatchMessage(caught instanceof Error ? `流程更新失敗：${caught.message}` : '流程更新失敗');
+      } finally {
+        setDispatchSaving(false);
       }
     };
-
     const dispatchRepair = async () => {
       const current = repairDetail?.request || selectedRow || {};
       const requestId = String(current.request_id || current.id || '');
       const technician = dispatchForm.technician.trim();
       const vendor = dispatchForm.vendor.trim();
       if (!canDispatch) { setDispatchMessage('僅限主管或派工管理人員派工'); return; }
-      if (!requestId) { setDispatchMessage('\u6848\u4ef6\u7f3a\u5c11 request_id'); return; }
-      if (!technician && !vendor) { setDispatchMessage('\u8acb\u9078\u64c7\u7dad\u4fee\u4eba\u54e1\u6216\u586b\u5beb\u59d4\u5916\u5ee0\u5546'); return; }
+      if (!requestId) { setDispatchMessage('案件缺少 request_id'); return; }
+      if (!technician && !vendor) { setDispatchMessage('請選擇維修人員或填寫委外廠商'); return; }
       const toIso = (value: string) => { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
       setDispatchSaving(true);
       setDispatchMessage('');
       try {
         const client = getSupabase();
-        const now = new Date().toISOString();
-        const orderPayload = { request_id: requestId, equipment_id: current.equipment_id ? String(current.equipment_id) : null, assignee_id: technician || null, vendor: vendor || null, expected_arrival: toIso(dispatchForm.expectedArrival), expected_finish: toIso(dispatchForm.expectedFinish), work_content: dispatchForm.workContent.trim() || null, need_shutdown: dispatchForm.needShutdown, need_approval: dispatchForm.needApproval, status: 'assigned', accept_status: 'pending' };
-        const orderResult = await client.from('maintenance_orders').insert(orderPayload).select('order_id,wo_no').single();
-        if (orderResult.error) throw orderResult.error;
-        const orderId = String(orderResult.data?.order_id || '');
-        const requestResult = await client.from('repair_requests').update({ status: 'assigned', assignee_id: technician || null, updated_at: now }).eq('request_id', requestId);
-        if (requestResult.error) throw requestResult.error;
-        const technicianName = dispatchTechnicians.find(item => item.user_id === technician)?.name || '';
-        const note = '\u6d3e\u5de5' + (technicianName ? ' \u2192 ' + technicianName : '') + (vendor ? ' \u59d4\u5916\uff1a' + vendor : '');
-        await client.from('case_status_log').insert({ request_id: requestId, order_id: orderId || null, from_status: String(current.status || 'pending'), to_status: 'assigned', note, operator_id: profile.user_id, operator_name: profile.name });
+        const result = await client.rpc('apply_repair_workflow', {
+          p_request_id: requestId,
+          p_action: 'dispatch',
+          p_payload: {
+            technician: technician || null,
+            vendor: vendor || null,
+            expected_arrival: toIso(dispatchForm.expectedArrival),
+            expected_finish: toIso(dispatchForm.expectedFinish),
+            work_content: dispatchForm.workContent.trim() || null,
+            need_shutdown: dispatchForm.needShutdown,
+            need_approval: dispatchForm.needApproval,
+          },
+        });
+        if (result.error) throw result.error;
         setShowDispatchForm(false);
         setDispatchForm({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
         await load();
         void openRepairDetail({ ...current, request_id: requestId, status: 'assigned' });
       } catch (caught) {
-        setDispatchMessage(caught instanceof Error ? '\u6d3e\u5de5\u5931\u6557\uff1a' + caught.message : '\u6d3e\u5de5\u5931\u6557');
+        setDispatchMessage(caught instanceof Error ? `派工失敗：${caught.message}` : '派工失敗');
       } finally {
         setDispatchSaving(false);
       }
     };
-
     const openCompletionForm = () => {
       const order = repairDetail?.order;
       setCompletionForm({
@@ -257,30 +253,29 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
 
     const completeRepair = async () => {
       const current = repairDetail?.request;
-      const order = repairDetail?.order;
       const requestId = String(current?.request_id || '');
-      const orderId = String(order?.order_id || '');
-      if (!requestId || !orderId) { setDispatchMessage('找不到報修案件或維修工單'); return; }
+      if (!requestId || !repairDetail?.order?.order_id) { setDispatchMessage('找不到報修案件或維修工單'); return; }
       if (!completionForm.faultCause.trim()) { setDispatchMessage('請填寫故障原因'); return; }
       if (!completionForm.handleMethod.trim()) { setDispatchMessage('請填寫處理方式'); return; }
+      const laborHours = completionForm.laborHours.trim() ? Number(completionForm.laborHours) : null;
+      if (laborHours != null && (!Number.isFinite(laborHours) || laborHours < 0)) { setDispatchMessage('工時必須是零以上的數字'); return; }
       setDispatchSaving(true);
       setDispatchMessage('');
       try {
         const client = getSupabase();
-        const now = new Date().toISOString();
-        const laborHours = completionForm.laborHours.trim() ? Number(completionForm.laborHours) : null;
-        if (laborHours != null && (!Number.isFinite(laborHours) || laborHours < 0)) throw new Error('工時必須是零以上的數字');
-        const orderResult = await client.from('maintenance_orders').update({
-          status: 'pending_review', finish_time: now, fault_cause: completionForm.faultCause.trim(),
-          handle_method: completionForm.handleMethod.trim(), result_desc: completionForm.handleMethod.trim(),
-          parts_used: completionForm.partsUsed.trim() || null, materials: completionForm.materials.trim() || null,
-          labor_hours: laborHours, note: completionForm.note.trim() || null, updated_at: now,
-        }).eq('order_id', orderId);
-        if (orderResult.error) throw orderResult.error;
-        const requestResult = await client.from('repair_requests').update({ status: 'pending_review', updated_at: now }).eq('request_id', requestId);
-        if (requestResult.error) throw requestResult.error;
-        const logResult = await client.from('case_status_log').insert({ request_id: requestId, order_id: orderId, from_status: String(order?.status || 'in_progress'), to_status: 'pending_review', note: `維修完成：${completionForm.handleMethod.trim()}`, operator_id: profile.user_id, operator_name: profile.name });
-        if (logResult.error) throw logResult.error;
+        const result = await client.rpc('apply_repair_workflow', {
+          p_request_id: requestId,
+          p_action: 'engineer_complete',
+          p_payload: {
+            fault_cause: completionForm.faultCause.trim(),
+            handle_method: completionForm.handleMethod.trim(),
+            parts_used: completionForm.partsUsed.trim() || null,
+            materials: completionForm.materials.trim() || null,
+            labor_hours: laborHours,
+            note: completionForm.note.trim() || null,
+          },
+        });
+        if (result.error) throw result.error;
         setShowCompletionForm(false);
         await load();
         void openRepairDetail({ ...current, status: 'pending_review' });
@@ -290,39 +285,19 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         setDispatchSaving(false);
       }
     };
-
     const acceptByReporter = async () => {
       const current = repairDetail?.request;
       const requestId = String(current?.request_id || '');
       if (!current || !requestId || String(current.status) !== 'pending_review') return;
       const isOwner = String(current.created_by || '') === profile.user_id;
       if (!isOwner && normalizedRole !== 'sysadmin') { setDispatchMessage('僅限原報修人進行本階段驗收'); return; }
-      setDispatchSaving(true);
-      setDispatchMessage('');
-      try {
-        const client = getSupabase();
-        const now = new Date().toISOString();
-        const requestResult = await client.from('repair_requests').update({ status: 'completed', updated_at: now }).eq('request_id', requestId);
-        if (requestResult.error) throw requestResult.error;
-        const logResult = await client.from('case_status_log').insert({ request_id: requestId, order_id: repairDetail?.order?.order_id || null, from_status: 'pending_review', to_status: 'completed', note: '報修人驗收通過，送主管驗收', operator_id: profile.user_id, operator_name: profile.name });
-        if (logResult.error) throw logResult.error;
-        await load();
-        void openRepairDetail({ ...current, status: 'completed' });
-      } catch (caught) {
-        setDispatchMessage(caught instanceof Error ? `報修人驗收失敗：${caught.message}` : '報修人驗收失敗');
-      } finally {
-        setDispatchSaving(false);
-      }
+      await runRepairWorkflow(current, 'reporter_accept', 'completed');
     };
-
     const acceptBySupervisor = async () => {
       const current = repairDetail?.request;
       if (!current || String(current.status) !== 'completed') return;
       if (!canSupervisorAccept) { setDispatchMessage('僅限主管進行最終驗收'); return; }
-      setDispatchSaving(true);
-      setDispatchMessage('');
-      await transitionRepair(current, 'closed', '主管驗收通過，案件結案', { accept_status: 'accepted' }, 'closed');
-      setDispatchSaving(false);
+      await runRepairWorkflow(current, 'supervisor_accept', 'closed');
     };
     const closeRepairDetail = () => {
       detailRequestSeq.current += 1;
@@ -419,7 +394,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
 
     useEffect(() => { load(); }, [load]);
     useEffect(() => {
-      if (!isDispatchModule && !isOrdersModule) return;
+      if (!isRepairTableModule) return;
       let active = true;
       void getSupabase().from('users').select('user_id,name,department,role,rbac_role').eq('status', 'active').order('name').limit(500).then(result => {
         if (!active || result.error) return;
@@ -427,7 +402,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         setDispatchTechnicians((result.data || []).filter(row => technicianRoles.has(String(row.rbac_role || row.role || ''))).map(row => ({ user_id: String(row.user_id || ''), name: String(row.name || ''), department: String(row.department || '') || null })).filter(row => row.user_id && row.name));
       });
       return () => { active = false; };
-    }, [isDispatchModule, isOrdersModule]);
+    }, [isRepairTableModule]);
     useEffect(() => {
       if (!isRequestModule) return;
       let active = true;
@@ -653,8 +628,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               <div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowCompletionForm(false)}>取消</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '送出中…' : '送出完工'}</button></div>
             </form> : <div className="dispatch-detail-actions">
               {(!detailOrder || ['pending', 'transferred', 'returned', 'rejected'].includes(detailStatus)) && canDispatch && !['closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-assign-button" onClick={startDispatch}>{detailOrder ? '主管派工' : detailStatus === 'pending' ? '主管派工' : '建立／補建派工'}</button>}
-              {detailStatus === 'assigned' && detailOrderStatus === 'assigned' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'accepted', '工程師接單', { accept_status: 'accepted', arrival_time: new Date().toISOString() }, 'assigned')}>工程師接單</button>}
-              {detailStatus === 'assigned' && detailOrderStatus === 'accepted' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'in_progress', '工程師開始維修', { start_time: new Date().toISOString() }, 'in_progress')}>開始維修</button>}
+              {detailStatus === 'assigned' && detailOrderStatus === 'assigned' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void runRepairWorkflow(detailRequest, 'engineer_accept', 'assigned')}>工程師接單</button>}
+              {detailStatus === 'assigned' && detailOrderStatus === 'accepted' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void runRepairWorkflow(detailRequest, 'engineer_start', 'in_progress')}>開始維修</button>}
               {detailStatus === 'in_progress' && Boolean(detailOrder) && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={openCompletionForm}>完工回報</button>}
               {detailStatus === 'pending_review' && canReporterAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptByReporter()}>報修人驗收通過</button>}
               {detailStatus === 'completed' && canSupervisorAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptBySupervisor()}>主管驗收並結案</button>}
@@ -665,7 +640,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               {detailStatus === 'pending_review' && !canReporterAccept && <p className="workflow-waiting">等待原報修人驗收。</p>}
               {detailStatus === 'completed' && !canSupervisorAccept && <p className="workflow-waiting">報修人已驗收，等待主管最終驗收。</p>}
               {detailStatus === 'closed' && <p className="workflow-finished">主管驗收完成，案件已結案。</p>}
-              {canDispatch && !['pending_review', 'completed', 'closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-cancel-button" onClick={() => void transitionRepair(detailRequest, 'cancelled', '主管取消案件', {}, 'cancelled')}>取消案件</button>}
+              {canDispatch && !['pending_review', 'completed', 'closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-cancel-button" onClick={() => void runRepairWorkflow(detailRequest, 'cancel', 'cancelled')}>取消案件</button>}
             </div>}
             {dispatchMessage && <p className="dispatch-detail-message" role="alert">{dispatchMessage}</p>}
           </section>}
