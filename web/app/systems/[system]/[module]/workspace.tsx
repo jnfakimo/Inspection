@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
@@ -17,6 +17,8 @@ type ModuleData = {
   summary?: Array<{ label: string; value: number | string }>;
 };
 type RepairEquipmentOption = { equipment_id: string; name: string; asset_code?: string | null; location?: string | null; category?: string | null };
+type DispatchTechnician = { user_id: string; name: string; department?: string | null };
+type DispatchForm = { technician: string; vendor: string; expectedArrival: string; expectedFinish: string; workContent: string; needShutdown: boolean; needApproval: boolean };
 type RepairDetail = {
   request: Record<string, unknown>;
   order: Record<string, unknown> | null;
@@ -144,6 +146,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
     const [attachments, setAttachments] = useState<File[]>([]);
     const [formMessage, setFormMessage] = useState('');
+const [dispatchTechnicians, setDispatchTechnicians] = useState<DispatchTechnician[]>([]);
+    const [dispatchForm, setDispatchForm] = useState<DispatchForm>({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
+    const [showDispatchForm, setShowDispatchForm] = useState(false);
+    const [dispatchSaving, setDispatchSaving] = useState(false);
+    const [dispatchMessage, setDispatchMessage] = useState('');
 
     const updateRepairStatus = async (row: Record<string, unknown>, status: string) => {
       const requestId = String(row.request_id || row.id || '');
@@ -159,7 +166,70 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       } catch (caught) { setError(caught instanceof Error ? `狀態更新失敗：${caught.message}` : '狀態更新失敗'); }
     };
 
-    const nextRepairAction = (status: string) => ({ pending: ['assigned', '派工'], assigned: ['in_progress', '開始處理'], in_progress: ['pending_review', '送驗收'], pending_review: ['closed', '結案'] } as Record<string, [string, string]>)[status];
+    const nextRepairAction = (status: string) => ({ pending: ['assigned', '\u6d3e\u5de5'], assigned: ['in_progress', '\u958b\u59cb\u8655\u7406'], in_progress: ['pending_review', '\u9001\u9a57\u6536'], pending_review: ['closed', '\u7d50\u6848'] } as Record<string, [string, string]>)[status];
+const startDispatch = () => {
+      const current = repairDetail?.request || selectedRow || {};
+      setDispatchForm({ technician: String(current.assignee_id || ''), vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
+      setDispatchMessage('');
+      setShowDispatchForm(true);
+    };
+
+    const transitionRepair = async (row: Record<string, unknown>, nextStatus: string, note: string, orderPatch: Record<string, unknown> = {}, requestStatus = nextStatus) => {
+      const requestId = String(row.request_id || row.id || '');
+      if (!requestId) { setError('\u6848\u4ef6\u7f3a\u5c11 request_id'); return; }
+      const orderId = String(repairDetail?.order?.order_id || row.order_id || '');
+      const fromStatus = String(row.status || repairDetail?.request.status || 'pending');
+      const now = new Date().toISOString();
+      try {
+        const client = getSupabase();
+        if (orderId) {
+          const orderResult = await client.from('maintenance_orders').update({ ...orderPatch, status: nextStatus, updated_at: now }).eq('order_id', orderId);
+          if (orderResult.error) throw orderResult.error;
+        }
+        const payload: Record<string, unknown> = { status: requestStatus, updated_at: now };
+        if (['pending', 'cancelled'].includes(requestStatus)) payload.assignee_id = null;
+        const requestResult = await client.from('repair_requests').update(payload).eq('request_id', requestId);
+        if (requestResult.error) throw requestResult.error;
+        await client.from('case_status_log').insert({ request_id: requestId, order_id: orderId || null, from_status: fromStatus, to_status: nextStatus, note, operator_id: profile.user_id, operator_name: profile.name });
+        await load();
+        void openRepairDetail({ ...row, request_id: requestId, status: requestStatus });
+      } catch (caught) {
+        setError(caught instanceof Error ? '\u6d41\u7a0b\u66f4\u65b0\u5931\u6557\uff1a' + caught.message : '\u6d41\u7a0b\u66f4\u65b0\u5931\u6557');
+      }
+    };
+
+    const dispatchRepair = async () => {
+      const current = repairDetail?.request || selectedRow || {};
+      const requestId = String(current.request_id || current.id || '');
+      const technician = dispatchForm.technician.trim();
+      const vendor = dispatchForm.vendor.trim();
+      if (!requestId) { setDispatchMessage('\u6848\u4ef6\u7f3a\u5c11 request_id'); return; }
+      if (!technician && !vendor) { setDispatchMessage('\u8acb\u9078\u64c7\u7dad\u4fee\u4eba\u54e1\u6216\u586b\u5beb\u59d4\u5916\u5ee0\u5546'); return; }
+      const toIso = (value: string) => { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
+      setDispatchSaving(true);
+      setDispatchMessage('');
+      try {
+        const client = getSupabase();
+        const now = new Date().toISOString();
+        const orderPayload = { request_id: requestId, equipment_id: current.equipment_id ? String(current.equipment_id) : null, assignee_id: technician || null, vendor: vendor || null, expected_arrival: toIso(dispatchForm.expectedArrival), expected_finish: toIso(dispatchForm.expectedFinish), work_content: dispatchForm.workContent.trim() || null, need_shutdown: dispatchForm.needShutdown, need_approval: dispatchForm.needApproval, status: 'assigned', accept_status: 'pending' };
+        const orderResult = await client.from('maintenance_orders').insert(orderPayload).select('order_id,wo_no').single();
+        if (orderResult.error) throw orderResult.error;
+        const orderId = String(orderResult.data?.order_id || '');
+        const requestResult = await client.from('repair_requests').update({ status: 'assigned', assignee_id: technician || null, updated_at: now }).eq('request_id', requestId);
+        if (requestResult.error) throw requestResult.error;
+        const technicianName = dispatchTechnicians.find(item => item.user_id === technician)?.name || '';
+        const note = '\u6d3e\u5de5' + (technicianName ? ' \u2192 ' + technicianName : '') + (vendor ? ' \u59d4\u5916\uff1a' + vendor : '');
+        await client.from('case_status_log').insert({ request_id: requestId, order_id: orderId || null, from_status: String(current.status || 'pending'), to_status: 'assigned', note, operator_id: profile.user_id, operator_name: profile.name });
+        setShowDispatchForm(false);
+        setDispatchForm({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
+        await load();
+        void openRepairDetail({ ...current, request_id: requestId, status: 'assigned' });
+      } catch (caught) {
+        setDispatchMessage(caught instanceof Error ? '\u6d3e\u5de5\u5931\u6557\uff1a' + caught.message : '\u6d3e\u5de5\u5931\u6557');
+      } finally {
+        setDispatchSaving(false);
+      }
+    };
 
     const closeRepairDetail = () => {
       detailRequestSeq.current += 1;
@@ -237,6 +307,15 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     }, [isRequestModule, module.key, system.key]);
 
     useEffect(() => { load(); }, [load]);
+useEffect(() => {
+      if (!isDispatchModule) return;
+      let active = true;
+      void getSupabase().from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(500).then(result => {
+        if (!active || result.error) return;
+        setDispatchTechnicians((result.data || []).map(row => ({ user_id: String(row.user_id || ''), name: String(row.name || ''), department: String(row.department || '') || null })).filter(row => row.user_id && row.name));
+      });
+      return () => { active = false; };
+    }, [isDispatchModule]);
     useEffect(() => {
       if (!isRequestModule) return;
       let active = true;
@@ -352,7 +431,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setAttachments([]); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {system.key === 'workorder' && module.key === 'requests' && <div className="request-status-chips"><button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button><button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待處理 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button><button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>已派工 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button><button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button><button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button></div>}
         {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <>
-          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{isDispatchModule && <th>派工</th>}{isRequestModule && <th>檢視</th>}</tr>{isRepairTableModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule || isDispatchModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{isDispatchModule ? repairDispatchStatusLabel(row[column.key]) : repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || '')) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
+          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{isDispatchModule && <th>派工</th>}{isRequestModule && <th>檢視</th>}</tr>{isRepairTableModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule || isDispatchModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{isDispatchModule ? repairDispatchStatusLabel(row[column.key]) : repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || '')) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (isDispatchModule) void openRepairDetail(row); else if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
           {isRequestModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
             <span>每頁 {REQUEST_PAGE_SIZE} 筆，第 {page}／{totalPages} 頁，共 {rows.length} 筆</span>
             <div>
@@ -380,7 +459,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
           </div>
           {repairDetail.attachments.length > 0 && <section className="request-detail-section"><h3>附件</h3><div className="request-detail-attachments">{repairDetail.attachments.map((attachment, index) => { const url = String(attachment.signed_url || ''); const name = String(attachment.file_name || attachment.kind || `附件 ${index + 1}`); const isImage = ['photo', 'location_photo'].includes(String(attachment.kind || '')) || /\.(jpe?g|png|webp|heic)$/i.test(name); return url ? <a key={String(attachment.attach_id || index)} href={url} target="_blank" rel="noopener noreferrer" className={isImage ? 'is-image' : ''}>{isImage ? <img src={url} alt={name} /> : <>📎 {name}</>}</a> : <span key={String(attachment.attach_id || index)}>附件暫時無法開啟：{name}</span>; })}</div></section>}
           <section className="request-detail-section"><h3>處理歷程</h3>{repairDetail.logs.length ? <ol className="request-detail-timeline">{repairDetail.logs.map((log, index) => <li key={String(log.log_id || index)}><strong>{repairTimelineStatusLabel(log.to_status)}</strong>{Boolean(log.note) && <p>{display(log.note)}</p>}<small>{[log.operator_name ? display(log.operator_name) : '', display(log.created_at)].filter(Boolean).join(' · ')}</small></li>)}</ol> : <p className="request-detail-empty">尚無歷程</p>}</section>
-          {isDispatchModule && !detailLoading && <section className="request-detail-section request-dispatch-actions"><h3>{'\u6d3e\u5de5\u64cd\u4f5c'}</h3><div className="dispatch-detail-actions">{String(detailRequest.status || '') === 'pending' && <button type="button" className="dispatch-assign-button" onClick={() => void updateRepairStatus(detailRequest, 'assigned')}>{'\u6d3e\u5de5'}</button>}{!['closed', 'cancelled'].includes(String(detailRequest.status || '')) && <button type="button" className="dispatch-cancel-button" onClick={() => void updateRepairStatus(detailRequest, 'cancelled')}>{'\u53d6\u6d88\u6848\u4ef6'}</button>}</div></section>}
+{isDispatchModule && !detailLoading && <section className="request-detail-section request-dispatch-actions"><h3>{'\u6d3e\u5de5\u64cd\u4f5c'}</h3>{showDispatchForm ? <form className="dispatch-detail-form" onSubmit={event => { event.preventDefault(); void dispatchRepair(); }}><div className="dispatch-detail-form-grid"><label><span>{'\u7dad\u4fee\u4eba\u54e1'}</span><select value={dispatchForm.technician} onChange={event => setDispatchForm(current => ({ ...current, technician: event.target.value }))}><option value="">-- {'\u8acb\u9078\u64c7'} --</option>{dispatchTechnicians.map(item => <option key={item.user_id} value={item.user_id}>{item.name}</option>)}</select></label><label><span>{'\u59d4\u5916\u5ee0\u5546'}</span><input value={dispatchForm.vendor} onChange={event => setDispatchForm(current => ({ ...current, vendor: event.target.value }))} /></label><label><span>{'\u9810\u8a08\u5230\u5834'}</span><input type="datetime-local" value={dispatchForm.expectedArrival} onChange={event => setDispatchForm(current => ({ ...current, expectedArrival: event.target.value }))} /></label><label><span>{'\u9810\u8a08\u5b8c\u6210'}</span><input type="datetime-local" value={dispatchForm.expectedFinish} onChange={event => setDispatchForm(current => ({ ...current, expectedFinish: event.target.value }))} /></label><label className="wide"><span>{'\u5de5\u4f5c\u5167\u5bb9'}</span><textarea value={dispatchForm.workContent} onChange={event => setDispatchForm(current => ({ ...current, workContent: event.target.value }))} /></label></div><div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowDispatchForm(false)}>{'\u53d6\u6d88'}</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '\u9001\u51fa\u4e2d...' : '\u78ba\u8a8d\u6d3e\u5de5'}</button></div></form> : <div className="dispatch-detail-actions">{['pending', 'transferred', 'returned', 'rejected'].includes(String(detailRequest.status || '')) && <button type="button" className="dispatch-assign-button" onClick={startDispatch}>{'\u6d3e\u5de5'}</button>}{String(detailRequest.status || '') === 'assigned' && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'accepted', '\u6280\u5e2b\u63a5\u55ae', { accept_status: 'accepted' }, 'assigned')}>{'\u63a5\u55ae'}</button>}{String(detailRequest.status || '') === 'accepted' && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'in_progress', '\u958b\u59cb\u7dad\u4fee', { start_time: new Date().toISOString() }, 'in_progress')}>{'\u958b\u59cb\u7dad\u4fee'}</button>}{String(detailRequest.status || '') === 'in_progress' && <button type="button" className="dispatch-step-button" onClick={() => void transitionRepair(detailRequest, 'pending_review', '\u7dad\u4fee\u5b8c\u6210\uff0c\u5f85\u9a57\u6536', {}, 'pending_review')}>{'\u5b8c\u6210\u7dad\u4fee'}</button>}{!['closed', 'cancelled'].includes(String(detailRequest.status || '')) && <button type="button" className="dispatch-cancel-button" onClick={() => void transitionRepair(detailRequest, 'cancelled', '\u53d6\u6d88\u6848\u4ef6', {}, 'cancelled')}>{'\u53d6\u6d88\u6848\u4ef6'}</button>}</div>}</section>}
         </div>}
       </section></div>}
       {showCreate && <div className="repair-create-backdrop" role="dialog" aria-modal="true" aria-labelledby="repair-create-title">

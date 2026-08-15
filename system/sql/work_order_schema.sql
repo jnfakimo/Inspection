@@ -43,6 +43,7 @@ alter table repair_requests add column if not exists assignee_id       uuid refe
 alter table repair_requests add column if not exists hidden            boolean default false;
 alter table repair_requests add column if not exists updated_at        timestamptz default now();
 alter table repair_requests alter column equipment_id drop not null;
+alter table maintenance_orders alter column equipment_id drop not null;
 
 -- 放寬 報修單 狀態（涵蓋舊值 + 完整流程 §八）
 alter table repair_requests drop constraint if exists repair_requests_status_check;
