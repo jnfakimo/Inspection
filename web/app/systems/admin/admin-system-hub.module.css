@@ -1,0 +1,100 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 972px;
+  margin: 16px auto 0;
+}
+
+.card {
+  --admin-card-accent: #00bde8;
+  position: relative;
+  display: flex;
+  min-height: 248px;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 26px 22px 20px;
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--admin-card-accent);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, color-mix(in srgb, var(--admin-card-accent) 2%, transparent) 3px, color-mix(in srgb, var(--admin-card-accent) 2%, transparent) 4px);
+}
+
+.card:hover,
+.card:focus-visible {
+  border-color: var(--admin-card-accent);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .12), inset 0 0 0 1px color-mix(in srgb, var(--admin-card-accent) 42%, transparent);
+}
+
+.badge {
+  position: absolute;
+  top: 11px;
+  right: 13px;
+  padding: 2px 7px;
+  border: 1px solid var(--admin-card-accent);
+  border-radius: 2px;
+  color: var(--admin-card-accent);
+  font: 600 10px var(--head);
+  letter-spacing: .08em;
+}
+
+.icon {
+  display: flex;
+  width: 62px;
+  height: 62px;
+  align-items: center;
+  justify-content: center;
+  margin: 3px 0 16px;
+}
+
+.icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--admin-card-accent) 55%, transparent));
+}
+
+.card h3 {
+  position: relative;
+  margin: 0 0 7px;
+  color: var(--text);
+  font-size: 20px;
+  letter-spacing: .04em;
+}
+
+.card p {
+  position: relative;
+  margin: 0 0 18px;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.card b {
+  position: relative;
+  margin-top: auto;
+  color: var(--admin-card-accent);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .grid { grid-template-columns: 1fr; }
+  .card { min-height: 220px; }
+}
