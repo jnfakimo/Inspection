@@ -25,12 +25,12 @@ function taipeiClock() {
 export function AppShell({ profile, title, children }: { profile: Profile; title: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
-  const [theme, setTheme] = useState('tech');
+  const [theme, setTheme] = useState('light');
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('siteTheme') === 'light' ? 'light' : 'tech';
+    const savedTheme = localStorage.getItem('siteTheme') === 'tech' ? 'tech' : 'light';
     document.documentElement.dataset.theme = savedTheme;
     setTheme(savedTheme);
     const timer = window.setInterval(() => setClock(taipeiClock()), 1000);
