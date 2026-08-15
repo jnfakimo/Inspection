@@ -33,6 +33,14 @@ const REQUEST_COLUMNS = [
   { key: 'status', label: '狀態' },
   { key: 'created_at', label: '報修時間' },
 ];
+const DISPATCH_COLUMNS = [
+  { key: 'req_no', label: '報修單號' },
+  { key: 'fault_type', label: '故障類型' },
+  { key: 'department', label: '單位' },
+  { key: 'urgency', label: '急迫性' },
+  { key: 'status', label: '狀態' },
+  { key: 'assignee_name', label: '指派人員' },
+];
 
 function taipeiToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
@@ -98,10 +106,10 @@ function requestTimeLabel(value: unknown): string {
 }
 type RequestFilterCellProps = { column: { key: string; label: string }; statusFilter: string; columnFilters: Record<string, string>; columnFilterOptions: Record<string, Array<{ value: string; label: string }>>; setStatusFilter: (value: string) => void; setColumnFilters: (updater: any) => void };
 function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOptions, setStatusFilter, setColumnFilters }: RequestFilterCellProps) {
-  if (column.key === 'req_no') return <th aria-label='報修單號不提供篩選' />;
+  if (column.key === 'req_no' || column.key === 'assignee_id' || column.key === 'assignee_name') return <th aria-label={column.key === 'req_no' ? '報修單號不提供篩選' : '指派人員不提供篩選'} />;
   const options = (columnFilterOptions[column.key] || []).filter(option => option.value !== EMPTY_FILTER_VALUE);
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
-  if (column.key === 'fault_type' || column.key === 'department') { const listId = 'request-' + column.key + '-filter-list'; return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : '全部單位'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; }
+  if (column.key === 'fault_type' || column.key === 'department' || column.key === 'urgency') { const listId = 'request-' + column.key + '-filter-list'; return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : column.key === 'department' ? '全部單位' : '全部急迫性'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; }
   if (column.key === 'created_at') return <th><input className='request-filter-date' type='date' value={columnFilters.created_at || ''} onChange={event => update(event.target.value)} aria-label='依報修時間篩選' /></th>;
   return <th><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''>全部狀態</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
 }
@@ -109,6 +117,8 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
 export function ModuleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   function Workspace({ profile }: { profile: Profile }) {
     const isRequestModule = system.key === 'workorder' && module.key === 'requests';
+    const isDispatchModule = system.key === 'workorder' && module.key === 'dispatch';
+    const isRepairTableModule = isRequestModule || isDispatchModule;
     const reporterLabel = [profile.department, profile.name].filter(Boolean).join(' / ');
     const emptyRepairForm = () => ({ reporter: reporterLabel, phone: '', mobile: '', department: profile.department || '', equipment: '', location: '', type: '', urgency: 'normal', description: '', desiredFinish: '' });
     const [data, setData] = useState<ModuleData | null>(null);
@@ -202,9 +212,18 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setError('');
       try {
         const moduleData = await invokeAppApi<ModuleData>('module_data', { system: system.key, module: module.key });
-        if (isRequestModule) {
-          const direct = await getSupabase().from('repair_requests').select('*').order('created_at', { ascending: false }).limit(500);
-          setData({ ...moduleData, columns: REQUEST_COLUMNS, rows: direct.error || !direct.data?.length ? moduleData.rows : direct.data as Array<Record<string, unknown>> });
+        if (isRepairTableModule) {
+          const direct = await getSupabase().from('repair_requests').select('*').order('updated_at', { ascending: false }).limit(500);
+          let repairRows = (direct.error || !direct.data?.length ? moduleData.rows : direct.data) as Array<Record<string, unknown>>;
+          if (isDispatchModule && repairRows.length) {
+            const ids = [...new Set(repairRows.map(row => String(row.assignee_id || '')).filter(Boolean))];
+            if (ids.length) {
+              const people = await getSupabase().from('users').select('user_id,name').in('user_id', ids);
+              const names = new Map((people.data || []).map(person => [String(person.user_id), String(person.name || '')]));
+              repairRows = repairRows.map(row => ({ ...row, assignee_name: names.get(String(row.assignee_id || '')) || (row.assignee_id ? display(row.assignee_id) : '') }));
+            }
+          }
+          setData({ ...moduleData, columns: isDispatchModule ? DISPATCH_COLUMNS : REQUEST_COLUMNS, rows: repairRows });
         } else { setData(moduleData); }
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : '資料讀取失敗');
@@ -242,7 +261,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       return data.rows.filter(row => {
         const matchesColumns = Object.entries(columnFilters).every(([key, value]) => {
           if (!value) return true;
-          if (key === 'fault_type' || key === 'department') return String(row[key] || '').toLocaleLowerCase().includes(value.toLocaleLowerCase());
+          if (key === 'fault_type' || key === 'department' || key === 'urgency') return String(row[key] || '').toLocaleLowerCase().includes(value.toLocaleLowerCase());
           return requestFilterValue(key, row[key]) === value;
         });
         return matchesColumns && (!statusFilter || String(row.status || '') === statusFilter) && (!needle || Object.values(row).some(value => display(value).toLowerCase().includes(needle)));
@@ -318,18 +337,18 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     return <AppShell profile={profile} title={module.title}>
       <div className="page-actions">
         <div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div>
-        {!isRequestModule && <div className="action-cluster">
+        {!isRequestModule && !isDispatchModule && <div className="action-cluster">
           {module.legacy && <a className="secondary-btn" href={`${LEGACY_BASE}/${module.legacy}`}>專業圖臺／進階作業</a>}
           <button className="primary-btn compact" onClick={load} disabled={syncing}>{syncing ? '同步中…' : '重新同步'}</button>
         </div>}
       </div>
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
       {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
-      <section className={`panel table-panel ${system.key === 'workorder' && module.key === 'requests' ? 'request-v1-table' : ''}`}>
+      <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : isDispatchModule ? 'dispatch-v1-table' : ''}`}>
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setAttachments([]); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {system.key === 'workorder' && module.key === 'requests' && <div className="request-status-chips"><button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.length || 0}</b></button><button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待處理 <b>{data?.rows.filter(row => row.status === 'pending').length || 0}</b></button><button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>已派工 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button><button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button><button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button></div>}
         {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <>
-          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{system.key === 'workorder' && module.key === 'dispatch' && <th>操作</th>}{isRequestModule && <th>檢視</th>}</tr>{isRequestModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
+          <div className="responsive-table"><table><thead><tr>{data?.columns.map(column => <th key={column.key}>{zhValue(column.label)}</th>)}{isDispatchModule && <th>派工</th>}{isRequestModule && <th>檢視</th>}</tr>{isRepairTableModule && <tr className="request-column-filters">{data?.columns.map(column => <RequestFilterCell key={column.key} column={column} statusFilter={statusFilter} columnFilters={columnFilters} columnFilterOptions={columnFilterOptions} setStatusFilter={setStatusFilter} setColumnFilters={setColumnFilters} />)}<th><button type="button" className="request-filter-clear" onClick={() => { setColumnFilters({}); setStatusFilter(''); }} disabled={!statusFilter && !Object.values(columnFilters).some(Boolean)}>清除</button></th></tr>}</thead><tbody>{visibleRows.map((row, index) => { const action = nextRepairAction(String(row.status || 'pending')); return <tr key={String(row.id || row.request_id || row.record_id || row.user_id || index)} onClick={() => { if (isRequestModule) void openRepairDetail(row); }}>{data?.columns.map(column => <td key={column.key}>{column.key === 'status' ? <span className={`status-pill ${repairStatusClass(row[column.key])}`}>{repairStatusLabel(row[column.key])}</span> : column.key === 'created_at' ? requestTimeLabel(row[column.key]) : column.key === 'urgency' ? requestFilterLabel('urgency', String(row[column.key] || '')) : display(row[column.key])}</td>)}{system.key === 'workorder' && module.key === 'dispatch' && <td><button className="secondary-btn" onClick={event => { event.stopPropagation(); if (action) void updateRepairStatus(row, action[0]); }}>{action ? action[1] : '—'}</button></td>}{isRequestModule && <td className="request-view-link">檢視 ›</td>}</tr>; })}</tbody></table>{data && rows.length === 0 && <p className="empty">查無資料</p>}</div>
           {isRequestModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
             <span>每頁 {REQUEST_PAGE_SIZE} 筆，第 {page}／{totalPages} 頁，共 {rows.length} 筆</span>
             <div>
