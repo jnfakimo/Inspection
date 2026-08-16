@@ -2892,7 +2892,7 @@ async function loadRepairs() {
   let query = db.from('repair_requests').select('*,equipment(name),maintenance_orders(status),locations(floor,area,detail,markets(name))').order('created_at',{ascending:true}).limit(200); // Reduced limit for client‑side pagination
   const { data, error } = await query;
   if (error) {
-    document.getElementById('repairsTbody').innerHTML = `<tr><td colspan="9" style="color:var(--red);font-family:var(--font-mono)">載入失敗：${translateError(error.message)}</td></tr>`;
+    document.getElementById('repairsTbody').innerHTML = `<tr><td colspan="9" style="color:var(--red);font-family:var(--font-mono)">載入失敗：${escHtml(translateError(error.message))}</td></tr>`;
     document.getElementById('repairsPagination').innerHTML = '';
     return;
   }
@@ -2976,7 +2976,7 @@ async function loadCostAdmin() {
   if (typeFilter) query = query.eq('cost_type', typeFilter);
   const { data, error } = await query;
   if (error) {
-    document.getElementById('costTbody').innerHTML = `<tr><td colspan="6" style="color:var(--red);font-family:var(--font-mono)">載入失敗：${translateError(error.message)}</td></tr>`;
+    document.getElementById('costTbody').innerHTML = `<tr><td colspan="6" style="color:var(--red);font-family:var(--font-mono)">載入失敗：${escHtml(translateError(error.message))}</td></tr>`;
     return;
   }
   _lastCosts = data || [];
