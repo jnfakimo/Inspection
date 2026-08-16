@@ -1456,10 +1456,8 @@ async function submitCaseUnsafe() {
   const { data, error } = await db.from('handover_cases').insert(newCase).select().single();
   if (error) { showToast('建立案件失敗：' + translateError(error.message), true); return; }
 
-  await db.from('handover_case_logs').insert({
-    case_id: data.case_id, action: 'create',
-    content: `案件建立：${title}`, new_data: newCase, created_by: currentUser.user_id
-  });
+  // 「建立案件」歷程改由 trg_log_handover_case_created 在同一交易內自動寫入，
+  // 前端不再另外 insert，避免案件已建立而歷程缺漏。
 
   if (pendingAttachments.length > 0) await uploadAttachments(data.case_id);
 
@@ -1658,18 +1656,16 @@ function closeCaseDetail() {
 async function assignCase(caseId) {
   const assignedTo = document.getElementById('actionAssignTo').value || null;
   const { data: old } = await db.from('handover_cases').select('assigned_to').eq('case_id', caseId).single();
-  const { error } = await db.from('handover_cases').update({ assigned_to: assignedTo, updated_at: new Date().toISOString() }).eq('case_id', caseId);
-  if (error) { showToast('指派失敗：' + translateError(error.message), true); return; }
   const name = allUsers.find(u => u.user_id === assignedTo)?.name || '—';
-  await db.from('handover_case_logs').insert({
-    case_id: caseId,
-    action: old?.assigned_to ? 'transfer' : 'assign',
-    content: `${old?.assigned_to ? '轉派' : '指派'}承辦人：${name}`,
-    old_data: { assigned_to: old?.assigned_to },
-    new_data: { assigned_to: assignedTo },
-    created_by: currentUser.user_id
+  const verb = old?.assigned_to ? '轉派' : '指派';
+  // 案件更新與歷程寫入改由 handover_case_action 於單一交易完成；
+  // 歷程的 action 與 old_data/new_data 由函式依現況自行判定。
+  const { error } = await db.rpc('handover_case_action', {
+    p_case_id: caseId, p_action: 'assign',
+    p_content: `${verb}承辦人：${name}`, p_assigned_to: assignedTo
   });
-  showToast(`已${old?.assigned_to?'轉派':'指派'}：${name}`);
+  if (error) { showToast('指派失敗：' + translateError(error.message), true); return; }
+  showToast(`已${verb}：${name}`);
   await openCaseDetail(caseId);
   await loadCases();
 }
@@ -1677,19 +1673,14 @@ async function assignCase(caseId) {
 async function updateCaseStatusUnsafe(caseId, oldStatus) {
   const newStatus = document.getElementById('actionStatus').value;
   if (newStatus === oldStatus) { showToast('狀態未變更', true); return; }
-  const updates = { status: newStatus, updated_at: new Date().toISOString() };
-  if (newStatus === 'closed') { updates.closed_at = new Date().toISOString(); updates.closed_by = currentUser.user_id; }
-  const { error } = await db.from('handover_cases').update(updates).eq('case_id', caseId);
-  if (error) { showToast('更新失敗：' + translateError(error.message), true); return; }
   const oldL = CASE_STATUS[oldStatus]?.label || oldStatus;
   const newL = CASE_STATUS[newStatus]?.label || newStatus;
-  await db.from('handover_case_logs').insert({
-    case_id: caseId,
-    action: newStatus === 'closed' ? 'close' : 'update',
-    content: `狀態更新：${oldL} → ${newL}`,
-    old_data: { status: oldStatus }, new_data: { status: newStatus },
-    created_by: currentUser.user_id
+  // 結案時的 closed_at/closed_by 由函式以登入身分填入，不再由前端指定。
+  const { error } = await db.rpc('handover_case_action', {
+    p_case_id: caseId, p_action: 'status',
+    p_content: `狀態更新：${oldL} → ${newL}`, p_new_status: newStatus
   });
+  if (error) { showToast('更新失敗：' + translateError(error.message), true); return; }
   showToast(`狀態已更新為：${newL}`);
   await openCaseDetail(caseId);
   await loadCases();
@@ -1698,9 +1689,8 @@ async function updateCaseStatusUnsafe(caseId, oldStatus) {
 async function updateCaseStatus(caseId,oldStatus){if(!beginSystemAction('handover.updateCaseStatus'))return;try{return await updateCaseStatusUnsafe(caseId,oldStatus);}finally{endSystemAction('handover.updateCaseStatus');}}
 
 async function reopenCaseUnsafe(caseId) {
-  const { error } = await db.from('handover_cases').update({ status:'open', closed_at:null, closed_by:null, updated_at:new Date().toISOString() }).eq('case_id', caseId);
-  if (error) { showToast('操作失敗', true); return; }
-  await db.from('handover_case_logs').insert({ case_id:caseId, action:'reopen', content:'案件重新開啟', created_by:currentUser.user_id });
+  const { error } = await db.rpc('handover_case_action', { p_case_id:caseId, p_action:'reopen', p_content:'案件重新開啟' });
+  if (error) { showToast('操作失敗：' + translateError(error.message), true); return; }
   showToast('案件已重新開啟');
   await openCaseDetail(caseId);
   await loadCases();
@@ -1711,8 +1701,7 @@ async function reopenCase(caseId){if(!beginSystemAction('handover.reopenCase'))r
 async function addProgressNoteUnsafe(caseId) {
   const note = document.getElementById('progressNote').value.trim();
   if (!note) { showToast('請輸入進度說明', true); return; }
-  await db.from('handover_cases').update({ updated_at: new Date().toISOString() }).eq('case_id', caseId);
-  const { error } = await db.from('handover_case_logs').insert({ case_id:caseId, action:'update', content:note, created_by:currentUser.user_id });
+  const { error } = await db.rpc('handover_case_action', { p_case_id:caseId, p_action:'note', p_content:note });
   if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
   showToast('進度已更新');
   await openCaseDetail(caseId);
