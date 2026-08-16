@@ -589,10 +589,12 @@ async function reviewRequest(approve){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canApprove(r))return;
   if(approve&&isPastPlannedSlot(r.trip_date,timeText(r.planned_departure_time))){setMsg('預計出發時間已經過去，不能核可此派車申請');return;}
   const note=val('fSupervisorNote');if(!approve&&!note){setMsg('退回時請填寫原因');return;}
-  const next=approve?'approved':'returned',payload={status:next,supervisor_id:currentUser.user_id,supervisor_name:currentUser.name,supervisor_note:note||null,approved_at:approve?new Date().toISOString():null};
-  const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','pending_approval').select().maybeSingle();
-  if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
-  await addLog(r.request_id,r.status,next,approve?'單位主管核可':'單位主管退回',note);closeModal('requestModal');await loadAll();toast(approve?'已核可並送交派車管理員':'已退回申請人');
+  // 申請單更新與流程歷程改由 vehicle_request_action 於單一交易完成；
+  // 主管姓名由伺服器端查表填入，不再由前端指定。
+  const {error}=await db.rpc('vehicle_request_action',{
+    p_request_id:r.request_id,p_action:approve?'approve':'return',p_note:note||null});
+  if(error){setMsg(safeDbError(error));return;}
+  closeModal('requestModal');await loadAll();toast(approve?'已核可並送交派車管理員':'已退回申請人');
 }
 
 async function dispatchRequest(){
@@ -602,17 +604,19 @@ async function dispatchRequest(){
   if(!vehicle||!driver){setMsg('請選擇公務車及司機');return;}
   if(!state.drivers.some(x=>x.user_id===driver.user_id&&x.active)){setMsg('所選人員尚未被指派為公務車司機');return;}
   const payload={status:'assigned',vehicle_manager_id:currentUser.user_id,vehicle_manager_name:currentUser.name,vehicle_id:vehicle.vehicle_id,plate_no:vehicle.plate_no,driver_id:driver.user_id,driver_name:driver.name,dispatch_note:val('fDispatchNote')||null,dispatched_at:new Date().toISOString(),driver_accepted_at:null,driver_accepted_by:null};
-  const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','approved').select().maybeSingle();
-  if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
-  await addLog(r.request_id,r.status,'assigned','派車管理員完成派車',`${vehicle.plate_no}｜司機 ${driver.name}${payload.dispatch_note?'｜'+payload.dispatch_note:''}`);closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
+  // 車號、司機姓名與派車人姓名改由伺服器端查表填入，不再採信前端傳值。
+  const {error}=await db.rpc('vehicle_request_action',{
+    p_request_id:r.request_id,p_action:'dispatch',p_note:val('fDispatchNote')||null,
+    p_vehicle_id:vehicle.vehicle_id,p_driver_id:driver.user_id});
+  if(error){setMsg(safeDbError(error));return;}
+  closeModal('requestModal');await loadAll();toast('派車完成，已送交司機行車回報');
 }
 
 async function acceptTrip(){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!canAccept(r))return;
-  const acceptedAt=new Date().toISOString();
-  const {data,error}=await db.from('vehicle_dispatch_requests').update({driver_accepted_at:acceptedAt,driver_accepted_by:currentUser.user_id}).eq('request_id',r.request_id).eq('status','assigned').eq('driver_id',currentUser.user_id).is('driver_accepted_at',null).select().maybeSingle();
-  if(error||!data){setMsg(error?.message||'此派車單已被處理，請重新整理');return;}
-  await addLog(r.request_id,'assigned','assigned','司機接單',`${r.plate_no||'公務車'}｜${r.origin_location} → ${r.destination_location}`);
+  // 接單時間與接單人由伺服器端填入；重複接單的防呆亦移至函式內。
+  const {error}=await db.rpc('vehicle_request_action',{p_request_id:r.request_id,p_action:'accept'});
+  if(error){setMsg(safeDbError(error));return;}
   await loadAll(true);openRequest(r.request_id);toast('接單完成，請於行程結束後填寫行車回報');
 }
 
@@ -652,8 +656,10 @@ async function completeTrip(){
 
 async function cancelRequest(){
   const r=state.requests.find(x=>x.request_id===currentRequestId);if(!r)return;const reason=prompt('請輸入取消原因：');if(reason===null)return;if(!reason.trim()){setMsg('請填寫取消原因');return;}
-  const {data,error}=await db.from('vehicle_dispatch_requests').update({status:'cancelled',cancel_reason:reason.trim(),cancelled_at:new Date().toISOString()}).eq('request_id',r.request_id).eq('status',r.status).select().maybeSingle();
-  if(error||!data){setMsg(error?.message||'取消失敗，請重新整理');return;}await addLog(r.request_id,r.status,'cancelled','取消派車申請',reason.trim());closeModal('requestModal');await loadAll();toast('申請已取消');
+  // 取消是唯一沒有 guard trigger 保護的轉移，授權判斷已移入函式內一併處理。
+  const {error}=await db.rpc('vehicle_request_action',{p_request_id:r.request_id,p_action:'cancel',p_note:reason.trim()});
+  if(error){setMsg(safeDbError(error));return;}
+  closeModal('requestModal');await loadAll();toast('申請已取消');
 }
 async function addLog(requestId,fromStatus,toStatus,action,note){const {error}=await db.from('vehicle_dispatch_logs').insert({request_id:requestId,from_status:fromStatus,to_status:toStatus,action,note:note||null,operator_id:currentUser.user_id,operator_name:currentUser.name});if(error)console.warn('vehicle_dispatch_logs',error);}
 
