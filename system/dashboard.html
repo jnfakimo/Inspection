@@ -600,7 +600,7 @@ function togglePatrolPoints(){
 function ymd(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
 function ym(d){const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}`;}
 // timestamptz 欄位回傳的是 UTC ISO 字串；統計一律以台北曆日/曆月為準，不能直接 slice(0,10)。
-function taipeiDateStr(iso){ if(!iso) return null; return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date(iso)); }
+function taipeiDateStr(iso){ if(!iso) return null; const s=window.SystemDate.formatDate(iso); return s==='—'?null:s; }
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
 function quick(r){
   const now=new Date(); let f;

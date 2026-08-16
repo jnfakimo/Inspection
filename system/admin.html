@@ -2138,7 +2138,7 @@ function populateEqFilter(selectId) {
 }
 
 async function loadDashboard() {
-  const today = window.SystemDate?.todayISO?.() || new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
+  const today = window.SystemDate.todayISO();
   const [{ data: orders, error: ordErr }, { count: inspCount, error: inspErr }, { count: pendingCount, error: pendErr }, { count: abnormalCount, error: abnErr }] = await Promise.all([
     db.from('maintenance_orders').select('*,equipment(name),repair_requests(reporter,fault_desc)').order('created_at',{ascending:false}).limit(10),
     db.from('inspection_records').select('*', { count: 'exact', head: true }).gte('inspect_time', today + 'T00:00:00'),
@@ -2814,7 +2814,7 @@ async function createEquipment() {
   if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
 
   if (cost) {
-    await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || (window.SystemDate?.todayISO?.() || new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date())), note: '初始購置費', created_by: currentUser.user_id });
+    await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || window.SystemDate.todayISO(), note: '初始購置費', created_by: currentUser.user_id });
   }
   await writeAudit('equipment', data.equipment_id, 'insert', null, eq);
   showToast(`設備「${name}」已新增`);

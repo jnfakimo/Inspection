@@ -148,7 +148,7 @@ let state={requests:[],vehicles:[],users:[],departments:[],logs:[],attachments:[
 const byId=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const val=id=>(byId(id)?.value||'').trim();
-const todayISO=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
+const todayISO=()=>window.SystemDate.todayISO();
 const nowLocalInput=()=>{const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());const p={};parts.forEach(x=>p[x.type]=x.value);const minute=Number(p.minute)<30?'00':'30';return `${p.year}-${p.month}-${p.day}T${p.hour}:${minute}`;};
 function taipeiDateTime(date,time){return new Date(`${date}T${String(time||'').slice(0,5)}:00+08:00`);}
 function isPastPlannedSlot(date,time){return !date||!time||taipeiDateTime(date,time)<=new Date();}
@@ -156,7 +156,7 @@ function localInputAt(value){return new Date(`${String(value||'').slice(0,16)}:0
 function isFutureActualTime(value){return !!value&&localInputAt(value)>new Date();}
 function actualDateTimeMax(tripDate){return tripDate<todayISO()?`${tripDate}T23:30`:nowLocalInput();}
 const fmtDate=v=>v?String(v).slice(0,10):'—';
-function fmtDateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ').slice(0,16);return new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(d).replaceAll('/','-');}
+function fmtDateTime(v){if(!v)return '—';const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v).replace('T',' ').slice(0,16);return window.SystemDate.formatDateTime(d);}
 function toIso(v){return v?new Date(v).toISOString():null;}
 function timeText(v){return v?String(v).slice(0,5):'—';}
 function timeOptions(selected=''){let html='<option value="">請選擇</option>';if(selected&&!isHalfHour(selected))html+=`<option value="${esc(selected)}" selected>${esc(selected)}（舊紀錄）</option>`;for(let hour=0;hour<24;hour++){for(const minute of ['00','30']){const value=`${String(hour).padStart(2,'0')}:${minute}`;html+=`<option value="${value}" ${value===selected?'selected':''}>${value}</option>`;}}return html;}

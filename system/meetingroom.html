@@ -288,7 +288,7 @@ function mondayOf(d){
   return x;
 }
 function isoDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;}
-function todayISO(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());}
+function todayISO(){return window.SystemDate.todayISO();}
 function fmtMD(d){return `${d.getMonth()+1}/${d.getDate()}`;}
 const DOW=['一','二','三','四','五','六','日'];
 

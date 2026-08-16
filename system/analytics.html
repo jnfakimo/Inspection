@@ -85,7 +85,7 @@ const db = createDb();
 (async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
 function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 let reports=[]; // {title, cols, rows}
-function ymd(d){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(d);}
+function ymd(d){return window.SystemDate.formatDate(d);}
 function quick(r){const now=new Date();let f;
   if(r==='month')f=new Date(now.getFullYear(),now.getMonth(),1);
   else if(r==='quarter')f=new Date(now.getFullYear(),Math.floor(now.getMonth()/3)*3,1);

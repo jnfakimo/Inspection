@@ -67,7 +67,7 @@ function formatLineResponse(value,status){
   if(translated)return translated[1];
   return status==='failed'?`發送失敗：${message}`:message;
 }
-const fmt=t=>t?new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(t)):'—';
+const fmt=t=>window.SystemDate.formatDateTime(t);
 const statusText={sent:'發送成功',failed:'發送失敗',skipped:'無須發送',pending:'處理中'};
 async function load(){
   document.getElementById('rows').innerHTML='<tr><td colspan="8" class="empty">載入中…</td></tr>';page=1;
