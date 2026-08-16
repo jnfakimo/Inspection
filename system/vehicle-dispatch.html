@@ -634,12 +634,20 @@ async function completeTrip(){
   if(refueled&&(!Number.isFinite(refuel)||refuel<start||refuel>end)){setMsg('加油里程必須介於起始與回程里程之間');return;}
   if(refueled&&(!Number.isFinite(refuelCost)||refuelCost<0)){setMsg('請填寫正確的本次加油費用');return;}
   if(hasAbnormality&&!abnormalityNote){setMsg('勾選異常通報時，請填寫異常內容');return;}
-  const payload={status:'completed',actual_passenger_count:passengers,actual_departure_at:toIso(departure),actual_return_at:toIso(returned),odometer_start:start,odometer_end:end,last_refuel_odometer:lastRefuelOdometer,last_refuel_cost:lastRefuelCost,refueled,refuel_odometer:refueled?refuel:null,refuel_cost:refueled?refuelCost:null,has_abnormality:hasAbnormality,abnormality_note:hasAbnormality?abnormalityNote:null,driver_note:val('fDriverNote')||null,completed_at:new Date().toISOString()};
-  const {data,error}=await db.from('vehicle_dispatch_requests').update(payload).eq('request_id',r.request_id).eq('status','assigned').select().maybeSingle();
+  // 申請單、車輛里程與流程歷程改由 complete_vehicle_trip 於單一交易內完成。
+  // 車輛里程原本另外呼叫 official_vehicles 更新，但司機不具該表的 RLS 更新權限，
+  // 更新會回傳 0 列且前端未檢查結果，屬於靜默失敗；已一併移入函式處理。
+  const {data,error}=await db.rpc('complete_vehicle_trip',{
+    p_request_id:r.request_id,p_actual_passenger_count:passengers,
+    p_actual_departure_at:toIso(departure),p_actual_return_at:toIso(returned),
+    p_odometer_start:start,p_odometer_end:end,
+    p_last_refuel_odometer:lastRefuelOdometer,p_last_refuel_cost:lastRefuelCost,
+    p_refueled:refueled,p_refuel_odometer:refueled?refuel:null,p_refuel_cost:refueled?refuelCost:null,
+    p_has_abnormality:hasAbnormality,p_abnormality_note:hasAbnormality?abnormalityNote:null,
+    p_driver_note:val('fDriverNote')||null});
   if(error||!data){setMsg(error?.message||'案件狀態已變更，請重新整理');return;}
-  if(assignedVehicle&&end>Number(assignedVehicle.current_odometer||0))await db.from('official_vehicles').update({current_odometer:end}).eq('vehicle_id',assignedVehicle.vehicle_id);
   const photoErrors=await uploadPhotos(r.request_id,photos,hasAbnormality?'abnormality':'driver');
-  await addLog(r.request_id,r.status,'completed','司機完成行車回報',`實際 ${passengers} 人｜${(end-start).toFixed(1)} km${refueled?`｜加油 ${refuelCost} 元`:''}${hasAbnormality?'｜有異常通報':''}`);closeModal('requestModal');await loadAll();toast(photoErrors.length?`行車回報已完成；${photoErrors.length} 張照片上傳失敗`:'行車回報完成，里程已自動核算',photoErrors.length>0);
+  closeModal('requestModal');await loadAll();toast(photoErrors.length?`行車回報已完成；${photoErrors.length} 張照片上傳失敗`:'行車回報完成，里程已自動核算',photoErrors.length>0);
 }
 
 async function cancelRequest(){
