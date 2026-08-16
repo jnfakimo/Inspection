@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { AdminSidebar } from '@/components/AdminSidebar';
 import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 
@@ -28,6 +29,8 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   const [theme, setTheme] = useState('light');
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState('');
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
+  const isAdminArea = pathname === '/systems/admin/' || pathname.startsWith('/systems/admin/');
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('siteTheme') === 'tech' ? 'tech' : 'light';
@@ -36,6 +39,20 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     const timer = window.setInterval(() => setClock(taipeiClock()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!adminMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAdminMenuOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [adminMenuOpen]);
 
   const actions = sharedActions.filter(item => !item.sysKey || profile.allowed_systems.includes('*') || profile.allowed_systems.includes(item.sysKey));
   async function logout() {
@@ -76,7 +93,28 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
         <button onClick={logout}>登出</button>
       </div>
     </header>
-    <main className="content v1-content">{children}</main>
+    {isAdminArea ? <div className="admin-v2-frame">
+      <AdminSidebar
+        profile={profile}
+        pathname={pathname}
+        open={adminMenuOpen}
+        onClose={() => setAdminMenuOpen(false)}
+        onChangePassword={() => { setPasswordMessage(''); setPasswordOpen(true); }}
+      />
+      <div className="admin-v2-workspace">
+        <button
+          type="button"
+          className="admin-sidebar-toggle"
+          aria-expanded={adminMenuOpen}
+          aria-controls="admin-v2-sidebar"
+          onClick={() => setAdminMenuOpen(true)}
+        >
+          <img src="/word-cloud/assets/system-icons/admin-icon.png" alt="" />
+          後台選單
+        </button>
+        <main className="content v1-content admin-v2-content">{children}</main>
+      </div>
+    </div> : <main className="content v1-content">{children}</main>}
     {passwordOpen && <div className="password-modal" role="dialog" aria-modal="true" aria-label="更改密碼"><form onSubmit={changePassword}><h2>更改密碼</h2><label>新密碼<input type="password" name="password" minLength={8} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={8} required autoComplete="new-password" /></label>{passwordMessage && <p>{passwordMessage}</p>}<div><button type="button" onClick={() => setPasswordOpen(false)}>取消</button><button className="primary-btn compact">確認更改</button></div></form></div>}
   </div>;
 }
