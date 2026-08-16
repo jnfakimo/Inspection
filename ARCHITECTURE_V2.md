@@ -10,10 +10,28 @@
 | 後端 | FastAPI（Python）或 Node.js | 負責權限、流程、API、通知、資料分析 |
 | 資料庫 | PostgreSQL | 若希望部署簡單，可直接使用 Supabase |
 
-**目前實作與基準的差異**：後端職責（JWT/RBAC 驗證、業務流程、通知、聚合分析）已完整存在，但 runtime
-是 Supabase Edge Function（Deno/TypeScript，見 `supabase/functions/`），而非獨立的 FastAPI 或 Node.js
-服務。這是為了配合「部署簡單、直接使用 Supabase」的資料庫選項所做的取捨；若日後要改為獨立後端服務，
-`app-api` / `admin-api` 的業務邏輯即為搬遷起點。
+### 後端 runtime 選型決策（2026-08-16）
+
+基準的資料庫欄註明「若希望部署簡單，可直接使用 Supabase」，本專案已採此路線，因此後端 runtime
+選用 **Supabase Edge Function（Deno / TypeScript）**，而非另行架設 FastAPI 或 Node.js 服務。
+規格要求後端承擔的職責均已落實：
+
+| 職責 | 實作位置 |
+| --- | --- |
+| 權限 | `app-api` / `admin-api` 驗證 JWT、`users` 啟用狀態與 `role_permissions`，再疊加資料庫 RLS |
+| 流程 | `app-api` 各 action，以及 PostgreSQL SECURITY DEFINER 函式（如 `create_meeting_booking_series`、`complete_repair_order`） |
+| API | `supabase/functions/` 共 11 支函式，`app-api`、`admin-api` 為業務主體 |
+| 通知 | `line-notify`、`patrol-timeout-check`、`meeting-booking-check`、FCM 推播 |
+| 資料分析 | `app-api` 的 `dashboard` action 聚合 30 日巡檢、異常率、設備與未結維修 |
+
+選擇 Edge Function 而非自架服務的理由：與資料庫同專案、延遲低；JWT 由 Supabase 閘道層先驗；
+零維運且無額外主機費用；本站前端託管於 GitHub Pages，本身無法執行後端程式。
+
+**何時應重新評估**：需要脫離 Supabase 以避免供應商鎖定時；或分析需求成長到必須使用 Deno 生態
+無法滿足的 Python 套件時。屆時 `app-api` / `admin-api` 的業務邏輯即為搬遷起點。
+
+**待清理**：正式專案另有 4 支已部署但原始碼不在本 repo 的函式（`hyper-worker`、`smart-function`、
+`bright-function`、`dynamic-processor`），研判為早期於儀表板試建後遺留的範本，尚未確認並移除。
 
 ## 規格符合度
 
