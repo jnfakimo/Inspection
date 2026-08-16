@@ -1,5 +1,20 @@
 # 北農巡檢系統 V2 架構與遷移說明
 
+## 技術規格基準
+
+本專案的技術選型基準（2026-08-16 確認）：
+
+| 層 | 基準 | 說明 |
+| --- | --- | --- |
+| 前端 | React / Next.js | — |
+| 後端 | FastAPI（Python）或 Node.js | 負責權限、流程、API、通知、資料分析 |
+| 資料庫 | PostgreSQL | 若希望部署簡單，可直接使用 Supabase |
+
+**目前實作與基準的差異**：後端職責（JWT/RBAC 驗證、業務流程、通知、聚合分析）已完整存在，但 runtime
+是 Supabase Edge Function（Deno/TypeScript，見 `supabase/functions/`），而非獨立的 FastAPI 或 Node.js
+服務。這是為了配合「部署簡單、直接使用 Supabase」的資料庫選項所做的取捨；若日後要改為獨立後端服務，
+`app-api` / `admin-api` 的業務邏輯即為搬遷起點。
+
 ## 規格符合度
 
 | 項目 | 原系統 | V2 處理方式 |
