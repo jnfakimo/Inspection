@@ -6,6 +6,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import { GuardPatrolSpecialized } from './guardpatrol-specialized';
 
 type Row = Record<string, any>;
 type HandoverForm = { date: string; shift: string; handoverBy: string; takeoverBy: string; issues: string[]; pending: string[]; notes: string };
@@ -104,5 +105,5 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
 }
 
 export function OperationsWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
-  return <AuthGate>{profile => system.key === 'handover' ? <HandoverWorkspace system={system} module={module} profile={profile} /> : <GuardPatrolWorkspace system={system} module={module} profile={profile} />}</AuthGate>;
+  return <AuthGate>{profile => system.key === 'handover' ? <HandoverWorkspace system={system} module={module} profile={profile} /> : module.key === 'map3d' || module.key === 'shifts' || module.key === 'notifications' ? <GuardPatrolSpecialized system={system} module={module} profile={profile} /> : <GuardPatrolWorkspace system={system} module={module} profile={profile} />}</AuthGate>;
 }
