@@ -1,3 +1,4 @@
+@import './systems/[system]/[module]/operations.css';
 /* V2 沿用第一版視覺與橫向操作版型；資料層仍使用 React + Supabase 安全 API。 */
 :root[data-theme="light"]{color-scheme:light;--bg:#f4f6fa;--panel:#fff;--panel2:#fff;--line:#dbe4ee;--text:#1e293b;--dim:#64748b;--cyan:#0284c7;--green:#059669;--amber:#b45309;--red:#dc2626;--violet:#7c3aed}
 :root[data-theme="light"] body{background-image:none}

@@ -6,7 +6,7 @@ import { AuthGate } from '@/components/AuthGate';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import { zhModuleCode, zhSystemCode } from '@/lib/zh-tw';
 import type { Profile } from '@/types/app';
-import '../[module]/operations.module.css';
+import { HandoverWorkspace } from './[module]/operations-workspace';
 
 function WorkorderHub({ profile }: { profile: Profile }) {
   return <AppShell profile={profile} title="維修／派工／完工系統">
@@ -21,6 +21,7 @@ function WorkorderHub({ profile }: { profile: Profile }) {
 }
 
 function OperationsHub({ system, profile }: { system: SystemDefinition; profile: Profile }) {
+  if (system.key === 'handover') return <HandoverWorkspace system={system} module={system.modules[0]} profile={profile} />;
   const handover = system.key === 'handover';
   const cards = handover ? [
     ['records', '新增交接／交接記錄', '填寫班別、異常、待辦與備註，送出後由接班人接收。', 'handover-icon.png', 'HANDOVER 01'],

@@ -6,7 +6,6 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
-import styles from './operations.module.css';
 
 type Row = Record<string, any>;
 type HandoverForm = { date: string; shift: string; handoverBy: string; takeoverBy: string; issues: string[]; pending: string[]; notes: string };
@@ -21,7 +20,7 @@ const shifts = [
 const text = (v: unknown) => v == null || v === '' ? '—' : String(v);
 const handoverStatus = (row: Row) => row.confirmed_at || row.confirmed_by ? '交接完成' : row.status === 'confirmed' ? '待接班人接收' : '草稿';
 
-function HandoverWorkspace({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
+export function HandoverWorkspace({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
   const client = getSupabase();
   const [rows, setRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
@@ -93,3 +92,4 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
 export function OperationsWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   return <AuthGate>{profile => system.key === 'handover' ? <HandoverWorkspace system={system} module={module} profile={profile} /> : <GuardPatrolWorkspace system={system} module={module} profile={profile} />}</AuthGate>;
 }
+
