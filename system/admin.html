@@ -2589,11 +2589,28 @@ async function createAuthBackedProfile(profile, password) {
   return { error: profileError, recoveryError: recovered.error, recovered: false };
 }
 
+// 批次匯入產生的臨時密碼只暫存於此，不渲染成畫面文字；管理者以複製按鈕取用後
+// 自行轉交當事人。關閉匯入視窗或重新整理即清空，避免憑證長時間留在頁面上。
+const importedTempPasswords = [];
+function clearImportedTempPasswords() { importedTempPasswords.length = 0; }
+async function copyTempPassword(idx, btn) {
+  const entry = importedTempPasswords[idx];
+  if (!entry) { if (btn) btn.textContent = '已失效'; return; }
+  try {
+    await navigator.clipboard.writeText(entry.pwd);
+    if (btn) { const t = btn.textContent; btn.textContent = '已複製'; setTimeout(() => { btn.textContent = t; }, 1600); }
+  } catch (e) {
+    // 剪貼簿被瀏覽器阻擋時退回提示，仍不把密碼寫進頁面。
+    showToast('無法存取剪貼簿，請改用「重設密碼」功能通知當事人', true);
+  }
+}
+
 async function importUsersXlsx() {
   const file = document.getElementById('csvImportFile').files[0];
   if (!file) { showToast('請選擇檔案（XLSX / CSV）', true); return; }
   const log = document.getElementById('csvImportLog');
   log.style.display = 'block'; log.innerHTML = '<div style="color:var(--cyan)">▶ 開始匯入…</div>';
+  clearImportedTempPasswords();
   const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, blankrows: true });
   if (!aoa || aoa.length < 2) { log.innerHTML += '<div style="color:var(--red)">格式錯誤：需至少一筆資料列</div>'; return; }
@@ -2638,6 +2655,7 @@ async function importUsersXlsx() {
       log.innerHTML += `<div style="color:var(--text-dim)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」（${escHtml(username)}）：帳號或Email已存在，跳過</div>`; skipped++; continue;
     }
     const pwd = password || genTempPassword();
+    // 密碼僅保留在記憶體供複製按鈕使用，不寫入 DOM 文字。
     const rbacRole = roleMap[roleRaw] || 'reporter';
     const userRole = legacyRoleForRbac(rbacRole);
     const permissions = defaultPermsForRole(rbacRole);
@@ -2646,7 +2664,13 @@ async function importUsersXlsx() {
     if (created.error) {
       log.innerHTML += `<div style="color:var(--red)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」：${escHtml(translateError(created.error.message))}</div>`; failed++; continue;
     }
-    const pwdNote = !password ? `<span style="color:var(--amber)">（臨時密碼：${pwd}）</span>` : '';
+    // 臨時密碼不再直接渲染為可見文字（避免截圖、旁觀或畫面殘留造成憑證外洩），
+    // 改為暫存於記憶體並提供複製按鈕；離開匯入畫面時一併清除。
+    let pwdNote = '';
+    if (!password) {
+      const idx = importedTempPasswords.push({ username, pwd }) - 1;
+      pwdNote = `<button type="button" class="copy-temp-pwd" data-idx="${idx}" onclick="copyTempPassword(${idx},this)" style="margin-left:6px;font-size:.7rem;padding:2px 8px;border:1px solid var(--amber);background:none;color:var(--amber);border-radius:3px;cursor:pointer">複製臨時密碼</button>`;
+    }
     const recoverNote = created.recovered ? '<span style="color:var(--amber)">（已修復既有 Email 的帳戶清單）</span>' : '';
     log.innerHTML += `<div style="color:var(--green)">✓ 「${escHtml(name)}」（${escHtml(username)}）${created.recovered ? '修復成功' : '匯入成功'} ${recoverNote}${pwdNote}</div>`;
     existingUsernames.add(username.toLowerCase());
