@@ -18,7 +18,10 @@ if (location.hash === '#repairs') {
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" integrity="sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb" crossorigin="anonymous"></script>
+<!-- 匯出一律使用 ExcelJS；SheetJS 僅保留供批次匯入解析，因該功能公開接受
+     .xlsx/.xls/.csv 三種格式，而 ExcelJS 不支援 .xls 且 .csv 需 stream API。 -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -2294,8 +2297,18 @@ function filterUsers() {
 }
 
 // 統一標準：匯出具摘要、主表與權限矩陣的視覺化 XLSX
-function exportUsersXlsx() {
+// ExcelJS 產出並觸發下載；沿用於本頁所有匯出。
+async function downloadWorkbook(wb, filename) {
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+async function exportUsersXlsx() {
   if (!allUsers.length) { showToast('目前無帳號資料可匯出', true); return; }
+  if (typeof ExcelJS === 'undefined') { showToast('Excel 排版元件尚未載入，請重新整理後再試', true); return; }
 
   const color = {
     navy:'17365D', blue:'0B6B8A', cyan:'DDEBF7', cyanSoft:'EEF7FA',
@@ -2323,20 +2336,36 @@ function exportUsersXlsx() {
     no:{fill:{patternType:'solid',fgColor:{rgb:color.gray}},font:{name:fontName,sz:10,color:{rgb:color.grayText}},alignment:{horizontal:'center',vertical:'center'},border}
   };
 
-  const setCellStyle = (ws, address, cellStyle) => {
-    if (!ws[address]) ws[address] = { t:'s', v:'' };
-    ws[address].s = cellStyle;
+  // 樣式定義沿用原本的 xlsx-js-style 形狀，於套用當下轉換為 ExcelJS 格式，
+  // 因此上方整組 style 與下方的排版邏輯都不需改動。
+  const argb = rgb => 'FF' + String(rgb || '000000').replace(/^#/, '');
+  const toExcel = src => {
+    const out = {};
+    if (src.font) out.font = { name:src.font.name, size:src.font.sz, bold:!!src.font.bold,
+      color:{ argb:argb(src.font.color && src.font.color.rgb) } };
+    if (src.fill && src.fill.fgColor) out.fill = { type:'pattern', pattern:'solid',
+      fgColor:{ argb:argb(src.fill.fgColor.rgb) } };
+    if (src.alignment) out.alignment = Object.assign({}, src.alignment,
+      { vertical: src.alignment.vertical === 'center' ? 'middle' : src.alignment.vertical });
+    if (src.border) { out.border = {}; for (const side of ['top','bottom','left','right']) {
+      const b = src.border[side]; if (b) out.border[side] = { style:b.style, color:{ argb:argb(b.color && b.color.rgb) } }; } }
+    return out;
   };
+  const colLetter = index => { let s = '', i = index; do { s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26) - 1; } while (i >= 0); return s; };
+  const wb = new ExcelJS.Workbook();
+  wb.creator = '臺北農產公司'; wb.company = '臺北農產公司';
+  wb.title = '帳號管理清單'; wb.subject = '帳號、角色與權限管理報表'; wb.created = new Date();
+  const mkSheet = (name, rows) => { const ws = wb.addWorksheet(name); rows.forEach(r => ws.addRow(r)); return ws; };
+  const setCellStyle = (ws, address, cellStyle) => { Object.assign(ws.getCell(address), toExcel(cellStyle)); };
   const setRangeStyle = (ws, rangeRef, cellStyle) => {
-    const range = XLSX.utils.decode_range(rangeRef);
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      for (let c = range.s.c; c <= range.e.c; c++) setCellStyle(ws, XLSX.utils.encode_cell({ r, c }), cellStyle);
-    }
+    const [a, b] = rangeRef.split(':');
+    const parse = ref => { const m = ref.match(/^([A-Z]+)(\d+)$/); let c = 0; for (const ch of m[1]) c = c * 26 + (ch.charCodeAt(0) - 64); return { c, r:Number(m[2]) }; };
+    const s0 = parse(a), s1 = parse(b || a);
+    for (let r = s0.r; r <= s1.r; r++) for (let c = s0.c; c <= s1.c; c++) Object.assign(ws.getRow(r).getCell(c), toExcel(cellStyle));
   };
-  const merge = (ws, rangeRef) => {
-    if (!ws['!merges']) ws['!merges'] = [];
-    ws['!merges'].push(XLSX.utils.decode_range(rangeRef));
-  };
+  const merge = (ws, rangeRef) => { try { ws.mergeCells(rangeRef); } catch (e) { /* 已合併過則略過 */ } };
+  const setCols = (ws, widths) => widths.forEach((w, i) => { ws.getColumn(i + 1).width = w.wch; });
+  const setRows = (ws, heights) => heights.forEach((h, i) => { ws.getRow(i + 1).height = h.hpt; });
   const taipeiParts = new Intl.DateTimeFormat('en-CA', {
     timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit',
     hour:'2-digit', minute:'2-digit', second:'2-digit', hourCycle:'h23'
@@ -2376,7 +2405,7 @@ function exportUsersXlsx() {
     coreHeaders,
     ...coreRows
   ];
-  const accountWs = XLSX.utils.aoa_to_sheet(accountRows);
+  const accountWs = mkSheet('帳號清單', accountRows);
   merge(accountWs, 'A1:K1'); merge(accountWs, 'A2:K2'); merge(accountWs, 'B4:D4'); merge(accountWs, 'A5:K5');
   setRangeStyle(accountWs, 'A1:K1', style.title); setRangeStyle(accountWs, 'A2:K2', style.subtitle);
   setCellStyle(accountWs, 'A4', style.metaLabel); setRangeStyle(accountWs, 'B4:D4', style.metaValue);
@@ -2393,9 +2422,9 @@ function exportUsersXlsx() {
     setCellStyle(accountWs, `J${excelRow}`, row[9] === '啟用' ? style.enabled : style.disabled);
   });
   const accountLastRow = Math.max(6, 6 + coreRows.length);
-  accountWs['!autofilter'] = { ref:`A6:K${accountLastRow}` };
-  accountWs['!cols'] = [{wch:7},{wch:14},{wch:18},{wch:30},{wch:15},{wch:16},{wch:18},{wch:18},{wch:16},{wch:10},{wch:12}];
-  accountWs['!rows'] = [{hpt:30},{hpt:20},{hpt:8},{hpt:24},{hpt:30},{hpt:28}, ...coreRows.map(() => ({hpt:24}))];
+  accountWs.autoFilter = `A6:K${accountLastRow}`;
+  setCols(accountWs, [{wch:7},{wch:14},{wch:18},{wch:30},{wch:15},{wch:16},{wch:18},{wch:18},{wch:16},{wch:10},{wch:12}]);
+  setRows(accountWs, [{hpt:30},{hpt:20},{hpt:8},{hpt:24},{hpt:30},{hpt:28}, ...coreRows.map(() => ({hpt:24}))]);
 
   const roleCounts = {};
   const deptCounts = {};
@@ -2420,7 +2449,7 @@ function exportUsersXlsx() {
   for (let i = 0; i < summaryLength; i++) {
     summaryRows.push([roleSummary[i]?.[0] || '', roleSummary[i]?.[1] ?? '', deptSummary[i]?.[0] || '', deptSummary[i]?.[1] ?? '', '', '', permissionSummary[i]?.[0] || '', permissionSummary[i]?.[1] ?? '']);
   }
-  const summaryWs = XLSX.utils.aoa_to_sheet(summaryRows);
+  const summaryWs = mkSheet('統計摘要', summaryRows);
   summaryWs.B4 = { t:'n', v:users.length, f:`COUNTA('帳號清單'!$B$7:$B$${accountLastRow})` };
   summaryWs.D4 = { t:'n', v:activeCount, f:`COUNTIF('帳號清單'!$J$7:$J$${accountLastRow},"啟用")` };
   summaryWs.F4 = { t:'n', v:inactiveCount, f:`COUNTIF('帳號清單'!$J$7:$J$${accountLastRow},"停用")` };
@@ -2435,7 +2464,7 @@ function exportUsersXlsx() {
   });
   permissionSummary.forEach(([label, count], index) => {
     const row = index + 7;
-    const permissionCol = XLSX.utils.encode_col(index + 4);
+    const permissionCol = colLetter(index + 4);
     summaryWs[`H${row}`] = { t:'n', v:count, f:`COUNTIF('權限矩陣'!$${permissionCol}$5:$${permissionCol}$${4 + users.length},"是")` };
   });
   merge(summaryWs, 'A1:H1'); merge(summaryWs, 'A2:H2');
@@ -2449,8 +2478,8 @@ function exportUsersXlsx() {
     ['A','B','C','D','G','H'].forEach(col => setCellStyle(summaryWs, `${col}${excelRow}`, i % 2 ? style.bodyAlt : style.body));
     ['B','D','H'].forEach(col => { summaryWs[`${col}${excelRow}`].s.alignment = {horizontal:'center',vertical:'center'}; });
   }
-  summaryWs['!cols'] = [{wch:20},{wch:11},{wch:24},{wch:11},{wch:16},{wch:11},{wch:20},{wch:14}];
-  summaryWs['!rows'] = [{hpt:30},{hpt:20},{hpt:8},{hpt:26},{hpt:8},{hpt:28}, ...Array(summaryLength).fill({hpt:22})];
+  setCols(summaryWs, [{wch:20},{wch:11},{wch:24},{wch:11},{wch:16},{wch:11},{wch:20},{wch:14}]);
+  setRows(summaryWs, [{hpt:30},{hpt:20},{hpt:8},{hpt:26},{hpt:8},{hpt:28}, ...Array(summaryLength).fill({hpt:22})]);
 
   const permissionHeaders = ['序號','姓名','登入帳號','角色', ...PERMISSION_DEFS.map(p => p.label)];
   const permissionRows = users.map((u,index) => {
@@ -2458,14 +2487,14 @@ function exportUsersXlsx() {
     return [index + 1, u.name || '', u.username || '', ROLE_LABEL[roleId] || roleId,
       ...PERMISSION_DEFS.map(({ key }) => permissionEnabled(u.permissions, key, roleId) ? '是' : '否')];
   });
-  const permissionWs = XLSX.utils.aoa_to_sheet([
+  const permissionWs = mkSheet('權限矩陣', [
     ['臺北農產公司｜帳號權限矩陣'],
     [`資料產製時間：${exportTime}`],
     ['閱讀方式：綠色「是」表示已授權，灰色「否」表示未授權。'],
     permissionHeaders,
     ...permissionRows
   ]);
-  const permissionLastCol = XLSX.utils.encode_col(permissionHeaders.length - 1);
+  const permissionLastCol = colLetter(permissionHeaders.length - 1);
   merge(permissionWs, `A1:${permissionLastCol}1`); merge(permissionWs, `A2:${permissionLastCol}2`); merge(permissionWs, `A3:${permissionLastCol}3`);
   setRangeStyle(permissionWs, `A1:${permissionLastCol}1`, style.title);
   setRangeStyle(permissionWs, `A2:${permissionLastCol}2`, style.subtitle);
@@ -2475,30 +2504,31 @@ function exportUsersXlsx() {
     const excelRow = index + 5;
     setRangeStyle(permissionWs, `A${excelRow}:${permissionLastCol}${excelRow}`, index % 2 ? style.bodyAlt : style.body);
     for (let col = 4; col < permissionHeaders.length; col++) {
-      const address = `${XLSX.utils.encode_col(col)}${excelRow}`;
+      const address = `${colLetter(col)}${excelRow}`;
       setCellStyle(permissionWs, address, row[col] === '是' ? style.yes : style.no);
     }
   });
   const permissionLastRow = Math.max(4, 4 + permissionRows.length);
-  permissionWs['!autofilter'] = { ref:`A4:${permissionLastCol}${permissionLastRow}` };
-  permissionWs['!cols'] = [{wch:7},{wch:14},{wch:18},{wch:16}, ...PERMISSION_DEFS.map(() => ({wch:13}))];
-  permissionWs['!rows'] = [{hpt:30},{hpt:20},{hpt:28},{hpt:34}, ...permissionRows.map(() => ({hpt:22}))];
+  permissionWs.autoFilter = `A4:${permissionLastCol}${permissionLastRow}`;
+  setCols(permissionWs, [{wch:7},{wch:14},{wch:18},{wch:16}, ...PERMISSION_DEFS.map(() => ({wch:13}))]);
+  setRows(permissionWs, [{hpt:30},{hpt:20},{hpt:28},{hpt:34}, ...permissionRows.map(() => ({hpt:22}))]);
 
-  const wb = XLSX.utils.book_new();
-  wb.Props = { Title:'帳號管理清單', Subject:'帳號、角色與權限管理報表', Author:'臺北農產公司', CreatedDate:new Date() };
-  XLSX.utils.book_append_sheet(wb, accountWs, '帳號清單');
-  XLSX.utils.book_append_sheet(wb, summaryWs, '統計摘要');
-  XLSX.utils.book_append_sheet(wb, permissionWs, '權限矩陣');
-  XLSX.writeFile(wb, `帳號管理清單_${exportDate}.xlsx`, { compression:true });
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = `帳號管理清單_${exportDate}.xlsx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // 統一標準：下載匯入範本（XLSX）
-function downloadImportTemplate() {
+async function downloadImportTemplate() {
   const head = ['姓名','帳號','Email','密碼','電話','角色'];
   const sample = ['王小明','tcfm_wang','wang@example.com','Password123','0912345678','一般報修人員'];
-  const ws = XLSX.utils.aoa_to_sheet([head, sample]);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '帳號匯入範本');
-  XLSX.writeFile(wb, '帳號匯入範本.xlsx');
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('帳號匯入範本');
+  ws.addRow(head); ws.addRow(sample);
+  await downloadWorkbook(wb, '帳號匯入範本.xlsx');
 }
 
 function parseCSVLine(line) {
@@ -3054,13 +3084,14 @@ async function loadCostByEq() {
   </div>`).join('') : '<div style="color:var(--text-dim);font-size:.85rem;font-family:var(--font-mono)">目前無費用紀錄</div>';
 }
 
-function exportCostCsv() {   // 統一標準：匯出 XLSX
+async function exportCostCsv() {   // 統一標準：匯出 XLSX
   if (!_lastCosts.length) { showToast('目前無費用記錄可下載', true); return; }
   const head = ['設備','費用類型','廠商','日期','說明','金額'];
   const rows = _lastCosts.map(c => [c.equipment?.name || '', COST_TYPE_LABEL[c.cost_type] || c.cost_type, c.vendor || '', c.cost_date || '', c.note || '', c.amount]);
-  const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, '費用報表');
-  XLSX.writeFile(wb, `費用報表_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('費用報表');
+  ws.addRow(head); rows.forEach(r => ws.addRow(r));
+  await downloadWorkbook(wb, `費用報表_${window.SystemDate.todayISO()}.xlsx`);
 }
 
 const AUDIT_ACTION_LABEL = { insert:'新增', update:'修改', status_change:'狀態變更', delete:'刪除', login:'登入系統', logout:'登出系統', login_attempt:'嘗試登入', page_view:'進入系統', function_use:'使用功能', data_action:'資料操作', data_read:'讀取資料', file_read:'讀取檔案', access_denied:'拒絕存取' };
