@@ -261,9 +261,18 @@ function closeModal(id){document.getElementById(id).classList.remove('show');}
 let _tt;
 function toast(msg,err){const el=document.getElementById('toast');el.textContent=msg;el.classList.toggle('err',!!err);el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2600);}
 
-async function writeAudit(table,recordId,action,before,after){
-  if(!currentUser) return;
-  try{ await db.from('audit_logs').insert({table_name:table,record_id:String(recordId),action,changes:{before,after},operator_id:currentUser.user_id}); }catch(e){}
+// 會議室的異動一律經 app-api：權限、流程檢查與稽核寫入都在後端完成。
+// supabase-js 遇到非 2xx 會把回應塞進 error 而不是 data，後端的中文訊息
+// 必須從 error.context 取回，否則使用者只會看到通用錯誤。
+async function callAppApi(action,payload){
+  const {data,error}=await db.functions.invoke('app-api',{body:{action,...payload}});
+  if(!error&&data?.ok) return data.data;
+  let message=data?.message||'';
+  const response=error?.context;
+  if(!message&&response&&typeof response.clone==='function'){
+    try{ const body=await response.clone().json(); message=body?.message||''; }catch(_e){}
+  }
+  throw new Error(message||'系統服務回應失敗，請稍後再試');
 }
 
 let currentUser=null;
@@ -619,10 +628,9 @@ async function loadMyBookings(){
 }
 
 async function checkIn(bookingId){
-  const before=myBookings.find(b=>b.booking_id===bookingId);
-  const {error}=await db.from('meeting_bookings').update({status:'checked_in',checked_in_at:new Date().toISOString()}).eq('booking_id',bookingId);
-  if(error){toast('報到失敗：'+translateError(error.message),true);return;}
-  await writeAudit('meeting_bookings',bookingId,'update',{status:before?.status},{status:'checked_in'});
+  try{
+    await callAppApi('meeting_check_in',{booking_id:bookingId});
+  }catch(e){toast('報到失敗：'+translateError(e.message||String(e)),true);return;}
   toast('報到成功');
   await loadWeek();await loadMyBookings();
 }
@@ -803,16 +811,11 @@ async function saveRoomUnsafe(){
   };
   try{
     if(editingRoomId){
-      const before=allRooms.find(r=>r.room_id===editingRoomId);
-      const {error}=await db.from('meeting_rooms').update(payload).eq('room_id',editingRoomId);
-      if(error)throw error;
-      await writeAudit('meeting_rooms',editingRoomId,'update',before,payload);
+      await callAppApi('meeting_save_room',{room_id:editingRoomId,...payload});
       toast('已更新會議室');
     }else{
-      payload.created_by=currentUser.user_id;
-      const {data,error}=await db.from('meeting_rooms').insert(payload).select().single();
-      if(error)throw error;
-      await writeAudit('meeting_rooms',data.room_id,'insert',null,payload);
+      // created_by 由後端以登入身分填入，不再由前端指定。
+      await callAppApi('meeting_save_room',payload);
       toast('已新增會議室');
     }
     await loadRooms();
