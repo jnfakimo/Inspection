@@ -13,7 +13,7 @@
 <title>駐衛警巡檢系統 — 臺北農產公司巡檢系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" integrity="sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
 <script src="patrolstatus.js?v=20260721-overdue-at-notify1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
@@ -330,64 +330,43 @@ function fmtLocalDateTime(value){
   const d=value||new Date(),p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
-function styleReportSheet(ws,rowCount){
-  const fontName='Microsoft JhengHei';
-  const borderColor={rgb:'B8C7D9'};
-  const thinBorder={
-    top:{style:'thin',color:borderColor},bottom:{style:'thin',color:borderColor},
-    left:{style:'thin',color:borderColor},right:{style:'thin',color:borderColor}
+// 報表樣式改用 ExcelJS 套用（原 xlsx-js-style 為 SheetJS 0.18.x 的第三方分支，
+// 已無維護且帶有 CVE-2023-30533 / CVE-2024-22363）。版面與配色維持與原本一致。
+function styleReportSheet(ws,dataRowCount){
+  const FONT='Microsoft JhengHei';
+  const line={style:'thin',color:{argb:'FFB8C7D9'}};
+  const box={top:line,bottom:line,left:line,right:line};
+  const fillOf=hex=>({type:'pattern',pattern:'solid',fgColor:{argb:'FF'+hex}});
+  // 逐欄設定寬度；資料列已加入後才指派 ws.columns 可能造成欄位錯位。
+  [13,9,34,15,17,15].forEach((w,i)=>{ws.getColumn(i+1).width=w;});
+  ws.mergeCells('A1:F1');ws.mergeCells('A2:F2');ws.mergeCells('A3:F3');
+  const band=(rowNo,height,style)=>{
+    const row=ws.getRow(rowNo);row.height=height;
+    for(let c=1;c<=6;c++){const cell=row.getCell(c);Object.assign(cell,style);}
   };
-  const ensureCell=(r,c)=>{
-    const address=XLSX.utils.encode_cell({r,c});
-    if(!ws[address])ws[address]={t:'s',v:''};
-    return ws[address];
+  band(1,31,{font:{name:FONT,size:18,bold:true,color:{argb:'FFFFFFFF'}},fill:fillOf('17365D'),alignment:{horizontal:'center',vertical:'middle'}});
+  band(2,22,{font:{name:FONT,size:10,color:{argb:'FF1F4E78'}},fill:fillOf('D9EAF7'),alignment:{horizontal:'left',vertical:'middle'}});
+  band(3,20,{font:{name:FONT,size:9,color:{argb:'FF5B6573'}},fill:fillOf('EEF3F8'),alignment:{horizontal:'left',vertical:'middle'}});
+  ws.getRow(4).height=8;
+  band(5,25,{font:{name:FONT,size:11,bold:true,color:{argb:'FFFFFFFF'}},fill:fillOf('1F4E78'),alignment:{horizontal:'center',vertical:'middle',wrapText:true},border:box});
+  const stateStyle={
+    '已打卡':{fill:'E2F0D9',font:'FF00875A'},
+    '待打卡':{fill:'FFF2CC',font:'FF9C6500'},
+    '逾期未打卡':{fill:'FCE4D6',font:'FFC00000'}
   };
-  for(let c=0;c<6;c++){
-    ensureCell(0,c).s={
-      font:{name:fontName,sz:18,bold:true,color:{rgb:'FFFFFF'}},
-      fill:{patternType:'solid',fgColor:{rgb:'17365D'}},
-      alignment:{horizontal:'center',vertical:'center'}
-    };
-    ensureCell(1,c).s={
-      font:{name:fontName,sz:10,color:{rgb:'1F4E78'}},
-      fill:{patternType:'solid',fgColor:{rgb:'D9EAF7'}},
-      alignment:{horizontal:'left',vertical:'center'}
-    };
-    ensureCell(2,c).s={
-      font:{name:fontName,sz:9,color:{rgb:'5B6573'}},
-      fill:{patternType:'solid',fgColor:{rgb:'EEF3F8'}},
-      alignment:{horizontal:'left',vertical:'center'}
-    };
-    ensureCell(4,c).s={
-      font:{name:fontName,sz:11,bold:true,color:{rgb:'FFFFFF'}},
-      fill:{patternType:'solid',fgColor:{rgb:'1F4E78'}},
-      alignment:{horizontal:'center',vertical:'center',wrapText:true},border:thinBorder
-    };
-  }
-  const statusStyle={
-    '已打卡':{fill:'E2F0D9',font:'00875A'},
-    '待打卡':{fill:'FFF2CC',font:'9C6500'},
-    '逾期未打卡':{fill:'FCE4D6',font:'C00000'}
-  };
-  for(let r=5;r<rowCount;r++){
-    for(let c=0;c<6;c++){
-      const cell=ensureCell(r,c),stripe=r%2?'FFFFFF':'F7FAFC';
-      cell.s={
-        font:{name:fontName,sz:10,color:{rgb:'243447'}},
-        fill:{patternType:'solid',fgColor:{rgb:stripe}},border:thinBorder,
-        alignment:{horizontal:c===2?'left':'center',vertical:'center',wrapText:c===2}
-      };
-      if(c===1){cell.s.font={name:fontName,sz:10,bold:true,color:{rgb:'1F4E78'}};cell.s.fill={patternType:'solid',fgColor:{rgb:'DDEBF7'}};}
-      if(c===5&&statusStyle[cell.v]){
-        const state=statusStyle[cell.v];
-        cell.s.font={name:fontName,sz:10,bold:true,color:{rgb:state.font}};
-        cell.s.fill={patternType:'solid',fgColor:{rgb:state.fill}};
-      }
+  for(let i=0;i<dataRowCount;i++){
+    const rowNo=6+i,row=ws.getRow(rowNo),stripe=rowNo%2?'FFFFFF':'F7FAFC';
+    row.height=21;
+    for(let c=1;c<=6;c++){
+      const cell=row.getCell(c);
+      cell.font={name:FONT,size:10,color:{argb:'FF243447'}};
+      cell.fill=fillOf(stripe);
+      cell.border=box;
+      cell.alignment={horizontal:c===3?'left':'center',vertical:'middle',wrapText:c===3};
+      if(c===2){cell.font={name:FONT,size:10,bold:true,color:{argb:'FF1F4E78'}};cell.fill=fillOf('DDEBF7');}
+      if(c===6){const st=stateStyle[cell.value];if(st){cell.font={name:FONT,size:10,bold:true,color:{argb:st.font}};cell.fill=fillOf(st.fill);}}
     }
   }
-  ws['!cols']=[{wch:13},{wch:9},{wch:34},{wch:15},{wch:17},{wch:15}];
-  ws['!rows']=[{hpt:31},{hpt:22},{hpt:20},{hpt:8},{hpt:25},...Array.from({length:Math.max(0,rowCount-5)},()=>({hpt:21}))];
-  ws['!margins']={left:.3,right:.3,top:.5,bottom:.5,header:.2,footer:.2};
 }
 async function exportReport(from,to){
   const status=document.getElementById('exportStatus');
@@ -395,7 +374,7 @@ async function exportReport(from,to){
   if(from>to){status.textContent='起日不可晚於迄日。';return;}
   const dates=eachDate(from,to);
   if(dates.length>366){status.textContent='單次匯出最多 366 天。';return;}
-  if(typeof XLSX==='undefined'){status.textContent='XLSX 元件尚未載入，請重新整理後再試。';return;}
+  if(typeof ExcelJS==='undefined'){status.textContent='Excel 排版元件尚未載入，請重新整理後再試。';return;}
   const buttons=[document.getElementById('exportDayBtn'),document.getElementById('exportRangeBtn')];
   buttons.forEach(b=>b.disabled=true);
   const filters=currentFilters(),rows=[];
@@ -423,21 +402,22 @@ async function exportReport(from,to){
       ['日期','樓層','巡檢點','班別','巡檢時段','打卡狀態'],
       ...rows
     ];
-    const ws=XLSX.utils.aoa_to_sheet(data);
-    ws['!merges']=[
-      {s:{r:0,c:0},e:{r:0,c:5}},
-      {s:{r:1,c:0},e:{r:1,c:5}},
-      {s:{r:2,c:0},e:{r:2,c:5}}
-    ];
-    ws['!autofilter']={ref:`A5:F${Math.max(5,data.length)}`};
-    styleReportSheet(ws,data.length);
-    const wb=XLSX.utils.book_new();
-    wb.Props={
-      Title:title,Subject:'第一市場駐衛警巡檢報表',Author:'臺北農產公司',
-      Company:'臺北農產公司',CreatedDate:new Date()
-    };
-    XLSX.utils.book_append_sheet(wb,ws,'巡檢報表');
-    XLSX.writeFile(wb,`第一市場巡檢表_${from}_${to}.xlsx`);
+    const wb=new ExcelJS.Workbook();
+    wb.creator='臺北農產公司';wb.company='臺北農產公司';
+    wb.subject='第一市場駐衛警巡檢報表';wb.title=title;wb.created=new Date();
+    const ws=wb.addWorksheet('巡檢報表',{
+      views:[{state:'frozen',ySplit:5}],
+      pageSetup:{margins:{left:.3,right:.3,top:.5,bottom:.5,header:.2,footer:.2}}
+    });
+    data.forEach(r=>ws.addRow(r));
+    styleReportSheet(ws,rows.length);
+    ws.autoFilter='A5:F'+Math.max(5,data.length);
+    const buffer=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=`第一市場巡檢表_${from}_${to}.xlsx`;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
     status.textContent=`匯出完成，共 ${rows.length} 筆；已套用目前篩選條件。`;
   }catch(e){status.textContent='匯出失敗：'+translateError(e.message);}
   finally{buttons.forEach(b=>b.disabled=false);}
