@@ -578,8 +578,11 @@ async function uploadRepairFile(path,file){
     return {data:null,error:{message:e?.message||first.error.message||'Load failed'}};
   }
 }
+// 狀態轉移的歷程已改由 repair_order_transition 在同一交易寫入；此函式僅剩派工
+// 建單一處使用。回傳 error 供呼叫端判斷，不再靜默吞掉寫入失敗。
 async function logStatus(reqId,ordId,from,to,note){
-  await db.from('case_status_log').insert({request_id:reqId,order_id:ordId,from_status:from,to_status:to,note:note||null,operator_id:me_.user_id||null,operator_name:operatorLabel()});
+  const {error}=await db.from('case_status_log').insert({request_id:reqId,order_id:ordId,from_status:from,to_status:to,note:note||null,operator_id:me_.user_id||null,operator_name:operatorLabel()});
+  return error;
 }
 const OPTIONAL_REPAIR_COLUMNS=['fault_location','mobile','equipment_category','location_id','desired_finish'];
 function isSchemaColumnError(error){
@@ -706,8 +709,11 @@ async function doDispatch(reqId){
     need_approval:document.getElementById('x-appr').value==='true',status:'assigned',accept_status:'pending'};
   const {data,error}=await db.from('maintenance_orders').insert(ord).select('order_id,wo_no').single();
   if(error){toast('派工失敗：'+translateError(error.message),true);return;}
-  await db.from('repair_requests').update({status:'assigned',assignee_id:tech||null,updated_at:new Date().toISOString()}).eq('request_id',reqId);
-  await logStatus(reqId,data.order_id,r.status,'assigned','派工 '+(data.wo_no||'')+(tech?(' → '+(techs.find(t=>t.user_id===tech)?.name||'')):'')+(vendor?(' 委外:'+vendor):''));
+  // 工單已建立，後續兩步若失敗會使報修單狀態與工單不一致，故明確回報。
+  const {error:reqErr}=await db.from('repair_requests').update({status:'assigned',assignee_id:tech||null,updated_at:new Date().toISOString()}).eq('request_id',reqId);
+  if(reqErr){toast('工單已建立，但報修單狀態更新失敗：'+translateError(reqErr.message),true);}
+  const logErr=await logStatus(reqId,data.order_id,r.status,'assigned','派工 '+(data.wo_no||'')+(tech?(' → '+(techs.find(t=>t.user_id===tech)?.name||'')):'')+(vendor?(' 委外:'+vendor):''));
+  if(logErr){toast('工單已建立，但流程歷程寫入失敗：'+translateError(logErr.message),true);}
   if(tech){ try{ await db.from('notifications').insert({recipient_id:tech,event:'dispatch',title:'新派工通知',
     body:`${r.req_no||''}｜${r.fault_type||'設備'}｜${r.fault_desc||''}`,request_id:reqId,order_id:data.order_id}); }catch(e){} }
   await loadData(); renderChips(); renderList(); openPendingDetail(reqId); toast('已派工');
@@ -717,8 +723,9 @@ async function doDispatch(reqId){
 }
 async function cancelCase(r){
   if(!hasPerm('delete')){toast('沒有刪除/取消權限',true);return;}
-  await db.from('repair_requests').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,null,r.status,'cancelled','案件取消');
+  const {error}=await db.rpc('repair_order_transition',{
+    p_request_id:r.request_id,p_action:'cancel',p_order_id:null,p_note:'案件取消',p_payload:{}});
+  if(error){toast(translateError(error.message),true);return;}
   await loadData(); renderChips(); renderList(); closeM('m-detail'); toast('已取消');
 }
 
@@ -809,41 +816,42 @@ function completeForm(r,o){
 }
 async function doComplete(reqId,ordId){
   if(!hasPerm('update')){toast('沒有更新權限',true);return;}
-  const now=new Date().toISOString();
-  const upd={status:'pending_review',finish_time:now,fault_cause:document.getElementById('x-cause').value.trim()||null,
-    handle_method:document.getElementById('x-method').value.trim()||null,parts_used:document.getElementById('x-parts').value.trim()||null,
-    materials:document.getElementById('x-mat').value.trim()||null,labor_hours:parseFloat(document.getElementById('x-hours').value)||null};
-  await db.from('maintenance_orders').update(upd).eq('order_id',ordId);
-  await db.from('repair_requests').update({status:'pending_review',updated_at:now}).eq('request_id',reqId);
-  await logStatus(reqId,ordId,'in_progress','pending_review','維修完成，待驗收'+(upd.fault_cause?'（原因:'+upd.fault_cause+'）':''));
-  await reloadAndReopen(ordId); toast('維修完成，待驗收');
+  const cause=document.getElementById('x-cause').value.trim()||null;
+  const payload={fault_cause:cause,handle_method:document.getElementById('x-method').value.trim()||null,
+    parts_used:document.getElementById('x-parts').value.trim()||null,
+    materials:document.getElementById('x-mat').value.trim()||null,
+    labor_hours:parseFloat(document.getElementById('x-hours').value)||null};
+  if(await transition({request_id:reqId},{order_id:ordId},'complete',
+      '維修完成，待驗收'+(cause?'（原因:'+cause+'）':''),payload))toast('維修完成，待驗收');
 }
-async function accept(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}await db.from('maintenance_orders').update({status:'accepted',accept_status:'accepted'}).eq('order_id',o.order_id);
-  await db.from('repair_requests').update({status:'assigned',updated_at:new Date().toISOString()}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,o.order_id,'assigned','accepted','技師接單');await reloadAndReopen(o.order_id);toast('已接單');}
-async function returnOrder(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}await db.from('maintenance_orders').update({status:'returned',accept_status:'returned'}).eq('order_id',o.order_id);
-  await db.from('repair_requests').update({status:'pending',assignee_id:null,updated_at:new Date().toISOString()}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,o.order_id,o.status,'returned','退回派工，待重新指派');await reloadAndReopen(o.order_id);toast('已退回');}
-async function rejectOrder(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}await db.from('maintenance_orders').update({status:'rejected',accept_status:'rejected'}).eq('order_id',o.order_id);
-  await db.from('repair_requests').update({status:'pending',assignee_id:null,updated_at:new Date().toISOString()}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,o.order_id,o.status,'rejected','技師拒絕，待重新指派');await reloadAndReopen(o.order_id);toast('已拒絕');}
-async function startWork(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}const now=new Date().toISOString();
-  await db.from('maintenance_orders').update({status:'in_progress',start_time:now,arrival_time:o.arrival_time||now}).eq('order_id',o.order_id);
-  await db.from('repair_requests').update({status:'in_progress',updated_at:now}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,o.order_id,'accepted','in_progress','開始維修，到場時間 '+fmt(now));await reloadAndReopen(o.order_id);toast('開始維修');}
-async function waitState(r,o,st){if(!hasPerm('update')){toast('沒有更新權限',true);return;}await db.from('maintenance_orders').update({status:st}).eq('order_id',o.order_id);
-  await logStatus(r.request_id,o.order_id,'in_progress',st,st==='waiting_parts'?'等待料件':'等待廠商');await reloadAndReopen(o.order_id);toast('狀態已更新');}
-async function resume(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}await db.from('maintenance_orders').update({status:'in_progress'}).eq('order_id',o.order_id);
-  await logStatus(r.request_id,o.order_id,o.status,'in_progress','繼續維修');await reloadAndReopen(o.order_id);toast('繼續維修');}
-async function confirmUnit(r,o){if(!hasPerm('sign')){toast('沒有簽核權限',true);return;}await logStatus(r.request_id,o?.order_id,'pending_review','pending_review','使用單位已驗收確認');await reloadAndReopen(o?.order_id);toast('已記錄使用單位驗收');}
-async function closeCase(r,o){const now=new Date().toISOString();
-  if(!hasPerm('close')){toast('沒有結案權限',true);return;}
-  if(o) await db.from('maintenance_orders').update({status:'closed'}).eq('order_id',o.order_id);
-  await db.from('repair_requests').update({status:'closed',updated_at:now}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,o?.order_id,'pending_review','closed','主管結案，案件完成');await reloadAndReopen(o?.order_id);toast('已結案');}
-async function reopen(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}if(o)await db.from('maintenance_orders').update({status:'in_progress'}).eq('order_id',o.order_id);
-  await db.from('repair_requests').update({status:'in_progress',updated_at:new Date().toISOString()}).eq('request_id',r.request_id);
-  await logStatus(r.request_id,o?.order_id,'pending_review','in_progress','驗收退回，重新維修');await reloadAndReopen(o?.order_id);toast('已退回重修');}
+// 狀態轉移改由 repair_order_transition 於單一交易完成：工單、報修單與流程歷程
+// 一次寫入，目標狀態由伺服器端依動作判定。與 workorder.html 使用同一支函式，
+// 兩頁不再各自維護一份轉移邏輯。前端保留 hasPerm 僅為即時回饋。
+async function transition(r,o,action,note,payload){
+  const {error}=await db.rpc('repair_order_transition',{
+    p_request_id:r.request_id,p_action:action,p_order_id:o?.order_id||null,
+    p_note:note||null,p_payload:payload||{}});
+  if(error){toast(translateError(error.message),true);return false;}
+  await reloadAndReopen(o?.order_id);return true;
+}
+async function accept(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,'accept','技師接單'))toast('已接單');}
+async function returnOrder(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,'return','退回派工，待重新指派'))toast('已退回');}
+async function rejectOrder(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,'reject','技師拒絕，待重新指派'))toast('已拒絕');}
+async function startWork(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,'start','開始維修'))toast('開始維修');}
+async function waitState(r,o,st){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,st==='waiting_parts'?'wait_parts':'wait_vendor',st==='waiting_parts'?'等待料件':'等待廠商'))toast('狀態已更新');}
+async function resume(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,'resume','繼續維修'))toast('繼續維修');}
+async function confirmUnit(r,o){if(!hasPerm('sign')){toast('沒有簽核權限',true);return;}
+  if(await transition(r,o,'confirm_unit','使用單位已驗收確認'))toast('已記錄使用單位驗收');}
+async function closeCase(r,o){if(!hasPerm('close')){toast('沒有結案權限',true);return;}
+  if(await transition(r,o,'close','主管結案，案件完成'))toast('已結案');}
+async function reopen(r,o){if(!hasPerm('update')){toast('沒有更新權限',true);return;}
+  if(await transition(r,o,'reopen','驗收退回，重新維修'))toast('已退回重修');}
 
 async function reloadAndReopen(ordId){ await loadData(); renderChips(); renderList(); if(ordId)openOrderDetail(ordId); }
 
