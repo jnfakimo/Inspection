@@ -2814,7 +2814,9 @@ async function createEquipment() {
   if (error) { showToast('新增失敗：' + translateError(error.message), true); return; }
 
   if (cost) {
-    await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || window.SystemDate.todayISO(), note: '初始購置費', created_by: currentUser.user_id });
+    // 設備已建立，此步失敗會使年度成本分析少算這筆購置費，故明確回報而非靜默略過。
+    const { error: costErr } = await db.from('cost_records').insert({ equipment_id: data.equipment_id, cost_type: 'purchase', amount: cost, cost_date: date || window.SystemDate.todayISO(), note: '初始購置費', created_by: currentUser.user_id });
+    if (costErr) { showToast('設備已新增，但購置成本紀錄寫入失敗：' + translateError(costErr.message), true); }
   }
   await writeAudit('equipment', data.equipment_id, 'insert', null, eq);
   showToast(`設備「${name}」已新增`);
@@ -4079,9 +4081,11 @@ async function changePassword() {
 
 // ─── END SETTINGS PAGE ────────────────────────────────────────────────────────
 
+// 稽核寫入失敗不應中斷已完成的管理操作，但也不該完全無聲——後台的稽核軌跡
+// 缺漏事後難以察覺，故至少記錄於主控台供排查。
 async function writeAudit(table, recordId, action, before, after) {
   if (!currentUser) return;
-  await db.from('audit_logs').insert({
+  const { error: auditErr } = await db.from('audit_logs').insert({
     table_name: table,
     record_id: String(recordId),
     action,
@@ -4099,6 +4103,7 @@ async function writeAudit(table, recordId, action, before, after) {
     user_agent: navigator.userAgent,
     source: 'admin.html'
   });
+  if (auditErr) console.warn('稽核紀錄寫入失敗', table, recordId, auditErr.message);
 }
 
 // 記錄登入/登出事件與裝置資訊；IP 應由受控後端擷取，失敗不影響登出流程本身
