@@ -221,10 +221,8 @@ function fillStaffSelect(selectId,ids){
   el.innerHTML=staffRows.map(u=>`<option value="${esc(u.user_id)}" ${selected.has(u.user_id)?'selected':''}>${esc(staffName(u.user_id))}</option>`).join('');
 }
 function selectedStaff(selectId){return [...document.getElementById(selectId).selectedOptions].map(o=>o.value);}
-async function saveStaffAssignments(){
-  const {error}=await db.from('system_settings').upsert({key:'patrol_shift_staff',value:JSON.stringify(staffAssignments)},{onConflict:'key'});
-  return error;
-}
+// 人員指派的寫入已移入 save_patrol_shift / save_patrol_shift_template，
+// 由伺服器端對 patrol_shift_staff 做局部合併，前端不再整包覆寫。
 
 function todayStr(){const d=new Date();const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;}
 function goToday(){document.getElementById('datePick').value=todayStr();load();}
@@ -322,12 +320,16 @@ async function saveShift(){
   if(![workStart,workEnd,start,end].every(isHalfHour)){msg.textContent='時間請以半小時為單位（00 或 30 分）';return;}
   const dateStr=document.getElementById('datePick').value;
   const s=shiftRows.find(x=>x.name===editShiftName);
-  const payload={shift_date:dateStr,name:editShiftName,start_time:start,end_time:end,sort_order:s?s.sort_order:0};
-  const {error}=await db.from('patrol_shifts').upsert(payload,{onConflict:'shift_date,name'});
+  // 班別時段與人員指派改由 save_patrol_shift 於單一交易寫入；人員指派在伺服器端
+  // 只更新該日期／班別的節點，不再整包覆寫。記憶體狀態等成功後才更新，避免失敗時
+  // 畫面已顯示成已儲存但資料庫沒有。
+  const staff=selectedStaff('f-users');
+  const {error}=await db.rpc('save_patrol_shift',{
+    p_shift_date:dateStr,p_name:editShiftName,p_start_time:start,p_end_time:end,
+    p_sort_order:s?s.sort_order:0,p_staff:staff,p_work_start:workStart,p_work_end:workEnd});
   if(error){msg.textContent=translateError(error.message);return;}
-  staffAssignments.dates[dateStr]||={};staffAssignments.dates[dateStr][editShiftName]=selectedStaff('f-users');
+  staffAssignments.dates[dateStr]||={};staffAssignments.dates[dateStr][editShiftName]=staff;
   staffAssignments.workTimes.dates[dateStr]||={};staffAssignments.workTimes.dates[dateStr][editShiftName]={start:workStart,end:workEnd};
-  const staffError=await saveStaffAssignments();if(staffError){msg.textContent=translateError(staffError.message);return;}
   closeModal('m-shift');toast('已更新');await load();
 }
 
@@ -364,14 +366,14 @@ async function saveTpl(){
   if(!name||!workStart||!workEnd||!start||!end){msg.textContent='請完整填寫班別名稱、上班時段與通報時段';return;}
   if(![workStart,workEnd,start,end].every(isHalfHour)){msg.textContent='時間請以半小時為單位（00 或 30 分）';return;}
   const sortOrder=editTplId?tplRows.find(x=>x.template_id===editTplId).sort_order:(tplRows.length?Math.max(...tplRows.map(s=>s.sort_order))+1:1);
-  const payload={name,start_time:start,end_time:end,sort_order:sortOrder};
-  let error;
-  if(editTplId){({error}=await db.from('patrol_shift_template').update(payload).eq('template_id',editTplId));}
-  else{({error}=await db.from('patrol_shift_template').insert(payload));}
+  // 範本與人員指派同樣改由單一交易寫入，見 save_patrol_shift 的說明。
+  const staff=selectedStaff('tf-users');
+  const {error}=await db.rpc('save_patrol_shift_template',{
+    p_template_id:editTplId,p_name:name,p_start_time:start,p_end_time:end,
+    p_sort_order:sortOrder,p_staff:staff,p_work_start:workStart,p_work_end:workEnd});
   if(error){msg.textContent=translateError(error.message);return;}
-  staffAssignments.templates[name]=selectedStaff('tf-users');
+  staffAssignments.templates[name]=staff;
   staffAssignments.workTimes.templates[name]={start:workStart,end:workEnd};
-  const staffError=await saveStaffAssignments();if(staffError){msg.textContent=translateError(staffError.message);return;}
   closeModal('m-tpl');toast(editTplId?'已更新':'已新增');await loadTpl();await load();
 }
 async function delTpl(id){
