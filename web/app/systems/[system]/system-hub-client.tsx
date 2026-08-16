@@ -28,12 +28,12 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 02'],
     ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 03'],
   ] : [
-    ['checkins', '駐衛警巡檢表', '查詢樓層與巡檢點的打卡狀態，掌握待巡與逾期項目。', 'guardpatrol-list-icon.png', 'PATROL 01'],
-    ['map3d', '3D 駐警巡檢雲台', '以立體場域視角查看巡檢點位與打卡狀態。', 'guardpatrol-3d-icon.png', 'PATROL 02'],
-    ['shifts', '巡檢排班系統', '管理每日巡檢班別、執勤人員與時段。', 'guardpatrol-schedule-icon.png', 'PATROL 03'],
-    ['notifications', 'LINE 推播紀錄', '查詢巡檢逾時推播與回應狀態。', 'guardpatrol-line-push-icon.png', 'PATROL 04'],
+    ['checkins', '駐衛警巡檢表', '查詢各樓層與巡檢點的打卡狀態，即時掌握待巡與逾期項目。', 'guardpatrol-list-icon.png', 'MODULE 01'],
+    ['map3d', '3D 駐警巡檢雲台', '以立體場域視角查看巡檢點位與打卡狀態，快速定位異常區域。', 'guardpatrol-3d-icon.png', 'MODULE 02'],
+    ['shifts', '巡檢排班系統', '管理每日巡檢班別、執勤人員與時段，維持排班資訊清楚且一致。', 'guardpatrol-schedule-icon.png', 'MODULE 03'],
+    ['notifications', 'LINE推播紀錄', '查詢巡檢逾時推播的發送時間、完成狀況、排定人員與 LINE 回應。', 'guardpatrol-line-push-icon.png', 'MODULE 04'],
   ];
-  return <AppShell profile={profile} title={system.title}><section className="operations-portal-hero"><img src={system.icon} alt="" /><div><h1>{system.title}</h1><p>{system.description}</p></div></section><div className="operations-portal-note">{handover ? 'HANDOVER WORKFLOW · 依班別完成交接與接收稽核' : 'GUARD PATROL WORKFLOW · 點選圖卡進入功能系統'}</div><section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><span className="operations-portal-code">{code}</span><img src={`/word-cloud/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>▶ 進入功能</b></Link>)}</section></AppShell>;
+  return <AppShell profile={profile} title={system.title}><section className="operations-portal-hero"><img src={system.icon} alt="" /><div><h1>{system.title}</h1><p>{system.description}</p></div></section><div className="operations-portal-note">{handover ? 'HANDOVER WORKFLOW · 依班別完成交接與接收稽核' : 'GUARD PATROL WORKFLOW · 點選圖卡進入功能系統'}</div><section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/word-cloud/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? "▶ 進入交接" : key === "checkins" ? "ENTER SYSTEM　→" : key === "map3d" ? "OPEN 3D VIEW　→" : key === "shifts" ? "MANAGE SHIFTS　→" : "VIEW NOTIFICATIONS　→"}</b></Link>)}</section></AppShell>;
 }
 
 export function SystemHubClient({ system }: { system: SystemDefinition }) {
@@ -45,3 +45,4 @@ export function SystemHubClient({ system }: { system: SystemDefinition }) {
   }
   return <AuthGate>{profile => <Hub profile={profile} />}</AuthGate>;
 }
+
