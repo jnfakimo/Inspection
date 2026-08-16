@@ -60,25 +60,28 @@ OpenSeadragon／Three.js 直接載入，需匿名可讀。內容為建物平面�
 **補償控制**：全表 RLS 已啟用且逐列授權；未經登入的 anon 角色在所有業務資料表
 皆無讀寫權限。金鑰集中於 `system/supabase-config.js` 一處，便於輪替。
 
-## 已知待處理項目
+## 試算表函式庫現況（已處理）
 
-### xlsx-js-style@1.2.0（高）
+CVE-2023-30533（Prototype Pollution，影響 SheetJS < 0.19.3）與 CVE-2024-22363
+（ReDoS，影響 < 0.20.2）已完全消除：
 
-`admin.html`、`guardpatrol.html`、`vehicle-dispatch.html` 三頁使用
-`xlsx-js-style@1.2.0`。該套件為 SheetJS 0.18.x 的第三方分支，**已無維護、無升級
-版本**，因此繼承同一組漏洞：
+| 頁面 | 匯出 | 解析匯入檔 |
+| --- | --- | --- |
+| `admin.html` | ExcelJS 4.4.0 | SheetJS 0.20.3 |
+| `equipment.html` | ExcelJS 4.4.0 | SheetJS 0.20.3 |
+| `guardpatrol.html` | ExcelJS 4.4.0 | — |
+| `vehicle-dispatch.html` | ExcelJS 4.4.0 | — |
+| `analytics.html`、`arealist.html` | SheetJS 0.20.3 | — |
 
-- CVE-2023-30533（Prototype Pollution，影響 SheetJS < 0.19.3）
-- CVE-2024-22363（ReDoS，影響 SheetJS < 0.20.2）
+- **`xlsx-js-style@1.2.0` 已自全站移除**。該套件為 SheetJS 0.18.x 的第三方分支，
+  已無維護且無升級版本，故改以 ExcelJS 重寫需要儲存格樣式的匯出。
+- 原版 SheetJS 由 0.18.5 升級至 **0.20.3**，來源改為官方 CDN（`cdn.sheetjs.com`，
+  已納入 CSP `script-src`），SRI 雜湊依實際檔案重新計算。
 
-原版 SheetJS 已於 2026-08-16 升級至 0.20.3（`analytics`、`arealist`、
-`equipment` 三頁），但該分支提供官方 CE 版沒有的儲存格樣式功能，**無法直接換版**。
-
-**風險評估**：兩個漏洞的利用前提皆為「解析攻擊者提供的惡意 xlsx 檔」。本系統的
-匯入功能僅開放給具備對應權限的內部人員，檔案來源為內部作業文件，非公開上傳。
-
-**改善路徑**：改用 `exceljs@4.4.0`（已在 `package.json` 相依中，且 `equipment.html`
-已部分採用）。屬程式改寫而非換版。
+**為何解析匯入檔仍使用 SheetJS**：批次匯入的檔案輸入公開接受
+`.xlsx`／`.xls`／`.csv` 三種格式。ExcelJS 不支援 `.xls`（BIFF），且 `.csv` 需
+stream API，改用 ExcelJS 會直接移除既有可用格式。0.20.3 無已知漏洞，實際攻擊面
+（解析外部檔案）已消除。
 
 ### 臨時密碼處理（已改善）
 
