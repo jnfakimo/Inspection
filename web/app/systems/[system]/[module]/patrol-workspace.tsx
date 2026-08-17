@@ -23,6 +23,7 @@ import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { FloorStack3D, floorOrder, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -45,7 +46,76 @@ export function PatrolWorkspace({ system, module, profile }: Props) {
   if (module.key === 'points') return <PointsModule system={system} module={module} profile={profile} />;
   if (module.key === 'records') return <RecordsModule system={system} module={module} profile={profile} />;
   if (module.key === 'shifts') return <ShiftsModule system={system} module={module} profile={profile} />;
+  if (module.key === 'map3d') return <Map3DModule system={system} module={module} profile={profile} />;
   return <NotificationsModule system={system} module={module} profile={profile} />;
+}
+
+/* ──────────────────────────── 立體巡檢雲臺 ──────────────────────────── */
+
+// 與 SYS-06 的立體樓層共用 FloorStack3D，差別在只顯示巡檢點，
+// 並依當日打卡狀態著色：已打卡綠色、未打卡紅色。
+function Map3DModule({ module, profile }: Props) {
+  const [models, setModels] = useState<Row[]>([]);
+  const [points, setPoints] = useState<Row[]>([]);
+  const [checkins, setCheckins] = useState<Row[]>([]);
+  const [date, setDate] = useState(taipeiToday());
+  const [busy, setBusy] = useState(true), [note, setNote] = useState('');
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [gap, setGap] = useState(1.6);
+
+  const load = useCallback(async () => {
+    setBusy(true); setNote('');
+    const client = getSupabase();
+    const [m, p, c] = await Promise.all([
+      client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
+      client.from('plan_markers').select('marker_id,floor_id,label,x,y,status').eq('kind', 'patrol').limit(5000),
+      client.from('checkin_logs').select('checkin_id,target_id,label,floor_id,user_name,checkin_at')
+        .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(5000),
+    ]);
+    if (m.error || p.error || c.error) setNote(`失敗：${errorMessage(m.error || p.error || c.error, '立體巡檢資料載入失敗')}`);
+    const sorted = (m.data || []).slice().sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    setModels(sorted); setPoints(p.data || []); setCheckins(c.data || []); setBusy(false);
+  }, [date]);
+  useEffect(() => { void load(); }, [load]);
+
+  const checkedIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const row of checkins) {
+      if (row.target_id) set.add(String(row.target_id));
+      set.add(`${row.floor_id}|${row.label}`);
+    }
+    return set;
+  }, [checkins]);
+  const isChecked = useCallback((point: Row) =>
+    checkedIds.has(String(point.marker_id)) || checkedIds.has(`${point.floor_id}|${point.label}`), [checkedIds]);
+
+  const active = useMemo(() => points.filter(p => p.status !== 'inactive'), [points]);
+  const stackMarkers: StackMarker[] = useMemo(() => active.map(p => ({
+    id: String(p.marker_id), floor_id: String(p.floor_id),
+    x: Number(p.x) || 0, y: Number(p.y) || 0,
+    color: isChecked(p) ? '#00ff9d' : '#ff3b3b',
+  })), [active, isChecked]);
+  const done = active.filter(isChecked).length;
+
+  return <AppShell profile={profile} title={module.title}>
+    <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+    <section className="panel admin-panel">
+      <div className="admin-toolbar">
+        <label>巡檢日期<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} />顯示巡檢點
+        </label>
+        <label>樓層間距<input type="range" min={0.8} max={3} step={0.2} value={gap} onChange={e => setGap(Number(e.target.value))} /></label>
+        <span>{models.length} 樓層｜已打卡 <b style={{ color: '#047857' }}>{done}</b>／未打卡 <b style={{ color: '#b42318' }}>{active.length - done}</b></span>
+      </div>
+      {!busy && !models.length && <p className="empty">尚未設定樓層模型，請至圖臺系統的「模型管理」建立。</p>}
+      <FloorStack3D models={models as never} markers={stackMarkers} showMarkers={showMarkers} gap={gap} />
+      <p className="inline-message">
+        綠色為當日已打卡、紅色為未打卡；拖曳旋轉、滾輪縮放、右鍵平移。
+        巡檢點座標取自 plan_markers（kind=patrol），維護請至圖臺系統的「整合標記」。
+      </p>
+    </section>
+  </AppShell>;
 }
 
 /* ──────────────────────────── 巡邏點清單 ──────────────────────────── */

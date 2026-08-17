@@ -15,8 +15,8 @@ import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase } from '@/lib/supabase';
-import { SUPABASE_URL } from '@/lib/config';
 import { AdminHeader, errorMessage, fmt, type Row } from '@/components/admin/shared';
+import { FloorStack3D, floorOrder, floorTextureUrl, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -28,14 +28,7 @@ const MARKER_KIND: Record<string, string> = {
 const KIND_COLOR: Record<string, string> = {
   equipment: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
 };
-const textureUrl = (imagePath: unknown) =>
-  imagePath ? `${SUPABASE_URL}/storage/v1/object/public/floorplans/${String(imagePath)}` : '';
-function floorOrder(floor: string) {
-  const basement = floor.match(/^B(\d+)$/); if (basement) return -Number(basement[1]);
-  if (floor === 'RF') return 999;
-  const above = floor.match(/^(\d+)F$/); if (above) return Number(above[1]);
-  return 500;
-}
+const textureUrl = floorTextureUrl;
 
 export function StructureMapViewers({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   return <AuthGate>{profile => module.key === 'floor3d'
@@ -190,109 +183,21 @@ function Floor2DViewer({ module, profile }: Props) {
 
 /* ──────────────────────────── 3D 立體樓層 ──────────────────────────── */
 
+
+/* ──────────────────────────── 3D 立體樓層 ──────────────────────────── */
+
 function Floor3DViewer({ module, profile }: Props) {
   const { models, markers, busy, note, reload } = useFloorData();
   const [showMarkers, setShowMarkers] = useState(true);
   const [gap, setGap] = useState(1.6);
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const cleanupRef = useRef<() => void>(() => {});
 
-  useEffect(() => {
-    let disposed = false;
-    if (!hostRef.current || !models.length) return;
-    (async () => {
-      const THREE = await import('three');
-      const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
-      if (disposed || !hostRef.current) return;
-      const host = hostRef.current;
-      host.innerHTML = '';
-
-      const width = host.clientWidth || 900, height = host.clientHeight || 560;
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x04101f);
-      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
-      camera.position.set(9, 9, 12);
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.setSize(width, height);
-      host.appendChild(renderer.domElement);
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.target.set(0, models.length * gap / 2, 0);
-
-      scene.add(new THREE.AmbientLight(0xffffff, 1.1));
-      const dir = new THREE.DirectionalLight(0xffffff, 0.7);
-      dir.position.set(8, 14, 6);
-      scene.add(dir);
-
-      const loader = new THREE.TextureLoader();
-      loader.setCrossOrigin('anonymous');
-      const planeW = 10, planeH = 7;
-      // level 目前資料皆為 0，因此以清單順序乘以間距堆疊；若日後 level 有值則優先採用。
-      const useLevel = models.some(m => Number(m.level) !== 0);
-      const heightOf = (index: number, row: Row) => useLevel ? Number(row.level) || 0 : index * gap;
-
-      models.forEach((row, index) => {
-        const y = heightOf(index, row);
-        const material = new THREE.MeshBasicMaterial({ color: 0x0a2036, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(planeW, planeH), material);
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.position.y = y;
-        scene.add(mesh);
-
-        const url = textureUrl(row.image_path);
-        if (url) {
-          loader.load(url, texture => {
-            texture.colorSpace = THREE.SRGBColorSpace;
-            material.map = texture; material.color.set(0xffffff); material.needsUpdate = true;
-          }, undefined, () => { /* 貼圖載入失敗時保留底色，不中斷場景 */ });
-        }
-
-        const edges = new THREE.LineSegments(
-          new THREE.EdgesGeometry(new THREE.PlaneGeometry(planeW, planeH)),
-          new THREE.LineBasicMaterial({ color: 0x1a4a70 }));
-        edges.rotation.x = -Math.PI / 2; edges.position.y = y + 0.002;
-        scene.add(edges);
-
-        if (showMarkers) {
-          const floorMarkers = markers.filter(m => String(m.floor_id) === String(row.floor_id) && m.status !== 'inactive');
-          for (const marker of floorMarkers) {
-            const color = new THREE.Color(String(marker.color || KIND_COLOR[String(marker.kind)] || '#00d4ff'));
-            const dot = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), new THREE.MeshBasicMaterial({ color }));
-            // plan_markers 的 x／y 是 0–1 相對座標，換算到平面尺寸並置中。
-            dot.position.set((Number(marker.x) || 0) * planeW - planeW / 2, y + 0.12, (Number(marker.y) || 0) * planeH - planeH / 2);
-            scene.add(dot);
-          }
-        }
-      });
-
-      let raf = 0;
-      const tick = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(tick); };
-      tick();
-      const onResize = () => {
-        const w = host.clientWidth || width, h = host.clientHeight || height;
-        camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
-      };
-      window.addEventListener('resize', onResize);
-
-      cleanupRef.current = () => {
-        cancelAnimationFrame(raf);
-        window.removeEventListener('resize', onResize);
-        controls.dispose();
-        scene.traverse(obj => {
-          const mesh = obj as any;
-          mesh.geometry?.dispose?.();
-          const mat = mesh.material;
-          if (Array.isArray(mat)) mat.forEach((m: any) => { m.map?.dispose?.(); m.dispose?.(); });
-          else if (mat) { mat.map?.dispose?.(); mat.dispose?.(); }
-        });
-        renderer.dispose();
-        if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
-      };
-    })();
-    return () => { disposed = true; cleanupRef.current(); cleanupRef.current = () => {}; };
-  }, [models, markers, showMarkers, gap]);
+  const stackMarkers: StackMarker[] = useMemo(() => markers
+    .filter(m => m.status !== 'inactive')
+    .map(m => ({
+      id: String(m.marker_id), floor_id: String(m.floor_id),
+      x: Number(m.x) || 0, y: Number(m.y) || 0,
+      color: String(m.color || KIND_COLOR[String(m.kind)] || '#00d4ff'),
+    })), [markers]);
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={reload} />
@@ -303,10 +208,10 @@ function Floor3DViewer({ module, profile }: Props) {
           <input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} />顯示標記
         </label>
         <label>樓層間距<input type="range" min={0.8} max={3} step={0.2} value={gap} onChange={e => setGap(Number(e.target.value))} /></label>
-        <span>{markers.filter(m => m.status !== 'inactive').length} 個標記</span>
+        <span>{stackMarkers.length} 個標記</span>
       </div>
       {!busy && !models.length && <p className="empty">尚未設定樓層模型，請先於「模型管理」建立。</p>}
-      <div ref={hostRef} className="plan-stage" />
+      <FloorStack3D models={models as never} markers={stackMarkers} showMarkers={showMarkers} gap={gap} />
       <p className="inline-message">
         拖曳旋轉、滾輪縮放、右鍵平移。樓層貼圖取自公開儲存桶 floorplans 的 image_path；
         標記依 plan_markers 的相對座標換算至各層平面。
