@@ -50,6 +50,11 @@
 .mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
 .mr-page .mr-list .mr-card:nth-child(odd){background:color-mix(in srgb,#e0f2fe 48%,var(--panel));border-left-color:#7dd3fc}
 .mr-page .mr-list .mr-card:nth-child(even){background:color-mix(in srgb,#ecfdf5 48%,var(--panel));border-left-color:#6ee7b7}
+/* 主檔每筆會議採固定的淺色循環，讓多筆資料在清單中容易辨識。 */
+:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n+1){background:#f0f9ff;border-left-color:#7dd3fc}
+:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n+2){background:#f0fdf4;border-left-color:#86efac}
+:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n+3){background:#fffbeb;border-left-color:#fcd34d}
+:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n){background:#faf5ff;border-left-color:#c4b5fd}
 
 /* 週排程依 V1 圖塊比例縮至約 75%；手機仍保留完整寬度與橫向瀏覽。 */
 @media (min-width:761px){
