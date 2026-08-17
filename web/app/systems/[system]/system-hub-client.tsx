@@ -8,6 +8,13 @@ import { zhModuleCode, zhSystemCode } from '@/lib/zh-tw';
 import type { Profile } from '@/types/app';
 import { HandoverModules } from './[module]/handover-workspace';
 
+const meetingroomModuleIcons: Record<string, string> = {
+  bookings: '/Inspection/assets/system-icons/meeting-booking-icon-v1.png',
+  rooms: '/Inspection/assets/system-icons/meeting-room-master-icon-v1.png',
+  changes: '/Inspection/assets/system-icons/meeting-change-icon-v1.png',
+  notifications: '/Inspection/assets/system-icons/meeting-notification-icon-v1.png',
+};
+
 function WorkorderHub({ profile }: { profile: Profile }) {
   return <AppShell profile={profile} title="維修／派工／完工系統">
     <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons/maintenance-icon.png" alt="" /> 維修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
@@ -42,7 +49,7 @@ export function SystemHubClient({ system }: { system: SystemDefinition }) {
     const allowed = profile.allowed_systems.includes('*') || profile.allowed_systems.includes(system.key);
     if (system.key === 'workorder' && allowed) return <WorkorderHub profile={profile} />;
     if ((system.key === 'handover' || system.key === 'guardpatrol') && allowed) return <OperationsHub system={system} profile={profile} />;
-    return <AppShell profile={profile} title={system.title}>{allowed ? <><section className="module-hero"><div><span>{zhSystemCode(system.code)}</span><h2>{system.title}</h2><p>{system.description}</p></div><img src={system.icon} alt="" /></section><section className="module-grid">{system.modules.map((module: ModuleDefinition, index: number) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`}><span>{zhModuleCode(index)}</span><h3>{module.title}</h3><p>{module.description}</p><b>開啟子系統 →</b></Link>)}</section></> : <div className="notice danger">目前角色沒有此系統權限，請由管理員開放。</div>}</AppShell>;
+    return <AppShell profile={profile} title={system.title}>{allowed ? <><section className="module-hero"><div><span>{zhSystemCode(system.code)}</span><h2>{system.title}</h2><p>{system.description}</p></div><img src={system.icon} alt="" /></section><section className="module-grid">{system.modules.map((module: ModuleDefinition, index: number) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className={system.key === 'meetingroom' ? 'meetingroom-module-card' : undefined}>{system.key === 'meetingroom' && <img src={meetingroomModuleIcons[module.key]} alt="" aria-hidden="true" />}<span>{zhModuleCode(index)}</span><h3>{module.title}</h3><p>{module.description}</p><b>開啟子系統 →</b></Link>)}</section></> : <div className="notice danger">目前角色沒有此系統權限，請由管理員開放。</div>}</AppShell>;
   }
   return <AuthGate>{profile => <Hub profile={profile} />}</AuthGate>;
 }

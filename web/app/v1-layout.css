@@ -95,3 +95,12 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
   body:has(.portal-intro) .portal-intro i{width:60px;margin:9px auto 5px}
   body:has(.portal-intro) .portal-intro>span{font-size:8px}
 }
+/* V2 會議室預約：子系統圖卡 ICON */
+.meetingroom-module-card{position:relative;overflow:hidden}
+.meetingroom-module-card::before{position:absolute;top:0;right:0;left:0;height:2px;background:var(--green);content:''}
+.meetingroom-module-card img{width:64px;height:64px;object-fit:contain;margin:0 0 8px;filter:drop-shadow(0 6px 10px rgba(0,132,199,.18))}
+.meetingroom-module-card:nth-child(2)::before{background:var(--cyan)}
+.meetingroom-module-card:nth-child(3)::before{background:var(--amber)}
+.meetingroom-module-card:nth-child(4)::before{background:var(--violet)}
+.meetingroom-module-card:hover{border-color:var(--cyan);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,132,199,.14)}
+@media(max-width:760px){.meetingroom-module-card img{width:54px;height:54px}}
