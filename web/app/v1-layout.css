@@ -62,3 +62,27 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 .request-dispatch-actions .dispatch-detail-form{display:grid;gap:14px;margin-top:4px;padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}.dispatch-detail-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.dispatch-detail-form label{display:grid;gap:6px;color:var(--muted);font-size:.88rem}.dispatch-detail-form label.wide{grid-column:1/-1}.dispatch-detail-form input:not([type="checkbox"]),.dispatch-detail-form select,.dispatch-detail-form textarea{width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:4px;padding:9px 10px;background:var(--panel);color:var(--text);font:inherit}.dispatch-detail-form textarea{min-height:76px;resize:vertical}.dispatch-detail-form-actions{display:flex;justify-content:flex-end;gap:10px}.request-dispatch-actions .dispatch-step-button{border-color:var(--line);color:var(--text);background:var(--surface)}.dispatch-detail-message{margin:10px 0 0;color:var(--danger,#dc2626)}@media(max-width:640px){.dispatch-detail-form-grid{grid-template-columns:1fr}.dispatch-detail-form label.wide{grid-column:auto}.dispatch-detail-form-actions{flex-direction:column-reverse}.dispatch-detail-form-actions button{width:100%}}
 /* V2 維修六階段：沿用 V1 詳情視窗，僅補流程進度、完工表單與驗收狀態。 */
 .repair-workflow-steps{display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:0;margin:0 0 22px;padding:0;overflow-x:auto;list-style:none}.repair-workflow-steps li{position:relative;display:grid;justify-items:center;gap:7px;min-width:90px;color:var(--dim);text-align:center;font-size:11px}.repair-workflow-steps li:not(:last-child)::after{position:absolute;top:13px;left:calc(50% + 16px);right:calc(-50% + 16px);height:2px;background:var(--line);content:''}.repair-workflow-steps li span{position:relative;z-index:1;display:grid;width:28px;height:28px;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--panel);font:700 11px var(--head)}.repair-workflow-steps li b{font-weight:600;white-space:nowrap}.repair-workflow-steps li.done{color:var(--cyan)}.repair-workflow-steps li.done span{border-color:var(--cyan);background:rgba(0,212,255,.1)}.repair-workflow-steps li.done:not(:last-child)::after{background:var(--cyan)}.repair-workflow-steps li.current{color:var(--amber)}.repair-workflow-steps li.current span{border-color:var(--amber);background:rgba(255,179,0,.12);box-shadow:0 0 0 3px rgba(255,179,0,.08)}.dispatch-detail-form label.dispatch-check{display:flex;align-items:center;gap:8px;padding:8px 0;color:var(--text)}.dispatch-detail-form label.dispatch-check input{width:auto}.workflow-waiting,.workflow-finished{margin:0;padding:10px 12px;border-left:3px solid var(--amber);background:rgba(255,179,0,.08);color:var(--text);font-size:13px}.workflow-finished{border-left-color:var(--green);background:rgba(0,255,157,.08)}@media(max-width:700px){.repair-workflow-steps{grid-template-columns:repeat(6,100px);padding-bottom:8px}}
+
+/* V2 整合管理入口：依需求縮減導覽列與系統圖卡（僅桌面入口頁） */
+@media (min-width:761px){
+  body:has(.portal-intro) .v1-navbar{gap:6px;min-height:27px;padding:4px 7px}
+  body:has(.portal-intro) .v1-brand{gap:5px}
+  body:has(.portal-intro) .v1-brand b{font-size:8px}
+  body:has(.portal-intro) .v1-brand strong{font-size:10px}
+  body:has(.portal-intro) .v1-brand>span{font-size:8px}
+  body:has(.portal-intro) .v1-actions{gap:3px}
+  body:has(.portal-intro) .v1-actions a{min-height:16px;padding:2px 5px;gap:3px;font-size:8px}
+  body:has(.portal-intro) .v1-actions img{width:11px;height:11px}
+  body:has(.portal-intro) .user-meta.v1-meta{gap:4px;font-size:7px}
+  body:has(.portal-intro) .user-meta.v1-meta>span,
+  body:has(.portal-intro) .user-meta.v1-meta>i,
+  body:has(.portal-intro) .user-meta.v1-meta>time,
+  body:has(.portal-intro) .user-meta.v1-meta>button{padding-left:4px}
+
+  body:has(.portal-intro) .system-grid{gap:18px}
+  body:has(.portal-intro) .system-card{flex-basis:225px;width:225px;min-height:225px;padding:20px 18px}
+  body:has(.portal-intro) .system-card img{width:66px;height:66px;margin-bottom:10px}
+  body:has(.portal-intro) .system-card h2{font-size:18px}
+  body:has(.portal-intro) .system-card p{font-size:12px;line-height:1.6}
+  body:has(.portal-intro) .system-card b{padding:5px 10px;font-size:11px}
+}
