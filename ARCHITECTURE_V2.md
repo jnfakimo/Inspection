@@ -30,6 +30,10 @@
 **何時應重新評估**：需要脫離 Supabase 以避免供應商鎖定時；或分析需求成長到必須使用 Deno 生態
 無法滿足的 Python 套件時。屆時 `app-api` / `admin-api` 的業務邏輯即為搬遷起點。
 
+**2026-08-17 再次確認**：對照規格基準重新評估後，維持 Edge Function，不另建 FastAPI／Node.js
+服務。主因是本站前端託管於 GitHub Pages，自建後端需另尋主機並重做一套 JWT 驗證層，
+而規格要求後端承擔的五項職責目前皆已有對應實作。
+
 **已清理（2026-08-17）**：正式專案原有 4 支已部署但原始碼不在本 repo 的函式
 （`hyper-worker`、`smart-function`、`bright-function`、`dynamic-processor`），皆停在 v12、
 最後更新 2026-06-24、程式碼與資料庫零呼叫，現已全數移除。原始碼留底於
@@ -48,8 +52,8 @@ LINE 群組，`verify_jwt` 為 true——任一持有有效 JWT 的使用者皆�
 
 | 項目 | 原系統 | V2 處理方式 |
 | --- | --- | --- |
-| React / Next.js | 不符合，為多頁靜態 HTML | Next.js App Router + React + TypeScript，靜態匯出至 `/v2/` |
-| 後端 API | 部分符合，既有 Supabase Edge Functions，但多數頁面直連資料表 | 新增 JWT/RBAC 保護的 `app-api`，新版頁面統一經 API 執行業務操作 |
+| React / Next.js | 不符合，為多頁靜態 HTML | Next.js App Router + React + TypeScript，靜態匯出至 `/Inspection/v2/` |
+| 後端 API | 部分符合，既有 Supabase Edge Functions，但多數頁面直連資料表 | 新增 JWT/RBAC 保護的 `app-api`，新版頁面經 API 或 SECURITY DEFINER 函式執行業務操作（見「遷移原則」第 3 條的實際落差） |
 | PostgreSQL / Supabase | 符合 | 沿用現有 PostgreSQL、RLS、Auth、Realtime、Storage |
 | 角色權限 | 符合 | API 再驗證 `users`、`rbac_role`、`role_permissions`，形成 API + RLS 雙層防線 |
 | 檔案獨立儲存 | 符合 | 沿用 `repair-files`、`floorplans`、`handover-attachments`、`vehicle-dispatch-files` Storage buckets |
@@ -60,7 +64,7 @@ LINE 群組，`verify_jwt` 為 true——任一持有有效 JWT 的使用者皆�
 
 ```text
 Browser / Mobile
-  └─ GitHub Pages /word-cloud/v2 (Next.js static export)
+  └─ GitHub Pages /Inspection/v2 (Next.js static export)
        ├─ Supabase Auth / username-login
        ├─ Supabase Edge Function / app-api
        │    ├─ JWT / active user / RBAC validation
@@ -70,10 +74,35 @@ Browser / Mobile
        └─ Firebase FCM
 ```
 
+### 基底路徑與 repo 更名
+
+repo 原名 `word-cloud`，現為 `jnfakimo/Inspection`，站台基底隨之由 `/word-cloud/` 變成
+`/Inspection/`。V2 的 basePath 定義在 `web/next.config.ts`（`/Inspection/v2`），
+`web/lib/config.ts` 的 `LEGACY_BASE` 為 `/Inspection/system`。
+
+V1 頁面中仍留有少量寫死的 `https://jnfakimo.github.io/word-cloud/system/...` 絕對網址
+（如 `analytics.html` 的導覽連結、`AGENTS.md` 的 Base URL 說明）。GitHub 對更名後的 repo
+會自動重導，因此這些連結仍可運作，屬已知的文件與連結落差，V1 不主動改動。
+
 ## 遷移原則
 
 1. 舊 `/system/` 保持運作，V2 與它共用資料，不複製正式資料。
 2. 優先遷移 Dashboard、巡檢、設備圖臺與手機入口。
 3. 涉及異動的新版功能必須經 `app-api`；RLS 仍是最後一道資料庫防線。
-4. 完成逐頁驗收後，再把入口由 `/system/index.html` 切換到 `/v2/`。
+4. 完成逐頁驗收後，再把入口由 `/system/index.html` 切換到 `/Inspection/v2/`。
 5. 高精度 OpenSeadragon / Three.js 圖臺暫時由 V2 深連結既有頁面，第二階段再封裝成 React 元件。
+
+### 第 3 條的實際落差（2026-08-17 盤點）
+
+目前 V2 有兩類寫入沒有經過 `app-api`：
+
+- **直接寫資料表**：`workspace.tsx`（報修建立與附件）、`operations-workspace.tsx`（交接紀錄）、
+  `guardpatrol-specialized.tsx`（班別）、`handover-pilot/page.tsx`、`components/admin/NoticesAdmin.tsx`。
+  這幾處只靠 RLS 一層把關，與「API ＋ RLS 雙層防線」的敘述不符，應逐步收斂回 API。
+- **前端直呼 SECURITY DEFINER 函式**：`apply_repair_workflow`、`save_dashboard_layout_version`、
+  `publish_dashboard_layout_version`、`vehicle_request_action`、`complete_vehicle_trip`。
+  這類函式內含權限與流程檢查（guard trigger 亦照常觸發），風險低於直接寫表，屬刻意取捨：
+  業務規則集中在資料庫端，改走 API 只會多一層轉發而不會提高安全性。
+
+判斷準則：**能被單一使用者濫用的寫入必須有伺服器端檢查**——不論那層檢查在 Edge Function
+還是在 SECURITY DEFINER 函式裡；純粹的 `insert`／`update` 直連則不符合。
