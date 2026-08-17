@@ -87,6 +87,17 @@ async function copyRuntimeFiles() {
   }
 }
 
+async function rewriteV2BasePaths() {
+  const files = await listFiles(outputV2Root);
+  const textExtensions = new Set(['.html', '.css', '.js', '.json', '.webmanifest']);
+  for (const file of files) {
+    if (!textExtensions.has(path.extname(file).toLowerCase())) continue;
+    const source = await readFile(file, 'utf8');
+    const rewritten = source.replaceAll('/word-cloud/', '/Inspection/');
+    if (rewritten !== source) await writeFile(file, rewritten, 'utf8');
+  }
+}
+
 function provenanceMarker(relativePath) {
   return createHash('sha256')
     .update(`${provenanceNamespace}\0${provenanceRepository}\0${provenanceCommit}\0${relativePath}`)
@@ -276,6 +287,7 @@ async function verifyArtifact() {
 await rm(outputRoot, { recursive: true, force: true });
 await mkdir(outputSystemRoot, { recursive: true });
 await copyRuntimeFiles();
+await rewriteV2BasePaths();
 await minifyRuntimeCode();
 await writeFile(path.join(outputRoot, '.nojekyll'), '', 'utf8');
 await writeFile(
