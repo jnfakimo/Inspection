@@ -234,7 +234,7 @@ function MeetingRoomPage({ module, profile }: Props) {
         <div className="mr-panel-head"><strong>我的預約</strong></div>
         <div className="mr-panel-body">
           {!myBookings.length ? <div className="empty">{busy ? '載入中…' : '目前沒有你的預約紀錄。'}</div>
-            : <div className="mr-list">{pagedMyBookings.map(b => {
+            : <div className="mr-list my-booking-list">{pagedMyBookings.map(b => {
               const room = (b.meeting_rooms as Row) || {};
               const start = slotStartAt(String(b.booking_date), hhmm(b.start_time)).getTime();
               const end = bookingEndAt(b).getTime();
@@ -261,7 +261,7 @@ function MeetingRoomPage({ module, profile }: Props) {
           <span className="hint">原申請人同意後，系統自動取消原預約並建立申請者的新預約</span></div>
         <div className="mr-panel-body">
           {!requests.length ? <div className="empty">{busy ? '載入中…' : '目前沒有變更申請。'}</div>
-            : <div className="mr-list">{pagedRequests.map(req => {
+            : <div className="mr-list change-request-list">{pagedRequests.map(req => {
               const target = (req.meeting_bookings as Row) || {}, room = (target.meeting_rooms as Row) || {};
               const requester = (req.users as Row) || {};
               const iAmOwner = target.user_id === profile.user_id;
@@ -494,7 +494,7 @@ function RoomAdminModal({ rooms, onClose, onSaved }: { rooms: Row[]; onClose: ()
         </div>
         {message && <p className="conflict-alert">{message}</p>}
         {!rooms.length ? <div className="empty">尚未建立會議室</div>
-          : <div className="mr-list">{rooms.map(room => <div className="mr-card" key={String(room.room_id)}>
+          : <div className="mr-list room-admin-list">{rooms.map(room => <div className="mr-card" key={String(room.room_id)}>
             <div className="grow">
               <b>{fmt(room.name)}</b>
               <small>{room.capacity != null ? `${room.capacity} 人` : '未設人數'}｜{fmt(room.floor)}｜{room.status === 'inactive' ? '停用' : '啟用'}</small>

@@ -53,13 +53,18 @@
 .mr-page .mr-card b{display:block;font-size:.88rem}
 .mr-page .mr-card small{display:block;margin-top:3px;color:var(--dim);font-size:.72rem}
 .mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
-.mr-page .mr-list .mr-card:nth-child(odd){background:color-mix(in srgb,#e0f2fe 48%,var(--panel));border-left-color:#7dd3fc}
-.mr-page .mr-list .mr-card:nth-child(even){background:color-mix(in srgb,#ecfdf5 48%,var(--panel));border-left-color:#6ee7b7}
-/* 主檔每筆會議採固定的淺色循環，讓多筆資料在清單中容易辨識。 */
-:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n+1){background:#f0f9ff;border-left-color:#7dd3fc}
-:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n+2){background:#f0fdf4;border-left-color:#86efac}
-:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n+3){background:#fffbeb;border-left-color:#fcd34d}
-:root[data-theme="light"] .mr-page .mr-list .mr-card:nth-child(4n){background:#faf5ff;border-left-color:#c4b5fd}
+.mr-page .mr-list .mr-card{background:var(--panel)}
+/* 會議室管理與週排程使用相同的淺藍／淺綠／淺黃／淺紫循環。 */
+.mr-page .room-admin-list .mr-card:nth-child(4n+1){background:#f0f9ff;border-left-color:#7dd3fc}
+.mr-page .room-admin-list .mr-card:nth-child(4n+2){background:#f0fdf4;border-left-color:#86efac}
+.mr-page .room-admin-list .mr-card:nth-child(4n+3){background:#fffbeb;border-left-color:#fcd34d}
+.mr-page .room-admin-list .mr-card:nth-child(4n){background:#faf5ff;border-left-color:#c4b5fd}
+/* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
+.mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
+.mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}
+/* 變更申請保留清楚但低對比的雙色區隔。 */
+.mr-page .change-request-list .mr-card:nth-child(odd){background:color-mix(in srgb,#e0f2fe 48%,var(--panel));border-left-color:#7dd3fc}
+.mr-page .change-request-list .mr-card:nth-child(even){background:color-mix(in srgb,#ecfdf5 48%,var(--panel));border-left-color:#6ee7b7}
 
 /* 週排程依 V1 圖塊比例縮至約 75%；手機仍保留完整寬度與橫向瀏覽。 */
 @media (min-width:761px){
