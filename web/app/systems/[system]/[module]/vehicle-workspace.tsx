@@ -118,7 +118,7 @@ function RequestsModule({ module, profile }: Props) {
   // KPI 統計數字
   const kApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_approval').length, [rows]);
   const kDispatchCount = useMemo(() => rows.filter(r => r.status === 'approved').length, [rows]);
-  const kTodayCount = useMemo(() => rows.filter(r => String(r.trip_date) === today && r.status === 'assigned').length, [rows], [today]);
+  const kTodayCount = useMemo(() => rows.filter(r => String(r.trip_date) === today && r.status === 'assigned').length, [rows, today]);
   const kDriverCount = useMemo(() => rows.filter(r => r.status === 'assigned').length, [rows]);
 
   // 頁籤資料列篩選
@@ -531,7 +531,7 @@ function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; on
   const [form, setForm] = useState({
     trip_date: taipeiToday(), planned_departure_time: '09:00', planned_return_time: '12:00',
     origin_location: '第一果菜市場', destination_location: '', trip_purpose: '',
-    passenger_count: '1', applicant_phone: profile.phone || '', applicant_note: '',
+    passenger_count: '1', applicant_phone: '', applicant_note: '',
   });
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
