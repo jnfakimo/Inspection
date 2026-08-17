@@ -487,7 +487,9 @@ function RoomAdminModal({ rooms, onClose, onSaved }: { rooms: Row[]; onClose: ()
         </div>
         <div className="field"><label>備註</label><input type="text" value={String(form.note || '')} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="選填" /></div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>{editing ? '儲存變更' : '＋ 新增會議室'}</button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
+            {editing ? '儲存變更' : <><span className="mr-add-icon" aria-hidden="true">＋</span> 新增會議室</>}
+          </button>
           {editing && <button className="btn" onClick={reset}>取消編輯</button>}
         </div>
         {message && <p className="conflict-alert">{message}</p>}
