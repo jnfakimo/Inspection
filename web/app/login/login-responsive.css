@@ -153,3 +153,18 @@
 .v1-login-page footer {
   margin-top: clamp(2px, .4vh, 4px);
 }
+/* Compact white login frame: 70% desktop footprint, full-width on phones. */
+@media (min-width: 641px) {
+  .v1-login-card {
+    width: 70%;
+    max-width: 280px;
+    padding: clamp(12px, 2.8vh, 25px);
+  }
+}
+
+@media (max-width: 640px) {
+  .v1-login-card {
+    width: 100%;
+    max-width: 400px;
+  }
+}
