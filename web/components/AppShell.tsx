@@ -8,12 +8,12 @@ import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 
 const sharedActions = [
-  { href: '/systems/', label: '首頁', icon: '/word-cloud/assets/system-icons/home-icon.svg' },
-  { href: '/', label: '戰情儀表板', icon: '/word-cloud/assets/system-icons/admin-icon.png' },
-  { href: '/systems/workorder/', label: '維修／派完工', icon: '/word-cloud/assets/system-icons/maintenance-icon.png', sysKey: 'workorder' },
-  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/word-cloud/assets/system-icons/guardpatrol-icon.png', sysKey: 'guardpatrol' },
-  { href: '/systems/handover/', label: '電子交接簿', icon: '/word-cloud/assets/system-icons/handover-icon.png', sysKey: 'handover' },
-  { href: '/systems/admin/', label: '後台', icon: '/word-cloud/assets/system-icons/admin-icon.png', sysKey: 'admin' },
+  { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons/home-icon.svg' },
+  { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons/admin-icon.png' },
+  { href: '/systems/workorder/', label: '維修／派完工', icon: '/Inspection/assets/system-icons/maintenance-icon.png', sysKey: 'workorder' },
+  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', sysKey: 'guardpatrol' },
+  { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons/handover-icon.png', sysKey: 'handover' },
+  { href: '/systems/admin/', label: '後台', icon: '/Inspection/assets/system-icons/admin-icon.png', sysKey: 'admin' },
 ];
 
 function taipeiClock() {
@@ -57,7 +57,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   const actions = sharedActions.filter(item => !item.sysKey || profile.allowed_systems.includes('*') || profile.allowed_systems.includes(item.sysKey));
   async function logout() {
     await getSupabase().auth.signOut({ scope: 'local' });
-    location.replace('/word-cloud/v2/login/');
+    location.replace('/Inspection/v2/login/');
   }
   function toggleTheme() {
     const nextTheme = theme === 'light' ? 'tech' : 'light';
@@ -109,7 +109,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
           aria-controls="admin-v2-sidebar"
           onClick={() => setAdminMenuOpen(true)}
         >
-          <img src="/word-cloud/assets/system-icons/admin-icon.png" alt="" />
+          <img src="/Inspection/assets/system-icons/admin-icon.png" alt="" />
           後台選單
         </button>
         <main className="content v1-content admin-v2-content">{children}</main>

@@ -14,9 +14,9 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
       const { data } = await getSupabase().auth.getSession();
       if (!data.session) {
         const returnTo = `${location.pathname}${location.search}${location.hash}`;
-        const query = returnTo.startsWith('/word-cloud/v2/') && !returnTo.startsWith('/word-cloud/v2/login')
+        const query = returnTo.startsWith('/Inspection/v2/') && !returnTo.startsWith('/Inspection/v2/login')
           ? `?next=${encodeURIComponent(returnTo)}` : '';
-        location.replace(`/word-cloud/v2/login/${query}`);
+        location.replace(`/Inspection/v2/login/${query}`);
         return;
       }
       try {

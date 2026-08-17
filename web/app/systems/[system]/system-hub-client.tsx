@@ -10,12 +10,12 @@ import { HandoverWorkspace } from './[module]/operations-workspace';
 
 function WorkorderHub({ profile }: { profile: Profile }) {
   return <AppShell profile={profile} title="維修／派工／完工系統">
-    <section className="workorder-page-header"><h2><img src="/word-cloud/assets/system-icons/maintenance-icon.png" alt="" /> 維修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
+    <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons/maintenance-icon.png" alt="" /> 維修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
     <div className="workorder-note">■ MAINTENANCE WORKFLOW ・ 點選圖卡進入功能系統</div>
     <section className="maintenance-hub-grid">
-      <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/word-cloud/assets/system-icons/repair-request-icon.png" alt="報修與維修" /><h3>報修 &amp; 維修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>
-      <Link className="maintenance-card amber" href="/systems/workorder/dispatch/"><span className="maintenance-badge">MAIN-02</span><img src="/word-cloud/assets/system-icons/under-repair-icon.png" alt="派工" /><h3>派工系統</h3><p>建立派工、承辦指派<br />工單處理進度追蹤</p><b>▶ 進入派工系統</b></Link>
-      <Link className="maintenance-card green" href="/systems/workorder/orders/"><span className="maintenance-badge">MAIN-03</span><img src="/word-cloud/assets/system-icons/repair-complete-icon.png" alt="維修完工回報" /><h3>維修完工回報</h3><p>填寫完工紀錄、照片回報<br />驗收及主管結案</p><b>▶ 進入完工回報</b></Link>
+      <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/Inspection/assets/system-icons/repair-request-icon.png" alt="報修與維修" /><h3>報修 &amp; 維修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>
+      <Link className="maintenance-card amber" href="/systems/workorder/dispatch/"><span className="maintenance-badge">MAIN-02</span><img src="/Inspection/assets/system-icons/under-repair-icon.png" alt="派工" /><h3>派工系統</h3><p>建立派工、承辦指派<br />工單處理進度追蹤</p><b>▶ 進入派工系統</b></Link>
+      <Link className="maintenance-card green" href="/systems/workorder/orders/"><span className="maintenance-badge">MAIN-03</span><img src="/Inspection/assets/system-icons/repair-complete-icon.png" alt="維修完工回報" /><h3>維修完工回報</h3><p>填寫完工紀錄、照片回報<br />驗收及主管結案</p><b>▶ 進入完工回報</b></Link>
     </section>
   </AppShell>;
 }
@@ -33,7 +33,7 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     ['shifts', '巡檢排班系統', '管理每日巡檢班別、執勤人員與時段，維持排班資訊清楚且一致。', 'guardpatrol-schedule-icon.png', 'MODULE 03'],
     ['notifications', 'LINE推播紀錄', '查詢巡檢逾時推播的發送時間、完成狀況、排定人員與 LINE 回應。', 'guardpatrol-line-push-icon.png', 'MODULE 04'],
   ];
-  return <AppShell profile={profile} title={system.title}><section className="operations-portal-hero"><img src={system.icon} alt="" /><div><h1>{system.title}</h1><p>{system.description}</p></div></section><div className="operations-portal-note">{handover ? 'HANDOVER WORKFLOW · 依班別完成交接與接收稽核' : 'GUARD PATROL WORKFLOW · 點選圖卡進入功能系統'}</div><section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/word-cloud/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? "▶ 進入交接" : key === "checkins" ? "ENTER SYSTEM　→" : key === "map3d" ? "OPEN 3D VIEW　→" : key === "shifts" ? "MANAGE SHIFTS　→" : "VIEW NOTIFICATIONS　→"}</b></Link>)}</section></AppShell>;
+  return <AppShell profile={profile} title={system.title}><section className="operations-portal-hero"><img src={system.icon} alt="" /><div><h1>{system.title}</h1><p>{system.description}</p></div></section><div className="operations-portal-note">{handover ? 'HANDOVER WORKFLOW · 依班別完成交接與接收稽核' : 'GUARD PATROL WORKFLOW · 點選圖卡進入功能系統'}</div><section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? "▶ 進入交接" : key === "checkins" ? "ENTER SYSTEM　→" : key === "map3d" ? "OPEN 3D VIEW　→" : key === "shifts" ? "MANAGE SHIFTS　→" : "VIEW NOTIFICATIONS　→"}</b></Link>)}</section></AppShell>;
 }
 
 export function SystemHubClient({ system }: { system: SystemDefinition }) {

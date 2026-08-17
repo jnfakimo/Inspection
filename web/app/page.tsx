@@ -23,8 +23,8 @@ function Dashboard({ profile }: { profile: Profile }) {
       </section>
       <section className="dashboard-grid">
         <article className="panel"><div className="panel-head"><h2>30 日巡檢趨勢</h2><span>分析層</span></div><div className="trend-chart">{data.inspection_trend.map(row => { const max=Math.max(...data.inspection_trend.map(x=>x.total),1); return <div key={row.date} title={`${row.date}：${row.total} 筆／異常 ${row.abnormal}`}><i style={{height:`${Math.max(6,row.total/max*100)}%`}} className={row.abnormal?'has-alert':''}/><small>{row.date.slice(5)}</small></div>; })}</div></article>
-        <article className="panel"><div className="panel-head"><h2>近期維修事件</h2><a href="/word-cloud/v2/systems/workorder/">開啟完整流程</a></div><DataList rows={data.recent_repairs} empty="目前沒有維修事件" /></article>
-        <article className="panel span-2"><div className="panel-head"><h2>最新巡檢紀錄</h2><a href="/word-cloud/v2/inspections/">查看巡檢</a></div><DataList rows={data.recent_inspections} empty="目前沒有巡檢紀錄" /></article>
+        <article className="panel"><div className="panel-head"><h2>近期維修事件</h2><a href="/Inspection/v2/systems/workorder/">開啟完整流程</a></div><DataList rows={data.recent_repairs} empty="目前沒有維修事件" /></article>
+        <article className="panel span-2"><div className="panel-head"><h2>最新巡檢紀錄</h2><a href="/Inspection/v2/inspections/">查看巡檢</a></div><DataList rows={data.recent_inspections} empty="目前沒有巡檢紀錄" /></article>
       </section>
     </>}
   </AppShell>;
