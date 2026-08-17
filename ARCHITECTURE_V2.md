@@ -30,8 +30,19 @@
 **何時應重新評估**：需要脫離 Supabase 以避免供應商鎖定時；或分析需求成長到必須使用 Deno 生態
 無法滿足的 Python 套件時。屆時 `app-api` / `admin-api` 的業務邏輯即為搬遷起點。
 
-**待清理**：正式專案另有 4 支已部署但原始碼不在本 repo 的函式（`hyper-worker`、`smart-function`、
-`bright-function`、`dynamic-processor`），研判為早期於儀表板試建後遺留的範本，尚未確認並移除。
+**已清理（2026-08-17）**：正式專案原有 4 支已部署但原始碼不在本 repo 的函式
+（`hyper-worker`、`smart-function`、`bright-function`、`dynamic-processor`），皆停在 v12、
+最後更新 2026-06-24、程式碼與資料庫零呼叫，現已全數移除。原始碼留底於
+`docs/removed-edge-functions/`（刻意不放 `supabase/functions/`，避免 `functions deploy`
+不帶參數時被重新部署）。
+
+其中 `smart-function` 與 `bright-function` 並非無害範本，而是已被 `line-notify` 取代的
+舊版 LINE 推播：以 service role 繞過 RLS 讀取 `line_channel_token`（該鍵本被
+`settings_active_read` 政策排除、一般使用者讀不到），並依請求內容組訊息推播至公司
+LINE 群組，`verify_jwt` 為 true——任一持有有效 JWT 的使用者皆可藉此把自訂內容推播到
+官方群組。移除後此路徑一併關閉。
+
+目前線上 11 支函式與 `supabase/functions/` 目錄一一對應，正式環境無未納管的程式碼。
 
 ## 規格符合度
 

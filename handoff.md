@@ -34,9 +34,8 @@
    驗收清單：https://claude.ai/code/artifact/4ffb8e70-be6d-4bcf-989e-f272f72fe2d2
 2. **確認 RBAC 有無「有設備權限、沒圖臺權限」的角色**。若無，應再發一支 migration
    把 `20260816140000` 的條件從「兩者其一」收斂為僅 `sys_structuremap`。
-3. **清理 4 支來歷不明的 Edge Function**（`hyper-worker`、`smart-function`、
-   `bright-function`、`dynamic-processor`）：已部署但原始碼不在 repo，先
-   `functions download` 確認內容再決定刪除或納管。
+3. **實機驗收後回報結果**。目前待辦僅剩驗收；4 支未納管的 Edge Function 與
+   SYS-02 派工建單非原子皆已於 2026-08-17 處理完畢。
 
 進度總表：https://claude.ai/code/artifact/8d04ce86-47af-49fd-8b11-0ca5d915f574
 
@@ -57,3 +56,6 @@
 
 2026-08-17 · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：✅ 已推（`02e79bd`）
 · L3 Obsidian：未更新（AGENTS.md 未登記 vault 路徑）
+
+> 2026-08-17 補：另完成派工建單原子化（dee2c61）、圖臺 RLS 收斂（f0c55d4）、
+> 4 支未納管 Edge Function 移除，線上 11 支與 supabase/functions/ 一一對應。
