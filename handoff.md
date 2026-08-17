@@ -32,10 +32,11 @@
    （順便確認車輛里程真的更新）→ 六頁 Excel 匯出（ExcelJS 產出的檔案與原本不同，
    排版需目視）→ admin 批次匯入（`.xlsx`／`.xls`／`.csv` 各一次）。
    驗收清單：https://claude.ai/code/artifact/4ffb8e70-be6d-4bcf-989e-f272f72fe2d2
-2. **確認 RBAC 有無「有設備權限、沒圖臺權限」的角色**。若無，應再發一支 migration
-   把 `20260816140000` 的條件從「兩者其一」收斂為僅 `sys_structuremap`。
-3. **實機驗收後回報結果**。目前待辦僅剩驗收；4 支未納管的 Edge Function 與
-   SYS-02 派工建單非原子皆已於 2026-08-17 處理完畢。
+2. **驗收後回報結果**，有任何一項不如預期就把畫面訊息或 Console 內容留下。
+
+其餘原列待辦（RBAC 角色確認與圖臺 RLS 收斂、4 支未納管 Edge Function、SYS-02 派工
+建單原子化）皆已於 2026-08-17 完成。CSP 的 `unsafe-inline` 經評估決定以
+`SECURITY_POSTURE.md` 說明架構限制與補償控制，不硬改。
 
 進度總表：https://claude.ai/code/artifact/8d04ce86-47af-49fd-8b11-0ca5d915f574
 
@@ -48,14 +49,12 @@
   前端會拿到 `Could not find the function ... in the schema cache`（已踩過一次）。
 - **測試資料刪不掉**：41 張表設有 `trg_prevent_removal`，禁止 DELETE/TRUNCATE，
   只能用狀態停用。測 SYS-07 會真的改動車輛里程，請挑停用中的車並先記下原值。
-- **SYS-02 派工建單仍非原子**（建工單 → 更新報修單 → 寫歷程），目前只補了錯誤回報。
+- **`supabase functions deploy` 不帶參數會部署 `supabase/functions/` 底下所有函式**。
+  已移除函式的原始碼因此留在 `docs/removed-edge-functions/`，不要搬回去。
 - 刻意不做的事及理由（150 個寫入點改走 API、後端改寫 FastAPI/Node、匯入改
   ExcelJS）記在進度總表與 `SECURITY_POSTURE.md`，日後有人問起可查。
 
 ## 🕐 最後更新
 
-2026-08-17 · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：✅ 已推（`02e79bd`）
+2026-08-17 · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：✅ 已推（`22cb93f`）
 · L3 Obsidian：未更新（AGENTS.md 未登記 vault 路徑）
-
-> 2026-08-17 補：另完成派工建單原子化（dee2c61）、圖臺 RLS 收斂（f0c55d4）、
-> 4 支未納管 Edge Function 移除，線上 11 支與 supabase/functions/ 一一對應。
