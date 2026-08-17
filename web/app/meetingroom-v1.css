@@ -73,6 +73,16 @@
 /* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
 .mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
 .mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}
+/* 已取消／已逾期以粉紅色註記，並與一般預約清楚區隔。 */
+.mr-page .booking-status-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
+.mr-page .booking-status-summary-item{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid #f9a8d4;border-radius:999px;background:#fce7f3;color:#9d174d;font-size:.72rem}
+.mr-page .booking-status-summary-item b{font-size:.8rem}
+.mr-page .booking-status-summary-total{color:var(--dim);font-size:.72rem}
+.mr-page .my-booking-list .mr-card.booking-status-pink{background:#fdf2f8;border-color:#f9a8d4;border-left-color:#f472b6}
+.mr-page .my-booking-list .booking-status-pink-label{color:#be185d;font-weight:700}
+@media (max-width:600px){
+  .mr-page .booking-status-summary{width:100%;margin-left:0}
+}
 /* 變更申請保留清楚但低對比的雙色區隔。 */
 .mr-page .change-request-list .mr-card:nth-child(odd){background:color-mix(in srgb,#e0f2fe 48%,var(--panel));border-left-color:#7dd3fc}
 .mr-page .change-request-list .mr-card:nth-child(even){background:color-mix(in srgb,#ecfdf5 48%,var(--panel));border-left-color:#6ee7b7}

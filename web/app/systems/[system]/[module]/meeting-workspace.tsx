@@ -159,6 +159,8 @@ function MeetingRoomPage({ module, profile }: Props) {
   // 自動回到最後一頁，避免操作完成後顯示空白頁。
   const myTotalPages = Math.max(1, Math.ceil(myBookings.length / PAGE_SIZE));
   const requestTotalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+  const cancelledCount = myBookings.filter(b => String(b.status) === 'cancelled').length;
+  const expiredCount = myBookings.filter(b => String(b.status) === 'expired').length;
   const pagedMyBookings = myBookings.slice((myPage - 1) * PAGE_SIZE, myPage * PAGE_SIZE);
   const pagedRequests = requests.slice((requestPage - 1) * PAGE_SIZE, requestPage * PAGE_SIZE);
   useEffect(() => { setMyPage(page => Math.min(Math.max(page, 1), myTotalPages)); }, [myTotalPages]);
@@ -258,7 +260,14 @@ function MeetingRoomPage({ module, profile }: Props) {
 
       {/* 我的預約 */}
       <div className="mr-panel mr-list-panel">
-        <div className="mr-panel-head"><strong>我的預約</strong></div>
+        <div className="mr-panel-head">
+          <strong>我的預約</strong>
+          <div className="booking-status-summary" aria-label="預約狀態統計">
+            <span className="booking-status-summary-item">已取消 <b>{cancelledCount}</b> 筆</span>
+            <span className="booking-status-summary-item">已逾期 <b>{expiredCount}</b> 筆</span>
+            <span className="booking-status-summary-total">共 {myBookings.length} 筆</span>
+          </div>
+        </div>
         <div className="mr-panel-body">
           {!myBookings.length ? <div className="empty">{busy ? '載入中…' : '目前沒有你的預約紀錄。'}</div>
             : <div className="mr-list my-booking-list">{pagedMyBookings.map(b => {
@@ -266,11 +275,14 @@ function MeetingRoomPage({ module, profile }: Props) {
               const start = slotStartAt(String(b.booking_date), hhmm(b.start_time)).getTime();
               const end = bookingEndAt(b).getTime();
               const inWindow = tick >= start && tick <= end;
-              return <div className="mr-card" key={String(b.booking_id)}>
+              const bookingStatus = String(b.status);
+              const statusIsPink = bookingStatus === 'cancelled' || bookingStatus === 'expired';
+              const statusLabel = ({ booked: '已預約', checked_in: '已報到', cancelled: '已取消', expired: '已逾期' } as Record<string, string>)[bookingStatus] || fmt(b.status);
+              return <div className={`mr-card${statusIsPink ? ' booking-status-pink' : ''}`} key={String(b.booking_id)}>
                 <div className="grow">
                   <b>{fmt(b.purpose)}　<span style={{ color: 'var(--dim)', fontWeight: 400 }}>{fmt(b.booking_no)}</span></b>
                   <small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}
-                    ｜{{ booked: '已預約', checked_in: '已報到', cancelled: '已取消', expired: '已逾期' }[String(b.status)] || fmt(b.status)}</small>
+                    ｜<span className={statusIsPink ? 'booking-status-pink-label' : undefined}>{statusLabel}</span></small>
                 </div>
                 <div className="acts">
                   {b.status === 'booked' && inWindow && <button className="btn btn-primary" onClick={() => void checkIn(b)}>報到</button>}
