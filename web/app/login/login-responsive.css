@@ -1,0 +1,122 @@
+/* V2 login: keep the complete form within the viewport on short screens. */
+.v1-login-page {
+  min-height: 100svh;
+  padding: clamp(12px, 3vh, 24px) clamp(12px, 4vw, 24px);
+}
+
+.v1-login-card {
+  gap: clamp(8px, 2vh, 18px);
+  padding: clamp(16px, 4vh, 36px);
+}
+
+.v1-login-logo {
+  height: clamp(58px, 10vh, 90px);
+  margin-bottom: clamp(4px, 1.5vh, 12px);
+}
+
+.v1-login-card h1 {
+  font-size: clamp(20px, 3vh, 24px);
+}
+
+.v1-login-sub,
+.v1-login-hint {
+  font-size: clamp(11px, 1.8vh, 13px);
+}
+
+.v1-login-sub {
+  margin: clamp(2px, .7vh, 5px) 0;
+}
+
+.v1-login-hint {
+  margin: 0 0 clamp(8px, 2.2vh, 20px);
+}
+
+.v1-login-card label {
+  gap: clamp(4px, 1vh, 7px);
+  margin-top: clamp(5px, 1.5vh, 13px);
+}
+
+.v1-login-card input {
+  min-height: clamp(38px, 5.8vh, 44px);
+}
+
+.v1-login-card .captcha-row {
+  gap: clamp(6px, 1.2vh, 10px);
+  margin-bottom: clamp(4px, 1vh, 8px);
+}
+
+.v1-login-card .captcha-row img,
+.v1-login-card .captcha-row button {
+  height: clamp(48px, 8vh, 64px);
+}
+
+.v1-login-card .primary-btn {
+  margin-top: clamp(0px, .8vh, 4px);
+  padding-block: clamp(9px, 1.5vh, 13px);
+}
+
+.v1-login-card .forgot-link {
+  margin-top: clamp(4px, 1.8vh, 14px);
+}
+
+.v1-login-page footer {
+  margin-top: clamp(6px, 2vh, 18px);
+}
+
+@media (max-height: 760px) {
+  .v1-login-card {
+    gap: clamp(6px, 1.5vh, 12px);
+    padding: clamp(14px, 3vh, 24px);
+  }
+
+  .v1-login-logo {
+    height: clamp(52px, 9vh, 72px);
+  }
+}
+
+@media (max-height: 600px) {
+  .v1-login-page {
+    padding-block: 8px;
+  }
+
+  .v1-login-card {
+    gap: 5px;
+    padding: 12px 16px;
+  }
+
+  .v1-login-logo {
+    height: 48px;
+    margin-bottom: 2px;
+  }
+
+  .v1-login-card h1 {
+    font-size: 20px;
+  }
+
+  .v1-login-sub,
+  .v1-login-hint {
+    font-size: 11px;
+  }
+
+  .v1-login-hint {
+    margin-bottom: 6px;
+  }
+
+  .v1-login-card label {
+    gap: 3px;
+    margin-top: 3px;
+  }
+
+  .v1-login-card input {
+    min-height: 36px;
+  }
+
+  .v1-login-card .captcha-row img,
+  .v1-login-card .captcha-row button {
+    height: 44px;
+  }
+
+  .v1-login-page footer {
+    margin-top: 6px;
+    font-size: 10px;
+  }
