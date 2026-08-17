@@ -26,7 +26,7 @@
 .mr-page .roomgrid td{padding:5px;border:1px solid var(--line);vertical-align:top;min-width:118px;height:78px}
 .mr-page .roomgrid td.weekend{background:color-mix(in srgb,var(--amber) 5%,transparent)}
 .mr-page .roomgrid td.past{opacity:.55}
-.mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--cyan) 5%,transparent);white-space:nowrap}
+.mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--room-accent,var(--cyan)) 9%,transparent);border-left:3px solid var(--room-accent,var(--cyan));white-space:nowrap}
 .mr-page .roomgrid td.selectable{cursor:pointer}
 .mr-page .roomgrid td.selectable:hover{background:color-mix(in srgb,var(--cyan) 12%,transparent)}
 
@@ -43,12 +43,14 @@
 .mr-page .bk-action:hover{border-color:var(--cyan)}
 
 .mr-page .mr-list{display:grid;gap:10px}
-.mr-page .mr-card{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:4px;background:var(--panel)}
+.mr-page .mr-card{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--room-accent,var(--cyan));border-radius:4px;background:color-mix(in srgb,var(--room-accent,var(--cyan)) 7%,var(--panel))}
 .mr-page .mr-card .grow{flex:1;min-width:200px}
-.mr-page .mr-card b{display:block;font-size:.88rem}
+.mr-page .mr-card b{display:flex;align-items:center;gap:7px;font-size:.88rem}
+.mr-page .mr-card b .dot{width:9px;height:9px;flex:none;border-radius:50%;background:var(--room-accent,var(--cyan));box-shadow:0 0 0 3px color-mix(in srgb,var(--room-accent,var(--cyan)) 18%,transparent)}
 .mr-page .mr-card small{display:block;margin-top:3px;color:var(--dim);font-size:.72rem}
 .mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
-.mr-page .mr-list .mr-card:nth-child(even){background:color-mix(in srgb,var(--cyan) 5%,var(--panel))}
+.mr-page .mr-card.inactive{opacity:.6}
+.mr-page .mr-card.inactive b .dot{background:var(--dim);box-shadow:none}
 
 /* 週排程依 V1 圖塊比例縮至約 75%；手機仍保留完整寬度與橫向瀏覽。 */
 @media (min-width:761px){
