@@ -862,6 +862,35 @@
   text-decoration: none;
 }
 
+@media (min-width: 1181px) {
+  .cardGrid {
+    gap: 14px;
+    margin-inline: auto;
+    width: 85%;
+  }
+
+  .card {
+    min-height: 233px;
+    padding: 17px;
+  }
+
+  .cardIcon {
+    height: 49px;
+    margin: 14px 0 11px;
+    width: 49px;
+  }
+
+  .cardIcon img {
+    height: 31px;
+    width: 31px;
+  }
+
+  .card p {
+    line-height: 1.55;
+    margin: 8px 0 13px;
+  }
+}
+
 @media (max-width: 1180px) {
   .cardGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
