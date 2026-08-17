@@ -1,117 +1,133 @@
 'use client';
 
-// SYS-08 會議室預約 V2 工作區。
+// SYS-08 會議室預約 V2 —— 版面與操作流程完全比照 V1 meetingroom.html：
+// 單一頁面內含「週排程」「我的預約」「預約變更申請」三個面板，加上預約、變更申請、
+// 會議室管理三個彈窗；時間仍採「上／下午 · 時 · 分」三段式選單，送出前先做衝突預檢。
+// V1 本身不動，這裡只是把同一套模板與操作模式搬到 React。
 //
-// 四個模組（預約／會議室主檔／變更申請／預約提醒）由此檔統一承接，取代原本的唯讀列表。
-// 所有寫入都走既有的伺服器端入口，不在前端拼裝 insert／update：
-//   create_meeting_booking_series        —— 建立預約（含每週週期，逐次檢查衝突後原子建立）
-//   cancel_own_meeting_booking           —— 取消自己的預約，並連帶作廢待審的變更申請
-//   create_meeting_booking_change_request—— 對他人預約提出變更申請
-//   respond_meeting_booking_change_request—— 原申請人同意／婉拒（同意時於單一交易換手）
-//   app-api meeting_check_in / meeting_save_room —— 報到與會議室主檔維護
-// 前端的檢查只用於即時提示，時段衝突、過去時段、電話碼數、52 次上限等規則
-// 一律以資料庫回傳的錯誤為準。
+// 與 V1 的唯一差異是配色改綁 V2 的 CSS 變數（見 meetingroom-v1.css），
+// 讓亮色與科技版兩種主題都正常；結構、欄位、流程與按鈕行為皆維持一致。
+//
+// 寫入一律走既有的伺服器端入口，不在前端拼裝 insert／update：
+//   create_meeting_booking_series / cancel_own_meeting_booking /
+//   create_meeting_booking_change_request / respond_meeting_booking_change_request /
+//   app-api 的 meeting_check_in 與 meeting_save_room
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
+import '@/app/meetingroom-v1.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
-const BOOKING_LABEL: Record<string, string> = { booked: '已預約', checked_in: '已報到', cancelled: '已取消', expired: '已逾期' };
-const BOOKING_TONE: Record<string, string> = { booked: 'assigned', checked_in: 'closed', cancelled: 'cancelled', expired: 'pending' };
-const CHANGE_LABEL: Record<string, string> = { pending: '待原申請人回覆', approved: '已同意', rejected: '已婉拒', cancelled: '已作廢' };
-const CHANGE_TONE: Record<string, string> = { pending: 'pending', approved: 'closed', rejected: 'cancelled', cancelled: 'cancelled' };
+const DOW = ['一', '二', '三', '四', '五', '六', '日'];
 const NOTIFY_LABEL: Record<string, string> = { pending: '待發送', sent: '已發送', failed: '發送失敗', skipped: '略過' };
-const NOTIFY_TONE: Record<string, string> = { pending: 'pending', sent: 'closed', failed: 'cancelled', skipped: 'review' };
 const NOTIFY_TYPE: Record<string, string> = { reminder: '開始前提醒', expired: '逾時未報到' };
-const ROOM_LABEL: Record<string, string> = { active: '開放預約', inactive: '停用' };
-const ROOM_TONE: Record<string, string> = { active: 'closed', inactive: 'cancelled' };
 
-function Pill({ value, labels, tones }: { value: unknown; labels: Record<string, string>; tones: Record<string, string> }) {
-  const key = String(value || '');
-  return <span className={`status-pill ${tones[key] || 'pending'}`}>{labels[key] || fmt(value)}</span>;
-}
-
+/* ── 日期與時間工具（對齊 V1 的同名函式） ── */
 function taipeiToday() {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
-    .formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {} as Record<string, string>);
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).reduce((a, x) => (a[x.type] = x.value, a), {} as Record<string, string>);
+  return `${p.year}-${p.month}-${p.day}`;
 }
-function timeText(value: unknown) { return value ? String(value).slice(0, 5) : '—'; }
-// 預約時段限 00／30 分，選單直接列出所有合法值，避免使用者踩到資料庫的格式檢查。
-const HALF_HOURS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
-// 台北時區下該筆預約的起訖絕對時間；用來判斷是否在可報到區間。
-function bookingWindow(row: Row) {
-  const start = Date.parse(`${row.booking_date}T${String(row.start_time).slice(0, 8)}+08:00`);
-  const end = Date.parse(`${row.booking_date}T${String(row.end_time).slice(0, 8)}+08:00`);
-  return { start, end };
+const pad = (n: number) => String(n).padStart(2, '0');
+function isoDate(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function mondayOf(d: Date) { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; }
+function addDays(d: Date, n: number) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function fmtMD(d: Date) { return `${d.getMonth() + 1}/${d.getDate()}`; }
+const hhmm = (v: unknown) => v ? String(v).slice(0, 5) : '';
+// 以台北時區判斷時段是否已過（與資料庫 guard_meeting_booking_input 的判斷一致）。
+function slotStartAt(dateStr: string, start: string) { return new Date(`${dateStr}T${start}:00+08:00`); }
+function bookingEndAt(row: Row) { return new Date(`${row.booking_date}T${String(row.end_time).slice(0, 8)}+08:00`); }
+
+/* ── 三段式時間（上/下午 · 1–12 · 00/30），與 V1 完全相同 ── */
+type TimeParts = { period: string; hour: string; minute: string };
+const EMPTY_TIME: TimeParts = { period: '', hour: '', minute: '' };
+function partsToValue(t: TimeParts) {
+  if (!t.period || !t.hour || !t.minute) return '';
+  let h = Number(t.hour) % 12;
+  if (t.period === 'pm') h += 12;
+  return `${pad(h)}:${t.minute}`;
+}
+function valueToParts(value: string): TimeParts {
+  if (!value) return EMPTY_TIME;
+  const [hStr, m] = value.split(':');
+  const h = Number(hStr);
+  return { period: h >= 12 ? 'pm' : 'am', hour: String(h % 12 === 0 ? 12 : h % 12), minute: m };
+}
+function TimeSelect({ value, onChange, label }: { value: TimeParts; onChange: (v: TimeParts) => void; label: string }) {
+  return <div className="field"><label>{label}</label><div className="time-parts">
+    <select aria-label={`${label}上午或下午`} value={value.period} onChange={e => onChange({ ...value, period: e.target.value })}>
+      <option value="">上／下午</option><option value="am">上午</option><option value="pm">下午</option>
+    </select>
+    <select aria-label={`${label}小時`} value={value.hour} onChange={e => onChange({ ...value, hour: e.target.value })}>
+      <option value="">時</option>
+      {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={String(i + 1)}>{pad(i + 1)}</option>)}
+    </select>
+    <select aria-label={`${label}分鐘`} value={value.minute} onChange={e => onChange({ ...value, minute: e.target.value })}>
+      <option value="">分</option><option value="00">00</option><option value="30">30</option>
+    </select>
+  </div></div>;
 }
 
 export function MeetingWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
-  return <AuthGate>{profile => {
-    if (module.key === 'rooms') return <RoomsModule system={system} module={module} profile={profile} />;
-    if (module.key === 'changes') return <ChangesModule system={system} module={module} profile={profile} />;
-    if (module.key === 'notifications') return <NotificationsModule system={system} module={module} profile={profile} />;
-    return <BookingsModule system={system} module={module} profile={profile} />;
-  }}</AuthGate>;
+  return <AuthGate>{profile => module.key === 'notifications'
+    ? <NotificationsModule system={system} module={module} profile={profile} />
+    : <MeetingRoomPage system={system} module={module} profile={profile} />}</AuthGate>;
 }
 
-function useIsAdmin(profile: Profile) {
-  const role = String(profile.rbac_role || profile.role || '');
-  return role === 'sysadmin' || role === 'admin';
-}
+/* ──────────────────── V1 版面的主頁（週排程／我的預約／變更申請） ──────────────────── */
 
-/* ──────────────────────────── 會議預約 ──────────────────────────── */
-
-function BookingsModule({ module, profile }: Props) {
-  const [rows, setRows] = useState<Row[]>([]);
+function MeetingRoomPage({ module, profile }: Props) {
+  const isAdmin = ['sysadmin', 'admin'].includes(String(profile.rbac_role || profile.role || ''));
+  const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [rooms, setRooms] = useState<Row[]>([]);
+  const [weekBookings, setWeekBookings] = useState<Row[]>([]);
+  const [myBookings, setMyBookings] = useState<Row[]>([]);
+  const [requests, setRequests] = useState<Row[]>([]);
+  const [users, setUsers] = useState<Row[]>([]);
   const [myPhone, setMyPhone] = useState('');
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
-  const [query, setQuery] = useState(''), [status, setStatus] = useState(''), [scope, setScope] = useState('upcoming'), [page, setPage] = useState(1);
-  const [creating, setCreating] = useState(false);
+  const [booking, setBooking] = useState<{ room_id: string; date: string } | null>(null);
   const [changeFor, setChangeFor] = useState<Row | null>(null);
+  const [roomAdmin, setRoomAdmin] = useState(module.key === 'rooms');
   const [tick, setTick] = useState(Date.now());
 
-  // 報到按鈕會隨時間進出可用狀態，每分鐘重算一次即可。
-  useEffect(() => { const timer = window.setInterval(() => setTick(Date.now()), 60_000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { const t = window.setInterval(() => setTick(Date.now()), 60_000); return () => window.clearInterval(t); }, []);
+
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
-    const [b, r, u] = await Promise.all([
-      client.from('meeting_bookings').select('*,meeting_rooms(name,floor),users(name,department)').order('booking_date', { ascending: false }).order('start_time', { ascending: false }).limit(500),
-      client.from('meeting_rooms').select('room_id,name,capacity,floor,status').order('name'),
+    const from = isoDate(days[0]), to = isoDate(days[6]);
+    const [r, w, mine, req, u, me] = await Promise.all([
+      client.from('meeting_rooms').select('*').order('name'),
+      client.from('meeting_bookings').select('*').gte('booking_date', from).lte('booking_date', to)
+        .in('status', ['booked', 'checked_in']).order('start_time'),
+      client.from('meeting_bookings').select('*,meeting_rooms(name,floor)').eq('user_id', profile.user_id)
+        .order('booking_date', { ascending: false }).limit(100),
+      client.from('meeting_booking_change_requests')
+        .select('*,meeting_bookings!target_booking_id(booking_no,booking_date,start_time,end_time,status,user_id,purpose,meeting_rooms(name)),users!requester_id(name,department)')
+        .order('created_at', { ascending: false }).limit(100),
+      client.from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(2000),
       client.from('users').select('phone').eq('user_id', profile.user_id).maybeSingle(),
     ]);
-    if (b.error || r.error) setNote(`失敗：${errorMessage(b.error || r.error, '會議預約資料載入失敗')}`);
-    setRows(b.data || []); setRooms(r.data || []); setMyPhone(String((u.data as Row)?.phone || '')); setBusy(false);
-  }, [profile.user_id]);
+    if (r.error || w.error) setNote(`失敗：${errorMessage(r.error || w.error, '會議室資料載入失敗')}`);
+    setRooms(r.data || []); setWeekBookings(w.data || []); setMyBookings(mine.data || []);
+    setRequests(req.data || []); setUsers(u.data || []);
+    setMyPhone(String((me.data as Row)?.phone || ''));
+    setBusy(false);
+  }, [days, profile.user_id]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => setPage(1), [query, status, scope]);
 
-  const today = taipeiToday();
-  const filtered = useMemo(() => rows.filter(row => {
-    const q = query.trim().toLowerCase();
-    const room = (row.meeting_rooms as Row) || {}, user = (row.users as Row) || {};
-    if (scope === 'upcoming' && String(row.booking_date) < today) return false;
-    if (scope === 'mine' && row.user_id !== profile.user_id) return false;
-    return (!status || row.status === status) &&
-      (!q || [row.booking_no, row.purpose, room.name, user.name, row.contact_phone].some(v => String(v || '').toLowerCase().includes(q)));
-  }), [rows, query, status, scope, today, profile.user_id]);
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const nameOf = useCallback((id: unknown) => users.find(x => x.user_id === id)?.name || '（未知）', [users]);
 
-  const checkIn = async (row: Row) => {
-    setBusy(true); setNote('');
-    try { await invokeAppApi('meeting_check_in', { booking_id: row.booking_id }); await load(); setNote('已完成報到'); }
-    catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
-  };
   const cancel = async (row: Row) => {
     if (!window.confirm(`確定取消「${fmt(row.purpose)}」這筆預約？`)) return;
     setBusy(true); setNote('');
@@ -119,254 +135,11 @@ function BookingsModule({ module, profile }: Props) {
     if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
     await load(); setNote('預約已取消');
   };
-
-  return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增預約</button>} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋預約編號、會議名稱、會議室或預約人" />
-        <select value={scope} onChange={e => setScope(e.target.value)}>
-          <option value="upcoming">今日與未來</option>
-          <option value="mine">我的預約</option>
-          <option value="all">全部</option>
-        </select>
-        <select value={status} onChange={e => setStatus(e.target.value)}>
-          <option value="">全部狀態</option>
-          {Object.entries(BOOKING_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
-        <span>共 {filtered.length} 筆</span>
-      </div>
-      <div className="responsive-table"><table>
-        <thead><tr><th>預約編號</th><th>日期／時段</th><th>會議室</th><th>會議名稱</th><th>預約人</th><th>狀態</th><th>操作</th></tr></thead>
-        <tbody>{paged.map(row => {
-          const room = (row.meeting_rooms as Row) || {}, user = (row.users as Row) || {};
-          const mine = row.user_id === profile.user_id;
-          const { start, end } = bookingWindow(row);
-          const inWindow = tick >= start && tick <= end;
-          const ended = tick > end;
-          return <tr key={String(row.booking_id)}>
-            <td><strong>{fmt(row.booking_no)}</strong><small>建立 {fmtTime(row.created_at)}</small></td>
-            <td>{fmt(row.booking_date)}<small>{timeText(row.start_time)}–{timeText(row.end_time)}</small></td>
-            <td>{fmt(room.name)}{room.floor ? <small>{String(room.floor)}</small> : null}</td>
-            <td>{fmt(row.purpose)}{row.contact_phone ? <small>聯繫 {String(row.contact_phone)}</small> : null}</td>
-            <td>{fmt(user.name)}{mine ? <small>我的預約</small> : user.department ? <small>{String(user.department)}</small> : null}</td>
-            <td><Pill value={row.status} labels={BOOKING_LABEL} tones={BOOKING_TONE} /></td>
-            <td><div className="admin-row-actions">
-              {mine && row.status === 'booked' && inWindow && <button onClick={() => void checkIn(row)}>報到</button>}
-              {mine && row.status === 'booked' && <button className="warn" onClick={() => void cancel(row)}>取消</button>}
-              {!mine && row.status === 'booked' && !ended && <button onClick={() => setChangeFor(row)}>申請變更</button>}
-            </div></td>
-          </tr>;
-        })}</tbody>
-      </table></div>
-      {!busy && paged.length === 0 && <p className="empty">查無符合條件的預約</p>}
-      <Pager page={page} total={filtered.length} onPage={setPage} />
-    </section>
-
-    {creating && <CreateBookingModal rooms={rooms} myPhone={myPhone} onClose={() => setCreating(false)}
-      onDone={async (message) => { setCreating(false); await load(); setNote(message); }} />}
-    {changeFor && <ChangeRequestModal row={changeFor} myPhone={myPhone} onClose={() => setChangeFor(null)}
-      onDone={async (message) => { setChangeFor(null); await load(); setNote(message); }} />}
-  </AppShell>;
-}
-
-function CreateBookingModal({ rooms, myPhone, onClose, onDone }: { rooms: Row[]; myPhone: string; onClose: () => void; onDone: (message: string) => void }) {
-  const [form, setForm] = useState({
-    room_id: '', purpose: '', booking_date: taipeiToday(), start_time: '09:00', end_time: '10:00',
-    contact_phone: myPhone, repeat_weekly: false, repeat_until: '',
-  });
-  const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
-  const set = (key: string, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
-
-  const submit = async () => {
-    if (!form.room_id) return setMessage('請選擇會議室');
-    if (!form.purpose.trim()) return setMessage('請填寫會議名稱');
-    if (form.end_time <= form.start_time) return setMessage('結束時間必須晚於開始時間');
-    // 系統未登記電話時，聯繫電話為必填（與資料庫的 guard 一致）。
-    const phone = form.contact_phone.trim();
-    if (!myPhone && !phone) return setMessage('系統未登記你的電話，請填寫聯繫電話');
-    if (phone && phone.replace(/[^0-9#*]/g, '').length < 4) return setMessage('聯繫電話請至少填寫 4 碼的電話或分機');
-    if (form.repeat_weekly && !form.repeat_until) return setMessage('請選擇週期截止日期');
-    if (form.repeat_weekly && form.repeat_until < form.booking_date) return setMessage('週期截止日期不得早於首次預約日期');
-
-    setBusy(true); setMessage('');
-    const { data, error } = await getSupabase().rpc('create_meeting_booking_series', {
-      p_room_id: form.room_id, p_purpose: form.purpose.trim(),
-      p_booking_date: form.booking_date, p_start_time: form.start_time, p_end_time: form.end_time,
-      p_booker_phone: myPhone || null, p_contact_phone: phone || null,
-      p_repeat_weekly: form.repeat_weekly, p_repeat_until: form.repeat_weekly ? form.repeat_until : null,
-    });
-    if (error) { setMessage(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    const count = Number((data as Row)?.count || 1);
-    onDone(count > 1 ? `已建立 ${count} 筆週期預約` : '預約已建立');
-  };
-
-  return <AdminModal title="新增會議室預約" onClose={onClose}>
-    <div className="admin-form-grid">
-      <label>會議室（必填）<select value={form.room_id} onChange={e => set('room_id', e.target.value)}>
-        <option value="">-- 請選擇 --</option>
-        {rooms.filter(room => room.status === 'active').map(room =>
-          <option key={String(room.room_id)} value={String(room.room_id)}>{room.name}{room.capacity ? `（${room.capacity} 人）` : ''}{room.floor ? `｜${room.floor}` : ''}</option>)}
-      </select></label>
-      <label>預約日期（必填）<input type="date" min={taipeiToday()} value={form.booking_date} onChange={e => set('booking_date', e.target.value)} /></label>
-      <label>開始時間<select value={form.start_time} onChange={e => set('start_time', e.target.value)}>{HALF_HOURS.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
-      <label>結束時間<select value={form.end_time} onChange={e => set('end_time', e.target.value)}>{HALF_HOURS.map(t => <option key={t} value={t}>{t}</option>)}</select></label>
-      <label className="wide">會議名稱（必填）<input value={form.purpose} onChange={e => set('purpose', e.target.value)} placeholder="例：設備維護月會" /></label>
-      <label className="wide">聯繫電話{myPhone ? '（可留空，預設用系統登記的號碼）' : '（必填）'}
-        <input value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} placeholder="分機或手機，至少 4 碼" /></label>
-      <label className="wide checkbox"><input type="checkbox" checked={form.repeat_weekly} onChange={e => set('repeat_weekly', e.target.checked)} />每週重複（同一星期幾、同一時段）</label>
-      {form.repeat_weekly && <label className="wide">週期截止日期（最多 52 次）
-        <input type="date" min={form.booking_date} value={form.repeat_until} onChange={e => set('repeat_until', e.target.value)} /></label>}
-    </div>
-    {message && <p className="inline-message danger">{message}</p>}
-    <footer>
-      <button className="secondary-btn" onClick={onClose}>取消</button>
-      <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出預約'}</button>
-    </footer>
-  </AdminModal>;
-}
-
-function ChangeRequestModal({ row, myPhone, onClose, onDone }: { row: Row; myPhone: string; onClose: () => void; onDone: (message: string) => void }) {
-  const room = (row.meeting_rooms as Row) || {}, owner = (row.users as Row) || {};
-  const [form, setForm] = useState({ meeting_name: '', contact_phone: myPhone, reason: '' });
-  const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
-  const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
-
-  const submit = async () => {
-    if (!form.meeting_name.trim()) return setMessage('請填寫你的會議名稱');
-    if (form.contact_phone.replace(/[^0-9#*]/g, '').length < 4) return setMessage('請填寫至少 4 碼的聯繫電話或分機');
-    setBusy(true); setMessage('');
-    const { error } = await getSupabase().rpc('create_meeting_booking_change_request', {
-      p_target_booking_id: row.booking_id, p_meeting_name: form.meeting_name.trim(),
-      p_contact_phone: form.contact_phone.trim(), p_reason: form.reason.trim() || null,
-    });
-    if (error) { setMessage(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    onDone('變更申請已送出，待原申請人回覆');
-  };
-
-  return <AdminModal title="申請變更他人預約" onClose={onClose}>
-    <dl className="detail-grid">
-      <div><dt>原預約</dt><dd>{fmt(row.booking_no)}｜{fmt(row.purpose)}</dd></div>
-      <div><dt>原申請人</dt><dd>{fmt(owner.name)}</dd></div>
-      <div><dt>會議室</dt><dd>{fmt(room.name)}</dd></div>
-      <div><dt>時段</dt><dd>{fmt(row.booking_date)} {timeText(row.start_time)}–{timeText(row.end_time)}</dd></div>
-    </dl>
-    <div className="admin-form-grid">
-      <label className="wide">你的會議名稱（必填）<input value={form.meeting_name} onChange={e => set('meeting_name', e.target.value)} /></label>
-      <label className="wide">聯繫電話（必填，至少 4 碼）<input value={form.contact_phone} onChange={e => set('contact_phone', e.target.value)} /></label>
-      <label className="wide">申請原因<textarea rows={2} value={form.reason} onChange={e => set('reason', e.target.value)} placeholder="讓原申請人判斷是否讓出時段" /></label>
-    </div>
-    <p className="inline-message">送出後由<b>原申請人</b>決定是否讓出。同意時系統會在同一筆交易內取消原預約並改建立你的預約，時段與會議室不變。</p>
-    {message && <p className="inline-message danger">{message}</p>}
-    <footer>
-      <button className="secondary-btn" onClick={onClose}>取消</button>
-      <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出申請'}</button>
-    </footer>
-  </AdminModal>;
-}
-
-/* ──────────────────────────── 會議室主檔 ──────────────────────────── */
-
-function RoomsModule({ module, profile }: Props) {
-  const isAdmin = useIsAdmin(profile);
-  const [rows, setRows] = useState<Row[]>([]);
-  const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [query, setQuery] = useState('');
-  const [editor, setEditor] = useState<Row | null>(null);
-
-  const load = useCallback(async () => {
+  const checkIn = async (row: Row) => {
     setBusy(true); setNote('');
-    const { data, error } = await getSupabase().from('meeting_rooms').select('*').order('name');
-    if (error) setNote(`失敗：${errorMessage(error, '會議室主檔載入失敗')}`);
-    setRows(data || []); setBusy(false);
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-
-  const filtered = useMemo(() => rows.filter(row => {
-    const q = query.trim().toLowerCase();
-    return !q || [row.name, row.floor, row.note].some(v => String(v || '').toLowerCase().includes(q));
-  }), [rows, query]);
-
-  const save = async () => {
-    if (!editor) return;
-    if (!String(editor.name || '').trim()) { setNote('失敗：請輸入會議室名稱'); return; }
-    setBusy(true); setNote('');
-    try {
-      await invokeAppApi('meeting_save_room', {
-        room_id: editor.room_id || undefined, name: String(editor.name).trim(),
-        capacity: editor.capacity === '' || editor.capacity == null ? null : editor.capacity,
-        floor: String(editor.floor || '').trim() || null, status: String(editor.status || 'active'),
-        note: String(editor.note || '').trim() || null,
-      });
-      setEditor(null); await load(); setNote(editor.room_id ? '會議室已更新' : '會議室已新增');
-    } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
+    try { await invokeAppApi('meeting_check_in', { booking_id: row.booking_id }); await load(); setNote('已完成報到'); }
+    catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
-
-  return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={isAdmin ? <button className="primary-btn compact" onClick={() => setEditor({ status: 'active' })}>＋ 新增會議室</button> : undefined} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋會議室名稱、樓層或備註" />
-        <span>開放 {rows.filter(r => r.status === 'active').length}／共 {rows.length} 間</span>
-        {!isAdmin && <span className="inline-message">僅管理者可維護會議室主檔</span>}
-      </div>
-      <div className="responsive-table"><table>
-        <thead><tr><th>會議室</th><th>容量</th><th>樓層</th><th>備註</th><th>狀態</th>{isAdmin && <th>操作</th>}</tr></thead>
-        <tbody>{filtered.map(row => <tr key={String(row.room_id)}>
-          <td><strong>{fmt(row.name)}</strong></td>
-          <td>{row.capacity == null ? '—' : `${row.capacity} 人`}</td>
-          <td>{fmt(row.floor)}</td>
-          <td>{fmt(row.note)}</td>
-          <td><Pill value={row.status} labels={ROOM_LABEL} tones={ROOM_TONE} /></td>
-          {isAdmin && <td><div className="admin-row-actions"><button onClick={() => setEditor({ ...row })}>編輯</button></div></td>}
-        </tr>)}</tbody>
-      </table></div>
-      {!busy && filtered.length === 0 && <p className="empty">目前沒有會議室資料</p>}
-    </section>
-
-    {editor && <AdminModal title={editor.room_id ? `編輯會議室｜${fmt(editor.name)}` : '新增會議室'} onClose={() => setEditor(null)}>
-      <div className="admin-form-grid">
-        <label>名稱（必填）<input value={String(editor.name || '')} onChange={e => setEditor({ ...editor, name: e.target.value })} /></label>
-        <label>容量（人）<input type="number" min={0} value={editor.capacity == null ? '' : String(editor.capacity)} onChange={e => setEditor({ ...editor, capacity: e.target.value })} /></label>
-        <label>樓層<input value={String(editor.floor || '')} onChange={e => setEditor({ ...editor, floor: e.target.value })} placeholder="例：3F" /></label>
-        <label>狀態<select value={String(editor.status || 'active')} onChange={e => setEditor({ ...editor, status: e.target.value })}>
-          {Object.entries(ROOM_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select></label>
-        <label className="wide">備註<input value={String(editor.note || '')} onChange={e => setEditor({ ...editor, note: e.target.value })} /></label>
-      </div>
-      <footer>
-        <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
-      </footer>
-    </AdminModal>}
-  </AppShell>;
-}
-
-/* ──────────────────────────── 變更申請 ──────────────────────────── */
-
-function ChangesModule({ module, profile }: Props) {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [status, setStatus] = useState('pending'), [page, setPage] = useState(1);
-
-  const load = useCallback(async () => {
-    setBusy(true); setNote('');
-    const { data, error } = await getSupabase()
-      .from('meeting_booking_change_requests')
-      // 這張表對 users 有兩個外鍵（requester_id／responded_by），對 meeting_bookings
-      // 也有兩個（target_booking_id／created_booking_id），兩者都必須指定要 join 哪一個，
-      // 否則 PostgREST 會回 PGRST201。以欄位名稱指定，不依賴 constraint 命名。
-      .select('*,meeting_bookings!target_booking_id(booking_no,booking_date,start_time,end_time,status,user_id,purpose,meeting_rooms(name)),users!requester_id(name,department)')
-      .order('created_at', { ascending: false }).limit(300);
-    if (error) setNote(`失敗：${errorMessage(error, '變更申請載入失敗')}`);
-    setRows(data || []); setBusy(false);
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => setPage(1), [status]);
-
-  const filtered = useMemo(() => rows.filter(row => !status || row.status === status), [rows, status]);
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   const respond = async (row: Row, approve: boolean) => {
     if (!window.confirm(approve ? '同意後會取消你的原預約，並把時段改建立為申請人的預約。確定？' : '確定婉拒這筆變更申請？')) return;
     setBusy(true); setNote('');
@@ -376,45 +149,350 @@ function ChangesModule({ module, profile }: Props) {
   };
 
   return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <select value={status} onChange={e => setStatus(e.target.value)}>
-          <option value="">全部狀態</option>
-          {Object.entries(CHANGE_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
-        <span>共 {filtered.length} 筆</span>
-        <span className="inline-message">只有原預約的申請人可以同意或婉拒</span>
+    <div className="mr-page">
+      <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+
+      <div className="mr-hero">
+        <div>
+          <h1>會議室預約系統</h1>
+          <p>週視圖排程總覽 · 送出即生效 · 系統自動防止同時段重複預約</p>
+        </div>
+        <div className="spacer" />
+        {isAdmin && <button className="btn" onClick={() => setRoomAdmin(true)}>🏢 會議室管理</button>}
       </div>
-      <div className="responsive-table"><table>
-        <thead><tr><th>申請時間</th><th>原預約</th><th>申請人</th><th>申請會議名稱</th><th>原因</th><th>狀態</th><th>操作</th></tr></thead>
-        <tbody>{paged.map(row => {
-          const booking = (row.meeting_bookings as Row) || {}, requester = (row.users as Row) || {};
-          const room = (booking.meeting_rooms as Row) || {};
-          const iAmOwner = booking.user_id === profile.user_id;
-          return <tr key={String(row.request_id)}>
-            <td>{fmtTime(row.created_at)}</td>
-            <td><strong>{fmt(booking.booking_no)}</strong><small>{fmt(room.name)}｜{fmt(booking.booking_date)} {timeText(booking.start_time)}–{timeText(booking.end_time)}</small></td>
-            <td>{fmt(requester.name)}{requester.department ? <small>{String(requester.department)}</small> : null}<small>聯繫 {fmt(row.contact_phone)}</small></td>
-            <td>{fmt(row.requested_meeting_name)}</td>
-            <td>{fmt(row.reason)}{row.response_note ? <small>{String(row.response_note)}</small> : null}</td>
-            <td><Pill value={row.status} labels={CHANGE_LABEL} tones={CHANGE_TONE} />{row.responded_at ? <small>{fmtTime(row.responded_at)}</small> : null}</td>
-            <td><div className="admin-row-actions">
-              {row.status === 'pending' && iAmOwner && <>
-                <button onClick={() => void respond(row, true)}>同意讓出</button>
-                <button className="warn" onClick={() => void respond(row, false)}>婉拒</button>
-              </>}
-            </div></td>
-          </tr>;
-        })}</tbody>
-      </table></div>
-      {!busy && paged.length === 0 && <p className="empty">目前沒有變更申請</p>}
-      <Pager page={page} total={filtered.length} onPage={setPage} />
-    </section>
+
+      {/* 週排程 */}
+      <div className="mr-panel">
+        <div className="mr-panel-head">
+          <strong>週排程</strong>
+          <div className="spacer" />
+          <div className="week-nav">
+            <button className="btn" onClick={() => setWeekStart(d => addDays(d, -7))}>‹ 上週</button>
+            <span className="week-label">{fmtMD(days[0])} — {fmtMD(days[6])}</span>
+            <button className="btn" onClick={() => setWeekStart(d => addDays(d, 7))}>下週 ›</button>
+            <button className="btn" onClick={() => setWeekStart(mondayOf(new Date()))}>本週</button>
+          </div>
+        </div>
+        <div className="mr-panel-body">
+          {!rooms.length
+            ? <div className="empty">{busy ? '載入中…' : '尚未建立會議室，請洽系統管理員於「會議室管理」新增。'}</div>
+            : <div className="grid-wrap"><table className="roomgrid">
+              <thead><tr><th style={{ minWidth: 110 }}>會議室</th>
+                {days.map(d => <th key={isoDate(d)} className={d.getDay() === 0 || d.getDay() === 6 ? 'weekend' : ''}>
+                  週{DOW[(d.getDay() + 6) % 7]}<br />{fmtMD(d)}</th>)}
+              </tr></thead>
+              <tbody>{rooms.map(room => <tr key={String(room.room_id)}>
+                <td className="roomname">{fmt(room.name)}{room.capacity ? <><br /><span style={{ color: 'var(--dim)', fontWeight: 400 }}>{String(room.capacity)} 人</span></> : null}</td>
+                {days.map(d => {
+                  const dateStr = isoDate(d);
+                  const weekend = d.getDay() === 0 || d.getDay() === 6;
+                  const past = dateStr < taipeiToday();
+                  const items = weekBookings
+                    .filter(b => b.room_id === room.room_id && b.booking_date === dateStr)
+                    .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
+                  return <td key={dateStr}
+                    className={[weekend ? 'weekend' : '', past ? 'past' : '', !past && room.status === 'active' ? 'selectable' : ''].filter(Boolean).join(' ')}
+                    onClick={() => { if (!past && room.status === 'active') setBooking({ room_id: String(room.room_id), date: dateStr }); }}>
+                    {items.map(b => {
+                      const mine = b.user_id === profile.user_id;
+                      const future = bookingEndAt(b).getTime() > tick;
+                      const canCancel = mine && b.status === 'booked';
+                      const canRequest = !mine && b.status === 'booked' && future;
+                      return <div key={String(b.booking_id)}
+                        className={`bk-pill${mine ? ' mine' : ''}${canCancel ? ' can-cancel' : ''}`}
+                        role={canCancel ? 'button' : undefined} tabIndex={canCancel ? 0 : undefined}
+                        title={canCancel ? '點擊取消此預約' : undefined}
+                        onClick={canCancel ? e => { e.stopPropagation(); void cancel(b); } : undefined}
+                        onKeyDown={canCancel ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); void cancel(b); } } : undefined}>
+                        <span className="bk-line">{hhmm(b.start_time)}-{hhmm(b.end_time)}</span>
+                        <span className="bk-line person">{nameOf(b.user_id)}</span>
+                        <span className="bk-line meeting">{b.purpose || '未填會議名稱'}</span>
+                        {canCancel && <span className="bk-cancel-hint">點擊圖卡取消預約</span>}
+                        {canRequest && <span><button className="bk-action" onClick={e => { e.stopPropagation(); setChangeFor(b); }}>申請變更</button></span>}
+                      </div>;
+                    })}
+                  </td>;
+                })}
+              </tr>)}</tbody>
+            </table></div>}
+        </div>
+      </div>
+
+      {/* 我的預約 */}
+      <div className="mr-panel">
+        <div className="mr-panel-head"><strong>我的預約</strong></div>
+        <div className="mr-panel-body">
+          {!myBookings.length ? <div className="empty">{busy ? '載入中…' : '目前沒有你的預約紀錄。'}</div>
+            : <div className="mr-list">{myBookings.slice(0, 20).map(b => {
+              const room = (b.meeting_rooms as Row) || {};
+              const start = slotStartAt(String(b.booking_date), hhmm(b.start_time)).getTime();
+              const end = bookingEndAt(b).getTime();
+              const inWindow = tick >= start && tick <= end;
+              return <div className="mr-card" key={String(b.booking_id)}>
+                <div className="grow">
+                  <b>{fmt(b.purpose)}　<span style={{ color: 'var(--dim)', fontWeight: 400 }}>{fmt(b.booking_no)}</span></b>
+                  <small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}
+                    ｜{{ booked: '已預約', checked_in: '已報到', cancelled: '已取消', expired: '已逾期' }[String(b.status)] || fmt(b.status)}</small>
+                </div>
+                <div className="acts">
+                  {b.status === 'booked' && inWindow && <button className="btn btn-primary" onClick={() => void checkIn(b)}>報到</button>}
+                  {b.status === 'booked' && <button className="btn btn-danger" onClick={() => void cancel(b)}>取消預約</button>}
+                </div>
+              </div>;
+            })}</div>}
+        </div>
+      </div>
+
+      {/* 預約變更申請 */}
+      <div className="mr-panel">
+        <div className="mr-panel-head"><strong>預約變更申請</strong>
+          <span className="hint">原申請人同意後，系統自動取消原預約並建立申請者的新預約</span></div>
+        <div className="mr-panel-body">
+          {!requests.length ? <div className="empty">{busy ? '載入中…' : '目前沒有變更申請。'}</div>
+            : <div className="mr-list">{requests.slice(0, 20).map(req => {
+              const target = (req.meeting_bookings as Row) || {}, room = (target.meeting_rooms as Row) || {};
+              const requester = (req.users as Row) || {};
+              const iAmOwner = target.user_id === profile.user_id;
+              return <div className="mr-card" key={String(req.request_id)}>
+                <div className="grow">
+                  <b>{fmt(req.requested_meeting_name)}　<span style={{ color: 'var(--dim)', fontWeight: 400 }}>
+                    {{ pending: '待原申請人回覆', approved: '已同意', rejected: '已婉拒', cancelled: '已作廢' }[String(req.status)] || fmt(req.status)}</span></b>
+                  <small>申請人 {fmt(requester.name)}｜聯繫 {fmt(req.contact_phone)}</small>
+                  <small>原預約 {fmt(target.booking_no)}｜{fmt(room.name)}｜{fmt(target.booking_date)} {hhmm(target.start_time)}–{hhmm(target.end_time)}</small>
+                  {req.reason ? <small>原因：{String(req.reason)}</small> : null}
+                  {req.response_note ? <small>{String(req.response_note)}</small> : null}
+                </div>
+                {req.status === 'pending' && iAmOwner && <div className="acts">
+                  <button className="btn btn-primary" onClick={() => void respond(req, true)}>同意讓出</button>
+                  <button className="btn btn-danger" onClick={() => void respond(req, false)}>婉拒</button>
+                </div>}
+              </div>;
+            })}</div>}
+        </div>
+      </div>
+    </div>
+
+    {booking && <BookingModal rooms={rooms} init={booking} myPhone={myPhone}
+      onClose={() => setBooking(null)}
+      onDone={async msg => { setBooking(null); await load(); setNote(msg); }} />}
+    {changeFor && <ChangeRequestModal row={changeFor} myPhone={myPhone} nameOf={nameOf}
+      onClose={() => setChangeFor(null)}
+      onDone={async msg => { setChangeFor(null); await load(); setNote(msg); }} />}
+    {roomAdmin && <RoomAdminModal rooms={rooms} onClose={() => setRoomAdmin(false)}
+      onSaved={async msg => { await load(); setNote(msg); }} />}
   </AppShell>;
 }
 
-/* ──────────────────────────── 預約提醒 ──────────────────────────── */
+/* ──────────────────────────── 預約表單彈窗 ──────────────────────────── */
+
+function BookingModal({ rooms, init, myPhone, onClose, onDone }: {
+  rooms: Row[]; init: { room_id: string; date: string }; myPhone: string;
+  onClose: () => void; onDone: (message: string) => void;
+}) {
+  const [roomId, setRoomId] = useState(init.room_id);
+  const [date, setDate] = useState(init.date);
+  const [purpose, setPurpose] = useState('');
+  const [start, setStart] = useState<TimeParts>(EMPTY_TIME);
+  const [end, setEnd] = useState<TimeParts>(EMPTY_TIME);
+  const [contactPhone, setContactPhone] = useState(myPhone);
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [repeatUntil, setRepeatUntil] = useState('');
+  const [conflict, setConflict] = useState('');
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+
+  const startValue = partsToValue(start), endValue = partsToValue(end);
+
+  // 送出前的衝突預檢，與 V1 的 checkConflictSoon 相同用意：先查同室同日的既有預約。
+  useEffect(() => {
+    let active = true;
+    if (!roomId || !date || !startValue || !endValue || endValue <= startValue) { setConflict(''); return; }
+    const timer = window.setTimeout(async () => {
+      const dates = [date];
+      if (repeatWeekly && repeatUntil >= date) {
+        let cursor = date;
+        while (true) {
+          const next = isoDate(addDays(new Date(`${cursor}T00:00:00`), 7));
+          if (next > repeatUntil || dates.length >= 52) break;
+          dates.push(next); cursor = next;
+        }
+      }
+      const { data } = await getSupabase().from('meeting_bookings')
+        .select('booking_no,booking_date,start_time,end_time')
+        .eq('room_id', roomId).in('booking_date', dates).in('status', ['booked', 'checked_in']);
+      if (!active) return;
+      const hit = (data || []).find(b => startValue < hhmm(b.end_time) && endValue > hhmm(b.start_time));
+      setConflict(hit ? `${hit.booking_date} 已有預約 ${hit.booking_no}（${hhmm(hit.start_time)}–${hhmm(hit.end_time)}）` : '');
+    }, 350);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [roomId, date, startValue, endValue, repeatWeekly, repeatUntil]);
+
+  const submit = async () => {
+    if (!roomId) return setMessage('請選擇會議室');
+    if (!purpose.trim()) return setMessage('請填寫會議名稱');
+    if (!startValue || !endValue) return setMessage('請選擇完整的開始與結束時間');
+    if (endValue <= startValue) return setMessage('結束時間必須晚於開始時間');
+    if (slotStartAt(date, startValue) <= new Date()) return setMessage('開始時間已經過去，不能預約過去時段');
+    const phone = contactPhone.trim();
+    if (!myPhone && !phone) return setMessage('系統未登記你的電話，請填寫聯繫電話');
+    if (phone && phone.replace(/[^0-9#*]/g, '').length < 4) return setMessage('聯繫電話請至少填寫 4 碼的電話或分機');
+    if (repeatWeekly && !repeatUntil) return setMessage('請選擇週期截止日期');
+    if (repeatWeekly && repeatUntil < date) return setMessage('週期截止日期不得早於首次預約日期');
+
+    setBusy(true); setMessage('');
+    const { data, error } = await getSupabase().rpc('create_meeting_booking_series', {
+      p_room_id: roomId, p_purpose: purpose.trim(),
+      p_booking_date: date, p_start_time: startValue, p_end_time: endValue,
+      p_booker_phone: myPhone || null, p_contact_phone: phone || null,
+      p_repeat_weekly: repeatWeekly, p_repeat_until: repeatWeekly ? repeatUntil : null,
+    });
+    if (error) { setMessage(`失敗：${errorMessage(error)}`); setBusy(false); return; }
+    const count = Number((data as Row)?.count || 1);
+    onDone(count > 1 ? `已建立 ${count} 筆週期預約` : '預約已建立');
+  };
+
+  return <div className="mr-modal-bg" role="dialog" aria-modal="true" aria-label="新增預約">
+    <div className="mr-modal">
+      <div className="mr-modal-head"><span className="modal-title">新增預約</span><button onClick={onClose} aria-label="關閉">✕</button></div>
+      <div className="mr-modal-body">
+        {conflict && <div className="conflict-alert">時段衝突：{conflict}</div>}
+        <div className="field"><label>會議室</label>
+          <select value={roomId} onChange={e => setRoomId(e.target.value)}>
+            <option value="">-- 請選擇 --</option>
+            {rooms.filter(r => r.status === 'active').map(r => <option key={String(r.room_id)} value={String(r.room_id)}>
+              {r.name}{r.capacity ? `（${r.capacity} 人）` : ''}{r.floor ? `｜${r.floor}` : ''}</option>)}
+          </select></div>
+        <div className="row2">
+          <div className="field"><label>日期</label><input type="date" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
+          <div className="field"><label>會議名稱</label><input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="例：管理部週會、面談會議" /></div>
+        </div>
+        <div className="row2">
+          <TimeSelect label="開始時間（上午／下午・時・分）" value={start} onChange={setStart} />
+          <TimeSelect label="結束時間（上午／下午・時・分）" value={end} onChange={setEnd} />
+        </div>
+        <div className="row2">
+          <div className="field"><label>系統登記電話</label><input type="tel" readOnly value={myPhone || '（未登記）'} /></div>
+          <div className="field"><label>聯繫電話</label><input type="tel" autoComplete="tel" value={contactPhone}
+            onChange={e => setContactPhone(e.target.value)} placeholder="請輸入可聯繫的電話或分機" /></div>
+        </div>
+        <div className="row2">
+          <div className="field"><label>週期預約</label>
+            <label className="booking-repeat"><input type="checkbox" checked={repeatWeekly}
+              onChange={e => setRepeatWeekly(e.target.checked)} />每週同星期、同時段重複預約</label></div>
+          {repeatWeekly && <div className="field"><label>週期截止日期（最多 52 次）</label>
+            <input type="date" min={date} value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} /></div>}
+        </div>
+      </div>
+      <div className="mr-modal-foot">
+        <span className="msg">{message}</span>
+        <button className="btn" onClick={onClose}>取消</button>
+        <button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出預約'}</button>
+      </div>
+    </div>
+  </div>;
+}
+
+/* ──────────────────────────── 變更申請彈窗 ──────────────────────────── */
+
+function ChangeRequestModal({ row, myPhone, nameOf, onClose, onDone }: {
+  row: Row; myPhone: string; nameOf: (id: unknown) => string;
+  onClose: () => void; onDone: (message: string) => void;
+}) {
+  const [meetingName, setMeetingName] = useState('');
+  const [phone, setPhone] = useState(myPhone);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+
+  const submit = async () => {
+    if (!meetingName.trim()) return setMessage('請填寫承接此時段的會議名稱');
+    if (phone.replace(/[^0-9#*]/g, '').length < 4) return setMessage('請填寫至少 4 碼的聯繫電話或分機');
+    setBusy(true); setMessage('');
+    const { error } = await getSupabase().rpc('create_meeting_booking_change_request', {
+      p_target_booking_id: row.booking_id, p_meeting_name: meetingName.trim(),
+      p_contact_phone: phone.trim(), p_reason: reason.trim() || null,
+    });
+    if (error) { setMessage(`失敗：${errorMessage(error)}`); setBusy(false); return; }
+    onDone('變更申請已送出，待原申請人回覆');
+  };
+
+  return <div className="mr-modal-bg" role="dialog" aria-modal="true" aria-label="申請變更預約時段">
+    <div className="mr-modal">
+      <div className="mr-modal-head"><span className="modal-title">申請變更預約時段</span><button onClick={onClose} aria-label="關閉">✕</button></div>
+      <div className="mr-modal-body">
+        <div className="field"><label>原預約資訊</label>
+          <input type="text" readOnly value={`${row.booking_date} ${hhmm(row.start_time)}–${hhmm(row.end_time)}｜${row.purpose || '未填會議名稱'}｜${nameOf(row.user_id)}`} /></div>
+        <div className="field"><label>申請者會議名稱</label>
+          <input type="text" value={meetingName} onChange={e => setMeetingName(e.target.value)} placeholder="請填寫承接此時段的會議名稱" /></div>
+        <div className="field"><label>聯繫電話</label>
+          <input type="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} /></div>
+        <div className="field"><label>申請原因</label>
+          <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)} placeholder="請說明需要此時段的原因" /></div>
+      </div>
+      <div className="mr-modal-foot">
+        <span className="msg">{message}</span>
+        <button className="btn" onClick={onClose}>取消</button>
+        <button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出變更申請'}</button>
+      </div>
+    </div>
+  </div>;
+}
+
+/* ──────────────────────────── 會議室管理彈窗 ──────────────────────────── */
+
+function RoomAdminModal({ rooms, onClose, onSaved }: { rooms: Row[]; onClose: () => void; onSaved: (message: string) => void }) {
+  const [form, setForm] = useState<Row>({ name: '', capacity: '', floor: '', status: 'active', note: '' });
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+  const editing = Boolean(form.room_id);
+
+  const reset = () => { setForm({ name: '', capacity: '', floor: '', status: 'active', note: '' }); setMessage(''); };
+  const save = async () => {
+    if (!String(form.name || '').trim()) return setMessage('請輸入會議室名稱');
+    setBusy(true); setMessage('');
+    try {
+      await invokeAppApi('meeting_save_room', {
+        room_id: form.room_id || undefined, name: String(form.name).trim(),
+        capacity: form.capacity === '' || form.capacity == null ? null : form.capacity,
+        floor: String(form.floor || '').trim() || null, status: String(form.status || 'active'),
+        note: String(form.note || '').trim() || null,
+      });
+      reset(); await onSaved(editing ? '會議室已更新' : '會議室已新增');
+    } catch (error) { setMessage(`失敗：${errorMessage(error)}`); }
+    finally { setBusy(false); }
+  };
+
+  return <div className="mr-modal-bg" role="dialog" aria-modal="true" aria-label="會議室管理">
+    <div className="mr-modal wide">
+      <div className="mr-modal-head"><span className="modal-title">會議室管理</span><button onClick={onClose} aria-label="關閉">✕</button></div>
+      <div className="mr-modal-body">
+        <div className="row2">
+          <div className="field"><label>名稱</label><input type="text" value={String(form.name || '')} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="例：3F 大會議室" /></div>
+          <div className="field"><label>可容納人數</label><input type="number" min={0} value={String(form.capacity ?? '')} onChange={e => setForm({ ...form, capacity: e.target.value })} placeholder="0" /></div>
+        </div>
+        <div className="row2">
+          <div className="field"><label>樓層</label><input type="text" value={String(form.floor || '')} onChange={e => setForm({ ...form, floor: e.target.value })} placeholder="例：3F" /></div>
+          <div className="field"><label>狀態</label><select value={String(form.status || 'active')} onChange={e => setForm({ ...form, status: e.target.value })}>
+            <option value="active">啟用</option><option value="inactive">停用</option></select></div>
+        </div>
+        <div className="field"><label>備註</label><input type="text" value={String(form.note || '')} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="選填" /></div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>{editing ? '儲存變更' : '＋ 新增會議室'}</button>
+          {editing && <button className="btn" onClick={reset}>取消編輯</button>}
+        </div>
+        {message && <p className="conflict-alert">{message}</p>}
+        {!rooms.length ? <div className="empty">尚未建立會議室</div>
+          : <div className="mr-list">{rooms.map(room => <div className="mr-card" key={String(room.room_id)}>
+            <div className="grow">
+              <b>{fmt(room.name)}</b>
+              <small>{room.capacity != null ? `${room.capacity} 人` : '未設人數'}｜{fmt(room.floor)}｜{room.status === 'inactive' ? '停用' : '啟用'}</small>
+              {room.note ? <small>{String(room.note)}</small> : null}
+            </div>
+            <div className="acts"><button className="btn" onClick={() => { setForm({ ...room, capacity: room.capacity ?? '' }); setMessage(''); }}>編輯</button></div>
+          </div>)}</div>}
+      </div>
+    </div>
+  </div>;
+}
+
+/* ──────────────────────────── 預約提醒（V2 專有） ──────────────────────────── */
 
 function NotificationsModule({ module, profile }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -432,7 +510,7 @@ function NotificationsModule({ module, profile }: Props) {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [status]);
 
-  const filtered = useMemo(() => rows.filter(row => !status || row.status === status), [rows, status]);
+  const filtered = useMemo(() => rows.filter(r => !status || r.status === status), [rows, status]);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return <AppShell profile={profile} title={module.title}>
@@ -441,19 +519,19 @@ function NotificationsModule({ module, profile }: Props) {
       <div className="admin-toolbar">
         <select value={status} onChange={e => setStatus(e.target.value)}>
           <option value="">全部狀態</option>
-          {Object.entries(NOTIFY_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          {Object.entries(NOTIFY_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <span>共 {filtered.length} 筆</span>
       </div>
       <div className="responsive-table"><table>
         <thead><tr><th>建立時間</th><th>預約</th><th>類型</th><th>狀態</th><th>發送時間</th><th>回應</th></tr></thead>
         <tbody>{paged.map(row => {
-          const booking = (row.meeting_bookings as Row) || {}, room = (booking.meeting_rooms as Row) || {};
+          const b = (row.meeting_bookings as Row) || {}, room = (b.meeting_rooms as Row) || {};
           return <tr key={String(row.notification_id)}>
             <td>{fmtTime(row.created_at)}</td>
-            <td><strong>{fmt(booking.booking_no)}</strong><small>{fmt(room.name)}｜{fmt(booking.booking_date)} {timeText(booking.start_time)}–{timeText(booking.end_time)}</small></td>
+            <td><strong>{fmt(b.booking_no)}</strong><small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</small></td>
             <td>{NOTIFY_TYPE[String(row.notification_type)] || fmt(row.notification_type)}</td>
-            <td><Pill value={row.status} labels={NOTIFY_LABEL} tones={NOTIFY_TONE} /></td>
+            <td>{NOTIFY_LABEL[String(row.status)] || fmt(row.status)}</td>
             <td>{fmtTime(row.sent_at)}</td>
             <td>{fmt(row.line_response)}</td>
           </tr>;

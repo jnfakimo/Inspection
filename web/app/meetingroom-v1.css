@@ -1,0 +1,84 @@
+/* 會議室預約：沿用 V1 meetingroom.html 的版面結構（週排程網格、預約方塊、三段式時間選單、
+   彈窗表單），僅把顏色改綁 V2 既有的 CSS 變數，讓亮色與科技版兩種主題都正常。
+   全部收斂在 .mr-page 之下，避免與 V2 既有的 .panel／.field 等通用類別衝突。 */
+
+.mr-page{display:grid;gap:16px}
+
+.mr-page .mr-hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 20px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:6px;background:var(--panel)}
+.mr-page .mr-hero h1{margin:0;font-size:1.35rem}
+.mr-page .mr-hero p{margin:6px 0 0;color:var(--dim);font-size:.82rem}
+.mr-page .mr-hero .spacer{flex:1}
+
+.mr-page .mr-panel{border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden}
+.mr-page .mr-panel-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid var(--line)}
+.mr-page .mr-panel-head strong{font-size:.95rem}
+.mr-page .mr-panel-head .spacer{flex:1}
+.mr-page .mr-panel-head .hint{color:var(--dim);font-size:.72rem}
+.mr-page .mr-panel-body{padding:14px 16px}
+
+.mr-page .week-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mr-page .week-label{min-width:150px;text-align:center;font-weight:700;font-size:.88rem}
+
+.mr-page .grid-wrap{overflow:auto}
+.mr-page .roomgrid{width:100%;border-collapse:collapse;font-size:.78rem;min-width:900px}
+.mr-page .roomgrid th{padding:8px 6px;border:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 8%,transparent);font-weight:700;text-align:center;line-height:1.5}
+.mr-page .roomgrid th.weekend{background:color-mix(in srgb,var(--amber) 12%,transparent)}
+.mr-page .roomgrid td{padding:5px;border:1px solid var(--line);vertical-align:top;min-width:118px;height:78px}
+.mr-page .roomgrid td.weekend{background:color-mix(in srgb,var(--amber) 5%,transparent)}
+.mr-page .roomgrid td.past{opacity:.55}
+.mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--cyan) 5%,transparent);white-space:nowrap}
+.mr-page .roomgrid td.selectable{cursor:pointer}
+.mr-page .roomgrid td.selectable:hover{background:color-mix(in srgb,var(--cyan) 12%,transparent)}
+
+.mr-page .bk-pill{display:grid;gap:1px;margin-bottom:4px;padding:5px 7px;border:1px solid var(--line);border-left:3px solid var(--dim);border-radius:3px;background:var(--panel);text-align:left}
+.mr-page .bk-pill.mine{border-left-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+.mr-page .bk-pill.can-cancel{cursor:pointer}
+.mr-page .bk-pill.can-cancel:hover{border-color:var(--red)}
+.mr-page .bk-pill.can-cancel:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+.mr-page .bk-line{font-size:.7rem;line-height:1.45}
+.mr-page .bk-line.person{color:var(--dim)}
+.mr-page .bk-line.meeting{font-weight:600}
+.mr-page .bk-cancel-hint{color:var(--red);font-size:.62rem}
+.mr-page .bk-action{margin-top:3px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;background:transparent;color:var(--cyan);font-size:.64rem;cursor:pointer}
+.mr-page .bk-action:hover{border-color:var(--cyan)}
+
+.mr-page .mr-list{display:grid;gap:10px}
+.mr-page .mr-card{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:4px;background:var(--panel)}
+.mr-page .mr-card .grow{flex:1;min-width:200px}
+.mr-page .mr-card b{display:block;font-size:.88rem}
+.mr-page .mr-card small{display:block;margin-top:3px;color:var(--dim);font-size:.72rem}
+.mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
+
+.mr-page .empty{padding:26px;color:var(--dim);text-align:center;font-size:.82rem}
+
+/* 彈窗：沿用 V1 的欄位配置（row2 兩欄、time-parts 三段式時間） */
+.mr-modal-bg{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;background:rgba(8,20,40,.66)}
+.mr-modal{width:min(720px,100%);max-height:90dvh;overflow:auto;border-top:3px solid var(--cyan);border-radius:5px;background:var(--panel);box-shadow:0 24px 80px rgba(0,0,0,.3)}
+.mr-modal.wide{width:min(900px,100%)}
+.mr-modal-head{display:flex;justify-content:space-between;align-items:center;padding:15px 18px;border-bottom:1px solid var(--line)}
+.mr-modal-head .modal-title{font-size:1.05rem;font-weight:700}
+.mr-modal-head button{border:0;background:transparent;color:var(--dim);font-size:1.5rem;cursor:pointer}
+.mr-modal-body{padding:16px 18px;display:grid;gap:12px}
+.mr-modal-foot{display:flex;justify-content:flex-end;align-items:center;gap:10px;padding:14px 18px;border-top:1px solid var(--line)}
+.mr-modal-foot .msg{flex:1;color:var(--red);font-size:.78rem}
+
+.mr-page .field,.mr-modal .field{display:grid;gap:5px}
+.mr-modal .field>label{color:var(--dim);font-size:.76rem}
+.mr-modal .field input,.mr-modal .field select,.mr-modal .field textarea{width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font:inherit}
+.mr-modal .field input[readonly]{background:color-mix(in srgb,var(--line) 35%,transparent)}
+.mr-modal .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mr-modal .time-parts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.mr-modal .booking-repeat{display:flex;align-items:center;gap:8px;color:var(--text);font-size:.8rem}
+.mr-modal .booking-repeat input{width:18px;height:18px;min-height:0;accent-color:var(--cyan)}
+.mr-modal .conflict-alert{padding:10px 12px;border:1px solid var(--red);border-radius:4px;background:color-mix(in srgb,var(--red) 10%,transparent);color:var(--red);font-size:.78rem}
+
+.mr-page .btn{padding:7px 13px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:.8rem;cursor:pointer}
+.mr-page .btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.mr-modal .btn{padding:8px 15px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:.82rem;cursor:pointer}
+.mr-page .btn-primary,.mr-modal .btn-primary{border-color:var(--cyan);background:var(--cyan);color:#001018;font-weight:700}
+.mr-page .btn-danger,.mr-modal .btn-danger{border-color:var(--red);color:var(--red)}
+
+@media (max-width:820px){
+  .mr-modal .row2,.mr-modal .time-parts{grid-template-columns:1fr}
+  .mr-page .roomgrid{min-width:760px}
+}
