@@ -17,7 +17,7 @@ V1（`system/*.html`）保留不刪除；V2（`web/app`）逐模組轉移，完�
 | 駐衛警巡檢 | `/v2/systems/guardpatrol/` | 入口與模組列表 | `patrolcheckin.html`、`patrolshifts.html` 等 |
 | 電子交接簿 | `/v2/systems/handover/`、`/v2/handover-pilot/` | 現場試用版與模組入口 | `handover.html` |
 | 設備建置 | `/Inspection/v2/systems/equipment/` | **八個模組已完整搬移**（見下方） | `equipment.html`、`materials.html` |
-| 專案關係／圖臺 | `/v2/systems/structuremap/` | 模組入口；2D／3D 尚待原生化 | `b1plan.html`、`floor3d.html` 等 |
+| 專案關係／圖臺 | `/Inspection/v2/systems/structuremap/` | **六個模組已完整搬移**（見下方） | `b1plan.html`、`floor3d.html` 等 |
 | 公務車派車 | `/Inspection/v2/systems/vehicle/` | **五個模組已完整搬移**（見下方） | `vehicle-dispatch.html` |
 | 會議室預約 | `/Inspection/v2/systems/meetingroom/` | **四個模組已完整搬移**（見下方） | `meetingroom.html` |
 
@@ -105,6 +105,32 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 `analytics.html` 的公式，確保兩邊數字一致；另補上 V1 沒有的「急迫度分布」。
 匯出統一為 .xlsx，ExcelJS 以動態 import 載入並經建置確認切成獨立 chunk，
 不會出現在任何頁面的初始載入。
+
+## SYS-06 專案關係與設備圖臺（2026-08-17 完成）
+
+四個資料模組在 `structuremap-workspace.tsx`，兩個檢視器在 `structuremap-viewers.tsx`：
+
+| 模組 | V2 功能 |
+|---|---|
+| 區域位置表 | `floor_spaces` 新增與編輯，樓層自動正規化並推導 floor_order |
+| 整合標記 | `plan_markers` 屬性維護：名稱、類型、座標、顏色、關聯設備、狀態 |
+| 平面樓層圖 | OpenSeadragon 檢視器，標記疊層可點選，支援點圖面重新定位並寫回 x／y |
+| 立體樓層模型 | Three.js 堆疊樓層，貼圖化，標記以球體標示，可調層距與切換標記顯示 |
+| 模型管理 | `floor_models` upsert（floor_id 為主鍵），bbox 以 JSON 編輯並驗證格式 |
+| 專案關係 | `locations` 的樓層／區域結構檢視。**唯讀**——維護入口在後台的場域位置模組 |
+
+檢視器的資產來源統一改為公開儲存桶 `floorplans` 的絕對網址（即 `floor_models.image_path`，
+目前為 B1.png～RF.png）。V1 用的是相對路徑 `plans/tex/...`，那掛在 `/Inspection/system`
+底下；V2 位於 `/Inspection/v2`，改走 Storage 才不受站台路徑影響。已確認該桶匿名可讀。
+
+平面圖採 OpenSeadragon 的 `{ type:'image' }` 單張影像模式，與 V1 `b1plan.html` 現行作法
+一致（該頁的 `.dzi` 圖磚是另一條未啟用的路徑）。`plan_markers` 的 x／y 視為 0–1 相對座標。
+
+`three` 與 `openseadragon` 皆以動態 import 載入，建置後確認切成獨立 chunk（337 KB／267 KB）
+且沒有任何頁面的初始 HTML 引用它們。
+
+**尚未驗證**：兩個檢視器的實際算繪需登入後才看得到，目前僅確認路由、bundle 切分、
+貼圖網址可取得與型別／建置通過。
 
 ## 交付順序
 

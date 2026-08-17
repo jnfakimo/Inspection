@@ -6,8 +6,12 @@
 
 import { AuthGate } from '@/components/AuthGate';
 import { StructureMapWorkspace } from './structuremap-workspace';
+import { StructureMapViewers } from './structuremap-viewers';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 
+const VIEWER_MODULES = new Set(['floor2d', 'floor3d']);
+
 export function StructureMapModules({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
+  if (VIEWER_MODULES.has(module.key)) return <StructureMapViewers system={system} module={module} />;
   return <AuthGate>{profile => <StructureMapWorkspace system={system} module={module} profile={profile} />}</AuthGate>;
 }

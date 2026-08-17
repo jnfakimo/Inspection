@@ -9,4 +9,9 @@
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px;margin:0}.detail-grid>div{padding:10px;background:#f6f9fd}.detail-grid dt{color:var(--muted);font-size:.75rem}.detail-grid dd{margin:5px 0 0;word-break:break-word}
 .detail-timeline{padding:0 20px 4px}.detail-timeline h3{margin:0 0 10px;font-size:.95rem}.detail-timeline ol{list-style:none;margin:0;padding:0;display:grid;gap:10px}.detail-timeline li{padding:11px 13px;border-left:3px solid var(--blue);background:#f6f9fd}.detail-timeline li b{margin-right:10px}.detail-timeline li span{color:var(--muted);font-size:.8rem}.detail-timeline li time{float:right;color:var(--muted);font-size:.78rem}.detail-timeline li p{margin:6px 0 0;font-size:.85rem}
 .admin-form-grid label.checkbox{grid-template-columns:auto 1fr;align-items:center;gap:8px;color:var(--ink)}.admin-form-grid label.checkbox input{width:20px;height:20px;min-height:0;accent-color:var(--blue)}
+/* SYS-06 圖臺：2D／3D 檢視器的畫布容器與平面標記 */
+.plan-stage{width:100%;height:min(68vh,620px);min-height:360px;margin-top:4px;border:1px solid var(--line);border-radius:5px;background:#04101f;overflow:hidden;position:relative}
+.plan-stage canvas{display:block}
+.plan-marker{width:16px;height:16px;padding:0;border:2px solid #fff;border-radius:50%;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,.45),0 0 10px rgba(0,212,255,.5)}
+.plan-marker:hover{transform:scale(1.25)}
 @media (max-width:800px){.admin-panel{padding:14px}.admin-form-grid{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.detail-timeline li time{float:none;display:block;margin-top:4px}.admin-form-grid label.wide{grid-column:auto}.admin-pager,.admin-layout-actions{align-items:stretch;flex-direction:column}.layout-summary{grid-template-columns:1fr}.audit-details{grid-template-columns:1fr}.admin-page-actions{gap:12px}.admin-toolbar label{width:100%}.admin-toolbar label input{flex:1}.admin-notice-list article{flex-direction:column}}
