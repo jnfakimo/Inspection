@@ -120,3 +120,36 @@
     margin-top: 6px;
     font-size: 10px;
   }
+/* Owner-requested compact spacing: retain field sizes, tighten vertical rhythm. */
+.v1-login-card {
+  gap: clamp(2px, .4vh, 4px);
+}
+
+.v1-login-logo {
+  margin-bottom: clamp(1px, .3vh, 2px);
+}
+
+.v1-login-sub {
+  margin: clamp(1px, .14vh, 1px) 0;
+}
+
+.v1-login-hint {
+  margin-bottom: clamp(2px, .44vh, 4px);
+}
+
+.v1-login-card label {
+  gap: clamp(1px, .2vh, 1px);
+  margin-top: clamp(1px, .3vh, 2px);
+}
+
+.v1-login-card .captcha-row {
+  margin-bottom: clamp(1px, .2vh, 2px);
+}
+
+.v1-login-card .forgot-link {
+  margin-top: clamp(2px, .36vh, 3px);
+}
+
+.v1-login-page footer {
+  margin-top: clamp(2px, .4vh, 4px);
+}
