@@ -26,8 +26,35 @@ import type { Profile } from '@/types/app';
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
 const DOW = ['一', '二', '三', '四', '五', '六', '日'];
-const NOTIFY_LABEL: Record<string, string> = { pending: '待發送', sent: '已發送', failed: '發送失敗', skipped: '略過' };
+const NOTIFY_LABEL: Record<string, string> = { pending: '待發送', sent: '已發送', failed: '發送失敗', skipped: '已略過' };
 const NOTIFY_TYPE: Record<string, string> = { reminder: '開始前提醒', expired: '逾時未報到' };
+
+/** 通知中心只呈現繁體中文，避免資料庫中的列舉值或第三方回應直接露出英文。 */
+function notificationTypeLabel(value: unknown) {
+  const key = String(value ?? '').trim().toLowerCase();
+  return NOTIFY_TYPE[key] || (key ? '其他通知' : '—');
+}
+
+function notificationStatusLabel(value: unknown) {
+  const key = String(value ?? '').trim().toLowerCase();
+  return NOTIFY_LABEL[key] || (key ? '其他狀態' : '—');
+}
+
+function notificationResponseLabel(value: unknown) {
+  if (value == null || value === '') return '—';
+  let raw = '';
+  try { raw = typeof value === 'object' ? (JSON.stringify(value) || '') : String(value); } catch { raw = ''; }
+  if (!raw) return '已收到系統回應';
+  if (/success|sent|delivered|^ok$|^200$|成功|送達|已發送/i.test(raw)) return '已送達';
+  if (/fail|error|timeout|unauthori[sz]ed|forbidden|^4\d\d$|^5\d\d$|失敗|錯誤|逾時/i.test(raw)) return '發送失敗';
+  if (/pending|queued|processing|待處理|處理中/i.test(raw)) return '處理中';
+  return '已收到系統回應';
+}
+
+function notificationErrorMessage(error: unknown) {
+  const translated = errorMessage(error, '預約提醒載入失敗');
+  return /[\u4e00-\u9fff]/.test(translated) ? translated : '預約提醒載入失敗，請稍後再試';
+}
 
 /* ── 日期與時間工具（對齊 V1 的同名函式） ── */
 function taipeiToday() {
@@ -519,7 +546,7 @@ function NotificationsModule({ module, profile }: Props) {
       .from('meeting_booking_notifications')
       .select('*,meeting_bookings(booking_no,booking_date,start_time,end_time,purpose,meeting_rooms(name))')
       .order('created_at', { ascending: false }).limit(300);
-    if (error) setNote(`失敗：${errorMessage(error, '預約提醒載入失敗')}`);
+    if (error) setNote(`失敗：${notificationErrorMessage(error)}`);
     setRows(data || []); setBusy(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -545,10 +572,10 @@ function NotificationsModule({ module, profile }: Props) {
           return <tr key={String(row.notification_id)}>
             <td>{fmtTime(row.created_at)}</td>
             <td><strong>{fmt(b.booking_no)}</strong><small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</small></td>
-            <td>{NOTIFY_TYPE[String(row.notification_type)] || fmt(row.notification_type)}</td>
-            <td>{NOTIFY_LABEL[String(row.status)] || fmt(row.status)}</td>
+            <td>{notificationTypeLabel(row.notification_type)}</td>
+            <td>{notificationStatusLabel(row.status)}</td>
             <td>{fmtTime(row.sent_at)}</td>
-            <td>{fmt(row.line_response)}</td>
+            <td>{notificationResponseLabel(row.line_response)}</td>
           </tr>;
         })}</tbody>
       </table></div>
