@@ -27,6 +27,11 @@
 .mr-page .roomgrid td.weekend{background:color-mix(in srgb,var(--amber) 5%,transparent)}
 .mr-page .roomgrid td.past{opacity:.55}
 .mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--cyan) 5%,transparent);white-space:nowrap}
+/* 週排程的會議室名稱欄依資料列循環跳色，與主檔清單保持一致。 */
+.mr-page .roomgrid tbody tr:nth-child(4n+1) td.roomname{background:#f0f9ff;border-left:3px solid #7dd3fc}
+.mr-page .roomgrid tbody tr:nth-child(4n+2) td.roomname{background:#f0fdf4;border-left:3px solid #86efac}
+.mr-page .roomgrid tbody tr:nth-child(4n+3) td.roomname{background:#fffbeb;border-left:3px solid #fcd34d}
+.mr-page .roomgrid tbody tr:nth-child(4n) td.roomname{background:#faf5ff;border-left:3px solid #c4b5fd}
 .mr-page .roomgrid td.selectable{cursor:pointer}
 .mr-page .roomgrid td.selectable:hover{background:color-mix(in srgb,var(--cyan) 12%,transparent)}
 
