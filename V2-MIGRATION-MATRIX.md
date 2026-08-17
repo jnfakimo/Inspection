@@ -16,7 +16,7 @@ V1（`system/*.html`）保留不刪除；V2（`web/app`）逐模組轉移，完�
 | 維修／派工 | `/v2/systems/workorder/` | 報修新增已可在 V2 送出；其餘列表基礎版 | `workorder.html`、`dispatch.html` |
 | 駐衛警巡檢 | `/v2/systems/guardpatrol/` | 入口與模組列表 | `patrolcheckin.html`、`patrolshifts.html` 等 |
 | 電子交接簿 | `/v2/systems/handover/`、`/v2/handover-pilot/` | 現場試用版與模組入口 | `handover.html` |
-| 設備建置 | `/v2/systems/equipment/` | 模組入口與資料列表 | `equipment.html`、`materials.html` |
+| 設備建置 | `/Inspection/v2/systems/equipment/` | **八個模組已完整搬移**（見下方） | `equipment.html`、`materials.html` |
 | 專案關係／圖臺 | `/v2/systems/structuremap/` | 模組入口；2D／3D 尚待原生化 | `b1plan.html`、`floor3d.html` 等 |
 | 公務車派車 | `/Inspection/v2/systems/vehicle/` | **五個模組已完整搬移**（見下方） | `vehicle-dispatch.html` |
 | 會議室預約 | `/Inspection/v2/systems/meetingroom/` | **四個模組已完整搬移**（見下方） | `meetingroom.html` |
@@ -64,6 +64,30 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 
 前端只做即時提示：時段限 00／30 分（下拉選單直接限制）、結束需晚於開始、未登記電話時
 聯繫電話必填且至少 4 碼。過去時段、時段衝突、報到時間區間等仍以資料庫與 API 的回應為準。
+
+## SYS-05 設備建置（2026-08-17 完成）
+
+`web/app/systems/[system]/[module]/equipment-workspace.tsx` 承接八個模組。八者結構高度相似，
+因此以「欄位規格驅動」的方式共用同一套列表與表單引擎，各模組只描述自己的資料表、清單欄位
+與表單欄位，避免八份幾乎一樣的程式碼：
+
+| 模組 | 資料表 | V2 功能 |
+|---|---|---|
+| 設備主檔 | `equipment` | 列表、搜尋、分頁；新增／編輯 33 個常用欄位（識別、位置、規格、原廠與代理商、保固、保養、負責人） |
+| 保養排程 | `equipment_maintenance_plans` | 依設備篩選；保養項目、類型、週期與間隔、負責人、上次／下次日期、狀態 |
+| 維修履歷 | `equipment_maintenance_records` | 履歷類型、故障內容與原因、處理方式、更換零件、停機時數與各項費用 |
+| 維護合約 | `equipment_contracts` | 廠商與聯絡人、合約編號與起訖、SLA 時數、金額、服務內容、狀態 |
+| 設備文件 | `equipment_documents` | 文件類型、版本、有效與到期日、目前版本旗標、檔案網址（可直接開啟） |
+| 年度成本 | `equipment_annual_costs` | 年度、來源、四類費用與自動合計 |
+| 中央監控 | `equipment_monitor_events` | **唯讀**＋事件確認。事件由外部系統寫入，不提供人工新增 |
+| 材料主檔 | `materials` | 材料編號與名稱、分類（下拉）、規格、廠牌型號、供應商、單價、狀態 |
+
+寫入直接走資料表，與 V1 相同。這些表的 RLS 已同時要求 `has_system_access('sys_equipment')`
+與 `has_app_permission('create')`／`('update')`，伺服器端把關存在；依
+`ARCHITECTURE_V2.md`「第 3 條的實際落差」的判斷準則，再包一層 Edge Function 只會多一次
+轉發而不會提高安全性，因此不另建 API action。
+
+`created_by`／`updated_by`（設備文件為 `uploaded_by`）由前端於新增與更新時蓋章。
 
 ## 交付順序
 
