@@ -185,3 +185,42 @@
   .v1-login-card {
     width: calc(100% - 24px);
     max-width: 300px;
+/* Fit the complete login frame in a 100% viewport without scrolling. */
+.v1-login-page {
+  padding-block: 8px;
+}
+
+.v1-login-card {
+  gap: 0;
+  padding: 8px 14px;
+}
+
+.v1-login-logo {
+  height: 32px;
+  margin-bottom: 1px;
+}
+
+.v1-login-card h1 {
+  line-height: 1.1;
+}
+
+.v1-login-sub,
+.v1-login-hint {
+  margin-block: 1px;
+  line-height: 1.2;
+}
+
+.v1-login-hint {
+  margin-bottom: 3px;
+}
+
+.v1-login-card label {
+  gap: 1px;
+  margin-top: 2px;
+  line-height: 1.15;
+}
+
+.v1-login-card input {
+  min-height: 32px;
+}
+
