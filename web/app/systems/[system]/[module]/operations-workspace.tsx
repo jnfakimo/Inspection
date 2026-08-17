@@ -8,86 +8,14 @@ import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import { GuardPatrolSpecialized } from './guardpatrol-specialized';
 import { PatrolWorkspace } from './patrol-workspace';
+import { HandoverModules } from './handover-workspace';
 
 type Row = Record<string, any>;
-type HandoverForm = { date: string; shift: string; handoverBy: string; takeoverBy: string; issues: string[]; pending: string[]; notes: string };
 type Point = { marker_id: string; floor_id?: string | null; label?: string | null; note?: string | null };
 type PatrolSchedule = { shift_id: string; name: string; start_time: string; end_time: string };
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
-const shifts = [
-  { id: 'morning', label: '早班', time: '06:00–14:00' },
-  { id: 'afternoon', label: '中班', time: '14:00–22:00' },
-  { id: 'night', label: '夜班', time: '22:00–06:00' },
-];
-const patrolShifts = [
-  { id: 'morning', label: '早班', time: '08:00–12:00' },
-  { id: 'noon', label: '午班', time: '12:00–16:00' },
-  { id: 'evening', label: '晚班', time: '16:00–22:00' },
-  { id: 'night', label: '夜班', time: '22:00–08:00' },
-];
 const text = (v: unknown) => v == null || v === '' ? '—' : String(v);
-const handoverStatus = (row: Row) => row.confirmed_at || row.confirmed_by ? '交接完成' : row.status === 'confirmed' ? '待接班人接收' : '草稿';
-
-export function HandoverWorkspace({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
-  const client = getSupabase();
-  const [rows, setRows] = useState<Row[]>([]);
-  const [users, setUsers] = useState<Row[]>([]);
-  const [form, setForm] = useState<HandoverForm>({ date: today(), shift: 'morning', handoverBy: profile.user_id, takeoverBy: '', issues: [], pending: [], notes: '' });
-  const [issue, setIssue] = useState('');
-  const [pending, setPending] = useState('');
-  const [activeTab, setActiveTab] = useState(module.key === 'open-items' ? 'open' : 'new');
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState('');
-  const isRecords = module.key === 'records';
-  const load = useCallback(async () => {
-    setBusy(true);
-    try {
-      const [data, people] = await Promise.all([
-        invokeAppApi<{ rows: Row[] }>('module_data', { system: 'handover', module: 'records' }),
-        client.from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(500),
-      ]);
-      setRows(data.rows || []); setUsers(people.data || []);
-    } catch (error) { setNote(error instanceof Error ? error.message : '交接資料載入失敗'); }
-    finally { setBusy(false); }
-  }, [client]);
-  useEffect(() => { void load(); }, [load]);
-  const add = (kind: 'issues' | 'pending') => {
-    const value = (kind === 'issues' ? issue : pending).trim();
-    if (!value) return;
-    setForm(current => ({ ...current, [kind]: [...current[kind], value] }));
-    kind === 'issues' ? setIssue('') : setPending('');
-  };
-  const save = async (status: 'draft' | 'confirmed') => {
-    if (!form.date || !form.handoverBy || !form.takeoverBy) { setNote('請選擇交接日期、交接人與接班人'); return; }
-    if (form.handoverBy === form.takeoverBy) { setNote('交接人與接班人不可為同一人'); return; }
-    setBusy(true); setNote('');
-    const { error } = await client.from('handover_records').insert({ shift_date: form.date, shift_type: form.shift, handover_by: form.handoverBy, takeover_by: form.takeoverBy, issues: form.issues.join('\n'), pending: form.pending.join('\n'), notes: form.notes, status });
-    if (error) setNote(`儲存失敗：${error.message}`); else { setNote(status === 'draft' ? '草稿已儲存' : '交接單已送出，等待指定接班人接收'); setForm(current => ({ ...current, issues: [], pending: [], notes: '' })); await load(); }
-    setBusy(false);
-  };
-  const receive = async (row: Row) => {
-    if (String(row.takeover_by) !== profile.user_id) { setNote('只有指定接班人可以接收此交接單'); return; }
-    setBusy(true); setNote('');
-    const { error } = await client.from('handover_records').update({ confirmed_by: profile.user_id, confirmed_at: new Date().toISOString() }).eq('record_id', row.record_id).eq('takeover_by', profile.user_id).eq('status', 'confirmed');
-    if (error) setNote(`接收失敗：${error.message}`); else { setNote('接班人已接收，交接正式完成'); await load(); }
-    setBusy(false);
-  };
-  const visible = useMemo(() => activeTab === 'open' ? rows.filter(row => row.pending || row.issues) : rows, [activeTab, rows]);
-  return <AppShell profile={profile} title={system.title}><div className='content v1-content operations-page'>
-    <header className='operations-header'><img src={system.icon} alt='' /><div><h1>{system.title}</h1><p>沿用 V1 的班別交接、雙層接收與待辦稽核流程。</p></div></header>
-    {note && <p className='operations-note' role='status'>{note}</p>}
-    <nav className='operations-tabs'><button className={activeTab === 'new' ? 'active' : ''} onClick={() => setActiveTab('new')}>新增交接</button><button className={activeTab === 'open' ? 'active' : ''} onClick={() => setActiveTab('open')}>未結事項</button><button className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>交接記錄</button></nav>
-    {activeTab === 'new' && <section className='operations-panel'>
-      <div className='operations-panel-title'><h2>基本資訊</h2><span>填表日期：<b>{today()}</b></span></div>
-      <div className='operations-form-grid'><label>班別<select value={form.shift} onChange={e => setForm({ ...form, shift: e.target.value })}>{shifts.map(shift => <option key={shift.id} value={shift.id}>{shift.label} {shift.time}</option>)}</select></label><label>交接日期<input type='date' value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label><label>交接人（離班）<select value={form.handoverBy} onChange={e => setForm({ ...form, handoverBy: e.target.value })}><option value=''>— 選擇人員 —</option>{users.map(user => <option key={user.user_id} value={user.user_id}>{user.name}{user.department ? `（${user.department}）` : ''}</option>)}</select></label><label>接班人（到班）<select value={form.takeoverBy} onChange={e => setForm({ ...form, takeoverBy: e.target.value })}><option value=''>— 選擇人員 —</option>{users.map(user => <option key={user.user_id} value={user.user_id}>{user.name}{user.department ? `（${user.department}）` : ''}</option>)}</select></label></div>
-      <div className='operations-panel-title compact'><h2>異常事項</h2></div><div className='operations-add-row'><input value={issue} placeholder='輸入異常事項，按 Enter 新增' onChange={e => setIssue(e.target.value)} onKeyDown={e => e.key === 'Enter' && add('issues')} /><button onClick={() => add('issues')}>＋ 新增</button></div><div className='operations-tags'>{form.issues.map((item, i) => <span key={`${item}-${i}`}>{item}<button onClick={() => setForm({ ...form, issues: form.issues.filter((_, index) => index !== i) })}>×</button></span>)}</div>
-      <div className='operations-panel-title compact'><h2>待辦事項</h2></div><div className='operations-add-row'><input value={pending} placeholder='輸入待辦事項，按 Enter 新增' onChange={e => setPending(e.target.value)} onKeyDown={e => e.key === 'Enter' && add('pending')} /><button onClick={() => add('pending')}>＋ 新增</button></div><div className='operations-tags'>{form.pending.map((item, i) => <span key={`${item}-${i}`}>{item}<button onClick={() => setForm({ ...form, pending: form.pending.filter((_, index) => index !== i) })}>×</button></span>)}</div>
-      <label className='operations-wide'>備註<textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder='其他需要說明的事項…' /></label><p className='operations-flow'>雙層交接稽核：交接人送出填單 → 指定接班人登入並點選接收 → 系統才登記交接完成。</p><div className='operations-actions'><button disabled={busy} onClick={() => void save('draft')}>儲存草稿</button><button className='primary' disabled={busy} onClick={() => void save('confirmed')}>送出交接（待接班人接收）</button></div>
-    </section>}
-    {activeTab !== 'new' && <section className='operations-panel'><div className='operations-panel-title'><h2>{activeTab === 'open' ? '未結事項' : '交接記錄'}</h2><button onClick={() => void load()} disabled={busy}>重新載入</button></div><div className='operations-table-wrap'><table className='operations-table'><thead><tr><th>日期</th><th>班別</th><th>異常事項</th><th>待辦</th><th>備註</th><th>狀態</th><th>操作</th></tr></thead><tbody>{visible.map((row, index) => <tr key={String(row.record_id || index)}><td>{text(row.shift_date)}</td><td>{shifts.find(shift => shift.id === row.shift_type)?.label || text(row.shift_type)}</td><td>{text(row.issues)}</td><td>{text(row.pending)}</td><td>{text(row.notes)}</td><td><span className={`operations-status ${row.confirmed_at ? 'done' : row.status === 'confirmed' ? 'waiting' : 'draft'}`}>{handoverStatus(row)}</span></td><td>{row.status === 'confirmed' && !row.confirmed_at && String(row.takeover_by) === profile.user_id && <button onClick={() => void receive(row)}>接收交接</button>}</td></tr>)}</tbody></table>{!visible.length && <p className='operations-empty'>{busy ? '載入中…' : '目前沒有交接資料。'}</p>}</div></section>}
-  </div></AppShell>;
-}
 
 function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
   const client = getSupabase();
@@ -113,7 +41,7 @@ const PATROL_MODULES = new Set(['points', 'records', 'shifts', 'notifications'])
 
 export function OperationsWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   return <AuthGate>{profile => system.key === 'handover'
-    ? <HandoverWorkspace system={system} module={module} profile={profile} />
+    ? <HandoverModules system={system} module={module} profile={profile} />
     : PATROL_MODULES.has(module.key)
       ? <PatrolWorkspace system={system} module={module} profile={profile} />
       : module.key === 'map3d'
