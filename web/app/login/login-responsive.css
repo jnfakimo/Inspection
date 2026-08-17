@@ -239,14 +239,14 @@
   .v1-login-card {
     width: min(85vw, 340px);
     max-width: 340px;
-    height: min(calc(85svh - 24px), 700px);
-    max-height: calc(85svh - 24px);
+    height: min(calc(75svh - 16px), 620px);
+    max-height: calc(75svh - 16px);
     overflow-y: auto;
     padding: 6px 18px;
   }
 
   .v1-login-logo {
-    width: min(100%, 160px);
-    height: 48px;
+    width: min(100%, 120px);
+    height: 36px;
   }
 }
