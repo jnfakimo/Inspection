@@ -6,7 +6,7 @@ import './handover-pilot/pilot-light.css';
 export const metadata: Metadata = {
   title: '北農智慧巡檢平台',
   description: '臺北農產公司第一果菜市場設備巡檢、維修與分析平台',
-  manifest: '/word-cloud/system/manifest.webmanifest',
+  manifest: '/Inspection/system/manifest.webmanifest',
 };
 
 export const viewport: Viewport = {

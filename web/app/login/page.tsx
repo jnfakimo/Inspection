@@ -9,8 +9,11 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   function nextPath() {
     const requested = new URLSearchParams(window.location.search).get('next');
-    return requested && requested.startsWith('/word-cloud/v2/') && !requested.startsWith('/word-cloud/v2/login')
-      ? requested : '/word-cloud/v2/systems/';
+    if (requested && (requested.startsWith('/Inspection/v2/') || requested.startsWith('/word-cloud/v2/'))
+      && !requested.startsWith('/Inspection/v2/login') && !requested.startsWith('/word-cloud/v2/login')) {
+      return requested;
+    }
+    return '/Inspection/v2/systems/';
   }
   async function loadCaptcha() {
     setCaptcha(null);
@@ -35,5 +38,5 @@ export default function LoginPage() {
       location.replace(nextPath());
     } catch { setMessage('登入服務暫時無法連線，請稍後重試'); setBusy(false); }
   }
-  return <main className="v1-login-page"><form className="login-card v1-login-card" onSubmit={submit}><img className="v1-login-logo" src="/word-cloud/system/assets/logo-title.png" alt="臺北農產第一果菜市場"/><h1>臺北農產公司</h1><p className="v1-login-sub">第一果菜市場 設備巡檢維修系統</p><p className="v1-login-hint">請使用帳號登入</p><label>帳號（英數字）<input name="identifier" required autoComplete="username" placeholder="請輸入帳號" /></label><label>密碼<input name="password" type="password" required autoComplete="current-password" placeholder="••••••••" /></label><label>安全驗證碼（六位數字）<div className="captcha-row"><input name="captcha" inputMode="numeric" pattern="[0-9]*" maxLength={6} required placeholder="輸入圖中六位數字"/>{captcha ? <img src={captcha.image} alt="六位數驗證碼" onClick={loadCaptcha}/> : <button type="button" onClick={loadCaptcha}>重新載入</button>}</div></label>{message && <p className="form-error">{message}</p>}<button className="primary-btn" disabled={busy}>{busy ? '登入中…' : '登入'}</button></form><footer>臺北農產運銷股份有限公司 第一果菜市場 ｜ 整合管理系統 ｜ 第二版</footer></main>;
+  return <main className="v1-login-page"><form className="login-card v1-login-card" onSubmit={submit}><img className="v1-login-logo" src="/Inspection/system/assets/logo-title.png" alt="臺北農產第一果菜市場"/><h1>臺北農產公司</h1><p className="v1-login-sub">第一果菜市場 設備巡檢維修系統</p><p className="v1-login-hint">請使用帳號登入</p><label>帳號（英數字）<input name="identifier" required autoComplete="username" placeholder="請輸入帳號" /></label><label>密碼<input name="password" type="password" required autoComplete="current-password" placeholder="••••••••" /></label><label>安全驗證碼（六位數字）<div className="captcha-row">{captcha ? <img src={captcha.image} alt="六位數驗證碼" onClick={loadCaptcha}/> : <button type="button" onClick={loadCaptcha}>重新載入</button>}<button type="button" onClick={loadCaptcha} aria-label="重新產生驗證碼">↻ 重新產生</button></div><input name="captcha" inputMode="numeric" pattern="[0-9]*" maxLength={6} required placeholder="輸入圖中六位數字"/></label>{message && <p className="form-error">{message}</p>}<button className="primary-btn" disabled={busy}>{busy ? '登入中…' : '登入'}</button><button type="button" className="forgot-link" onClick={() => setMessage('請洽系統管理員重設密碼')}>忘記密碼？</button></form><footer>臺北農產運銷股份有限公司 第一果菜市場 ｜ 整合管理系統 ｜ 第二版</footer></main>;
 }
