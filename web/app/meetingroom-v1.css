@@ -52,7 +52,7 @@
 
 /* 週排程依 V1 圖塊比例縮至約 75%；手機仍保留完整寬度與橫向瀏覽。 */
 @media (min-width:761px){
-  .mr-page .mr-schedule-panel,.mr-page .mr-list-panel{width:75%;justify-self:center}
+  .mr-page .mr-hero,.mr-page .mr-schedule-panel,.mr-page .mr-list-panel{width:75%;justify-self:center}
   .mr-page .mr-schedule-panel .mr-panel-body{padding:11px 12px}
   .mr-page .mr-schedule-panel .roomgrid{min-width:0}
   .mr-page .mr-schedule-panel .roomgrid th{padding:6px 4px}
