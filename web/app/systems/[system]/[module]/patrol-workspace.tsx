@@ -22,12 +22,28 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { LEGACY_BASE } from '@/lib/config';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { FloorStack3D, floorOrder, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
+
+// QR 內容指向 V1 的 patrolcheckin.html——實際的簽到流程（含 MFA 與 patrol-checkin
+// Edge Function）仍在 V1，而且現場已張貼的標籤也是這個網址；V2 只負責產生同一組標籤，
+// 換成 V2 網址反而會讓新舊標籤指向不同地方。
+const checkinUrl = (markerId: unknown) =>
+  `${typeof location === 'undefined' ? '' : location.origin}${LEGACY_BASE}/patrolcheckin.html?marker=${encodeURIComponent(String(markerId))}`;
+
+// qrcode-generator 為零相依套件，以動態 import 載入，確保不進入任何頁面的初始 bundle。
+async function qrDataUrl(text: string, cellSize = 4) {
+  const qrcode = (await import('qrcode-generator')).default;
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return qr.createDataURL(cellSize, 8);
+}
 
 function taipeiToday() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -126,6 +142,7 @@ function PointsModule({ module, profile }: Props) {
   const [date, setDate] = useState(taipeiToday());
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [query, setQuery] = useState(''), [floor, setFloor] = useState(''), [page, setPage] = useState(1);
+  const [qr, setQr] = useState<{ point: Row; image: string } | null>(null);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -160,9 +177,49 @@ function PointsModule({ module, profile }: Props) {
   }), [points, query, floor]);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const done = filtered.filter(p => hitFor(p)).length;
+  // 樓層統計取代 V1 的分組卡片：點一下就把清單篩到該樓層，分頁行為不受影響。
+  const floorStats = useMemo(() => floors.map(name => {
+    const items = points.filter(point => String(point.floor_id || '未分類') === name);
+    return { name, total: items.length, done: items.filter(point => hitFor(point)).length };
+  }), [floors, points, checkinByPoint]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openQr = async (point: Row) => {
+    setNote('');
+    try { setQr({ point, image: await qrDataUrl(checkinUrl(point.marker_id), 6) }); }
+    catch (error) { setNote(`失敗：${errorMessage(error, 'QR 產生失敗')}`); }
+  };
+
+  // 對應 V1 patrollist.html 的 printAllQr：另開視窗排版成標籤頁供列印。
+  // 產生的是 data URL 圖片，視窗內沒有任何腳本。
+  const printAll = async () => {
+    if (!filtered.length) { setNote('失敗：目前沒有可列印的巡邏點'); return; }
+    setNote('');
+    try {
+      const sorted = filtered.slice().sort((a, b) =>
+        (floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id))) || String(a.label || '').localeCompare(String(b.label || ''), 'zh-Hant'));
+      const tags = await Promise.all(sorted.map(async point => ({
+        image: await qrDataUrl(checkinUrl(point.marker_id), 6),
+        label: String(point.label || point.marker_id), floor: String(point.floor_id || '未分類'),
+      })));
+      const win = window.open('', '_blank');
+      if (!win) { setNote('失敗：請允許彈出視窗才能列印 QR 標籤'); return; }
+      const escape = (value: string) => value.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] || ch));
+      win.document.write('<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><title>巡邏點 QR 標籤</title><style>'
+        + 'body{font-family:"Noto Sans TC",system-ui,sans-serif;margin:0;padding:16px}'
+        + '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}'
+        + '.tag{border:1px dashed #999;border-radius:6px;padding:12px;text-align:center;page-break-inside:avoid}'
+        + '.tag img{width:140px;height:140px;image-rendering:pixelated}'
+        + '.tag .n{font-size:14px;font-weight:700;margin-top:6px}.tag .f{font-size:11px;color:#666}'
+        + '@media print{.tag{border:1px solid #ccc}}</style></head><body><div class="grid">'
+        + tags.map(tag => `<div class="tag"><img src="${tag.image}" alt=""><div class="n">${escape(tag.label)}</div><div class="f">${escape(tag.floor)}</div></div>`).join('')
+        + '</div></body></html>');
+      win.document.close(); win.focus();
+    } catch (error) { setNote(`失敗：${errorMessage(error, 'QR 標籤列印失敗')}`); }
+  };
 
   return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+    <AdminHeader module={module} busy={busy} note={note} onReload={load}
+      action={<button className="primary-btn compact" onClick={() => void printAll()}>🖶 列印全部 QR</button>} />
     <section className="panel admin-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋巡邏點名稱、樓層或說明" />
@@ -172,8 +229,14 @@ function PointsModule({ module, profile }: Props) {
         <label>打卡日期<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
         <span>{date} 已打卡 {done}／{filtered.length} 點</span>
       </div>
+      <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
+        <button className={floor ? 'secondary-btn' : 'primary-btn compact'} onClick={() => setFloor('')}>全部樓層 {points.length}</button>
+        {floorStats.map(item => <button key={item.name}
+          className={floor === item.name ? 'primary-btn compact' : 'secondary-btn'}
+          onClick={() => setFloor(item.name)}>{item.name}　{item.done}／{item.total}</button>)}
+      </div>
       <div className="responsive-table"><table>
-        <thead><tr><th>樓層</th><th>巡邏點</th><th>座標</th><th>巡檢說明</th><th>當日打卡</th><th>狀態</th></tr></thead>
+        <thead><tr><th>樓層</th><th>巡邏點</th><th>座標</th><th>巡檢說明</th><th>當日打卡</th><th>狀態</th><th>操作</th></tr></thead>
         <tbody>{paged.map(point => {
           const hit = hitFor(point);
           return <tr key={String(point.marker_id)}>
@@ -185,6 +248,10 @@ function PointsModule({ module, profile }: Props) {
               ? <><span className="status-pill closed">已打卡</span><small>{fmt(hit.user_name)}｜{fmtTime(hit.checkin_at)}</small></>
               : <span className="status-pill pending">未打卡</span>}</td>
             <td><span className={`status-pill ${point.status === 'inactive' ? 'cancelled' : 'closed'}`}>{point.status === 'inactive' ? '停用' : '啟用'}</span></td>
+            <td><div className="admin-row-actions">
+              <button onClick={() => void openQr(point)}>QR</button>
+              <a className="link-btn" href={`/Inspection/v2/systems/structuremap/markers/?marker=${encodeURIComponent(String(point.marker_id))}`}>定位</a>
+            </div></td>
           </tr>;
         })}</tbody>
       </table></div>
@@ -192,6 +259,19 @@ function PointsModule({ module, profile }: Props) {
       <Pager page={page} total={filtered.length} onPage={setPage} />
       <p className="inline-message">巡邏點的新增與座標調整屬「專案關係與設備圖臺」系統（plan_markers 的寫入權限為 sys_structuremap），請至圖臺的整合標記模組維護。</p>
     </section>
+
+    {qr && <AdminModal title={`巡邏點 QR｜${fmt(qr.point.label)}`} onClose={() => setQr(null)}>
+      <div style={{ textAlign: 'center' }}>
+        <img src={qr.image} alt={`${String(qr.point.label || '')} 的簽到 QR`} style={{ width: 220, height: 220, imageRendering: 'pixelated' }} />
+      </div>
+      <dl className="detail-grid">
+        <div><dt>巡邏點</dt><dd>{fmt(qr.point.label)}</dd></div>
+        <div><dt>樓層</dt><dd>{fmt(qr.point.floor_id)}</dd></div>
+        <div><dt>簽到網址</dt><dd style={{ wordBreak: 'break-all' }}>{checkinUrl(qr.point.marker_id)}</dd></div>
+      </dl>
+      <p className="inline-message">掃描後導向現行的巡邏點簽到頁，與現場已張貼的標籤是同一組網址。</p>
+      <footer><button className="primary-btn compact" onClick={() => setQr(null)}>關閉</button></footer>
+    </AdminModal>}
   </AppShell>;
 }
 
