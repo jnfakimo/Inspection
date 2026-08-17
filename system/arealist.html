@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260814-patrol-session1"></script>
 <script src="floor-utils.js?v=20260806-1"></script>
@@ -13,7 +13,9 @@
 <title>區域位置表 — 臺北農產公司巡檢系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<!-- 匯入與匯出一律使用 ExcelJS，只收 .xlsx；SheetJS 已移除（見 xlsx-io.js 的說明）。 -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
+<script src="xlsx-io.js?v=20260817-xlsxonly1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
@@ -202,10 +204,10 @@ a{color:inherit;text-decoration:none}
     <div class="t-space"></div>
     <button class="btn btn-add" onclick="openAdd()">＋ 新增空間</button>
     <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">⭳ 匯入XLSX</button>
-    <button class="btn btn-green" onclick="exportData('xlsx')">⭱ 匯出XLSX</button>
+    <button class="btn btn-green" onclick="exportData()">⭱ 匯出XLSX</button>
     <button class="btn" onclick="downloadTemplate()">範本</button>
     <button class="btn" style="border-color:var(--red);color:var(--red)" onclick="clearAll()">全部停用</button>
-    <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="onImportFile(event)">
+    <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="onImportFile(event)">
   </div>
 
   <div id="list"></div>
@@ -553,34 +555,30 @@ function exportRows(){
     .sort((a,b)=>(a.sort_order-b.sort_order)||a.space_name.localeCompare(b.space_name,'zh-Hant'))
     .map(r=>[r.floor,r.space_name,spaceUseText(r.space_id)]));
 }
-function exportData(fmt){
+async function exportData(){
   const aoa=[['樓層','空間名稱','空間是否使用'],...exportRows()];
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'區域位置表');
-  const stamp=new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb,`區域位置表_${stamp}.${fmt}`,{bookType:fmt});
-  toast('已匯出 '+fmt.toUpperCase());
+  // 用本地日期組出時間戳；toISOString 會轉成 UTC，台灣時間在早上八點前會退一天。
+  const d=new Date();
+  const stamp=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  try{
+    await XlsxIO.downloadAoa(`區域位置表_${stamp}.xlsx`,'區域位置表',aoa);
+    toast('已匯出 XLSX');
+  }catch(e){toast('匯出失敗：'+(e.message||''),true);}
 }
-function downloadTemplate(){
+async function downloadTemplate(){
   const aoa=[['樓層','空間名稱'],['B1','配電室'],['1F','蔬菜零批場 A區'],['2F','辦公室']];
-  const ws=XLSX.utils.aoa_to_sheet(aoa);
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'區域位置表');
-  XLSX.writeFile(wb,'區域位置表_匯入範本.xlsx');
+  try{
+    await XlsxIO.downloadAoa('區域位置表_匯入範本.xlsx','區域位置表',aoa);
+  }catch(e){toast('範本下載失敗：'+(e.message||''),true);}
 }
 
 // ── Import ─────────────────────────────────────────────────
-function onImportFile(ev){
+async function onImportFile(ev){
   const file=ev.target.files[0];ev.target.value='';if(!file)return;
-  const reader=new FileReader();
-  reader.onload=async e=>{
-    try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const aoa=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false});
-      await importAoa(aoa);
-    }catch(err){toast('匯入失敗：'+translateError(err.message),true);}
-  };
-  reader.readAsArrayBuffer(file);
+  try{
+    // 空白列由 importAoa 自行略過，這裡不再過濾。
+    await importAoa(await XlsxIO.readFileAoa(file));
+  }catch(err){toast('匯入失敗：'+translateError(err.message||'請確認是 .xlsx 格式'),true);}
 }
 
 async function importAoa(aoa){
@@ -595,6 +593,8 @@ async function importAoa(aoa){
   let invalidCount=0;
   for(let i=start;i<aoa.length;i++){
     const row=aoa[i]||[];
+    // 整列皆空的列直接略過，不計入無效筆數（xlsx 常有結尾空白列）。
+    if(!row.some(c=>String(c==null?'':c).trim()))continue;
     const floor=normFloor(row[floorCol]);
     const name=normSpaceName(row[nameCol]);
     if(!floor||!name){invalidCount++;continue;}

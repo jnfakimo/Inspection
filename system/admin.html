@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>
 if (location.hash === '#repairs') {
   document.documentElement.classList.add('maintenance-only');
@@ -18,10 +18,9 @@ if (location.hash === '#repairs') {
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
-<!-- 匯出一律使用 ExcelJS；SheetJS 僅保留供批次匯入解析，因該功能公開接受
-     .xlsx/.xls/.csv 三種格式，而 ExcelJS 不支援 .xls 且 .csv 需 stream API。 -->
+<!-- 匯入與匯出一律使用 ExcelJS，只收 .xlsx；SheetJS 已移除（見 xlsx-io.js 的說明）。 -->
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<script src="xlsx-io.js?v=20260817-xlsxonly1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -874,9 +873,9 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
           <span>批次匯入帳號（XLSX）</span>
           <button class="btn btn-sm" style="border:1px solid var(--border);color:var(--text-dim);font-size:.72rem;background:none" onclick="downloadImportTemplate()">範本</button>
         </div>
-        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">支援匯出格式或範本格式（姓名, 帳號, Email, 密碼, 電話, 角色）；XLSX / CSV 皆可讀。帳號/Email已存在則自動跳過。</p>
+        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px">支援匯出格式或範本格式（姓名, 帳號, Email, 密碼, 電話, 角色）；僅接受 .xlsx，請以 Excel 另存新檔為「Excel 活頁簿」。帳號/Email已存在則自動跳過。</p>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="csvImportFile" accept=".xlsx,.xls,.csv" style="flex:1;padding:8px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.8rem;outline:none;min-width:200px">
+          <input type="file" id="csvImportFile" accept=".xlsx" style="flex:1;padding:8px;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;color:var(--text-hi);font-size:.8rem;outline:none;min-width:200px">
           <button class="btn btn-sm" style="border:1px solid #1a7fff;color:#6fb4ff;background:none" onclick="importUsersXlsx()">⭳ 匯入XLSX</button>
         </div>
         <div id="csvImportLog" style="margin-top:12px;font-family:var(--font-mono);font-size:.75rem;max-height:180px;overflow-y:auto;background:rgba(2,8,20,.8);border:1px solid var(--border);border-radius:2px;padding:10px;display:none;line-height:1.7"></div>
@@ -2531,18 +2530,6 @@ async function downloadImportTemplate() {
   await downloadWorkbook(wb, '帳號匯入範本.xlsx');
 }
 
-function parseCSVLine(line) {
-  const result = []; let cur = ''; let inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
-    else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-    else cur += ch;
-  }
-  result.push(cur.trim());
-  return result;
-}
-
 function genTempPassword() {
   return 'Tc' + Math.random().toString(36).slice(2,8).toUpperCase() + Math.floor(10 + Math.random() * 90);
 }
@@ -2637,12 +2624,17 @@ async function copyTempPassword(idx, btn) {
 
 async function importUsersXlsx() {
   const file = document.getElementById('csvImportFile').files[0];
-  if (!file) { showToast('請選擇檔案（XLSX / CSV）', true); return; }
+  if (!file) { showToast('請選擇檔案（.xlsx）', true); return; }
   const log = document.getElementById('csvImportLog');
   log.style.display = 'block'; log.innerHTML = '<div style="color:var(--cyan)">▶ 開始匯入…</div>';
   clearImportedTempPasswords();
-  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, blankrows: true });
+  let aoa;
+  try {
+    aoa = await XlsxIO.readFileAoa(file);
+  } catch (e) {
+    log.innerHTML += `<div style="color:var(--red)">無法讀取檔案：${escHtml(e.message || '請確認是 .xlsx 格式')}</div>`;
+    return;
+  }
   if (!aoa || aoa.length < 2) { log.innerHTML += '<div style="color:var(--red)">格式錯誤：需至少一筆資料列</div>'; return; }
   const headerRowIndex = aoa.findIndex(row => {
     const labels = (row || []).map(x => String(x == null ? '' : x).trim());

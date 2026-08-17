@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260814-patrol-session1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -11,7 +11,9 @@
 <title>統計分析 — 報修派工管理系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<!-- 匯出一律使用 ExcelJS，只出 .xlsx；SheetJS 已移除（見 xlsx-io.js 的說明）。 -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
+<script src="xlsx-io.js?v=20260817-xlsxonly1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;
@@ -138,22 +140,16 @@ function kp(n,l){return `<div class="kp"><div class="n">${n}</div><div class="l"
 function render(){
   document.getElementById('grid').innerHTML=reports.map((rp,i)=>`
     <div class="card"><h3>${rp.title}<span class="ex">
-      <button onclick="exp(${i},'csv')">CSV</button><button onclick="exp(${i},'xlsx')">Excel</button>
+      <button onclick="exp(${i})">Excel</button>
     </span></h3>
     ${rp.rows.length?`<table><tr>${rp.cols.map((c,n)=>`<th class="${n>0?'num':''}">${escHtml(c)}</th>`).join('')}</tr>${rp.rows.slice(0,20).map(row=>`<tr>${row.map((c,n)=>`<td class="${n>0?'num':''}">${escHtml(c)}</td>`).join('')}</tr>`).join('')}</table>`:'<div class="empty">無資料</div>'}
     </div>`).join('');
 }
-function exp(i,type){
+async function exp(i){
   const rp=reports[i];const aoa=[rp.cols,...rp.rows];
-  if(type==='csv'){
-    const csv='﻿'+aoa.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
-    dl(new Blob([csv],{type:'text/csv;charset=utf-8'}),rp.title+'.csv');
-  }else{
-    const ws=XLSX.utils.aoa_to_sheet(aoa);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'報表');
-    XLSX.writeFile(wb,rp.title+'.xlsx');
-  }
+  try{await XlsxIO.downloadAoa(rp.title+'.xlsx','報表',aoa);}
+  catch(e){alert('匯出失敗：'+(e.message||''));}
 }
-function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
 quick('month');
 </script>
 </body>

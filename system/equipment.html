@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260814-patrol-session1"></script>
 <script src="floor-utils.js?v=20260806-1"></script>
@@ -11,8 +11,9 @@
 <title>設備建置與生命週期管理 — 臺北農產公司</title>
 <script src="vendor/supabase-js-2.min.js"></script>
 <script src="supabase-config.js?v=20260806-1"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<!-- 匯入與匯出一律使用 ExcelJS，只收 .xlsx；SheetJS 已移除（見 xlsx-io.js 的說明）。 -->
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
+<script src="xlsx-io.js?v=20260817-xlsxonly1"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#9b5cff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#527896;--font-head:'Rajdhani','Noto Sans TC',sans-serif}
@@ -87,7 +88,7 @@
     <button class="btn btn-green mobile-hide" onclick="exportWorkbook()" title="匯出完整設備主檔與所有關聯紀錄">⭱ 匯出 XLSX</button>
     <button class="btn mobile-hide" onclick="downloadTemplate()">範本</button>
     <button class="btn btn-amber mobile-hide" onclick="printAllEquipmentQR()">▦ 列印全部 QR</button>
-    <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none" onchange="prepareImport(event)">
+    <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="prepareImport(event)">
   </div>
 
   <div id="view"></div>
@@ -350,12 +351,12 @@ const XLSX_HEADERS={
  '年度成本':['年度','設備編號','設備名稱','維修費','保養費','零件費','停機損失','合計','備註'],
  '中央監控介接':['設備編號','設備名稱','外部系統','外部設備鍵','協定','同步模式','點位碼','點位名稱','點位位址','資料型態','單位','讀寫權限','取樣秒數','正常下限','正常上限','告警下限','告警上限','狀態']
 };
-function sheetRows(wb,name){const s=wb.Sheets[name];return s?XLSX.utils.sheet_to_json(s,{defval:'',raw:true}):[];}
-function excelDate(v){if(!v)return null;if(v instanceof Date)return fmtDate(v);if(typeof v==='number'){const d=XLSX.SSF.parse_date_code(v);return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:null;}const s=String(v).trim().replace(/\//g,'-');const d=new Date(s);return isNaN(d)?null:fmtDate(d);}
+function sheetRows(wb,name){return XlsxIO.sheetToObjects(wb.getWorksheet(name));}
+function excelDate(v){if(!v)return null;if(v instanceof Date)return fmtDate(v);if(typeof v==='number'){const d=XlsxIO.excelSerialToDate(v);return d?fmtDate(d):null;}const s=String(v).trim().replace(/\//g,'-');const d=new Date(s);return isNaN(d)?null:fmtDate(d);}
 function num(v){const n=Number(String(v??'').replace(/,/g,''));return Number.isFinite(n)?n:0;}
 function yes(v){return /^(是|有|yes|y|true|1)$/i.test(String(v||'').trim());}
 function hash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(16);}
-async function prepareImport(ev){const file=ev.target.files[0];ev.target.value='';if(!file)return;try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});const sheets={};Object.keys(XLSX_HEADERS).forEach(n=>sheets[n]=sheetRows(wb,n));const incoming=new Set(sheets['設備總表'].map(r=>String(r['設備編號']||'').trim().toUpperCase()).filter(Boolean));const known=new Set([...state.assets.map(e=>String(e.asset_code||e.qr_code||'').toUpperCase()),...incoming]);const refs=[];Object.keys(sheets).filter(n=>n!=='設備總表').forEach(n=>sheets[n].forEach(r=>{const c=String(r['設備編號']||'').trim().toUpperCase();if(c&&!known.has(c))refs.push(`${n}：${c}`);}));pendingImport={fileName:file.name,sheets,refs:[...new Set(refs)]};document.getElementById('importPreview').innerHTML=`<p class="hint">檔案：${esc(file.name)}。系統會先以設備編號建立/更新設備，再匯入其餘關聯資料。</p><div class="import-summary">${Object.entries(sheets).map(([n,r])=>`<div class="import-card"><b>${r.length}</b><span>${n}</span></div>`).join('')}</div>${refs.length?`<div class="warn-list"><strong>無法對應的設備編號（將跳過）</strong><br>${refs.slice(0,50).map(esc).join('<br>')}</div>`:'<div class="hint" style="color:var(--green)">✓ 所有關聯資料皆可對應設備編號。</div>'}`;document.getElementById('importMsg').textContent='';document.getElementById('importConfirmBtn').disabled=false;openModal('importModal');}catch(e){toast('無法讀取 XLSX：'+e.message,true);}}
+async function prepareImport(ev){const file=ev.target.files[0];ev.target.value='';if(!file)return;try{const wb=await XlsxIO.loadWorkbook(await file.arrayBuffer());const sheets={};Object.keys(XLSX_HEADERS).forEach(n=>sheets[n]=sheetRows(wb,n));const incoming=new Set(sheets['設備總表'].map(r=>String(r['設備編號']||'').trim().toUpperCase()).filter(Boolean));const known=new Set([...state.assets.map(e=>String(e.asset_code||e.qr_code||'').toUpperCase()),...incoming]);const refs=[];Object.keys(sheets).filter(n=>n!=='設備總表').forEach(n=>sheets[n].forEach(r=>{const c=String(r['設備編號']||'').trim().toUpperCase();if(c&&!known.has(c))refs.push(`${n}：${c}`);}));pendingImport={fileName:file.name,sheets,refs:[...new Set(refs)]};document.getElementById('importPreview').innerHTML=`<p class="hint">檔案：${esc(file.name)}。系統會先以設備編號建立/更新設備，再匯入其餘關聯資料。</p><div class="import-summary">${Object.entries(sheets).map(([n,r])=>`<div class="import-card"><b>${r.length}</b><span>${n}</span></div>`).join('')}</div>${refs.length?`<div class="warn-list"><strong>無法對應的設備編號（將跳過）</strong><br>${refs.slice(0,50).map(esc).join('<br>')}</div>`:'<div class="hint" style="color:var(--green)">✓ 所有關聯資料皆可對應設備編號。</div>'}`;document.getElementById('importMsg').textContent='';document.getElementById('importConfirmBtn').disabled=false;openModal('importModal');}catch(e){toast('無法讀取 XLSX：'+e.message,true);}}
 async function upsertChunks(table,rows,onConflict){for(let i=0;i<rows.length;i+=100){const q=db.from(table).upsert(rows.slice(i,i+100),onConflict?{onConflict}:undefined);const {error}=await q;if(error)throw error;}}
 async function confirmImport(){if(!pendingImport)return;const btn=document.getElementById('importConfirmBtn'),msg=document.getElementById('importMsg');btn.disabled=true;msg.textContent='匯入中，請勿關閉…';try{
   const master=pendingImport.sheets['設備總表'],existing=new Map(state.assets.map(e=>[String(e.asset_code||e.qr_code||'').toUpperCase(),e]));
@@ -372,7 +373,8 @@ async function confirmImport(){if(!pendingImport)return;const btn=document.getEl
   closeModal('importModal');toast(`匯入完成：${assets.length} 台設備，${plans.length+records.length+contracts.length+docs.length+costs.length+monitorLinks.length+monitorPoints.length} 筆關聯資料`);pendingImport=null;await loadAll();
  }catch(e){msg.textContent=schemaError(e)?'資料庫尚未套用 equipment_lifecycle.sql，無法匯入完整資料。':e.message;btn.disabled=false;}}
 
-function buildSheet(rows,headers){const ws=XLSX.utils.json_to_sheet(rows,{header:headers});ws['!cols']=headers.map(h=>({wch:Math.max(12,Math.min(28,h.length*2+4))}));if(rows.length)ws['!autofilter']={ref:`A1:${XLSX.utils.encode_col(headers.length-1)}${rows.length+1}`};return ws;}
+// 供匯入範本使用：只有表頭的空白工作表（欄寬沿用原本的計算方式）。
+function addTemplateSheet(wb,name,headers){return XlsxIO.addAoaSheet(wb,name,[headers]);}
 
 const EXPORT_HEADERS={
  '設備總表':['設備編號','QR定位網址','3D點位狀態','3D樓層','X座標','Y座標','Z座標','安裝樓層','位置說明','設備名稱','設備類別','設備照片','使用部門','廠牌','型號','序號','製造年份','安裝日期','驗收日期','設備壽命(年)','電壓','功率(kW)','原廠名稱','原廠聯絡人','原廠電話','代理商','代理商聯絡人','代理商電話','保固開始','保固到期','是否有保養合約','保養廠商','保養週期','上次保養','下次保養','設備負責人','24小時維修電話','操作手冊','維修手冊','電路圖','PLC程式','中央監控狀態','外部主資料鍵','關鍵程度','設備狀態','備註'],
@@ -493,7 +495,7 @@ async function exportWorkbook(){
     const buffer=await wb.xlsx.writeBuffer(),blob=new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),url=URL.createObjectURL(blob),a=document.createElement('a'),now=new Date();a.href=url;a.download=`設備生命週期_${todayISO()}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}.xlsx`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);toast(`已匯出 ${state.assets.length} 台設備完整資料`);
   }catch(e){console.error(e);toast('匯出失敗：'+e.message,true);}finally{exportingWorkbook=false;}
 }
-function downloadTemplate(){const wb=XLSX.utils.book_new();Object.entries(XLSX_HEADERS).forEach(([n,h])=>XLSX.utils.book_append_sheet(wb,buildSheet([],h),n));XLSX.writeFile(wb,'設備履歷管理範本.xlsx');}
+async function downloadTemplate(){try{const wb=XlsxIO.newWorkbook();Object.entries(XLSX_HEADERS).forEach(([n,h])=>addTemplateSheet(wb,n,h));await XlsxIO.download(wb,'設備履歷管理範本.xlsx');}catch(e){toast('範本下載失敗：'+(e.message||''),true);}}
 
 loadAll();
 </script>
