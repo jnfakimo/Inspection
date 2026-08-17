@@ -4,7 +4,7 @@
 
 ## ⏯️ 上次做到哪
 
-八大系統的資料一致性修正與資安整備，共 31 個 commit、10 支 migration，全部已部署。
+八大系統的資料一致性修正與資安整備，共 38 個 commit、13 支 migration，全部已部署。
 
 - **八大系統逐一檢視**，方法一致：盤點資料表寫入點 → 查該系統的 RLS 政策與 guard
   trigger → 只修真正的缺陷。SYS-05 設備與 SYS-06 圖臺檢視後判定業務邏輯無須修改
@@ -28,12 +28,13 @@
 置換 `window.fetch` 的方式讓**每一次資料讀取**都觸發伺服器端的告警偵測路徑。已加上
 5 秒逾時並把 LINE 推播移至背景（`EdgeRuntime.waitUntil`），修正後 502 完全消失。
 
-- 正式站已部署至 `02e79bd`，`Hardened Pages deployment` 通過，線上已確認無舊版函式庫殘留。
-- 10 支 migration 全數套用至 `qztffronusdhgxhjjubt`。
-- 收工前發現並修好一個線上故障：`patrol_shift_template.assigned_user_ids` 在正式庫
+- 正式站已部署至 `d2eb977`，`Hardened Pages deployment` 通過，線上已確認無舊版
+  函式庫殘留；Edge Function 線上 11 支，與 `supabase/functions/` 一一對應。
+- 13 支 migration 全數套用至 `qztffronusdhgxhjjubt`。
+- 另一個曾經存在的線上故障：`patrol_shift_template.assigned_user_ids` 在正式庫
   不存在，導致 `save_patrol_shift_template` 執行階段失敗（班別範本儲存實際上是壞的）。
   已補欄位、回填既有資料，並加 `20260817100000` 驗證六支新函式的 100 餘個欄位，
-  確認無其他同類問題。
+  確認無其他同類問題。**此項尚未實機驗證，測 SYS-03 時請優先確認。**
 
 ## ➡️ 下一步
 
