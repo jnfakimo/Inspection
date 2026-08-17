@@ -247,10 +247,9 @@
   .v1-login-card {
     width: min(85vw, 340px);
     max-width: 340px;
-    height: min(calc(75svh - 16px), 620px);
-    max-height: calc(75svh - 16px);
-    overflow-y: auto;
-    scrollbar-width: none;
+    height: auto;
+    max-height: none;
+    overflow: visible;
     padding: 6px 18px;
   }
 
