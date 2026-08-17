@@ -104,3 +104,17 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 .meetingroom-module-card:nth-child(4)::before{background:var(--violet)}
 .meetingroom-module-card:hover{border-color:var(--cyan);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,132,199,.14)}
 @media(max-width:760px){.meetingroom-module-card img{width:54px;height:54px}}
+/* 會議室預約頁：主圖卡與四張子系統圖卡縮至約 65%（桌面） */
+@media (min-width:761px){
+  body:has(.meetingroom-module-card) .module-hero{max-width:632px;min-height:98px;padding:14px}
+  body:has(.meetingroom-module-card) .module-hero h2{font-size:18px;margin:5px 0}
+  body:has(.meetingroom-module-card) .module-hero p{font-size:10px}
+  body:has(.meetingroom-module-card) .module-hero img{width:57px;height:57px}
+  body:has(.meetingroom-module-card) .module-grid{max-width:828px;gap:10px;margin-top:10px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card{flex-basis:195px;width:195px;min-height:117px;padding:13px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card img{width:42px;height:42px;margin-bottom:5px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card span{font-size:8px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card h3{font-size:15px;margin:5px 0 0}
+  body:has(.meetingroom-module-card) .meetingroom-module-card p{font-size:10px;line-height:1.45}
+  body:has(.meetingroom-module-card) .meetingroom-module-card b{font-size:10px}
+}
