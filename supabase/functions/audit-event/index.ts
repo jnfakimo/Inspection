@@ -364,8 +364,12 @@ async function sendSecurityAlertLine(
   ].filter(Boolean).join("\n");
 
   try {
+    // 對外呼叫必須有逾時上限：原本沒有 AbortSignal，LINE 一慢就會把 worker 卡住
+    // 直到被平台強制終止，前端因而收到 502（且該回應不帶 CORS 標頭，瀏覽器會再
+    // 報一次 CORS 錯誤）。
     const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
       method: "POST",
+      signal: AbortSignal.timeout(5000),
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
@@ -587,12 +591,24 @@ Deno.serve(async (req) => {
     let lineNotification = null;
     if (["data_read", "file_read", "access_denied"].includes(eventType)) {
       try {
+        // 告警偵測與大量讀取切斷維持同步：前端會讀回應中的 security_action 來
+        // 強制登出，移到背景會使該資安控制失效。兩者皆為資料庫查詢，成本可控。
         alert = await detectSecurityAlert(admin, profile, ipAddress, eventType, details);
         if (alert?.alert_type === "bulk_read" && !isSysadminProfile(profile)) {
           securityAction = await enforceBulkReadCutoff(admin, profile, token, alert);
         }
+        // LINE 推播改為背景執行：它是本函式唯一的對外呼叫，延遲不可控，而其結果
+        // （line_notification）前端並未使用。以 EdgeRuntime.waitUntil 保住 worker
+        // 直到背景工作結束，避免回應送出後任務被中斷。
         if (alert) {
-          lineNotification = await sendSecurityAlertLine(admin, profile, ipAddress, alert);
+          lineNotification = { status: "queued" };
+          const linePush = sendSecurityAlertLine(admin, profile, ipAddress, alert)
+            .catch((lineError) => {
+              console.error("Security alert LINE push failed",
+                lineError instanceof Error ? lineError.message : String(lineError));
+            });
+          const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+          if (typeof runtime?.waitUntil === "function") runtime.waitUntil(linePush);
         }
       } catch (alertError) {
         console.error("Security alert detection failed", alertError instanceof Error ? alertError.message : String(alertError));
