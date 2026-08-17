@@ -405,19 +405,19 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
       </div>
       <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
         <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>乘車人次</div>
-        <div style={{ fontSize: '1.1rem', fontWeight 800, color: 'var(--cyan)' }}>{metrics.passengers} 人</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.passengers} 人</div>
       </div>
       <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
         <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>完成里程</div>
-        <div style={{ fontSize: '1.1rem', fontWeight 800, color: 'var(--cyan)' }}>{metrics.mileage.toFixed(1)} km</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.mileage.toFixed(1)} km</div>
       </div>
       <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
         <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>加油費用</div>
-        <div style={{ fontSize: '1.1rem', fontWeight 800, color: 'var(--cyan)' }}>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
       </div>
       <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
         <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>異常通報</div>
-        <div style={{ fontSize: '1.1rem', fontWeight 800, color: metrics.abnormal > 0 ? 'var(--red)' : 'var(--cyan)' }}>{metrics.abnormal} 件</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: metrics.abnormal > 0 ? 'var(--red)' : 'var(--cyan)' }}>{metrics.abnormal} 件</div>
       </div>
     </div>
 
