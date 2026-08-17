@@ -224,3 +224,9 @@
   min-height: 32px;
 }
 
+/* Final owner dimensions for the white login frame. */
+.v1-login-card {
+  width: 190px;
+  max-width: calc(100% - 24px);
+  padding-block: 6px;
+}
