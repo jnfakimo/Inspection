@@ -86,3 +86,12 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
   body:has(.portal-intro) .system-card p{font-size:12px;line-height:1.6}
   body:has(.portal-intro) .system-card b{padding:5px 10px;font-size:11px}
 }
+/* V2 整合入口：淺藍提示框以上的品牌標題區縮減約一半 */
+@media (min-width:761px){
+  body:has(.portal-intro) .portal-intro{padding:14px 10px 12px}
+  body:has(.portal-intro) .portal-intro .org-badge{padding:2px 7px;margin-bottom:7px;font-size:8px}
+  body:has(.portal-intro) .portal-intro h1{font-size:20px}
+  body:has(.portal-intro) .portal-intro p{margin:2px 0;font-size:11px}
+  body:has(.portal-intro) .portal-intro i{width:60px;margin:9px auto 5px}
+  body:has(.portal-intro) .portal-intro>span{font-size:8px}
+}
