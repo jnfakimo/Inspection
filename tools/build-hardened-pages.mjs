@@ -12,6 +12,8 @@ const projectRoot = process.cwd();
 const outputRoot = path.join(projectRoot, '_site');
 const systemRoot = path.join(projectRoot, 'system');
 const outputSystemRoot = path.join(outputRoot, 'system');
+const nextExportRoot = path.join(projectRoot, 'web', 'out');
+const outputV2Root = path.join(outputRoot, 'v2');
 const publicKeySource = path.join(projectRoot, 'security', 'provenance-public-key.pem');
 const provenanceNamespace = 'com.jnfakimo.word-cloud.provenance';
 const provenanceOwner = 'jnfakimo';
@@ -67,9 +69,7 @@ async function copyRuntimeFiles() {
   await cp(path.join(projectRoot, 'index.html'), path.join(outputRoot, 'index.html'));
   await cp(path.join(projectRoot, 'LICENSE'), path.join(outputRoot, 'proprietary-notice.txt'));
   await cp(path.join(projectRoot, 'assets'), path.join(outputRoot, 'assets'), { recursive: true });
-  // V2 is kept in the repository for maintenance, but is intentionally not
-  // published in this V1-only deployment.  This removes /Inspection/v2/ from
-  // the generated GitHub Pages artifact without deleting its source files.
+  await cp(nextExportRoot, outputV2Root, { recursive: true });
 
   const systemEntries = await readdir(systemRoot, { withFileTypes: true });
   for (const entry of systemEntries) {
