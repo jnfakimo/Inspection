@@ -13,7 +13,7 @@
 //   create_meeting_booking_change_request / respond_meeting_booking_change_request /
 //   app-api 的 meeting_check_in 與 meeting_save_room
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
 import '@/app/meetingroom-v1.css';
 import { AppShell } from '@/components/AppShell';
@@ -28,16 +28,6 @@ type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Prof
 const DOW = ['一', '二', '三', '四', '五', '六', '日'];
 const NOTIFY_LABEL: Record<string, string> = { pending: '待發送', sent: '已發送', failed: '發送失敗', skipped: '略過' };
 const NOTIFY_TYPE: Record<string, string> = { reminder: '開始前提醒', expired: '逾時未報到' };
-
-// 每間會議室固定配一個跳色（依 room_id 雜湊取色，不受排序/新增異動影響），
-// 亮色／科技版共用同一組 hue，靠 meetingroom-v1.css 的 color-mix 自動配深淺。
-const ROOM_COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1', '#f97316'];
-function roomAccent(id: unknown) {
-  const s = String(id ?? '');
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return ROOM_COLORS[h % ROOM_COLORS.length];
-}
 
 /* ── 日期與時間工具（對齊 V1 的同名函式） ── */
 function taipeiToday() {
@@ -203,7 +193,7 @@ function MeetingRoomPage({ module, profile }: Props) {
                   週{DOW[(d.getDay() + 6) % 7]}<br />{fmtMD(d)}</th>)}
               </tr></thead>
               <tbody>{rooms.map(room => <tr key={String(room.room_id)}>
-                <td className="roomname" style={{ '--room-accent': roomAccent(room.room_id) } as CSSProperties}>{fmt(room.name)}{room.capacity ? <><br /><span style={{ color: 'var(--dim)', fontWeight: 400 }}>{String(room.capacity)} 人</span></> : null}</td>
+                <td className="roomname">{fmt(room.name)}{room.capacity ? <><br /><span style={{ color: 'var(--dim)', fontWeight: 400 }}>{String(room.capacity)} 人</span></> : null}</td>
                 {days.map(d => {
                   const dateStr = isoDate(d);
                   const weekend = d.getDay() === 0 || d.getDay() === 6;
@@ -502,12 +492,9 @@ function RoomAdminModal({ rooms, onClose, onSaved }: { rooms: Row[]; onClose: ()
         </div>
         {message && <p className="conflict-alert">{message}</p>}
         {!rooms.length ? <div className="empty">尚未建立會議室</div>
-          : <div className="mr-list">{rooms.map(room => <div
-              className={`mr-card${room.status === 'inactive' ? ' inactive' : ''}`}
-              key={String(room.room_id)}
-              style={{ '--room-accent': roomAccent(room.room_id) } as CSSProperties}>
+          : <div className="mr-list">{rooms.map(room => <div className="mr-card" key={String(room.room_id)}>
             <div className="grow">
-              <b><span className="dot" />{fmt(room.name)}</b>
+              <b>{fmt(room.name)}</b>
               <small>{room.capacity != null ? `${room.capacity} 人` : '未設人數'}｜{fmt(room.floor)}｜{room.status === 'inactive' ? '停用' : '啟用'}</small>
               {room.note ? <small>{String(room.note)}</small> : null}
             </div>
