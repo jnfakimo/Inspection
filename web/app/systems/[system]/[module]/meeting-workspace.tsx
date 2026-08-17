@@ -167,6 +167,7 @@ function MeetingRoomPage({ module, profile }: Props) {
   useEffect(() => { setRequestPage(page => Math.min(Math.max(page, 1), requestTotalPages)); }, [requestTotalPages]);
 
   const nameOf = useCallback((id: unknown) => users.find(x => x.user_id === id)?.name || '（未知）', [users]);
+  const today = taipeiToday();
 
   const cancel = async (row: Row) => {
     if (!window.confirm(`確定取消「${fmt(row.purpose)}」這筆預約？`)) return;
@@ -226,22 +227,26 @@ function MeetingRoomPage({ module, profile }: Props) {
                 {days.map(d => {
                   const dateStr = isoDate(d);
                   const weekend = d.getDay() === 0 || d.getDay() === 6;
-                  const past = dateStr < taipeiToday();
+                  // 過去日期整格停用；今天仍保留可預約狀態，個別已結束的時段另行灰化。
+                  const past = dateStr < today;
                   const items = weekBookings
                     .filter(b => b.room_id === room.room_id && b.booking_date === dateStr)
                     .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
                   return <td key={dateStr}
                     className={[weekend ? 'weekend' : '', past ? 'past' : '', !past && room.status === 'active' ? 'selectable' : ''].filter(Boolean).join(' ')}
+                    title={past ? '過去日期不可預約' : room.status !== 'active' ? '會議室已停用' : '點選選擇預約日期'}
+                    aria-disabled={past || room.status !== 'active' ? true : undefined}
                     onClick={() => { if (!past && room.status === 'active') setBooking({ room_id: String(room.room_id), date: dateStr }); }}>
                     {items.map(b => {
                       const mine = b.user_id === profile.user_id;
-                      const future = bookingEndAt(b).getTime() > tick;
+                      const ended = bookingEndAt(b).getTime() <= tick;
+                      const future = !ended;
                       const canCancel = mine && b.status === 'booked';
                       const canRequest = !mine && b.status === 'booked' && future;
                       return <div key={String(b.booking_id)}
-                        className={`bk-pill${mine ? ' mine' : ''}${canCancel ? ' can-cancel' : ''}`}
+                        className={`bk-pill${mine ? ' mine' : ''}${canCancel ? ' can-cancel' : ''}${ended ? ' past-booking' : ''}`}
                         role={canCancel ? 'button' : undefined} tabIndex={canCancel ? 0 : undefined}
-                        title={canCancel ? '點擊取消此預約' : undefined}
+                        title={canCancel ? '點擊取消此預約' : ended ? '此時段已過去' : undefined}
                         onClick={canCancel ? e => { e.stopPropagation(); void cancel(b); } : undefined}
                         onKeyDown={canCancel ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); void cancel(b); } } : undefined}>
                         <span className="bk-line">{hhmm(b.start_time)}-{hhmm(b.end_time)}</span>
@@ -251,6 +256,7 @@ function MeetingRoomPage({ module, profile }: Props) {
                         {canRequest && <span><button className="bk-action" onClick={e => { e.stopPropagation(); setChangeFor(b); }}>申請變更</button></span>}
                       </div>;
                     })}
+                    {!items.length && past && <span className="past-slot-label">已過去</span>}
                   </td>;
                 })}
               </tr>)}</tbody>
@@ -324,7 +330,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       </div>
     </div>
 
-    {booking && <BookingModal rooms={rooms} init={booking} myPhone={myPhone}
+    {booking && <BookingModal rooms={rooms} init={booking} myPhone={myPhone} now={tick}
       onClose={() => setBooking(null)}
       onDone={async msg => { setBooking(null); await load(); setNote(msg); }} />}
     {changeFor && <ChangeRequestModal row={changeFor} myPhone={myPhone} nameOf={nameOf}
@@ -337,8 +343,9 @@ function MeetingRoomPage({ module, profile }: Props) {
 
 /* ──────────────────────────── 預約表單彈窗 ──────────────────────────── */
 
-function BookingModal({ rooms, init, myPhone, onClose, onDone }: {
+function BookingModal({ rooms, init, myPhone, now, onClose, onDone }: {
   rooms: Row[]; init: { room_id: string; date: string }; myPhone: string;
+  now: number;
   onClose: () => void; onDone: (message: string) => void;
 }) {
   const [roomId, setRoomId] = useState(init.room_id);
@@ -353,6 +360,7 @@ function BookingModal({ rooms, init, myPhone, onClose, onDone }: {
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
 
   const startValue = partsToValue(start), endValue = partsToValue(end);
+  const startPast = Boolean(date && startValue && slotStartAt(date, startValue).getTime() <= now);
 
   // 送出前的衝突預檢，與 V1 的 checkConflictSoon 相同用意：先查同室同日的既有預約。
   useEffect(() => {
@@ -383,7 +391,7 @@ function BookingModal({ rooms, init, myPhone, onClose, onDone }: {
     if (!purpose.trim()) return setMessage('請填寫會議名稱');
     if (!startValue || !endValue) return setMessage('請選擇完整的開始與結束時間');
     if (endValue <= startValue) return setMessage('結束時間必須晚於開始時間');
-    if (slotStartAt(date, startValue) <= new Date()) return setMessage('開始時間已經過去，不能預約過去時段');
+    if (startPast) return setMessage('開始時間已經過去，不能預約過去時段');
     const phone = contactPhone.trim();
     if (!myPhone && !phone) return setMessage('系統未登記你的電話，請填寫聯繫電話');
     if (phone && phone.replace(/[^0-9#*]/g, '').length < 4) return setMessage('聯繫電話請至少填寫 4 碼的電話或分機');
@@ -407,6 +415,7 @@ function BookingModal({ rooms, init, myPhone, onClose, onDone }: {
       <div className="mr-modal-head"><span className="modal-title">新增預約</span><button onClick={onClose} aria-label="關閉">✕</button></div>
       <div className="mr-modal-body">
         {conflict && <div className="conflict-alert">時段衝突：{conflict}</div>}
+        {startPast && <div className="past-time-alert">開始時間已經過去，請選擇未來時段</div>}
         <div className="field"><label>會議室</label>
           <select value={roomId} onChange={e => setRoomId(e.target.value)}>
             <option value="">-- 請選擇 --</option>
@@ -437,7 +446,7 @@ function BookingModal({ rooms, init, myPhone, onClose, onDone }: {
       <div className="mr-modal-foot">
         <span className="msg">{message}</span>
         <button className="btn" onClick={onClose}>取消</button>
-        <button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出預約'}</button>
+        <button className="btn btn-primary" disabled={busy || startPast} onClick={() => void submit()}>{busy ? '送出中…' : '送出預約'}</button>
       </div>
     </div>
   </div>;
