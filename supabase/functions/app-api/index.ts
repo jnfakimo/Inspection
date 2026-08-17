@@ -147,6 +147,14 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
+    // 每個登入帳號每分鐘最多 120 次 V2 API 請求；限制在資料庫內計數，
+    // 不依賴單一 Edge instance 的記憶體，避免爬蟲透過輪換連線繞過限制。
+    const { data: rateAllowed, error: rateError } = await userDb.rpc('consume_api_rate_limit', {
+      p_scope: 'app-api', p_window_seconds: 60, p_max_requests: 120,
+    });
+    if (rateError || rateAllowed !== true) {
+      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+    }
     const body = await req.json().catch(() => ({}));
     const action = text(body.action, 40);
 
@@ -163,7 +171,8 @@ Deno.serve(async (req) => {
       if(systemKey==='guardpatrol'&&moduleKey==='records'){
         selectColumns.push('equipment(name)','users!inspection_records_inspector_id_fkey(name)');
       }
-      let query=userDb.from(config.table).select(selectColumns.join(',')).limit(500);
+      // API 不提供整表下載；畫面分頁仍由前端保留，但單次回傳最多 100 筆。
+      let query=userDb.from(config.table).select(selectColumns.join(',')).limit(100);
       if(config.filter)query=query.eq(config.filter[0],config.filter[1]);
       if(config.order)query=query.order(config.order,{ascending:false});
       const {data,error}=await query;
