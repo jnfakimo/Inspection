@@ -13,7 +13,7 @@ V1（`system/*.html`）保留不刪除；V2（`web/app`）逐模組轉移，完�
 | 系統 | V2 路由 | V2 狀態 | V1 備援 |
 |---|---|---|---|
 | 後台管理 | `/v2/systems/admin/` | 入口與資料列表 | `admin.html`、`rbac.html` |
-| 維修／派工 | `/v2/systems/workorder/` | 報修新增已可在 V2 送出；其餘列表基礎版 | `workorder.html`、`dispatch.html` |
+| 維修／派工 | `/Inspection/v2/systems/workorder/` | **五個模組已完整搬移**（見下方） | `workorder.html`、`dispatch.html` |
 | 駐衛警巡檢 | `/v2/systems/guardpatrol/` | 入口與模組列表 | `patrolcheckin.html`、`patrolshifts.html` 等 |
 | 電子交接簿 | `/v2/systems/handover/`、`/v2/handover-pilot/` | 現場試用版與模組入口 | `handover.html` |
 | 設備建置 | `/Inspection/v2/systems/equipment/` | **八個模組已完整搬移**（見下方） | `equipment.html`、`materials.html` |
@@ -88,6 +88,23 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 轉發而不會提高安全性，因此不另建 API action。
 
 `created_by`／`updated_by`（設備文件為 `uploaded_by`）由前端於新增與更新時蓋章。
+
+## SYS-02 維修派工（2026-08-17 補完最後兩個模組）
+
+報修／派工／工單三個模組原本即有專屬實作（`workspace.tsx`）。本次補完剩餘兩個：
+
+| 模組 | V2 功能 |
+|---|---|
+| 維修附件 | 附件索引：依類型與關鍵字篩選，帶出報修編號、故障說明與工單號；`repair-files` 是私有 bucket，以 `createSignedUrl` 產生 5 分鐘有效的簽章網址開啟 |
+| 維修分析 | 九張報表＋五個 KPI，可選期間與快捷區間，匯出 .xlsx |
+
+維修附件刻意唯讀：上傳本來就內含於報修建立與完工回報流程，此模組定位是索引；
+且 `repair_attachments` 只有 select 與 insert 政策，沒有 update／delete。
+
+維修分析的彙總方式（MTTR、平均派工時間、SLA 準時判定、各項排行）逐項沿用 V1
+`analytics.html` 的公式，確保兩邊數字一致；另補上 V1 沒有的「急迫度分布」。
+匯出統一為 .xlsx，ExcelJS 以動態 import 載入並經建置確認切成獨立 chunk，
+不會出現在任何頁面的初始載入。
 
 ## 交付順序
 
