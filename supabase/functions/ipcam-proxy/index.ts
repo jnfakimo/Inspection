@@ -92,25 +92,27 @@ async function fetchIpcamFrame(targetUrl: URL, username: string, password: strin
   });
 }
 
-async function isAuthorized(req: Request) {
+async function authorize(req: Request) {
   const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!bearer) return false;
+  if (!bearer) return null;
   const db = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
   const { data: { user } } = await db.auth.getUser(bearer);
-  if (!user) return false;
+  if (!user) return null;
   const { data: profile } = await db.from("users")
     .select("rbac_role,role,status")
     .eq("auth_id", user.id).maybeSingle();
-  if (!profile || profile.status !== "active") return false;
+  if (!profile || profile.status !== "active") return null;
   const role = profile.rbac_role || (profile.role === "admin" ? "sysadmin" : profile.role);
-  if (role === "sysadmin") return true;
-  const { data: permission } = await db.from("role_permissions")
-    .select("allowed").eq("role_id", role).eq("perm", "sys_admin").maybeSingle();
-  return permission?.allowed === true;
+  if (role !== "sysadmin") {
+    const { data: permission } = await db.from("role_permissions")
+      .select("allowed").eq("role_id", role).eq("perm", "sys_admin").maybeSingle();
+    if (permission?.allowed !== true) return null;
+  }
+  return { db, subject: user.id };
 }
 
 Deno.serve(async (req) => {
@@ -119,7 +121,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!await isAuthorized(req)) return textResponse("Unauthorized", 401);
+    const authorized = await authorize(req);
+    if (!authorized) return textResponse("Unauthorized", 401);
+    const { data: rateAllowed, error: rateError } = await authorized.db.rpc("enforce_request_rate_limit", {
+      p_subject: authorized.subject,
+      p_scope: "ipcam-proxy",
+    });
+    if (rateError) {
+      console.error("ipcam-proxy rate limit failed:", rateError.message);
+      return textResponse("Rate limit service unavailable", 503);
+    }
+    if (rateAllowed !== true) return textResponse("Too many requests", 429);
     const requestUrl = new URL(req.url);
     if (requestUrl.searchParams.get("health") === "1") {
       return jsonResponse({ ok: true, fn: "ipcam-proxy", time: new Date().toISOString() });

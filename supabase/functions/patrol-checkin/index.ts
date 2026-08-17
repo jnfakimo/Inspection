@@ -96,6 +96,17 @@ Deno.serve(async (req) => {
     );
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, code: "invalid_session", message: "登入狀態已失效，請重新登入" }, 401);
+    const { data: rateAllowed, error: rateError } = await admin.rpc("enforce_request_rate_limit", {
+      p_subject: authData.user.id,
+      p_scope: "patrol-checkin",
+    });
+    if (rateError) {
+      console.error("patrol-checkin rate limit failed", rateError.message);
+      return reply(req, { ok: false, code: "rate_limit_unavailable", message: "安全限流服務暫時無法使用" }, 503);
+    }
+    if (rateAllowed !== true) {
+      return reply(req, { ok: false, code: "rate_limited", message: "簽到請求過於頻繁，請稍後再試" }, 429);
+    }
 
     const { data: profile, error: profileError } = await admin.from("users")
       .select("user_id,username,email,name,role,rbac_role,status")

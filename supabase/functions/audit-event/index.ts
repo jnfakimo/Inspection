@@ -530,6 +530,17 @@ Deno.serve(async (req) => {
     );
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, message: "登入狀態無效" }, 401);
+    const { data: rateAllowed, error: rateError } = await admin.rpc("enforce_request_rate_limit", {
+      p_subject: authData.user.id,
+      p_scope: "audit-event",
+    });
+    if (rateError) {
+      console.error("audit-event rate limit failed", rateError.message);
+      return reply(req, { ok: false, message: "安全限流服務暫時無法使用" }, 503);
+    }
+    if (rateAllowed !== true) {
+      return reply(req, { ok: false, message: "系統紀錄請求過於頻繁，請稍後再試" }, 429);
+    }
 
     const { data: profile, error: profileError } = await admin.from("users")
       .select("user_id,username,email,name,role,rbac_role,department,dept_id,status")

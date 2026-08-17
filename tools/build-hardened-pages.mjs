@@ -19,6 +19,18 @@ const provenanceNamespace = 'com.jnfakimo.word-cloud.provenance';
 const provenanceOwner = 'jnfakimo';
 const provenanceRepository = process.env.GITHUB_REPOSITORY || 'jnfakimo/word-cloud';
 const provenanceCommit = process.env.GITHUB_SHA || 'local-validation';
+const robotsDirectives = [
+  'noindex',
+  'nofollow',
+  'noarchive',
+  'nosnippet',
+  'noimageindex',
+  'max-snippet:0',
+  'max-image-preview:none',
+  'max-video-preview:0',
+];
+const robotsContent = robotsDirectives.join(',');
+const robotsMeta = `<meta name="robots" content="${robotsContent}">`;
 
 const runtimeSystemDirectories = ['assets', 'icons', 'plans', 'vendor'];
 const runtimeSystemExtensions = new Set([
@@ -107,8 +119,11 @@ function provenanceMarker(relativePath) {
 
 function addHtmlDirectives(html, relativePath) {
   const directives = [];
-  if (!/\bname\s*=\s*["']robots["']/i.test(html)) {
-    directives.push('<meta name="robots" content="noindex,nofollow,noarchive,nosnippet">');
+  const robotsMetaPattern = /<meta\b(?=[^>]*\bname\s*=\s*["']robots["'])[^>]*>/gi;
+  if (robotsMetaPattern.test(html)) {
+    html = html.replace(robotsMetaPattern, robotsMeta);
+  } else {
+    directives.push(robotsMeta);
   }
   if (!/\bname\s*=\s*["']application-provenance["']/i.test(html)) {
     directives.push(`<meta name="application-provenance" content="TAPM1:${provenanceMarker(relativePath)}">`);
@@ -118,6 +133,13 @@ function addHtmlDirectives(html, relativePath) {
   }
   if (!directives.length) return html;
   return html.replace(/<head(?:\s[^>]*)?>/i, `$&${directives.join('')}`);
+}
+
+function hasCompleteRobotsMeta(html) {
+  const tag = html.match(/<meta\b(?=[^>]*\bname\s*=\s*["']robots["'])[^>]*>/i)?.[0] || '';
+  const content = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i)?.[1] || '';
+  const declared = new Set(content.toLowerCase().split(',').map((value) => value.trim()).filter(Boolean));
+  return robotsDirectives.every((directive) => declared.has(directive));
 }
 
 function addJavaScriptProvenance(source, relativePath) {
@@ -261,6 +283,9 @@ async function verifyArtifact() {
   for (const file of textFiles) {
     const text = await readFile(file, 'utf8');
     const relative = toPosix(path.relative(outputRoot, file));
+    if (relative.endsWith('.html') && !hasCompleteRobotsMeta(text)) {
+      throw new Error(`正式頁面缺少完整防索引標記：${relative}`);
+    }
     if (relative.endsWith('.html') && !/name="application-provenance" content="TAPM1:[A-Za-z0-9_-]{32}"/.test(text)) {
       throw new Error(`正式頁面缺少隱藏來源指紋：${relative}`);
     }
@@ -290,9 +315,10 @@ await copyRuntimeFiles();
 await rewriteV2BasePaths();
 await minifyRuntimeCode();
 await writeFile(path.join(outputRoot, '.nojekyll'), '', 'utf8');
+// 專案路徑內的 robots.txt 僅作輔助；正式爬蟲規則仍須由網域根路徑提供。
 await writeFile(
   path.join(outputRoot, 'robots.txt'),
-  'User-agent: *\nDisallow: /word-cloud/system/\n',
+  'User-agent: *\nDisallow: /\n',
   'utf8',
 );
 await writeSignedProvenance();

@@ -44,11 +44,35 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, message: '登入狀態無效，請重新登入' }, 401);
+    const { data: globalRateAllowed, error: globalRateError } = await admin.rpc('enforce_request_rate_limit', {
+      p_subject: authData.user.id,
+      p_scope: 'admin-api',
+    });
+    if (globalRateError) {
+      console.error('admin-api rate limit failed:', globalRateError.message);
+      return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
+    }
+    if (globalRateAllowed !== true) {
+      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+    }
     const { data: profile, error: profileError } = await admin.from('users').select('user_id,auth_id,name,username,role,rbac_role,status').eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
     const roleId = profile.rbac_role || (profile.role === 'admin' ? 'sysadmin' : profile.role);
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = clean(body.action, 50);
+    if (action !== 'admin_get_settings') {
+      const { data: writeRateAllowed, error: writeRateError } = await admin.rpc('enforce_request_rate_limit', {
+        p_subject: authData.user.id,
+        p_scope: 'admin-api:write',
+      });
+      if (writeRateError) {
+        console.error('admin-api:write rate limit failed:', writeRateError.message);
+        return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
+      }
+      if (writeRateAllowed !== true) {
+        return reply(req, { ok: false, message: '操作過於頻繁，請稍後再試' }, 429);
+      }
+    }
     const isAdmin = roleId === 'sysadmin' || profile.role === 'admin';
     if (!isAdmin && action !== 'admin_mark_notice') return reply(req, { ok: false, message: '僅限系統管理員執行此操作' }, 403);
     const userDb = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });

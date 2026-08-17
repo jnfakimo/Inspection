@@ -132,6 +132,18 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, message: '登入狀態無效' }, 401);
 
+    const { data: globalRateAllowed, error: globalRateError } = await admin.rpc('enforce_request_rate_limit', {
+      p_subject: authData.user.id,
+      p_scope: 'app-api',
+    });
+    if (globalRateError) {
+      console.error('app-api rate limit failed:', globalRateError.message);
+      return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
+    }
+    if (globalRateAllowed !== true) {
+      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+    }
+
     const { data: profile, error: profileError } = await admin.from('users')
       .select('user_id,username,name,department,role,rbac_role,status')
       .eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
@@ -147,16 +159,27 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
-    // 每個登入帳號每分鐘最多 120 次 V2 API 請求；限制在資料庫內計數，
-    // 不依賴單一 Edge instance 的記憶體，避免爬蟲透過輪換連線繞過限制。
-    const { data: rateAllowed, error: rateError } = await userDb.rpc('consume_api_rate_limit', {
-      p_scope: 'app-api', p_window_seconds: 60, p_max_requests: 120,
-    });
-    if (rateError || rateAllowed !== true) {
-      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
-    }
     const body = await req.json().catch(() => ({}));
     const action = text(body.action, 40);
+    const actionScope = ({
+      module_data: 'app-api:module_data',
+      dashboard: 'app-api:dashboard',
+      inspections: 'app-api:inspections',
+      equipment_map: 'app-api:equipment_map',
+    } as Record<string, string>)[action];
+    if (actionScope) {
+      const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
+        p_subject: authData.user.id,
+        p_scope: actionScope,
+      });
+      if (actionRateError) {
+        console.error(`${actionScope} rate limit failed:`, actionRateError.message);
+        return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
+      }
+      if (actionRateAllowed !== true) {
+        return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+      }
+    }
 
     if (action === 'profile') {
       return reply(req, { ok: true, data: { ...profile, allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });

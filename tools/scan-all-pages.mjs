@@ -10,6 +10,16 @@ const outputRoot = path.join(projectRoot, '_site');
 const remoteBaseUrl = process.argv[2] ? new URL(process.argv[2]) : null;
 const expectedCommit = process.env.EXPECTED_COMMIT || process.env.GITHUB_SHA || '';
 const provenanceNamespace = 'com.jnfakimo.word-cloud.provenance';
+const robotsDirectives = [
+  'noindex',
+  'nofollow',
+  'noarchive',
+  'nosnippet',
+  'noimageindex',
+  'max-snippet:0',
+  'max-image-preview:none',
+  'max-video-preview:0',
+];
 const sensitivePaths = [
   'PROJECT_CONTEXT.md',
   'system/sql/schema.sql',
@@ -40,6 +50,13 @@ function compileInlineScripts(html, file) {
     count += 1;
   }
   return count;
+}
+
+function hasCompleteRobotsMeta(html) {
+  const tag = html.match(/<meta\b(?=[^>]*\bname\s*=\s*["']robots["'])[^>]*>/i)?.[0] || '';
+  const content = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i)?.[1] || '';
+  const declared = new Set(content.toLowerCase().split(',').map((value) => value.trim()).filter(Boolean));
+  return robotsDirectives.every((directive) => declared.has(directive));
 }
 
 function localReferenceTarget(pagePath, rawReference) {
@@ -82,6 +99,9 @@ async function scanLocalArtifact(pagePaths) {
     }
     if (!/name="copyright" content="Copyright © 2026 jnfakimo\. All rights reserved\."/.test(html)) {
       throw new Error(`頁面缺少權利標記：${pagePath}`);
+    }
+    if (!hasCompleteRobotsMeta(html)) {
+      throw new Error(`頁面缺少完整防索引標記：${pagePath}`);
     }
     inlineScriptCount += compileInlineScripts(html, pagePath);
     validateStaticReferences(html, pagePath);
@@ -135,6 +155,9 @@ async function scanRemoteArtifact(pagePaths) {
       if (!contentType.includes('text/html')) throw new Error(`${pagePath} 回傳非 HTML：${contentType}`);
       if (!/name="application-provenance" content="TAPM1:[A-Za-z0-9_-]{32}"/.test(html)) {
         throw new Error(`正式頁面缺少隱藏來源指紋：${pagePath}`);
+      }
+      if (!hasCompleteRobotsMeta(html)) {
+        throw new Error(`正式頁面缺少完整防索引標記：${pagePath}`);
       }
       scanned += 1;
     }));
