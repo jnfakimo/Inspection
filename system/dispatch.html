@@ -578,12 +578,8 @@ async function uploadRepairFile(path,file){
     return {data:null,error:{message:e?.message||first.error.message||'Load failed'}};
   }
 }
-// 狀態轉移的歷程已改由 repair_order_transition 在同一交易寫入；此函式僅剩派工
-// 建單一處使用。回傳 error 供呼叫端判斷，不再靜默吞掉寫入失敗。
-async function logStatus(reqId,ordId,from,to,note){
-  const {error}=await db.from('case_status_log').insert({request_id:reqId,order_id:ordId,from_status:from,to_status:to,note:note||null,operator_id:me_.user_id||null,operator_name:operatorLabel()});
-  return error;
-}
+// 派工建單改走 create_repair_dispatch 後，本頁所有歷程寫入皆已移入資料庫函式，
+// 原本的 logStatus 已無呼叫端，故移除。
 const OPTIONAL_REPAIR_COLUMNS=['fault_location','mobile','equipment_category','location_id','desired_finish'];
 function isSchemaColumnError(error){
   return error?.code==='PGRST204'||/schema cache|Could not find the .+ column/i.test(error?.message||'');
@@ -703,17 +699,16 @@ async function doDispatch(reqId){
   const r=reqs.find(x=>x.request_id===reqId);
   const tech=document.getElementById('x-tech').value, vendor=document.getElementById('x-vendor').value.trim();
   if(!tech&&!vendor){toast('請選擇技師或填寫委外廠商',true);return;}
-  const ord={request_id:reqId,equipment_id:r.equipment_id,assignee_id:tech||null,vendor:vendor||null,
-    expected_arrival:document.getElementById('x-arr').value||null,expected_finish:document.getElementById('x-fin').value||null,
-    work_content:document.getElementById('x-content').value.trim()||null,need_shutdown:document.getElementById('x-shut').value==='true',
-    need_approval:document.getElementById('x-appr').value==='true',status:'assigned',accept_status:'pending'};
-  const {data,error}=await db.from('maintenance_orders').insert(ord).select('order_id,wo_no').single();
-  if(error){toast('派工失敗：'+translateError(error.message),true);return;}
-  // 工單已建立，後續兩步若失敗會使報修單狀態與工單不一致，故明確回報。
-  const {error:reqErr}=await db.from('repair_requests').update({status:'assigned',assignee_id:tech||null,updated_at:new Date().toISOString()}).eq('request_id',reqId);
-  if(reqErr){toast('工單已建立，但報修單狀態更新失敗：'+translateError(reqErr.message),true);}
-  const logErr=await logStatus(reqId,data.order_id,r.status,'assigned','派工 '+(data.wo_no||'')+(tech?(' → '+(techs.find(t=>t.user_id===tech)?.name||'')):'')+(vendor?(' 委外:'+vendor):''));
-  if(logErr){toast('工單已建立，但流程歷程寫入失敗：'+translateError(logErr.message),true);}
+  // 建單、更新報修單與寫入歷程改由 create_repair_dispatch 於單一交易完成；
+  // 與 workorder.html 共用同一支函式，兩頁不再各自維護一份建單邏輯。
+  const {data,error}=await db.rpc('create_repair_dispatch',{
+    p_request_id:reqId,p_assignee_id:tech||null,p_vendor:vendor||null,
+    p_expected_arrival:document.getElementById('x-arr').value||null,
+    p_expected_finish:document.getElementById('x-fin').value||null,
+    p_work_content:document.getElementById('x-content').value.trim()||null,
+    p_need_shutdown:document.getElementById('x-shut').value==='true',
+    p_need_approval:document.getElementById('x-appr').value==='true'});
+  if(error||!data){toast('派工失敗：'+translateError(error?.message||'未取得工單資料'),true);return;}
   if(tech){ try{ await db.from('notifications').insert({recipient_id:tech,event:'dispatch',title:'新派工通知',
     body:`${r.req_no||''}｜${r.fault_type||'設備'}｜${r.fault_desc||''}`,request_id:reqId,order_id:data.order_id}); }catch(e){} }
   await loadData(); renderChips(); renderList(); openPendingDetail(reqId); toast('已派工');
