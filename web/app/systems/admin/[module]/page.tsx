@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { AdminModuleGate } from '@/components/AdminModuleGate';
 import { findModule } from '@/lib/modules';
 
-const ADMIN_MODULES = ['users', 'permissions', 'locations', 'audit', 'alerts', 'notices', 'layouts'];
+const ADMIN_MODULES = ['users', 'permissions', 'locations', 'audit', 'alerts', 'notices', 'layouts', 'cycles', 'costs', 'locanalysis', 'health'];
 
 export function generateStaticParams() {
   return ADMIN_MODULES.map(module => ({ module }));

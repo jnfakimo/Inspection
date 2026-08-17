@@ -18,6 +18,10 @@ const cardVisuals = [
   { icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', accent: '#ef5b87' },
   { icon: '/Inspection/assets/system-icons/guardpatrol-line-push-icon.png', accent: '#e5a100' },
   { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: '#00bde8' },
+  { icon: '/Inspection/assets/system-icons/guardpatrol-schedule-icon.png', accent: '#00c985' },
+  { icon: '/Inspection/assets/system-icons/audit-icon.png', accent: '#e5a100' },
+  { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: '#4f8cff' },
+  { icon: '/Inspection/assets/system-icons/settings-icon.png', accent: '#ef5b87' },
 ] as const;
 
 function AdminHub({ profile }: { profile: Profile }) {

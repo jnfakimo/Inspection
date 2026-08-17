@@ -8,6 +8,10 @@ import { AuditAdminV2 } from '@/components/admin/AuditAdminV2';
 import { AlertsAdminV2 } from '@/components/admin/AlertsAdminV2';
 import { NoticesAdmin } from '@/components/admin/NoticesAdmin';
 import { LayoutsAdmin } from '@/components/admin/LayoutsAdmin';
+import { CyclesAdmin } from '@/components/admin/CyclesAdmin';
+import { CostsAdmin } from '@/components/admin/CostsAdmin';
+import { LocationAnalysisAdmin } from '@/components/admin/LocationAnalysisAdmin';
+import { HealthAdmin } from '@/components/admin/HealthAdmin';
 import type { ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -19,6 +23,10 @@ const MODULES: Record<string, React.ComponentType<{ profile: Profile; module: Mo
   alerts: AlertsAdminV2,
   notices: NoticesAdmin,
   layouts: LayoutsAdmin,
+  cycles: CyclesAdmin,
+  costs: CostsAdmin,
+  locanalysis: LocationAnalysisAdmin,
+  health: HealthAdmin,
 };
 
 export function AdminWorkspace({ profile, module }: { profile: Profile; module: ModuleDefinition }) {
