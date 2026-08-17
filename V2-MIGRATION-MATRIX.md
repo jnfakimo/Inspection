@@ -12,19 +12,20 @@ V1（`system/*.html`）保留不刪除；V2（`web/app`）逐模組轉移，完�
 
 | 系統 | V2 路由 | V2 狀態 | V1 備援 |
 |---|---|---|---|
-| 後台管理 | `/v2/systems/admin/` | 入口與資料列表 | `admin.html`、`rbac.html` |
+| 後台管理 | `/Inspection/v2/systems/admin/` | **十一個模組已完整搬移**（見下方） | `admin.html`、`rbac.html` |
 | 維修／派工 | `/Inspection/v2/systems/workorder/` | **五個模組已完整搬移**（見下方） | `workorder.html`、`dispatch.html` |
-| 駐衛警巡檢 | `/v2/systems/guardpatrol/` | 入口與模組列表 | `patrolcheckin.html`、`patrolshifts.html` 等 |
-| 電子交接簿 | `/v2/systems/handover/`、`/v2/handover-pilot/` | 現場試用版與模組入口 | `handover.html` |
+| 駐衛警巡檢 | `/Inspection/v2/systems/guardpatrol/` | **六個模組已完整搬移**（見下方） | `patrolcheckin.html`、`patrolshifts.html` 等 |
+| 電子交接簿 | `/Inspection/v2/systems/handover/`、`/v2/handover-pilot/` | **三個模組已完整搬移**（見下方） | `handover.html` |
 | 設備建置 | `/Inspection/v2/systems/equipment/` | **八個模組已完整搬移**（見下方） | `equipment.html`、`materials.html` |
 | 專案關係／圖臺 | `/Inspection/v2/systems/structuremap/` | **六個模組已完整搬移**（見下方） | `b1plan.html`、`floor3d.html` 等 |
 | 公務車派車 | `/Inspection/v2/systems/vehicle/` | **五個模組已完整搬移**（見下方） | `vehicle-dispatch.html` |
 | 會議室預約 | `/Inspection/v2/systems/meetingroom/` | **四個模組已完整搬移**（見下方） | `meetingroom.html` |
 
-> 路由前綴為 `/Inspection/v2/`（`web/next.config.ts` 的 `basePath`）。上表其餘各列的
-> 「模組入口與資料列表」意指走 `app-api` 的 `module_data`——那是唯讀通用查詢，
-> 只有列表沒有寫入。44 個模組全部都有 `MODULE_SOURCES` 設定，因此「有畫面」不等於
-> 「已搬移」，判斷是否完成請看該模組有沒有專屬元件與寫入路徑。
+> 路由前綴為 `/Inspection/v2/`（`web/next.config.ts` 的 `basePath`）。
+> 八個系統的模組現在都有專屬元件，不再有只靠 `app-api` `module_data`（唯讀通用查詢）
+> 撐場的模組。後台管理新增的巡檢週期、費用統計、位置分析、系統健康四個模組走
+> `web/components/AdminWorkspace.tsx` 的元件對照表，不經 `module_data`，因此
+> `MODULE_SOURCES` 未新增對應設定。
 
 ## SYS-07 公務車派車（2026-08-17 完成）
 
@@ -131,6 +132,75 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 
 **尚未驗證**：兩個檢視器的實際算繪需登入後才看得到，目前僅確認路由、bundle 切分、
 貼圖網址可取得與型別／建置通過。
+
+## SYS-01 後台管理（2026-08-18 完成）
+
+原有七個模組（人員帳號、角色權限、場域位置、操作稽核、資安告警、通知中心、戰情版面）
+均為專屬元件。本次補上 `admin.html` 有而 V2 缺少的四個模組，各自獨立成
+`web/components/admin/` 底下的元件：
+
+| 模組 | 資料來源 | V2 功能 |
+|---|---|---|
+| 巡檢週期 | `inspection_cycles` | 開啟新週期（結束現有週期、設備重置紅燈）、週期歷史 |
+| 費用統計 | `cost_records` | 新增費用記錄；設備／類型／日期區間篩選、合計、各設備排名與占比；匯出 .xlsx |
+| 位置分析 | `inspection_records`＋`repair_requests` | 市場→樓層→區域→細部位置的樞紐下鑽，可收合；巡檢數、異常數、異常率、報修數、最近巡檢 |
+| 系統健康 | `client_error_logs` | 類型與期間篩選、錯誤訊息中文化（規則逐條沿用 V1）、技術原文收合、詳細內容 |
+
+費用寫入直接走 `cost_records`：其 insert／update 政策要求 `has_system_access('sys_workorder')`
+且必須是管理者或具 dispatch 權限，伺服器端把關存在，依 `ARCHITECTURE_V2.md` 的判斷準則
+不另包 Edge Function。巡檢週期沿用 V1 的兩步驟寫入（無對應的 security definer 函式），
+但插入失敗時明確提示「目前沒有進行中的週期」，不讓中間狀態被誤認為正常。
+
+`admin.html` 的 3D 建模導覽頁（`page-modelhub`）刻意不搬——那是連往 modeler／arealist／
+patrollist／整合標記／floor3d 的卡片牆，五個目的地在 V2 都已是 SYS-06 與 SYS-03 的模組，
+再做一頁只會多一層轉跳。
+
+## SYS-03 駐衛警巡檢（2026-08-18 完成）
+
+六個模組皆有專屬元件：打卡矩陣在 `operations-workspace.tsx`，其餘五個在 `patrol-workspace.tsx`。
+
+| 模組 | V2 功能 |
+|---|---|
+| 巡邏打卡 | 依班別排程的樓層×班別矩陣、日期切換、樓層／班別／狀態篩選、選點打卡、當日與期間匯出 .xlsx |
+| 巡邏點清單 | 清單與搜尋、樓層統計快捷、當日打卡狀態；**QR 標籤檢視與整批列印**；定位連結至圖臺整合標記 |
+| 巡檢排班 | 當日班別與班別範本雙表，走 `save_patrol_shift`／`save_patrol_shift_template`，人員以姓名指派 |
+| 逾時推播 | 直接查 `patrol_timeout_notifications`，期間／班別／狀態篩選，含 LINE 與 FCM 回應 |
+| 設備巡檢 | 走 `app-api` 的 `inspections`／`create_inspection`，異常必填說明 |
+| 立體巡檢雲臺 | 與 SYS-06 共用 `FloorStack3D`，只顯示巡檢點並依當日打卡著色 |
+
+本次補上兩項：
+
+- **QR 標籤**（對應 V1 `patrollist.html` 的 `openQr`／`printAllQr`）。以零相依的
+  `qrcode-generator` 動態載入，建置後確認切成 20 KB 獨立 chunk，不在任何頁面的初始載入。
+  QR 內容仍指向 V1 的 `patrolcheckin.html?marker=…`——實際簽到流程（含 MFA 與
+  `patrol-checkin` Edge Function）在 V1，現場已張貼的標籤也是這組網址，改指 V2 會讓
+  新舊標籤指向不同地方。
+- **當班即時統計修正**。原本「已打卡／待打卡」用打卡筆數粗算、「逾期未打卡」恆為 0，
+  與矩陣裡逐格算出的狀態對不起來。改為沿用 V1 `renderDutyStats` 的語意：只有所選日期是
+  今天且此刻落在某班別時段內才統計，逐點算出 ok／pending／overdue，否則顯示「目前無進行中班別」。
+
+`patrolcheckin.html` 本身刻意不搬：它是掃 QR 後直接進入的單頁簽到流程，含 MFA 驗證，
+不是後臺作業畫面，改寫成 V2 路由只會讓現場標籤失效。
+
+## SYS-04 電子交接簿（2026-08-18 完成）
+
+三個模組在 `handover-workspace.tsx`：
+
+| 模組 | V2 功能 |
+|---|---|
+| 交接紀錄 | 列表（日期區間、班別、狀態、關鍵字）、詳細檢視、接收交接；新增交接單含當班設備運轉概況與每日報修概況自動帶入、異常與待辦逐項清單、草稿／送出 |
+| 未結事項 | 案件列表（狀態、類別、日期區間）、**新增案件**（異常大／小類、案件編號自動編碼、發生時間驗證）、**附件上傳與檢視**、指派／進度／狀態異動與重新開啟 |
+| 設備概況 | 交接當下的設備狀態總覽，含保養逾期標示 |
+
+本次補上：交接單的設備與報修概況自動帶入（對應 V1 的 `fetchEqStatus`／`fetchRepairStatus`，
+狀態集合與 V1 相同）、異常與待辦的逐項清單（V1 以換行串成單一欄位存放，此處沿用同一格式，
+兩版互讀不會走樣）、交接單詳細檢視、案件建立與 `handover_case_attachments` 附件。
+
+附件所在的 `handover-attachments` 是私有 bucket，開啟一律以 `createSignedUrl` 產生 5 分鐘
+簽章網址；上傳成功但索引寫入失敗時會把已上傳的物件收回，不留下查不到的孤兒檔案。
+
+送出交接沿用 V1 的規則：交接人必須是登入者本人、不得與接班人相同、過去班次不可補單
+（資料庫的 `handover_shift_end_at` 亦會擋，前端先行提示）。
 
 ## 交付順序
 
