@@ -21,6 +21,7 @@ _site/
 node_modules/
 web/.next/
 web/out/
+web/tsconfig.tsbuildinfo
 
 # Python .venv (ai-agent-ep03)
 .venv/

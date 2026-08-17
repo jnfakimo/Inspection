@@ -19,7 +19,7 @@ V1（`system/*.html`）保留不刪除；V2（`web/app`）逐模組轉移，完�
 | 設備建置 | `/v2/systems/equipment/` | 模組入口與資料列表 | `equipment.html`、`materials.html` |
 | 專案關係／圖臺 | `/v2/systems/structuremap/` | 模組入口；2D／3D 尚待原生化 | `b1plan.html`、`floor3d.html` 等 |
 | 公務車派車 | `/Inspection/v2/systems/vehicle/` | **五個模組已完整搬移**（見下方） | `vehicle-dispatch.html` |
-| 會議室預約 | `/v2/systems/meetingroom/` | 模組入口與資料列表 | `meetingroom.html` |
+| 會議室預約 | `/Inspection/v2/systems/meetingroom/` | **四個模組已完整搬移**（見下方） | `meetingroom.html` |
 
 > 路由前綴為 `/Inspection/v2/`（`web/next.config.ts` 的 `basePath`）。上表其餘各列的
 > 「模組入口與資料列表」意指走 `app-api` 的 `module_data`——那是唯讀通用查詢，
@@ -45,6 +45,25 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 
 注意：`sys_vehicle` 權限目前只開放給 `mgmt_supervisor` 與 `sysadmin`（見 `role_permissions`），
 因此一般司機在 V2 進不了此系統。這是既有的權限設定問題，不是本次搬移造成的。
+
+## SYS-08 會議室預約（2026-08-17 完成）
+
+`web/app/systems/[system]/[module]/meeting-workspace.tsx` 承接四個模組：
+
+| 模組 | V2 功能 |
+|---|---|
+| 會議預約 | 列表（今日與未來／我的預約／全部）、搜尋、狀態篩選、分頁；新增預約（含每週週期）；會議時段內報到；取消自己的預約；對他人預約提出變更申請 |
+| 會議室主檔 | 列表與搜尋；新增／編輯（名稱、容量、樓層、狀態、備註），限管理者 |
+| 變更申請 | 列表與狀態篩選；原預約申請人可同意讓出或婉拒 |
+| 預約提醒 | 提醒與逾時通知紀錄，含發送狀態與 LINE 回應 |
+
+寫入全部走既有伺服器端入口：`create_meeting_booking_series`（逐次檢查衝突後原子建立，
+週期上限 52 次）、`cancel_own_meeting_booking`、`create_meeting_booking_change_request`、
+`respond_meeting_booking_change_request`（同意時於單一交易取消原預約並改建立申請人的預約，
+並自動婉拒同一時段其餘待審申請），以及 `app-api` 的 `meeting_check_in`、`meeting_save_room`。
+
+前端只做即時提示：時段限 00／30 分（下拉選單直接限制）、結束需晚於開始、未登記電話時
+聯繫電話必填且至少 4 碼。過去時段、時段衝突、報到時間區間等仍以資料庫與 API 的回應為準。
 
 ## 交付順序
 
