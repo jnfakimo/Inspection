@@ -1,17 +1,14 @@
 'use client';
 
-// SYS-07 公務車派車 V2 工作區。
+// SYS-07 公務車派車 V2 工作區（100% 保持 V1 樣板視覺與操作模式）。
 //
-// 五個模組（申請／車輛／駕駛／管理員／紀錄）由此檔統一承接，取代原本只能唯讀列表的
-// 通用 ModuleWorkspace。狀態轉移一律走既有的資料庫函式，不在前端自行拼裝寫入：
+// 五個模組（派車申請／公務車輛／駕駛人員／派車管理員／派車紀錄）由本檔承接，
+// 前端採用 React / Next.js，後端以 Supabase PostgreSQL Security Definer RPC 函式為基礎：
 //   vehicle_request_action  —— 核可／退回／派車／接單／取消（security definer，內含 RLS 等價檢查）
 //   complete_vehicle_trip   —— 司機行車回報（單一交易內更新申請單、車輛里程與流程歷程）
-// 兩支函式的 guard trigger（approval / assignment_and_driver / time_window）仍照常觸發，
-// 因此畫面上的按鈕僅作為操作提示，真正的權限與流程判斷以資料庫回傳的錯誤為準。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-// 沿用後台既有的面板／表格／彈窗樣式；該檔原本只在 /systems/admin 的 layout 匯入，
-// 這裡一併帶入，避免把同一套版面重寫一份。檔內全部為 class 選擇器，不會污染其他頁。
+import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
@@ -38,14 +35,12 @@ function Pill({ value, labels, tones }: { value: unknown; labels: Record<string,
   return <span className={`status-pill ${tones[key] || 'pending'}`}>{labels[key] || fmt(value)}</span>;
 }
 
-// 一律以台北時區組出 YYYY-MM-DD，不用 toISOString（那會轉 UTC，台灣清晨會退一天）。
 function taipeiToday() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
     .formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {} as Record<string, string>);
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 function timeText(value: unknown) { return value ? String(value).slice(0, 5) : '—'; }
-// datetime-local 的值是本地時間字串，交給 Date 解析後轉 ISO 即為正確的絕對時間。
 function localToIso(value: string) { return value ? new Date(value).toISOString() : null; }
 function isoToLocalInput(value: unknown) {
   if (!value) return '';
@@ -80,11 +75,10 @@ function useFleetRole(profile: Profile) {
       .then(({ data }) => { if (active) setIsManager(Boolean(data)); });
     return () => { active = false; };
   }, [profile.user_id]);
-  // 車輛主檔的 RLS（vehicles_manager_update）要求 is_admin() 或啟用中的派車管理員。
   return { isAdmin, isManager, canManageFleet: isAdmin || isManager };
 }
 
-/* ──────────────────────────── 派車申請 ──────────────────────────── */
+/* ──────────────────────────── 派車申請 (100% V1 視覺對齊) ──────────────────────────── */
 
 function RequestsModule({ module, profile }: Props) {
   const { isAdmin, canManageFleet } = useFleetRole(profile);
@@ -92,30 +86,67 @@ function RequestsModule({ module, profile }: Props) {
   const [vehicles, setVehicles] = useState<Row[]>([]);
   const [drivers, setDrivers] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
-  const [query, setQuery] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1);
+  
+  const [tab, setTab] = useState<'mine' | 'driverToday' | 'todo' | 'all'>('mine');
+  const [query, setQuery] = useState(''), [statusFilter, setStatusFilter] = useState(''), [dateFilter, setDateFilter] = useState(''), [page, setPage] = useState(1);
+  
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [logs, setLogs] = useState<Row[]>([]);
   const [tripFor, setTripFor] = useState<Row | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showVehicleMasterModal, setShowVehicleMasterModal] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
     const [r, v, d] = await Promise.all([
-      client.from('vehicle_dispatch_requests').select('*').order('application_date', { ascending: false }).order('created_at', { ascending: false }).limit(500),
-      client.from('official_vehicles').select('vehicle_id,plate_no,vehicle_name,seats,current_odometer,status').order('plate_no'),
+      client.from('vehicle_dispatch_requests').select('*').order('application_date', { ascending: false }).order('created_at', { ascending: false }).limit(1000),
+      client.from('official_vehicles').select('vehicle_id,plate_no,vehicle_name,brand,model,seats,current_odometer,status,note').order('plate_no'),
       client.from('vehicle_dispatch_drivers').select('user_id,active,users(name,username,department)').eq('active', true),
     ]);
     if (r.error || v.error || d.error) setNote(`失敗：${errorMessage(r.error || v.error || d.error, '派車資料載入失敗')}`);
     setRows(r.data || []); setVehicles(v.data || []); setDrivers(d.data || []); setBusy(false);
   }, []);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => setPage(1), [query, status]);
 
-  const filtered = useMemo(() => rows.filter(row => {
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => setPage(1), [query, statusFilter, dateFilter, tab]);
+
+  const today = taipeiToday();
+  const isDriver = useMemo(() => drivers.some(d => d.user_id === profile.user_id), [drivers, profile.user_id]);
+
+  // KPI 統計數字
+  const kApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_approval').length, [rows]);
+  const kDispatchCount = useMemo(() => rows.filter(r => r.status === 'approved').length, [rows]);
+  const kTodayCount = useMemo(() => rows.filter(r => String(r.trip_date) === today && r.status === 'assigned').length, [rows], [today]);
+  const kDriverCount = useMemo(() => rows.filter(r => r.status === 'assigned').length, [rows]);
+
+  // 頁籤資料列篩選
+  const mineRows = useMemo(() => rows.filter(r => r.applicant_id === profile.user_id), [rows, profile.user_id]);
+  const driverTodayRows = useMemo(() => rows.filter(r => r.driver_id === profile.user_id && String(r.trip_date) === today && ['assigned', 'completed'].includes(String(r.status))), [rows, profile.user_id, today]);
+  const todoRows = useMemo(() => rows.filter(r => {
+    if (r.status === 'pending_approval' && (canManageFleet || isAdmin || r.applicant_department === profile.department)) return true;
+    if (r.status === 'approved' && (canManageFleet || isAdmin)) return true;
+    if (r.status === 'assigned' && r.driver_id === profile.user_id) return true;
+    return false;
+  }), [rows, canManageFleet, isAdmin, profile.department, profile.user_id]);
+
+  const tabRows = useMemo(() => {
+    if (tab === 'mine') return mineRows;
+    if (tab === 'driverToday') return driverTodayRows;
+    if (tab === 'todo') return todoRows;
+    return rows;
+  }, [tab, mineRows, driverTodayRows, todoRows, rows]);
+
+  const filtered = useMemo(() => tabRows.filter(row => {
     const q = query.trim().toLowerCase();
-    return (!status || row.status === status) && (!q || [row.request_no, row.applicant_name, row.applicant_department, row.destination_location, row.trip_purpose, row.plate_no, row.driver_name].some(v => String(v || '').toLowerCase().includes(q)));
-  }), [rows, query, status]);
+    const matchStatus = !statusFilter || row.status === statusFilter;
+    const matchDate = !dateFilter || String(row.trip_date) === dateFilter;
+    const matchQuery = !q || [row.request_no, row.applicant_name, row.applicant_department, row.origin_location, row.destination_location, row.trip_purpose, row.plate_no, row.driver_name]
+      .some(v => String(v || '').toLowerCase().includes(q));
+    return matchStatus && matchDate && matchQuery;
+  }), [tabRows, query, statusFilter, dateFilter]);
+
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const act = async (requestId: string, action: string, extra: { note?: string; vehicleId?: string; driverId?: string } = {}, success = '已完成') => {
@@ -137,24 +168,89 @@ function RequestsModule({ module, profile }: Props) {
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
+
+    {/* V1 四步驟流程 Banner */}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--cyan)' }}>
+        <b style={{ color: 'var(--cyan)', fontSize: '0.85rem' }}>1. 申請人填單</b>
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>線上填寫用車日期、地點、人數與事由</div>
+      </div>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--amber)' }}>
+        <b style={{ color: 'var(--amber)', fontSize: '0.85rem' }}>2. 單位主管核可</b>
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>單位主管審核或退回派車申請</div>
+      </div>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--purple)' }}>
+        <b style={{ color: 'var(--purple)', fontSize: '0.85rem' }}>3. 派車管理員</b>
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>派車管理員指派公務車號與駕駛人員</div>
+      </div>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--green)' }}>
+        <b style={{ color: 'var(--green)', fontSize: '0.85rem' }}>4. 司機接單與回報</b>
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>司機於用車當日接單、實際里程與加油紀錄回報</div>
+      </div>
+    </div>
+
+    {/* V1 四大 KPI 統計卡 */}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(130px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--amber)' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--amber)', lineHeight: 1 }}>{kApprovalCount}</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>待主管核可</div>
+      </div>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--blue)' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{kDispatchCount}</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>待車管派車</div>
+      </div>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--purple)' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--purple)', lineHeight: 1 }}>{kTodayCount}</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>今日已派行程</div>
+      </div>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--green)' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--green)', lineHeight: 1 }}>{kDriverCount}</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>待司機回報</div>
+      </div>
+    </div>
+
+    {/* V1 四大頁籤（帶計數） */}
+    <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', marginBottom: '12px' }}>
+      <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('mine')}>
+        我的申請 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,212,255,0.15)', fontSize: '0.68rem' }}>{mineRows.length}</span>
+      </button>
+      {isDriver && <button className={`secondary-btn ${tab === 'driverToday' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('driverToday')}>
+        今日派車 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,255,157,0.15)', fontSize: '0.68rem' }}>{driverTodayRows.length}</span>
+      </button>}
+      <button className={`secondary-btn ${tab === 'todo' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('todo')}>
+        待我處理 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(255,179,0,0.15)', fontSize: '0.68rem' }}>{todoRows.length}</span>
+      </button>
+      <button className={`secondary-btn ${tab === 'all' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('all')}>
+        派車總覽 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', fontSize: '0.68rem' }}>{rows.length}</span>
+      </button>
+    </div>
+
+    {/* 工具列 */}
     <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋申請編號、申請人、目的地、車號或駕駛" />
-        <select value={status} onChange={e => setStatus(e.target.value)}>
+      <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: '8px' }}>
+        <input style={{ minWidth: '220px', flex: 1 }} value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋申請編號、申請人、地點、車號或駕駛…" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全部狀態</option>
           {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
-        <span>共 {filtered.length} 筆</span>
+        <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="用車日期" />
+        <button className="secondary-btn" onClick={() => { setQuery(''); setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
+        {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
+        {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
+        <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
       </div>
+
       <div className="responsive-table"><table>
-        <thead><tr><th>申請編號</th><th>用車日／時段</th><th>申請人</th><th>目的地</th><th>車輛／駕駛</th><th>狀態</th><th>操作</th></tr></thead>
+        <thead><tr><th>申請編號</th><th>狀態</th><th>用車日期／時間</th><th>起訖地點</th><th>申請人／單位</th><th>人數</th><th>車號／司機</th><th>里程</th><th>操作</th></tr></thead>
         <tbody>{paged.map(row => <tr key={row.request_id}>
           <td><strong>{fmt(row.request_no)}</strong><small>申請日 {fmt(row.application_date)}</small></td>
-          <td>{fmt(row.trip_date)}<small>{timeText(row.planned_departure_time)}–{timeText(row.planned_return_time)}</small></td>
-          <td>{fmt(row.applicant_name)}<small>{fmt(row.applicant_department)}</small></td>
-          <td>{fmt(row.destination_location)}<small>{fmt(row.trip_purpose)}</small></td>
-          <td>{row.plate_no ? <>{row.plate_no}<small>{fmt(row.driver_name)}{row.driver_accepted_at ? '（已接單）' : ''}</small></> : '—'}</td>
           <td><Pill value={row.status} labels={STATUS_LABEL} tones={STATUS_TONE} /></td>
+          <td>{fmt(row.trip_date)}<small>{timeText(row.planned_departure_time)}–{timeText(row.planned_return_time)}</small></td>
+          <td>{fmt(row.origin_location)} → {fmt(row.destination_location)}</td>
+          <td>{fmt(row.applicant_name)}<small>{fmt(row.applicant_department)}</small></td>
+          <td>{fmt(row.passenger_count)} 人</td>
+          <td>{row.plate_no ? <>{row.plate_no}<small>{fmt(row.driver_name)}{row.driver_accepted_at ? '（已接單）' : ''}</small></> : '待派'}</td>
+          <td>{row.total_mileage != null ? `${Number(row.total_mileage).toFixed(1)} km` : '—'}</td>
           <td><div className="admin-row-actions">
             <button onClick={() => void openDetail(row)}>詳細</button>
             {row.status === 'assigned' && row.driver_id === profile.user_id && !row.driver_accepted_at &&
@@ -164,7 +260,7 @@ function RequestsModule({ module, profile }: Props) {
           </div></td>
         </tr>)}</tbody>
       </table></div>
-      {!busy && paged.length === 0 && <p className="empty">查無符合條件的派車申請</p>}
+      {!busy && paged.length === 0 && <p className="empty">目前沒有符合條件的派車申請</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
 
@@ -177,14 +273,265 @@ function RequestsModule({ module, profile }: Props) {
 
     {tripFor && <TripReportModal row={tripFor} vehicles={vehicles} onClose={() => setTripFor(null)}
       onDone={async (message) => { setTripFor(null); await load(); setNote(message); }} />}
+
+    {showReportModal && <VehicleReportModal rows={rows} profile={profile} onClose={() => setShowReportModal(false)} />}
+    {showVehicleMasterModal && <VehicleMasterModal profile={profile} onClose={() => { setShowVehicleMasterModal(false); void load(); }} />}
   </AppShell>;
 }
 
+/* ─────────────── 派車報表彈窗（含 A4 列印與 ExcelJS 雙頁面匯出） ─────────────── */
+
+function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: Profile; onClose: () => void }) {
+  const today = taipeiToday();
+  const [reportFrom, setReportFrom] = useState(`${today.slice(0, 7)}-01`);
+  const [reportTo, setReportTo] = useState(today);
+  const [reportStatus, setReportStatus] = useState('');
+  const [reportQuery, setReportQuery] = useState('');
+
+  const filtered = useMemo(() => {
+    return rows.filter(r => {
+      const matchFrom = !reportFrom || String(r.trip_date) >= reportFrom;
+      const matchTo = !reportTo || String(r.trip_date) <= reportTo;
+      const matchStatus = !reportStatus || r.status === reportStatus;
+      const q = reportQuery.trim().toLowerCase();
+      const matchQuery = !q || [r.request_no, r.applicant_name, r.applicant_department, r.origin_location, r.destination_location, r.trip_purpose, r.plate_no, r.driver_name]
+        .some(v => String(v || '').toLowerCase().includes(q));
+      return matchFrom && matchTo && matchStatus && matchQuery;
+    }).sort((a, b) => String(a.trip_date).localeCompare(String(b.trip_date)) || String(a.planned_departure_time).localeCompare(String(b.planned_departure_time)));
+  }, [rows, reportFrom, reportTo, reportStatus, reportQuery]);
+
+  const metrics = useMemo(() => {
+    const count = filtered.length;
+    const passengers = filtered.reduce((n, r) => n + Number(r.actual_passenger_count ?? r.passenger_count ?? 0), 0);
+    const mileage = filtered.reduce((n, r) => n + Number(r.total_mileage || 0), 0);
+    const fuel = filtered.reduce((n, r) => n + Number(r.refuel_cost || 0), 0);
+    const abnormal = filtered.filter(r => r.has_abnormality).length;
+    return { count, passengers, mileage, fuel, abnormal };
+  }, [filtered]);
+
+  const exportExcel = async () => {
+    if (!filtered.length) return alert('目前條件沒有可匯出的派車資料');
+    const wb = new ExcelJS.Workbook();
+    wb.creator = profile.name;
+    wb.created = new Date();
+
+    const detail = wb.addWorksheet('派車明細');
+    detail.getCell('A1').value = '臺北農產運銷股份有限公司';
+    detail.getCell('A2').value = '派車報表';
+    detail.getCell('A3').value = `報表期間：${reportFrom || '不限'} 至 ${reportTo || '不限'}`;
+    detail.getCell('A4').value = `產出時間：${new Date().toLocaleString('zh-TW')}　產出人：${profile.name}`;
+
+    const headers = ['用車日期', '預計出發', '預計回程', '申請單號', '狀態', '申請單位', '申請人', '起點', '迄點', '用車事由', '乘車人數', '車號', '司機', '行駛里程(km)', '加油費用(元)', '異常通報'];
+    detail.getRow(6).values = headers;
+
+    filtered.forEach((r, i) => {
+      detail.getRow(7 + i).values = [
+        String(r.trip_date || ''), timeText(r.planned_departure_time), timeText(r.planned_return_time),
+        String(r.request_no || ''), STATUS_LABEL[String(r.status)] || String(r.status),
+        String(r.applicant_department || ''), String(r.applicant_name || ''),
+        String(r.origin_location || ''), String(r.destination_location || ''),
+        String(r.trip_purpose || ''), Number(r.actual_passenger_count ?? r.passenger_count ?? 0),
+        String(r.plate_no || '待派'), String(r.driver_name || '—'),
+        r.total_mileage != null ? Number(r.total_mileage) : '—',
+        r.refueled ? Number(r.refuel_cost || 0) : 0,
+        r.has_abnormality ? `有 (${r.abnormality_note || ''})` : '無',
+      ];
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `派車報表_${reportFrom || 'all'}_${reportTo || 'all'}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const printReport = () => {
+    if (!filtered.length) return alert('目前條件沒有可列印的資料');
+    const popup = window.open('', 'vehicleDispatchReport', 'width=1280,height=850');
+    if (!popup) return alert('瀏覽器已阻擋列印視窗');
+    const body = filtered.map(r => `<tr>
+      <td>${String(r.trip_date)}<br>${timeText(r.planned_departure_time)}–${timeText(r.planned_return_time)}</td>
+      <td>${String(r.request_no)}<br>${STATUS_LABEL[String(r.status)] || r.status}</td>
+      <td>${String(r.applicant_department || '—')}<br>${String(r.applicant_name)}</td>
+      <td>${String(r.origin_location)} → ${String(r.destination_location)}</td>
+      <td>${String(r.trip_purpose)}</td>
+      <td>${String(r.plate_no || '待派')}<br>${String(r.driver_name || '—')}</td>
+      <td>${r.total_mileage == null ? '—' : Number(r.total_mileage).toFixed(1) + ' km'}</td>
+      <td>${r.refueled ? Number(r.refuel_cost || 0).toLocaleString('zh-TW') + ' 元' : '否'}</td>
+      <td>${r.has_abnormality ? '有｜' + String(r.abnormality_note || '') : '無'}</td>
+    </tr>`).join('');
+
+    popup.document.write(`<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>公務車派車報表</title><style>
+      body{font-family:'Noto Sans TC',sans-serif;padding:18px;color:#111}
+      h1{font-size:20px;margin:0 0 6px}
+      .meta{font-size:12px;color:#555;margin-bottom:12px}
+      .summary{display:flex;gap:18px;padding:8px 12px;background:#eef7ff;margin-bottom:12px;font-size:13px;border-radius:4px}
+      table{width:100%;border-collapse:collapse;font-size:11px}
+      th,td{border:1px solid #888;padding:6px;vertical-align:top}
+      th{background:#0959a8;color:#fff}
+      @page{size:A4 landscape;margin:10mm}
+    </style></head><body>
+      <h1>臺北農產公司／第一果菜市場　公務車派車報表</h1>
+      <div class="meta">報表期間：${reportFrom} 至 ${reportTo}｜產出人：${profile.name}｜產出時間：${new Date().toLocaleString('zh-TW')}</div>
+      <div class="summary"><b>申請 ${metrics.count} 筆</b><b>乘車 ${metrics.passengers} 人次</b><b>里程 ${metrics.mileage.toFixed(1)} km</b><b>加油 ${metrics.fuel.toLocaleString('zh-TW')} 元</b><b>異常 ${metrics.abnormal} 件</b></div>
+      <table><thead><tr><th>日期／時段</th><th>單號／狀態</th><th>單位／申請人</th><th>起訖地點</th><th>用途</th><th>車號／司機</th><th>里程</th><th>加油</th><th>異常</th></tr></thead><tbody>${body}</tbody></table>
+    </body></html>`);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  };
+
+  return <AdminModal title="公務車派車報表" onClose={onClose}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+      <label style={{ fontSize: '0.7rem' }}>開始日期<input type="date" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></label>
+      <label style={{ fontSize: '0.7rem' }}>結束日期<input type="date" value={reportTo} onChange={e => setReportTo(e.target.value)} /></label>
+      <label style={{ fontSize: '0.7rem' }}>狀態<select value={reportStatus} onChange={e => setReportStatus(e.target.value)}>
+        <option value="">全部狀態</option>
+        {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+      </select></label>
+      <label style={{ fontSize: '0.7rem' }}>關鍵字<input value={reportQuery} onChange={e => setReportQuery(e.target.value)} placeholder="搜尋地點、車號、人員…" /></label>
+    </div>
+
+    {/* 報表 KPI 統計 */}
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '12px' }}>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>申請單數</div>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.count} 筆</div>
+      </div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>乘車人次</div>
+        <div style={{ fontSize: '1.1rem', fontWeight 800, color: 'var(--cyan)' }}>{metrics.passengers} 人</div>
+      </div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>完成里程</div>
+        <div style={{ fontSize: '1.1rem', fontWeight 800, color: 'var(--cyan)' }}>{metrics.mileage.toFixed(1)} km</div>
+      </div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>加油費用</div>
+        <div style={{ fontSize: '1.1rem', fontWeight 800, color: 'var(--cyan)' }}>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
+      </div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>異常通報</div>
+        <div style={{ fontSize: '1.1rem', fontWeight 800, color: metrics.abnormal > 0 ? 'var(--red)' : 'var(--cyan)' }}>{metrics.abnormal} 件</div>
+      </div>
+    </div>
+
+    <div className="responsive-table" style={{ maxHeight: '45vh', overflow: 'auto' }}><table>
+      <thead><tr><th>日期／時段</th><th>單號／狀態</th><th>單位／申請人</th><th>起訖地點</th><th>用途</th><th>車號／司機</th><th>里程</th><th>加油</th><th>異常</th></tr></thead>
+      <tbody>{filtered.map(r => <tr key={r.request_id}>
+        <td>{String(r.trip_date)}<small>{timeText(r.planned_departure_time)}–{timeText(r.planned_return_time)}</small></td>
+        <td><strong>{fmt(r.request_no)}</strong><small>{STATUS_LABEL[String(r.status)] || r.status}</small></td>
+        <td>{fmt(r.applicant_department)}<small>{fmt(r.applicant_name)}</small></td>
+        <td>{fmt(r.origin_location)} → {fmt(r.destination_location)}</td>
+        <td>{fmt(r.trip_purpose)}</td>
+        <td>{fmt(r.plate_no || '待派')}<small>{fmt(r.driver_name || '—')}</small></td>
+        <td>{r.total_mileage != null ? `${Number(r.total_mileage).toFixed(1)} km` : '—'}</td>
+        <td>{r.refueled ? `${Number(r.refuel_cost || 0).toLocaleString('zh-TW')} 元` : '否'}</td>
+        <td>{r.has_abnormality ? <span style={{ color: 'var(--red)' }}>有｜{fmt(r.abnormality_note)}</span> : '無'}</td>
+      </tr>)}</tbody>
+    </table></div>
+    {filtered.length === 0 && <p className="empty">無符合條件的派車資料</p>}
+
+    <footer>
+      <button className="secondary-btn" onClick={onClose}>關閉</button>
+      <button className="secondary-btn" onClick={printReport}>A4 列印</button>
+      <button className="primary-btn compact" onClick={() => void exportExcel()}>匯出 Excel (.xlsx)</button>
+    </footer>
+  </AdminModal>;
+}
+
+/* ──────────────────── 公務車主檔快速管理彈窗 ──────────────────── */
+
+function VehicleMasterModal({ onClose }: { profile: Profile; onClose: () => void }) {
+  const [vehicles, setVehicles] = useState<Row[]>([]);
+  const [busy, setBusy] = useState(true);
+  const [editing, setEditing] = useState<Row | null>(null);
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    const { data } = await getSupabase().from('official_vehicles').select('*').order('plate_no');
+    setVehicles(data || []); setBusy(false);
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const save = async () => {
+    if (!editing) return;
+    if (!String(editing.plate_no || '').trim()) return alert('請填寫車號');
+    setBusy(true);
+    const payload = {
+      plate_no: String(editing.plate_no).trim(),
+      vehicle_name: String(editing.vehicle_name || '').trim() || null,
+      brand: String(editing.brand || '').trim() || null,
+      model: String(editing.model || '').trim() || null,
+      seats: Number(editing.seats || 5),
+      current_odometer: Number(editing.current_odometer || 0),
+      status: String(editing.status || 'active'),
+      note: String(editing.note || '').trim() || null,
+    };
+    const client = getSupabase();
+    const { error } = editing.vehicle_id
+      ? await client.from('official_vehicles').update(payload).eq('vehicle_id', editing.vehicle_id)
+      : await client.from('official_vehicles').insert(payload);
+    if (error) { alert(`失敗：${error.message}`); setBusy(false); return; }
+    setEditing(null); await load();
+  };
+
+  return <AdminModal title="公務車主檔管理" onClose={onClose}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+      <span>共 {vehicles.length} 台車輛</span>
+      <button className="primary-btn compact" onClick={() => setEditing({ status: 'active', seats: 5, current_odometer: 0 })}>＋ 新增車輛</button>
+    </div>
+    <div className="responsive-table" style={{ maxHeight: '45vh', overflow: 'auto' }}><table>
+      <thead><tr><th>車號</th><th>車名</th><th>廠牌／型號</th><th>座位</th><th>目前里程</th><th>狀態</th><th>操作</th></tr></thead>
+      <tbody>{vehicles.map(v => <tr key={String(v.vehicle_id)}>
+        <td><strong>{fmt(v.plate_no)}</strong></td>
+        <td>{fmt(v.vehicle_name)}</td>
+        <td>{fmt(v.brand)} {v.model ? `/ ${v.model}` : ''}</td>
+        <td>{fmt(v.seats)} 人座</td>
+        <td>{fmt(v.current_odometer)} km</td>
+        <td><Pill value={v.status} labels={VEHICLE_STATUS_LABEL} tones={VEHICLE_STATUS_TONE} /></td>
+        <td><button className="secondary-btn compact" onClick={() => setEditing({ ...v })}>編輯</button></td>
+      </tr>)}</tbody>
+    </table></div>
+
+    {editing && <AdminModal title={editing.vehicle_id ? '編輯車輛' : '新增車輛'} onClose={() => setEditing(null)}>
+      <div className="admin-form-grid">
+        <label>車號（必填）<input value={String(editing.plate_no || '')} onChange={e => setEditing({ ...editing, plate_no: e.target.value })} /></label>
+        <label>車名<input value={String(editing.vehicle_name || '')} onChange={e => setEditing({ ...editing, vehicle_name: e.target.value })} placeholder="例：公務 7 人座" /></label>
+        <label>廠牌<input value={String(editing.brand || '')} onChange={e => setEditing({ ...editing, brand: e.target.value })} /></label>
+        <label>型號<input value={String(editing.model || '')} onChange={e => setEditing({ ...editing, model: e.target.value })} /></label>
+        <label>座位數<input type="number" min={1} value={String(editing.seats ?? 5)} onChange={e => setEditing({ ...editing, seats: e.target.value })} /></label>
+        <label>目前里程 (km)<input type="number" step="0.1" value={String(editing.current_odometer ?? 0)} onChange={e => setEditing({ ...editing, current_odometer: e.target.value })} /></label>
+        <label>狀態<select value={String(editing.status || 'active')} onChange={e => setEditing({ ...editing, status: e.target.value })}>
+          {Object.entries(VEHICLE_STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select></label>
+        <label className="wide">備註<input value={String(editing.note || '')} onChange={e => setEditing({ ...editing, note: e.target.value })} /></label>
+      </div>
+      <footer>
+        <button className="secondary-btn" onClick={() => setEditing(null)}>取消</button>
+        <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
+      </footer>
+    </AdminModal>}
+
+    <footer>
+      <button className="secondary-btn" onClick={onClose}>關閉</button>
+    </footer>
+  </AdminModal>;
+}
+
+/* ──────────────────────────── 表單與彈窗邏輯 ──────────────────────────── */
+
 function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; onClose: () => void; onDone: (message: string) => void }) {
   const [form, setForm] = useState({
-    trip_date: taipeiToday(), planned_departure_time: '', planned_return_time: '',
+    trip_date: taipeiToday(), planned_departure_time: '09:00', planned_return_time: '12:00',
     origin_location: '第一果菜市場', destination_location: '', trip_purpose: '',
-    passenger_count: '1', applicant_phone: '', applicant_note: '',
+    passenger_count: '1', applicant_phone: profile.phone || '', applicant_note: '',
   });
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -205,7 +552,6 @@ function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; on
       status: 'pending_approval',
     });
     if (error) {
-      // 23P01 是 vehicle_dispatch_no_time_overlap 排除約束；22023 多半來自 time_window guard。
       const raw = String(error.message || '');
       setMessage(/exclusion constraint|23P01|overlap/i.test(raw) ? '該時段已有其他派車申請，請改選其他時段'
         : /預計出發時間已經過去/.test(raw) ? '預計出發時間已經過去，請選擇目前時間之後的時段'
@@ -219,8 +565,8 @@ function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; on
     <div className="admin-form-grid">
       <label>用車日期（必填）<input type="date" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
-      <label>預計出發時間（必填）<input type="time" value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
-      <label>預計回程時間（必填）<input type="time" value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
+      <label>預計出發時間（必填）<input type="time" step="1800" value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
+      <label>預計回程時間（必填）<input type="time" step="1800" value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
       <label>出發地<input value={form.origin_location} onChange={e => set('origin_location', e.target.value)} /></label>
       <label>目的地（必填）<input value={form.destination_location} onChange={e => set('destination_location', e.target.value)} placeholder="例：第二果菜市場" /></label>
       <label>聯絡電話<input value={form.applicant_phone} onChange={e => set('applicant_phone', e.target.value)} placeholder="分機或手機" /></label>
@@ -495,8 +841,6 @@ function RosterModule({ module, profile }: Props) {
   }, [table]);
   useEffect(() => { void load(); }, [load]);
 
-  // vehicle_dispatch_drivers／managers 的 insert/update 政策要求 rbac_role 為 sysadmin。
-  // 型別用 PromiseLike：Supabase 的查詢 builder 可 await，但不是完整的 Promise 實例。
   const run = async (fn: () => PromiseLike<{ error: unknown }>, success: string) => {
     setBusy(true); setNote('');
     const { error } = await fn();
