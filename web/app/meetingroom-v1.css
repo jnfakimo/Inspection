@@ -49,6 +49,19 @@
 .mr-page .mr-card small{display:block;margin-top:3px;color:var(--dim);font-size:.72rem}
 .mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
 
+/* 週排程依 V1 圖塊比例縮至約 75%；手機仍保留完整寬度與橫向瀏覽。 */
+@media (min-width:761px){
+  .mr-page .mr-schedule-panel{width:75%;justify-self:center}
+  .mr-page .mr-schedule-panel .mr-panel-body{padding:11px 12px}
+  .mr-page .mr-schedule-panel .roomgrid{min-width:0}
+  .mr-page .mr-schedule-panel .roomgrid th{padding:6px 4px}
+  .mr-page .mr-schedule-panel .roomgrid td{min-width:0;height:58px;padding:4px}
+  .mr-page .mr-schedule-panel .bk-pill{padding:4px 5px}
+  .mr-page .mr-schedule-panel .bk-line{font-size:.62rem}
+  .mr-page .mr-schedule-panel .bk-cancel-hint{font-size:.55rem}
+  .mr-page .mr-schedule-panel .bk-action{font-size:.56rem;padding:2px 5px}
+}
+
 .mr-page .empty{padding:26px;color:var(--dim);text-align:center;font-size:.82rem}
 
 /* 彈窗：沿用 V1 的欄位配置（row2 兩欄、time-parts 三段式時間） */

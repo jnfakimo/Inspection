@@ -90,6 +90,8 @@ function MeetingRoomPage({ module, profile }: Props) {
   const [weekBookings, setWeekBookings] = useState<Row[]>([]);
   const [myBookings, setMyBookings] = useState<Row[]>([]);
   const [requests, setRequests] = useState<Row[]>([]);
+  const [myPage, setMyPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
   const [users, setUsers] = useState<Row[]>([]);
   const [myPhone, setMyPhone] = useState('');
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
@@ -125,6 +127,15 @@ function MeetingRoomPage({ module, profile }: Props) {
     setBusy(false);
   }, [days, profile.user_id]);
   useEffect(() => { void load(); }, [load]);
+
+  // V1 的清單規則是每頁 10 筆；資料重新載入後若目前頁碼超出範圍，
+  // 自動回到最後一頁，避免操作完成後顯示空白頁。
+  const myTotalPages = Math.max(1, Math.ceil(myBookings.length / PAGE_SIZE));
+  const requestTotalPages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+  const pagedMyBookings = myBookings.slice((myPage - 1) * PAGE_SIZE, myPage * PAGE_SIZE);
+  const pagedRequests = requests.slice((requestPage - 1) * PAGE_SIZE, requestPage * PAGE_SIZE);
+  useEffect(() => { setMyPage(page => Math.min(Math.max(page, 1), myTotalPages)); }, [myTotalPages]);
+  useEffect(() => { setRequestPage(page => Math.min(Math.max(page, 1), requestTotalPages)); }, [requestTotalPages]);
 
   const nameOf = useCallback((id: unknown) => users.find(x => x.user_id === id)?.name || '（未知）', [users]);
 
@@ -162,7 +173,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       </div>
 
       {/* 週排程 */}
-      <div className="mr-panel">
+      <div className="mr-panel mr-schedule-panel">
         <div className="mr-panel-head">
           <strong>週排程</strong>
           <div className="spacer" />
@@ -223,7 +234,7 @@ function MeetingRoomPage({ module, profile }: Props) {
         <div className="mr-panel-head"><strong>我的預約</strong></div>
         <div className="mr-panel-body">
           {!myBookings.length ? <div className="empty">{busy ? '載入中…' : '目前沒有你的預約紀錄。'}</div>
-            : <div className="mr-list">{myBookings.slice(0, 20).map(b => {
+            : <div className="mr-list">{pagedMyBookings.map(b => {
               const room = (b.meeting_rooms as Row) || {};
               const start = slotStartAt(String(b.booking_date), hhmm(b.start_time)).getTime();
               const end = bookingEndAt(b).getTime();
@@ -240,6 +251,7 @@ function MeetingRoomPage({ module, profile }: Props) {
                 </div>
               </div>;
             })}</div>}
+          {myBookings.length > 0 && <Pager page={myPage} total={myBookings.length} onPage={setMyPage} />}
         </div>
       </div>
 
@@ -249,7 +261,7 @@ function MeetingRoomPage({ module, profile }: Props) {
           <span className="hint">原申請人同意後，系統自動取消原預約並建立申請者的新預約</span></div>
         <div className="mr-panel-body">
           {!requests.length ? <div className="empty">{busy ? '載入中…' : '目前沒有變更申請。'}</div>
-            : <div className="mr-list">{requests.slice(0, 20).map(req => {
+            : <div className="mr-list">{pagedRequests.map(req => {
               const target = (req.meeting_bookings as Row) || {}, room = (target.meeting_rooms as Row) || {};
               const requester = (req.users as Row) || {};
               const iAmOwner = target.user_id === profile.user_id;
@@ -268,6 +280,7 @@ function MeetingRoomPage({ module, profile }: Props) {
                 </div>}
               </div>;
             })}</div>}
+          {requests.length > 0 && <Pager page={requestPage} total={requests.length} onPage={setRequestPage} />}
         </div>
       </div>
     </div>
