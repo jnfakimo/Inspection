@@ -55,10 +55,10 @@
 .mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
 .mr-page .mr-list .mr-card{background:var(--panel)}
 /* 會議室管理與週排程使用相同的淺藍／淺綠／淺黃／淺紫循環。 */
-.mr-page .room-admin-list .mr-card:nth-child(4n+1){background:#f0f9ff;border-left-color:#7dd3fc}
-.mr-page .room-admin-list .mr-card:nth-child(4n+2){background:#f0fdf4;border-left-color:#86efac}
-.mr-page .room-admin-list .mr-card:nth-child(4n+3){background:#fffbeb;border-left-color:#fcd34d}
-.mr-page .room-admin-list .mr-card:nth-child(4n){background:#faf5ff;border-left-color:#c4b5fd}
+.mr-page .room-admin-list .room-admin-card.room-color-0{background:#e0f2fe;border-left-color:#7dd3fc}
+.mr-page .room-admin-list .room-admin-card.room-color-1{background:#dcfce7;border-left-color:#86efac}
+.mr-page .room-admin-list .room-admin-card.room-color-2{background:#fef3c7;border-left-color:#fcd34d}
+.mr-page .room-admin-list .room-admin-card.room-color-3{background:#f3e8ff;border-left-color:#c4b5fd}
 /* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
 .mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
 .mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}

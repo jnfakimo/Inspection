@@ -494,7 +494,7 @@ function RoomAdminModal({ rooms, onClose, onSaved }: { rooms: Row[]; onClose: ()
         </div>
         {message && <p className="conflict-alert">{message}</p>}
         {!rooms.length ? <div className="empty">尚未建立會議室</div>
-          : <div className="mr-list room-admin-list">{rooms.map(room => <div className="mr-card" key={String(room.room_id)}>
+          : <div className="mr-list room-admin-list">{rooms.map((room, index) => <div className={`mr-card room-admin-card room-color-${index % 4}`} key={String(room.room_id)}>
             <div className="grow">
               <b>{fmt(room.name)}</b>
               <small>{room.capacity != null ? `${room.capacity} 人` : '未設人數'}｜{fmt(room.floor)}｜{room.status === 'inactive' ? '停用' : '啟用'}</small>
