@@ -168,3 +168,20 @@
     max-width: 400px;
   }
 }
+/* Owner-requested 60% login frame and logo scale. */
+.v1-login-card {
+  width: min(60%, 240px);
+  max-width: 240px;
+  padding: clamp(10px, 2.2vh, 22px);
+}
+
+.v1-login-logo {
+  width: min(100%, 138px);
+  height: clamp(34px, 6vh, 54px);
+  margin-bottom: clamp(1px, .25vh, 2px);
+}
+
+@media (max-width: 380px) {
+  .v1-login-card {
+    width: calc(100% - 24px);
+    max-width: 300px;
