@@ -230,7 +230,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       </div>
 
       {/* 我的預約 */}
-      <div className="mr-panel">
+      <div className="mr-panel mr-list-panel">
         <div className="mr-panel-head"><strong>我的預約</strong></div>
         <div className="mr-panel-body">
           {!myBookings.length ? <div className="empty">{busy ? '載入中…' : '目前沒有你的預約紀錄。'}</div>
@@ -256,7 +256,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       </div>
 
       {/* 預約變更申請 */}
-      <div className="mr-panel">
+      <div className="mr-panel mr-list-panel">
         <div className="mr-panel-head"><strong>預約變更申請</strong>
           <span className="hint">原申請人同意後，系統自動取消原預約並建立申請者的新預約</span></div>
         <div className="mr-panel-body">
