@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 
@@ -166,7 +167,7 @@ function Pilot({ profile }: { profile: Profile }) {
   return <AppShell profile={profile} title="電子交接簿｜現場調整版">
     <div className="handover-pilot-head">
       <div><p className="eyebrow">現場試行／班別紀錄</p><h1>值勤交接看板</h1><p className="muted">先把紙本流程變成現場人員真的願意使用的單班卡片。</p></div>
-      <div className="pilot-controls"><label>紀錄日期<input type="date" aria-label="紀錄日期（年／月／日）" placeholder="年／月／日" value={date} onChange={event => setDate(event.target.value)} /></label><span className={`connection-pill ${online ? 'online' : 'offline'}`}><i />{online ? '線上同步' : '離線暫存'}</span></div>
+      <div className="pilot-controls"><label>紀錄日期<LocalizedDateInput aria-label="紀錄日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label><span className={`connection-pill ${online ? 'online' : 'offline'}`}><i />{online ? '線上同步' : '離線暫存'}</span></div>
     </div>
     {message && <div className="notice pilot-notice">{message}</div>}
     <section className="pilot-metrics"><article><span>今日班次</span><strong>{records.filter(row => row.status !== 'draft').length}<small>/ 3</small></strong><em>已送出或完成</em></article><article className="amber"><span>待主管批示</span><strong>{pending}</strong><em>需要後續確認</em></article><article className="red"><span>未結事項</span><strong>{openItems}</strong><em>跨班持續追蹤</em></article><article className="green"><span>同步狀態</span><strong>{online ? 'OK' : 'OFF'}</strong><em>{online ? '資料可同步' : '恢復連線自動補送'}</em></article></section>

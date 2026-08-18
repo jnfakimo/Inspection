@@ -14,6 +14,7 @@
 //   app-api 的 meeting_check_in 與 meeting_save_room
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import '@/app/meetingroom-v1.css';
 import { AppShell } from '@/components/AppShell';
@@ -456,7 +457,7 @@ function BookingModal({ rooms, init, myPhone, now, calendarStatus, onClose, onDo
                 {rooms.filter(r => r.status === 'active').map(r => <option key={String(r.room_id)} value={String(r.room_id)}>
                   {r.name}{r.capacity ? `（${r.capacity} 人）` : ''}{r.floor ? `｜${r.floor}` : ''}</option>)}
               </select></div>
-            <div className="field"><label>日期（年／月／日）</label><input type="date" aria-label="預約日期（年／月／日）" placeholder="年／月／日" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
+            <div className="field"><label>日期（年/月/日）</label><LocalizedDateInput aria-label="預約日期（年/月/日）" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
             <div className="field"><label>會議名稱</label><input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="例：管理部週會、面談會議" /></div>
           </div>
         </section>
@@ -478,7 +479,7 @@ function BookingModal({ rooms, init, myPhone, now, calendarStatus, onClose, onDo
             <label className="booking-repeat"><input type="checkbox" checked={repeatWeekly}
               onChange={e => setRepeatWeekly(e.target.checked)} /><span><b>每週重複預約</b><small>於相同星期與時段自動建立預約</small></span></label>
             {repeatWeekly && <div className="field"><label>週期截止日期（最多 52 次）</label>
-              <input type="date" aria-label="週期截止日期（年／月／日）" placeholder="年／月／日" min={date} value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} /></div>}
+              <LocalizedDateInput aria-label="週期截止日期（年/月/日）" min={date} value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} /></div>}
           </div>
           <div className={`booking-repeat-panel calendar-sync-option${syncGoogle ? ' is-active' : ''}`}>
             <label className="booking-repeat"><input type="checkbox" checked={syncGoogle} disabled={!calendarStatus?.connected}

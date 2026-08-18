@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
@@ -234,7 +235,7 @@ function RequestsModule({ module, profile }: Props) {
           <option value="">全部狀態</option>
           {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
-        <input type="date" aria-label="用車日期（年／月／日）" placeholder="年／月／日" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="用車日期" />
+        <LocalizedDateInput aria-label="用車日期（年/月/日）" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="用車日期" />
         <button className="secondary-btn" onClick={() => { setQuery(''); setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
         {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
         {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
@@ -391,8 +392,8 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
 
   return <AdminModal title="公務車派車報表" onClose={onClose}>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '12px' }}>
-      <label style={{ fontSize: '0.7rem' }}>開始日期<input type="date" aria-label="報表開始日期（年／月／日）" placeholder="年／月／日" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></label>
-      <label style={{ fontSize: '0.7rem' }}>結束日期<input type="date" aria-label="報表結束日期（年／月／日）" placeholder="年／月／日" value={reportTo} onChange={e => setReportTo(e.target.value)} /></label>
+      <label style={{ fontSize: '0.7rem' }}>開始日期<LocalizedDateInput aria-label="報表開始日期（年/月/日）" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></label>
+      <label style={{ fontSize: '0.7rem' }}>結束日期<LocalizedDateInput aria-label="報表結束日期（年/月/日）" value={reportTo} onChange={e => setReportTo(e.target.value)} /></label>
       <label style={{ fontSize: '0.7rem' }}>狀態<select value={reportStatus} onChange={e => setReportStatus(e.target.value)}>
         <option value="">全部狀態</option>
         {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -566,7 +567,7 @@ function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; on
 
   return <AdminModal title="新增派車申請" onClose={onClose}>
     <div className="admin-form-grid">
-      <label>用車日期（必填）<input type="date" aria-label="用車日期（年／月／日）" placeholder="年／月／日" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
+      <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
       <label>預計出發時間（必填）<input type="time" step="1800" value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
       <label>預計回程時間（必填）<input type="time" step="1800" value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
@@ -708,8 +709,8 @@ function TripReportModal({ row, vehicles, onClose, onDone }: { row: Row; vehicle
   return <AdminModal title={`行車回報｜${fmt(row.request_no)}　${fmt(row.plate_no)}`} onClose={onClose}>
     <div className="admin-form-grid">
       <label>實際搭乘人數<input type="number" min={0} value={form.actual_passenger_count} onChange={e => set('actual_passenger_count', e.target.value)} /></label>
-      <label>實際出發時間<input type="datetime-local" step="1800" aria-label="實際出發時間（年／月／日 上午／下午 時 分）" value={form.actual_departure_at} onChange={e => set('actual_departure_at', e.target.value)} /></label>
-      <label>實際回程時間<input type="datetime-local" step="1800" aria-label="實際回程時間（年／月／日 上午／下午 時 分）" value={form.actual_return_at} onChange={e => set('actual_return_at', e.target.value)} /></label>
+      <label>實際出發時間<input type="datetime-local" step="1800" aria-label="實際出發時間（年/月/日 上午/下午 時 分）" value={form.actual_departure_at} onChange={e => set('actual_departure_at', e.target.value)} /></label>
+      <label>實際回程時間<input type="datetime-local" step="1800" aria-label="實際回程時間（年/月/日 上午/下午 時 分）" value={form.actual_return_at} onChange={e => set('actual_return_at', e.target.value)} /></label>
       <label>起始里程（km）<input type="number" step="0.1" value={form.odometer_start} onChange={e => set('odometer_start', e.target.value)} /></label>
       <label>回程里程（km）<input type="number" step="0.1" value={form.odometer_end} onChange={e => set('odometer_end', e.target.value)} /></label>
       <label>上次加油里程<input type="number" step="0.1" value={form.last_refuel_odometer} onChange={e => set('last_refuel_odometer', e.target.value)} /></label>

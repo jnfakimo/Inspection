@@ -37,6 +37,24 @@ for (const relative of roots) {
 
 const errors = findings.filter(item => item.severity === 'error');
 const warnings = findings.filter(item => item.severity === 'warning');
-console.log(`資安設計自我檢核：錯誤 ${errors.length}，警告 ${warnings.length}`);
+const modulesFile = path.join(root, 'web', 'lib', 'modules.ts');
+if (fs.existsSync(modulesFile)) {
+  const registry = fs.readFileSync(modulesFile, 'utf8');
+  const systemCount = (registry.match(/code:'SYS-\d+'/g) || []).length;
+  const moduleCount = (registry.match(/\bm\(/g) || []).length;
+  console.log(`V2 模組盤點：${systemCount} 大系統、${moduleCount} 個子系統`);
+  if (systemCount !== 8 || moduleCount !== 48) {
+    findings.push({ severity: 'error', file: 'web/lib/modules.ts', rule: '系統拓撲數量', message: 'V2 必須維持 8 大系統、48 個子系統，請同步更新專案設計與權限盤點。' });
+  }
+}
+for (const file of walk(path.join(root, 'web'))) {
+  if (file.endsWith('LocalizedDateInput.tsx')) continue;
+  const text = fs.readFileSync(file, 'utf8');
+  if (/type=["']date["']/.test(text)) add('error', file, '原生日期欄位', '可見日期欄位必須使用 LocalizedDateInput，避免瀏覽器顯示 yyyy/月/dd。');
+  if (/type=["']datetime-local["']/.test(text) && !/type=["']datetime-local["'][^>]*step=["']1800["']/.test(text)) add('error', file, '時間間隔', '日期時間欄位必須限制為每 30 分鐘一格（step=1800）。');
+}
+const finalErrors = findings.filter(item => item.severity === 'error');
+const finalWarnings = findings.filter(item => item.severity === 'warning');
+console.log(`資安設計自我檢核：錯誤 ${finalErrors.length}，警告 ${finalWarnings.length}`);
 for (const item of findings) console.log(`[${item.severity === 'error' ? '錯誤' : '警告'}] ${item.file}（${item.rule}）${item.message}`);
-if (errors.length) process.exitCode = 1;
+if (finalErrors.length) process.exitCode = 1;

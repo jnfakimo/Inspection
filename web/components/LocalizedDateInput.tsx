@@ -27,6 +27,7 @@ export function LocalizedDateInput({ value, onFocus, onBlur, onChange, ...props 
       placeholder="年/月/日"
       readOnly
       onFocus={event => { onFocus?.(event); openPicker(); }}
+      onBlur={onBlur}
       onClick={openPicker}
     />
     <button type="button" tabIndex={-1} aria-label="開啟日期選擇器" onClick={openPicker} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>▣</button>

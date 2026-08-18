@@ -154,6 +154,22 @@ LINE 群組，`verify_jwt` 為 true——任一持有有效 JWT 的使用者皆�
 | 即時與 FCM | 符合 | 沿用 Realtime publication、FCM subscription 與通知 Edge Functions |
 | 分析層 | 部分符合 | V2 Dashboard 在 API 聚合 30 日巡檢、異常率、設備與未結維修；後續可導入 materialized view |
 
+## V2 全系統自檢紀錄（2026-08-19）
+
+本次以 `web/lib/modules.ts` 為唯一盤點來源，確認 **8 大系統、48 個子系統**；逐一檢視入口、模組路由、共用頁首、繁體中文顯示、日期／時間欄位、列表分頁、權限與部署設定。結果如下：
+
+| 檢查面向 | 結果 | 後續規則 |
+| --- | --- | --- |
+| 系統／子系統拓撲 | 8／48，與模組登錄表及系統關係圖一致 | 新增或刪除模組必須同步更新 `web/lib/modules.ts`、本表與權限種子 |
+| 日期顯示 | 日期欄位統一使用 `LocalizedDateInput`，可見格式為 `年/月/日`，避免瀏覽器顯示 `yyyy/月/dd` | 禁止頁面自行使用可見的原生 `type="date"`；只可由共用元件內部使用原生選擇器 |
+| 時間選擇 | 時段欄位採上午／下午、時、分；原生日期時間欄位統一 `step="1800"`（30 分鐘） | 新增時間欄位必須沿用三段式選單或 30 分鐘間隔，不得任意放寬 |
+| 列表與手機版 | 共用 `PAGE_SIZE = 10`／`Pager`，列表採白／淺藍交錯列，窄螢幕以水平捲動或卡片化呈現 | 新列表不得自訂每頁筆數或另造分頁元件 |
+| 語系 | 使用者可見文字以臺灣繁體中文為主，Email、日期與操作提示已統一 | 英文只可保留技術識別碼、網址、檔名或必要品牌名稱 |
+| 資安 | `npm run security:audit`：錯誤 0、警告 4 | 警告項須逐欄跳脫／維持受控內網來源；禁止硬編碼 service role、私鑰、`eval` 或 `new Function` |
+| 部署 | GitHub Pages workflow 以 `main` 推送觸發建置、掃描、CSP 封裝、部署與 provenance 驗證 | 所有正式修正必須提交至 `main`，不得繞過 workflow 直接改發布檔 |
+
+目前 4 項資安警告均為已知且受控的例外：固定主題 bootstrap 的 `dangerouslySetInnerHTML`、兩處舊式列印 `document.write`、以及受控內部攝影機 HTTP 來源；它們不是本次自檢的錯誤，但列入後續重構清單，不能新增同類用法。
+
 ## 部署拓撲
 
 ```text

@@ -19,6 +19,7 @@
 //   fcm_response 永遠是空的，期間篩選也只在 100 筆內作用。改為直接查表。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
@@ -118,7 +119,7 @@ function Map3DModule({ module, profile }: Props) {
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
     <section className="panel admin-panel">
       <div className="admin-toolbar">
-        <label>巡檢日期<input type="date" aria-label="巡檢日期（年／月／日）" placeholder="年／月／日" value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label>巡檢日期<LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></label>
         <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} />顯示巡檢點
         </label>
@@ -226,7 +227,7 @@ function PointsModule({ module, profile }: Props) {
         <select value={floor} onChange={e => setFloor(e.target.value)}>
           <option value="">全部樓層</option>{floors.map(f => <option key={f} value={f}>{f}</option>)}
         </select>
-        <label>打卡日期<input type="date" aria-label="打卡日期（年／月／日）" placeholder="年／月／日" value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label>打卡日期<LocalizedDateInput aria-label="打卡日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></label>
         <span>{date} 已打卡 {done}／{filtered.length} 點</span>
       </div>
       <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
@@ -463,7 +464,7 @@ function ShiftsModule({ module, profile }: Props) {
     <section className="panel admin-panel">
       <div className="admin-toolbar">
         <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
-        <input type="date" aria-label="巡檢日期（年／月／日）" placeholder="年／月／日" value={date} onChange={e => setDate(e.target.value)} />
+        <LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} />
         <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
         <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
         <span>當日 {shifts.length} 個班別</span>
