@@ -81,9 +81,9 @@
 /* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
 .mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
 .mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}
-.mr-page .my-booking-list .booking-info-grid{display:grid;grid-template-columns:minmax(120px,180px) minmax(230px,1fr) minmax(72px,max-content);align-items:baseline;row-gap:6px;flex:1 1 560px;min-width:0}
+.mr-page .my-booking-list .booking-info-grid{display:grid;grid-template-columns:140px 250px 90px minmax(0,1fr);align-items:baseline;row-gap:6px;flex:1 1 560px;min-width:0}
 .mr-page .my-booking-list .booking-purpose{grid-column:1;grid-row:1;min-width:0;font-size:.88rem;overflow-wrap:anywhere}
-.mr-page .my-booking-list .booking-number{grid-column:2 / 4;grid-row:1;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.88rem;white-space:nowrap}
+.mr-page .my-booking-list .booking-number{grid-column:2 / 5;grid-row:1;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.88rem;white-space:nowrap}
 .mr-page .my-booking-list .booking-room{grid-column:1;grid-row:2;min-width:0;color:var(--dim);font-size:.72rem;overflow-wrap:anywhere}
 .mr-page .my-booking-list .booking-time{grid-column:2;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.72rem;white-space:nowrap}
 .mr-page .my-booking-list .booking-state{grid-column:3;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.72rem;white-space:nowrap}
