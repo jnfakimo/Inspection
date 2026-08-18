@@ -122,6 +122,31 @@ function provenanceMarker(relativePath) {
     .slice(0, 32);
 }
 
+// V2（web/ 的 Next 靜態匯出）沒有內建 CSP，在此統一注入。
+//
+// 為什麼不寫在 web/app/layout.tsx：React 19 會攔截並重新處理 <head> 裡的 <meta>，
+// 手寫的 http-equiv 不會出現在產出的 HTML；Next 的 metadata.other 也會被濾掉。
+// 兩種寫法都是「看起來有防護、產出裡卻沒有」，因此改在建置階段注入，並且只有一份定義。
+//
+// Next 靜態匯出的 hydration script 是 inline 且內容每次建置都不同，無法用 hash 白名單，
+// script-src 只能留 unsafe-inline。真正的防線是 connect-src 與 img-src：
+// 即使發生 XSS，也只能連回本站與 Supabase，竊得的權杖送不出去。
+// frame-ancestors 只認 HTTP header，在 meta 形式無效，故不列入以免產生主控台警告。
+const v2ContentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  // data: 供 QR 標籤、blob: 供 3D 貼圖，圖片外部來源僅限 Storage 公開桶。
+  // V1 用的是 https:（等於任何 HTTPS 網域），那會留下把資料塞進網址外傳的管道。
+  "img-src 'self' data: blob: https://qztffronusdhgxhjjubt.supabase.co",
+  "connect-src 'self' https://qztffronusdhgxhjjubt.supabase.co wss://qztffronusdhgxhjjubt.supabase.co",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 function addHtmlDirectives(html, relativePath) {
   const directives = [];
   const robotsMetaPattern = /<meta\b(?=[^>]*\bname\s*=\s*["']robots["'])[^>]*>/gi;
@@ -135,6 +160,11 @@ function addHtmlDirectives(html, relativePath) {
   }
   if (!/\bname\s*=\s*["']copyright["']/i.test(html)) {
     directives.push('<meta name="copyright" content="Copyright © 2026 jnfakimo. All rights reserved.">');
+  }
+  // V1 每頁已自帶 CSP（含各自的 CDN 白名單），不能被覆蓋；只補 V2。
+  // CSP 必須早於任何受限資源，所以排在最前面。
+  if (relativePath.startsWith('v2/') && !/http-equiv\s*=\s*["']content-security-policy["']/i.test(html)) {
+    directives.unshift(`<meta http-equiv="Content-Security-Policy" content="${v2ContentSecurityPolicy}">`);
   }
   if (!directives.length) return html;
   return html.replace(/<head(?:\s[^>]*)?>/i, `$&${directives.join('')}`);
