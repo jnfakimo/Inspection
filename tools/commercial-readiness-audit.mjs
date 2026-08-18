@@ -11,7 +11,9 @@ const add=(severity,rule,file,message)=>findings.push({severity,rule,file:path.r
 function walk(dir,predicate){
   const out=[];
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
-    if(['.git','plans','vendor','node_modules'].includes(entry.name))continue;
+    // removed-edge-functions 是刻意留底的已移除函式原始碼（見 ARCHITECTURE_V2.md），
+    // 不會被部署也不該被當成現役程式碼稽核；掃它只會讓已處置的舊版本永遠亮紅燈。
+    if(['.git','plans','vendor','node_modules','removed-edge-functions'].includes(entry.name))continue;
     const full=path.join(dir,entry.name);
     if(entry.isDirectory())out.push(...walk(full,predicate));
     else if(predicate(full))out.push(full);
