@@ -210,15 +210,20 @@
   .mr-page .roomgrid{min-width:760px}
 }
 @media (max-width:520px){
-  .mr-modal-bg{padding:8px}
-  .mr-modal.booking-modal{max-height:98dvh;border-radius:10px}
-  .booking-modal .mr-modal-head{padding:17px 16px}
+  .mr-modal-bg{padding:0;place-items:stretch}
+  .mr-modal.booking-modal{width:100%;height:100dvh;max-height:100dvh;border:0;border-radius:0;overscroll-behavior:contain}
+  .booking-modal .mr-modal-head{position:sticky;top:0;z-index:5;padding:calc(15px + env(safe-area-inset-top)) 16px 15px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel));backdrop-filter:blur(12px)}
   .booking-modal-heading small{display:none}
   .booking-modal-mark{width:40px;height:40px;flex-basis:40px}
-  .booking-modal .mr-modal-body{padding:12px}
+  .booking-modal .modal-close{width:44px;height:44px;flex-basis:44px;touch-action:manipulation}
+  .booking-modal .mr-modal-body{padding:12px 10px 18px}
   .booking-form-section{padding:15px 13px}
-  .booking-modal .time-parts{grid-template-columns:1fr}
-  .booking-modal .mr-modal-foot{flex-wrap:wrap;padding:12px}
+  .booking-section-head{align-items:flex-start}
+  .booking-section-head small{line-height:1.45}
+  .booking-modal .field input,.booking-modal .field select,.booking-modal .field textarea{min-height:48px;font-size:16px}
+  .booking-modal .time-parts{grid-template-columns:1.25fr .8fr .8fr;gap:6px}
+  .booking-modal .booking-repeat input{width:22px;height:22px;flex:0 0 22px}
+  .booking-modal .mr-modal-foot{z-index:5;flex-wrap:wrap;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--panel)}
   .booking-submit-note{flex-basis:100%}
-  .booking-modal .mr-modal-foot .btn{flex:1}
+  .booking-modal .mr-modal-foot .btn{min-height:48px;flex:1;touch-action:manipulation}
 }
