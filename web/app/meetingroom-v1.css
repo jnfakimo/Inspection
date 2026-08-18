@@ -87,6 +87,7 @@
 .mr-page .my-booking-list .booking-room{grid-column:1;grid-row:2;min-width:0;color:var(--dim);font-size:.72rem;overflow-wrap:anywhere}
 .mr-page .my-booking-list .booking-time{grid-column:2;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.72rem;white-space:nowrap}
 .mr-page .my-booking-list .booking-state{grid-column:3;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.72rem;white-space:nowrap}
+.mr-page .my-booking-list .calendar-sync-state{grid-column:4;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.68rem;white-space:nowrap}.mr-page .my-booking-list .calendar-sync-state.is-synced{color:#047857}.mr-page .my-booking-list .calendar-sync-state.is-failed{color:var(--red)}.mr-page .my-booking-list .calendar-sync-state.is-pending{color:#b45309}
 .mr-page .my-booking-list .mr-card .acts{align-self:center;margin-left:auto}
 /* 已取消／已逾期以粉紅色註記，並與一般預約清楚區隔。 */
 .mr-page .booking-status-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
@@ -103,6 +104,7 @@
   .mr-page .my-booking-list .booking-room,
   .mr-page .my-booking-list .booking-time,
   .mr-page .my-booking-list .booking-state{grid-column:1;grid-row:auto;padding-left:0;border-left:0;white-space:normal}
+  .mr-page .my-booking-list .calendar-sync-state{grid-column:1;grid-row:auto;padding-left:0;border-left:0;white-space:normal}
 }
 /* 變更申請保留清楚但低對比的雙色區隔。 */
 .mr-page .change-request-list .mr-card:nth-child(odd){background:color-mix(in srgb,#e0f2fe 48%,var(--panel));border-left-color:#7dd3fc}
@@ -188,6 +190,8 @@
 .booking-modal .time-parts{gap:8px}
 .booking-repeat-panel{display:flex;align-items:end;gap:16px;justify-content:space-between;padding:13px 14px;border:1px dashed color-mix(in srgb,var(--cyan) 34%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--cyan) 4%,var(--panel));transition:.18s ease}
 .booking-repeat-panel.is-active{border-style:solid;background:color-mix(in srgb,var(--cyan) 8%,var(--panel))}
+.calendar-sync-option{align-items:center}.calendar-sync-option .btn{flex:0 0 auto}
+.calendar-link-status{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:1px 8px;padding:7px 11px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--text);text-align:left;cursor:pointer}.calendar-link-status>span{grid-row:1/3;display:grid;width:26px;height:26px;place-items:center;border-radius:7px;background:linear-gradient(135deg,#4285f4 0 25%,#34a853 25% 50%,#fbbc05 50% 75%,#ea4335 75%);color:#fff;font-weight:900}.calendar-link-status b{font-size:.7rem}.calendar-link-status small{max-width:180px;overflow:hidden;color:var(--dim);font-size:.6rem;text-overflow:ellipsis}.calendar-link-status:hover,.calendar-link-status.is-connected{border-color:color-mix(in srgb,var(--green) 48%,var(--line))}
 .booking-modal .booking-repeat{align-items:center;min-height:46px;cursor:pointer}
 .booking-modal .booking-repeat>span{display:grid;gap:2px}
 .booking-modal .booking-repeat b{font-size:.8rem}
@@ -226,4 +230,5 @@
   .booking-modal .mr-modal-foot{z-index:5;flex-wrap:wrap;padding:12px 12px calc(12px + env(safe-area-inset-bottom));background:var(--panel)}
   .booking-submit-note{flex-basis:100%}
   .booking-modal .mr-modal-foot .btn{min-height:48px;flex:1;touch-action:manipulation}
+  .calendar-link-status{width:100%;order:3}.calendar-sync-option{align-items:stretch}
 }

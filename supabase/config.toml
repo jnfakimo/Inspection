@@ -19,3 +19,15 @@ verify_jwt = true
 
 [functions.app-api]
 verify_jwt = true
+
+[functions.google-calendar]
+verify_jwt = true
+
+# Google OAuth callback does not carry a Supabase JWT. It accepts GET only and
+# validates one-time state, PKCE, expiry and browser fingerprint itself.
+[functions.google-calendar-callback]
+verify_jwt = false
+
+# Scheduled worker accepts only the server-side CRON_SECRET.
+[functions.google-calendar-worker]
+verify_jwt = false

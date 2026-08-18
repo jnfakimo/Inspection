@@ -19,6 +19,7 @@ import '@/app/meetingroom-v1.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { invokeGoogleCalendar, openPersonalProfile, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -121,6 +122,7 @@ function MeetingRoomPage({ module, profile }: Props) {
   const [requestPage, setRequestPage] = useState(1);
   const [users, setUsers] = useState<Row[]>([]);
   const [myPhone, setMyPhone] = useState('');
+  const [calendarStatus, setCalendarStatus] = useState<GoogleCalendarStatus | null>(null);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [booking, setBooking] = useState<{ room_id: string; date: string } | null>(null);
   const [changeFor, setChangeFor] = useState<Row | null>(null);
@@ -154,6 +156,11 @@ function MeetingRoomPage({ module, profile }: Props) {
     setBusy(false);
   }, [days, profile.user_id]);
   useEffect(() => { void load(); }, [load]);
+  const loadCalendarStatus = useCallback(async () => {
+    try { setCalendarStatus(await invokeGoogleCalendar<GoogleCalendarStatus>('status')); }
+    catch { setCalendarStatus(null); }
+  }, []);
+  useEffect(() => { void loadCalendarStatus(); }, [loadCalendarStatus]);
 
   // V1 的清單規則是每頁 10 筆；資料重新載入後若目前頁碼超出範圍，
   // 自動回到最後一頁，避免操作完成後顯示空白頁。
@@ -174,7 +181,7 @@ function MeetingRoomPage({ module, profile }: Props) {
     setBusy(true); setNote('');
     const { error } = await getSupabase().rpc('cancel_own_meeting_booking', { p_booking_id: row.booking_id });
     if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    await load(); setNote('預約已取消');
+    await load(); setNote('預約已取消；個人行事曆將由背景服務同步');
   };
   const checkIn = async (row: Row) => {
     setBusy(true); setNote('');
@@ -199,6 +206,10 @@ function MeetingRoomPage({ module, profile }: Props) {
           <p>週視圖排程總覽 · 送出即生效 · 系統自動防止同時段重複預約</p>
         </div>
         <div className="spacer" />
+        <button className={`calendar-link-status${calendarStatus?.connected ? ' is-connected' : ''}`} onClick={openPersonalProfile}>
+          <span aria-hidden="true">G</span><b>{calendarStatus?.connected ? '個人行事曆已連結' : '連結個人 Google 行事曆'}</b>
+          {calendarStatus?.connected && <small>{calendarStatus.google_email}</small>}
+        </button>
         {isAdmin && <button className="btn" onClick={() => setRoomAdmin(true)}>🏢 會議室管理</button>}
       </div>
 
@@ -291,8 +302,10 @@ function MeetingRoomPage({ module, profile }: Props) {
                   <span className="booking-room">{fmt(room.name)}</span>
                   <span className="booking-time">{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</span>
                   <span className={`booking-state${statusIsPink ? ' booking-status-pink-label' : ''}`}>{statusLabel}</span>
+                  {b.google_sync_enabled !== false && <span className={`calendar-sync-state is-${String(b.google_calendar_sync_status || 'not_connected')}`}>{({ synced: '已同步行事曆', pending: '行事曆同步中', failed: '行事曆同步失敗', cancelled: '行事曆已取消', not_connected: '行事曆未連結' } as Record<string,string>)[String(b.google_calendar_sync_status || 'not_connected')] || '行事曆待同步'}</span>}
                 </div>
                 <div className="acts">
+                  {b.google_calendar_sync_status === 'failed' && <button className="btn" onClick={async () => { setBusy(true); try { await invokeGoogleCalendar('retry', { booking_id: b.booking_id }); await load(); setNote('已排入 Google 行事曆重新同步'); } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); } }}>重試同步</button>}
                   {b.status === 'booked' && inWindow && <button className="btn btn-primary checkin-btn" onClick={() => void checkIn(b)}>報到</button>}
                   {b.status === 'booked' && <button className="btn btn-danger" onClick={() => void cancel(b)}>取消預約</button>}
                 </div>
@@ -332,9 +345,9 @@ function MeetingRoomPage({ module, profile }: Props) {
       </div>
     </div>
 
-    {booking && <BookingModal rooms={rooms} init={booking} myPhone={myPhone} now={tick}
+    {booking && <BookingModal rooms={rooms} init={booking} myPhone={myPhone} now={tick} calendarStatus={calendarStatus}
       onClose={() => setBooking(null)}
-      onDone={async msg => { setBooking(null); await load(); setNote(msg); }} />}
+      onDone={async msg => { setBooking(null); await load(); setNote(`${msg}；個人行事曆將由背景服務同步`); }} />}
     {changeFor && <ChangeRequestModal row={changeFor} myPhone={myPhone} nameOf={nameOf}
       onClose={() => setChangeFor(null)}
       onDone={async msg => { setChangeFor(null); await load(); setNote(msg); }} />}
@@ -345,9 +358,9 @@ function MeetingRoomPage({ module, profile }: Props) {
 
 /* ──────────────────────────── 預約表單彈窗 ──────────────────────────── */
 
-function BookingModal({ rooms, init, myPhone, now, onClose, onDone }: {
+function BookingModal({ rooms, init, myPhone, now, calendarStatus, onClose, onDone }: {
   rooms: Row[]; init: { room_id: string; date: string }; myPhone: string;
-  now: number;
+  now: number; calendarStatus: GoogleCalendarStatus | null;
   onClose: () => void; onDone: (message: string) => void;
 }) {
   const [roomId, setRoomId] = useState(init.room_id);
@@ -358,6 +371,7 @@ function BookingModal({ rooms, init, myPhone, now, onClose, onDone }: {
   const [contactPhone, setContactPhone] = useState(myPhone);
   const [repeatWeekly, setRepeatWeekly] = useState(false);
   const [repeatUntil, setRepeatUntil] = useState('');
+  const [syncGoogle, setSyncGoogle] = useState(Boolean(calendarStatus?.connected));
   const [conflict, setConflict] = useState('');
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
 
@@ -408,6 +422,11 @@ function BookingModal({ rooms, init, myPhone, now, onClose, onDone }: {
       p_repeat_weekly: repeatWeekly, p_repeat_until: repeatWeekly ? repeatUntil : null,
     });
     if (error) { setMessage(`失敗：${errorMessage(error)}`); setBusy(false); return; }
+    const created = Array.isArray((data as Row)?.bookings) ? (data as Row).bookings as Row[] : [];
+    if (!syncGoogle && created.length) {
+      const ids = created.map(row => row.booking_id).filter(Boolean);
+      if (ids.length) await getSupabase().rpc('set_own_meeting_booking_google_sync', { p_booking_ids: ids, p_enabled: false });
+    }
     const count = Number((data as Row)?.count || 1);
     onDone(count > 1 ? `已建立 ${count} 筆週期預約` : '預約已建立');
   };
@@ -460,6 +479,11 @@ function BookingModal({ rooms, init, myPhone, now, onClose, onDone }: {
               onChange={e => setRepeatWeekly(e.target.checked)} /><span><b>每週重複預約</b><small>於相同星期與時段自動建立預約</small></span></label>
             {repeatWeekly && <div className="field"><label>週期截止日期（最多 52 次）</label>
               <input type="date" min={date} value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} /></div>}
+          </div>
+          <div className={`booking-repeat-panel calendar-sync-option${syncGoogle ? ' is-active' : ''}`}>
+            <label className="booking-repeat"><input type="checkbox" checked={syncGoogle} disabled={!calendarStatus?.connected}
+              onChange={e => setSyncGoogle(e.target.checked)} /><span><b>同步到我的 Google 行事曆</b><small>{calendarStatus?.connected ? `已連結 ${calendarStatus.google_email || '個人帳號'}` : '請先至個人資料設定連結 Google 帳號'}</small></span></label>
+            {!calendarStatus?.connected && <button type="button" className="btn" onClick={openPersonalProfile}>前往個人資料設定</button>}
           </div>
         </section>
       </div>

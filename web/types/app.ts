@@ -1,7 +1,9 @@
 export type Profile = {
   user_id: string;
   username?: string | null;
+  email?: string | null;
   name: string;
+  phone?: string | null;
   department?: string | null;
   role: string;
   rbac_role?: string | null;

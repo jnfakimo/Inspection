@@ -114,7 +114,7 @@ export function AdminSidebar({
         <span>{profile.name}［{administrator ? '系統管理員' : profile.role}］</span>
         <button type="button" onClick={() => { onClose(); onChangePassword(); }}>
           <img src="/Inspection/assets/system-icons/account-icon.png" alt="" />
-          更改密碼
+          個人資料設定
         </button>
       </div>
     </aside>

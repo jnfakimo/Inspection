@@ -1,0 +1,28 @@
+name: Google personal calendar sync
+
+on:
+  schedule:
+    - cron: "2,7,12,17,22,27,32,37,42,47,52,57 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: google-personal-calendar-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Process queued Google Calendar jobs
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --retry 2 --retry-all-errors \
+            --max-time 90 \
+            -X POST \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/google-calendar-worker

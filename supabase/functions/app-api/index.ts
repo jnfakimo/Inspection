@@ -145,7 +145,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: profile, error: profileError } = await admin.from('users')
-      .select('user_id,username,name,department,role,rbac_role,status')
+      .select('user_id,username,email,name,phone,department,role,rbac_role,status')
       .eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
 
@@ -166,6 +166,7 @@ Deno.serve(async (req) => {
       dashboard: 'app-api:dashboard',
       inspections: 'app-api:inspections',
       equipment_map: 'app-api:equipment_map',
+      update_personal_profile: 'app-api:update_personal_profile',
     } as Record<string, string>)[action];
     if (actionScope) {
       const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
@@ -182,7 +183,22 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'profile') {
-      return reply(req, { ok: true, data: { ...profile, allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
+      return reply(req, { ok: true, data: { ...profile, email: profile.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
+    }
+
+    if (action === 'update_personal_profile') {
+      const name = text(body.name, 100);
+      const phone = text(body.phone, 40);
+      if (name.length < 2) return reply(req, { ok: false, message: '姓名至少需要 2 個字元' }, 400);
+      if (phone && !/^[0-9()#+*\-\s]{4,40}$/.test(phone)) return reply(req, { ok: false, message: '聯絡電話格式不正確' }, 400);
+      const before = { name: profile.name, phone: profile.phone || null };
+      const { data: updated, error } = await admin.from('users')
+        .update({ name, phone: phone || null })
+        .eq('user_id', profile.user_id).eq('status', 'active')
+        .select('user_id,username,email,name,phone,department,role,rbac_role,status').single();
+      if (error || !updated) return reply(req, { ok: false, message: '個人資料更新失敗' }, 500);
+      await writeAudit(admin, profile.user_id, 'users', profile.user_id, 'update', before, { name: updated.name, phone: updated.phone });
+      return reply(req, { ok: true, data: { ...updated, email: updated.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
     }
 
     if (action === 'module_data') {
