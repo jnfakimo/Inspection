@@ -79,6 +79,10 @@ async function listFiles(directory) {
 
 async function copyRuntimeFiles() {
   await cp(path.join(projectRoot, 'index.html'), path.join(outputRoot, 'index.html'));
+  await cp(
+    path.join(projectRoot, 'google620de73073c56d88.html'),
+    path.join(outputRoot, 'google620de73073c56d88.html'),
+  );
   await cp(path.join(projectRoot, 'LICENSE'), path.join(outputRoot, 'proprietary-notice.txt'));
   await cp(path.join(projectRoot, 'assets'), path.join(outputRoot, 'assets'), { recursive: true });
   await cp(nextExportRoot, outputV2Root, { recursive: true });
