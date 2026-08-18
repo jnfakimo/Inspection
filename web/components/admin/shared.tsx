@@ -62,9 +62,9 @@ export function StatusPill({ value }: { value: unknown }) {
   const tone = ['active', 'published', 'acknowledged'].includes(key) ? 'closed' : ['open', 'failed'].includes(key) ? 'cancelled' : key === 'draft' ? 'assigned' : 'pending';
   return <span className={`status-pill ${tone}`}>{label}</span>;
 }
-export function AdminModal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+export function AdminModal({ title, children, onClose, className = '' }: { title: string; children: ReactNode; onClose: () => void; className?: string }) {
   return <div className="admin-modal-backdrop" role="dialog" aria-modal="true" aria-label={title}>
-    <section className="admin-modal"><header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="關閉">×</button></header>{children}</section>
+    <section className={`admin-modal ${className}`.trim()}><header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="關閉">×</button></header>{children}</section>
   </div>;
 }
 export function AdminHeader({ module, busy, note, onReload, action }: { module: ModuleDefinition; busy: boolean; note: string; onReload: () => void; action?: ReactNode }) {

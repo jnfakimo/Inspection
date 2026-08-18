@@ -22,6 +22,9 @@
 .admin-form-grid input[readonly]{background:var(--surface-muted)}
 .audit-details div,.detail-grid>div,.detail-timeline li{background:var(--surface-soft)}
 .admin-alert .severity{background:var(--surface-soft);color:var(--muted)}
+.handover-create-modal>header{background:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 10%,var(--surface)),var(--surface) 72%);border-bottom-color:color-mix(in srgb,var(--cyan) 25%,var(--line))}
+.handover-create-modal .detail-grid>div{border-left:3px solid var(--cyan)}
+.handover-create-modal .detail-grid dd{font-size:1.05rem;font-weight:700}
 .handover-records-panel{width:85%;margin-left:auto;margin-right:auto}
 .handover-records-panel tbody tr:nth-child(odd){background:var(--surface)}
 .handover-records-panel tbody tr:nth-child(even){background:color-mix(in srgb,#dbeafe 15%,var(--surface))}
@@ -29,3 +32,20 @@
 .handover-create-btn{background:#dbeafe;color:#075985;border:1px solid #7dd3fc}
 html[data-theme="tech"] .handover-create-btn{background:var(--cyan);color:#001018;border-color:var(--cyan)}
 @media (max-width:800px){.handover-records-panel{width:100%}}
+@media (max-width:600px){
+  .admin-modal-backdrop:has(.handover-create-modal){padding:8px}
+  .handover-create-modal{width:100%;max-height:calc(100dvh - 16px);border-radius:10px}
+  .handover-create-modal>header{position:sticky;top:0;z-index:2;padding:13px 16px}
+  .handover-create-modal>header h2{font-size:1.05rem}
+  .handover-create-modal .admin-form-grid{grid-template-columns:1fr;gap:10px;padding:14px 16px}
+  .handover-create-modal .admin-form-grid input,.handover-create-modal .admin-form-grid select{min-height:46px;font-size:16px}
+  .handover-create-modal .detail-timeline{padding:0 16px 4px}
+  .handover-create-modal .detail-timeline h3{font-size:.95rem;margin-bottom:8px}
+  .handover-create-modal .detail-grid{grid-template-columns:1fr 1fr;gap:8px;padding:10px 0}
+  .handover-create-modal .detail-grid>div{padding:9px 10px}
+  .handover-create-modal .detail-grid dd{font-size:1rem}
+  .handover-create-modal .detail-timeline ol{gap:7px}
+  .handover-create-modal .detail-timeline li{padding:9px 10px}
+  .handover-create-modal>footer{position:sticky;bottom:0;z-index:2;padding:10px 16px;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(8px)}
+  .handover-create-modal>footer button{min-height:44px}
+}

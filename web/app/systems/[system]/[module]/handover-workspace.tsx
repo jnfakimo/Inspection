@@ -347,7 +347,7 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
 
   const personOptions = (list: Row[]) => list.map(u => <option key={String(u.user_id)} value={String(u.user_id)}>{u.name}{u.department ? `（${u.department}）` : ''}</option>);
 
-  return <AdminModal title="新增交接單" onClose={onClose}>
+  return <AdminModal title="新增交接單" className="handover-create-modal" onClose={onClose}>
     <div className="admin-form-grid">
       <label>交接日期（必填）<input type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} /></label>
       <label>班別<select value={form.shift_type} onChange={e => set('shift_type', e.target.value)}>
