@@ -70,7 +70,7 @@ export function SystemRelations() {
         {SYSTEMS.map(item => <a key={item.key} href={`/Inspection/v2/systems/${item.key}/`}>
           <g>
             <rect x={item.x} y={item.y} width={CARD_W} height={CARD_H} rx="8"
-              fill="rgba(7,21,38,.95)" stroke="var(--cyan)" strokeWidth="1.2" />
+              fill="var(--panel2)" stroke="var(--cyan)" strokeWidth="1.2" />
             <text x={item.x + 14} y={item.y + 25} fill="var(--cyan)" fontSize="10" fontWeight="700">{item.code}</text>
             <text x={item.x + 14} y={item.y + 46} fill="var(--text)" fontSize="15">{item.label}</text>
           </g>
