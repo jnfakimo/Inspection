@@ -22,3 +22,5 @@ jobs:
         run: node tools/commercial-readiness-audit.mjs
       - name: Audit V2 security design controls
         run: npm run security:audit
+      - name: Audit production dependencies
+        run: npm audit --package-lock-only --omit=dev --audit-level=moderate
