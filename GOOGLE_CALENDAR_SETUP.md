@@ -32,12 +32,12 @@ supabase secrets set GOOGLE_TOKEN_ENCRYPTION_KEY="<32 bytes Base64>"
 
 ```powershell
 supabase functions deploy app-api
-supabase functions deploy google-calendar
+supabase functions deploy google-calendar --no-verify-jwt
 supabase functions deploy google-calendar-callback --no-verify-jwt
 supabase functions deploy google-calendar-worker --no-verify-jwt
 ```
 
-只有 `google-calendar-callback` 與受 `CRON_SECRET` 保護的 `google-calendar-worker` 使用 `--no-verify-jwt`。登入後的 `google-calendar` API 保留平台 JWT 驗證；callback 另外驗證一次性 state、PKCE、期限與瀏覽器指紋。
+`google-calendar` 關閉只支援 legacy secret 的 Gateway JWT 驗證，改由函式內的 `auth.getUser()` 驗證目前登入者，以相容專案目前的 JWT signing keys。callback 另外驗證一次性 state、PKCE、期限與瀏覽器指紋；worker 則只接受受 `CRON_SECRET` 保護的排程請求。
 
 ## 使用流程
 

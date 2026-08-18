@@ -21,7 +21,9 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.google-calendar]
-verify_jwt = true
+# The function validates the current user with auth.getUser(). Keep the legacy
+# gateway verifier off so tokens signed by the project's current JWT keys work.
+verify_jwt = false
 
 # Google OAuth callback does not carry a Supabase JWT. It accepts GET only and
 # validates one-time state, PKCE, expiry and browser fingerprint itself.
