@@ -172,46 +172,46 @@ function RequestsModule({ module, profile }: Props) {
 
     {/* V1 四步驟流程 Banner */}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--cyan)' }}>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--cyan)' }}>
         <b style={{ color: 'var(--cyan)', fontSize: '0.85rem' }}>1. 申請人填單</b>
-        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>線上填寫用車日期、地點、人數與事由</div>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>線上填寫用車日期、地點、人數與事由</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--amber)' }}>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--amber)' }}>
         <b style={{ color: 'var(--amber)', fontSize: '0.85rem' }}>2. 單位主管核可</b>
-        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>單位主管審核或退回派車申請</div>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>單位主管審核或退回派車申請</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--purple)' }}>
-        <b style={{ color: 'var(--purple)', fontSize: '0.85rem' }}>3. 派車管理員</b>
-        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>派車管理員指派公務車號與駕駛人員</div>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--violet)' }}>
+        <b style={{ color: 'var(--violet)', fontSize: '0.85rem' }}>3. 派車管理員</b>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>派車管理員指派公務車號與駕駛人員</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', borderLeft: '3px solid var(--green)' }}>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--green)' }}>
         <b style={{ color: 'var(--green)', fontSize: '0.85rem' }}>4. 司機接單與回報</b>
-        <div style={{ color: 'var(--text-dim)', fontSize: '0.72rem', marginTop: '3px' }}>司機於用車當日接單、實際里程與加油紀錄回報</div>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>司機於用車當日接單、實際里程與加油紀錄回報</div>
       </div>
     </div>
 
     {/* V1 四大 KPI 統計卡 */}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(130px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--amber)' }}>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--amber)' }}>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--amber)', lineHeight: 1 }}>{kApprovalCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>待主管核可</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待主管核可</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--blue)' }}>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--blue)' }}>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{kDispatchCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>待車管派車</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待車管派車</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--purple)' }}>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--purple)', lineHeight: 1 }}>{kTodayCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>今日已派行程</div>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--violet)' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--violet)', lineHeight: 1 }}>{kTodayCount}</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>今日已派行程</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '4px', padding: '12px 14px', borderLeft: '3px solid var(--green)' }}>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--green)' }}>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--green)', lineHeight: 1 }}>{kDriverCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '6px' }}>待司機回報</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待司機回報</div>
       </div>
     </div>
 
     {/* V1 四大頁籤（帶計數） */}
-    <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', marginBottom: '12px' }}>
+    <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
       <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('mine')}>
         我的申請 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,212,255,0.15)', fontSize: '0.68rem' }}>{mineRows.length}</span>
       </button>
@@ -402,24 +402,24 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
 
     {/* 報表 KPI 統計 */}
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '12px' }}>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>申請單數</div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>申請單數</div>
         <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.count} 筆</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>乘車人次</div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>乘車人次</div>
         <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.passengers} 人</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>完成里程</div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>完成里程</div>
         <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.mileage.toFixed(1)} km</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>加油費用</div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>加油費用</div>
         <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--text-dim)' }}>異常通報</div>
+      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
+        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>異常通報</div>
         <div style={{ fontSize: '1.1rem', fontWeight: 800, color: metrics.abnormal > 0 ? 'var(--red)' : 'var(--cyan)' }}>{metrics.abnormal} 件</div>
       </div>
     </div>
