@@ -22,3 +22,5 @@
 .admin-form-grid input[readonly]{background:var(--surface-muted)}
 .audit-details div,.detail-grid>div,.detail-timeline li{background:var(--surface-soft)}
 .admin-alert .severity{background:var(--surface-soft);color:var(--muted)}
+.handover-records-panel{width:85%;margin-left:auto;margin-right:auto}
+@media (max-width:800px){.handover-records-panel{width:100%}}
