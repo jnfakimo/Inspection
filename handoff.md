@@ -93,7 +93,9 @@ JSON 裡的 `workTimes.templates.<班別名>` 是**兩組獨立的值**，不會
   帳號 `SYS07TEST` status=inactive 且 auth 已停權、`vehicle_dispatch_drivers` active=false；
   派車單 `CAR-20260817-0008`、`CAR-20260817-0012` 兩張 completed（用途欄已註明為測試）。
   正式車 9390-AG 全程未被動到，里程維持 15000.0。
-- **正式庫的 `is_admin()` 與 repo 原始碼不一致，漏認 `sysadmin`**。實測：
+- **正式庫的 `is_admin()` 漏認 `sysadmin`——已於 2026-08-18 修正**
+  （`supabase/migrations/20260818120000_is_admin_align_sysadmin.sql`，已套用至正式庫並驗證）。
+  以下是當初的實測紀錄，保留供日後查考：實測：
   `role='supervisor'` + `rbac_role='sysadmin'` → **false**；`role='admin'` → true；
   `rbac_role='admin'` → true。亦即線上版本等同 `role='admin' or rbac_role='admin'`，
   而 `system/sql/rls_hardening.sql:36-46` 寫的是 `rbac_role in ('admin','sysadmin')`。
@@ -106,7 +108,10 @@ JSON 裡的 `workTimes.templates.<班別名>` 是**兩組獨立的值**，不會
   「SYS-03驗收測試範本（勿使用）」sort_order=999；`patrol_shifts` 的
   `2099-12-31 SYS-03測試班` 一列。`system_settings` 的 `patrol_shift_staff`
   已還原為測試前的原始內容（919 字元，逐節點比對無差異）。
-- **`vehicle_dispatch_no_time_overlap` 排除約束沒有把 `vehicle_id` 納入鍵值**，
+- **`vehicle_dispatch_no_time_overlap` 排除約束沒有把 `vehicle_id` 納入鍵值——已於
+  2026-08-18 修正**（`supabase/migrations/20260818130000_vehicle_overlap_per_vehicle.sql`，
+  已套用至正式庫並驗證）。修正後 `vehicle_id` 為 null 的申請彼此不再互斥；生效狀態集合
+  （含 `pending_approval` 與 `completed`）維持原樣，那屬流程決策。以下為當初的紀錄：
   現在只有一台車所以看不出來，但加第二台車後兩台車就不能在重疊時段各自出勤；
   且 `pending_approval` 與 `completed` 都在生效狀態內（未核可的申請就會鎖住時段、
   同日已完成的行程永久占住該時段）。SYS-07 驗收建第二張測試單時撞到 23P01 才發現，
@@ -120,5 +125,6 @@ JSON 裡的 `workTimes.templates.<班別名>` 是**兩組獨立的值**，不會
 
 2026-08-17 · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：✅ 已推
 · 本次：SYS-07 行車回報、SYS-03 排班實機驗收完成（含負向對照），未改任何程式碼
-· 順帶發現兩項未修缺陷：正式庫 is_admin() 漏認 sysadmin、派車時段排除約束未區分車輛
+· 順帶發現兩項缺陷：正式庫 is_admin() 漏認 sysadmin、派車時段排除約束未區分車輛
+  （兩項均已於 2026-08-18 修正並套用至正式庫）
 · L3 Obsidian：未更新（AGENTS.md 未登記 vault 路徑）
