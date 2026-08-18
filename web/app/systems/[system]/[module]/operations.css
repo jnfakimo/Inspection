@@ -10,3 +10,7 @@
 .operations-portal-card:hover{border-color:var(--icon-sky)}
 .operations-portal-card img{filter:drop-shadow(0 5px 10px color-mix(in srgb,var(--icon-sky) 28%,transparent))}
 .operations-portal-code,.operations-portal-card b{color:var(--icon-sky-text)}
+
+/* Table Zebra Striping */
+.operations-table tbody tr:nth-child(odd) { background: #ffffff; }
+.operations-table tbody tr:nth-child(even) { background: rgba(0, 212, 255, 0.08); }

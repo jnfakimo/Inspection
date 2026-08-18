@@ -121,7 +121,7 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
   if (column.key === 'fault_type' || column.key === 'department' || column.key === 'urgency') { const listId = 'request-' + column.key + '-filter-list'; return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : column.key === 'department' ? '全部單位' : '全部急迫性'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; }
   if (column.key === 'created_at' || column.key === 'desired_finish') return <th><input className='request-filter-date' type='date' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
-  return <th><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''>全部狀態</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
+  return <th><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''></option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
 }
 
 export function ModuleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
@@ -442,7 +442,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
           return requestFilterValue(key, row[key]) === value;
         });
         const statusMatches = !statusFilter || (statusFilter === 'pending' ? ['pending', 'transferred'].includes(rowStatus) : statusFilter === 'returned' ? ['returned', 'rejected'].includes(rowStatus) : rowStatus === statusFilter);
-        const hideClosedByDefault = isRequestModule && !statusFilter && rowStatus === 'closed';
+        const hideClosedByDefault = isRepairTableModule && !statusFilter && rowStatus === 'closed';
         return !hideClosedByDefault && matchesColumns && statusMatches && (!needle || Object.values(row).some(value => display(value).toLowerCase().includes(needle)));
       });
     }, [columnFilters, data, isRequestModule, query, statusFilter]);
@@ -459,8 +459,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       }
       return options;
     }, [data]);
-    const totalPages = isRequestModule ? Math.max(1, Math.ceil(rows.length / REQUEST_PAGE_SIZE)) : 1;
-    const visibleRows = isRequestModule ? rows.slice((page - 1) * REQUEST_PAGE_SIZE, page * REQUEST_PAGE_SIZE) : rows;
+    const totalPages = isRepairTableModule ? Math.max(1, Math.ceil(rows.length / REQUEST_PAGE_SIZE)) : 1;
+    const visibleRows = isRepairTableModule ? rows.slice((page - 1) * REQUEST_PAGE_SIZE, page * REQUEST_PAGE_SIZE) : rows;
     const paginationPages = useMemo(() => {
       if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
       return [...new Set([1, page - 1, page, page + 1, totalPages])].filter(item => item >= 1 && item <= totalPages).sort((a, b) => a - b);
@@ -572,7 +572,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             </table>
             {data && rows.length === 0 && <p className="empty">查無資料</p>}
           </div>
-          {isRequestModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
+          {isRepairTableModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
             <span>每頁 {REQUEST_PAGE_SIZE} 筆，第 {page}／{totalPages} 頁，共 {rows.length} 筆</span>
             <div>
               <button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={page === 1} aria-label="上一頁">‹</button>
