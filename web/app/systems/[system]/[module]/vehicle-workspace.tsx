@@ -105,7 +105,7 @@ function RequestsModule({ module, profile }: Props) {
     const [r, v, d] = await Promise.all([
       client.from('vehicle_dispatch_requests').select('*').order('application_date', { ascending: false }).order('created_at', { ascending: false }).limit(1000),
       client.from('official_vehicles').select('vehicle_id,plate_no,vehicle_name,brand,model,seats,current_odometer,status,note').order('plate_no'),
-      client.from('vehicle_dispatch_drivers').select('user_id,active,users(name,username,department)').eq('active', true),
+      client.from('vehicle_dispatch_drivers').select('user_id,active,users!vehicle_dispatch_drivers_user_id_fkey(name,username,department)').eq('active', true),
     ]);
     if (r.error || v.error || d.error) setNote(`失敗：${errorMessage(r.error || v.error || d.error, '派車資料載入失敗')}`);
     setRows(r.data || []); setVehicles(v.data || []); setDrivers(d.data || []); setBusy(false);
@@ -834,7 +834,7 @@ function RosterModule({ module, profile }: Props) {
     setBusy(true); setNote('');
     const client = getSupabase();
     const [r, u] = await Promise.all([
-      client.from(table).select('user_id,active,assigned_at,updated_at,users(name,username,department,status)').order('updated_at', { ascending: false }),
+      client.from(table).select(`user_id,active,assigned_at,updated_at,users!${table}_user_id_fkey(name,username,department,status)`).order('updated_at', { ascending: false }),
       client.from('users').select('user_id,name,username,department,status').eq('status', 'active').order('name').limit(2000),
     ]);
     if (r.error || u.error) setNote(`失敗：${errorMessage(r.error || u.error, '名單載入失敗')}`);
