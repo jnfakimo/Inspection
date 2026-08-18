@@ -291,7 +291,7 @@ function MeetingRoomPage({ module, profile }: Props) {
                     ｜<span className={statusIsPink ? 'booking-status-pink-label' : undefined}>{statusLabel}</span></small>
                 </div>
                 <div className="acts">
-                  {b.status === 'booked' && inWindow && <button className="btn btn-primary" onClick={() => void checkIn(b)}>報到</button>}
+                  {b.status === 'booked' && inWindow && <button className="btn btn-primary checkin-btn" onClick={() => void checkIn(b)}>報到</button>}
                   {b.status === 'booked' && <button className="btn btn-danger" onClick={() => void cancel(b)}>取消預約</button>}
                 </div>
               </div>;

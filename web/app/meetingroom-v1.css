@@ -20,8 +20,10 @@
 .mr-page .week-label{min-width:150px;text-align:center;font-weight:700;font-size:.88rem}
 
 .mr-page .grid-wrap{overflow:auto}
-.mr-page .roomgrid{width:100%;border-collapse:collapse;font-size:.78rem;min-width:900px}
+.mr-page .roomgrid{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.78rem;min-width:900px}
 .mr-page .roomgrid th{padding:8px 6px;border:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 8%,transparent);font-weight:700;text-align:center;line-height:1.5}
+.mr-page .roomgrid th:first-child{width:26%}
+.mr-page .roomgrid th:not(:first-child){width:10.5714%}
 .mr-page .roomgrid th.weekend{background:color-mix(in srgb,var(--amber) 12%,transparent)}
 .mr-page .roomgrid td{padding:5px;border:1px solid var(--line);vertical-align:top;min-width:118px;height:78px}
 .mr-page .roomgrid td.weekend{background:color-mix(in srgb,var(--amber) 5%,transparent)}
@@ -44,10 +46,10 @@
 .mr-page .bk-pill.can-cancel:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
 .mr-page .bk-pill.past-booking{background:#e5e7eb;border-color:#cbd5e1;border-left-color:#9ca3af;color:#64748b;filter:grayscale(.4)}
 .mr-page .past-time-alert{padding:8px 10px;border:1px solid #cbd5e1;background:#f3f4f6;color:#64748b;border-radius:4px;font-size:.78rem}
-.mr-page .bk-line{font-size:.7rem;line-height:1.45}
+.mr-page .bk-line{font-size:1.12rem;line-height:1.35;overflow-wrap:anywhere}
 .mr-page .bk-line.person{color:var(--dim)}
 .mr-page .bk-line.meeting{font-weight:600}
-.mr-page .bk-cancel-hint{color:var(--red);font-size:.62rem}
+.mr-page .bk-cancel-hint{color:var(--red);font-size:.992rem;line-height:1.35;overflow-wrap:anywhere}
 .mr-page .bk-action{margin-top:3px;padding:2px 7px;border:1px solid var(--line);border-radius:3px;background:transparent;color:var(--cyan);font-size:.64rem;cursor:pointer}
 .mr-page .bk-action:hover{border-color:var(--cyan)}
 
@@ -99,8 +101,8 @@
   .mr-page .mr-schedule-panel .roomgrid th{padding:6px 4px}
   .mr-page .mr-schedule-panel .roomgrid td{min-width:0;height:58px;padding:4px}
   .mr-page .mr-schedule-panel .bk-pill{padding:4px 5px}
-  .mr-page .mr-schedule-panel .bk-line{font-size:.62rem}
-  .mr-page .mr-schedule-panel .bk-cancel-hint{font-size:.55rem}
+  .mr-page .mr-schedule-panel .bk-line{font-size:.992rem}
+  .mr-page .mr-schedule-panel .bk-cancel-hint{font-size:.88rem}
   .mr-page .mr-schedule-panel .bk-action{font-size:.56rem;padding:2px 5px}
 }
 
@@ -131,6 +133,8 @@
 .mr-page .btn:hover{border-color:var(--cyan);color:var(--cyan)}
 .mr-modal .btn{padding:8px 15px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font-size:.82rem;cursor:pointer}
 .mr-page .btn-primary{border-color:var(--cyan);background:var(--cyan);color:#001018;font-weight:700}
+.mr-page .btn.checkin-btn{border-color:#7dd3fc;background:#e0f2fe;color:#0369a1;font-weight:700;box-shadow:none}
+.mr-page .btn.checkin-btn:hover{border-color:#38bdf8;background:#bae6fd;color:#075985}
 .mr-modal .btn-primary{border-color:#7dd3fc;background:#e0f2fe;color:#0369a1;font-weight:700;box-shadow:none}
 .mr-modal .btn-primary:hover:not(:disabled){border-color:#38bdf8;background:#bae6fd;color:#075985}
 .mr-modal .btn-primary:disabled{border-color:#cbd5e1;background:#f1f5f9;color:#94a3b8;cursor:not-allowed}
