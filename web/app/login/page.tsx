@@ -18,8 +18,8 @@ function friendlyError(raw: unknown, fallback: string) {
   const text = raw instanceof Error ? raw.message : String(raw || '');
   if (/rate limit|too many requests|for security purposes/i.test(text)) return '操作過於頻繁，請稍後再試';
   if (/failed to fetch|network|load failed/i.test(text)) return '網路連線失敗，請確認連線後再試';
-  if (/invalid.*email|email.*invalid/i.test(text)) return 'Email 格式不正確';
-  if (/user not found|no user/i.test(text)) return '查無此 Email 對應的帳號';
+  if (/invalid.*email|email.*invalid/i.test(text)) return '電子郵件格式不正確';
+  if (/user not found|no user/i.test(text)) return '查無此電子郵件對應的帳號';
   if (/expired|invalid.*token|session/i.test(text)) return '重設連結已失效，請重新申請';
   if (/password.*(short|least|weak)/i.test(text)) return '密碼強度不足，請至少 8 個字元';
   return text || fallback;
@@ -83,7 +83,7 @@ export default function LoginPage() {
 
   async function sendResetLink() {
     setMessage(''); setNotice('');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setMessage('請輸入有效的 Email 地址'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setMessage('請輸入有效的電子郵件地址'); return; }
     setBusy(true);
     const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim(), { redirectTo });
@@ -126,7 +126,7 @@ export default function LoginPage() {
   if (view === 'forgot') return <main className="v1-login-page">
     <div className="login-card v1-login-card">
       {brand}
-      <p className="v1-login-hint">請輸入您帳號對應的 Email，系統將寄送重設連結</p>
+      <p className="v1-login-hint">請輸入您帳號對應的電子郵件，系統將寄送重設連結</p>
       <label>電子郵件<input type="email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} placeholder="請輸入電子郵件地址" /></label>
       {message && <p className="form-error">{message}</p>}
       {notice && <p className="inline-message">{notice}</p>}
