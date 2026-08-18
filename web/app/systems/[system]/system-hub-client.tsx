@@ -1,12 +1,14 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
-import { zhModuleCode, zhSystemCode } from '@/lib/zh-tw';
+import { zhModuleCode, zhSystemCode, zhValue } from '@/lib/zh-tw';
 import type { Profile } from '@/types/app';
 import { HandoverModules } from './[module]/handover-workspace';
+import { invokeAppApi } from '@/lib/supabase';
 
 const meetingroomModuleIcons: Record<string, string> = {
   bookings: '/Inspection/assets/system-icons/meeting-booking-icon-v1.png',
@@ -16,8 +18,18 @@ const meetingroomModuleIcons: Record<string, string> = {
 };
 
 function WorkorderHub({ profile }: { profile: Profile }) {
+  const [summary, setSummary] = useState<Array<{ label: string; value: number | string }>>([]);
+  useEffect(() => {
+    let active = true;
+    invokeAppApi<{ summary?: Array<{ label: string; value: number | string }> }>('module_data', { system: 'workorder', module: 'requests' })
+      .then(res => { if (active) setSummary(res.summary || []); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
   return <AppShell profile={profile} title="維修／派工／完工系統">
     <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons/maintenance-icon.png" alt="" /> 維修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
+    {summary.length > 0 && <section className="mini-metrics">{summary.map(item => <article key={item.label} data-label={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
     <div className="workorder-note">■ MAINTENANCE WORKFLOW ・ 點選圖卡進入功能系統</div>
     <section className="maintenance-hub-grid">
       <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/Inspection/assets/system-icons/repair-request-icon.png" alt="報修與維修" /><h3>報修 &amp; 維修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>
