@@ -15,7 +15,13 @@ export async function invokeGoogleCalendar<T>(action: string, payload: Record<st
   const { data, error } = await getSupabase().functions.invoke('google-calendar', {
     body: { action, ...payload },
   });
-  if (error) throw new Error('Google 行事曆服務連線失敗，請稍後再試');
+  if (error) {
+    const response = 'context' in error && error.context instanceof Response ? error.context : null;
+    const details = response
+      ? await response.clone().json().catch(() => null) as { message?: string } | null
+      : null;
+    throw new Error(details?.message || 'Google 行事曆服務連線失敗，請稍後再試');
+  }
   if (!data?.ok) throw new Error(data?.message || 'Google 行事曆操作失敗');
   return data.data as T;
 }
