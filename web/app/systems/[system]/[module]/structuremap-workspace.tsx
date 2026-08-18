@@ -14,6 +14,7 @@ import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { SystemRelations } from './system-relations';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -382,6 +383,7 @@ function RelationsModule({ module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+    <SystemRelations />
     <section className="panel admin-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋樓層、區域或細部位置" />
