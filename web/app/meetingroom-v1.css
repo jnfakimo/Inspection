@@ -34,10 +34,10 @@
 .mr-page .past-slot-label{display:inline-block;margin:8px 2px;color:#9aa5b1;font-size:.8704rem}
 .mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--cyan) 5%,transparent);white-space:normal;overflow-wrap:anywhere}
 /* 週排程的會議室名稱欄依資料列循環跳色，與主檔清單保持一致。 */
-.mr-page .roomgrid tbody tr:nth-child(4n+1) td.roomname{background:#f0f9ff;border-left:3px solid #7dd3fc}
-.mr-page .roomgrid tbody tr:nth-child(4n+2) td.roomname{background:#f0fdf4;border-left:3px solid #86efac}
-.mr-page .roomgrid tbody tr:nth-child(4n+3) td.roomname{background:#fffbeb;border-left:3px solid #fcd34d}
-.mr-page .roomgrid tbody tr:nth-child(4n) td.roomname{background:#faf5ff;border-left:3px solid #c4b5fd}
+.mr-page .roomgrid tbody tr:nth-child(4n+1) td.roomname{background:color-mix(in srgb,#7dd3fc 12%,var(--panel));border-left:3px solid #7dd3fc}
+.mr-page .roomgrid tbody tr:nth-child(4n+2) td.roomname{background:color-mix(in srgb,#86efac 12%,var(--panel));border-left:3px solid #86efac}
+.mr-page .roomgrid tbody tr:nth-child(4n+3) td.roomname{background:color-mix(in srgb,#fcd34d 12%,var(--panel));border-left:3px solid #fcd34d}
+.mr-page .roomgrid tbody tr:nth-child(4n) td.roomname{background:color-mix(in srgb,#c4b5fd 12%,var(--panel));border-left:3px solid #c4b5fd}
 .mr-page .roomgrid td.selectable{cursor:pointer}
 .mr-page .roomgrid td.selectable:hover{background:color-mix(in srgb,var(--cyan) 12%,transparent)}
 
@@ -79,8 +79,8 @@
 .mr-modal .room-admin-list .room-admin-card.room-color-2{background:color-mix(in srgb,#fef3c7 20%,var(--panel));border-left-color:#fcd34d}
 .mr-modal .room-admin-list .room-admin-card.room-color-3{background:color-mix(in srgb,#f3e8ff 20%,var(--panel));border-left-color:#c4b5fd}
 /* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
-.mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
-.mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}
+.mr-page .my-booking-list .mr-card:nth-child(odd){background:var(--panel);border-left-color:#7dd3fc}
+.mr-page .my-booking-list .mr-card:nth-child(even){background:color-mix(in srgb,#7dd3fc 10%,var(--panel));border-left-color:#7dd3fc}
 .mr-page .my-booking-list .booking-info-grid{display:grid;grid-template-columns:140px 250px 90px minmax(0,1fr);align-items:baseline;row-gap:6px;flex:1 1 560px;min-width:0}
 .mr-page .my-booking-list .booking-purpose{grid-column:1;grid-row:1;min-width:0;font-size:.88rem;overflow-wrap:anywhere}
 .mr-page .my-booking-list .booking-number{grid-column:2 / 5;grid-row:1;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.88rem;white-space:nowrap}
