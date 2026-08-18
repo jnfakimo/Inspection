@@ -156,7 +156,69 @@
 .mr-modal .mr-add-icon{display:inline-block;color:#0284c7;font-size:1.08em;line-height:1;font-weight:800}
 .mr-page .btn-danger,.mr-modal .btn-danger{border-color:var(--red);color:var(--red)}
 
+/* 新增預約：以分段式資訊卡建立清楚的填寫動線與視覺層級。 */
+.mr-modal.booking-modal{width:min(860px,100%);max-height:94dvh;border:1px solid color-mix(in srgb,var(--cyan) 32%,var(--line));border-top:0;border-radius:14px;background:var(--panel);box-shadow:0 30px 90px rgba(2,8,23,.35);overflow:auto}
+.booking-modal .mr-modal-head{position:relative;padding:20px 24px;background:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 12%,var(--panel)),var(--panel) 72%);border-bottom-color:color-mix(in srgb,var(--cyan) 24%,var(--line))}
+.booking-modal .mr-modal-head:before{content:'';position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--cyan),#38bdf8 55%,color-mix(in srgb,var(--cyan) 15%,transparent))}
+.booking-modal-heading{display:flex;align-items:center;gap:14px;min-width:0}
+.booking-modal-heading>div{display:grid;gap:2px}
+.booking-modal-mark{position:relative;display:grid;width:46px;height:46px;flex:0 0 46px;place-items:center;border:1px solid color-mix(in srgb,var(--cyan) 38%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--cyan) 12%,var(--panel));box-shadow:0 8px 20px color-mix(in srgb,var(--cyan) 12%,transparent)}
+.booking-modal-mark:before{content:'';width:21px;height:18px;border:2px solid var(--cyan);border-radius:4px;background:linear-gradient(to bottom,var(--cyan) 0 4px,transparent 4px)}
+.booking-modal .modal-eyebrow{color:var(--cyan);font:700 .62rem/1.2 var(--head);letter-spacing:.14em}
+.booking-modal .mr-modal-head .modal-title{font-size:1.25rem;line-height:1.25}
+.booking-modal-heading small{color:var(--dim);font-size:.72rem}
+.booking-modal .modal-close{display:grid;width:40px;height:40px;flex:0 0 40px;place-items:center;border:1px solid transparent;border-radius:50%;font-size:1.25rem;line-height:1;transition:.18s ease}
+.booking-modal .modal-close:hover{border-color:var(--line);background:color-mix(in srgb,var(--line) 35%,transparent);color:var(--text);transform:rotate(4deg)}
+.booking-modal .mr-modal-body{gap:16px;padding:20px 22px;background:color-mix(in srgb,var(--line) 14%,var(--panel))}
+.booking-form-section{position:relative;display:grid;gap:16px;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--panel);box-shadow:0 5px 18px rgba(15,23,42,.045);overflow:hidden}
+.booking-form-section:before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(var(--cyan),color-mix(in srgb,var(--cyan) 18%,transparent))}
+.booking-section-head{display:flex;align-items:center;gap:11px;padding-bottom:12px;border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent)}
+.booking-section-head>span{display:grid;width:34px;height:34px;flex:0 0 34px;place-items:center;border-radius:9px;background:color-mix(in srgb,var(--cyan) 11%,var(--panel));color:var(--cyan);font:800 .72rem var(--head);letter-spacing:.05em}
+.booking-section-head>div{display:grid;gap:2px}
+.booking-section-head b{color:var(--text);font-size:.88rem}
+.booking-section-head small{color:var(--dim);font-size:.68rem}
+.booking-section-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.booking-section-fields .field-wide{grid-column:1 / -1}
+.booking-modal .field{gap:7px}
+.booking-modal .field>label{color:var(--text);font-size:.76rem;font-weight:650}
+.booking-modal .field input,.booking-modal .field select,.booking-modal .field textarea{min-height:46px;padding:10px 12px;border-color:color-mix(in srgb,var(--line) 88%,var(--dim));border-radius:7px;background:color-mix(in srgb,var(--bg) 28%,var(--panel));transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
+.booking-modal .field input:hover,.booking-modal .field select:hover,.booking-modal .field textarea:hover{border-color:color-mix(in srgb,var(--cyan) 45%,var(--line))}
+.booking-modal .field input:focus,.booking-modal .field select:focus,.booking-modal .field textarea:focus{outline:0;border-color:var(--cyan);background:var(--panel);box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 13%,transparent)}
+.booking-modal .field input[readonly]{color:var(--dim);background:color-mix(in srgb,var(--line) 28%,var(--panel))}
+.booking-modal .time-parts{gap:8px}
+.booking-repeat-panel{display:flex;align-items:end;gap:16px;justify-content:space-between;padding:13px 14px;border:1px dashed color-mix(in srgb,var(--cyan) 34%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--cyan) 4%,var(--panel));transition:.18s ease}
+.booking-repeat-panel.is-active{border-style:solid;background:color-mix(in srgb,var(--cyan) 8%,var(--panel))}
+.booking-modal .booking-repeat{align-items:center;min-height:46px;cursor:pointer}
+.booking-modal .booking-repeat>span{display:grid;gap:2px}
+.booking-modal .booking-repeat b{font-size:.8rem}
+.booking-modal .booking-repeat small{color:var(--dim);font-size:.68rem}
+.booking-modal .booking-repeat-panel>.field{width:min(260px,100%)}
+.booking-modal .mr-modal-foot{position:sticky;bottom:0;padding:15px 22px;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(10px);box-shadow:0 -8px 24px rgba(15,23,42,.05)}
+.booking-submit-note{display:grid;gap:2px;flex:1;min-width:180px}
+.booking-submit-note small{color:var(--dim);font-size:.68rem}
+.booking-modal .mr-modal-foot .btn{min-height:44px;padding:9px 19px;border-radius:7px;font-weight:700}
+.booking-modal .mr-modal-foot .btn-primary{border-color:#0284c7;background:linear-gradient(135deg,#38bdf8,#0284c7);color:#fff;box-shadow:0 8px 18px rgba(2,132,199,.2)}
+.booking-modal .mr-modal-foot .btn-primary:hover:not(:disabled){border-color:#0369a1;background:linear-gradient(135deg,#0ea5e9,#0369a1);color:#fff;transform:translateY(-1px)}
+
 @media (max-width:820px){
   .mr-modal .row2,.mr-modal .time-parts{grid-template-columns:1fr}
+  .booking-modal .booking-section-fields{grid-template-columns:1fr}
+  .booking-modal .booking-section-fields .field-wide{grid-column:auto}
+  .booking-modal .time-parts{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .booking-repeat-panel{align-items:stretch;flex-direction:column}
+  .booking-modal .booking-repeat-panel>.field{width:100%}
   .mr-page .roomgrid{min-width:760px}
+}
+@media (max-width:520px){
+  .mr-modal-bg{padding:8px}
+  .mr-modal.booking-modal{max-height:98dvh;border-radius:10px}
+  .booking-modal .mr-modal-head{padding:17px 16px}
+  .booking-modal-heading small{display:none}
+  .booking-modal-mark{width:40px;height:40px;flex-basis:40px}
+  .booking-modal .mr-modal-body{padding:12px}
+  .booking-form-section{padding:15px 13px}
+  .booking-modal .time-parts{grid-template-columns:1fr}
+  .booking-modal .mr-modal-foot{flex-wrap:wrap;padding:12px}
+  .booking-submit-note{flex-basis:100%}
+  .booking-modal .mr-modal-foot .btn{flex:1}
 }

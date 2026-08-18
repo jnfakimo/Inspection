@@ -413,40 +413,58 @@ function BookingModal({ rooms, init, myPhone, now, onClose, onDone }: {
   };
 
   return <div className="mr-modal-bg" role="dialog" aria-modal="true" aria-label="新增預約">
-    <div className="mr-modal">
-      <div className="mr-modal-head"><span className="modal-title">新增預約</span><button onClick={onClose} aria-label="關閉">✕</button></div>
+    <div className="mr-modal booking-modal">
+      <div className="mr-modal-head">
+        <div className="booking-modal-heading">
+          <span className="booking-modal-mark" aria-hidden="true" />
+          <div>
+            <span className="modal-eyebrow">MEETING ROOM RESERVATION</span>
+            <span className="modal-title">新增預約</span>
+            <small>填寫會議資訊並確認使用時段</small>
+          </div>
+        </div>
+        <button className="modal-close" onClick={onClose} aria-label="關閉">✕</button>
+      </div>
       <div className="mr-modal-body">
         {conflict && <div className="conflict-alert">時段衝突：{conflict}</div>}
         {startPast && <div className="past-time-alert">開始時間已經過去，請選擇未來時段</div>}
-        <div className="field"><label>會議室</label>
-          <select value={roomId} onChange={e => setRoomId(e.target.value)}>
-            <option value="">-- 請選擇 --</option>
-            {rooms.filter(r => r.status === 'active').map(r => <option key={String(r.room_id)} value={String(r.room_id)}>
-              {r.name}{r.capacity ? `（${r.capacity} 人）` : ''}{r.floor ? `｜${r.floor}` : ''}</option>)}
-          </select></div>
-        <div className="row2">
-          <div className="field"><label>日期</label><input type="date" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
-          <div className="field"><label>會議名稱</label><input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="例：管理部週會、面談會議" /></div>
-        </div>
-        <div className="row2">
-          <TimeSelect label="開始時間（上午／下午・時・分）" value={start} onChange={setStart} />
-          <TimeSelect label="結束時間（上午／下午・時・分）" value={end} onChange={setEnd} />
-        </div>
-        <div className="row2">
-          <div className="field"><label>系統登記電話</label><input type="tel" readOnly value={myPhone || '（未登記）'} /></div>
-          <div className="field"><label>聯繫電話</label><input type="tel" autoComplete="tel" value={contactPhone}
-            onChange={e => setContactPhone(e.target.value)} placeholder="請輸入可聯繫的電話或分機" /></div>
-        </div>
-        <div className="row2">
-          <div className="field"><label>週期預約</label>
+        <section className="booking-form-section">
+          <div className="booking-section-head"><span>01</span><div><b>基本資訊</b><small>選擇空間並填寫本次會議名稱</small></div></div>
+          <div className="booking-section-fields">
+            <div className="field field-wide"><label>會議室</label>
+              <select value={roomId} onChange={e => setRoomId(e.target.value)}>
+                <option value="">-- 請選擇 --</option>
+                {rooms.filter(r => r.status === 'active').map(r => <option key={String(r.room_id)} value={String(r.room_id)}>
+                  {r.name}{r.capacity ? `（${r.capacity} 人）` : ''}{r.floor ? `｜${r.floor}` : ''}</option>)}
+              </select></div>
+            <div className="field"><label>日期</label><input type="date" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
+            <div className="field"><label>會議名稱</label><input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="例：管理部週會、面談會議" /></div>
+          </div>
+        </section>
+        <section className="booking-form-section">
+          <div className="booking-section-head"><span>02</span><div><b>使用時段</b><small>設定開始與結束時間，系統將自動檢查衝突</small></div></div>
+          <div className="row2">
+            <TimeSelect label="開始時間（上午／下午・時・分）" value={start} onChange={setStart} />
+            <TimeSelect label="結束時間（上午／下午・時・分）" value={end} onChange={setEnd} />
+          </div>
+        </section>
+        <section className="booking-form-section">
+          <div className="booking-section-head"><span>03</span><div><b>聯絡與週期</b><small>確認聯繫方式，並視需要設定重複預約</small></div></div>
+          <div className="row2">
+            <div className="field"><label>系統登記電話</label><input type="tel" readOnly value={myPhone || '（未登記）'} /></div>
+            <div className="field"><label>聯繫電話</label><input type="tel" autoComplete="tel" value={contactPhone}
+              onChange={e => setContactPhone(e.target.value)} placeholder="請輸入可聯繫的電話或分機" /></div>
+          </div>
+          <div className={`booking-repeat-panel${repeatWeekly ? ' is-active' : ''}`}>
             <label className="booking-repeat"><input type="checkbox" checked={repeatWeekly}
-              onChange={e => setRepeatWeekly(e.target.checked)} />每週同星期、同時段重複預約</label></div>
-          {repeatWeekly && <div className="field"><label>週期截止日期（最多 52 次）</label>
-            <input type="date" min={date} value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} /></div>}
-        </div>
+              onChange={e => setRepeatWeekly(e.target.checked)} /><span><b>每週重複預約</b><small>於相同星期與時段自動建立預約</small></span></label>
+            {repeatWeekly && <div className="field"><label>週期截止日期（最多 52 次）</label>
+              <input type="date" min={date} value={repeatUntil} onChange={e => setRepeatUntil(e.target.value)} /></div>}
+          </div>
+        </section>
       </div>
       <div className="mr-modal-foot">
-        <span className="msg">{message}</span>
+        <div className="booking-submit-note"><span className="msg">{message}</span>{!message && <small>送出前請再次確認會議室與使用時段</small>}</div>
         <button className="btn" onClick={onClose}>取消</button>
         <button className="btn btn-primary" disabled={busy || startPast} onClick={() => void submit()}>{busy ? '送出中…' : '送出預約'}</button>
       </div>
