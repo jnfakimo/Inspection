@@ -104,18 +104,18 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 .meetingroom-module-card:nth-child(4)::before{background:var(--violet)}
 .meetingroom-module-card:hover{border-color:var(--cyan);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,132,199,.14)}
 @media(max-width:760px){.meetingroom-module-card img{width:54px;height:54px}}
-/* 會議室預約頁：主圖卡為版面寬度 85%，內容較原緊湊版放大 1.2 倍。 */
+/* 會議室預約頁：主圖卡高度縮為 85%；四張子系統圖卡較原尺寸放大 1.2 倍。 */
 @media (min-width:761px){
-  body:has(.meetingroom-module-card) .module-hero{width:85%;max-width:none;min-height:118px;padding:17px}
+  body:has(.meetingroom-module-card) .module-hero{width:85%;max-width:none;min-height:100px;padding:14px}
   body:has(.meetingroom-module-card) .module-hero span{font-size:14.4px}
   body:has(.meetingroom-module-card) .module-hero h2{font-size:21.6px;margin:6px 0}
   body:has(.meetingroom-module-card) .module-hero p{font-size:12px}
   body:has(.meetingroom-module-card) .module-hero img{width:68.4px;height:68.4px}
-  body:has(.meetingroom-module-card) .module-grid{max-width:950px;gap:10px;margin-top:10px}
-  body:has(.meetingroom-module-card) .meetingroom-module-card{flex-basis:224px;width:224px;min-height:135px;padding:15px}
-  body:has(.meetingroom-module-card) .meetingroom-module-card img{width:48px;height:48px;margin-bottom:6px}
-  body:has(.meetingroom-module-card) .meetingroom-module-card span{font-size:8px}
-  body:has(.meetingroom-module-card) .meetingroom-module-card h3{font-size:15px;margin:5px 0 0}
-  body:has(.meetingroom-module-card) .meetingroom-module-card p{font-size:10px;line-height:1.45}
-  body:has(.meetingroom-module-card) .meetingroom-module-card b{font-size:10px}
+  body:has(.meetingroom-module-card) .module-grid{max-width:1120px;gap:12px;margin-top:12px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card{flex-basis:268.8px;width:268.8px;min-height:162px;padding:18px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card img{width:57.6px;height:57.6px;margin-bottom:7.2px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card span{font-size:9.6px}
+  body:has(.meetingroom-module-card) .meetingroom-module-card h3{font-size:18px;margin:6px 0 0}
+  body:has(.meetingroom-module-card) .meetingroom-module-card p{font-size:12px;line-height:1.45}
+  body:has(.meetingroom-module-card) .meetingroom-module-card b{font-size:12px}
 }
