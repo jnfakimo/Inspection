@@ -12,25 +12,27 @@
 .mr-page .mr-panel{border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden}
 .mr-page .mr-panel-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid var(--line)}
 .mr-page .mr-panel-head strong{font-size:.95rem}
+.mr-page .mr-schedule-panel .mr-panel-head strong{font-size:1.52rem}
 .mr-page .mr-panel-head .spacer{flex:1}
 .mr-page .mr-panel-head .hint{color:var(--dim);font-size:.72rem}
 .mr-page .mr-panel-body{padding:14px 16px}
 
 .mr-page .week-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.mr-page .week-label{min-width:150px;text-align:center;font-weight:700;font-size:.88rem}
+.mr-page .week-label{min-width:150px;text-align:center;font-weight:700;font-size:1.408rem}
+.mr-page .mr-schedule-panel .week-nav .btn{font-size:1.28rem}
 
 .mr-page .grid-wrap{overflow:auto}
-.mr-page .roomgrid{width:100%;border-collapse:collapse;table-layout:fixed;font-size:.78rem;min-width:900px}
+.mr-page .roomgrid{width:100%;border-collapse:collapse;table-layout:fixed;font-size:1.248rem;min-width:900px}
 .mr-page .roomgrid th{padding:8px 6px;border:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 8%,transparent);font-weight:700;text-align:center;line-height:1.5}
-.mr-page .roomgrid th:first-child{width:26%}
-.mr-page .roomgrid th:not(:first-child){width:10.5714%}
+.mr-page .roomgrid th:first-child{width:13%}
+.mr-page .roomgrid th:not(:first-child){width:12.4286%}
 .mr-page .roomgrid th.weekend{background:color-mix(in srgb,var(--amber) 12%,transparent)}
 .mr-page .roomgrid td{padding:5px;border:1px solid var(--line);vertical-align:top;min-width:118px;height:78px}
 .mr-page .roomgrid td.weekend{background:color-mix(in srgb,var(--amber) 5%,transparent)}
 .mr-page .roomgrid td.past{background:#eef1f4 !important;color:#94a3b8;opacity:1;cursor:not-allowed}
 .mr-page .roomgrid td.past .bk-pill{filter:grayscale(.65);opacity:.72}
-.mr-page .past-slot-label{display:inline-block;margin:8px 2px;color:#9aa5b1;font-size:.68rem}
-.mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--cyan) 5%,transparent);white-space:nowrap}
+.mr-page .past-slot-label{display:inline-block;margin:8px 2px;color:#9aa5b1;font-size:1.088rem}
+.mr-page .roomgrid td.roomname{font-weight:700;vertical-align:middle;background:color-mix(in srgb,var(--cyan) 5%,transparent);white-space:normal;overflow-wrap:anywhere}
 /* 週排程的會議室名稱欄依資料列循環跳色，與主檔清單保持一致。 */
 .mr-page .roomgrid tbody tr:nth-child(4n+1) td.roomname{background:#f0f9ff;border-left:3px solid #7dd3fc}
 .mr-page .roomgrid tbody tr:nth-child(4n+2) td.roomname{background:#f0fdf4;border-left:3px solid #86efac}
