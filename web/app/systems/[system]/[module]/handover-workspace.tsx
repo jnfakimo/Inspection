@@ -427,7 +427,7 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
     <footer>
       <button className="secondary-btn" onClick={onClose}>取消</button>
       <button className="secondary-btn" disabled={busy} onClick={() => void save('draft')}>儲存草稿</button>
-      <button className="primary-btn compact" disabled={busy} onClick={() => void save('confirmed')}>{busy ? '送出中…' : '送出交接'}</button>
+      <button className="primary-btn compact handover-submit-btn" disabled={busy} onClick={() => void save('confirmed')}>{busy ? '送出中…' : '送出交接'}</button>
     </footer>
   </AdminModal>;
 }
