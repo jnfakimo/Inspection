@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminSidebar } from '@/components/AdminSidebar';
+import { ResponsiveTableLabels } from '@/components/ResponsiveTableLabels';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import type { Profile } from '@/types/app';
@@ -162,6 +163,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   }
 
   return <div className="app-shell v1-shell">
+    <ResponsiveTableLabels />
     <header className="v1-navbar">
       <div className="v1-brand"><b>■ TAIPEC-MKT-1</b><strong>{title}</strong><span>臺北農產公司／第一果菜市場</span></div>
       <nav className="v1-actions" aria-label="共用系統導覽">

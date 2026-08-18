@@ -21,3 +21,43 @@
 :where(a, button, input, select, textarea, summary, [tabindex]):focus:not(:focus-visible) {
   outline: none;
 }
+
+/* 表格手機卡片化。
+   原本 .responsive-table 只有 overflow:auto，稽核紀錄 7 欄、派車申請 9 欄在手機上
+   要一路左右滑。640px 以下改成每列一張卡片，欄位名由 ResponsiveTableLabels
+   從 <thead> 自動注入 data-label。 */
+@media (max-width: 640px) {
+  .responsive-table table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td { display: block; width: 100% }
+  .responsive-table thead { display: none }
+  .responsive-table tr {
+    margin-bottom: 10px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .responsive-table td {
+    display: grid;
+    grid-template-columns: minmax(72px, 32%) 1fr;
+    gap: 12px;
+    align-items: baseline;
+    padding: 7px 0;
+    border: 0;
+    border-bottom: 1px solid rgba(127, 127, 127, .16);
+  }
+  .responsive-table tr td:last-child { border-bottom: 0 }
+  /* 欄位名來自 data-label；跨欄儲存格（小計列、空狀態）沒有標籤，就整格佔滿。 */
+  .responsive-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .responsive-table td:not([data-label]) { display: block; text-align: center }
+  .responsive-table td:not([data-label])::before { content: none }
+  /* 操作按鈕在卡片裡改為靠左並可換行，不再被擠成一直行。 */
+  .responsive-table .admin-row-actions { display: flex; flex-wrap: wrap; gap: 6px }
+}
