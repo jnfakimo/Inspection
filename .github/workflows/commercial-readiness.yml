@@ -20,3 +20,5 @@ jobs:
           node-version: 22
       - name: Audit static application
         run: node tools/commercial-readiness-audit.mjs
+      - name: Audit V2 security design controls
+        run: npm run security:audit

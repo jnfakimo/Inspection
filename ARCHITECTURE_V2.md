@@ -74,6 +74,28 @@ V2 的 8 大系統、48 個子系統皆以臺灣繁體中文作為主要顯示�
 5. GitHub 儲存庫的 Pages 設定必須維持 **Source: GitHub Actions**；不得改回 branch／root 或 `/docs` 部署。
 6. 發布後若瀏覽器仍顯示舊版，使用網址加 `?v=<commit>` 或重新整理快取；這是 CDN 快取更新，不代表部署未執行。
 
+## 資安與 ISO/IEC 27000 系列設計規格（2026-08-19）
+
+本專案以 ISO/IEC 27001 的資訊安全管理控制精神及 ISO/IEC 27002 的控制實務作為設計基準；「可通過」僅能由正式稽核與認證機構判定，開發流程不得自行宣稱已取得認證。每次新增功能、資料表、Edge Function 或第三方整合，必須先完成以下自我檢核：
+
+1. **身分與權限**：登入狀態、帳號啟用狀態、RBAC 與最小權限均在伺服器端驗證；資料庫以 RLS 作最後一道防線。
+2. **輸入與輸出安全**：使用參數化查詢；所有使用者可控資料在 HTML、列印、CSV／XLSX、URL 與日誌輸出前完成情境式跳脫；禁止 `eval`／`new Function`。
+3. **瀏覽器防護**：維持 CSP、HTTPS、SRI、`frame-ancestors`（可用 header 時）及安全 Cookie／Token 設定；不得將 access token 或 service role key 寫入畫面、日誌或版本庫。
+4. **機密與個資**：機密只由 GitHub Secrets／Supabase Secrets 注入；個資、聯絡方式、IP 與 User-Agent 依最小必要原則使用，匯出與附件遵守權限及保存期限。
+5. **紀錄與追蹤**：登入、權限拒絕、重要異動、匯出與管理操作需有可追溯稽核紀錄；紀錄不得包含密碼、Token 或完整個資。
+6. **資料完整性與可用性**：跨表流程使用交易或 SECURITY DEFINER 函式；重要資料採備份、復原演練與永久資料保護規則，不任意刪除或重置。
+7. **弱點與變更管理**：提交前執行 `npm run security:audit`、`npm run scan:pages` 及必要的型別／建置檢查；GitHub Actions 需通過後才可部署，並保留 commit 與部署證據。
+
+### 開發前資安自我檢核
+
+```text
+npm run security:audit
+npm run scan:pages
+npm run build:pages
+```
+
+`security:audit` 目前會阻擋硬編碼服務金鑰、私鑰、動態程式碼執行與正式環境 HTTP；對 `dangerouslySetInnerHTML`、`document.write` 等需人工確認的項目列警告。這是工程閘門，不取代滲透測試、風險評估、供應商審查、資產清冊、SoA 或 ISO/IEC 27001 第三方稽核。
+
 本專案的技術選型基準（2026-08-16 確認）：
 
 | 層 | 基準 | 說明 |

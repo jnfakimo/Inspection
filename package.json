@@ -9,6 +9,7 @@
     "build:pages": "npm run build:v2 && node tools/build-hardened-pages.mjs",
     "scan:pages": "node tools/scan-all-pages.mjs",
     "verify:provenance": "node tools/verify-provenance.mjs",
+    "security:audit": "node tools/security-design-audit.mjs",
     "test": "node --check tools/build-hardened-pages.mjs"
   },
   "dependencies": {
