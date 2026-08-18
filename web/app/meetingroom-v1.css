@@ -63,10 +63,10 @@
 .mr-page .mr-card .acts{display:flex;gap:6px;flex-wrap:wrap}
 .mr-page .mr-list .mr-card{background:var(--panel)}
 /* 會議室管理與週排程使用相同的淺藍／淺綠／淺黃／淺紫循環。 */
-.mr-page .room-admin-list .room-admin-card.room-color-0{background:#e0f2fe;border-left-color:#7dd3fc}
-.mr-page .room-admin-list .room-admin-card.room-color-1{background:#dcfce7;border-left-color:#86efac}
-.mr-page .room-admin-list .room-admin-card.room-color-2{background:#fef3c7;border-left-color:#fcd34d}
-.mr-page .room-admin-list .room-admin-card.room-color-3{background:#f3e8ff;border-left-color:#c4b5fd}
+.mr-page .room-admin-list .room-admin-card.room-color-0{background:color-mix(in srgb,#e0f2fe 20%,var(--panel));border-left-color:#7dd3fc}
+.mr-page .room-admin-list .room-admin-card.room-color-1{background:color-mix(in srgb,#dcfce7 20%,var(--panel));border-left-color:#86efac}
+.mr-page .room-admin-list .room-admin-card.room-color-2{background:color-mix(in srgb,#fef3c7 20%,var(--panel));border-left-color:#fcd34d}
+.mr-page .room-admin-list .room-admin-card.room-color-3{background:color-mix(in srgb,#f3e8ff 20%,var(--panel));border-left-color:#c4b5fd}
 /* 會議室管理清單在彈窗中位於 .mr-page 外，使用同一組 V1 淺色跳色。 */
 .mr-modal .room-admin-list{display:grid;gap:10px}
 .mr-modal .room-admin-card{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:4px;background:var(--panel)}
@@ -74,10 +74,10 @@
 .mr-modal .room-admin-card b{display:block;font-size:.88rem}
 .mr-modal .room-admin-card small{display:block;margin-top:3px;color:var(--dim);font-size:.72rem}
 .mr-modal .room-admin-card .acts{display:flex;gap:6px;flex-wrap:wrap}
-.mr-modal .room-admin-list .room-admin-card.room-color-0{background:#e0f2fe;border-left-color:#7dd3fc}
-.mr-modal .room-admin-list .room-admin-card.room-color-1{background:#dcfce7;border-left-color:#86efac}
-.mr-modal .room-admin-list .room-admin-card.room-color-2{background:#fef3c7;border-left-color:#fcd34d}
-.mr-modal .room-admin-list .room-admin-card.room-color-3{background:#f3e8ff;border-left-color:#c4b5fd}
+.mr-modal .room-admin-list .room-admin-card.room-color-0{background:color-mix(in srgb,#e0f2fe 20%,var(--panel));border-left-color:#7dd3fc}
+.mr-modal .room-admin-list .room-admin-card.room-color-1{background:color-mix(in srgb,#dcfce7 20%,var(--panel));border-left-color:#86efac}
+.mr-modal .room-admin-list .room-admin-card.room-color-2{background:color-mix(in srgb,#fef3c7 20%,var(--panel));border-left-color:#fcd34d}
+.mr-modal .room-admin-list .room-admin-card.room-color-3{background:color-mix(in srgb,#f3e8ff 20%,var(--panel));border-left-color:#c4b5fd}
 /* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
 .mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
 .mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}
