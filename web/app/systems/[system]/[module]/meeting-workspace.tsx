@@ -285,10 +285,12 @@ function MeetingRoomPage({ module, profile }: Props) {
               const statusIsPink = bookingStatus === 'cancelled' || bookingStatus === 'expired';
               const statusLabel = ({ booked: '已預約', checked_in: '已報到', cancelled: '已取消', expired: '已逾期' } as Record<string, string>)[bookingStatus] || fmt(b.status);
               return <div className={`mr-card${statusIsPink ? ' booking-status-pink' : ''}`} key={String(b.booking_id)}>
-                <div className="grow">
-                  <b>{fmt(b.purpose)}　<span style={{ color: 'var(--dim)', fontWeight: 400 }}>{fmt(b.booking_no)}</span></b>
-                  <small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}
-                    ｜<span className={statusIsPink ? 'booking-status-pink-label' : undefined}>{statusLabel}</span></small>
+                <div className="grow booking-info-grid">
+                  <strong className="booking-purpose">{fmt(b.purpose)}</strong>
+                  <span className="booking-number">{fmt(b.booking_no)}</span>
+                  <span className="booking-room">{fmt(room.name)}</span>
+                  <span className="booking-time">{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</span>
+                  <span className={`booking-state${statusIsPink ? ' booking-status-pink-label' : ''}`}>{statusLabel}</span>
                 </div>
                 <div className="acts">
                   {b.status === 'booked' && inWindow && <button className="btn btn-primary checkin-btn" onClick={() => void checkIn(b)}>報到</button>}

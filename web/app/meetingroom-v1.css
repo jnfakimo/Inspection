@@ -81,6 +81,13 @@
 /* 我的預約固定以白色與淺藍色交替，避免與管理清單混用四種色彩。 */
 .mr-page .my-booking-list .mr-card:nth-child(odd){background:#fff;border-left-color:#7dd3fc}
 .mr-page .my-booking-list .mr-card:nth-child(even){background:#f0f9ff;border-left-color:#7dd3fc}
+.mr-page .my-booking-list .booking-info-grid{display:grid;grid-template-columns:minmax(120px,180px) minmax(230px,1fr) minmax(72px,max-content);align-items:baseline;row-gap:6px;flex:1 1 560px;min-width:0}
+.mr-page .my-booking-list .booking-purpose{grid-column:1;grid-row:1;min-width:0;font-size:.88rem;overflow-wrap:anywhere}
+.mr-page .my-booking-list .booking-number{grid-column:2 / 4;grid-row:1;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.88rem;white-space:nowrap}
+.mr-page .my-booking-list .booking-room{grid-column:1;grid-row:2;min-width:0;color:var(--dim);font-size:.72rem;overflow-wrap:anywhere}
+.mr-page .my-booking-list .booking-time{grid-column:2;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.72rem;white-space:nowrap}
+.mr-page .my-booking-list .booking-state{grid-column:3;grid-row:2;padding-left:14px;border-left:1px solid var(--line);color:var(--dim);font-size:.72rem;white-space:nowrap}
+.mr-page .my-booking-list .mr-card .acts{align-self:center;margin-left:auto}
 /* 已取消／已逾期以粉紅色註記，並與一般預約清楚區隔。 */
 .mr-page .booking-status-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
 .mr-page .booking-status-summary-item{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border:1px solid #f9a8d4;border-radius:999px;background:#fce7f3;color:#9d174d;font-size:.72rem}
@@ -90,6 +97,12 @@
 .mr-page .my-booking-list .booking-status-pink-label{color:#be185d;font-weight:700}
 @media (max-width:600px){
   .mr-page .booking-status-summary{width:100%;margin-left:0}
+  .mr-page .my-booking-list .booking-info-grid{grid-template-columns:1fr;row-gap:4px}
+  .mr-page .my-booking-list .booking-purpose,
+  .mr-page .my-booking-list .booking-number,
+  .mr-page .my-booking-list .booking-room,
+  .mr-page .my-booking-list .booking-time,
+  .mr-page .my-booking-list .booking-state{grid-column:1;grid-row:auto;padding-left:0;border-left:0;white-space:normal}
 }
 /* 變更申請保留清楚但低對比的雙色區隔。 */
 .mr-page .change-request-list .mr-card:nth-child(odd){background:color-mix(in srgb,#e0f2fe 48%,var(--panel));border-left-color:#7dd3fc}
