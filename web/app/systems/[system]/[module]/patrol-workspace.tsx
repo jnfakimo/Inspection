@@ -23,6 +23,7 @@ import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { LEGACY_BASE } from '@/lib/config';
+import { escHtml } from '@/lib/html-escape';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { FloorStack3D, floorOrder, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -203,7 +204,6 @@ function PointsModule({ module, profile }: Props) {
       })));
       const win = window.open('', '_blank');
       if (!win) { setNote('失敗：請允許彈出視窗才能列印 QR 標籤'); return; }
-      const escape = (value: string) => value.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] || ch));
       win.document.write('<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="UTF-8"><title>巡邏點 QR 標籤</title><style>'
         + 'body{font-family:"Noto Sans TC",system-ui,sans-serif;margin:0;padding:16px}'
         + '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}'
@@ -211,7 +211,7 @@ function PointsModule({ module, profile }: Props) {
         + '.tag img{width:140px;height:140px;image-rendering:pixelated}'
         + '.tag .n{font-size:14px;font-weight:700;margin-top:6px}.tag .f{font-size:11px;color:#666}'
         + '@media print{.tag{border:1px solid #ccc}}</style></head><body><div class="grid">'
-        + tags.map(tag => `<div class="tag"><img src="${tag.image}" alt=""><div class="n">${escape(tag.label)}</div><div class="f">${escape(tag.floor)}</div></div>`).join('')
+        + tags.map(tag => `<div class="tag"><img src="${tag.image}" alt=""><div class="n">${escHtml(tag.label)}</div><div class="f">${escHtml(tag.floor)}</div></div>`).join('')
         + '</div></body></html>');
       win.document.close(); win.focus();
     } catch (error) { setNote(`失敗：${errorMessage(error, 'QR 標籤列印失敗')}`); }

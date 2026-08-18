@@ -14,6 +14,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { escHtml } from '@/lib/html-escape';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -354,16 +355,18 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
     if (!filtered.length) return alert('目前條件沒有可列印的資料');
     const popup = window.open('', 'vehicleDispatchReport', 'width=1280,height=850');
     if (!popup) return alert('瀏覽器已阻擋列印視窗');
+    // 這份 HTML 不經過 React，每個來自資料庫的值都必須跳脫；
+    // 數值欄位先轉成數字再格式化，本身不會挾帶標記。
     const body = filtered.map(r => `<tr>
-      <td>${String(r.trip_date)}<br>${timeText(r.planned_departure_time)}–${timeText(r.planned_return_time)}</td>
-      <td>${String(r.request_no)}<br>${STATUS_LABEL[String(r.status)] || r.status}</td>
-      <td>${String(r.applicant_department || '—')}<br>${String(r.applicant_name)}</td>
-      <td>${String(r.origin_location)} → ${String(r.destination_location)}</td>
-      <td>${String(r.trip_purpose)}</td>
-      <td>${String(r.plate_no || '待派')}<br>${String(r.driver_name || '—')}</td>
+      <td>${escHtml(r.trip_date)}<br>${escHtml(timeText(r.planned_departure_time))}–${escHtml(timeText(r.planned_return_time))}</td>
+      <td>${escHtml(r.request_no)}<br>${escHtml(STATUS_LABEL[String(r.status)] || r.status)}</td>
+      <td>${escHtml(r.applicant_department || '—')}<br>${escHtml(r.applicant_name)}</td>
+      <td>${escHtml(r.origin_location)} → ${escHtml(r.destination_location)}</td>
+      <td>${escHtml(r.trip_purpose)}</td>
+      <td>${escHtml(r.plate_no || '待派')}<br>${escHtml(r.driver_name || '—')}</td>
       <td>${r.total_mileage == null ? '—' : Number(r.total_mileage).toFixed(1) + ' km'}</td>
       <td>${r.refueled ? Number(r.refuel_cost || 0).toLocaleString('zh-TW') + ' 元' : '否'}</td>
-      <td>${r.has_abnormality ? '有｜' + String(r.abnormality_note || '') : '無'}</td>
+      <td>${r.has_abnormality ? '有｜' + escHtml(r.abnormality_note || '') : '無'}</td>
     </tr>`).join('');
 
     popup.document.write(`<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>公務車派車報表</title><style>
@@ -377,7 +380,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
       @page{size:A4 landscape;margin:10mm}
     </style></head><body>
       <h1>臺北農產公司／第一果菜市場　公務車派車報表</h1>
-      <div class="meta">報表期間：${reportFrom} 至 ${reportTo}｜產出人：${profile.name}｜產出時間：${new Date().toLocaleString('zh-TW')}</div>
+      <div class="meta">報表期間：${escHtml(reportFrom)} 至 ${escHtml(reportTo)}｜產出人：${escHtml(profile.name)}｜產出時間：${escHtml(new Date().toLocaleString('zh-TW'))}</div>
       <div class="summary"><b>申請 ${metrics.count} 筆</b><b>乘車 ${metrics.passengers} 人次</b><b>里程 ${metrics.mileage.toFixed(1)} km</b><b>加油 ${metrics.fuel.toLocaleString('zh-TW')} 元</b><b>異常 ${metrics.abnormal} 件</b></div>
       <table><thead><tr><th>日期／時段</th><th>單號／狀態</th><th>單位／申請人</th><th>起訖地點</th><th>用途</th><th>車號／司機</th><th>里程</th><th>加油</th><th>異常</th></tr></thead><tbody>${body}</tbody></table>
     </body></html>`);
