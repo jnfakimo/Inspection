@@ -50,3 +50,21 @@
   .dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .bar-row{grid-template-columns:minmax(60px,40%) 1fr auto}
 }
+
+/* 臺灣即時氣象：V1 在此嵌互動地圖，V2 改用下拉選單（見 weather-widget.tsx 的說明）。 */
+.weather-bulletins{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.weather-bulletin{display:inline-flex;align-items:baseline;gap:6px;border:1px solid var(--line);border-left:3px solid var(--dim);border-radius:6px;padding:7px 11px;font-size:12px;color:var(--dim)}
+.weather-bulletin b{color:var(--text);font-size:12px}
+.weather-bulletin.active{border-left-color:var(--red);color:var(--text)}
+.weather-bulletin.ended{border-left-color:var(--amber)}
+.weather-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.weather-controls select{background:#020b18;border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:6px}
+.weather-controls .secondary-btn{background:transparent;border:1px solid var(--line);color:var(--dim);padding:8px 13px;border-radius:6px;cursor:pointer}
+.weather-controls>span{margin-left:auto;color:var(--dim);font-size:12px}
+.weather-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 12px}
+.weather-metrics>div{border:1px solid var(--line);border-radius:8px;padding:11px 13px}
+.weather-metrics dt{color:var(--dim);font-size:11px}
+.weather-metrics dd{margin:5px 0 0;font:700 18px var(--head);color:var(--cyan)}
+.weather-alerts p{margin:0 0 8px;padding:9px 12px;border:1px solid rgba(255,59,59,.4);border-radius:6px;color:var(--text);font-size:12px}
+@media(max-width:1200px){.weather-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.weather-metrics{grid-template-columns:1fr 1fr}.weather-controls>span{margin-left:0;width:100%}}

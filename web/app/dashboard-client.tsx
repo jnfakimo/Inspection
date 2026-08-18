@@ -18,6 +18,8 @@
 // 2. 圖表不引入 Chart.js：狀態分佈與各項排行改用與 V1 rankBars 同樣的水平長條，
 //    月趨勢沿用 V2 既有的 .trend-chart 直條。數字口徑不變。
 //
+// 臺灣即時氣象另成一個元件（weather-widget.tsx），資料仍走既有的 cwa-weather 函式。
+//
 // KPI／提醒的計算逐項沿用 V1 render() 的公式（SLA、MTTR、MTBF、逾期、待派工），
 // 曆日一律以台北時區為準——timestamptz 回傳的是 UTC，直接 slice(0,10) 會跨日算錯。
 
@@ -25,6 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
+import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
 
 type Row = Record<string, any>;
@@ -281,9 +284,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
             <small>{month.label}</small>
           </div>)}</div>;
       }
-      case 'weather_taiwan': return <p className="empty">
-        臺灣即時氣象尚未搬移至此版，請至 V1 戰情儀表板檢視警特報、縣市觀測與鄉鎮預報。
-      </p>;
+      case 'weather_taiwan': return <WeatherWidget />;
       default: return <p className="empty">未知的版面元件：{item.widget_key}</p>;
     }
   };
