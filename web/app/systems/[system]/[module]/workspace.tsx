@@ -120,7 +120,7 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
   const options = (columnFilterOptions[column.key] || []).filter(option => option.value !== EMPTY_FILTER_VALUE);
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
   if (column.key === 'fault_type' || column.key === 'department' || column.key === 'urgency') { const listId = 'request-' + column.key + '-filter-list'; return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : column.key === 'department' ? '全部單位' : '全部急迫性'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; }
-  if (column.key === 'created_at' || column.key === 'desired_finish') return <th><input className='request-filter-date' type='date' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
+  if (column.key === 'created_at' || column.key === 'desired_finish') return <th><input className='request-filter-date' type={columnFilters[column.key] ? 'date' : 'text'} placeholder='年/月/日' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} onFocus={e => { e.currentTarget.type = 'date'; try { e.currentTarget.showPicker(); } catch(err){} }} onBlur={e => { if (!e.currentTarget.value) e.currentTarget.type = 'text'; }} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
   return <th><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''></option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
 }
 
@@ -530,17 +530,17 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         </div>}
       </div>
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
-      {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
+      {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label} data-label={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
       <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : isDispatchModule ? 'dispatch-v1-table' : ''}`}>
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setEquipmentPhoto(null); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {isRequestModule && <div className="request-status-chips">
-          <button className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.filter(row => row.status !== 'closed').length || 0}</b></button>
-          <button className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待主管派工 <b>{data?.rows.filter(row => ['pending', 'transferred'].includes(String(row.status))).length || 0}</b></button>
-          <button className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>待接單 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button>
-          <button className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button>
-          <button className={statusFilter === 'pending_review' ? 'active' : ''} onClick={() => setStatusFilter('pending_review')}>待報修人驗收 <b>{data?.rows.filter(row => row.status === 'pending_review').length || 0}</b></button>
-          <button className={statusFilter === 'completed' ? 'active' : ''} onClick={() => setStatusFilter('completed')}>待主管驗收 <b>{data?.rows.filter(row => row.status === 'completed').length || 0}</b></button>
-          <button className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button>
+          <button data-status="all" className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.filter(row => row.status !== 'closed').length || 0}</b></button>
+          <button data-status="pending" className={statusFilter === 'pending' ? 'active' : ''} onClick={() => setStatusFilter('pending')}>待主管派工 <b>{data?.rows.filter(row => ['pending', 'transferred'].includes(String(row.status))).length || 0}</b></button>
+          <button data-status="assigned" className={statusFilter === 'assigned' ? 'active' : ''} onClick={() => setStatusFilter('assigned')}>待接單 <b>{data?.rows.filter(row => row.status === 'assigned').length || 0}</b></button>
+          <button data-status="in_progress" className={statusFilter === 'in_progress' ? 'active' : ''} onClick={() => setStatusFilter('in_progress')}>維修中 <b>{data?.rows.filter(row => row.status === 'in_progress').length || 0}</b></button>
+          <button data-status="pending_review" className={statusFilter === 'pending_review' ? 'active' : ''} onClick={() => setStatusFilter('pending_review')}>待報修人驗收 <b>{data?.rows.filter(row => row.status === 'pending_review').length || 0}</b></button>
+          <button data-status="completed" className={statusFilter === 'completed' ? 'active' : ''} onClick={() => setStatusFilter('completed')}>待主管驗收 <b>{data?.rows.filter(row => row.status === 'completed').length || 0}</b></button>
+          <button data-status="closed" className={statusFilter === 'closed' ? 'active' : ''} onClick={() => setStatusFilter('closed')}>已結案 <b>{data?.rows.filter(row => row.status === 'closed').length || 0}</b></button>
         </div>}        {!data && !error ? <div className="loading-panel">正在透過安全服務載入資料…</div> : <>
           <div className="responsive-table">
             <table>
