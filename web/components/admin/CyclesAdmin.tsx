@@ -2,15 +2,12 @@
 
 // SYS-01 巡檢週期：對應 V1 admin.html 的 page-cycles。
 //
-// 開新週期沿用 V1 的兩步驟做法（先把所有未結束的週期補上 ended_at，再插入新的一筆），
-// 因為 inspection_cycles 沒有對應的 security definer 函式可呼叫。兩個 statement 之間
-// 不是同一筆交易：若關閉成功而插入失敗，會短暫出現「沒有進行中週期」的狀態，
-// 因此插入失敗時明確提示需重新開啟，不讓使用者以為沒事。
-// 兩段寫入的權限都由 inspection_cycles_admin_insert／_admin_update（is_admin()）把關。
+// 開新週期由 app-api 呼叫 security definer 函式，在同一筆交易內關閉舊週期並建立新週期，
+// 避免兩個 statement 之間失敗而留下「沒有進行中週期」的狀態。
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, type AdminProps, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from './shared';
 
 const CYCLE_TYPES: Array<[string, string]> = [['daily', '每日'], ['shift', '每班'], ['weekly', '每週']];
@@ -41,16 +38,8 @@ export function CyclesAdmin({ profile, module }: AdminProps) {
   const createCycle = async () => {
     if (!window.confirm('確定要開啟新巡檢週期？所有設備將重置為未巡檢（紅燈）。')) return;
     setBusy(true); setNote('');
-    const client = getSupabase();
-    const closed = await client.from('inspection_cycles').update({ ended_at: new Date().toISOString() }).is('ended_at', null);
-    if (closed.error) { setNote(`失敗：結束現有週期失敗，未建立新週期。${errorMessage(closed.error)}`); setBusy(false); return; }
-    const { error } = await client.from('inspection_cycles').insert({
-      cycle_type: cycleType, started_at: new Date().toISOString(), created_by: profile.user_id,
-    });
-    if (error) {
-      setNote(`失敗：現有週期已結束但新週期建立失敗，目前沒有進行中的週期，請再按一次開啟。${errorMessage(error)}`);
-      await load(); return;
-    }
+    try { await invokeAppApi('open_inspection_cycle', { cycle_type: cycleType }); }
+    catch (error) { setNote(`失敗：${errorMessage(error, '開啟巡檢週期失敗')}`); setBusy(false); return; }
     await load(); setNote('新巡檢週期已開啟，所有設備已重置為未巡檢');
   };
 

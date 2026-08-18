@@ -12,7 +12,7 @@ import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { escHtml } from '@/lib/html-escape';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -769,11 +769,8 @@ function VehiclesModule({ module, profile }: Props) {
       seats, current_odometer: odometer, status: String(editor.status || 'active'),
       note: String(editor.note || '').trim() || null,
     };
-    const client = getSupabase();
-    const { error } = editor.vehicle_id
-      ? await client.from('official_vehicles').update(payload).eq('vehicle_id', editor.vehicle_id)
-      : await client.from('official_vehicles').insert({ ...payload, created_by: profile.user_id });
-    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
+    try { await invokeAppApi('save_official_vehicle', { vehicle_id: editor.vehicle_id, ...payload }); }
+    catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
     setEditor(null); await load(); setNote(editor.vehicle_id ? '車輛資料已更新' : '車輛已新增');
   };
 

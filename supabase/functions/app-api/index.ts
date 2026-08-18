@@ -154,6 +154,7 @@ Deno.serve(async (req) => {
     const { data: permissions } = await admin.from('role_permissions').select('perm,allowed').eq('role_id', roleId).eq('allowed', true).like('perm', 'sys_%');
     const allowedSystems = new Set((permissions || []).map(row => String(row.perm).replace(/^sys_/, '')));
     const can = (system: string) => isSysadmin || allowedSystems.has(system);
+    const isAdmin = profile.role === 'admin' || ['admin', 'sysadmin'].includes(String(profile.rbac_role || ''));
 
     const userDb = createClient(SUPABASE_URL, ANON_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -167,6 +168,9 @@ Deno.serve(async (req) => {
       inspections: 'app-api:inspections',
       equipment_map: 'app-api:equipment_map',
       update_personal_profile: 'app-api:update_personal_profile',
+      open_inspection_cycle: 'app-api:open_inspection_cycle',
+      create_cost_record: 'app-api:create_cost_record',
+      save_official_vehicle: 'app-api:save_official_vehicle',
     } as Record<string, string>)[action];
     if (actionScope) {
       const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
@@ -286,6 +290,66 @@ Deno.serve(async (req) => {
       return reply(req, { ok: true, data });
     }
 
+    if (action === 'open_inspection_cycle') {
+      if (!isAdmin || !can('guardpatrol')) return reply(req, { ok: false, message: '只有巡檢系統管理者可以開啟週期' }, 403);
+      const cycleType = text(body.cycle_type, 20);
+      if (!['daily', 'shift', 'weekly'].includes(cycleType)) return reply(req, { ok: false, message: '週期類型無效' }, 400);
+      const { data, error } = await userDb.rpc('open_inspection_cycle', { p_cycle_type: cycleType });
+      if (error) throw error;
+      return reply(req, { ok: true, data: { cycle_id: data } });
+    }
+
+    if (action === 'create_cost_record') {
+      if (!can('workorder') || !isAdmin) {
+        return reply(req, { ok: false, message: '目前角色沒有新增費用權限' }, 403);
+      }
+      const equipmentId = text(body.equipment_id, 80);
+      const costType = text(body.cost_type, 20);
+      const vendor = text(body.vendor, 200) || null;
+      const note = text(body.note, 1000) || null;
+      const costDate = text(body.cost_date, 10);
+      const amount = Number(body.amount);
+      if (!/^[0-9a-f-]{36}$/i.test(equipmentId)) return reply(req, { ok: false, message: '設備識別碼無效' }, 400);
+      if (!['purchase', 'outsource', 'parts', 'labor', 'other'].includes(costType)) return reply(req, { ok: false, message: '費用類型無效' }, 400);
+      if (!Number.isFinite(amount) || amount < 0 || amount > 9999999999) return reply(req, { ok: false, message: '金額必須介於 0 至 9,999,999,999' }, 400);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(costDate)) return reply(req, { ok: false, message: '日期格式無效' }, 400);
+      const { data, error } = await userDb.from('cost_records').insert({
+        equipment_id: equipmentId, cost_type: costType, vendor, cost_date: costDate,
+        amount, note, created_by: profile.user_id,
+      }).select('cost_id').single();
+      if (error) throw error;
+      return reply(req, { ok: true, data });
+    }
+
+    if (action === 'save_official_vehicle') {
+      if (!can('vehicle')) return reply(req, { ok: false, message: '目前角色沒有車輛主檔權限' }, 403);
+      const isFleetManager = isAdmin || (await userDb.from('vehicle_dispatch_managers').select('user_id').eq('user_id', profile.user_id).eq('active', true).maybeSingle()).data;
+      if (!isFleetManager) return reply(req, { ok: false, message: '只有派車管理者可以維護車輛主檔' }, 403);
+      const vehicleId = text(body.vehicle_id, 80);
+      const plateNo = text(body.plate_no, 40);
+      const seats = Number(body.seats);
+      const odometer = Number(body.current_odometer);
+      if (!plateNo || !Number.isInteger(seats) || seats < 1 || seats > 100 || !Number.isFinite(odometer) || odometer < 0 || odometer > 999999999) {
+        return reply(req, { ok: false, message: '車號、座位數或里程資料無效' }, 400);
+      }
+      const payload = {
+        plate_no: plateNo, vehicle_name: text(body.vehicle_name, 120) || null,
+        brand: text(body.brand, 120) || null, model: text(body.model, 120) || null,
+        seats, current_odometer: odometer, status: body.status === 'inactive' ? 'inactive' : 'active',
+        note: text(body.note, 1000) || null,
+      };
+      if (vehicleId) {
+        if (!/^[0-9a-f-]{36}$/i.test(vehicleId)) return reply(req, { ok: false, message: '車輛識別碼無效' }, 400);
+        const { data, error } = await userDb.from('official_vehicles').update(payload).eq('vehicle_id', vehicleId).select('vehicle_id').maybeSingle();
+        if (error) throw error;
+        if (!data) return reply(req, { ok: false, message: '找不到車輛' }, 404);
+        return reply(req, { ok: true, data: { vehicle_id: vehicleId, created: false } });
+      }
+      const { data, error } = await userDb.from('official_vehicles').insert({ ...payload, created_by: profile.user_id }).select('vehicle_id').single();
+      if (error) throw error;
+      return reply(req, { ok: true, data: { vehicle_id: data.vehicle_id, created: true } });
+    }
+
     if (action === 'equipment_map') {
       if (!can('structuremap') && !can('equipment')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
       const [equipment, markers, locations] = await Promise.all([
@@ -304,8 +368,6 @@ Deno.serve(async (req) => {
     // ---- SYS-08 會議室預約 ----------------------------------------------
     // 鏡射 public.is_admin()：role='admin' 或 rbac_role in ('admin','sysadmin')。
     // profile 查詢已限定 status='active'，故此處不必再判斷。
-    const isAdmin = profile.role === 'admin' || ['admin', 'sysadmin'].includes(String(profile.rbac_role || ''));
-
     if (action === 'meeting_check_in') {
       if (!can('meetingroom')) return reply(req, { ok: false, message: '目前角色沒有會議室系統權限' }, 403);
       const bookingId = text(body.booking_id, 80);

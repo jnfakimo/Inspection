@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, type AdminProps, errorMessage, fmt, PAGE_SIZE, Pager, type Row } from './shared';
 
 const COST_TYPES: Array<[string, string]> = [
@@ -77,12 +77,10 @@ export function CostsAdmin({ profile, module }: AdminProps) {
     if (!form.cost_date) { setNote('失敗：請填寫日期'); return; }
     if (!Number.isFinite(amount) || amount < 0) { setNote('失敗：請填寫有效金額'); return; }
     setBusy(true); setNote('');
-    const { error } = await getSupabase().from('cost_records').insert({
-      equipment_id: form.equipment_id, cost_type: form.cost_type,
-      vendor: form.vendor.trim() || null, cost_date: form.cost_date,
-      amount, note: form.note.trim() || null, created_by: profile.user_id,
-    });
-    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
+    try { await invokeAppApi('create_cost_record', {
+      equipment_id: form.equipment_id, cost_type: form.cost_type, vendor: form.vendor,
+      cost_date: form.cost_date, amount, note: form.note,
+    }); } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
     setCreating(false); setForm(emptyForm()); await load(); setNote('費用記錄已新增');
   };
 
