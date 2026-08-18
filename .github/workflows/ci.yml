@@ -33,7 +33,7 @@ jobs:
       # Lint HTML files using htmlhint
       - name: Lint HTML with htmlhint
         run: |
-          npx htmlhint "**/*.html"
+          npx htmlhint "**/*.html" --ignore "google620de73073c56d88.html"
 
       # Validate HTML semantics using html-validate
       - name: Validate HTML semantics
