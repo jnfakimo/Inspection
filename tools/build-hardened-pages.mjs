@@ -14,6 +14,7 @@ const systemRoot = path.join(projectRoot, 'system');
 const outputSystemRoot = path.join(outputRoot, 'system');
 const nextExportRoot = path.join(projectRoot, 'web', 'out');
 const outputV2Root = path.join(outputRoot, 'v2');
+const searchConsoleVerificationFile = 'google620de73073c56d88.html';
 const publicKeySource = path.join(projectRoot, 'security', 'provenance-public-key.pem');
 const provenanceNamespace = 'com.jnfakimo.word-cloud.provenance';
 const provenanceOwner = 'jnfakimo';
@@ -80,8 +81,8 @@ async function listFiles(directory) {
 async function copyRuntimeFiles() {
   await cp(path.join(projectRoot, 'index.html'), path.join(outputRoot, 'index.html'));
   await cp(
-    path.join(projectRoot, 'google620de73073c56d88.html'),
-    path.join(outputRoot, 'google620de73073c56d88.html'),
+    path.join(projectRoot, searchConsoleVerificationFile),
+    path.join(outputRoot, searchConsoleVerificationFile),
   );
   await cp(path.join(projectRoot, 'LICENSE'), path.join(outputRoot, 'proprietary-notice.txt'));
   await cp(path.join(projectRoot, 'assets'), path.join(outputRoot, 'assets'), { recursive: true });
@@ -287,10 +288,11 @@ async function verifyArtifact() {
   for (const file of textFiles) {
     const text = await readFile(file, 'utf8');
     const relative = toPosix(path.relative(outputRoot, file));
-    if (relative.endsWith('.html') && !hasCompleteRobotsMeta(text)) {
+    const isSearchConsoleVerificationFile = relative === searchConsoleVerificationFile;
+    if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !hasCompleteRobotsMeta(text)) {
       throw new Error(`正式頁面缺少完整防索引標記：${relative}`);
     }
-    if (relative.endsWith('.html') && !/name="application-provenance" content="TAPM1:[A-Za-z0-9_-]{32}"/.test(text)) {
+    if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !/name="application-provenance" content="TAPM1:[A-Za-z0-9_-]{32}"/.test(text)) {
       throw new Error(`正式頁面缺少隱藏來源指紋：${relative}`);
     }
     if (relative.endsWith('.js') && !relative.includes('/vendor/') && !text.includes(provenanceNamespace)) {
