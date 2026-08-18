@@ -23,7 +23,7 @@ export const SYSTEM_PERMISSIONS = [
 ] as const;
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
-  const raw = error instanceof Error ? error.message : String(error || '');
+  const raw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error) ? String((error as Record<string, unknown>).message) : String(error || '');
   if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(raw)) return '目前帳號沒有執行此操作的權限';
   if (/duplicate|unique/i.test(raw)) return '資料已存在，請勿重複建立';
   if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(raw)) return '網路連線失敗，請確認連線後再試';
