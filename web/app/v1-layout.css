@@ -4,6 +4,7 @@
 :root[data-theme="light"] body{background-image:none}
 :root[data-theme="light"]{--muted:#64748b;--ink:#1e293b;--surface:#fff;--surface-soft:#f6f9fd;--surface-muted:#f1f5f9}
 :root[data-theme="light"]{--icon-sky:#7dd3fc;--icon-sky-text:#0369a1}
+:root[data-theme="light"]{--list-row-odd:#fff;--list-row-even:#eff6ff}
 .system-card:not(.amber):not(.green):not(.violet),.maintenance-card:not(.amber):not(.green),.quick-grid a:not(.amber):not(.green):not(.violet){border-top-color:var(--icon-sky)}
 .system-card:not(.amber):not(.green):not(.violet) b,.maintenance-card:not(.amber):not(.green) .maintenance-badge,.maintenance-card:not(.amber):not(.green) b,.quick-grid a:not(.amber):not(.green):not(.violet) b{color:var(--icon-sky-text)}
 .maintenance-card:not(.amber):not(.green) img,.quick-grid a:not(.amber):not(.green):not(.violet) i{filter:drop-shadow(0 5px 10px color-mix(in srgb,var(--icon-sky) 28%,transparent))}
@@ -83,6 +84,17 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
   body:has(.portal-intro) .system-card p{font-size:12px;line-height:1.6}
   body:has(.portal-intro) .system-card b{padding:5px 10px;font-size:11px}
 }
+
+/* 列表設計規格：奇數列白色、偶數列淺藍（80% 淡化），所有列表每頁 10 筆。 */
+.responsive-table tbody tr:nth-child(odd),
+.admin-panel table tbody tr:nth-child(odd),
+.operations-table tbody tr:nth-child(odd){background:var(--list-row-odd)}
+.responsive-table tbody tr:nth-child(even),
+.admin-panel table tbody tr:nth-child(even),
+.operations-table tbody tr:nth-child(even){background:var(--list-row-even)}
+.responsive-table tbody tr:hover,
+.admin-panel table tbody tr:hover,
+.operations-table tbody tr:hover{background:color-mix(in srgb,var(--icon-sky) 18%,var(--list-row-even))}
 
 /* Theme surfaces for legacy components that retain intentional status colours. */
 .operations-page{width:min(1180px,85%)}

@@ -26,8 +26,8 @@
 .handover-create-modal .detail-grid>div{border-left:3px solid var(--cyan)}
 .handover-create-modal .detail-grid dd{font-size:1.05rem;font-weight:700}
 .handover-records-panel{width:85%;margin-left:auto;margin-right:auto}
-.handover-records-panel tbody tr:nth-child(odd){background:var(--surface)}
-.handover-records-panel tbody tr:nth-child(even){background:color-mix(in srgb,#dbeafe 15%,var(--surface))}
+.handover-records-panel tbody tr:nth-child(odd){background:var(--list-row-odd)}
+.handover-records-panel tbody tr:nth-child(even){background:var(--list-row-even)}
 .handover-records-panel tbody tr:hover{background:color-mix(in srgb,var(--cyan) 10%,var(--surface))}
 .handover-create-btn{background:#dbeafe;color:#075985;border:1px solid #7dd3fc}
 .handover-submit-btn{background:#dbeafe;color:#075985;border:1px solid #7dd3fc}
