@@ -84,7 +84,7 @@ const cards: SettingsCard[] = [
     english: 'SYSTEM IDENTITY',
     description: '設定組織與場域名稱，供全系統品牌列與文件共用。',
     icon: '/Inspection/assets/system-icons/admin-icon.png',
-    accent: '#00a9d6',
+    accent: 'var(--icon-sky)',
     section: 'identity',
   },
   {
@@ -138,7 +138,7 @@ const cards: SettingsCard[] = [
     english: 'INTEGRATION API',
     description: '檢視核心連線、共用鍵值及十一項系統整合邊界。',
     icon: '/Inspection/assets/system-icons/admin-icon.png',
-    accent: '#0088ad',
+    accent: 'var(--icon-sky)',
     section: 'api',
   },
   {

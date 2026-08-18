@@ -7,7 +7,7 @@
 }
 
 .card {
-  --admin-card-accent: #00bde8;
+  --admin-card-accent: var(--icon-sky);
   position: relative;
   display: flex;
   min-height: 248px;

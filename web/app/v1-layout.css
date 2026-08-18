@@ -3,6 +3,10 @@
 :root[data-theme="light"]{color-scheme:light;--bg:#f4f6fa;--panel:#fff;--panel2:#fff;--line:#dbe4ee;--text:#1e293b;--dim:#64748b;--cyan:#0284c7;--green:#059669;--amber:#b45309;--red:#dc2626;--violet:#7c3aed;--blue:#0959a8}
 :root[data-theme="light"] body{background-image:none}
 :root[data-theme="light"]{--muted:#64748b;--ink:#1e293b;--surface:#fff;--surface-soft:#f6f9fd;--surface-muted:#f1f5f9}
+:root[data-theme="light"]{--icon-sky:#7dd3fc;--icon-sky-text:#0369a1}
+.system-card:not(.amber):not(.green):not(.violet),.maintenance-card:not(.amber):not(.green),.quick-grid a:not(.amber):not(.green):not(.violet){border-top-color:var(--icon-sky)}
+.system-card:not(.amber):not(.green):not(.violet) b,.maintenance-card:not(.amber):not(.green) .maintenance-badge,.maintenance-card:not(.amber):not(.green) b,.quick-grid a:not(.amber):not(.green):not(.violet) b{color:var(--icon-sky-text)}
+.maintenance-card:not(.amber):not(.green) img,.quick-grid a:not(.amber):not(.green):not(.violet) i{filter:drop-shadow(0 5px 10px color-mix(in srgb,var(--icon-sky) 28%,transparent))}
 /* 這裡原本用白名單逐一列出要翻成白底的 class，每新增一個元件就會漏一次——
    儀表板的 .dash-widget 就是這樣變成淺色主題下的深底深字。
    上述元件已全部改用 var(--panel)／var(--panel2)，淺色主題下這兩個變數即為 #fff，

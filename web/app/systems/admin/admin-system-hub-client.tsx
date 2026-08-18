@@ -11,13 +11,13 @@ import styles from './admin-system-hub.module.css';
 const adminSystem = findSystem('admin');
 
 const cardVisuals = [
-  { icon: '/Inspection/assets/system-icons/account-icon.png', accent: '#00bde8' },
+  { icon: '/Inspection/assets/system-icons/account-icon.png', accent: 'var(--icon-sky)' },
   { icon: '/Inspection/assets/system-icons/account-icon.png', accent: '#4f8cff' },
   { icon: '/Inspection/assets/system-icons/guardpatrol-list-icon.png', accent: '#00c985' },
   { icon: '/Inspection/assets/system-icons/audit-icon.png', accent: '#9b70e8' },
   { icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', accent: '#ef5b87' },
   { icon: '/Inspection/assets/system-icons/guardpatrol-line-push-icon.png', accent: '#e5a100' },
-  { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: '#00bde8' },
+  { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: 'var(--icon-sky)' },
   { icon: '/Inspection/assets/system-icons/guardpatrol-schedule-icon.png', accent: '#00c985' },
   { icon: '/Inspection/assets/system-icons/audit-icon.png', accent: '#e5a100' },
   { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: '#4f8cff' },
@@ -45,7 +45,7 @@ function AdminHub({ profile }: { profile: Profile }) {
             <Link
               className={styles.card}
               href="/systems/admin/settings/"
-              style={{ '--admin-card-accent': '#00bde8' } as CSSProperties}
+              style={{ '--admin-card-accent': 'var(--icon-sky)' } as CSSProperties}
             >
               <span className={styles.badge}>系統設定</span>
               <span className={styles.icon} aria-hidden="true">
