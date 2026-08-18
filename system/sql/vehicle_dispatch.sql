@@ -194,8 +194,13 @@ alter table vehicle_dispatch_requests add constraint vehicle_dispatch_time_check
   check (planned_return_time > planned_departure_time and
     (actual_departure_at is null or actual_return_at is null or actual_return_at >= actual_departure_at));
 alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_no_time_overlap;
+-- 鍵值必須含 vehicle_id，否則任何兩張時段重疊的申請都互斥，
+-- 加第二台車後兩台車就不能在重疊時段各自出勤（2026-08-17 驗收撞到 23P01 才發現）。
+-- vehicle_id 為 null（尚未指派車輛）的申請彼此不互斥，衝突改由指派時的 guard 判斷。
+create extension if not exists btree_gist;
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_no_time_overlap
   exclude using gist (
+    vehicle_id with =,
     tsrange(trip_date + planned_departure_time,trip_date + planned_return_time,'[)') with &&
   ) where (status in ('pending_approval','approved','assigned','completed'));
 alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_mileage_check;
