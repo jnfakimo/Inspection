@@ -374,14 +374,15 @@
 }
 
 .primaryButton {
-  background: #0089ad;
-  border: 1px solid #0089ad;
-  color: #fff;
+  background: #dbeafe;
+  border: 1px solid #7dd3fc;
+  color: #075985;
 }
 
 .primaryButton:hover {
-  background: #006f8e;
-  border-color: #006f8e;
+  background: #bae6fd;
+  border-color: #38bdf8;
+  color: #075985;
 }
 
 .secondaryButton,
