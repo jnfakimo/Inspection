@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
@@ -297,8 +298,8 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       <button className={`range-btn${range === 'today' ? ' active' : ''}`} onClick={() => applyQuickRange('today')}>今日</button>
       <button className={`range-btn${range === 'month' ? ' active' : ''}`} onClick={() => applyQuickRange('month')}>本月</button>
       <button className={`range-btn${range === 'year' ? ' active' : ''}`} onClick={() => applyQuickRange('year')}>今年</button>
-      <input type="date" aria-label="起始日期（年／月／日）" placeholder="年／月／日" value={from} onChange={e => setFrom(e.target.value)} />
-      <input type="date" aria-label="結束日期（年／月／日）" placeholder="年／月／日" value={to} onChange={e => setTo(e.target.value)} />
+      <LocalizedDateInput aria-label="起始日期（年／月／日）" value={from} onChange={e => setFrom(e.target.value)} />
+      <LocalizedDateInput aria-label="結束日期（年／月／日）" value={to} onChange={e => setTo(e.target.value)} />
       <button onClick={() => void load()} disabled={busy}>{busy ? '載入中…' : '重新整理'}</button>
       <span className="spacer">區間：{from} ~ {to}{updatedAt && `　最後更新：${updatedAt}`}</span>
     </div>

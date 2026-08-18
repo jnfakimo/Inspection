@@ -127,7 +127,7 @@ export default function LoginPage() {
     <div className="login-card v1-login-card">
       {brand}
       <p className="v1-login-hint">請輸入您帳號對應的 Email，系統將寄送重設連結</p>
-      <label>Email<input type="email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} placeholder="your@email.com" /></label>
+      <label>電子郵件<input type="email" value={email} autoComplete="email" onChange={e => setEmail(e.target.value)} placeholder="請輸入電子郵件地址" /></label>
       {message && <p className="form-error">{message}</p>}
       {notice && <p className="inline-message">{notice}</p>}
       <button className="primary-btn" disabled={busy || Boolean(notice)} onClick={() => void sendResetLink()}>{busy ? '寄送中…' : '寄送重設連結'}</button>

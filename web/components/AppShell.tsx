@@ -202,7 +202,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     </div> : <main className="content v1-content">{children}</main>}
     {profileOpen && <div className="profile-modal-bg" role="dialog" aria-modal="true" aria-labelledby="personal-profile-title">
       <section className="profile-modal">
-        <header><div><small>PERSONAL SETTINGS</small><h2 id="personal-profile-title">個人資料設定</h2><p>查詢與維護本人的聯絡資料、登入安全及個人行事曆。</p></div><button type="button" aria-label="關閉" onClick={() => setProfileOpen(false)}>×</button></header>
+        <header><div><small>個人設定</small><h2 id="personal-profile-title">個人資料設定</h2><p>查詢與維護本人的聯絡資料、登入安全及個人行事曆。</p></div><button type="button" aria-label="關閉" onClick={() => setProfileOpen(false)}>×</button></header>
         <div className="profile-modal-body">
           <form className="profile-section" onSubmit={saveProfile}>
             <div className="profile-section-title"><span>01</span><div><b>基本資料</b><small>帳號、單位及權限由管理員維護</small></div></div>
