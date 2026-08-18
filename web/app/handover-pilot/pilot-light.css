@@ -1,1 +1,11 @@
-.supervisor-inline{margin-top:16px}.review-form{display:grid;gap:12px}.review-form textarea{width:100%;resize:vertical;background:#fff;border:1px solid #cbd5e1;color:#1e293b;padding:12px;border-radius:6px}.review-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}.review-actions .pilot-status{margin-top:0}:root[data-theme="light"] .pilot-editor,:root[data-theme="light"] .shift-card,:root[data-theme="light"] .pilot-metrics article,:root[data-theme="light"] .supervisor-inline,:root[data-theme="light"] .audit-layout .panel{background:#fff;color:#1e293b;border-color:#dbe4ee}:root[data-theme="light"] .editor-grid input,:root[data-theme="light"] .editor-grid textarea,:root[data-theme="light"] .editor-grid select,:root[data-theme="light"] .pilot-controls input{background:#fff;color:#1e293b;border-color:#cbd5e1}:root[data-theme="light"] .pilot-item{background:#f8fafc;color:#1e293b;border-color:#dbe4ee}:root[data-theme="light"] .pilot-item span,:root[data-theme="light"] .shift-card strong,:root[data-theme="light"] .section-title{color:#1e293b}:root[data-theme="light"] .attachment-box{border-color:#cbd5e1}:root[data-theme="light"] .pilot-tabs{border-color:#dbe4ee}:root[data-theme="light"] .pilot-tabs button{color:#64748b}
+/* 這裡原本有一整段 :root[data-theme="light"] 的白名單覆蓋，逐一把 pilot 的元件翻成白底。
+   pilot.css 的 .pilot-editor／.editor-grid 輸入元件／.pilot-item 已改用
+   var(--panel)／var(--panel2)，淺色主題下這兩個變數即為 #fff，與原本覆蓋等價，
+   其餘元件（.shift-card、.pilot-metrics article、.pilot-tabs、.section-title）本來就在用變數，
+   覆蓋只是多餘。因此整段移除，改主題不必再回頭維護名單。 */
+.supervisor-inline{margin-top:16px;background:var(--panel)}
+.review-form{display:grid;gap:12px}
+/* 這幾條沒有 data-theme 前綴，是全主題套用的，原本卻寫死白底深字。 */
+.review-form textarea{width:100%;resize:vertical;background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:12px;border-radius:6px}
+.review-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.review-actions .pilot-status{margin-top:0}
