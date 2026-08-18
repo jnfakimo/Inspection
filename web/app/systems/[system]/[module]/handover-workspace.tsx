@@ -171,8 +171,8 @@ function RecordsModule({ module, profile }: Props) {
           <option value="">全部狀態</option>
           <option value="draft">草稿</option><option value="waiting">待接班人接收</option><option value="done">交接完成</option>
         </select>
-        <label>起日<input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>
-        <label>迄日<input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
+        <label>起日<input type="date" aria-label="起始日期（年／月／日）" placeholder="年／月／日" value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label>迄日<input type="date" aria-label="結束日期（年／月／日）" placeholder="年／月／日" value={to} onChange={e => setTo(e.target.value)} /></label>
         <button className="secondary-btn" onClick={() => { setQuery(''); setShift(''); setStatus(''); setFrom(''); setTo(''); }}>清除</button>
         <span>待接收 {rows.filter(r => stateOf(r) === 'waiting').length}／共 {filtered.length} 筆</span>
       </div>
@@ -349,7 +349,7 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
 
   return <AdminModal title="新增交接單" className="handover-create-modal" onClose={onClose}>
     <div className="admin-form-grid">
-      <label>交接日期（必填）<input type="date" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} /></label>
+      <label>交接日期（必填）<input type="date" aria-label="交接日期（年／月／日）" placeholder="年／月／日" value={form.shift_date} onChange={e => set('shift_date', e.target.value)} /></label>
       <label>班別<select value={form.shift_type} onChange={e => set('shift_type', e.target.value)}>
         {shifts.map(s => <option key={s.id} value={s.id}>{s.label}{s.start ? ` ${s.start}–${s.end}` : ''}</option>)}
       </select></label>
@@ -517,8 +517,8 @@ function CasesModule({ module, profile }: Props) {
           <option value="">全部類別</option>
           {Object.keys(ANOMALY_SUBS).map(key => <option key={key} value={key}>{key}</option>)}
         </select>
-        <label>起日<input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>
-        <label>迄日<input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
+        <label>起日<input type="date" aria-label="起始日期（年／月／日）" placeholder="年／月／日" value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label>迄日<input type="date" aria-label="結束日期（年／月／日）" placeholder="年／月／日" value={to} onChange={e => setTo(e.target.value)} /></label>
         <span>未結 {rows.filter(r => r.status !== 'closed').length}｜逾期 {overdue}｜共 {filtered.length} 筆</span>
       </div>
       <div className="responsive-table"><table>
@@ -736,7 +736,7 @@ function CaseFormModal({ users, departments, profile, onClose, onDone }: {
         {reporters.map(u => <option key={String(u.user_id)} value={String(u.user_id)}>{u.name}</option>)}
       </select></label>
       <label>發生地點<input value={form.incident_location} onChange={e => set('incident_location', e.target.value)} placeholder="發生地點" /></label>
-      <label>發生時間<input type="datetime-local" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} /></label>
+      <label>發生時間<input type="datetime-local" step="1800" aria-label="發生時間（年／月／日 上午／下午 時 分）" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} /></label>
       <label>異常大類（必填）<select value={form.anomaly_category} onChange={e => { set('anomaly_category', e.target.value); set('anomaly_sub', ''); }}>
         <option value="">— 選擇大類 —</option>
         {Object.keys(ANOMALY_SUBS).map(key => <option key={key} value={key}>{key}</option>)}

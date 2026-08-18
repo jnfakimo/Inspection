@@ -250,8 +250,8 @@ function AnalyticsModule({ module, profile }: Props) {
         <button className="secondary-btn" onClick={() => quick(1)}>近一個月</button>
         <button className="secondary-btn" onClick={() => quick(3)}>近一季</button>
         <button className="secondary-btn" onClick={() => quick(12)}>近一年</button>
-        <label>起日<input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label>
-        <label>迄日<input type="date" value={to} onChange={e => setTo(e.target.value)} /></label>
+        <label>起日<input type="date" aria-label="起始日期（年／月／日）" placeholder="年／月／日" value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label>迄日<input type="date" aria-label="結束日期（年／月／日）" placeholder="年／月／日" value={to} onChange={e => setTo(e.target.value)} /></label>
       </div>
       <div className="admin-toolbar" style={{ gap: 18 }}>
         {kpis.map(([value, label]) => <span key={label}><strong style={{ fontSize: '1.4rem' }}>{value}</strong>　{label}</span>)}

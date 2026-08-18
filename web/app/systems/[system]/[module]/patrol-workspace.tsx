@@ -118,7 +118,7 @@ function Map3DModule({ module, profile }: Props) {
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
     <section className="panel admin-panel">
       <div className="admin-toolbar">
-        <label>巡檢日期<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label>巡檢日期<input type="date" aria-label="巡檢日期（年／月／日）" placeholder="年／月／日" value={date} onChange={e => setDate(e.target.value)} /></label>
         <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} />顯示巡檢點
         </label>
@@ -226,7 +226,7 @@ function PointsModule({ module, profile }: Props) {
         <select value={floor} onChange={e => setFloor(e.target.value)}>
           <option value="">全部樓層</option>{floors.map(f => <option key={f} value={f}>{f}</option>)}
         </select>
-        <label>打卡日期<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label>打卡日期<input type="date" aria-label="打卡日期（年／月／日）" placeholder="年／月／日" value={date} onChange={e => setDate(e.target.value)} /></label>
         <span>{date} 已打卡 {done}／{filtered.length} 點</span>
       </div>
       <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
@@ -463,7 +463,7 @@ function ShiftsModule({ module, profile }: Props) {
     <section className="panel admin-panel">
       <div className="admin-toolbar">
         <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+        <input type="date" aria-label="巡檢日期（年／月／日）" placeholder="年／月／日" value={date} onChange={e => setDate(e.target.value)} />
         <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
         <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
         <span>當日 {shifts.length} 個班別</span>
@@ -503,10 +503,10 @@ function ShiftsModule({ module, profile }: Props) {
       <div className="admin-form-grid">
         <label>班別名稱（必填）<input value={String(editor.name || '')} onChange={e => setEditor({ ...editor, name: e.target.value })} /></label>
         <label>排序<input type="number" value={String(editor.sort_order ?? 0)} onChange={e => setEditor({ ...editor, sort_order: e.target.value })} /></label>
-        <label>班別開始<input type="time" value={String(editor.start_time || '')} onChange={e => setEditor({ ...editor, start_time: e.target.value })} /></label>
-        <label>班別結束<input type="time" value={String(editor.end_time || '')} onChange={e => setEditor({ ...editor, end_time: e.target.value })} /></label>
-        <label>通報開始<input type="time" value={String(editor.work_start || '')} onChange={e => setEditor({ ...editor, work_start: e.target.value })} /></label>
-        <label>通報結束<input type="time" value={String(editor.work_end || '')} onChange={e => setEditor({ ...editor, work_end: e.target.value })} /></label>
+        <label>班別開始<input type="time" step="1800" value={String(editor.start_time || '')} onChange={e => setEditor({ ...editor, start_time: e.target.value })} /></label>
+        <label>班別結束<input type="time" step="1800" value={String(editor.end_time || '')} onChange={e => setEditor({ ...editor, end_time: e.target.value })} /></label>
+        <label>通報開始<input type="time" step="1800" value={String(editor.work_start || '')} onChange={e => setEditor({ ...editor, work_start: e.target.value })} /></label>
+        <label>通報結束<input type="time" step="1800" value={String(editor.work_end || '')} onChange={e => setEditor({ ...editor, work_end: e.target.value })} /></label>
       </div>
       <div className="detail-timeline">
         <h3>排定人員（{Array.isArray(editor.assigned_user_ids) ? editor.assigned_user_ids.length : 0} 人）</h3>

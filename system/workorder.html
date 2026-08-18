@@ -200,7 +200,7 @@ tbody tr:hover{background:rgba(0,212,255,.04)}
       <div class="field"><label>故障描述</label><textarea id="c-desc" placeholder="請描述故障狀況…"></textarea></div>
       <div class="field date-field" id="desiredDateField">
         <label>希望完成日期</label>
-        <input id="c-desired-view" readonly placeholder="yyyy/mm/dd" onclick="openDesiredCalendar()" onfocus="openDesiredCalendar()">
+        <input id="c-desired-view" readonly placeholder="年/月/日" aria-label="希望完成日期（年／月／日）" onclick="openDesiredCalendar()" onfocus="openDesiredCalendar()">
         <input id="c-desired" type="hidden">
         <div class="date-picker" id="desiredPicker">
           <div class="date-head">

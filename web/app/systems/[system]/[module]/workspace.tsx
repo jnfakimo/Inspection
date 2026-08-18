@@ -609,8 +609,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               <div className="dispatch-detail-form-grid">
                 <label><span>維修人員</span><select value={dispatchForm.technician} onChange={event => setDispatchForm(current => ({ ...current, technician: event.target.value }))}><option value="">-- 請選擇 --</option>{dispatchTechnicians.map(item => <option key={item.user_id} value={item.user_id}>{item.name}{item.department ? `（${item.department}）` : ''}</option>)}</select></label>
                 <label><span>委外廠商</span><input value={dispatchForm.vendor} onChange={event => setDispatchForm(current => ({ ...current, vendor: event.target.value }))} /></label>
-                <label><span>預計到場</span><input type="datetime-local" value={dispatchForm.expectedArrival} onChange={event => setDispatchForm(current => ({ ...current, expectedArrival: event.target.value }))} /></label>
-                <label><span>預計完成</span><input type="datetime-local" value={dispatchForm.expectedFinish} onChange={event => setDispatchForm(current => ({ ...current, expectedFinish: event.target.value }))} /></label>
+                <label><span>預計到場</span><input type="datetime-local" step="1800" aria-label="預計到場（年／月／日 上午／下午 時 分）" value={dispatchForm.expectedArrival} onChange={event => setDispatchForm(current => ({ ...current, expectedArrival: event.target.value }))} /></label>
+                <label><span>預計完成</span><input type="datetime-local" step="1800" aria-label="預計完成（年／月／日 上午／下午 時 分）" value={dispatchForm.expectedFinish} onChange={event => setDispatchForm(current => ({ ...current, expectedFinish: event.target.value }))} /></label>
                 <label className="wide"><span>工作內容</span><textarea value={dispatchForm.workContent} onChange={event => setDispatchForm(current => ({ ...current, workContent: event.target.value }))} /></label>
                 <label className="dispatch-check"><input type="checkbox" checked={dispatchForm.needShutdown} onChange={event => setDispatchForm(current => ({ ...current, needShutdown: event.target.checked }))} />需要停機</label>
                 <label className="dispatch-check"><input type="checkbox" checked={dispatchForm.needApproval} onChange={event => setDispatchForm(current => ({ ...current, needApproval: event.target.checked }))} />需要主管核准</label>
@@ -674,4 +674,3 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
   }
   return <AuthGate>{profile => <Workspace profile={profile} />}</AuthGate>;
 }
-

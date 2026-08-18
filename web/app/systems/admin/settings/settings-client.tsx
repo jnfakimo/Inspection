@@ -706,6 +706,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
               <span>開始</span>
               <input
                 type="time"
+                step="1800"
                 value={shift.start}
                 onChange={event => setShifts(current => current.map((item, itemIndex) =>
                   itemIndex === index ? { ...item, start: event.target.value } : item,
@@ -716,6 +717,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
               <span>結束</span>
               <input
                 type="time"
+                step="1800"
                 value={shift.end}
                 onChange={event => setShifts(current => current.map((item, itemIndex) =>
                   itemIndex === index ? { ...item, end: event.target.value } : item,
