@@ -294,9 +294,9 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     {layoutNote && <p className="inline-message">{layoutNote}</p>}
 
     <div className="dash-toolbar">
-      <button className={range === 'today' ? 'active' : ''} onClick={() => applyQuickRange('today')}>今日</button>
-      <button className={range === 'month' ? 'active' : ''} onClick={() => applyQuickRange('month')}>本月</button>
-      <button className={range === 'year' ? 'active' : ''} onClick={() => applyQuickRange('year')}>今年</button>
+      <button className={`range-btn${range === 'today' ? ' active' : ''}`} onClick={() => applyQuickRange('today')}>今日</button>
+      <button className={`range-btn${range === 'month' ? ' active' : ''}`} onClick={() => applyQuickRange('month')}>本月</button>
+      <button className={`range-btn${range === 'year' ? ' active' : ''}`} onClick={() => applyQuickRange('year')}>今年</button>
       <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
       <input type="date" value={to} onChange={e => setTo(e.target.value)} />
       <button onClick={() => void load()} disabled={busy}>{busy ? '載入中…' : '重新整理'}</button>
