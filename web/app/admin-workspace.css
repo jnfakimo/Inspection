@@ -23,15 +23,24 @@
 .admin-page-actions .primary-btn,
 .admin-panel .primary-btn,
 .admin-modal .primary-btn,
-.admin-layout-actions .primary-btn{
+.admin-layout-actions .primary-btn,
+.admin-page-actions .handover-create-btn,
+.admin-modal .handover-submit-btn{
   background:#dbeafe;
   border:1px solid #7dd3fc;
   color:#075985;
+  min-height:40px;
+  padding:9px 16px;
+  border-radius:8px;
+  font-size:.85rem;
+  line-height:1.2;
 }
 .admin-page-actions .primary-btn:hover,
 .admin-panel .primary-btn:hover,
 .admin-modal .primary-btn:hover,
-.admin-layout-actions .primary-btn:hover{
+.admin-layout-actions .primary-btn:hover,
+.admin-page-actions .handover-create-btn:hover,
+.admin-modal .handover-submit-btn:hover{
   background:#bae6fd;
   border-color:#38bdf8;
   color:#075985;
@@ -48,8 +57,8 @@
 .handover-records-panel tbody tr:hover{background:color-mix(in srgb,var(--cyan) 10%,var(--surface))}
 .handover-create-btn{background:#dbeafe;color:#075985;border:1px solid #7dd3fc}
 .handover-submit-btn{background:#dbeafe;color:#075985;border:1px solid #7dd3fc}
-html[data-theme="tech"] .handover-create-btn{background:var(--cyan);color:#001018;border-color:var(--cyan)}
-html[data-theme="tech"] .handover-submit-btn{background:var(--icon-sky);color:#082f49;border-color:var(--icon-sky)}
+html[data-theme="tech"] .handover-create-btn,
+html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;border-color:#7dd3fc}
 @media (max-width:800px){.handover-records-panel{width:100%}}
 @media (max-width:600px){
   .admin-modal-backdrop:has(.handover-create-modal){padding:8px}
