@@ -125,8 +125,8 @@ export function CostsAdmin({ profile, module }: AdminProps) {
           <option value="">全部類型</option>
           {COST_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <label>起日<LocalizedDateInput aria-label="起始日期（年／月／日）" value={from} onChange={e => setFrom(e.target.value)} /></label>
-        <label>迄日<LocalizedDateInput aria-label="結束日期（年／月／日）" value={to} onChange={e => setTo(e.target.value)} /></label>
+        <label>起日<LocalizedDateInput aria-label="起始日期（年/月/日）" value={from} onChange={e => setFrom(e.target.value)} /></label>
+        <label>迄日<LocalizedDateInput aria-label="結束日期（年/月/日）" value={to} onChange={e => setTo(e.target.value)} /></label>
         <button className="secondary-btn" onClick={() => { setEquipmentFilter(''); setTypeFilter(''); setFrom(''); setTo(''); }}>清除</button>
         <button className="secondary-btn" onClick={() => void exportXlsx()}>⭱ 匯出 XLSX</button>
         <span>合計 <b>{money(total)}</b> 元／{filtered.length} 筆</span>
@@ -174,7 +174,7 @@ export function CostsAdmin({ profile, module }: AdminProps) {
         <label>費用類型<select value={form.cost_type} onChange={e => setForm({ ...form, cost_type: e.target.value })}>
           {COST_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        <label>日期（必填）<LocalizedDateInput aria-label="費用日期（年／月／日）" value={form.cost_date} onChange={e => setForm({ ...form, cost_date: e.target.value })} /></label>
+        <label>日期（必填）<LocalizedDateInput aria-label="費用日期（年/月/日）" value={form.cost_date} onChange={e => setForm({ ...form, cost_date: e.target.value })} /></label>
         <label>金額（元，必填）<input type="number" min={0} value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} /></label>
         <label>廠商<input value={form.vendor} onChange={e => setForm({ ...form, vendor: e.target.value })} placeholder="廠商名稱（選填）" /></label>
         <label className="wide">說明<input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="費用說明（選填）" /></label>
