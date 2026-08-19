@@ -697,6 +697,7 @@ function CaseFormModal({ users, departments, profile, onClose, onDone }: {
     }
 
     let attachmentWarning = '';
+    const client = getSupabase();
     for (const file of files) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
       const path = `${caseId}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
