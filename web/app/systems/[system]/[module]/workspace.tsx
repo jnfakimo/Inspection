@@ -52,6 +52,32 @@ const ORDER_COLUMNS = [
   { key: 'status', label: '流程狀態' },
   { key: 'desired_finish', label: '希望完成' },
 ];
+const REPAIR_PHOTO_ALLOWED_TYPES = /^image\/(jpeg|png|webp|heic)$/i;
+const REPAIR_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+type WorkorderUploadSession = {
+  request_snapshot: {
+    request_id: string;
+    req_no: string;
+    source: string;
+    reporter: string;
+    phone: string | null;
+    department: string | null;
+    equipment_id: string | null;
+    equipment_category: string | null;
+    fault_location: string | null;
+    fault_type: string | null;
+    urgency: string;
+    fault_desc: string;
+    mobile: string | null;
+    status: string;
+    created_by: string;
+  };
+  uploads: {
+    location: { path: string; token: string };
+    equipment: { path: string; token: string };
+  };
+};
+
 function taipeiToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 }
@@ -446,35 +472,80 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       if (!locationPhoto) { setFormMessage('請上傳一張故障位置照片'); return; }
       if (!equipmentPhoto) { setFormMessage('請上傳一張維修設備照片'); return; }
       if (!form.description.trim()) { setFormMessage('請填寫故障描述'); return; }
-      const permitted = /^image\/(jpeg|png|webp|heic)$/i;
-      const invalidFile = [locationPhoto, equipmentPhoto].find(file => file.size > 10 * 1024 * 1024 || !permitted.test(file.type));
+      const invalidFile = [locationPhoto, equipmentPhoto].find(file => file.size > REPAIR_PHOTO_MAX_BYTES || !REPAIR_PHOTO_ALLOWED_TYPES.test(file.type || ''));
       if (invalidFile) { setFormMessage(`照片不符合限制：${invalidFile.name}（僅接受 JPEG／PNG／WebP／HEIC，單檔 10MB）`); return; }
       setSaving(true); setFormMessage('送出中…');
       try {
         const client = getSupabase();
-        const { data: auth } = await client.auth.getUser();
-        if (!auth.user) throw new Error('登入狀態已失效，請重新登入');
-        const day = taipeiToday();
-        const requestId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        const dayKey = day.replace(/-/g, '');
-        const todayCount = data?.rows.filter(row => String(row.created_at || '').startsWith(day)).length || 0;
-        const reqNo = `${dayKey}-${String(todayCount + 1).padStart(3, '0')}`;
         const faultDesc = [form.location.trim() ? `故障位置：${form.location.trim()}` : '', form.mobile.trim() ? `聯絡手機：${form.mobile.trim()}` : '', `故障描述：${form.description.trim()}`].filter(Boolean).join('\n');
         const selectedEquipment = equipmentOptions.find(item => item.equipment_id === form.equipment);
-        const { error: insertError } = await client.from('repair_requests').insert({ request_id: requestId, req_no: reqNo, source: 'direct', reporter: form.reporter.trim() || profile.name, phone: form.phone.trim() || null, department: form.department.trim() || profile.department || null, equipment_id: form.equipment || null, equipment_category: selectedEquipment?.category || null, fault_location: form.location.trim() || null, fault_type: form.type.trim() || null, urgency: form.urgency, fault_desc: faultDesc, mobile: form.mobile.trim() || null, status: 'pending', created_by: profile.user_id });
-        if (insertError) throw new Error(insertError.message);
-        const initialLog = await client.from('case_status_log').insert({ request_id: requestId, order_id: null, from_status: null, to_status: 'pending', note: '報修人建立報修', operator_id: profile.user_id, operator_name: profile.name });
-        if (initialLog.error) console.warn('建立報修歷程失敗', initialLog.error.message);
-        const photoPath = `${requestId}/${Date.now()}_location.${locationPhoto.name.split('.').pop() || 'jpg'}`;
-        const upload = await client.storage.from('repair-files').upload(photoPath, locationPhoto, { upsert: true, contentType: locationPhoto.type || 'image/jpeg' });
-        if (upload.error) throw new Error(`故障位置照片上傳失敗：${upload.error.message}`);
-        const photoRecord = await client.from('repair_attachments').insert({ request_id: requestId, kind: 'location_photo', file_path: photoPath, file_name: locationPhoto.name, uploaded_by: profile.user_id });
-        if (photoRecord.error) { await client.storage.from('repair-files').remove([photoPath]); throw new Error(`照片紀錄失敗：${photoRecord.error.message}`); }
-        const equipmentPath = `${requestId}/${Date.now()}_equipment.${equipmentPhoto.name.split('.').pop() || 'jpg'}`;
-        const equipmentUpload = await client.storage.from('repair-files').upload(equipmentPath, equipmentPhoto, { upsert: true, contentType: equipmentPhoto.type || 'image/jpeg' });
-        if (equipmentUpload.error) throw new Error(`維修設備照片上傳失敗：${equipmentUpload.error.message}`);
-        const equipmentRecord = await client.from('repair_attachments').insert({ request_id: requestId, kind: 'equipment_photo', file_path: equipmentPath, file_name: equipmentPhoto.name, uploaded_by: profile.user_id });
-        if (equipmentRecord.error) { await client.storage.from('repair-files').remove([equipmentPath]); throw new Error(`維修設備照片紀錄失敗：${equipmentRecord.error.message}`); }
+        const uploadSession = await invokeAppApi<WorkorderUploadSession>('workorder_prepare_upload', {
+          request: {
+            reporter: form.reporter.trim() || profile.name,
+            phone: form.phone.trim() || null,
+            department: form.department.trim() || profile.department || null,
+            equipment_id: form.equipment || null,
+            equipment_category: selectedEquipment?.category || null,
+            fault_location: form.location.trim() || null,
+            fault_type: form.type.trim() || null,
+            urgency: form.urgency,
+            fault_desc: faultDesc,
+            mobile: form.mobile.trim() || null,
+          },
+          location_photo: {
+            name: locationPhoto.name,
+            type: locationPhoto.type || 'image/jpeg',
+            size: locationPhoto.size,
+          },
+          equipment_photo: {
+            name: equipmentPhoto.name,
+            type: equipmentPhoto.type || 'image/jpeg',
+            size: equipmentPhoto.size,
+          },
+        });
+        const uploadTargets = [uploadSession.uploads.location.path, uploadSession.uploads.equipment.path];
+        try {
+          const [locationUpload, equipmentUpload] = await Promise.all([
+            client.storage.from('repair-files').uploadToSignedUrl(
+              uploadSession.uploads.location.path,
+              uploadSession.uploads.location.token,
+              locationPhoto,
+              { upsert: true, contentType: locationPhoto.type || 'image/jpeg' },
+            ),
+            client.storage.from('repair-files').uploadToSignedUrl(
+              uploadSession.uploads.equipment.path,
+              uploadSession.uploads.equipment.token,
+              equipmentPhoto,
+              { upsert: true, contentType: equipmentPhoto.type || 'image/jpeg' },
+            ),
+          ]);
+          if (locationUpload.error) throw new Error(`故障位置照片上傳失敗：${locationUpload.error.message}`);
+          if (equipmentUpload.error) throw new Error(`維修設備照片上傳失敗：${equipmentUpload.error.message}`);
+        } catch (uploadError) {
+          await client.storage.from('repair-files').remove(uploadTargets).catch(() => null);
+          throw uploadError;
+        }
+        const { request_id: requestId, req_no: reqNo } = uploadSession.request_snapshot;
+        await invokeAppApi('workorder_create_request', {
+          request: {
+            request_id: requestId,
+            req_no: reqNo,
+            reporter: form.reporter.trim() || profile.name,
+            phone: form.phone.trim() || null,
+            department: form.department.trim() || profile.department || null,
+            equipment_id: form.equipment || null,
+            equipment_category: selectedEquipment?.category || null,
+            fault_location: form.location.trim() || null,
+            fault_type: form.type.trim() || null,
+            urgency: form.urgency,
+            fault_desc: faultDesc,
+            mobile: form.mobile.trim() || null,
+          },
+          location_file_path: uploadSession.uploads.location.path,
+          equipment_file_path: uploadSession.uploads.equipment.path,
+          location_file_name: locationPhoto.name,
+          equipment_file_name: equipmentPhoto.name,
+        });
         setForm(emptyRepairForm());
         setLocationPhoto(null); setEquipmentPhoto(null);
         setShowCreate(false); setFormMessage(''); await load();

@@ -55,6 +55,17 @@ function relationName(value: unknown) {
   return text((relation as { name?: unknown }).name, 200);
 }
 
+function extractFileExt(name: string, fallback: string) {
+  const match = text(name, 80).toLowerCase().match(/\.([a-z0-9]{2,8})$/);
+  return match ? match[1] : fallback;
+}
+
+function nextRequestRequestId() {
+  const source = globalThis.crypto;
+  if (source && typeof source.randomUUID === 'function') return source.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 function canonicalFloor(value: unknown) {
   const raw = text(value, 20).toUpperCase().replace(/\s+/g, '');
   if (raw === 'B1' || raw === 'B1F') return 'B1F';
@@ -190,11 +201,13 @@ export async function handleAppApiRequest(req: Request) {
       create_cost_record: 'app-api:create_cost_record',
       save_official_vehicle: 'app-api:save_official_vehicle',
       save_floor_model: 'app-api:save_floor_model',
-      workorder_list: 'app-api:workorder_list',
-      workorder_options: 'app-api:workorder_options',
-      workorder_detail: 'app-api:workorder_detail',
-      workorder_workflow: 'app-api:workorder_workflow',
-    } as Record<string, string>)[action];
+    workorder_list: 'app-api:workorder_list',
+    workorder_prepare_upload: 'app-api:workorder_prepare_upload',
+    workorder_options: 'app-api:workorder_options',
+    workorder_detail: 'app-api:workorder_detail',
+    workorder_create_request: 'app-api:workorder_create_request',
+    workorder_workflow: 'app-api:workorder_workflow',
+  } as Record<string, string>)[action];
     if (actionScope) {
       const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
         p_subject: authData.user.id,
@@ -378,6 +391,179 @@ export async function handleAppApiRequest(req: Request) {
         logs: logsResult.data || [],
         warnings,
       } });
+    }
+
+    if (action === 'workorder_prepare_upload') {
+      if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      const reqBody = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+      const requestPayload = reqBody.request && typeof reqBody.request === 'object' && !Array.isArray(reqBody.request)
+        ? reqBody.request as Record<string, unknown>
+        : {};
+      const locationPhoto = reqBody.location_photo && typeof reqBody.location_photo === 'object' && !Array.isArray(reqBody.location_photo)
+        ? reqBody.location_photo as Record<string, unknown>
+        : {};
+      const equipmentPhoto = reqBody.equipment_photo && typeof reqBody.equipment_photo === 'object' && !Array.isArray(reqBody.equipment_photo)
+        ? reqBody.equipment_photo as Record<string, unknown>
+        : {};
+      const locationFileName = text(locationPhoto.name, 200);
+      const equipmentFileName = text(equipmentPhoto.name, 200);
+      const locationFileType = text(locationPhoto.type, 80).toLowerCase();
+      const equipmentFileType = text(equipmentPhoto.type, 80).toLowerCase();
+      if (!locationFileName || !equipmentFileName) return reply(req, { ok: false, message: '照片檔名不可為空' }, 400);
+      if (!/^(image\/(?:jpeg|png|webp|heic))$/i.test(locationFileType) || !/^(image\/(?:jpeg|png|webp|heic))$/i.test(equipmentFileType)) {
+        return reply(req, { ok: false, message: '照片類型必須是 JPEG、PNG、WebP 或 HEIC' }, 400);
+      }
+      const locationFileSize = Number(locationPhoto.size);
+      const equipmentFileSize = Number(equipmentPhoto.size);
+      if (!Number.isFinite(locationFileSize) || locationFileSize <= 0 || locationFileSize > 10 * 1024 * 1024) return reply(req, { ok: false, message: '故障位置照片大小限制 10MB' }, 400);
+      if (!Number.isFinite(equipmentFileSize) || equipmentFileSize <= 0 || equipmentFileSize > 10 * 1024 * 1024) return reply(req, { ok: false, message: '維修設備照片大小限制 10MB' }, 400);
+
+      const requestId = nextRequestRequestId();
+      const reqNoResult = await admin.rpc('gen_req_no');
+      if (reqNoResult.error || !reqNoResult.data) return reply(req, { ok: false, message: '無法產生報修單號，請稍後再試' }, 503);
+      const reqNo = text(reqNoResult.data, 40);
+      const requestSnapshot = {
+        request_id: requestId,
+        req_no: reqNo,
+        source: 'app-api',
+        reporter: text(requestPayload.reporter, 100) || profile.name,
+        phone: text(requestPayload.phone, 40) || null,
+        department: text(requestPayload.department, 100) || text(profile.department, 100) || null,
+        equipment_id: /^[0-9a-f-]{36}$/i.test(text(requestPayload.equipment_id, 80)) ? text(requestPayload.equipment_id, 80) : null,
+        equipment_category: text(requestPayload.equipment_category, 120) || null,
+        fault_location: text(requestPayload.fault_location, 200) || null,
+        fault_type: text(requestPayload.fault_type, 80) || null,
+        urgency: text(requestPayload.urgency, 20) || 'normal',
+        fault_desc: text(requestPayload.fault_desc, 2000),
+        mobile: text(requestPayload.mobile, 40) || null,
+        status: 'pending',
+        created_by: profile.user_id,
+      };
+      if (!requestSnapshot.req_no) return reply(req, { ok: false, message: '無法建立報修單號，請稍後再試' }, 500);
+      if (!requestSnapshot.fault_desc) return reply(req, { ok: false, message: '故障描述不可空白' }, 400);
+      if (!requestSnapshot.mobile) return reply(req, { ok: false, message: '手機號碼為必填欄位' }, 400);
+
+      const locationPath = `${requestId}/location_${new Date().toISOString().replace(/[-:.TZ]/g, '')}-${extractFileExt(locationFileName, 'jpg')}`;
+      const equipmentPath = `${requestId}/equipment_${new Date().toISOString().replace(/[-:.TZ]/g, '')}-${extractFileExt(equipmentFileName, 'jpg')}`;
+      const [locationUpload, equipmentUpload] = await Promise.all([
+        admin.storage.from('repair-files').createSignedUploadUrl(locationPath, 15 * 60),
+        admin.storage.from('repair-files').createSignedUploadUrl(equipmentPath, 15 * 60),
+      ]);
+
+      if (locationUpload.error || !locationUpload.data || !locationUpload.data.path || !locationUpload.data.token) {
+        return reply(req, { ok: false, message: text(locationUpload.error?.message, 300) || '故障位置照片上傳授權建立失敗' }, 500);
+      }
+      if (equipmentUpload.error || !equipmentUpload.data || !equipmentUpload.data.path || !equipmentUpload.data.token) {
+        return reply(req, { ok: false, message: text(equipmentUpload.error?.message, 300) || '維修設備照片上傳授權建立失敗' }, 500);
+      }
+
+      return reply(req, { ok: true, data: {
+        request_snapshot: requestSnapshot,
+        uploads: {
+          location: {
+            path: locationUpload.data.path,
+            token: locationUpload.data.token,
+          },
+          equipment: {
+            path: equipmentUpload.data.path,
+            token: equipmentUpload.data.token,
+          },
+        },
+      } });
+    }
+
+    if (action === 'workorder_create_request') {
+      if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      const reqBody = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+      const requestData = reqBody.request && typeof reqBody.request === 'object' && !Array.isArray(reqBody.request)
+        ? reqBody.request as Record<string, unknown>
+        : {};
+      const requestId = text(requestData.request_id, 80);
+      const reqNo = text(requestData.req_no, 80);
+      const locationPath = text(reqBody.location_file_path, 1000);
+      const equipmentPath = text(reqBody.equipment_file_path, 1000);
+      const locationFileName = text(reqBody.location_file_name, 120);
+      const equipmentFileName = text(reqBody.equipment_file_name, 120);
+      if (!/^[0-9a-f-]{36}$/i.test(requestId)) return reply(req, { ok: false, message: '報修案件識別碼無效' }, 400);
+      if (!reqNo) return reply(req, { ok: false, message: '報修單號不可為空' }, 400);
+      if (!locationPath || !equipmentPath) return reply(req, { ok: false, message: '上傳檔案資訊不完整' }, 400);
+      if (!locationPath.startsWith(`${requestId}/`) || !equipmentPath.startsWith(`${requestId}/`)) return reply(req, { ok: false, message: '上傳檔案路徑不符案件' }, 400);
+      if (!locationFileName || !equipmentFileName) return reply(req, { ok: false, message: '上傳檔名不完整' }, 400);
+
+      const uploadedList = await admin.storage.from('repair-files').list(requestId);
+      if (uploadedList.error) return reply(req, { ok: false, message: text(uploadedList.error.message, 300) || '驗證附件上傳結果失敗' }, 503);
+      const uploadedSet = new Set((uploadedList.data || []).map(item => text((item as { name: string }).name, 500)));
+      const uploadedLocationFile = locationPath.split('/').pop();
+      const uploadedEquipmentFile = equipmentPath.split('/').pop();
+      if (!uploadedSet.has(uploadedLocationFile || '') || !uploadedSet.has(uploadedEquipmentFile || '')) {
+        return reply(req, { ok: false, message: '附件尚未完成上傳，請重新上傳' }, 409);
+      }
+
+      const [existingRequest] = await Promise.all([
+        admin.from('repair_requests').select('request_id').eq('request_id', requestId).maybeSingle(),
+      ]);
+      if (existingRequest.error) return reply(req, { ok: false, message: text(existingRequest.error.message, 300) || '檢查現有資料失敗' }, 500);
+      if (existingRequest.data) return reply(req, { ok: false, message: '此報修案件已提交，請勿重複送出' }, 409);
+
+      const [existingReqNo] = await Promise.all([
+        admin.from('repair_requests').select('request_id').eq('req_no', reqNo).maybeSingle(),
+      ]);
+      if (existingReqNo.error) return reply(req, { ok: false, message: text(existingReqNo.error.message, 300) || '檢查報修單號失敗' }, 500);
+      if (existingReqNo.data) return reply(req, { ok: false, message: '報修單號重複，請稍後再試' }, 409);
+
+      const requestRow = {
+        request_id: requestId,
+        req_no: reqNo,
+        source: 'app-api',
+        reporter: text(requestData.reporter, 100) || profile.name,
+        phone: text(requestData.phone, 40) || null,
+        department: text(requestData.department, 100) || text(profile.department, 100) || null,
+        equipment_id: /^[0-9a-f-]{36}$/i.test(text(requestData.equipment_id, 80)) ? text(requestData.equipment_id, 80) : null,
+        equipment_category: text(requestData.equipment_category, 120) || null,
+        fault_location: text(requestData.fault_location, 200) || null,
+        fault_type: text(requestData.fault_type, 80) || null,
+        urgency: text(requestData.urgency, 20) || 'normal',
+        fault_desc: text(requestData.fault_desc, 2000),
+        mobile: text(requestData.mobile, 40) || null,
+        status: 'pending',
+        created_by: profile.user_id,
+      };
+      const attachmentsRows = [
+        { request_id: requestId, kind: 'location_photo', file_path: locationPath, file_name: locationFileName, uploaded_by: profile.user_id },
+        { request_id: requestId, kind: 'equipment_photo', file_path: equipmentPath, file_name: equipmentFileName, uploaded_by: profile.user_id },
+      ];
+      const logRow = {
+        request_id: requestId,
+        order_id: null,
+        from_status: null,
+        to_status: 'pending',
+        note: '報修人建立報修',
+        operator_id: profile.user_id,
+        operator_name: profile.name,
+      };
+      const createResponse = await admin.from('repair_requests').insert(requestRow).select('request_id,req_no').single();
+      if (createResponse.error) {
+        await admin.storage.from('repair-files').remove([locationPath, equipmentPath]);
+        return reply(req, { ok: false, message: text(createResponse.error.message, 300) || '建立報修失敗' }, 400);
+      }
+      const created = createResponse.data;
+
+      const initLog = await admin.from('case_status_log').insert(logRow);
+      if (initLog.error) {
+        await admin.storage.from('repair-files').remove([locationPath, equipmentPath]);
+        await admin.from('repair_requests').delete().eq('request_id', requestId);
+        return reply(req, { ok: false, message: text(initLog.error.message, 300) || '建立歷程失敗' }, 400);
+      }
+
+      const attachmentInsert = await admin.from('repair_attachments').insert(attachmentsRows).select('attach_id').limit(10);
+      if (attachmentInsert.error) {
+        await admin.storage.from('repair-files').remove([locationPath, equipmentPath]);
+        await admin.from('repair_requests').delete().eq('request_id', requestId);
+        await admin.from('case_status_log').delete().eq('request_id', requestId);
+        return reply(req, { ok: false, message: text(attachmentInsert.error.message, 300) || '建立附件失敗' }, 400);
+      }
+
+      return reply(req, { ok: true, data: created });
     }
 
     if (action === 'workorder_workflow') {
