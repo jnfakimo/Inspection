@@ -123,5 +123,10 @@ session 驗證**，只確認了 `next build` 仍通過。
   跨 agent 並行稽核（實際損害一處已排除）、四筆對比／版面修正、兩處靜默失敗補上提示、
   SYS-06 的 A1／A2 實機驗收通過
 · 同日另有 agent 並行推送 34 筆：Node.js 後端 runtime、DXF modeler 移植 V2、
-  天氣 SVG 地圖、ComboboxSelect、3D 檢視器版面——該批未經本 session 驗證
+  天氣 SVG 地圖、ComboboxSelect、3D 檢視器版面
+· 該 34 筆已於 08-19 晚間補驗建置層級：TypeScript strict 與 next build 皆通過；
+  儀表板新引入的 chart.js 雖是靜態 import，實測首頁初始載入 818 KB、
+  僅比登入頁多 29 KB，Turbopack 已切出去，不需改成動態載入。功能面仍未實機驗收。
+· 清掉一個殘留的 cherry-pick 狀態（b37424c，內容已以 a06f2ce 提交、兩者 diff 相同），
+  以 --quit 只清狀態未動歷史；若再遇到 pull 被 CHERRY_PICK_HEAD 擋住可比照處理
 · L3 Obsidian：未更新（AGENTS.md 未登記 vault 路徑）
