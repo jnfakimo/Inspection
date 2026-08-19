@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
+import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { MARKET_ID } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';

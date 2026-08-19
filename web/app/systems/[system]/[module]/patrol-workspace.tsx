@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
+import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { LEGACY_BASE } from '@/lib/config';
 import { escHtml } from '@/lib/html-escape';

@@ -12,7 +12,7 @@ import { useEffect, useRef } from 'react';
 import { SUPABASE_URL } from '@/lib/config';
 
 export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; level?: number | null };
-export type StackMarker = { id: string; floor_id: string; x: number; y: number; color: string };
+export type StackMarker = { id: string; floor_id: string; x: number; y: number; color: string; kind?: string; label?: string };
 
 export const floorTextureUrl = (imagePath: unknown) =>
   imagePath ? `${SUPABASE_URL}/storage/v1/object/public/floorplans/${String(imagePath)}` : '';
@@ -26,8 +26,12 @@ export function floorOrder(floor: string) {
 
 const PLANE_W = 10, PLANE_H = 7;
 
-export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6 }: {
+export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors }: {
   models: StackModel[]; markers: StackMarker[]; showMarkers?: boolean; gap?: number;
+  xPan?: number; yPan?: number;
+  visibleKinds?: Record<string, boolean>;
+  showLabels?: boolean;
+  visibleFloors?: Record<string, boolean>;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
@@ -54,7 +58,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6 }:
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.target.set(0, models.length * gap / 2, 0);
+      controls.target.set(xPan, models.length * gap / 2 + yPan, 0);
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.1));
       const dir = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -68,6 +72,10 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6 }:
 
       models.forEach((row, index) => {
         const y = useLevel ? Number(row.level) || 0 : index * gap;
+        
+        const isVisible = visibleFloors ? visibleFloors[String(row.floor_id)] !== false : true;
+        if (!isVisible) return;
+        
         const material = new THREE.MeshBasicMaterial({ color: 0x0a2036, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PLANE_W, PLANE_H), material);
         mesh.rotation.x = -Math.PI / 2;
@@ -90,12 +98,34 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6 }:
 
         if (showMarkers) {
           for (const marker of markers.filter(m => m.floor_id === String(row.floor_id))) {
+            const isKindVisible = visibleKinds ? visibleKinds[marker.kind || ''] !== false : true;
+            if (!isKindVisible) continue;
+            
             const dot = new THREE.Mesh(
               new THREE.SphereGeometry(0.075, 12, 12),
               new THREE.MeshBasicMaterial({ color: new THREE.Color(marker.color) }));
             // 標記的 x／y 為 0–1 相對座標，換算到平面尺寸並置中。
             dot.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.12, marker.y * PLANE_H - PLANE_H / 2);
             scene.add(dot);
+            
+            if (showLabels && marker.label) {
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d')!;
+              ctx.font = 'bold 24px sans-serif';
+              const textWidth = ctx.measureText(marker.label).width;
+              canvas.width = Math.max(textWidth + 10, 64);
+              canvas.height = 32;
+              ctx.font = 'bold 24px sans-serif';
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText(marker.label, 5, 24);
+              
+              const tex = new THREE.CanvasTexture(canvas);
+              const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+              const sprite = new THREE.Sprite(mat);
+              sprite.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.35, marker.y * PLANE_H - PLANE_H / 2);
+              sprite.scale.set(canvas.width / 40, canvas.height / 40, 1);
+              scene.add(sprite);
+            }
           }
         }
       });
@@ -125,7 +155,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6 }:
       };
     })();
     return () => { disposed = true; cleanupRef.current(); cleanupRef.current = () => {}; };
-  }, [models, markers, showMarkers, gap]);
+  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors]);
 
-  return <div ref={hostRef} className="plan-stage" />;
+  return <div ref={hostRef} className="plan-stage" style={{ width: '100%', height: '100%' }} />;
 }
