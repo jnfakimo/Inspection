@@ -184,7 +184,7 @@ function renderNeon(canvas: HTMLCanvasElement, polylines: Polyline[], bbox: BBox
   const pointY = (y: number) => padding + (bbox.mxy - y) * scale;
   context.lineJoin = 'round';
   context.lineCap = 'round';
-  for (const pass of [{ width: 3, blur: 8, alpha: .5 }, { width: 1.4, blur: 3, alpha: .85 }, { width: 1, blur: 0, alpha: 1 }]) {
+  for (const pass of [{ width: 1.2, blur: 4, alpha: .5 }, { width: 0.6, blur: 1.5, alpha: .85 }, { width: 0.4, blur: 0, alpha: 1 }]) {
     context.strokeStyle = `rgba(94,234,255,${pass.alpha})`;
     context.lineWidth = pass.width;
     context.shadowColor = '#5eeaff';
