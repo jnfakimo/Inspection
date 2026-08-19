@@ -15,6 +15,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type PatrolState = 'ok' | 'pending' | 'overdue';
 
+/**
+ * 巡檢班別的「刪除」是軟刪除：`a06f2ce` 把名稱前綴成 `[已刪除] 原名`，資料列保留。
+ * 讀 patrol_shifts 的地方共有四處（排班頁、打卡矩陣、首頁當班巡檢、本檔），
+ * 導入時只有排班頁做了過濾，其餘三處會把前綴直接顯示給使用者。判斷集中在這裡，
+ * 四處共用，避免再各寫一份字串比對。
+ */
+export const DELETED_SHIFT_PREFIX = '[已刪除]';
+export const isDeletedShift = (name: unknown) => String(name ?? '').startsWith(DELETED_SHIFT_PREFIX);
+
 export const PATROL_COLORS: Record<PatrolState, string> = {
   ok: '#00ff9d', pending: '#c77dff', overdue: '#ff5470',
 };
@@ -92,7 +101,8 @@ function getOverrides(client: Client, dateStr: string) {
     // Supabase 的查詢建構器回傳 PromiseLike，包一層才是完整的 Promise。
     overridePromises.set(dateStr, (async () => {
       const result = await client.from('patrol_shifts').select('*').eq('shift_date', dateStr);
-      return result.data || [];
+      // 已軟刪除的班別不得覆寫樣板時段，否則通報時窗會沿用一個已經不存在的班。
+      return (result.data || []).filter(row => !isDeletedShift(row.name));
     })());
   }
   return overridePromises.get(dateStr)!;

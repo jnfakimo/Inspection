@@ -24,6 +24,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { DELETED_SHIFT_PREFIX, isDeletedShift } from '@/lib/patrol-status';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { FloorStack3D, floorOrder, type StackMarker } from './floor-stack-3d';
 import { PointListModule } from './patrol-pointlist';
@@ -243,7 +244,7 @@ function ShiftsModule({ module, profile }: Props) {
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
     ]);
     if (s.error || t.error || u.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error, '排班資料載入失敗')}`);
-    setShifts((s.data || []).filter(row => !String(row.name).startsWith('[已刪除]'))); 
+    setShifts((s.data || []).filter(row => !isDeletedShift(row.name)));
     setTemplates(t.data || []); 
     setUsers(u.data || []);
     // system_settings 為 admin-only，非管理者讀不到；此時通報時段留白即可，不擋畫面。
@@ -315,7 +316,7 @@ function ShiftsModule({ module, profile }: Props) {
       else { setNote('範本已刪除'); await load(); }
     } else {
       // patrol_shifts 因資料庫保護無法 DELETE，且無 status 欄位，故以名稱前綴隱藏
-      const { error } = await client.from('patrol_shifts').update({ name: `[已刪除] ${row.name}`, assigned_user_ids: [] }).eq('shift_id', row.shift_id);
+      const { error } = await client.from('patrol_shifts').update({ name: `${DELETED_SHIFT_PREFIX} ${row.name}`, assigned_user_ids: [] }).eq('shift_id', row.shift_id);
       if (error) setNote(`刪除失敗：${errorMessage(error)}`);
       else { setNote('班別已刪除'); await load(); }
     }

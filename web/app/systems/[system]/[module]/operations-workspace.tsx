@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { isDeletedShift } from '@/lib/patrol-status';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import type { Profile } from '@/types/app';
@@ -21,7 +22,7 @@ const text = (v: unknown) => v == null || v === '' ? '—' : String(v);
 function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
   const client = getSupabase();
   const [rows, setRows] = useState<Row[]>([]); const [points, setPoints] = useState<Point[]>([]); const [schedules, setSchedules] = useState<PatrolSchedule[]>([]); const [selected, setSelected] = useState(''); const [exportFrom, setExportFrom] = useState(today()); const [exportTo, setExportTo] = useState(today()); const [date, setDate] = useState(today()); const [floor, setFloor] = useState(''); const [shift, setShift] = useState(''); const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false); const [note, setNote] = useState('');
-  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), client.from('patrol_shifts').select('shift_id,name,start_time,end_time').eq('shift_date', date).order('sort_order').order('start_time')]); setRows(data.rows || []); setPoints(markerResult.data || []); setSchedules(scheduleResult.data || []); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); } }, [client, date]);
+  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), client.from('patrol_shifts').select('shift_id,name,start_time,end_time').eq('shift_date', date).order('sort_order').order('start_time')]); setRows(data.rows || []); setPoints(markerResult.data || []); setSchedules((scheduleResult.data || []).filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); } }, [client, date]);
   useEffect(() => { void load(); }, [load]);
   const visibleRows = useMemo(() => rows.filter(row => (!floor || String(row.floor_id || '') === floor) && (!date || String(row.checkin_at || '').slice(0, 10) === date) && (!shift || !row.shift_type || String(row.shift_type) === shift) && (!status || status === 'ok')), [rows, floor, date, shift, status]);
   const floors = useMemo(() => [...new Set(points.map(point => String(point.floor_id || '未分類')))].sort(), [points]);

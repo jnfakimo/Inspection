@@ -28,6 +28,7 @@ import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
+import { isDeletedShift } from '@/lib/patrol-status';
 import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
@@ -201,7 +202,8 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     });
     const isDone = (point: Row) => checked.has(String(point.marker_id)) || checked.has(`${point.floor_id}|${point.label}`);
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const activeShift = (shiftResult.data || []).find(item => {
+    // 已軟刪除的班別不列入當班判定，否則首頁會顯示「[已刪除] ○班」。
+    const activeShift = (shiftResult.data || []).filter(item => !isDeletedShift(item.name)).find(item => {
       const toMinutes = (value: unknown) => { const [h, m] = String(value).slice(0, 5).split(':').map(Number); return (h || 0) * 60 + (m || 0); };
       const start = toMinutes(item.start_time), end = toMinutes(item.end_time);
       return end > start ? nowMinutes >= start && nowMinutes <= end : nowMinutes >= start || nowMinutes <= end;
