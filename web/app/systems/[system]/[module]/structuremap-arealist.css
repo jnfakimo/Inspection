@@ -1,5 +1,9 @@
 /* SYS-06 區域位置表｜V1 arealist.html 的版型移植
  *
+ * 共用的清單版型（導覽、統計卡、工具列、樓層分組、資料列、QR 視窗）在
+ * `v1-listpage.css`，本檔只留區域位置表獨有的部分：篩選標頭、使用中標籤、
+ * 分頁、編輯視窗與 Toast。
+ *
  * V1 自帶一整套 --surface／--border／--text-hi／--text-dim 的區域變數，並在
  * :root[data-theme="light"] 覆寫一次。V2 已有等價的全域 token，因此直接對應過去，
  * 不再宣告第二套：
@@ -9,140 +13,12 @@
  * 從 --cyan 推導，科技版與 V1 的觀感一致，淺色版自然收斂成淡淡的暈邊。
  */
 
-.arealist-page {
-  --arealist-glow: 0 0 14px color-mix(in srgb, var(--cyan) 50%, transparent);
-  max-width: 1100px;
-  margin: 0 auto;
+.v1list-page.arealist-page {
+  --v1list-glow: 0 0 14px color-mix(in srgb, var(--cyan) 50%, transparent);
+  --v1list-modal-shadow: 0 0 40px color-mix(in srgb, var(--cyan) 15%, transparent);
 }
 
-/* ── 區域內導覽 ─────────────────────────────────────────────────────── */
-
-.arealist-local-nav {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 0 12px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 14px;
-}
-
-.arealist-nav-heading {
-  flex: 0 0 auto;
-  min-width: max-content;
-}
-
-.arealist-nav-heading h1 {
-  margin: 0;
-  color: var(--cyan);
-  font-family: var(--head);
-  font-size: 1.1rem;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-shadow: var(--arealist-glow);
-}
-
-.arealist-nav-heading p {
-  margin: 2px 0 0;
-  color: var(--dim);
-  font-size: .7rem;
-}
-
-.arealist-nav-links {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-
-.arealist-nav-links a {
-  padding: 5px 10px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  color: var(--dim);
-  font-family: var(--head);
-  font-size: .7rem;
-  letter-spacing: .05em;
-  text-decoration: none;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: border-color .2s, color .2s;
-}
-
-.arealist-nav-links a:hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
-}
-
-/* ── 說明與統計 ─────────────────────────────────────────────────────── */
-
-.arealist-hint {
-  margin: 0 0 12px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--cyan);
-  border-radius: 2px;
-  background: var(--surface);
-  color: var(--dim);
-  font-size: .72rem;
-  line-height: 1.6;
-}
-
-.arealist-stats {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-.arealist-stat {
-  min-width: 120px;
-  padding: 10px 16px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: var(--panel);
-}
-
-.arealist-stat .n {
-  color: var(--cyan);
-  font-family: var(--head);
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.arealist-stat .l {
-  margin-top: 2px;
-  color: var(--dim);
-  font-size: .68rem;
-  letter-spacing: .05em;
-}
-
-/* ── 工具列 ─────────────────────────────────────────────────────────── */
-
-.arealist-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
-.arealist-toolbar select,
-.arealist-toolbar input {
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: .78rem;
-  outline: none;
-  transition: border-color .2s;
-}
-
-.arealist-toolbar select:focus,
-.arealist-toolbar input:focus { border-color: var(--cyan); }
-
-.arealist-space { flex: 1; }
+/* ── 工具列按鈕 ─────────────────────────────────────────────────────── */
 
 .arealist-btn {
   display: inline-flex;
@@ -190,60 +66,7 @@
 
 .arealist-btn.blue:hover { background: color-mix(in srgb, var(--blue) 15%, transparent); }
 
-/* ── 樓層分組 ───────────────────────────────────────────────────────── */
-
-.arealist-floor {
-  margin-bottom: 12px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: var(--panel);
-  overflow: hidden;
-}
-
-.arealist-floor-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 11px 14px;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--cyan) 6%, transparent), transparent);
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.arealist-floor-head .caret {
-  width: 14px;
-  color: var(--cyan);
-  font-size: .8rem;
-  transition: transform .2s;
-}
-
-.arealist-floor-head.collapsed .caret { transform: rotate(-90deg); }
-
-.arealist-floor-head .fname {
-  color: var(--text);
-  font-family: var(--head);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: .05em;
-}
-
-.arealist-floor-head .fcount {
-  padding: 1px 9px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--dim);
-  font-size: .7rem;
-}
-
-.arealist-floor-body { padding: 8px 10px; }
-
-/* ── 清單標頭與資料列 ───────────────────────────────────────────────── */
+/* ── 清單標頭與篩選 ─────────────────────────────────────────────────── */
 
 .arealist-row-head {
   display: flex;
@@ -272,7 +95,7 @@
 }
 
 .arealist-row-head .h-use,
-.arealist-row .use-col {
+.arealist-page .v1list-row .use-col {
   width: 132px;
   flex: none;
   text-align: center;
@@ -283,8 +106,8 @@
   flex: none;
 }
 
-.name-filter,
-.use-filter {
+.arealist-page .name-filter,
+.arealist-page .use-filter {
   padding: 4px 7px;
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -294,48 +117,35 @@
   outline: none;
 }
 
-.name-filter { width: 220px; max-width: 100%; }
-.use-filter { width: 126px; }
-.name-filter:focus,
-.use-filter:focus { border-color: var(--cyan); }
+.arealist-page .name-filter { width: 220px; max-width: 100%; }
+.arealist-page .use-filter { width: 126px; }
+.arealist-page .name-filter:focus,
+.arealist-page .use-filter:focus { border-color: var(--cyan); }
 
-.arealist-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  transition: background .15s, border-color .15s;
-}
+/* ── 資料列 ─────────────────────────────────────────────────────────── */
 
-.arealist-row:hover {
-  background: var(--surface);
-  border-color: var(--line);
-}
-
-.arealist-row .dot {
+.arealist-page .v1list-row .dot {
   width: 6px;
   height: 6px;
   flex: none;
   border-radius: 50%;
   background: var(--cyan);
-  box-shadow: var(--arealist-glow);
+  box-shadow: var(--v1list-glow);
 }
 
-.arealist-row .sname {
+.arealist-page .v1list-row .sname {
   flex: 1;
   color: var(--text);
   font-size: .85rem;
 }
 
-.arealist-row .sname small {
+.arealist-page .v1list-row .sname small {
   margin-left: 6px;
   color: var(--dim);
   font-size: .68rem;
 }
 
-.use-pill {
+.arealist-page .use-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -348,36 +158,22 @@
   font-size: .66rem;
 }
 
-.use-pill.used {
+.arealist-page .use-pill.used {
   border-color: color-mix(in srgb, var(--green) 55%, transparent);
   background: color-mix(in srgb, var(--green) 12%, transparent);
   color: var(--green);
 }
 
 /* 操作按鈕在 V1 是 hover 才浮現。鍵盤操作看不到 hover，因此焦點落在列內時也顯示。 */
-.arealist-row .acts {
-  display: flex;
-  gap: 6px;
+.arealist-page .v1list-row .acts {
   opacity: 0;
   transition: opacity .15s;
 }
 
-.arealist-row:hover .acts,
-.arealist-row:focus-within .acts { opacity: 1; }
+.arealist-page .v1list-row:hover .acts,
+.arealist-page .v1list-row:focus-within .acts { opacity: 1; }
 
-.mini {
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: none;
-  color: var(--dim);
-  font-size: .68rem;
-  cursor: pointer;
-  transition: border-color .2s, color .2s;
-}
-
-.mini:hover { border-color: var(--cyan); color: var(--cyan); }
-.mini.del:hover { border-color: var(--red); color: var(--red); }
+.arealist-page .mini.del:hover { border-color: var(--red); color: var(--red); }
 
 /* ── 分頁 ───────────────────────────────────────────────────────────── */
 
@@ -394,7 +190,7 @@
 
 .arealist-pager .page-info { margin-right: auto; }
 
-.page-btn {
+.arealist-page .page-btn {
   padding: 4px 10px;
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -405,69 +201,13 @@
   transition: border-color .2s, color .2s;
 }
 
-.page-btn:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
-.page-btn:disabled { opacity: .35; cursor: not-allowed; }
-
-.arealist-empty {
-  padding: 60px 20px;
-  color: var(--dim);
-  font-size: .85rem;
-  text-align: center;
-}
+.arealist-page .page-btn:hover:not(:disabled) { border-color: var(--cyan); color: var(--cyan); }
+.arealist-page .page-btn:disabled { opacity: .35; cursor: not-allowed; }
 
 /* ── 視窗 ───────────────────────────────────────────────────────────── */
 
-.arealist-modal-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 60px 16px;
-  overflow: auto;
-  background: color-mix(in srgb, var(--bg) 82%, transparent);
-}
-
-.arealist-modal {
-  width: 100%;
-  max-width: 440px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--panel);
-  box-shadow: 0 0 40px color-mix(in srgb, var(--cyan) 15%, transparent);
-}
-
-.arealist-modal.qr {
-  max-width: 280px;
-  text-align: center;
-}
-
-.arealist-modal-head {
-  display: flex;
-  align-items: center;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--line);
-}
-
-.arealist-modal-head .mt {
-  color: var(--cyan);
-  font-family: var(--head);
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: .05em;
-}
-
-.arealist-modal-head .x {
-  margin-left: auto;
-  border: 0;
-  background: none;
-  color: var(--dim);
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-
-.arealist-modal-head .x:hover { color: var(--red); }
+/* 關閉鈕在本頁是「放棄編輯」，沿用 V1 的紅色 hover；巡邏點清單只有 QR 視窗，用主色。 */
+.arealist-page .v1list-modal-head .x:hover { color: var(--red); }
 
 .arealist-modal-body { padding: 18px; }
 
@@ -520,37 +260,6 @@
 
 .arealist-msg.err { color: var(--red); }
 
-.arealist-qr-body { padding: 22px; }
-
-.arealist-qr-body .qname {
-  margin-bottom: 2px;
-  color: var(--text);
-  font-family: var(--head);
-  font-size: 1rem;
-}
-
-.arealist-qr-body .qfloor {
-  margin-bottom: 6px;
-  color: var(--dim);
-  font-size: .72rem;
-}
-
-/* QR 底色固定為白：掃描器需要高對比的黑白圖，跟著主題翻成深色會掃不到。 */
-.arealist-qr-body .qbox {
-  width: fit-content;
-  margin: 10px auto;
-  padding: 8px;
-  border-radius: 4px;
-  background: #fff;
-}
-
-.arealist-qr-body .qbox img {
-  display: block;
-  width: 180px;
-  height: 180px;
-  image-rendering: pixelated;
-}
-
 /* ── Toast ──────────────────────────────────────────────────────────── */
 
 .arealist-toast {
@@ -585,24 +294,22 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arealist-floor-head .caret,
-  .arealist-row,
   .arealist-toast { transition: none; }
 }
 
 /* 列印 QR 標籤時只留視窗本身，與 V1 的 window.print() 行為一致。 */
 @media print {
-  .arealist-page > *:not(.arealist-modal-bg) { display: none !important; }
-  .arealist-modal-bg {
+  .arealist-page > *:not(.v1list-modal-bg) { display: none !important; }
+  .arealist-page .v1list-modal-bg {
     position: static;
     padding: 0;
     background: none;
   }
-  .arealist-modal.qr {
+  .arealist-page .v1list-modal.qr {
     max-width: none;
     border: 0;
     box-shadow: none;
   }
-  .arealist-modal-head .x,
-  .arealist-qr-body .arealist-primary { display: none !important; }
+  .arealist-page .v1list-modal-head .x,
+  .arealist-page .v1list-qr-body .arealist-primary { display: none !important; }
 }

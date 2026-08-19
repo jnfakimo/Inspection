@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
+import './v1-listpage.css';
 import './structuremap-arealist.css';
 import { AppShell } from '@/components/AppShell';
 import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
@@ -443,13 +444,13 @@ export function AreaListModule({ module, profile }: Props) {
   </>;
 
   return <AppShell profile={profile} title={module.title}>
-    <div className="arealist-page">
-      <nav className="arealist-local-nav" aria-label="設備圖臺相關功能">
-        <div className="arealist-nav-heading">
+    <div className="v1list-page arealist-page">
+      <nav className="v1list-local-nav" aria-label="設備圖臺相關功能">
+        <div className="v1list-nav-heading">
           <h1>區域位置表</h1>
           <p>各樓層平面空間名稱</p>
         </div>
-        <div className="arealist-nav-links">
+        <div className="v1list-nav-links">
           <a href={`${LEGACY_BASE}/modeler.html?v=2`}>3D建模系統</a>
           <a href={`${LEGACY_BASE}/arealist.html`}>區域位置表</a>
           <a href={`${LEGACY_BASE}/b1_integrated_marker_system.html`}>整合標記系統</a>
@@ -457,23 +458,23 @@ export function AreaListModule({ module, profile }: Props) {
         </div>
       </nav>
 
-      <p className="arealist-hint">
+      <p className="v1list-hint">
         每一列為單一「平面空間名稱」，以「樓層」區分。此表是整合標記系統的空間主檔來源，
         停用後歷史資料仍永久保留。
       </p>
 
-      <div className="arealist-stats">
-        <div className="arealist-stat">
+      <div className="v1list-stats">
+        <div className="v1list-stat">
           <div className="n">{new Set(rows.map(row => row.floor)).size}</div>
           <div className="l">樓層數</div>
         </div>
-        <div className="arealist-stat">
+        <div className="v1list-stat">
           <div className="n">{rows.length}</div>
           <div className="l">空間總數</div>
         </div>
       </div>
 
-      <div className="arealist-toolbar">
+      <div className="v1list-toolbar">
         <select value={floorFilter} onChange={event => setFloorFilter(event.target.value)} aria-label="樓層篩選">
           <option value="">全部樓層</option>
           {floorsSorted.map(floor => <option key={floor} value={floor}>{floor}</option>)}
@@ -483,7 +484,7 @@ export function AreaListModule({ module, profile }: Props) {
         </select>
         <input value={query} onChange={event => setQuery(event.target.value)}
           placeholder="搜尋空間名稱…" aria-label="搜尋空間名稱" />
-        <span className="arealist-space" />
+        <span className="v1list-space" />
         <button className="arealist-btn add"
           onClick={() => setEditor({ id: null, floor: floorFilter, name: '', message: '' })}>＋ 新增空間</button>
         <label className="arealist-btn blue">
@@ -495,9 +496,9 @@ export function AreaListModule({ module, profile }: Props) {
         <button className="arealist-btn" onClick={() => void clearAll()}>全部停用</button>
       </div>
 
-      {loadError && <div className="arealist-empty">{loadError}</div>}
-      {!loadError && busy && !rows.length && <div className="arealist-empty">載入中…</div>}
-      {!loadError && !busy && !filtered.length && <div className="arealist-empty">尚無資料，請「新增空間」或「匯入」。</div>}
+      {loadError && <div className="v1list-empty">{loadError}</div>}
+      {!loadError && busy && !rows.length && <div className="v1list-empty">載入中…</div>}
+      {!loadError && !busy && !filtered.length && <div className="v1list-empty">尚無資料，請「新增空間」或「匯入」。</div>}
 
       {!loadError && grouped.map(([floor, items]) => {
         const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
@@ -506,14 +507,14 @@ export function AreaListModule({ module, profile }: Props) {
         const pageItems = items.slice(start, start + PAGE_SIZE);
         // 有任何篩選條件時一律展開，與 V1 相同——否則會搜尋到被摺疊起來的結果。
         const isCollapsed = !filterActive && collapsed.has(floor);
-        return <section className="arealist-floor" key={floor}>
-          <button type="button" className={`arealist-floor-head${isCollapsed ? ' collapsed' : ''}`}
+        return <section className="v1list-floor" key={floor}>
+          <button type="button" className={`v1list-floor-head${isCollapsed ? ' collapsed' : ''}`}
             onClick={() => toggleFloor(floor)} aria-expanded={!isCollapsed}>
             <span className="caret">▼</span>
             <span className="fname">{floor}</span>
             <span className="fcount">{items.length} 個空間</span>
           </button>
-          {!isCollapsed && <div className="arealist-floor-body">
+          {!isCollapsed && <div className="v1list-floor-body">
             <div className="arealist-row-head">
               <span className="h-name">
                 <span>空間名稱</span>
@@ -530,7 +531,7 @@ export function AreaListModule({ module, profile }: Props) {
             </div>
             {pageItems.map(space => {
               const checkin = lastCheckin.get(space.space_id);
-              return <div className="arealist-row" key={space.space_id}>
+              return <div className="v1list-row" key={space.space_id}>
                 <span className="dot" />
                 <span className="sname">
                   {space.space_name}
@@ -560,10 +561,10 @@ export function AreaListModule({ module, profile }: Props) {
         </section>;
       })}
 
-      {editor && <div className="arealist-modal-bg" role="dialog" aria-modal="true"
+      {editor && <div className="v1list-modal-bg" role="dialog" aria-modal="true"
         aria-label={editor.id ? '編輯空間' : '新增空間'}>
-        <div className="arealist-modal">
-          <div className="arealist-modal-head">
+        <div className="v1list-modal">
+          <div className="v1list-modal-head">
             <span className="mt">{editor.id ? '編輯空間' : '新增空間'}</span>
             <button className="x" onClick={() => setEditor(null)} aria-label="關閉">✕</button>
           </div>
@@ -584,13 +585,13 @@ export function AreaListModule({ module, profile }: Props) {
         </div>
       </div>}
 
-      {qr && <div className="arealist-modal-bg" role="dialog" aria-modal="true" aria-label="空間 QR code">
-        <div className="arealist-modal qr">
-          <div className="arealist-modal-head">
+      {qr && <div className="v1list-modal-bg" role="dialog" aria-modal="true" aria-label="空間 QR code">
+        <div className="v1list-modal qr">
+          <div className="v1list-modal-head">
             <span className="mt">空間 QR code</span>
             <button className="x" onClick={() => setQr(null)} aria-label="關閉">✕</button>
           </div>
-          <div className="arealist-qr-body">
+          <div className="v1list-qr-body">
             <div className="qname">{qr.name}</div>
             <div className="qfloor">{qr.floor}</div>
             <div className="qbox"><img src={qr.dataUrl} alt={`${qr.floor} ${qr.name} 的簽到 QR code`} /></div>

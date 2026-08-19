@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
+import './v1-listpage.css';
 import './patrol-pointlist.css';
 import { AppShell } from '@/components/AppShell';
 import { LEGACY_BASE } from '@/lib/config';
@@ -182,13 +183,13 @@ export function PointListModule({ module, profile }: Props) {
   }, [printTags]);
 
   return <AppShell profile={profile} title={module.title}>
-    <div className="pointlist-page">
-      <nav className="pointlist-local-nav" aria-label="巡邏點相關功能">
-        <div className="pointlist-nav-heading">
+    <div className="v1list-page pointlist-page">
+      <nav className="v1list-local-nav" aria-label="巡邏點相關功能">
+        <div className="v1list-nav-heading">
           <h1>巡邏點清單</h1>
           <p>全樓層巡邏點標示彙總</p>
         </div>
-        <div className="pointlist-nav-links">
+        <div className="v1list-nav-links">
           <a href={`${LEGACY_BASE}/modeler.html?v=2`}>3D建模系統</a>
           <a href={`${LEGACY_BASE}/arealist.html`}>區域位置表</a>
           <a href={`${LEGACY_BASE}/b1_integrated_marker_system.html`}>整合標記系統</a>
@@ -198,55 +199,55 @@ export function PointListModule({ module, profile }: Props) {
         </div>
       </nav>
 
-      <p className="pointlist-hint">
+      <p className="v1list-hint">
         彙總所有樓層目前已放置的「巡邏點」標示（唯讀）。新增、移動或停用巡邏點請至
         「整合標記系統」的平面圖操作，本頁只呈現結果並提供 QR 標籤。
       </p>
 
-      <div className="pointlist-stats">
-        <div className="pointlist-stat">
+      <div className="v1list-stats">
+        <div className="v1list-stat">
           <div className="n">{rows.length ? new Set(rows.map(row => row.floor_id)).size : '—'}</div>
           <div className="l">涵蓋樓層數</div>
         </div>
-        <div className="pointlist-stat">
+        <div className="v1list-stat">
           <div className="n">{rows.length || '—'}</div>
           <div className="l">巡邏點總數</div>
         </div>
       </div>
 
-      <div className="pointlist-toolbar">
+      <div className="v1list-toolbar">
         <select value={floorFilter} onChange={event => setFloorFilter(event.target.value)} aria-label="樓層篩選">
           <option value="">全部樓層</option>
           {floorsSorted.map(floor => <option key={floor} value={floor}>{floor}</option>)}
         </select>
         <input value={query} onChange={event => setQuery(event.target.value)}
           placeholder="搜尋巡邏點名稱或說明…" aria-label="搜尋巡邏點" />
-        <span className="pointlist-space" />
+        <span className="v1list-space" />
         <button className="mini" onClick={() => void printAll()}>🖶 列印全部 QR</button>
       </div>
 
-      {status && <div className="pointlist-empty">
+      {status && <div className="v1list-empty">
         {status}
         {failed && <><br /><button className="mini" style={{ marginTop: 12 }} onClick={() => void load()}>重新載入</button></>}
       </div>}
 
-      {!status && !filtered.length && <div className="pointlist-empty">
+      {!status && !filtered.length && <div className="v1list-empty">
         尚無巡邏點資料。<br />請至「整合標記系統」平面圖新增巡邏點標示。
       </div>}
 
       {!status && grouped.map(([floor, items]) => {
         const isCollapsed = collapsed.has(floor);
-        return <section className="pointlist-floor" key={floor}>
-          <button type="button" className={`pointlist-floor-head${isCollapsed ? ' collapsed' : ''}`}
+        return <section className="v1list-floor" key={floor}>
+          <button type="button" className={`v1list-floor-head${isCollapsed ? ' collapsed' : ''}`}
             onClick={() => toggleFloor(floor)} aria-expanded={!isCollapsed}>
             <span className="caret">▼</span>
             <span className="fname">{floor}</span>
             <span className="fcount">{items.length} 個巡邏點</span>
           </button>
-          {!isCollapsed && <div className="pointlist-floor-body">
+          {!isCollapsed && <div className="v1list-floor-body">
             {items.map(point => {
               const checkin = lastCheckin.get(point.marker_id);
-              return <div className="pointlist-row" key={point.marker_id}>
+              return <div className="v1list-row" key={point.marker_id}>
                 <span className="dot" />
                 <span className="mname">{point.label}</span>
                 <span className="mnote">{point.note || ''}</span>
@@ -263,13 +264,13 @@ export function PointListModule({ module, profile }: Props) {
         </section>;
       })}
 
-      {qr && <div className="pointlist-modal-bg" role="dialog" aria-modal="true" aria-label="巡邏點 QR code">
-        <div className="pointlist-modal">
-          <div className="pointlist-modal-head">
+      {qr && <div className="v1list-modal-bg" role="dialog" aria-modal="true" aria-label="巡邏點 QR code">
+        <div className="v1list-modal qr">
+          <div className="v1list-modal-head">
             <span className="mt">巡邏點 QR code</span>
             <button className="x" onClick={() => setQr(null)} aria-label="關閉">✕</button>
           </div>
-          <div className="pointlist-qr-body">
+          <div className="v1list-qr-body">
             <div className="qname">{qr.label}</div>
             <div className="qfloor">{qr.floor}</div>
             <div className="qbox"><img src={qr.image} alt={`${qr.floor} ${qr.label} 的簽到 QR code`} /></div>

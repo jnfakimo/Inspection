@@ -1,0 +1,347 @@
+/* V1 圖臺清單頁的共用視覺語言
+ *
+ * 區域位置表（arealist）與巡邏點清單（patrollist）在 V1 是同一套清單版型：
+ * 區域內導覽、說明列、統計卡、工具列、可收合的樓層分組、資料列、QR 視窗。
+ * 兩頁移植完成並通過驗收後，把逐字重複的部分收斂到這裡；只有主色與各頁獨有的
+ * 欄位（arealist 的篩選列／分頁／Toast、pointlist 的列印標籤紙）留在各自的樣式表。
+ *
+ * 使用端在 .v1list-page 上覆寫下列變數即可換色，不需要重寫任何規則：
+ *   --v1list-accent        主色（預設 --cyan）
+ *   --v1list-glow          標題發光（預設 none；V1 淺色版本來就關閉發光）
+ *   --v1list-floor-wash    樓層標頭漸層的起點色
+ *   --v1list-modal-anchor  視窗垂直錨點（flex-start／center）
+ *   --v1list-modal-inset   視窗外圍留白
+ *   --v1list-modal-width   視窗最大寬
+ *   --v1list-modal-radius  視窗圓角
+ *   --v1list-modal-shadow  視窗陰影
+ *
+ * 顏色一律走主題 token（--surface／--line／--text／--dim／--panel／--head），
+ * 沒有第二套主題變數，淺色主題自動跟著翻。
+ */
+
+.v1list-page {
+  --v1list-accent: var(--cyan);
+  --v1list-glow: none;
+  --v1list-floor-wash: color-mix(in srgb, var(--v1list-accent) 6%, transparent);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ── 區域內導覽 ─────────────────────────────────────────────────────── */
+
+.v1list-local-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.v1list-nav-heading {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
+.v1list-nav-heading h1 {
+  margin: 0;
+  color: var(--v1list-accent);
+  font-family: var(--head);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-shadow: var(--v1list-glow);
+}
+
+.v1list-nav-heading p {
+  margin: 2px 0 0;
+  color: var(--dim);
+  font-size: .7rem;
+}
+
+.v1list-nav-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.v1list-nav-links a {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--dim);
+  font-family: var(--head);
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: border-color .2s, color .2s;
+}
+
+.v1list-nav-links a:hover {
+  border-color: var(--v1list-accent);
+  color: var(--v1list-accent);
+}
+
+/* ── 說明與統計 ─────────────────────────────────────────────────────── */
+
+.v1list-hint {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--v1list-accent);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--dim);
+  font-size: .72rem;
+  line-height: 1.6;
+}
+
+.v1list-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.v1list-stat {
+  min-width: 120px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--panel);
+}
+
+.v1list-stat .n {
+  color: var(--v1list-accent);
+  font-family: var(--head);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.v1list-stat .l {
+  margin-top: 2px;
+  color: var(--dim);
+  font-size: .68rem;
+  letter-spacing: .05em;
+}
+
+/* ── 工具列 ─────────────────────────────────────────────────────────── */
+
+.v1list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.v1list-toolbar select,
+.v1list-toolbar input {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: .78rem;
+  outline: none;
+  transition: border-color .2s;
+}
+
+.v1list-toolbar select:focus,
+.v1list-toolbar input:focus { border-color: var(--v1list-accent); }
+
+.v1list-space { flex: 1; }
+
+/* ── 樓層分組 ───────────────────────────────────────────────────────── */
+
+.v1list-floor {
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.v1list-floor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--v1list-floor-wash), transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.v1list-floor-head .caret {
+  width: 14px;
+  color: var(--v1list-accent);
+  font-size: .8rem;
+  transition: transform .2s;
+}
+
+.v1list-floor-head.collapsed .caret { transform: rotate(-90deg); }
+
+.v1list-floor-head .fname {
+  color: var(--text);
+  font-family: var(--head);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.v1list-floor-head .fcount {
+  padding: 1px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--dim);
+  font-size: .7rem;
+}
+
+.v1list-floor-body { padding: 8px 10px; }
+
+/* ── 資料列 ─────────────────────────────────────────────────────────── */
+
+.v1list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  transition: background .15s, border-color .15s;
+}
+
+.v1list-row:hover {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.v1list-row .acts {
+  display: flex;
+  gap: 6px;
+}
+
+.v1list-page .mini {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: none;
+  color: var(--dim);
+  font-size: .68rem;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+
+.v1list-page .mini:hover {
+  border-color: var(--v1list-accent);
+  color: var(--v1list-accent);
+}
+
+.v1list-empty {
+  padding: 60px 20px;
+  color: var(--dim);
+  font-size: .85rem;
+  text-align: center;
+}
+
+/* ── 視窗 ───────────────────────────────────────────────────────────── */
+
+.v1list-modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: var(--v1list-modal-anchor, flex-start);
+  justify-content: center;
+  padding: var(--v1list-modal-inset, 60px 16px);
+  overflow: auto;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+}
+
+.v1list-modal {
+  width: 100%;
+  max-width: var(--v1list-modal-width, 440px);
+  border: 1px solid var(--line);
+  border-radius: var(--v1list-modal-radius, 4px);
+  background: var(--panel);
+  box-shadow: var(--v1list-modal-shadow, none);
+}
+
+.v1list-modal.qr {
+  max-width: 280px;
+  text-align: center;
+}
+
+.v1list-modal-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.v1list-modal-head .mt {
+  color: var(--v1list-accent);
+  font-family: var(--head);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.v1list-modal-head .x {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.v1list-modal-head .x:hover { color: var(--v1list-accent); }
+
+/* ── QR 內容 ────────────────────────────────────────────────────────── */
+
+.v1list-qr-body { padding: 22px; }
+
+.v1list-qr-body .qname {
+  margin-bottom: 2px;
+  color: var(--text);
+  font-family: var(--head);
+  font-size: 1rem;
+}
+
+.v1list-qr-body .qfloor {
+  margin-bottom: 6px;
+  color: var(--dim);
+  font-size: .72rem;
+}
+
+/* QR 底色固定為白：掃描器需要高對比的黑白圖，跟著主題翻成深色會掃不到。 */
+.v1list-qr-body .qbox {
+  width: fit-content;
+  margin: 10px auto;
+  padding: 8px;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.v1list-qr-body .qbox img {
+  display: block;
+  width: 180px;
+  height: 180px;
+  image-rendering: pixelated;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v1list-floor-head .caret,
+  .v1list-row { transition: none; }
+}
