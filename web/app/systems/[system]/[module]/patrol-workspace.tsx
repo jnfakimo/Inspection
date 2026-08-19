@@ -393,12 +393,14 @@ function ShiftsModule({ module, profile }: Props) {
     const client = getSupabase();
     const [s, t, u, c] = await Promise.all([
       client.from('patrol_shifts').select('*').eq('shift_date', date).order('sort_order').order('start_time'),
-      client.from('patrol_shift_template').select('*').order('sort_order'),
+      client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
       client.from('users').select('user_id,name,username,department').eq('status', 'active').order('name').limit(2000),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
     ]);
     if (s.error || t.error || u.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error, '排班資料載入失敗')}`);
-    setShifts(s.data || []); setTemplates(t.data || []); setUsers(u.data || []);
+    setShifts((s.data || []).filter(row => !String(row.name).startsWith('[已刪除]'))); 
+    setTemplates(t.data || []); 
+    setUsers(u.data || []);
     // system_settings 為 admin-only，非管理者讀不到；此時通報時段留白即可，不擋畫面。
     try { setConfig(c.data?.value ? JSON.parse(String(c.data.value)) : null); } catch { setConfig(null); }
     setBusy(false);
@@ -463,11 +465,12 @@ function ShiftsModule({ module, profile }: Props) {
     setBusy(true); setNote('');
     const client = getSupabase();
     if (scope === 'template') {
-      const { error } = await client.from('patrol_shift_template').delete().eq('template_id', row.template_id);
+      const { error } = await client.from('patrol_shift_template').update({ status: 'inactive' }).eq('template_id', row.template_id);
       if (error) setNote(`刪除失敗：${errorMessage(error)}`);
       else { setNote('範本已刪除'); await load(); }
     } else {
-      const { error } = await client.from('patrol_shifts').delete().eq('shift_id', row.shift_id);
+      // patrol_shifts 因資料庫保護無法 DELETE，且無 status 欄位，故以名稱前綴隱藏
+      const { error } = await client.from('patrol_shifts').update({ name: `[已刪除] ${row.name}`, assigned_user_ids: [] }).eq('shift_id', row.shift_id);
       if (error) setNote(`刪除失敗：${errorMessage(error)}`);
       else { setNote('班別已刪除'); await load(); }
     }
