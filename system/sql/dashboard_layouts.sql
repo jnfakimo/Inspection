@@ -275,3 +275,39 @@ commit;
 -- 讓 Supabase PostgREST 立即辨識本檔新增的 RPC，避免短時間仍回報
 -- "Could not find the function ... in the schema cache"。
 notify pgrst, 'reload schema';
+
+-- TV 專屬預設版面
+insert into dashboard_layouts(layout_id,layout_code,layout_name,status)
+values('33333333-3333-4333-8333-333333333333','tv_display','大螢幕戰情看板','active')
+on conflict(layout_code) do nothing;
+
+insert into dashboard_layout_versions(
+  version_id,layout_id,version_no,state,version_note,published_at
+) values(
+  '44444444-4444-4444-8444-444444444444',
+  (select layout_id from dashboard_layouts where layout_code='tv_display'),
+  1,'published','大螢幕預設版面',now()
+)
+on conflict(layout_id,version_no) do nothing;
+
+insert into dashboard_layout_items(
+  version_id,widget_key,title,x,y,width,height,min_width,min_height,visible,sort_order
+)
+select v.version_id,x.widget_key,x.title,x.x,x.y,x.w,x.h,x.min_w,x.min_h,true,x.ord
+from dashboard_layout_versions v
+cross join (values
+  ('tv_alerts','即時重大警報',0,0,12,2,4,2,10),
+  ('tv_kpis','戰情關鍵數據',0,2,12,3,4,3,20),
+  ('tv_equipment','重點設備健康度',0,5,6,7,4,4,30),
+  ('tv_map','設備位置熱區預覽',6,5,6,7,4,4,40)
+) as x(widget_key,title,x,y,w,h,min_w,min_h,ord)
+where v.layout_id=(select layout_id from dashboard_layouts where layout_code='tv_display')
+  and v.version_no=1
+on conflict(version_id,widget_key) do nothing;
+
+update dashboard_layouts l
+set published_version_id=v.version_id,updated_at=now()
+from dashboard_layout_versions v
+where l.layout_code='tv_display'
+  and v.layout_id=l.layout_id and v.version_no=1
+  and l.published_version_id is null;
