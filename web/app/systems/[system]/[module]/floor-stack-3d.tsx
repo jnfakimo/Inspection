@@ -26,6 +26,15 @@ export function floorOrder(floor: string) {
 
 const PLANE_W = 10, PLANE_H = 7;
 
+// 將亮色 hex 轉為深色版本（light theme 用，提高對比度）
+function darkenColor(hex: string): string {
+  const c = parseInt(hex.replace('#', ''), 16);
+  const r = Math.round(((c >> 16) & 0xff) * 0.45);
+  const g = Math.round(((c >> 8) & 0xff) * 0.45);
+  const b = Math.round((c & 0xff) * 0.45);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
 export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors }: {
   models: StackModel[]; markers: StackMarker[]; showMarkers?: boolean; gap?: number;
   xPan?: number; yPan?: number;
@@ -104,7 +113,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             
             const dot = new THREE.Mesh(
               new THREE.SphereGeometry(0.075, 12, 12),
-              new THREE.MeshBasicMaterial({ color: new THREE.Color(marker.color) }));
+              new THREE.MeshBasicMaterial({ color: new THREE.Color(isLight ? darkenColor(marker.color) : marker.color) }));
             // 標記的 x／y 為 0–1 相對座標，換算到平面尺寸並置中。
             dot.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.12, marker.y * PLANE_H - PLANE_H / 2);
             scene.add(dot);
@@ -112,13 +121,13 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             if (showLabels && marker.label) {
               const canvas = document.createElement('canvas');
               const ctx = canvas.getContext('2d')!;
-              ctx.font = 'bold 24px sans-serif';
+              ctx.font = '16px sans-serif';
               const textWidth = ctx.measureText(marker.label).width;
               canvas.width = Math.max(textWidth + 10, 64);
-              canvas.height = 32;
-              ctx.font = 'bold 24px sans-serif';
-              ctx.fillStyle = '#ffffff';
-              ctx.fillText(marker.label, 5, 24);
+              canvas.height = 24;
+              ctx.font = '16px sans-serif';
+              ctx.fillStyle = isLight ? '#000000' : '#ffffff';
+              ctx.fillText(marker.label, 5, 18);
               
               const tex = new THREE.CanvasTexture(canvas);
               const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
