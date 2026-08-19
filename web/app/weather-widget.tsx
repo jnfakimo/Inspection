@@ -189,13 +189,13 @@ export function WeatherWidget() {
                   
                   {/* 圖示與氣溫卡 */}
                   <g transform={`translate(${pos[0]} ${pos[1]})`}>
-                    <circle r={isSelected ? "28" : "24"} fill={isSelected ? "var(--cyan)" : "var(--panel)"} stroke="var(--cyan)" strokeWidth={isSelected ? "0" : "1.5"} opacity={isSelected ? "1" : "0.9"} />
-                    <text y="-2" textAnchor="middle" dominantBaseline="central" fontSize={isSelected ? "26px" : "22px"}>
+                    <circle r={isSelected ? "20" : "17"} fill={isSelected ? "var(--cyan)" : "var(--panel)"} stroke="var(--cyan)" strokeWidth={isSelected ? "0" : "1.5"} opacity={isSelected ? "1" : "0.9"} />
+                    <text y="-1" textAnchor="middle" dominantBaseline="central" fontSize={isSelected ? "18px" : "16px"}>
                       {weatherIcon(data.weather, data.weatherCode)}
                     </text>
                     <text 
-                      y={isLeft ? "1" : "32"} 
-                      x={isLeft ? "-32" : "0"} 
+                      y={isLeft ? "1" : "26"} 
+                      x={isLeft ? "-26" : "0"} 
                       textAnchor={isLeft ? "end" : "middle"} 
                       dominantBaseline="central" 
                       fontSize="14px" 
