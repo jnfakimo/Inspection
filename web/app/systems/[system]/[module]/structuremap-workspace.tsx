@@ -15,8 +15,10 @@ import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { MARKET_ID } from '@/lib/config';
+import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { AreaListModule } from './structuremap-arealist';
 import { ModelHubModule } from './structuremap-modelhub';
 import { SystemRelations } from './system-relations';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -34,122 +36,12 @@ function Pill({ value, labels, tones }: { value: unknown; labels: Record<string,
   const key = String(value || '');
   return <span className={`status-pill ${tones[key] || 'pending'}`}>{labels[key] || fmt(value)}</span>;
 }
-// 與 V1 floor-utils.js 的 canonicalFloor 對齊：B1F≈B1、1≈1F、頂樓≈RF。
-function canonicalFloor(value: unknown) {
-  const raw = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
-  const basement = raw.match(/^B(\d+)F?$/); if (basement) return `B${basement[1]}`;
-  if (['RF', 'R', '頂樓', 'PH', 'ROOF'].includes(raw)) return 'RF';
-  const above = raw.match(/^(\d+)F?$/); if (above) return `${above[1]}F`;
-  return raw;
-}
-function floorOrder(floor: string) {
-  const basement = floor.match(/^B(\d+)$/); if (basement) return -Number(basement[1]);
-  if (floor === 'RF') return 999;
-  const above = floor.match(/^(\d+)F$/); if (above) return Number(above[1]);
-  return 500;
-}
 
 export function StructureMapWorkspace({ system, module, profile }: Props) {
-  if (module.key === 'areas') return <AreasModule system={system} module={module} profile={profile} />;
+  if (module.key === 'areas') return <AreaListModule module={module} profile={profile} />;
   if (module.key === 'markers') return <MarkersModule system={system} module={module} profile={profile} />;
   if (module.key === 'models') return <ModelHubModule module={module} profile={profile} />;
   return <RelationsModule system={system} module={module} profile={profile} />;
-}
-
-/* ──────────────────────────── 區域位置表 ──────────────────────────── */
-
-function AreasModule({ module, profile }: Props) {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [busy, setBusy] = useState(true), [note, setNote] = useState('');
-  const [query, setQuery] = useState(''), [floor, setFloor] = useState(''), [page, setPage] = useState(1);
-  const [editor, setEditor] = useState<Row | null>(null);
-
-  const load = useCallback(async () => {
-    setBusy(true); setNote('');
-    const { data, error } = await getSupabase().from('floor_spaces').select('*')
-      .eq('market_id', MARKET_ID).order('floor_order').order('sort_order').order('space_name').limit(5000);
-    if (error) setNote(`失敗：${errorMessage(error, '區域位置表載入失敗')}`);
-    setRows(data || []); setBusy(false);
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => setPage(1), [query, floor]);
-
-  const floors = useMemo(() => [...new Set(rows.map(r => String(r.floor || '')))].filter(Boolean)
-    .sort((a, b) => floorOrder(a) - floorOrder(b)), [rows]);
-  const filtered = useMemo(() => rows.filter(row => {
-    const q = query.trim().toLowerCase();
-    return (!floor || String(row.floor) === floor) &&
-      (!q || [row.floor, row.space_name, row.note].some(v => String(v || '').toLowerCase().includes(q)));
-  }), [rows, query, floor]);
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const save = async () => {
-    if (!editor) return;
-    const floorValue = canonicalFloor(editor.floor);
-    const name = String(editor.space_name || '').trim();
-    if (!floorValue) { setNote('失敗：請填寫樓層'); return; }
-    if (!name) { setNote('失敗：請填寫空間名稱'); return; }
-    setBusy(true); setNote('');
-    const payload = {
-      market_id: MARKET_ID, floor: floorValue, floor_order: floorOrder(floorValue),
-      space_name: name, sort_order: Number(editor.sort_order ?? 0) || 0,
-      note: String(editor.note || '').trim() || null, status: String(editor.status || 'active'),
-    };
-    const client = getSupabase();
-    const { error } = editor.space_id
-      ? await client.from('floor_spaces').update(payload).eq('space_id', editor.space_id)
-      : await client.from('floor_spaces').insert({ ...payload, created_by: profile.user_id });
-    if (error) {
-      const raw = String(error.message || '');
-      setNote(/duplicate|unique/i.test(raw) ? '失敗：同樓層已有相同名稱的空間' : `失敗：${errorMessage(error)}`);
-      setBusy(false); return;
-    }
-    setEditor(null); await load(); setNote(editor.space_id ? '空間已更新' : '空間已新增');
-  };
-
-  return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact" onClick={() => setEditor({ status: 'active', sort_order: 0, floor: floor || '' })}>＋ 新增空間</button>} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋樓層、空間名稱或備註" />
-        <select value={floor} onChange={e => setFloor(e.target.value)}>
-          <option value="">全部樓層</option>{floors.map(f => <option key={f} value={f}>{f}</option>)}
-        </select>
-        <span>{floors.length} 個樓層／共 {filtered.length} 個空間</span>
-      </div>
-      <div className="responsive-table"><table>
-        <thead><tr><th>樓層</th><th>空間名稱</th><th>排序</th><th>備註</th><th>狀態</th><th>操作</th></tr></thead>
-        <tbody>{paged.map(row => <tr key={String(row.space_id)}>
-          <td><strong>{fmt(row.floor)}</strong></td>
-          <td>{fmt(row.space_name)}</td>
-          <td>{fmt(row.sort_order)}</td>
-          <td>{fmt(row.note)}</td>
-          <td><Pill value={row.status} labels={ACTIVE_LABEL} tones={ACTIVE_TONE} /></td>
-          <td><div className="admin-row-actions"><button onClick={() => setEditor({ ...row })}>編輯</button></div></td>
-        </tr>)}</tbody>
-      </table></div>
-      {!busy && paged.length === 0 && <p className="empty">目前沒有空間資料</p>}
-      <Pager page={page} total={filtered.length} onPage={setPage} />
-    </section>
-
-    {editor && <AdminModal title={editor.space_id ? `編輯空間｜${fmt(editor.space_name)}` : '新增空間'} onClose={() => setEditor(null)}>
-      <div className="admin-form-grid">
-        <label>樓層（必填）<input value={String(editor.floor || '')} onChange={e => setEditor({ ...editor, floor: e.target.value })} placeholder="例：B1／1F／RF" /></label>
-        <label>排序<input type="number" value={String(editor.sort_order ?? 0)} onChange={e => setEditor({ ...editor, sort_order: e.target.value })} /></label>
-        <label className="wide">空間名稱（必填）<input value={String(editor.space_name || '')} onChange={e => setEditor({ ...editor, space_name: e.target.value })} placeholder="例：配電室" /></label>
-        <label>狀態<select value={String(editor.status || 'active')} onChange={e => setEditor({ ...editor, status: e.target.value })}>
-          {Object.entries(ACTIVE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select></label>
-        <label className="wide">備註<input value={String(editor.note || '')} onChange={e => setEditor({ ...editor, note: e.target.value })} /></label>
-      </div>
-      <p className="inline-message">樓層會自動正規化（B1F→B1、1→1F、頂樓→RF），與 V1 的 canonicalFloor 規則一致。</p>
-      <footer>
-        <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
-      </footer>
-    </AdminModal>}
-  </AppShell>;
 }
 
 /* ──────────────────────────── 整合標記 ──────────────────────────── */
