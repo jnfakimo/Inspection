@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react';
 import '@/app/admin-workspace.css';
 import './structuremap-modelhub.css';
 import { AppShell } from '@/components/AppShell';
+import { errorMessage } from '@/components/admin/shared';
 import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase';
 import type { ModuleDefinition } from '@/lib/modules';
@@ -78,9 +79,11 @@ const STAT_ITEMS: readonly { key: keyof BridgeStats; label: string }[] = [
 export function ModelHubModule({ module, profile }: Props) {
   const [stats, setStats] = useState<BridgeStats | null>(null);
   const [busy, setBusy] = useState(true);
+  const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
     setBusy(true);
+    setNote('');
     setStats(null);
     const db = getSupabase();
     const [spaceResult, markerResult] = await Promise.all([
@@ -91,6 +94,9 @@ export function ModelHubModule({ module, profile }: Props) {
     ]);
     const failure = spaceResult.error || markerResult.error;
     if (failure) {
+      // 不能只留三個破折號：權限被擋、連線失敗或登入過期都長得一樣，
+      // 使用者無從判斷是「真的沒資料」還是「查不到」。
+      setNote(`失敗：${errorMessage(failure, '介接統計載入失敗')}`);
       setBusy(false);
       return;
     }
@@ -122,6 +128,8 @@ export function ModelHubModule({ module, profile }: Props) {
         </h1>
         <p>{module.description}</p>
       </header>
+
+      {note && <p className="inline-message danger" role="status">{note}</p>}
 
       <p className="modelhub-note">■ 3D-MODELER v1.0 · 點選卡片進入子系統</p>
 
