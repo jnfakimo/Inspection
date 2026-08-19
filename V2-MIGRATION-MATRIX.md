@@ -109,14 +109,17 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 
 ## SYS-06 專案關係與設備圖臺（2026-08-17 完成）
 
-四個資料模組在 `structuremap-workspace.tsx`，兩個檢視器在 `structuremap-viewers.tsx`：
+2026-08-19 依需求把 3D建模系統 hub 的五個子系統全部改為 V1 頁面的忠實移植，
+各自獨立成檔：`structuremap-arealist.tsx`（區域位置表）、`structuremap-markerboard.tsx`（整合標記系統）、`structuremap-floor3d.tsx`（3D模型圖）、
+`patrol-pointlist.tsx`（巡邏點清單，屬 SYS-03）。剩下的專案關係圖仍在
+`structuremap-workspace.tsx`，2D 平面樓層圖仍在 `structuremap-viewers.tsx`：
 
 | 模組 | V2 功能 |
 |---|---|
-| 區域位置表 | `floor_spaces` 新增與編輯，樓層自動正規化並推導 floor_order |
-| 整合標記 | `plan_markers` 屬性維護：名稱、類型、座標、顏色、關聯設備、狀態 |
+| 區域位置表 | V1 `arealist.html` 的移植：樓層分組摺疊清單（每層獨立分頁）、統計卡、使用狀態篩選、空間 QR 與列印、XLSX 匯入匯出與範本、單筆與全部停用（皆先檢查是否已被標記引用） |
+| 整合標記系統 | V1 `b1_integrated_marker_system.html` 的移植：全螢幕 OpenSeadragon 圖面、放置標記模式（可從設備／空間／報修清單帶連結放置）、五種標記類型與三張表連結、詳細彈窗、旋轉與標籤工具、深連結 `?marker=`、巡邏點三色狀態 |
 | 平面樓層圖 | OpenSeadragon 檢視器，標記疊層可點選，支援點圖面重新定位並寫回 x／y |
-| 立體樓層模型 | Three.js 堆疊樓層，貼圖化，標記以球體標示，可調層距與切換標記顯示 |
+| 3D模型圖 | V1 `floor3d.html` 的移植：全螢幕、立體控制（間距、平移、四行讀數、重置／俯視／真實比例）、逐層顯示開關、標記類型與標籤、巡邏點三色狀態、深連結 `?marker=`。算繪沿用共用的 `FloorStack3D` |
 | 3D建模系統 | V1 `admin.html#modelhub` 的子系統導覽頁：五張 HUB 圖卡＋空間標記覆蓋率統計 |
 | 專案關係 | `locations` 的樓層／區域結構檢視。**唯讀**——維護入口在後台的場域位置模組 |
 
@@ -162,6 +165,14 @@ Storage 上傳由 RLS 授權，模型清單與 `floor_models` 更新則經 Node.
 原本掛在 models 模組的 `floor_models` 通用維護表格維持移除；正式建模入口改為上述 V2
 專用頁。V2 的立體樓層檢視器與巡檢工作區繼續共用同一份 `floor_models` 貼圖來源。
 
+移植過程中一併收斂了三份不相容的 `floorOrder`：V1 的 arealist／patrollist 用
+B1=99／1F=101／RF=900，而 V2 自行實作的兩份用 B1=-1／1F=1／RF=999。`floor_order`
+會寫進 `floor_spaces` 與 `locations`，兩套編號混在同一欄會讓 `.order('floor_order')`
+失去意義。現統一由 `web/lib/floor.ts` 提供，採 V1 的編號。
+
+巡邏點的三色打卡狀態抽成 `web/lib/patrol-status.ts`（V1 `patrolstatus.js` 的 compute()
+移植），整合標記系統與 3D模型圖共用。
+
 ## SYS-03 駐衛警巡檢（2026-08-18 完成）
 
 六個模組皆有專屬元件：打卡矩陣在 `operations-workspace.tsx`，其餘五個在 `patrol-workspace.tsx`。
@@ -169,7 +180,7 @@ Storage 上傳由 RLS 授權，模型清單與 `floor_models` 更新則經 Node.
 | 模組 | V2 功能 |
 |---|---|
 | 巡邏打卡 | 依班別排程的樓層×班別矩陣、日期切換、樓層／班別／狀態篩選、選點打卡、當日與期間匯出 .xlsx |
-| 巡邏點清單 | 清單與搜尋、樓層統計快捷、當日打卡狀態；**QR 標籤檢視與整批列印**；定位連結至圖臺整合標記 |
+| 巡邏點清單 | V1 `patrollist.html` 的移植（`patrol-pointlist.tsx`）：統計卡、樓層分組摺疊清單、最近一次簽到時間、單點 QR 與**整批列印**、定位連結至整合標記系統。當日打卡的視角由同系統的「巡邏打卡」模組負責，本頁為唯讀彙總 |
 | 巡檢排班 | 當日班別與班別範本雙表，走 `save_patrol_shift`／`save_patrol_shift_template`，人員以姓名指派 |
 | 逾時推播 | 直接查 `patrol_timeout_notifications`，期間／班別／狀態篩選，含 LINE 與 FCM 回應 |
 | 設備巡檢 | 走 `app-api` 的 `inspections`／`create_inspection`，異常必填說明 |
