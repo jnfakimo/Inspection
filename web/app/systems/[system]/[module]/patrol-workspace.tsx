@@ -458,28 +458,48 @@ function ShiftsModule({ module, profile }: Props) {
     assigned_user_ids: Array.isArray(tpl.assigned_user_ids) ? tpl.assigned_user_ids : [],
   }, 'date');
 
+  const confirmDelete = async (row: Row, scope: 'date' | 'template') => {
+    if (!confirm(`確定要刪除${scope === 'template' ? '範本' : '班別'}「${row.name}」嗎？`)) return;
+    setBusy(true); setNote('');
+    const client = getSupabase();
+    if (scope === 'template') {
+      const { error } = await client.from('patrol_shift_template').delete().eq('template_id', row.template_id);
+      if (error) setNote(`刪除失敗：${errorMessage(error)}`);
+      else { setNote('範本已刪除'); await load(); }
+    } else {
+      const { error } = await client.from('patrol_shifts').delete().eq('shift_id', row.shift_id);
+      if (error) setNote(`刪除失敗：${errorMessage(error)}`);
+      else { setNote('班別已刪除'); await load(); }
+    }
+    setBusy(false);
+  };
+
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => openEditor({ name: '', start_time: '', end_time: '', sort_order: shifts.length, assigned_user_ids: [] }, 'date')}>＋ 新增當日班別</button>} />
 
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
-        <span className="admin-toolbar-date"><LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></span>
-        <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
-        <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
-        <span>當日 {shifts.length} 個班別</span>
-      </div>
-      <div className="responsive-table"><table>
-        <thead><tr><th>班別</th><th>班別時段</th><th>通報時段</th><th>排定人員</th><th>操作</th></tr></thead>
-        <tbody>{shifts.map(row => <tr key={String(row.shift_id)}>
-          <td><strong>{fmt(row.name)}</strong></td>
-          <td>{hhmm(row.start_time)} ～ {hhmm(row.end_time)}</td>
-          <td>{workTimeOf('date', String(row.name))}</td>
-          <td>{namesOf(row.assigned_user_ids)}</td>
-          <td><div className="admin-row-actions"><button onClick={() => openEditor(row, 'date')}>編輯</button></div></td>
-        </tr>)}</tbody>
-      </table></div>
+    <div style={{ maxWidth: '85%', margin: '0 auto' }}>
+      <section className="panel admin-panel">
+        <div className="admin-toolbar">
+          <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
+          <span className="admin-toolbar-date"><LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></span>
+          <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
+          <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
+          <span>當日 {shifts.length} 個班別</span>
+        </div>
+        <div className="responsive-table"><table>
+          <thead><tr><th>班別名稱</th><th>班別時段</th><th>通報時段</th><th>排定人員</th><th>操作</th></tr></thead>
+          <tbody>{shifts.map(row => <tr key={String(row.shift_id)}>
+            <td><strong>{fmt(row.name)}</strong></td>
+            <td>{hhmm(row.start_time)} ～ {hhmm(row.end_time)}</td>
+            <td>{workTimeOf('date', String(row.name))}</td>
+            <td>{namesOf(row.assigned_user_ids)}</td>
+            <td><div className="admin-row-actions">
+              <button onClick={() => openEditor(row, 'date')}>編輯</button>
+              <button onClick={() => confirmDelete(row, 'date')} className="danger">刪除</button>
+            </div></td>
+          </tr>)}</tbody>
+        </table></div>
       {!busy && shifts.length === 0 && <p className="empty">尚未設定當日班別，可從下方範本套用</p>}
     </section>
 
@@ -495,11 +515,13 @@ function ShiftsModule({ module, profile }: Props) {
           <td><div className="admin-row-actions">
             <button onClick={() => applyTemplate(row)}>套用到 {date}</button>
             <button onClick={() => openEditor(row, 'template')}>編輯範本</button>
+            <button onClick={() => confirmDelete(row, 'template')} className="danger">刪除</button>
           </div></td>
         </tr>)}</tbody>
       </table></div>
       {!busy && templates.length === 0 && <p className="empty">尚未建立班別範本</p>}
     </section>
+    </div>
 
     {editor && <AdminModal title={editor.__scope === 'template' ? `班別範本｜${fmt(editor.name) === '—' ? '新增' : editor.name}` : `當日班別｜${date}`} onClose={() => setEditor(null)}>
       <div className="admin-form-grid">
