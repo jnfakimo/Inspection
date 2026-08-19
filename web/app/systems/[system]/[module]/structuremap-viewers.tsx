@@ -226,49 +226,49 @@ function Floor3DViewer({ module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={reload} />
-    <section className="panel admin-panel" style={{ flex: 1, minHeight: 'calc(100vh - 120px)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0, background: 'var(--panel)' }}>
+    <section className="panel admin-panel" style={{ flex: 1, minHeight: 'calc(100vh - 80px)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0, background: 'var(--panel)' }}>
       {/* 左側浮動面板群 */}
-      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 10, width: 176 }}>
+      <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 6, width: 106 }}>
         {/* 立體控制 */}
-        <div style={{ background: 'var(--panel)', padding: '12px', borderRadius: '6px', border: '1px solid var(--cyan)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-          <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => setShowCtrl(!showCtrl)}>
+        <div style={{ background: 'var(--panel)', padding: '7px', borderRadius: '4px', border: '1px solid var(--cyan)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', fontSize: '11px' }}>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--cyan)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => setShowCtrl(!showCtrl)}>
             立體控制 <span>{showCtrl ? '▼' : '▶'}</span>
           </h4>
           {showCtrl && <>
-            <label style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', marginBottom: 8 }}>
-              樓層間距 ({gap})
+            <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', marginBottom: 5 }}>
+              間距 ({gap})
               <input type="range" min={0} max={3} step={0.2} value={gap} onChange={e => setGap(Number(e.target.value))} />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', marginBottom: 8 }}>
-              水平平移 ({xPan})
+            <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', marginBottom: 5 }}>
+              水平 ({xPan})
               <input type="range" min={-10} max={10} step={0.5} value={xPan} onChange={e => setXPan(Number(e.target.value))} />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', marginBottom: 12 }}>
-              Y軸平移 ({yPan})
+            <label style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', marginBottom: 8 }}>
+              Y軸 ({yPan})
               <input type="range" min={-10} max={10} step={0.5} value={yPan} onChange={e => setYPan(Number(e.target.value))} />
             </label>
-            <div style={{ display: 'flex', gap: 5 }}>
-              <button className="secondary-btn compact" style={{ flex: 1, padding: '4px' }} onClick={() => { setGap(1.6); setXPan(0); setYPan(0); }}>重置</button>
-              <button className="secondary-btn compact" style={{ flex: 1, padding: '4px' }} onClick={() => { setGap(0); }}>俯視</button>
-              <button className="secondary-btn compact" style={{ flex: 1, padding: '4px' }} onClick={() => { setGap(2); }}>真實</button>
+            <div style={{ display: 'flex', gap: 3 }}>
+              <button className="secondary-btn compact" style={{ flex: 1, padding: '2px 0', fontSize: '10px' }} onClick={() => { setGap(1.6); setXPan(0); setYPan(0); }}>重置</button>
+              <button className="secondary-btn compact" style={{ flex: 1, padding: '2px 0', fontSize: '10px' }} onClick={() => { setGap(0); }}>俯視</button>
+              <button className="secondary-btn compact" style={{ flex: 1, padding: '2px 0', fontSize: '10px' }} onClick={() => { setGap(2); }}>真實</button>
             </div>
           </>}
         </div>
         {/* 標記顯示 */}
-        <div style={{ background: 'var(--panel)', padding: '12px', borderRadius: '6px', border: '1px solid var(--cyan)', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-          <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => setShowKind(!showKind)}>
+        <div style={{ background: 'var(--panel)', padding: '7px', borderRadius: '4px', border: '1px solid var(--cyan)', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', fontSize: '11px' }}>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--cyan)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => setShowKind(!showKind)}>
             標記顯示 <span>{showKind ? '▼' : '▶'}</span>
           </h4>
           {showKind && <>
-            <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+            <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5, paddingBottom: 5, borderBottom: '1px solid var(--border)', fontSize: '11px' }}>
               <input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} /> 所有標記
             </label>
             {Object.entries(MARKER_KIND).map(([k, label]) => (
-              <label key={k} className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color: KIND_COLOR[k] }}>
+              <label key={k} className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, color: KIND_COLOR[k], fontSize: '11px' }}>
                 <input type="checkbox" disabled={!showMarkers} checked={visibleKinds[k] ?? true} onChange={e => setVisibleKinds(prev => ({ ...prev, [k]: e.target.checked }))} /> {label}
               </label>
             ))}
-            <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border)', fontSize: '11px' }}>
               <input type="checkbox" disabled={!showMarkers} checked={showLabels} onChange={e => setShowLabels(e.target.checked)} /> 文字標籤
             </label>
           </>}
@@ -276,13 +276,13 @@ function Floor3DViewer({ module, profile }: Props) {
       </div>
 
       {/* 右側浮動樓層面板 */}
-      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 10, width: 144 }}>
-        <div style={{ background: 'var(--panel)', padding: '12px', borderRadius: '6px', border: '1px solid var(--cyan)', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}>
-          <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => setShowFloorPanel(!showFloorPanel)}>
-            樓層顯示 <span>{showFloorPanel ? '▼' : '▶'}</span>
+      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10, width: 88 }}>
+        <div style={{ background: 'var(--panel)', padding: '7px', borderRadius: '4px', border: '1px solid var(--cyan)', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', fontSize: '11px' }}>
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', color: 'var(--cyan)', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }} onClick={() => setShowFloorPanel(!showFloorPanel)}>
+            樓層 <span>{showFloorPanel ? '▼' : '▶'}</span>
           </h4>
           {showFloorPanel && models.map(m => (
-            <label key={String(m.floor_id)} className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <label key={String(m.floor_id)} className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, fontSize: '11px' }}>
               <input type="checkbox" checked={visibleFloors[String(m.floor_id)] ?? true} onChange={e => setVisibleFloors(prev => ({ ...prev, [String(m.floor_id)]: e.target.checked }))} /> {m.name || m.floor_id}
             </label>
           ))}
