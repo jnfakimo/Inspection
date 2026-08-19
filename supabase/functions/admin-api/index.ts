@@ -22,7 +22,7 @@ function reply(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 }
 function clean(value: unknown, max = 500) { return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max); }
-function id(value: unknown) { const result = clean(value, 80); return /^[0-9a-f]{8}-[0-9a-f-]{28}$/i.test(result) ? result : ''; }
+function id(value: unknown) { const result = clean(value, 80); return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result) ? result : ''; }
 function status(value: unknown) { return value === 'inactive' ? 'inactive' : 'active'; }
 function safeDetails(value: unknown) { return value && typeof value === 'object' ? value : {}; }
 function boolText(value: unknown) { return value === true || value === 'true' ? 'true' : 'false'; }
