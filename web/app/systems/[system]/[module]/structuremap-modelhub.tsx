@@ -15,7 +15,6 @@ import { useCallback, useEffect, useState } from 'react';
 import '@/app/admin-workspace.css';
 import './structuremap-modelhub.css';
 import { AppShell } from '@/components/AppShell';
-import { AdminHeader, errorMessage } from '@/components/admin/shared';
 import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase';
 import type { ModuleDefinition } from '@/lib/modules';
@@ -79,11 +78,9 @@ const STAT_ITEMS: readonly { key: keyof BridgeStats; label: string }[] = [
 export function ModelHubModule({ module, profile }: Props) {
   const [stats, setStats] = useState<BridgeStats | null>(null);
   const [busy, setBusy] = useState(true);
-  const [note, setNote] = useState('');
 
   const load = useCallback(async () => {
     setBusy(true);
-    setNote('');
     setStats(null);
     const db = getSupabase();
     const [spaceResult, markerResult] = await Promise.all([
@@ -94,7 +91,6 @@ export function ModelHubModule({ module, profile }: Props) {
     ]);
     const failure = spaceResult.error || markerResult.error;
     if (failure) {
-      setNote(`失敗：${errorMessage(failure, '介接統計載入失敗')}`);
       setBusy(false);
       return;
     }
@@ -117,7 +113,15 @@ export function ModelHubModule({ module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}>
     <div className="modelhub-page">
-      <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+      <header className="modelhub-page-header">
+        <h1>
+          <span className="modelhub-section-icon" aria-hidden="true">
+            <img src={`${ICON_BASE}/equipment-icon.png`} alt="" />
+          </span>
+          {module.title}
+        </h1>
+        <p>{module.description}</p>
+      </header>
 
       <p className="modelhub-note">■ 3D-MODELER v1.0 · 點選卡片進入子系統</p>
 
