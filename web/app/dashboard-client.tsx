@@ -30,6 +30,10 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
+import { Line, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
 type Row = Record<string, any>;
 type LayoutItem = {
@@ -272,18 +276,40 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         </div>
         <BarList entries={patrol.floors} empty="今日所有巡邏點都已完成打卡" />
       </>;
-      case 'status': return <BarList entries={countBy(requests, row => STATUS_LABEL[String(row.status)] || '未知狀態')} empty="區間內沒有報修案件" />;
+      case 'status': {
+        const counts = countBy(requests, row => STATUS_LABEL[String(row.status)] || '未知狀態');
+        if (!counts.length) return <p className="empty">區間內沒有報修案件</p>;
+        const data = {
+          labels: counts.map(c => c[0]),
+          datasets: [{
+            data: counts.map(c => c[1]),
+            backgroundColor: ['#00d4ff', '#00ff9d', '#ffb300', '#ff3b3b', '#a855f7', '#3b82f6', '#ec4899', '#f97316'],
+            borderWidth: 0,
+            hoverOffset: 4
+          }]
+        };
+        const options = { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { position: 'right' as const, labels: { color: 'gray', padding: 20 } } } };
+        return <div style={{ position: 'relative', height: '100%', minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Doughnut data={data} options={options} /></div>;
+      }
       case 'rank_dept': return <BarList entries={countBy(requests, row => row.department)} empty="區間內沒有報修案件" />;
       case 'rank_equipment': return <BarList entries={countBy(requests, row => (row.equipment as Row)?.name || '未知設備')} empty="區間內沒有報修案件" />;
       case 'rank_technician': return <BarList entries={countBy(orders, row => (row.users as Row)?.name || '未指派')} empty="目前沒有維修工單" />;
       case 'rank_fault': return <BarList entries={countBy(requests, row => row.fault_type || '未分類')} empty="區間內沒有報修案件" />;
       case 'trend': {
-        const max = Math.max(...trend.map(month => month.value), 1);
-        return <div className="trend-chart">{trend.map(month =>
-          <div key={month.label} title={`${month.label}：${month.value} 件`}>
-            <i style={{ height: `${Math.max(6, month.value / max * 100)}%` }} />
-            <small>{month.label}</small>
-          </div>)}</div>;
+        const data = {
+          labels: trend.map(m => m.label),
+          datasets: [{
+            label: '報修件數',
+            data: trend.map(m => m.value),
+            borderColor: '#00d4ff',
+            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4
+          }]
+        };
+        const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: 'gray' } }, x: { grid: { display: false }, ticks: { color: 'gray' } } } };
+        return <div style={{ position: 'relative', height: '100%', minHeight: '200px' }}><Line data={data} options={options} /></div>;
       }
       case 'weather_taiwan': return <WeatherWidget />;
       default: return <p className="empty">未知的版面元件：{item.widget_key}</p>;
