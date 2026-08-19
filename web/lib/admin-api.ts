@@ -1,7 +1,36 @@
 import { getSupabase } from '@/lib/supabase';
 
+const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
+
 export async function invokeAdminApi<T = Record<string, unknown>>(action: string, payload: Record<string, unknown> = {}) {
   const client = getSupabase();
+  if (nodeAppApiUrl) {
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (sessionError || !accessToken) throw new Error('登入狀態無效，請重新登入');
+
+    let response: Response | undefined;
+    try {
+      response = await fetch(`${nodeAppApiUrl}/api/admin-api`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, ...payload }),
+        cache: 'no-store',
+      });
+    } catch {
+      console.warn('Node.js admin API connection failed, falling back to Supabase Edge Function');
+    }
+
+    if (response) {
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) throw new Error(result?.message || '後台管理服務回傳失敗');
+      return result as T;
+    }
+  }
+
   const { data, error } = await client.functions.invoke('admin-api', { body: { action, ...payload } });
   if (error) {
     let detail = '';

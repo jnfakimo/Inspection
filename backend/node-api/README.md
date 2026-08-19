@@ -22,7 +22,8 @@ npm run build:api
 npm run start:api
 ```
 
-健康檢查為 `GET /health`，業務 API 為 `POST /api/app-api`。業務 API 必須攜帶
+健康檢查為 `GET /health`，一般業務 API 為 `POST /api/app-api`，後台管理 API 為
+`POST /api/admin-api`。兩個業務 API 都必須攜帶
 `Authorization: Bearer <Supabase access token>`；service role key 只能存在後端環境變數中。
 
 ## 正式部署
@@ -37,4 +38,3 @@ npm run start:api
 
 未設定 `NEXT_PUBLIC_APP_API_URL` 時，前端暫時保留既有 Supabase Edge Function 作為遷移
 回退路徑，避免正式網站在 Node 主機尚未就緒時中斷。
-

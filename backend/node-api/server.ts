@@ -1,5 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type IncomingMessage, type ServerResponse } from 'node:http';
 import { handleAppApiRequest } from '../../supabase/functions/app-api/index.ts';
+import { handleAdminApiRequest } from '../../supabase/functions/admin-api/index.ts';
 
 const port = Number.parseInt(process.env.PORT || '8787', 10);
 const host = process.env.HOST || '0.0.0.0';
@@ -49,7 +50,12 @@ const server = createServer(async (request, response) => {
     if (request.method === 'GET' && pathname === '/health') {
       return sendJson(response, 200, { ok: true, runtime: 'nodejs', service: 'beinong-app-api' });
     }
-    if (pathname !== '/api/app-api') {
+    const handler = pathname === '/api/app-api'
+      ? handleAppApiRequest
+      : pathname === '/api/admin-api'
+        ? handleAdminApiRequest
+        : null;
+    if (!handler) {
       return sendJson(response, 404, { ok: false, message: '找不到 API 路徑' });
     }
 
@@ -58,7 +64,7 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url || '/', `${forwardedProtocol}://${request.headers.host || 'localhost'}`);
     const body = ['GET', 'HEAD'].includes(request.method || '') ? undefined : await readBody(request);
     const webRequest = new Request(url, { method: request.method, headers, body });
-    await sendWebResponse(response, await handleAppApiRequest(webRequest));
+    await sendWebResponse(response, await handler(webRequest));
   } catch (error) {
     if (error instanceof RangeError) return sendJson(response, 413, { ok: false, message: '請求內容過大' });
     console.error('node-api failed', error instanceof Error ? error.message : String(error));
@@ -69,4 +75,3 @@ const server = createServer(async (request, response) => {
 server.requestTimeout = 30_000;
 server.headersTimeout = 35_000;
 server.listen(port, host, () => console.log(`Beinong Node.js API listening on ${host}:${port}`));
-
