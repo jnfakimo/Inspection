@@ -1,0 +1,421 @@
+/* SYS-03 巡邏點清單｜V1 patrollist.html 的版型移植
+ *
+ * 對應關係與區域位置表相同：V1 的 --surface／--border／--text-hi／--text-dim／--font-head
+ * 直接換成 V2 的 --surface／--line／--text／--dim／--head，不再宣告第二套主題變數。
+ *
+ * 唯一保留原始色值的是 V1 的 --patrol（深色 #c77dff、淺色 #9333ea）——這是巡邏點在
+ * 全站的識別色，也是 3D建模系統 hub 上 HUB-03 卡片的顏色，換成 --violet 會與那裡對不上。
+ *
+ * 注意：本檔與 structuremap-arealist.css 有相當比例的重複（樓層分組、統計卡、視窗、
+ * 工具列）。兩支都是 V1 圖臺清單的同一套視覺語言，等兩頁都通過驗收後值得抽成共用
+ * 樣式表；在那之前保持各自獨立，改動其中一頁不會波及另一頁。
+ */
+
+.pointlist-page {
+  --pointlist-accent: #c77dff;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+:root[data-theme='light'] .pointlist-page {
+  --pointlist-accent: #9333ea;
+}
+
+/* ── 區域內導覽 ─────────────────────────────────────────────────────── */
+
+.pointlist-local-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 0 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+
+.pointlist-nav-heading {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+
+.pointlist-nav-heading h1 {
+  margin: 0;
+  color: var(--pointlist-accent);
+  font-family: var(--head);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.pointlist-nav-heading p {
+  margin: 2px 0 0;
+  color: var(--dim);
+  font-size: .7rem;
+}
+
+.pointlist-nav-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.pointlist-nav-links a {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--dim);
+  font-family: var(--head);
+  font-size: .7rem;
+  letter-spacing: .05em;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: border-color .2s, color .2s;
+}
+
+.pointlist-nav-links a:hover {
+  border-color: var(--pointlist-accent);
+  color: var(--pointlist-accent);
+}
+
+/* ── 說明與統計 ─────────────────────────────────────────────────────── */
+
+.pointlist-hint {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--pointlist-accent);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--dim);
+  font-size: .72rem;
+  line-height: 1.6;
+}
+
+.pointlist-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.pointlist-stat {
+  min-width: 120px;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--panel);
+}
+
+.pointlist-stat .n {
+  color: var(--pointlist-accent);
+  font-family: var(--head);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.pointlist-stat .l {
+  margin-top: 2px;
+  color: var(--dim);
+  font-size: .68rem;
+  letter-spacing: .05em;
+}
+
+/* ── 工具列 ─────────────────────────────────────────────────────────── */
+
+.pointlist-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.pointlist-toolbar select,
+.pointlist-toolbar input {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: .78rem;
+  outline: none;
+  transition: border-color .2s;
+}
+
+.pointlist-toolbar select:focus,
+.pointlist-toolbar input:focus { border-color: var(--pointlist-accent); }
+
+.pointlist-space { flex: 1; }
+
+/* ── 樓層分組 ───────────────────────────────────────────────────────── */
+
+.pointlist-floor {
+  margin-bottom: 12px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.pointlist-floor-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pointlist-accent) 8%, transparent), transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pointlist-floor-head .caret {
+  width: 14px;
+  color: var(--pointlist-accent);
+  font-size: .8rem;
+  transition: transform .2s;
+}
+
+.pointlist-floor-head.collapsed .caret { transform: rotate(-90deg); }
+
+.pointlist-floor-head .fname {
+  color: var(--text);
+  font-family: var(--head);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.pointlist-floor-head .fcount {
+  padding: 1px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--dim);
+  font-size: .7rem;
+}
+
+.pointlist-floor-body { padding: 8px 10px; }
+
+/* ── 資料列 ─────────────────────────────────────────────────────────── */
+
+.pointlist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  transition: background .15s, border-color .15s;
+}
+
+.pointlist-row:hover {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.pointlist-row .dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--pointlist-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 60%, transparent);
+}
+
+.pointlist-row .mname {
+  flex: 1;
+  color: var(--text);
+  font-size: .85rem;
+}
+
+.pointlist-row .mnote {
+  color: var(--dim);
+  font-size: .72rem;
+}
+
+.pointlist-row .mlast {
+  color: var(--dim);
+  font-size: .7rem;
+  white-space: nowrap;
+}
+
+.pointlist-row .mlast.has { color: var(--green); }
+
+.pointlist-row .acts {
+  display: flex;
+  gap: 6px;
+}
+
+.pointlist-page .mini {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: none;
+  color: var(--dim);
+  font-size: .68rem;
+  cursor: pointer;
+  transition: border-color .2s, color .2s;
+}
+
+.pointlist-page .mini:hover {
+  border-color: var(--pointlist-accent);
+  color: var(--pointlist-accent);
+}
+
+.pointlist-empty {
+  padding: 60px 20px;
+  color: var(--dim);
+  font-size: .85rem;
+  text-align: center;
+}
+
+/* ── QR 視窗 ────────────────────────────────────────────────────────── */
+
+.pointlist-modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+}
+
+.pointlist-modal {
+  width: 100%;
+  max-width: 280px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  text-align: center;
+}
+
+.pointlist-modal-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pointlist-modal-head .mt {
+  color: var(--pointlist-accent);
+  font-family: var(--head);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.pointlist-modal-head .x {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.pointlist-modal-head .x:hover { color: var(--pointlist-accent); }
+
+.pointlist-qr-body { padding: 22px; }
+
+.pointlist-qr-body .qname {
+  margin-bottom: 2px;
+  color: var(--text);
+  font-family: var(--head);
+  font-size: 1rem;
+}
+
+.pointlist-qr-body .qfloor {
+  margin-bottom: 6px;
+  color: var(--dim);
+  font-size: .72rem;
+}
+
+/* QR 底色固定為白：掃描器需要高對比的黑白圖，跟著主題翻成深色會掃不到。 */
+.pointlist-qr-body .qbox {
+  width: fit-content;
+  margin: 10px auto;
+  padding: 8px;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.pointlist-qr-body .qbox img {
+  display: block;
+  width: 180px;
+  height: 180px;
+  image-rendering: pixelated;
+}
+
+/* ── 列印 ───────────────────────────────────────────────────────────── */
+
+/* 標籤區塊平常不佔版面；列印時才顯示，取代 V1 另開視窗的做法。 */
+.pointlist-print-sheet { display: none; }
+
+@media print {
+  .pointlist-page > *:not(.pointlist-print-sheet):not(.pointlist-modal-bg) { display: none !important; }
+
+  .pointlist-print-sheet {
+    display: block;
+    padding: 16px;
+  }
+  .pointlist-print-sheet .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .pointlist-print-sheet .tag {
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    text-align: center;
+    page-break-inside: avoid;
+  }
+  .pointlist-print-sheet .tag img {
+    width: 140px;
+    height: 140px;
+    image-rendering: pixelated;
+  }
+  .pointlist-print-sheet .tag .n {
+    margin-top: 6px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .pointlist-print-sheet .tag .f {
+    font-size: 11px;
+    color: #666;
+  }
+
+  /* 單點 QR 視窗維持可列印，與 V1 視窗內的「列印」按鈕行為一致。 */
+  .pointlist-modal-bg {
+    position: static;
+    padding: 0;
+    background: none;
+  }
+  .pointlist-modal {
+    max-width: none;
+    border: 0;
+  }
+  .pointlist-modal-head .x,
+  .pointlist-qr-body .mini { display: none !important; }
+}
+
+@media (max-width: 640px) {
+  .pointlist-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .pointlist-row .mname { flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pointlist-floor-head .caret,
+  .pointlist-row { transition: none; }
+}

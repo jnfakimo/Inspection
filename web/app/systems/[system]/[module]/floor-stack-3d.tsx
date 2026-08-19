@@ -9,7 +9,11 @@
 // three 以動態 import 載入，不會進入其他頁面的初始 bundle。
 
 import { useEffect, useRef } from 'react';
+
 import { SUPABASE_URL } from '@/lib/config';
+
+// 樓層排序沿用全站唯一的 web/lib/floor.ts；此處再匯出，既有匯入端不必改寫。
+export { floorOrder } from '@/lib/floor';
 
 export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; level?: number | null };
 export type StackMarker = { id: string; floor_id: string; x: number; y: number; color: string; kind?: string; label?: string };
@@ -17,12 +21,6 @@ export type StackMarker = { id: string; floor_id: string; x: number; y: number; 
 export const floorTextureUrl = (imagePath: unknown) =>
   imagePath ? `${SUPABASE_URL}/storage/v1/object/public/floorplans/${String(imagePath)}` : '';
 
-export function floorOrder(floor: string) {
-  const basement = floor.match(/^B(\d+)$/); if (basement) return -Number(basement[1]);
-  if (floor === 'RF') return 999;
-  const above = floor.match(/^(\d+)F$/); if (above) return Number(above[1]);
-  return 500;
-}
 
 const PLANE_W = 10, PLANE_H = 7;
 
