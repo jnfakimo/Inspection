@@ -17,6 +17,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { ComboboxSelect } from '@/components/ComboboxSelect';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -447,10 +448,15 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
     <section className="panel admin-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder={`搜尋${module.title}`} />
-        {spec.equipmentScoped && <select value={equipmentFilter} onChange={e => setEquipmentFilter(e.target.value)}>
-          <option value="">全部設備</option>
-          {equipment.map(row => <option key={String(row.equipment_id)} value={String(row.equipment_id)}>{`${row.asset_code || row.qr_code || ''} ${row.name || ''}`.trim()}</option>)}
-        </select>}
+        {spec.equipmentScoped && <ComboboxSelect 
+          value={equipmentFilter} 
+          onChange={setEquipmentFilter} 
+          placeholder="全部設備" 
+          options={[
+            { value: '', label: '全部設備' },
+            ...equipment.map(row => ({ value: String(row.equipment_id), label: `${row.asset_code || row.qr_code || ''} ${row.name || ''}`.trim() }))
+          ]} 
+        />}
         <span>共 {filtered.length} 筆</span>
       </div>
       <div className="responsive-table"><table>
@@ -470,15 +476,25 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
     {editor && <AdminModal title={`${editor[spec.pk] ? '編輯' : '新增'}${module.title}`} onClose={() => setEditor(null)}>
       <div className="admin-form-grid">
         {spec.equipmentScoped && <label className="wide">設備（必填）
-          <select value={String(editor.equipment_id || '')} onChange={e => setEditor({ ...editor, equipment_id: e.target.value })}>
-            <option value="">-- 請選擇 --</option>
-            {equipment.map(row => <option key={String(row.equipment_id)} value={String(row.equipment_id)}>{`${row.asset_code || row.qr_code || ''} ${row.name || ''}`.trim()}</option>)}
-          </select></label>}
+          <ComboboxSelect 
+            value={String(editor.equipment_id || '')} 
+            onChange={val => setEditor({ ...editor, equipment_id: val })} 
+            placeholder="-- 請選擇 --" 
+            options={[
+              { value: '', label: '-- 請選擇 --' },
+              ...equipment.map(row => ({ value: String(row.equipment_id), label: `${row.asset_code || row.qr_code || ''} ${row.name || ''}`.trim() }))
+            ]} 
+          /></label>}
         {spec.table === 'materials' && <label className="wide">材料分類
-          <select value={String(editor.category_id || '')} onChange={e => setEditor({ ...editor, category_id: e.target.value || null })}>
-            <option value="">-- 未分類 --</option>
-            {categories.filter(row => row.status !== 'inactive').map(row => <option key={String(row.category_id)} value={String(row.category_id)}>{row.name}</option>)}
-          </select></label>}
+          <ComboboxSelect 
+            value={String(editor.category_id || '')} 
+            onChange={val => setEditor({ ...editor, category_id: val || null })} 
+            placeholder="-- 未分類 --" 
+            options={[
+              { value: '', label: '-- 未分類 --' },
+              ...categories.filter(row => row.status !== 'inactive').map(row => ({ value: String(row.category_id), label: row.name }))
+            ]} 
+          /></label>}
         {spec.fields.map(field => <FieldInput key={field.key} field={field} value={editor[field.key]}
           onChange={value => setEditor({ ...editor, [field.key]: value })} />)}
       </div>
@@ -498,7 +514,12 @@ function FieldInput({ field, value, onChange }: { field: Field; value: unknown; 
   const common = { value: value == null ? '' : String(value), onChange: (e: { target: { value: string } }) => onChange(e.target.value) };
   return <label className={field.wide ? 'wide' : undefined}>{label}
     {field.type === 'select'
-      ? <select {...common}>{!field.required && <option value="">-- 未指定 --</option>}{(field.options || []).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      ? <ComboboxSelect 
+          value={value == null ? '' : String(value)} 
+          onChange={onChange} 
+          placeholder="-- 未指定 --" 
+          options={!field.required ? [{ value: '', label: '-- 未指定 --' }, ...(field.options || []).map(([v, l]) => ({ value: String(v), label: String(l) }))] : (field.options || []).map(([v, l]) => ({ value: String(v), label: String(l) }))} 
+        />
       : field.type === 'textarea'
         ? <textarea rows={2} placeholder={field.placeholder} {...common} />
         : <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
