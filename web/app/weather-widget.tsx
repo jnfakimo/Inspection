@@ -147,8 +147,8 @@ export function WeatherWidget() {
           {/* 注入台灣地圖路徑，設定樣式 */}
           <style>{`
             .weather-map-container svg .county {
-              fill: var(--border);
-              stroke: var(--text-dim);
+              fill: var(--line);
+              stroke: var(--dim);
               stroke-width: 1px;
               transition: fill 0.2s;
             }
