@@ -1,11 +1,12 @@
 'use client';
 
-// SYS-06 專案關係與設備圖臺：四個資料模組（區域位置表／整合標記／模型管理／專案關係）。
+// SYS-06 專案關係與設備圖臺：三個資料模組（區域位置表／整合標記／專案關係）。
+// 模型管理是 V1 modelhub 的子系統導覽頁，不做資料維護，另放 structuremap-modelhub.tsx。
 //
 // 2D 平面圖與 3D 樓層由 structuremap-viewers.tsx 承接，兩者依賴 OpenSeadragon 與
 // Three.js，載入方式與資產路徑另行處理。
 //
-// 這四張表的寫入政策為 has_system_access('sys_structuremap') 加上
+// 這三張表的寫入政策為 has_system_access('sys_structuremap') 加上
 // has_app_permission('create')／('update')（20260817110000 將其由 sys_equipment
 // 收斂而來），伺服器端把關已存在，因此比照 SYS-05 直接走資料表。
 
@@ -14,7 +15,8 @@ import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { MARKET_ID } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase';
-import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { AdminHeader, AdminModal, errorMessage, fmt, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { ModelHubModule } from './structuremap-modelhub';
 import { SystemRelations } from './system-relations';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -49,7 +51,7 @@ function floorOrder(floor: string) {
 export function StructureMapWorkspace({ system, module, profile }: Props) {
   if (module.key === 'areas') return <AreasModule system={system} module={module} profile={profile} />;
   if (module.key === 'markers') return <MarkersModule system={system} module={module} profile={profile} />;
-  if (module.key === 'models') return <ModelsModule system={system} module={module} profile={profile} />;
+  if (module.key === 'models') return <ModelHubModule module={module} profile={profile} />;
   return <RelationsModule system={system} module={module} profile={profile} />;
 }
 
@@ -257,83 +259,6 @@ function MarkersModule({ module, profile }: Props) {
           {Object.entries(ACTIVE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select></label>
         <label className="wide">說明<textarea rows={2} value={String(editor.note || '')} onChange={e => setEditor({ ...editor, note: e.target.value })} /></label>
-      </div>
-      <footer>
-        <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
-      </footer>
-    </AdminModal>}
-  </AppShell>;
-}
-
-/* ──────────────────────────── 模型管理 ──────────────────────────── */
-
-function ModelsModule({ module, profile }: Props) {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [busy, setBusy] = useState(true), [note, setNote] = useState('');
-  const [editor, setEditor] = useState<Row | null>(null);
-
-  const load = useCallback(async () => {
-    setBusy(true); setNote('');
-    const { data, error } = await getSupabase().from('floor_models').select('*').order('floor_id').limit(500);
-    if (error) setNote(`失敗：${errorMessage(error, '樓層模型載入失敗')}`);
-    setRows(data || []); setBusy(false);
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-
-  const save = async () => {
-    if (!editor) return;
-    const floorValue = canonicalFloor(editor.floor_id);
-    if (!floorValue) { setNote('失敗：請填寫樓層代碼'); return; }
-    const level = Number(editor.level ?? 0);
-    if (!Number.isFinite(level)) { setNote('失敗：樓層高度必須是數字'); return; }
-    let bbox: unknown = null;
-    const bboxText = String(editor.bbox_text ?? '').trim();
-    if (bboxText) {
-      try { bbox = JSON.parse(bboxText); }
-      catch { setNote('失敗：模型範圍必須是合法的 JSON'); return; }
-    }
-    setBusy(true); setNote('');
-    const payload = {
-      floor_id: floorValue, name: String(editor.name || '').trim() || null,
-      image_path: String(editor.image_path || '').trim() || null, level, bbox,
-    };
-    // floor_id 是主鍵，用 upsert 讓新增與編輯共用同一條路徑。
-    const { error } = await getSupabase().from('floor_models').upsert(payload, { onConflict: 'floor_id' });
-    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    setEditor(null); await load(); setNote('樓層模型已儲存');
-  };
-
-  const openEditor = (row: Row) => setEditor({ ...row, bbox_text: row.bbox ? JSON.stringify(row.bbox) : '' });
-
-  return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact" onClick={() => setEditor({ floor_id: '', name: '', image_path: '', level: 0, bbox_text: '' })}>＋ 新增樓層模型</button>} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar"><span>共 {rows.length} 個樓層模型</span></div>
-      <div className="responsive-table"><table>
-        <thead><tr><th>樓層代碼</th><th>模型名稱</th><th>平面材質</th><th>樓層高度</th><th>模型範圍</th><th>更新時間</th><th>操作</th></tr></thead>
-        <tbody>{rows.map(row => <tr key={String(row.floor_id)}>
-          <td><strong>{fmt(row.floor_id)}</strong></td>
-          <td>{fmt(row.name)}</td>
-          <td>{fmt(row.image_path)}</td>
-          <td>{fmt(row.level)}</td>
-          <td>{row.bbox ? <code style={{ fontSize: '.72rem' }}>{JSON.stringify(row.bbox).slice(0, 60)}</code> : '—'}</td>
-          <td>{fmtTime(row.updated_at)}</td>
-          <td><div className="admin-row-actions"><button onClick={() => openEditor(row)}>編輯</button></div></td>
-        </tr>)}</tbody>
-      </table></div>
-      {!busy && rows.length === 0 && <p className="empty">目前沒有樓層模型</p>}
-      <p className="inline-message">平面材質檔案存放於公開的 floorplans 儲存桶；此頁維護對照設定，實際圖磚與貼圖不在此上傳。</p>
-    </section>
-
-    {editor && <AdminModal title={editor.updated_at ? `編輯樓層模型｜${fmt(editor.floor_id)}` : '新增樓層模型'} onClose={() => setEditor(null)}>
-      <div className="admin-form-grid">
-        <label>樓層代碼（必填）<input value={String(editor.floor_id || '')} readOnly={Boolean(editor.updated_at)} onChange={e => setEditor({ ...editor, floor_id: e.target.value })} placeholder="例：B1／1F／RF" /></label>
-        <label>樓層高度（level）<input type="number" step="0.1" value={String(editor.level ?? 0)} onChange={e => setEditor({ ...editor, level: e.target.value })} /></label>
-        <label className="wide">模型名稱<input value={String(editor.name || '')} onChange={e => setEditor({ ...editor, name: e.target.value })} placeholder="例：B1 地下一層" /></label>
-        <label className="wide">平面材質檔名<input value={String(editor.image_path || '')} onChange={e => setEditor({ ...editor, image_path: e.target.value })} placeholder="例：B1.png" /></label>
-        <label className="wide">模型範圍 bbox（JSON，可留空）<textarea rows={2} value={String(editor.bbox_text || '')} onChange={e => setEditor({ ...editor, bbox_text: e.target.value })} placeholder='例：{"w":1200,"h":800}' /></label>
       </div>
       <footer>
         <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
