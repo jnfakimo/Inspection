@@ -226,7 +226,7 @@ function Floor3DViewer({ module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={reload} />
-    <section className="panel admin-panel" style={{ flex: 1, height: 0, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0, background: 'var(--panel)' }}>
+    <section className="panel admin-panel" style={{ flex: 1, height: 'calc(100vh - 120px)', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0, background: 'var(--panel)' }}>
       {/* 左側浮動面板群 */}
       <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 6, width: 106 }}>
         {/* 立體控制 */}
