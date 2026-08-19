@@ -223,7 +223,10 @@
 
 .modelhub-bridge {
   position: relative;
+  /* V1 只給了 max-width、靠左對齊，在寬螢幕上會比上方滿版的卡片列窄一截且偏左。
+     依需求改為水平置中，寬度上限維持 V1 的 996px。 */
   max-width: 996px;
+  margin-inline: auto;
   padding: 16px 18px;
   border: 1px solid var(--line);
   border-radius: 4px;
