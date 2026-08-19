@@ -93,7 +93,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
         const edges = new THREE.LineSegments(
           new THREE.EdgesGeometry(new THREE.PlaneGeometry(PLANE_W, PLANE_H)),
-          new THREE.LineBasicMaterial({ color: isLight ? 0xcccccc : 0x1a4a70 }));
+          new THREE.LineBasicMaterial({ color: isLight ? 0x000000 : 0x1a4a70 }));
         edges.rotation.x = -Math.PI / 2; edges.position.y = y + 0.002;
         scene.add(edges);
 
