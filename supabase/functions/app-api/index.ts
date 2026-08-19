@@ -66,6 +66,15 @@ function nextRequestRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function extractClientIp(req: Request) {
+  const raw = req.headers.get('cf-connecting-ip')
+    || req.headers.get('x-real-ip')
+    || req.headers.get('x-forwarded-for')
+    || req.headers.get('fly-client-ip')
+    || '';
+  return text(raw.split(',')[0], 80) || null;
+}
+
 function canonicalFloor(value: unknown) {
   const raw = text(value, 20).toUpperCase().replace(/\s+/g, '');
   if (raw === 'B1' || raw === 'B1F') return 'B1F';
@@ -191,7 +200,7 @@ export async function handleAppApiRequest(req: Request) {
     });
     const body = await req.json().catch(() => ({}));
     const action = text(body.action, 40);
-    const actionScope = ({
+  const actionScope = ({
       module_data: 'app-api:module_data',
       dashboard: 'app-api:dashboard',
       inspections: 'app-api:inspections',
@@ -201,6 +210,7 @@ export async function handleAppApiRequest(req: Request) {
       create_cost_record: 'app-api:create_cost_record',
       save_official_vehicle: 'app-api:save_official_vehicle',
       save_floor_model: 'app-api:save_floor_model',
+      guardpatrol_checkin: 'patrol-checkin',
     workorder_list: 'app-api:workorder_list',
     workorder_prepare_upload: 'app-api:workorder_prepare_upload',
     workorder_options: 'app-api:workorder_options',
@@ -446,8 +456,8 @@ export async function handleAppApiRequest(req: Request) {
       const locationPath = `${requestId}/location_${new Date().toISOString().replace(/[-:.TZ]/g, '')}-${extractFileExt(locationFileName, 'jpg')}`;
       const equipmentPath = `${requestId}/equipment_${new Date().toISOString().replace(/[-:.TZ]/g, '')}-${extractFileExt(equipmentFileName, 'jpg')}`;
       const [locationUpload, equipmentUpload] = await Promise.all([
-        admin.storage.from('repair-files').createSignedUploadUrl(locationPath, 15 * 60),
-        admin.storage.from('repair-files').createSignedUploadUrl(equipmentPath, 15 * 60),
+        admin.storage.from('repair-files').createSignedUploadUrl(locationPath),
+        admin.storage.from('repair-files').createSignedUploadUrl(equipmentPath),
       ]);
 
       if (locationUpload.error || !locationUpload.data || !locationUpload.data.path || !locationUpload.data.token) {
@@ -667,6 +677,63 @@ export async function handleAppApiRequest(req: Request) {
       }).select('record_id').single();
       if (error) throw error;
       return reply(req, { ok: true, data });
+    }
+
+    if (action === 'guardpatrol_checkin') {
+      if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有巡邏系統權限' }, 403);
+
+      const targetType = text(body.target_type, 20);
+      const targetId = text(body.target_id, 80);
+      if (targetType !== 'marker' || !/^[0-9a-f-]{36}$/i.test(targetId)) {
+        return reply(req, { ok: false, message: '巡邏點資料格式不正確' }, 400);
+      }
+
+      const { data: marker, error: markerError } = await admin
+        .from('plan_markers')
+        .select('marker_id,floor_id,label,kind,status')
+        .eq('marker_id', targetId)
+        .maybeSingle();
+      if (markerError) throw markerError;
+      if (!marker || marker.kind !== 'patrol' || marker.status !== 'active') {
+        return reply(req, { ok: false, message: '此巡邏點已停用或不存在' }, 404);
+      }
+
+      const recentSince = new Date(Date.now() - 5 * 60_000).toISOString();
+      const { data: recent, error: recentError } = await admin
+        .from('checkin_logs')
+        .select('checkin_id,checkin_at')
+        .eq('user_id', profile.user_id)
+        .eq('target_type', targetType)
+        .eq('target_id', targetId)
+        .gte('checkin_at', recentSince)
+        .order('checkin_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (recentError) throw recentError;
+      if (recent) return reply(req, { ok: false, message: '本巡邏點五分鐘內已完成簽到', data: { duplicate: true, event: recent } }, 409);
+
+      const event = {
+        target_type: targetType,
+        target_id: targetId,
+        floor_id: marker.floor_id || null,
+        label: text(marker.label, 200) || '未命名巡檢點',
+        user_id: profile.user_id,
+        user_name: text(profile.name, 160) || text(profile.username, 160) || '巡檢人員',
+        checkin_source: 'v2-dashboard',
+        auth_level: 'server',
+        verification_method: 'password_session',
+        source_ip: extractClientIp(req),
+        user_agent: text(req.headers.get('user-agent'), 1000) || null,
+      };
+
+      const { data: inserted, error: insertError } = await admin
+        .from('checkin_logs')
+        .insert(event)
+        .select('checkin_id,checkin_at,target_type,target_id,floor_id,label,user_id,user_name,checkin_source,auth_level,verification_method')
+        .single();
+      if (insertError) throw insertError;
+      await writeAudit(admin, profile.user_id, 'checkin_logs', inserted.checkin_id, 'insert', null, inserted);
+      return reply(req, { ok: true, data: { event: inserted } });
     }
 
     if (action === 'open_inspection_cycle') {
