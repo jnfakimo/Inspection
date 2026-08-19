@@ -117,7 +117,7 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 | 整合標記 | `plan_markers` 屬性維護：名稱、類型、座標、顏色、關聯設備、狀態 |
 | 平面樓層圖 | OpenSeadragon 檢視器，標記疊層可點選，支援點圖面重新定位並寫回 x／y |
 | 立體樓層模型 | Three.js 堆疊樓層，貼圖化，標記以球體標示，可調層距與切換標記顯示 |
-| 模型管理 | `floor_models` upsert（floor_id 為主鍵），bbox 以 JSON 編輯並驗證格式 |
+| 3D建模系統 | V1 `admin.html#modelhub` 的子系統導覽頁：五張 HUB 圖卡＋空間標記覆蓋率統計 |
 | 專案關係 | `locations` 的樓層／區域結構檢視。**唯讀**——維護入口在後台的場域位置模組 |
 
 檢視器的資產來源統一改為公開儲存桶 `floorplans` 的絕對網址（即 `floor_models.image_path`，
@@ -151,9 +151,12 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 不另包 Edge Function。巡檢週期沿用 V1 的兩步驟寫入（無對應的 security definer 函式），
 但插入失敗時明確提示「目前沒有進行中的週期」，不讓中間狀態被誤認為正常。
 
-`admin.html` 的 3D 建模導覽頁（`page-modelhub`）刻意不搬——那是連往 modeler／arealist／
-patrollist／整合標記／floor3d 的卡片牆，五個目的地在 V2 都已是 SYS-06 與 SYS-03 的模組，
-再做一頁只會多一層轉跳。
+`admin.html` 的 3D 建模導覽頁（`page-modelhub`）原本刻意不搬，理由是五個目的地在 V2 都已是
+SYS-06 與 SYS-03 的模組，再做一頁只會多一層轉跳。**2026-08-19 依需求推翻此決定**：
+SYS-06 的 `models` 模組改為該導覽頁（`structuremap-modelhub.tsx`），版型與功能對齊 V1，
+五張卡依需求全部連回 V1 頁面——V2 沒有 modeler（DXF 上傳建模）的對應模組，五張一起留在
+V1 才不會走到一半換介面。原本掛在該模組的 `floor_models` 維護表格隨之移除，該表的維護
+入口回到 V1 的 `modeler.html`；V2 仍有兩處讀取它（立體樓層檢視器與巡檢工作區的貼圖來源）。
 
 ## SYS-03 駐衛警巡檢（2026-08-18 完成）
 
