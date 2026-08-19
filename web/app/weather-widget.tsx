@@ -72,6 +72,10 @@ export function WeatherWidget() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(text, 'image/svg+xml');
         
+        const SCALE = 0.65;
+        const TX = 180;
+        const TY = 140;
+
         const centers: Record<string, [number, number]> = {};
         doc.querySelectorAll('.county').forEach(el => {
           const c = el.getAttribute('data-county');
@@ -80,7 +84,10 @@ export function WeatherWidget() {
           if (c && cx && cy) {
             // Normalize "台" to "臺" just in case the SVG uses "台"
             const canonicalName = c.replace('台', '臺');
-            centers[canonicalName] = [Number(cx), Number(cy)];
+            centers[canonicalName] = [
+              Number(cx) * SCALE + TX,
+              Number(cy) * SCALE + TY
+            ];
           }
         });
         setCountyCenters(centers);
@@ -162,7 +169,7 @@ export function WeatherWidget() {
             }
           `}</style>
           
-          {mapSvg && <g dangerouslySetInnerHTML={{ __html: mapSvg }} />}
+          <g transform="translate(180, 140) scale(0.65)" dangerouslySetInnerHTML={{ __html: mapSvg }} />
 
           <g className="weather-marker-layer">
             {COUNTIES.map(name => {
