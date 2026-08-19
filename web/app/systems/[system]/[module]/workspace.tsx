@@ -120,21 +120,28 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
   const options = (columnFilterOptions[column.key] || []).filter(option => option.value !== EMPTY_FILTER_VALUE);
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
 
-  if (column.key === 'fault_type' || column.key === 'department') { 
-    const listId = 'request-' + column.key + '-filter-list'; 
-    return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : '全部單位'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; 
-  }
-  
   if (column.key === 'created_at' || column.key === 'desired_finish') {
     return <th><input className='request-filter-date' type={columnFilters[column.key] ? 'date' : 'text'} placeholder='年/月/日' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} onFocus={e => { e.currentTarget.type = 'date'; try { e.currentTarget.showPicker(); } catch(err){} }} onBlur={e => { if (!e.currentTarget.value) e.currentTarget.type = 'text'; }} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
   }
 
   const isStatus = column.key === 'status';
   const currentValue = isStatus ? statusFilter : (columnFilters[column.key] || '');
-  const onChange = (value: string) => isStatus ? setStatusFilter(value) : update(value);
-  const allLabel = column.key === 'urgency' ? '全部急迫性' : column.key === 'assignee_name' ? '全部人員' : '全部狀態';
+  let displayValue = currentValue;
+  if (currentValue) {
+    const matchedOption = options.find(o => o.value === currentValue);
+    if (matchedOption) displayValue = matchedOption.label;
+  }
+  
+  const onChange = (value: string) => {
+    const rawMatch = options.find(o => o.label === value);
+    const setVal = rawMatch ? rawMatch.value : value;
+    isStatus ? setStatusFilter(setVal) : update(setVal);
+  };
 
-  return <th><select value={currentValue} onChange={event => onChange(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''>{allLabel}</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
+  const listId = 'request-' + column.key + '-filter-list'; 
+  const placeholderText = column.key === 'fault_type' ? '全部故障類型' : column.key === 'department' ? '全部單位' : column.key === 'urgency' ? '全部急迫性' : column.key === 'status' ? '全部狀態' : column.key === 'assignee_name' ? '全部人員' : '全部';
+  
+  return <th><div className='request-filter-combobox'><input list={listId} value={displayValue} onChange={event => onChange(event.target.value)} placeholder={placeholderText} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.label} />)}</datalist></th>;
 }
 
 export function ModuleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
@@ -451,14 +458,17 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         const rowStatus = String(row.status || '');
         const matchesColumns = Object.entries(columnFilters).every(([key, value]) => {
           if (!value) return true;
-          if (key === 'fault_type' || key === 'department' || key === 'urgency') return String(row[key] || '').toLocaleLowerCase().includes(value.toLocaleLowerCase());
-          return requestFilterValue(key, row[key]) === value;
+          const raw = requestFilterValue(key, row[key]);
+          if (key === 'created_at' || key === 'desired_finish') return raw === value;
+          const lbl = requestFilterLabel(key, raw);
+          return raw.toLocaleLowerCase().includes(value.toLocaleLowerCase()) || lbl.toLocaleLowerCase().includes(value.toLocaleLowerCase());
         });
-        const statusMatches = !statusFilter || (statusFilter === 'pending' ? ['pending', 'transferred'].includes(rowStatus) : statusFilter === 'returned' ? ['returned', 'rejected'].includes(rowStatus) : rowStatus === statusFilter);
-        const hideClosedByDefault = isRepairTableModule && !statusFilter && rowStatus === 'closed';
-        return !hideClosedByDefault && matchesColumns && statusMatches && (!needle || Object.values(row).some(value => display(value).toLowerCase().includes(needle)));
+        const mappedStatusFilter = statusFilter === '待主管派工' ? 'pending' : statusFilter === '待接單' ? 'assigned' : statusFilter === '維修中' ? 'in_progress' : statusFilter === '待報修人驗收' ? 'pending_review' : statusFilter === '待主管驗收' ? 'completed' : statusFilter === '已結案' ? 'closed' : statusFilter === '退回' ? 'returned' : statusFilter;
+        const statusMatches = !mappedStatusFilter || (mappedStatusFilter === 'pending' ? ['pending', 'transferred'].includes(rowStatus) : mappedStatusFilter === 'returned' ? ['returned', 'rejected'].includes(rowStatus) : rowStatus === mappedStatusFilter || repairWorkflowStatusLabel(row) === mappedStatusFilter || repairStatusLabel(rowStatus) === mappedStatusFilter);
+        const hideClosedByDefault = isRepairTableModule && !mappedStatusFilter && rowStatus === 'closed';
+        return !hideClosedByDefault && matchesColumns && statusMatches && (!needle || Object.values(row).some(val => display(val).toLowerCase().includes(needle)));
       });
-    }, [columnFilters, data, isRequestModule, query, statusFilter]);
+    }, [columnFilters, data, isRepairTableModule, query, statusFilter]);
     const columnFilterOptions = useMemo(() => {
       const options: Record<string, Array<{ value: string; label: string }>> = {};
       for (const column of data?.columns || []) {
