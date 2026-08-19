@@ -464,7 +464,7 @@ function ShiftsModule({ module, profile }: Props) {
     <section className="panel admin-panel">
       <div className="admin-toolbar">
         <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
-        <LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} />
+        <span className="admin-toolbar-date"><LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></span>
         <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
         <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
         <span>當日 {shifts.length} 個班別</span>
