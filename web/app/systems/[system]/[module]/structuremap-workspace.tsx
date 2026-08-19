@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
+import { MARKET_ID } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { SystemRelations } from './system-relations';
@@ -20,7 +21,6 @@ import type { Profile } from '@/types/app';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
-const MARKET = 'first';
 const MARKER_KIND: Record<string, string> = {
   equipment: '設備', patrol: '巡檢點', repair: '報修', note: '註記', other: '其他',
 };
@@ -64,7 +64,7 @@ function AreasModule({ module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const { data, error } = await getSupabase().from('floor_spaces').select('*')
-      .eq('market_id', MARKET).order('floor_order').order('sort_order').order('space_name').limit(5000);
+      .eq('market_id', MARKET_ID).order('floor_order').order('sort_order').order('space_name').limit(5000);
     if (error) setNote(`失敗：${errorMessage(error, '區域位置表載入失敗')}`);
     setRows(data || []); setBusy(false);
   }, []);
@@ -88,7 +88,7 @@ function AreasModule({ module, profile }: Props) {
     if (!name) { setNote('失敗：請填寫空間名稱'); return; }
     setBusy(true); setNote('');
     const payload = {
-      market_id: MARKET, floor: floorValue, floor_order: floorOrder(floorValue),
+      market_id: MARKET_ID, floor: floorValue, floor_order: floorOrder(floorValue),
       space_name: name, sort_order: Number(editor.sort_order ?? 0) || 0,
       note: String(editor.note || '').trim() || null, status: String(editor.status || 'active'),
     };
@@ -353,7 +353,7 @@ function RelationsModule({ module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const { data, error } = await getSupabase().from('locations').select('*')
-      .eq('market_id', MARKET).order('floor_order').order('area_order').order('detail_order').limit(5000);
+      .eq('market_id', MARKET_ID).order('floor_order').order('area_order').order('detail_order').limit(5000);
     if (error) setNote(`失敗：${errorMessage(error, '場域位置載入失敗')}`);
     setRows(data || []); setBusy(false);
   }, []);
