@@ -147,18 +147,18 @@ export function WeatherWidget() {
           {/* 注入台灣地圖路徑，設定樣式 */}
           <style>{`
             .weather-map-container svg .county {
-              fill: var(--panel);
-              stroke: var(--border-hi);
+              fill: var(--border);
+              stroke: var(--text-dim);
               stroke-width: 1px;
               transition: fill 0.2s;
             }
             .weather-map-container svg .county.selected {
-              fill: rgba(34, 211, 238, 0.2);
+              fill: rgba(34, 211, 238, 0.4);
               stroke: var(--cyan);
               stroke-width: 2px;
             }
             .weather-map-container svg .county:hover {
-              fill: rgba(255, 255, 255, 0.1);
+              fill: rgba(34, 211, 238, 0.2);
             }
           `}</style>
           
