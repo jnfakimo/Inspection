@@ -278,7 +278,7 @@ function renderNeon(pls,bbox){
   const X=x=>pad+(x-bbox.mnx)*sc, Y=y=>pad+(bbox.mxy-y)*sc; // flip Y
   // glow pass + crisp pass
   ctx.lineJoin='round';ctx.lineCap='round';
-  for(const pass of [{w:3.0,blur:8,a:.5},{w:1.4,blur:3,a:.85},{w:1.0,blur:0,a:1}]){
+  for(const pass of [{w:1.2,blur:4,a:.5},{w:0.6,blur:1.5,a:.85},{w:0.4,blur:0,a:1}]){
     ctx.strokeStyle=`rgba(94,234,255,${pass.a})`; ctx.lineWidth=pass.w;
     ctx.shadowColor='#5eeaff'; ctx.shadowBlur=pass.blur;
     pls.forEach(p=>{ctx.beginPath();p.forEach(([x,y],i)=>i?ctx.lineTo(X(x),Y(y)):ctx.moveTo(X(x),Y(y)));ctx.stroke();});
