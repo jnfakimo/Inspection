@@ -27,7 +27,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
     const accessToken = sessionData.session?.access_token;
     if (sessionError || !accessToken) throw new Error('登入狀態無效，請重新登入');
 
-    let response: Response;
+    let response: Response | undefined;
     try {
       response = await fetch(`${nodeAppApiUrl}/api/app-api`, {
         method: 'POST',
@@ -39,12 +39,15 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
         cache: 'no-store',
       });
     } catch {
-      throw new Error('Node.js API 連線失敗，請稍後再試');
+      console.warn('Node.js API connection failed, falling back to Supabase Edge Function');
+      // Do nothing, let it fall through to the Supabase Edge Function below
     }
 
-    const result = await response.json().catch(() => null);
-    if (!response.ok || !result?.ok) throw new Error(result?.message || '系統服務回傳失敗');
-    return result.data as T;
+    if (response) {
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) throw new Error(result?.message || '系統服務回傳失敗');
+      return result.data as T;
+    }
   }
 
   const { data, error } = await getSupabase().functions.invoke('app-api', {
