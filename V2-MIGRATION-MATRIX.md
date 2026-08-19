@@ -154,9 +154,13 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 `admin.html` 的 3D 建模導覽頁（`page-modelhub`）原本刻意不搬，理由是五個目的地在 V2 都已是
 SYS-06 與 SYS-03 的模組，再做一頁只會多一層轉跳。**2026-08-19 依需求推翻此決定**：
 SYS-06 的 `models` 模組改為該導覽頁（`structuremap-modelhub.tsx`），版型與功能對齊 V1，
-五張卡依需求全部連回 V1 頁面——V2 沒有 modeler（DXF 上傳建模）的對應模組，五張一起留在
-V1 才不會走到一半換介面。原本掛在該模組的 `floor_models` 維護表格隨之移除，該表的維護
-入口回到 V1 的 `modeler.html`；V2 仍有兩處讀取它（立體樓層檢視器與巡檢工作區的貼圖來源）。
+五張卡的版型、文字與操作目的維持 V1。HUB-01 已於 2026-08-19 改接
+`/Inspection/v2/systems/structuremap/modeler/`：DXF 仍在瀏覽器解析與產生原圖／行動版 PNG，
+Storage 上傳由 RLS 授權，模型清單與 `floor_models` 更新則經 `app-api` 完成 JWT、啟用帳號、
+RBAC、限流、RLS 與稽核檢查。其餘四張卡仍保留原目的地，待各自獨立驗收後再切換。
+
+原本掛在 models 模組的 `floor_models` 通用維護表格維持移除；正式建模入口改為上述 V2
+專用頁。V2 的立體樓層檢視器與巡檢工作區繼續共用同一份 `floor_models` 貼圖來源。
 
 ## SYS-03 駐衛警巡檢（2026-08-18 完成）
 

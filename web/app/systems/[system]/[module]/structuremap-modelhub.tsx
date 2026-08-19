@@ -3,9 +3,8 @@
 // SYS-06「模型管理」＝ V1 `admin.html#modelhub` 的 3D建模系統 hub。
 //
 // 這一頁不做資料維護，只有兩件事：把五個子系統的入口排成圖卡，以及算出空間主檔
-// 與平面圖標記的介接覆蓋率。五個入口目前都指向 V1 頁面——V2 雖然有 areas／markers／
-// floor3d 三個對應模組，但 modeler（DXF 上傳建模）沒有 V2 版，五張卡一起留在 V1
-// 才不會走到一半換介面。
+// 與平面圖標記的介接覆蓋率。HUB-01 已改接 React／Next.js 的 DXF 建模頁；其餘入口
+// 仍維持 V1 目的地，避免在本次單頁遷移中改變既有功能範圍。
 //
 // 統計沿用 V1 的兩支查詢：floor_spaces 取啟用中的空間主檔，plan_markers 取啟用中
 // 且已綁定 space_id 的標記，兩邊取交集算已標記數。兩張表的讀取權限由
@@ -37,34 +36,34 @@ type HubCard = {
   title: string;
   description: readonly [string, string];
   enter: string;
-  legacy: string;
+  href: string;
 };
 
 const HUB_CARDS: readonly HubCard[] = [
   {
     code: 'HUB-01', accent: 'pink', icon: 'equipment-icon.png', title: '3D建模系統',
     description: ['上傳 DXF 更新樓層平面圖', '同步更新 3D 立體模型'],
-    enter: '▶ 第一步：進入建模', legacy: 'modeler.html?v=2',
+    enter: '▶ 第一步：進入建模', href: '/Inspection/v2/systems/structuremap/modeler/',
   },
   {
     code: 'HUB-02', accent: 'cyan', icon: 'admin-icon.png', title: '區域位置表',
     description: ['建立樓層與空間名稱主檔', '空間是否使用 / 匯入匯出'],
-    enter: '▶ 第二步：建立主檔', legacy: 'arealist.html',
+    enter: '▶ 第二步：建立主檔', href: `${LEGACY_BASE}/arealist.html`,
   },
   {
     code: 'HUB-03', accent: 'purple', icon: 'guardpatrol-icon.png', title: '巡邏點清單',
     description: ['讀取全樓層巡邏點標示資料', '彙總檢視與快速定位'],
-    enter: '▶ 檢視巡邏點', legacy: 'patrollist.html',
+    enter: '▶ 檢視巡邏點', href: `${LEGACY_BASE}/patrollist.html`,
   },
   {
     code: 'HUB-04', accent: 'green', icon: 'handover-icon.png', title: '整合標記系統',
     description: ['讀取區域位置表空間主檔', '平面圖標記與位置定位'],
-    enter: '▶ 第三步：標記定位', legacy: 'b1_integrated_marker_system.html',
+    enter: '▶ 第三步：標記定位', href: `${LEGACY_BASE}/b1_integrated_marker_system.html`,
   },
   {
     code: 'HUB-05', accent: 'amber', icon: 'equipment-icon.png', title: '3D模型圖',
     description: ['統一 3D 立體模型資料來源', '供後續多系統介接應用'],
-    enter: '▶ 檢視 3D 模型', legacy: 'floor3d.html',
+    enter: '▶ 檢視 3D 模型', href: `${LEGACY_BASE}/floor3d.html`,
   },
 ];
 
@@ -137,7 +136,7 @@ export function ModelHubModule({ module, profile }: Props) {
         {HUB_CARDS.map(card => <a
           key={card.code}
           className={`modelhub-card ${card.accent}`}
-          href={`${LEGACY_BASE}/${card.legacy}`}
+          href={card.href}
         >
           <span className="modelhub-card-badge">{card.code}</span>
           <span className="modelhub-card-icon"><img src={`${ICON_BASE}/${card.icon}`} alt="" /></span>

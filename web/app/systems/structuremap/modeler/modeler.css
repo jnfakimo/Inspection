@@ -1,0 +1,298 @@
+.modeler-page {
+  --modeler-pink: #ff5ea0;
+  --modeler-glow: #5eeaff;
+  width: 100%;
+}
+
+:root[data-theme='light'] .modeler-page {
+  --modeler-pink: #be185d;
+  --modeler-glow: #0284c7;
+}
+
+.modeler-local-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -10px -16px 18px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.modeler-nav-heading {
+  min-width: max-content;
+}
+
+.modeler-nav-heading h1 {
+  margin: 0;
+  color: var(--modeler-pink);
+  font-family: var(--head);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.modeler-nav-heading p {
+  margin: 0;
+  color: var(--dim);
+  font-size: .7rem;
+  white-space: nowrap;
+}
+
+.modeler-nav-links {
+  display: flex;
+  flex: 1 0 auto;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modeler-nav-links a {
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--dim);
+  font-size: .7rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color .2s, color .2s;
+}
+
+.modeler-nav-links a:hover,
+.modeler-nav-links a:focus-visible {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.modeler-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 18px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+
+.modeler-card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.modeler-card h2 {
+  margin: 0 0 12px;
+  color: var(--cyan);
+  font-family: var(--head);
+  font-size: .95rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.modeler-card label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--dim);
+  font-size: .7rem;
+  letter-spacing: .04em;
+}
+
+.modeler-card select,
+.modeler-card input[type='text'] {
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  outline: none;
+  background: var(--panel2);
+  color: var(--text);
+  font-size: .82rem;
+}
+
+.modeler-card select:focus,
+.modeler-card input[type='text']:focus {
+  border-color: var(--cyan);
+}
+
+.modeler-drop {
+  margin-bottom: 12px;
+  padding: 24px 12px;
+  border: 1.5px dashed color-mix(in srgb, var(--cyan) 45%, var(--line));
+  border-radius: 4px;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: .8rem;
+  text-align: center;
+  transition: border-color .2s, color .2s, background .2s;
+}
+
+.modeler-drop span { font-size: .7rem; }
+
+.modeler-drop:hover,
+.modeler-drop:focus-visible,
+.modeler-drop.over {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 4%, transparent);
+  color: var(--cyan);
+}
+
+.modeler-button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid;
+  border-radius: 2px;
+  cursor: pointer;
+  font-family: var(--head);
+  font-size: .82rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: background .2s;
+}
+
+.modeler-button-primary {
+  border-color: var(--modeler-pink);
+  background: color-mix(in srgb, var(--modeler-pink) 12%, transparent);
+  color: var(--modeler-pink);
+}
+
+.modeler-button-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--modeler-pink) 22%, transparent);
+}
+
+.modeler-button:disabled { cursor: not-allowed; opacity: .4; }
+
+.modeler-stat {
+  color: var(--dim);
+  font-size: .72rem;
+  line-height: 1.8;
+}
+
+.modeler-stat b { color: var(--text); }
+.modeler-file-stat span { color: var(--amber); }
+
+.modeler-message {
+  min-height: 1.4em;
+  margin-top: 8px;
+  padding: 6px;
+  font-size: .74rem;
+  text-align: center;
+}
+
+.modeler-message.ok { color: var(--green); }
+.modeler-message.err { color: var(--red); }
+.modeler-message.work { color: var(--amber); }
+.modeler-saved-title { margin-top: 18px !important; }
+.modeler-saved-list { margin-top: 10px; }
+.modeler-saved-error { color: var(--amber); }
+
+.modeler-saved-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-size: .72rem;
+}
+
+.modeler-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.modeler-floor-id {
+  min-width: 34px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.modeler-saved-item time {
+  margin-left: auto;
+  color: var(--dim);
+}
+
+.modeler-links {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.modeler-links a {
+  flex: 1;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--cyan);
+  font-size: .72rem;
+  text-align: center;
+  text-decoration: none;
+  transition: border-color .2s, background .2s;
+}
+
+.modeler-links a:hover,
+.modeler-links a:focus-visible {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
+}
+
+.modeler-hint {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font-size: .68rem;
+  line-height: 1.7;
+}
+
+.modeler-hint b { color: var(--text); }
+.modeler-preview-card { padding: 12px; }
+
+.modeler-preview {
+  position: relative;
+  display: flex;
+  min-height: 420px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #04101f;
+}
+
+.modeler-preview canvas {
+  display: none;
+  max-width: 100%;
+  max-height: 70vh;
+}
+
+.modeler-preview canvas.visible { display: block; }
+
+.modeler-placeholder {
+  padding: 40px;
+  color: #8eb6cb;
+  font-size: .82rem;
+  text-align: center;
+}
+
+.modeler-denied {
+  padding: 30px;
+  color: var(--red);
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  .modeler-local-nav { align-items: flex-start; flex-direction: column; }
+  .modeler-nav-links { width: 100%; justify-content: flex-start; }
+  .modeler-layout { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeler-nav-links a,
+  .modeler-drop,
+  .modeler-button,
+  .modeler-links a { transition: none; }
+}

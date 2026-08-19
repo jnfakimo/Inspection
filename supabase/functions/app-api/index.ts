@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
       open_inspection_cycle: 'app-api:open_inspection_cycle',
       create_cost_record: 'app-api:create_cost_record',
       save_official_vehicle: 'app-api:save_official_vehicle',
+      save_floor_model: 'app-api:save_floor_model',
     } as Record<string, string>)[action];
     if (actionScope) {
       const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
@@ -363,6 +364,33 @@ Deno.serve(async (req) => {
         markers: markers.error ? [] : (markers.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
         locations: locations.error ? [] : (locations.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
       } });
+    }
+
+    if (action === 'save_floor_model') {
+      if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
+      const floorId = text(body.floor_id, 20).toUpperCase().replace(/\s+/g, '');
+      const name = text(body.name, 100);
+      const imagePath = text(body.image_path, 100);
+      const bboxSource = body.bbox && typeof body.bbox === 'object' ? body.bbox as Record<string, unknown> : {};
+      const bbox = {
+        mnx: Number(bboxSource.mnx), mny: Number(bboxSource.mny),
+        mxx: Number(bboxSource.mxx), mxy: Number(bboxSource.mxy),
+        w: Number(bboxSource.w), h: Number(bboxSource.h),
+      };
+      if (!/^[A-Z0-9_-]{1,20}$/.test(floorId)) return reply(req, { ok: false, message: '樓層代號格式無效' }, 400);
+      if (!name) return reply(req, { ok: false, message: '樓層名稱不可空白' }, 400);
+      if (imagePath !== `${floorId}.png`) return reply(req, { ok: false, message: '模型檔案路徑無效' }, 400);
+      if (Object.values(bbox).some(value => !Number.isFinite(value)) || bbox.w <= 0 || bbox.h <= 0) {
+        return reply(req, { ok: false, message: '模型繪圖範圍無效' }, 400);
+      }
+      const { data: before, error: readError } = await userDb.from('floor_models')
+        .select('floor_id,name,image_path,bbox,updated_at').eq('floor_id', floorId).maybeSingle();
+      if (readError) throw readError;
+      const payload = { floor_id: floorId, name, image_path: imagePath, bbox, updated_at: new Date().toISOString() };
+      const { data, error } = await userDb.from('floor_models').upsert(payload, { onConflict: 'floor_id' }).select('floor_id').single();
+      if (error) throw error;
+      await writeAudit(userDb, profile.user_id, 'floor_models', floorId, before ? 'update' : 'insert', before, payload);
+      return reply(req, { ok: true, data });
     }
 
     // ---- SYS-08 會議室預約 ----------------------------------------------
