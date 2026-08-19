@@ -211,8 +211,26 @@ export function WeatherWidget() {
             })}
           </g>
         </svg>
-        <div style={{ position: 'absolute', bottom: '10px', left: '10px', background: 'rgba(0,0,0,0.6)', padding: '6px 12px', borderRadius: '4px', color: 'var(--cyan)', fontSize: '14px' }}>
-          點擊地圖 切換縣市
+        <div style={{ 
+          position: 'absolute', 
+          bottom: '24px', 
+          right: '24px', 
+          background: 'color-mix(in srgb, var(--panel) 90%, transparent)',
+          backdropFilter: 'blur(4px)',
+          border: '1px solid var(--line)',
+          padding: '8px 16px', 
+          borderRadius: '20px', 
+          color: 'var(--text)', 
+          fontSize: '13px',
+          fontWeight: '500',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          pointerEvents: 'none'
+        }}>
+          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--cyan)' }}></span>
+          點擊地圖或周圍圖示可切換縣市
         </div>
       </div>
 
