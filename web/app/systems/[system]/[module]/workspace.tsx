@@ -116,12 +116,25 @@ function requestTimeLabel(value: unknown): string {
 }
 type RequestFilterCellProps = { column: { key: string; label: string }; statusFilter: string; columnFilters: Record<string, string>; columnFilterOptions: Record<string, Array<{ value: string; label: string }>>; setStatusFilter: (value: string) => void; setColumnFilters: (updater: any) => void };
 function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOptions, setStatusFilter, setColumnFilters }: RequestFilterCellProps) {
-  if (column.key === 'req_no' || column.key === 'assignee_id' || column.key === 'assignee_name') return <th aria-label={column.key === 'req_no' ? '報修單號不提供篩選' : '指派人員不提供篩選'} />;
+  if (column.key === 'req_no' || column.key === 'assignee_id') return <th aria-label={column.key === 'req_no' ? '報修單號不提供篩選' : '不提供篩選'} />;
   const options = (columnFilterOptions[column.key] || []).filter(option => option.value !== EMPTY_FILTER_VALUE);
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
-  if (column.key === 'fault_type' || column.key === 'department' || column.key === 'urgency') { const listId = 'request-' + column.key + '-filter-list'; return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : column.key === 'department' ? '全部單位' : '全部急迫性'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; }
-  if (column.key === 'created_at' || column.key === 'desired_finish') return <th><input className='request-filter-date' type={columnFilters[column.key] ? 'date' : 'text'} placeholder='年/月/日' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} onFocus={e => { e.currentTarget.type = 'date'; try { e.currentTarget.showPicker(); } catch(err){} }} onBlur={e => { if (!e.currentTarget.value) e.currentTarget.type = 'text'; }} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
-  return <th><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''></option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
+
+  if (column.key === 'fault_type' || column.key === 'department') { 
+    const listId = 'request-' + column.key + '-filter-list'; 
+    return <th><div className='request-filter-combobox'><input list={listId} value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} placeholder={column.key === 'fault_type' ? '全部故障類型' : '全部單位'} aria-label={'篩選' + zhValue(column.label)} /><span aria-hidden='true'>▾</span></div><datalist id={listId}>{options.map(option => <option key={option.value} value={option.value} />)}</datalist></th>; 
+  }
+  
+  if (column.key === 'created_at' || column.key === 'desired_finish') {
+    return <th><input className='request-filter-date' type={columnFilters[column.key] ? 'date' : 'text'} placeholder='年/月/日' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} onFocus={e => { e.currentTarget.type = 'date'; try { e.currentTarget.showPicker(); } catch(err){} }} onBlur={e => { if (!e.currentTarget.value) e.currentTarget.type = 'text'; }} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
+  }
+
+  const isStatus = column.key === 'status';
+  const currentValue = isStatus ? statusFilter : (columnFilters[column.key] || '');
+  const onChange = (value: string) => isStatus ? setStatusFilter(value) : update(value);
+  const allLabel = column.key === 'urgency' ? '全部急迫性' : column.key === 'assignee_name' ? '全部人員' : '全部狀態';
+
+  return <th><select value={currentValue} onChange={event => onChange(event.target.value)} aria-label={'篩選' + zhValue(column.label)}><option value=''>{allLabel}</option>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></th>;
 }
 
 export function ModuleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
@@ -530,7 +543,23 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         </div>}
       </div>
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
-      {data?.summary && <section className="mini-metrics">{data.summary.map(item => <article key={item.label} data-label={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
+      {data?.summary && (
+        <section className="mini-metrics">
+          {(() => {
+            const displaySummary = [...data.summary];
+            if (isRepairTableModule) {
+              const urgentCount = data.rows.filter(r => (String(r.urgency) === 'urgent' || String(r.urgency) === 'high') && String(r.status) !== 'closed' && String(r.status) !== 'completed').length;
+              displaySummary.splice(1, 0, { label: '急迫性案件', value: urgentCount });
+            }
+            return displaySummary.map(item => (
+              <article key={item.label} data-label={item.label}>
+                <span>{zhValue(item.label)}</span>
+                <strong>{item.value}</strong>
+              </article>
+            ));
+          })()}
+        </section>
+      )}
       <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : isDispatchModule ? 'dispatch-v1-table' : ''}`}>
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setEquipmentPhoto(null); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {isRequestModule && <div className="request-status-chips">
