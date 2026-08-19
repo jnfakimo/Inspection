@@ -13,9 +13,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
-import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { AuthGate } from '@/components/AuthGate';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { FloorStack3D, floorOrder, floorTextureUrl, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -142,177 +141,16 @@ function Floor2DViewer({ module, profile }: Props) {
       const point = viewer.viewport.pointFromPixel(event.position);
       const x = Number(point.x.toFixed(4)), y = Number(point.y.toFixed(4));
       setSaving(true); setNote('');
-      const { error } = await getSupabase().from('plan_markers').update({ x, y }).eq('marker_id', selected.marker_id);
-      setSaving(false);
-      if (error) { setNote(`失敗：${errorMessage(error)}`); return; }
-      setPlacing(false); setSelected(null); await reload();
-      setNote(`已將「${selected.label}」移到 ${x}, ${y}`);
-    };
-    viewer.addHandler('canvas-click', onCanvasClick);
-    return () => { try { viewer.removeHandler('canvas-click', onCanvasClick); } catch { /* 忽略 */ } };
-  }, [placing, selected, setNote, reload]);
-
-  return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy || saving} note={note} onReload={reload} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <select value={floor} onChange={e => { setFloor(e.target.value); setSelected(null); setPlacing(false); }}>
-          {models.map(m => <option key={String(m.floor_id)} value={String(m.floor_id)}>{m.name || m.floor_id}</option>)}
-        </select>
-        <select value={kindFilter} onChange={e => setKindFilter(e.target.value)}>
-          <option value="">全部類型</option>
-          {Object.entries(MARKER_KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <span>{visible.length} 個標記</span>
-        {selected && <>
-          <span>已選：<b>{fmt(selected.label)}</b></span>
-          <button className={placing ? 'primary-btn compact' : 'secondary-btn'} onClick={() => setPlacing(v => !v)}>
-            {placing ? '點圖面完成定位（再按取消）' : '重新定位'}
-          </button>
-          <button className="secondary-btn" onClick={() => { setSelected(null); setPlacing(false); }}>取消選取</button>
-        </>}
-      </div>
-      {!model && !busy && <p className="empty">這個樓層沒有對應的平面材質，請先於「模型管理」設定 image_path。</p>}
-      <div ref={hostRef} className="plan-stage" />
-      <p className="inline-message">
-        點選圖面上的標記可選取，再按「重新定位」後點圖面即可更新座標（存回 plan_markers 的 x／y，0–1 相對座標）。
-        標記的新增與屬性維護請用「整合標記」模組。
-      </p>
-    </section>
-  </AppShell>;
-}
-import { ComboboxSelect } from '@/components/ComboboxSelect';
-import { AuthGate } from '@/components/AuthGate';
-import { getSupabase } from '@/lib/supabase';
-import { AdminHeader, errorMessage, fmt, type Row } from '@/components/admin/shared';
-import { FloorStack3D, floorOrder, floorTextureUrl, type StackMarker } from './floor-stack-3d';
-import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
-import type { Profile } from '@/types/app';
-
-type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
-
-const MARKER_KIND: Record<string, string> = {
-  equipment: '設備', patrol: '巡檢點', repair: '報修', note: '註記', other: '其他',
-};
-const KIND_COLOR: Record<string, string> = {
-  equipment: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
-};
-const textureUrl = floorTextureUrl;
-
-export function StructureMapViewers({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
-  return <AuthGate>{profile => module.key === 'floor3d'
-    ? <Floor3DViewer system={system} module={module} profile={profile} />
-    : <Floor2DViewer system={system} module={module} profile={profile} />}</AuthGate>;
-}
-
-/** 兩個檢視器共用的樓層與標記資料。 */
-function useFloorData() {
-  const [models, setModels] = useState<Row[]>([]);
-  const [markers, setMarkers] = useState<Row[]>([]);
-  const [busy, setBusy] = useState(true);
-  const [note, setNote] = useState('');
-
-  const load = useCallback(async () => {
-    setBusy(true); setNote('');
-    const client = getSupabase();
-    const [m, k] = await Promise.all([
-      client.from('floor_models').select('*').order('floor_id').limit(200),
-      client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status,note,equipment_id').limit(5000),
-    ]);
-    if (m.error || k.error) setNote(`失敗：${errorMessage(m.error || k.error, '圖臺資料載入失敗')}`);
-    const sorted = (m.data || []).slice().sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
-    setModels(sorted); setMarkers(k.data || []); setBusy(false);
-  }, []);
-  useEffect(() => { void load(); }, [load]);
-  return { models, markers, busy, note, setNote, reload: load };
-}
-
-/* ──────────────────────────── 2D 平面樓層圖 ──────────────────────────── */
-
-function Floor2DViewer({ module, profile }: Props) {
-  const { models, markers, busy, note, setNote, reload } = useFloorData();
-  const [floor, setFloor] = useState('');
-  const [kindFilter, setKindFilter] = useState('');
-  const [placing, setPlacing] = useState(false);
-  const [selected, setSelected] = useState<Row | null>(null);
-  const [saving, setSaving] = useState(false);
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const viewerRef = useRef<any>(null);
-  const overlayRef = useRef<Map<string, HTMLElement>>(new Map());
-
-  useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
-  const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
-  const visible = useMemo(() => markers.filter(m =>
-    String(m.floor_id) === floor && (!kindFilter || String(m.kind) === kindFilter)), [markers, floor, kindFilter]);
-
-  // 建立／切換 OpenSeadragon。函式庫以動態 import 載入。
-  useEffect(() => {
-    let disposed = false;
-    const url = textureUrl(model?.image_path);
-    if (!hostRef.current || !url) return;
-    (async () => {
-      const OpenSeadragon = (await import('openseadragon')).default;
-      if (disposed || !hostRef.current) return;
-      if (!viewerRef.current) {
-        viewerRef.current = OpenSeadragon({
-          element: hostRef.current, prefixUrl: '',
-          showNavigationControl: false, showNavigator: true, navigatorPosition: 'BOTTOM_LEFT',
-          navigatorAutoFade: false,
-          minZoomLevel: 0.2, maxZoomPixelRatio: 4, zoomPerScroll: 1.3,
-          animationTime: 0.5, springStiffness: 7,
-          panHorizontal: true, panVertical: true, constrainDuringPan: false,
-          visibilityRatio: 0, crossOriginPolicy: 'Anonymous',
-          // flick 屬於手勢設定，不是頂層選項（V1 寫在頂層其實不會生效）。
-          gestureSettingsMouse: { flickEnabled: true, flickMomentum: 0.4 },
-        });
+      const marker_id = selected.marker_id;
+      if (!marker_id) { setNote('失敗：未選取標記'); setSaving(false); return; }
+      try {
+        await invokeAppApi<{ marker_id: string }>('move_structuremap_marker', { marker_id, x, y });
+      } catch (error) {
+        setSaving(false);
+        setNote(`失敗：${errorMessage(error)}`);
+        return;
       }
-      overlayRef.current.clear();
-      viewerRef.current.open({ type: 'image', url });
-    })();
-    return () => { disposed = true; };
-  }, [model]);
-
-  // 銷毀 viewer（僅在元件卸載時）。
-  useEffect(() => () => { try { viewerRef.current?.destroy(); } catch { /* 忽略 */ } viewerRef.current = null; }, []);
-
-  // 依 marker 清單重建覆蓋層。plan_markers 的 x／y 為 0–1 的相對座標。
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    const attach = () => {
-      overlayRef.current.forEach(el => { try { viewer.removeOverlay(el); } catch { /* 忽略 */ } });
-      overlayRef.current.clear();
-      for (const marker of visible) {
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'plan-marker';
-        el.style.background = String(marker.color || KIND_COLOR[String(marker.kind)] || '#00d4ff');
-        el.title = `${marker.label ?? ''}（${MARKER_KIND[String(marker.kind)] || marker.kind}）`;
-        el.onclick = event => { event.stopPropagation(); setSelected(marker); };
-        try {
-          viewer.addOverlay({ element: el, location: new (window as any).OpenSeadragon.Point(Number(marker.x) || 0, Number(marker.y) || 0), placement: 'CENTER' });
-          overlayRef.current.set(String(marker.marker_id), el);
-        } catch { /* viewer 尚未就緒時略過，open 事件會再觸發一次 */ }
-      }
-    };
-    viewer.addHandler('open', attach);
-    attach();
-    return () => { try { viewer.removeHandler('open', attach); } catch { /* 忽略 */ } };
-  }, [visible]);
-
-  // 定位模式：點擊圖面把選取的標記移到該處。
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    const onCanvasClick = async (event: any) => {
-      if (!placing || !selected) return;
-      event.preventDefaultAction = true;
-      const point = viewer.viewport.pointFromPixel(event.position);
-      const x = Number(point.x.toFixed(4)), y = Number(point.y.toFixed(4));
-      setSaving(true); setNote('');
-      const { error } = await getSupabase().from('plan_markers').update({ x, y }).eq('marker_id', selected.marker_id);
       setSaving(false);
-      if (error) { setNote(`失敗：${errorMessage(error)}`); return; }
       setPlacing(false); setSelected(null); await reload();
       setNote(`已將「${selected.label}」移到 ${x}, ${y}`);
     };
@@ -352,4 +190,108 @@ function Floor2DViewer({ module, profile }: Props) {
 
 /* ──────────────────────────── 3D 立體樓層 ──────────────────────────── */
 
-믯暿湵瑣潩⁮汆潯㍲噄敩敷⡲⁻潭畤敬‬牰景汩⁥㩽倠潲獰 ੻†潣獮⁴⁻潭敤獬‬慭歲牥ⱳ戠獵ⱹ渠瑯ⱥ爠汥慯⁤⁽‽獵䙥潬牯慄慴⤨਻†潣獮⁴獛潨䵷牡敫獲‬敳却潨䵷牡敫獲⁝‽獵卥慴整琨畲⥥਻†潣獮⁴杛灡‬敳䝴灡⁝‽獵卥慴整ㄨ㘮㬩 挠湯瑳嬠偸湡‬敳塴慐嵮㴠甠敳瑓瑡⡥⤰਻†潣獮⁴祛慐Ɱ猠瑥偙湡⁝‽獵卥慴整〨㬩 ਠ†潣獮⁴癛獩扩敬楋摮ⱳ猠瑥楖楳汢䭥湩獤⁝‽獵卥慴整刼捥牯㱤瑳楲杮‬潢汯慥㹮⠾⤨㴠ਾ††扏敪瑣欮祥⡳䅍䭒剅䭟义⥄爮摥捵⡥愨捣‬楫摮 㸽⠠⁻⸮愮捣‬歛湩嵤›牴敵素Ⱙ笠⥽ ⤠਻†潣獮⁴獛潨䱷扡汥ⱳ猠瑥桓睯慌敢獬⁝‽獵卥慴整昨污敳㬩 挠湯瑳嬠楶楳汢䙥潬牯ⱳ猠瑥楖楳汢䙥潬牯嵳㴠甠敳瑓瑡㱥敒潣摲猼牴湩Ⱨ戠潯敬湡㸾笨⥽਻ 甠敳晅敦瑣⠨ 㸽笠 †挠湯瑳椠楮楴污汆潯獲›敒潣摲猼牴湩Ⱨ戠潯敬湡‾‽絻਻††潭敤獬昮牯慅档洨㴠‾⁻湩瑩慩䙬潬牯孳瑓楲杮洨昮潬牯楟⥤⁝‽牴敵※⥽਻††敳噴獩扩敬汆潯獲椨楮楴污汆潯獲㬩 素‬浛摯汥嵳㬩ਊ†潣獮⁴瑳捡䵫牡敫獲›瑓捡䵫牡敫孲⁝‽獵䵥浥⡯⤨㴠‾慭歲牥ੳ††昮汩整⡲⁭㸽洠献慴畴⁳㴡‽椢慮瑣癩≥਩††洮灡洨㴠‾笨 ††椠㩤匠牴湩⡧⹭慭歲牥楟⥤‬汦潯彲摩›瑓楲杮洨昮潬牯楟⥤ਬ†††㩸丠浵敢⡲⹭⥸簠⁼ⰰ礠›畎扭牥洨礮 籼〠ਬ†††潣潬㩲匠牴湩⡧⹭潣潬⁲籼䬠义彄佃佌孒瑓楲杮洨欮湩⥤⁝籼∠〣搰昴≦Ⱙ ††欠湩㩤匠牴湩⡧⹭楫摮Ⱙ ††氠扡汥›瑓楲杮洨氮扡汥簠⁼∢Ⱙ †素⤩‬浛牡敫獲⥝਻ 爠瑥牵⁮䄼灰桓汥⁬牰景汩㵥灻潲楦敬⁽楴汴㵥浻摯汵⹥楴汴絥ਾ††䄼浤湩效摡牥洠摯汵㵥浻摯汵絥戠獵㵹扻獵絹渠瑯㵥湻瑯絥漠剮汥慯㵤牻汥慯絤⼠ਾ††猼捥楴湯挠慬獳慎敭∽慰敮⁬摡業⵮慰敮≬猠祴敬笽⁻汦硥›ⰱ瀠獯瑩潩㩮∠敲慬楴敶Ⱒ漠敶晲潬㩷∠楨摤湥Ⱒ搠獩汰祡›昢敬≸‬汦硥楄敲瑣潩㩮∠潣畬湭Ⱒ瀠摡楤杮›‰絽ਾ†††⽻‪럥뒁뗦開軦뚈鷩뾝⨠累 ††㰠楤⁶瑳汹㵥筻瀠獯瑩潩㩮∠扡潳畬整Ⱒ琠灯›〱‬敬瑦›〱‬䥺摮硥›〱‬楤灳慬㩹∠汦硥Ⱒ映敬䑸物捥楴湯›挢汯浵≮‬慧㩰ㄠⰰ眠摩桴›㈲‰絽ਾ††††⽻‪ꯧ钫軦뚈⨠累 †††㰠楤⁶瑳汹㵥筻戠捡杫潲湵㩤∠杲慢㈨‬ㄱ‬㐲‬⸰㔸∩‬慰摤湩㩧∠㈱硰Ⱒ戠牯敤割摡畩㩳∠瀶≸‬潢摲牥›ㄢ硰猠汯摩瘠牡⴨挭慹⥮•絽ਾ†††††格‴瑳汹㵥筻洠牡楧㩮∠‰‰〱硰〠Ⱒ挠汯牯›瘢牡⴨挭慹⥮•絽讫ꯩꞎ裥㲶栯㸴 ††††㰠慬敢⁬瑳汹㵥筻搠獩汰祡›昢敬≸‬汦硥楄敲瑣潩㩮∠潣畬湭Ⱒ映湯却穩㩥∠㌱硰Ⱒ洠牡楧䉮瑯潴㩭㠠素㹽 †††††鎨뇥鎖럨₝笨慧絰਩††††††椼灮瑵琠灹㵥爢湡敧•業㵮ほ⁽慭㵸㍻⁽瑳灥笽⸰紲瘠污敵笽慧絰漠䍮慨杮㵥敻㴠‾敳䝴灡丨浵敢⡲⹥慴杲瑥瘮污敵⤩⁽㸯 ††††㰠氯扡汥ਾ†††††氼扡汥猠祴敬笽⁻楤灳慬㩹∠汦硥Ⱒ映敬䑸物捥楴湯›挢汯浵≮‬潦瑮楓敺›ㄢ瀳≸‬慭杲湩潂瑴浯›‸絽ਾ††††††냦뎹맥뮧⠠硻慐絮਩††††††椼灮瑵琠灹㵥爢湡敧•業㵮⵻〱⁽慭㵸ㅻ細猠整㵰ほ㔮⁽慶畬㵥硻慐絮漠䍮慨杮㵥敻㴠‾敳塴慐⡮畎扭牥攨琮牡敧⹴慶畬⥥紩⼠ਾ†††††⼼慬敢㹬 ††††㰠慬敢⁬瑳汹㵥筻搠獩汰祡›昢敬≸‬汦硥楄敲瑣潩㩮∠潣畬湭Ⱒ映湯却穩㩥∠㌱硰Ⱒ洠牡楧䉮瑯潴㩭ㄠ′絽ਾ††††††뢻맥뮧⠠祻慐絮਩††††††椼灮瑵琠灹㵥爢湡敧•業㵮⵻〱⁽慭㵸ㅻ細猠整㵰ほ㔮⁽慶畬㵥祻慐絮漠䍮慨杮㵥敻㴠‾敳奴慐⡮畎扭牥攨琮牡敧⹴慶畬⥥紩⼠ਾ†††††⼼慬敢㹬 ††††㰠楤⁶瑳汹㵥筻搠獩汰祡›昢敬≸‬慧㩰㔠素㹽 †††††㰠畢瑴湯挠慬獳慎敭∽敳潣摮牡⵹瑢⁮潣灭捡≴猠祴敬笽⁻汦硥›‱絽漠䍮楬正笽⤨㴠‾⁻敳䝴灡ㄨ㘮㬩猠瑥偘湡〨㬩猠瑥偙湡〨㬩素㹽蟩꺽⼼畢瑴湯ਾ††††††戼瑵潴⁮汣獡乳浡㵥猢捥湯慤祲戭湴挠浯慰瑣•瑳汹㵥筻映敬㩸ㄠ素⁽湯汃捩㵫⡻ 㸽笠猠瑥慇⡰⤰※絽꾿ꛨ㲖戯瑵潴㹮 †††††㰠畢瑴湯挠慬獳慎敭∽敳潣摮牡⵹瑢⁮潣灭捡≴猠祴敬笽⁻汦硥›‱絽漠䍮楬正笽⤨㴠‾⁻敳䝴灡㈨㬩素㹽鳧ꚯ꿦设⼼畢瑴湯ਾ†††††⼼楤㹶 †††㰠搯癩ਾ††††⽻‪꣦風ꇩ몤⨠累 †††㰠楤⁶瑳汹㵥筻戠捡杫潲湵㩤∠杲慢㈨‬ㄱ‬㐲‬⸰㔸∩‬慰摤湩㩧∠㈱硰Ⱒ戠牯敤割摡畩㩳∠瀶≸‬潢摲牥›ㄢ硰猠汯摩瘠牡⴨挭慹⥮•絽ਾ†††††格‴瑳汹㵥筻洠牡楧㩮∠‰‰〱硰〠Ⱒ挠汯牯›瘢牡⴨挭慹⥮•絽馨꣨꾡ꓧ㲺栯㸴 ††††㰠慬敢⁬汣獡乳浡㵥挢敨正潢≸猠祴敬笽⁻楤灳慬㩹∠汦硥Ⱒ愠楬湧瑉浥㩳∠散瑮牥Ⱒ朠灡›ⰶ洠牡楧䉮瑯潴㩭㠠‬慰摤湩䉧瑯潴㩭㠠‬潢摲牥潂瑴浯›ㄢ硰猠汯摩⌠㌳∳素㹽 †††††㰠湩異⁴祴数∽档捥扫硯•档捥敫㵤獻潨䵷牡敫獲⁽湯桃湡敧笽⁥㸽猠瑥桓睯慍歲牥⡳⹥慴杲瑥挮敨正摥紩⼠‾ꇩ몤触覜꣦風 ††††㰠氯扡汥ਾ†††††佻橢捥⹴湥牴敩⡳䅍䭒剅䭟义⥄洮灡⠨歛‬慬敢嵬 㸽⠠ †††††㰠慬敢⁬敫㵹死⁽汣獡乳浡㵥挢敨正潢≸猠祴敬笽⁻楤灳慬㩹∠汦硥Ⱒ愠楬湧瑉浥㩳∠散瑮牥Ⱒ朠灡›ⰶ洠牡楧䉮瑯潴㩭㘠‬潣潬㩲䬠义彄佃佌孒嵫素㹽 ††††††㰠湩異⁴祴数∽档捥扫硯•楤慳汢摥笽猡潨䵷牡敫獲⁽档捥敫㵤登獩扩敬楋摮孳嵫㼠‿牴敵⁽湯桃湡敧笽⁥㸽猠瑥楖楳汢䭥湩獤瀨敲⁶㸽⠠⁻⸮瀮敲ⱶ嬠嵫›⹥慴杲瑥挮敨正摥素⤩⁽㸯笠慬敢絬 †††††㰠氯扡汥ਾ†††††⤩੽†††††氼扡汥挠慬獳慎敭∽档捥扫硯•瑳汹㵥筻搠獩汰祡›昢敬≸‬污杩䥮整獭›挢湥整≲‬慧㩰㘠‬慭杲湩潔㩰ㄠⰰ瀠摡楤杮潔㩰ㄠⰰ戠牯敤呲灯›ㄢ硰猠汯摩⌠㌳∳素㹽 †††††㰠湩異⁴祴数∽档捥扫硯•楤慳汢摥笽猡潨䵷牡敫獲⁽档捥敫㵤獻潨䱷扡汥絳漠䍮慨杮㵥敻㴠‾敳却潨䱷扡汥⡳⹥慴杲瑥挮敨正摥紩⼠‾雦鞭꣦꒱ ††††㰠氯扡汥ਾ††††⼼楤㹶 ††㰠搯癩ਾ††† ††笠⨯뎏臥꺵该鎨뇥ꊝ鷦₿⼪੽†††搼癩猠祴敬笽⁻潰楳楴湯›愢獢汯瑵≥‬潴㩰ㄠⰰ爠杩瑨›〱‬䥺摮硥›〱‬楷瑤㩨ㄠ〸素㹽 †††㰠楤⁶瑳汹㵥筻戠捡杫潲湵㩤∠杲慢㈨‬ㄱ‬㐲‬⸰㔸∩‬慰摤湩㩧∠㈱硰Ⱒ戠牯敤割摡畩㩳∠瀶≸‬潢摲牥›ㄢ硰猠汯摩瘠牡⴨挭慹⥮Ⱒ洠硡效杩瑨›㠢瘰≨‬癯牥汦睯㩙∠畡潴•絽ਾ†††††格‴瑳汹㵥筻洠牡楧㩮∠‰‰〱硰〠Ⱒ挠汯牯›瘢牡⴨挭慹⥮•絽鎨뇥꾡ꓧ㲺栯㸴 ††††笠潭敤獬洮灡洨㴠‾ਨ††††††氼扡汥欠祥笽瑓楲杮洨昮潬牯楟⥤⁽汣獡乳浡㵥挢敨正潢≸猠祴敬笽⁻楤灳慬㩹∠汦硥Ⱒ愠楬湧瑉浥㩳∠散瑮牥Ⱒ朠灡›ⰶ洠牡楧䉮瑯潴㩭㘠素㹽 ††††††㰠湩異⁴祴数∽档捥扫硯•档捥敫㵤登獩扩敬汆潯獲卛牴湩⡧⹭汦潯彲摩崩㼠‿牴敵⁽湯桃湡敧笽⁥㸽猠瑥楖楳汢䙥潬牯⡳牰癥㴠‾笨⸠⸮牰癥‬卛牴湩⡧⹭汦潯彲摩崩›⹥慴杲瑥挮敨正摥素⤩⁽㸯笠⹭慮敭簠⁼⹭汦潯彲摩੽††††††⼼慬敢㹬 ††††⤠紩 †††㰠搯癩ਾ†††⼼楤㹶ਊ†††ⅻ畢祳☠…洡摯汥⹳敬杮桴☠…瀼挠慬獳慎敭∽浥瑰≹猠祴敬笽⁻潰楳楴湯›愢獢汯瑵≥‬潴㩰∠〵∥‬楷瑤㩨∠〱┰Ⱒ琠硥䅴楬湧›挢湥整≲‬䥺摮硥›‵絽骰鳦궨껥鎨뇥ꆨ黥貼ꯨ袅雦貀꣦讞껧蚐胣못ꯧ芀⼼㹰੽††† ††㰠楤⁶瑳汹㵥筻映敬㩸ㄠ‬楷瑤㩨∠〱┰Ⱒ栠楥桧㩴∠〱┰•絽ਾ††††䘼潬牯瑓捡㍫⁄ ††††洠摯汥㵳浻摯汥⁳獡渠癥牥⁽ ††††洠牡敫獲笽瑳捡䵫牡敫獲⁽ ††††猠潨䵷牡敫獲笽桳睯慍歲牥絳 ††††朠灡笽慧絰ਠ†††††偸湡笽偸湡⁽ ††††礠慐㵮祻慐絮ਠ†††††楶楳汢䭥湩獤笽楶楳汢䭥湩獤⁽ ††††猠潨䱷扡汥㵳獻潨䱷扡汥絳ਠ†††††楶楳汢䙥潬牯㵳登獩扩敬汆潯獲⁽ †††⼠ਾ†††⼼楤㹶 †㰠猯捥楴湯ਾ†⼼灁印敨汬㬾紊਍
+
+/* ──────────────────────────── 3D 立體樓層 ──────────────────────────── */
+
+function Floor3DViewer({ module, profile }: Props) {
+  const { models, markers, busy, note, reload } = useFloorData();
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [gap, setGap] = useState(1.6);
+  const [xPan, setXPan] = useState(0);
+  const [yPan, setYPan] = useState(0);
+  
+  const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(() =>
+    Object.keys(MARKER_KIND).reduce((acc, kind) => ({ ...acc, [kind]: true }), {})
+  );
+  const [showLabels, setShowLabels] = useState(false);
+  const [visibleFloors, setVisibleFloors] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const initialFloors: Record<string, boolean> = {};
+    models.forEach(m => { initialFloors[String(m.floor_id)] = true; });
+    setVisibleFloors(initialFloors);
+  }, [models]);
+
+  const stackMarkers: StackMarker[] = useMemo(() => markers
+    .filter(m => m.status !== 'inactive')
+    .map(m => ({
+      id: String(m.marker_id), floor_id: String(m.floor_id),
+      x: Number(m.x) || 0, y: Number(m.y) || 0,
+      color: String(m.color || KIND_COLOR[String(m.kind)] || '#00d4ff'),
+      kind: String(m.kind),
+      label: String(m.label || ''),
+    })), [markers]);
+
+  return <AppShell profile={profile} title={module.title}>
+    <AdminHeader module={module} busy={busy} note={note} onReload={reload} />
+    <section className="panel admin-panel" style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
+      {/* 左側浮動控制面板 */}
+      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 10, width: 220 }}>
+        {/* 立體控制 */}
+        <div style={{ background: 'rgba(2, 11, 24, 0.85)', padding: '12px', borderRadius: '6px', border: '1px solid var(--cyan)' }}>
+          <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)' }}>立體控制</h4>
+          <label style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', marginBottom: 8 }}>
+            樓層間距 ({gap})
+            <input type="range" min={0} max={3} step={0.2} value={gap} onChange={e => setGap(Number(e.target.value))} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', marginBottom: 8 }}>
+            水平平移 ({xPan})
+            <input type="range" min={-10} max={10} step={0.5} value={xPan} onChange={e => setXPan(Number(e.target.value))} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', fontSize: '13px', marginBottom: 12 }}>
+            Y軸平移 ({yPan})
+            <input type="range" min={-10} max={10} step={0.5} value={yPan} onChange={e => setYPan(Number(e.target.value))} />
+          </label>
+          <div style={{ display: 'flex', gap: 5 }}>
+            <button className="secondary-btn compact" style={{ flex: 1 }} onClick={() => { setGap(1.6); setXPan(0); setYPan(0); }}>重置</button>
+            <button className="secondary-btn compact" style={{ flex: 1 }} onClick={() => { setGap(0); }}>俯視</button>
+            <button className="secondary-btn compact" style={{ flex: 1 }} onClick={() => { setGap(2); }}>真實比例</button>
+          </div>
+        </div>
+        {/* 標記顯示 */}
+        <div style={{ background: 'rgba(2, 11, 24, 0.85)', padding: '12px', borderRadius: '6px', border: '1px solid var(--cyan)' }}>
+          <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)' }}>標記顯示</h4>
+          <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #333' }}>
+            <input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} /> 顯示所有標記
+          </label>
+          {Object.entries(MARKER_KIND).map(([k, label]) => (
+            <label key={k} className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, color: KIND_COLOR[k] }}>
+              <input type="checkbox" disabled={!showMarkers} checked={visibleKinds[k] ?? true} onChange={e => setVisibleKinds(prev => ({ ...prev, [k]: e.target.checked }))} /> {label}
+            </label>
+          ))}
+          <label className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingTop: 10, borderTop: '1px solid #333' }}>
+            <input type="checkbox" disabled={!showMarkers} checked={showLabels} onChange={e => setShowLabels(e.target.checked)} /> 文字標籤
+          </label>
+        </div>
+      </div>
+      
+      {/* 右側浮動樓層面板 */}
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 10, width: 180 }}>
+        <div style={{ background: 'rgba(2, 11, 24, 0.85)', padding: '12px', borderRadius: '6px', border: '1px solid var(--cyan)', maxHeight: '80vh', overflowY: 'auto' }}>
+          <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)' }}>樓層顯示</h4>
+          {models.map(m => (
+            <label key={String(m.floor_id)} className="checkbox" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <input type="checkbox" checked={visibleFloors[String(m.floor_id)] ?? true} onChange={e => setVisibleFloors(prev => ({ ...prev, [String(m.floor_id)]: e.target.checked }))} /> {m.name || m.floor_id}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {!busy && !models.length && <p className="empty" style={{ position: 'absolute', top: '50%', width: '100%', textAlign: 'center', zIndex: 5 }}>尚未設定樓層模型，請先於「模型管理」建立。</p>}
+      
+      <div style={{ flex: 1, width: '100%', height: '100%' }}>
+        <FloorStack3D 
+          models={models as never} 
+          markers={stackMarkers} 
+          showMarkers={showMarkers}
+          gap={gap} 
+          xPan={xPan} 
+          yPan={yPan} 
+          visibleKinds={visibleKinds} 
+          showLabels={showLabels} 
+          visibleFloors={visibleFloors} 
+        />
+      </div>
+    </section>
+  </AppShell>;
+}
