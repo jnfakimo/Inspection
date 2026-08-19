@@ -336,6 +336,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       setMessage({ text: `✓ 已更新 ${floor} 模型，平面圖與 3D 已同步${mobileNote}`, tone: 'ok' });
       await loadModels();
     } catch (error) {
+      console.error('Save Model Error:', error);
       setMessage({ text: `儲存失敗：${translateError(error)}（請確認已建立 floor_models 表與 floorplans 儲存桶）`, tone: 'err' });
     } finally { setSaving(false); }
   }

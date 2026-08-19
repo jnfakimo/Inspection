@@ -53,7 +53,17 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
   const { data, error } = await getSupabase().functions.invoke('app-api', {
     body: { action, ...payload },
   });
-  if (error) throw new Error('系統服務連線失敗，請稍後再試');
+  if (error) {
+    console.error('Edge Function Error:', error);
+    let msg = error.message || '連線失敗';
+    if ((error as any).context && typeof (error as any).context.json === 'function') {
+      try {
+        const errData = await (error as any).context.json();
+        if (errData?.message) msg = errData.message;
+      } catch { /* ignore */ }
+    }
+    throw new Error(`Edge Function 失敗: ${msg}`);
+  }
   if (!data?.ok) throw new Error(data?.message || '系統服務回傳失敗');
   return data.data as T;
 }
