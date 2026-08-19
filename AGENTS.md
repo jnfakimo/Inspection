@@ -98,9 +98,10 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
     text contrast is ≥ 4.5:1. This has already regressed once: `.dash-widget` was
     fixed on 08-18, had `rgba(2,11,24,0.7)` put back on 08-19 by a different agent,
     and shipped at 1.84:1 on the post-login landing page until it was caught.
-- **Dates**: unified format is 西元 `YYYY-MM-DD` (datetime `YYYY-MM-DD HH:mm`);
+- **Date inputs**: unified format is 西元 `YYYY-MM-DD` (datetime `YYYY-MM-DD HH:mm`);
   date inputs use a calendar picker; forms show a 填表日期 (today). Use the local
   `fmtDate()`/`todayISO()` helpers.
+- **Table Filters / Dropdowns**: Whenever creating a filter dropdown in a table header, use a combobox design (`<input list="..."><datalist>`) rather than a native `<select>`. This allows users to type to filter while providing a dropdown list. Ensure the `<option>` values in the datalist use the localized display labels (e.g. `緊急` instead of `urgent`), and update the filtering logic to match against labels so the UI shows Traditional Chinese properly.
 - **Floor naming differs between systems**: area/material data may use `B1F`,
   while plan/3D use `B1`. Reconcile with a `canonicalFloor()` (B1≈B1F, 1F≈1, RF≈頂樓).
 - **New/changed DB columns**: `create table if not exists` won't alter an existing
