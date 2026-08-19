@@ -479,12 +479,11 @@ function VehicleMasterModal({ onClose }: { profile: Profile; onClose: () => void
       status: String(editing.status || 'active'),
       note: String(editing.note || '').trim() || null,
     };
-    const client = getSupabase();
-    const { error } = editing.vehicle_id
-      ? await client.from('official_vehicles').update(payload).eq('vehicle_id', editing.vehicle_id)
-      : await client.from('official_vehicles').insert(payload);
-    if (error) { alert(`失敗：${error.message}`); setBusy(false); return; }
-    setEditing(null); await load();
+    try {
+      await invokeAppApi('save_official_vehicle', editing.vehicle_id ? { vehicle_id: String(editing.vehicle_id), ...payload } : payload);
+      setEditing(null); await load();
+    } catch (error) { alert(`失敗：${error instanceof Error ? error.message : String(error)}`); }
+    setBusy(false);
   };
 
   return <AdminModal title="公務車主檔管理" onClose={onClose}>
@@ -548,22 +547,18 @@ function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; on
     const passengers = Number(form.passenger_count);
     if (!Number.isFinite(passengers) || passengers < 1) return setMessage('搭乘人數必須大於 0');
     setBusy(true); setMessage('');
-    const { error } = await getSupabase().from('vehicle_dispatch_requests').insert({
-      applicant_id: profile.user_id, applicant_name: profile.name, applicant_department: profile.department || null,
-      trip_date: form.trip_date, planned_departure_time: form.planned_departure_time, planned_return_time: form.planned_return_time,
-      origin_location: form.origin_location.trim(), destination_location: form.destination_location.trim(),
-      trip_purpose: form.trip_purpose.trim(), passenger_count: passengers,
-      applicant_phone: form.applicant_phone.trim() || null, applicant_note: form.applicant_note.trim() || null,
-      status: 'pending_approval',
-    });
-    if (error) {
-      const raw = String(error.message || '');
-      setMessage(/exclusion constraint|23P01|overlap/i.test(raw) ? '該時段已有其他派車申請，請改選其他時段'
-        : /預計出發時間已經過去/.test(raw) ? '預計出發時間已經過去，請選擇目前時間之後的時段'
-        : `失敗：${errorMessage(error)}`);
+    try {
+      await invokeAppApi('vehicle_create_request', {
+        trip_date: form.trip_date, planned_departure_time: form.planned_departure_time, planned_return_time: form.planned_return_time,
+        origin_location: form.origin_location.trim(), destination_location: form.destination_location.trim(),
+        trip_purpose: form.trip_purpose.trim(), passenger_count: passengers,
+        applicant_phone: form.applicant_phone.trim() || null, applicant_note: form.applicant_note.trim() || null,
+      });
+      onDone('派車申請已送出，待單位主管核可');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
       setBusy(false); return;
     }
-    onDone('派車申請已送出，待單位主管核可');
   };
 
   return <AdminModal title="新增派車申請" onClose={onClose}>
@@ -843,18 +838,17 @@ function RosterModule({ module, profile }: Props) {
   }, [table]);
   useEffect(() => { void load(); }, [load]);
 
-  const run = async (fn: () => PromiseLike<{ error: unknown }>, success: string) => {
+  const run = async (fn: () => Promise<void>, success: string) => {
     setBusy(true); setNote('');
-    const { error } = await fn();
-    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    setPicking(false); setPick(''); await load(); setNote(success);
+    try { await fn(); setPicking(false); setPick(''); await load(); setNote(success); }
+    catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
   const toggle = (row: Row) => run(
-    () => getSupabase().from(table).update({ active: !row.active }).eq('user_id', row.user_id),
+    () => invokeAppApi('vehicle_roster_update', { table, user_id: row.user_id, active: !row.active }),
     row.active ? `已停用該${roleWord}` : `已啟用該${roleWord}`);
   const add = () => {
     if (!pick) { setNote('失敗：請先選擇人員'); return; }
-    return run(() => getSupabase().from(table).upsert({ user_id: pick, active: true, assigned_by: profile.user_id }, { onConflict: 'user_id' }), `已新增${roleWord}`);
+    return run(() => invokeAppApi('vehicle_roster_update', { table, user_id: pick, active: true }), `已新增${roleWord}`);
   };
 
   const listed = new Set(rows.map(row => String(row.user_id)));

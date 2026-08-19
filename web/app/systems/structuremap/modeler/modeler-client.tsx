@@ -329,15 +329,12 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       }
       const optionLabel = FLOOR_OPTIONS.find(option => option[0] === floorChoice)?.[1] || floor;
       
-      const payload = {
+      await invokeAppApi('save_floor_model', {
         floor_id: floor,
         name: floorChoice === '__custom' ? floor : optionLabel,
         image_path: path,
         bbox,
-        updated_at: new Date().toISOString()
-      };
-      const { error: dbError } = await getSupabase().from('floor_models').upsert(payload, { onConflict: 'floor_id' });
-      if (dbError) throw dbError;
+      });
       
       if (floor === 'B1') setRefBBox(bbox);
       setMessage({ text: `✓ 已更新 ${floor} 模型，平面圖與 3D 已同步${mobileNote}`, tone: 'ok' });

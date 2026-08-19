@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
+import { invokeAdminApi } from '@/lib/admin-api';
 import { AdminHeader, type AdminProps, errorMessage, fmtTime, type Row } from './shared';
 
 const NOTICE_EVENT_LABELS: Record<string, string> = {
@@ -33,10 +34,7 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
   const mark = async (notifId?: string) => {
     setBusy(true); setNote('');
     try {
-      let request = getSupabase().from('notifications').update({ is_read: true }).eq('recipient_id', profile.user_id).eq('is_read', false);
-      if (notifId) request = request.eq('notif_id', notifId);
-      const { error } = await request;
-      if (error) throw error;
+      await invokeAdminApi('admin_mark_notice', notifId ? { notif_id: notifId } : {});
       await load({ preserveNote: true });
       setNote(notifId ? '通知已標記為已讀' : '全部通知已標記為已讀');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }

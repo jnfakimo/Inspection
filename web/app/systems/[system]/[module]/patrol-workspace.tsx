@@ -309,17 +309,13 @@ function ShiftsModule({ module, profile }: Props) {
   const confirmDelete = async (row: Row, scope: 'date' | 'template') => {
     if (!confirm(`確定要刪除${scope === 'template' ? '範本' : '班別'}「${row.name}」嗎？`)) return;
     setBusy(true); setNote('');
-    const client = getSupabase();
-    if (scope === 'template') {
-      const { error } = await client.from('patrol_shift_template').update({ status: 'inactive' }).eq('template_id', row.template_id);
-      if (error) setNote(`刪除失敗：${errorMessage(error)}`);
-      else { setNote('範本已刪除'); await load(); }
-    } else {
-      // patrol_shifts 因資料庫保護無法 DELETE，且無 status 欄位，故以名稱前綴隱藏
-      const { error } = await client.from('patrol_shifts').update({ name: `${DELETED_SHIFT_PREFIX} ${row.name}`, assigned_user_ids: [] }).eq('shift_id', row.shift_id);
-      if (error) setNote(`刪除失敗：${errorMessage(error)}`);
-      else { setNote('班別已刪除'); await load(); }
-    }
+    try {
+      await invokeAppApi('patrol_shift_delete', scope === 'template'
+        ? { scope: 'template', template_id: row.template_id }
+        : { scope: 'date', shift_id: row.shift_id });
+      setNote(scope === 'template' ? '範本已刪除' : '班別已刪除');
+      await load();
+    } catch (error) { setNote(`刪除失敗：${errorMessage(error)}`); }
     setBusy(false);
   };
 

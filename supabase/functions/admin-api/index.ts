@@ -101,6 +101,10 @@ export async function handleAdminApiRequest(req: Request) {
       const { data } = await admin.from('departments').select('name').eq('dept_id', deptId).maybeSingle();
       return data?.name || null;
     };
+    const roleExists = async (rbacRole: string) => {
+      const { data } = await admin.from('roles').select('role_id').eq('role_id', rbacRole).maybeSingle();
+      return Boolean(data);
+    };
 
     if (action === 'admin_get_settings') {
       const keys = [...SAFE_SETTING_KEYS, 'line_channel_token'];
@@ -199,7 +203,7 @@ export async function handleAdminApiRequest(req: Request) {
       if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) return reply(req, { ok: false, message: '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號' }, 400);
       if (!/^\S+@\S+\.\S+$/.test(email) || /[(),]/.test(email)) return reply(req, { ok: false, message: 'Email 格式不正確' }, 400);
       if (password.length < 8) return reply(req, { ok: false, message: '初始密碼至少需要 8 個字元' }, 400);
-      if (!ROLES.has(rbacRole)) return reply(req, { ok: false, message: '角色設定無效' }, 400);
+      if (!ROLES.has(rbacRole) && !(await roleExists(rbacRole))) return reply(req, { ok: false, message: '角色設定無效' }, 400);
       const [{ count: usernameCount }, { count: emailCount }] = await Promise.all([admin.from('users').select('*', { count: 'exact', head: true }).ilike('username', username), admin.from('users').select('*', { count: 'exact', head: true }).ilike('email', email)]); const count = Number(usernameCount || 0) + Number(emailCount || 0);
       if (count) return reply(req, { ok: false, message: '登入帳號或 Email 已存在' }, 409);
       const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name, username } });
@@ -213,7 +217,7 @@ export async function handleAdminApiRequest(req: Request) {
 
     if (action === 'admin_update_user') {
       const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null;
-      if (!userId || !name || !/^[A-Za-z0-9._-]{3,64}$/.test(username) || !ROLES.has(rbacRole)) return reply(req, { ok: false, message: '人員資料或角色設定無效' }, 400);
+      if (!userId || !name || !/^[A-Za-z0-9._-]{3,64}$/.test(username) || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '人員資料或角色設定無效' }, 400);
       const { data: before } = await admin.from('users').select('user_id,auth_id,name,username,phone,dept_id,department,role,rbac_role,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
       if (userId === profile.user_id && rbacRole !== roleId) return reply(req, { ok: false, message: '不可變更目前登入管理員自己的角色' }, 400);
@@ -263,7 +267,8 @@ export async function handleAdminApiRequest(req: Request) {
 
     if (action === 'admin_set_permission') {
       const rbacRole = clean(body.role_id, 40), permission = clean(body.permission, 60), allowed = Boolean(body.allowed);
-      if (!ROLES.has(rbacRole) || !PERMISSIONS.has(permission)) return reply(req, { ok: false, message: '角色或權限代碼無效' }, 400);
+      if (!PERMISSIONS.has(permission)) return reply(req, { ok: false, message: '權限代碼無效' }, 400);
+      if (!ROLES.has(rbacRole) && !(await roleExists(rbacRole))) return reply(req, { ok: false, message: '角色不存在' }, 400);
       if (permission === 'sys_admin' && rbacRole !== 'sysadmin' && allowed) return reply(req, { ok: false, message: '後台管理權限只保留給系統管理員，不可委派' }, 400);
       if (rbacRole === 'sysadmin' && !allowed) return reply(req, { ok: false, message: '系統管理員的完整權限不可取消' }, 400);
       const { data: before } = await admin.from('role_permissions').select('allowed').eq('role_id', rbacRole).eq('perm', permission).maybeSingle();
@@ -277,7 +282,7 @@ export async function handleAdminApiRequest(req: Request) {
 
     if (action === 'admin_assign_role') {
       const userId = id(body.user_id), rbacRole = clean(body.rbac_role, 40);
-      if (!userId || !ROLES.has(rbacRole)) return reply(req, { ok: false, message: '使用者或角色設定無效' }, 400);
+      if (!userId || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '使用者或角色設定無效' }, 400);
       if (userId === profile.user_id) return reply(req, { ok: false, message: '不可變更目前登入管理員自己的角色' }, 400);
       const { data: before } = await admin.from('users').select('rbac_role,role').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
@@ -356,6 +361,30 @@ export async function handleAdminApiRequest(req: Request) {
       if (error) return reply(req, { ok: false, message: `通知更新失敗：${error.message}` }, 400);
       await audit('notifications', notifId || `recipient:${profile.user_id}`, 'status_change', { event_type: notifId ? 'mark_read' : 'mark_all_read', count: data?.length || 0 });
       return reply(req, { ok: true, data: { count: data?.length || 0 } });
+    }
+
+    if (action === 'admin_create_role') {
+      const roleId = clean(body.role_id, 40).toLowerCase(), name = clean(body.name, 80);
+      if (!/^[a-z0-9_]{2,40}$/.test(roleId) || !name) return reply(req, { ok: false, message: '角色代碼須為 2–40 個小寫英數字或底線，且名稱不可空白' }, 400);
+      if (ROLES.has(roleId)) return reply(req, { ok: false, message: '此角色代碼為系統保留角色，不可建立' }, 409);
+      const { data: existing } = await admin.from('roles').select('role_id').eq('role_id', roleId).maybeSingle();
+      if (existing) return reply(req, { ok: false, message: '角色代碼已存在' }, 409);
+      const { data: maxRow } = await admin.from('roles').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
+      const { data, error } = await admin.from('roles').insert({ role_id: roleId, name, sort_order: Number(maxRow?.sort_order || 0) + 10 }).select('role_id').single();
+      if (error) return reply(req, { ok: false, message: `角色建立失敗：${error.message}` }, 400);
+      await audit('roles', roleId, 'insert', { role_id: roleId, name });
+      return reply(req, { ok: true, data });
+    }
+
+    if (action === 'admin_update_role') {
+      const roleId = clean(body.role_id, 40).toLowerCase(), name = clean(body.name, 80);
+      if (!/^[a-z0-9_]{2,40}$/.test(roleId) || !name) return reply(req, { ok: false, message: '角色代碼與名稱格式無效' }, 400);
+      const { data: before } = await admin.from('roles').select('role_id,name,sort_order').eq('role_id', roleId).maybeSingle();
+      if (!before) return reply(req, { ok: false, message: '找不到指定角色' }, 404);
+      const { error } = await admin.from('roles').update({ name }).eq('role_id', roleId);
+      if (error) return reply(req, { ok: false, message: `角色更新失敗：${error.message}` }, 400);
+      await audit('roles', roleId, 'update', { before: before.name, after: name });
+      return reply(req, { ok: true });
     }
 
     return reply(req, { ok: false, message: '不支援的後台管理動作' }, 400);

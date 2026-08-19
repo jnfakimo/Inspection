@@ -27,7 +27,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -151,13 +151,10 @@ function RecordsModule({ module, profile }: Props) {
 
   const receive = async (row: Row) => {
     setBusy(true); setNote('');
-    const { data, error } = await getSupabase().from('handover_records')
-      .update({ confirmed_by: profile.user_id, confirmed_at: new Date().toISOString() })
-      .eq('record_id', row.record_id).eq('takeover_by', profile.user_id).eq('status', 'confirmed')
-      .select('record_id').maybeSingle();
-    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    if (!data) { setNote('失敗：這筆交接單已被處理或你不是指定的接班人'); setBusy(false); return; }
-    setDetail(null); await load(); setNote('已接收，交接正式完成');
+    try {
+      await invokeAppApi('handover_save', { kind: 'receive', record_id: row.record_id });
+      setDetail(null); await load(); setNote('已接收，交接正式完成');
+    } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
   return <AppShell profile={profile} title={module.title}>
@@ -326,25 +323,20 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
       if (form.handover_by === form.takeover_by) return setMessage('交接人與接班人不可為同一人');
     }
     setBusy(true); setMessage('');
-    const { error } = await getSupabase().from('handover_records').insert({
-      shift_date: form.shift_date, shift_type: form.shift_type, dept_id: form.dept_id || null,
-      handover_by: form.handover_by || null, takeover_by: form.takeover_by || null,
-      eq_normal: equipment.normal, eq_abnormal: equipment.abnormal,
-      // V1 以換行串接存於同一欄位，維持相同格式，兩版讀到的內容才會一致。
-      issues: issues.join('\n') || null, pending: pending.join('\n') || null,
-      notes: form.notes.trim() || null, status: mode, confirmed_at: null, confirmed_by: null,
-      // handover_records_own_insert 政策要求 created_by = active_user_id()，不帶會被擋下。
-      created_by: profile.user_id,
-    });
-    if (error) {
-      const raw = String(error.message || '');
-      setMessage(/row-level security/i.test(raw)
-        ? '失敗：沒有建立交接單的權限（需要電子交接簿系統權限）'
-        : /已經結束|不能建立過去班次/.test(raw) ? '失敗：所選交接日期與班別已經結束，不能建立過去班次的交接單'
-          : `失敗：${errorMessage(error)}`);
-      setBusy(false); return;
+    try {
+      await invokeAppApi('handover_save', {
+        kind: 'record', shift_date: form.shift_date, shift_type: form.shift_type, dept_id: form.dept_id || null,
+        handover_by: form.handover_by || null, takeover_by: form.takeover_by || null,
+        eq_normal: equipment.normal, eq_abnormal: equipment.abnormal,
+        // V1 以換行串接存於同一欄位，維持相同格式，兩版讀到的內容才會一致。
+        issues: issues.join('\n') || null, pending: pending.join('\n') || null,
+        notes: form.notes.trim() || null, status: mode,
+      });
+      onDone(mode === 'draft' ? '草稿已儲存' : '交接單已送出，等待指定接班人接收');
+    } catch (error) {
+      setMessage(`失敗：${errorMessage(error)}`);
+      setBusy(false);
     }
-    onDone(mode === 'draft' ? '草稿已儲存' : '交接單已送出，等待指定接班人接收');
   };
 
   const personOptions = (list: Row[]) => list.map(u => <option key={String(u.user_id)} value={String(u.user_id)}>{u.name}{u.department ? `（${u.department}）` : ''}</option>);
@@ -618,12 +610,16 @@ function CaseAttachments({ caseId, rows, profile, onOpen, onChanged, onError }: 
       const path = `${caseId}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
       const upload = await client.storage.from('handover-attachments').upload(path, file);
       if (upload.error) { onError(`失敗：附件上傳失敗 ${file.name}（${errorMessage(upload.error)}）`); continue; }
-      const { error } = await client.from('handover_case_attachments').insert({
-        case_id: caseId, file_name: file.name, file_type: file.type,
-        file_size: file.size, storage_path: path, uploaded_by: profile.user_id,
-      });
-      // 檔案已上傳但索引寫入失敗時把檔案收回，避免留下查不到的孤兒物件。
-      if (error) { await client.storage.from('handover-attachments').remove([path]); onError(`失敗：附件紀錄寫入失敗 ${file.name}`); }
+      try {
+        await invokeAppApi('handover_save', {
+          kind: 'add_attachment', case_id: caseId, file_name: file.name, file_type: file.type,
+          file_size: file.size, storage_path: path,
+        });
+      } catch (error) {
+        // 檔案已上傳但索引寫入失敗時把檔案收回，避免留下查不到的孤兒物件。
+        await client.storage.from('handover-attachments').remove([path]);
+        onError(`失敗：附件紀錄寫入失敗 ${file.name}`);
+      }
     }
     setBusy(false); onChanged();
   };
@@ -679,36 +675,42 @@ function CaseFormModal({ users, departments, profile, onClose, onDone }: {
     if (!form.anomaly_category) return setMessage('請選擇異常大類');
     if (form.incident_time && new Date(form.incident_time) > new Date()) return setMessage('發生時間不得晚於目前時間');
     setBusy(true); setMessage('');
-    const client = getSupabase();
     const reporterUser = users.find(u => String(u.user_id) === form.reporter);
     const title = form.title.trim()
       || [form.anomaly_category, form.anomaly_sub, form.anomaly_other].filter(Boolean).join(' – ');
-    const { data, error } = await client.from('handover_cases').insert({
-      case_no: form.case_no, title, shift_type: form.shift_type,
-      reporter: reporterUser?.name || null,
-      reporter_unit: reporterUser?.department || departments.find(d => String(d.dept_id) === form.unit_l1)?.name || null,
-      incident_time: form.incident_time ? new Date(form.incident_time).toISOString() : null,
-      incident_location: form.incident_location.trim() || null,
-      anomaly_category: form.anomaly_category,
-      anomaly_sub: form.anomaly_sub || null, anomaly_other: form.anomaly_other.trim() || null,
-      description: form.description.trim() || null, action_taken: form.action_taken.trim() || null,
-      followup: form.followup.trim() || null, note: form.note.trim() || null,
-      status: 'open', created_by: profile.user_id,
-    }).select('case_id').single();
-    // 「建立案件」歷程由 trg_log_handover_case_created 在同一交易內寫入，前端不再另外 insert。
-    if (error || !data) { setMessage(`失敗：${errorMessage(error, '建立案件失敗')}`); setBusy(false); return; }
+    let caseId = '';
+    try {
+      const result = await invokeAppApi<{ case_id: string }>('handover_save', {
+        kind: 'create_case', case_no: form.case_no, title, shift_type: form.shift_type,
+        reporter: reporterUser?.name || null,
+        reporter_unit: reporterUser?.department || departments.find(d => String(d.dept_id) === form.unit_l1)?.name || null,
+        incident_time: form.incident_time ? new Date(form.incident_time).toISOString() : null,
+        incident_location: form.incident_location.trim() || null,
+        anomaly_category: form.anomaly_category,
+        anomaly_sub: form.anomaly_sub || null, anomaly_other: form.anomaly_other.trim() || null,
+        description: form.description.trim() || null, action_taken: form.action_taken.trim() || null,
+        followup: form.followup.trim() || null, note: form.note.trim() || null,
+      });
+      caseId = String(result.case_id || '');
+    } catch (error) {
+      setMessage(`失敗：${errorMessage(error)}`); setBusy(false); return;
+    }
 
     let attachmentWarning = '';
     for (const file of files) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
-      const path = `${data.case_id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
+      const path = `${caseId}/${Date.now()}_${crypto.randomUUID()}_${safeName}`;
       const upload = await client.storage.from('handover-attachments').upload(path, file);
       if (upload.error) { attachmentWarning = `，但附件「${file.name}」上傳失敗`; continue; }
-      const meta = await client.from('handover_case_attachments').insert({
-        case_id: data.case_id, file_name: file.name, file_type: file.type,
-        file_size: file.size, storage_path: path, uploaded_by: profile.user_id,
-      });
-      if (meta.error) { await client.storage.from('handover-attachments').remove([path]); attachmentWarning = `，但附件「${file.name}」紀錄寫入失敗`; }
+      try {
+        await invokeAppApi('handover_save', {
+          kind: 'add_attachment', case_id: caseId, file_name: file.name, file_type: file.type,
+          file_size: file.size, storage_path: path,
+        });
+      } catch (error) {
+        await client.storage.from('handover-attachments').remove([path]);
+        attachmentWarning = `，但附件「${file.name}」紀錄寫入失敗`;
+      }
     }
     onDone(`案件 ${form.case_no} 已建立${attachmentWarning}`);
   };

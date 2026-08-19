@@ -6,16 +6,14 @@
 // 結構高度相似，因此以「欄位規格驅動」的方式共用同一套列表與表單引擎，各模組只描述
 // 自己的資料表、清單欄位與表單欄位，避免寫八份幾乎一樣的程式碼。
 //
-// 寫入直接走資料表，與 V1 一致。這些表的 RLS 已同時要求
-// has_system_access('sys_equipment') 與 has_app_permission('create'/'update')，
-// 伺服器端把關存在，另包一層 Edge Function 只會多一次轉發而不會提高安全性
-// （見 ARCHITECTURE_V2.md「第 3 條的實際落差」的判斷準則）。
+// 寫入統一走 app-api 的 equipment_save（後端驗證系統權限、依表別欄位白名單清洗並
+// 寫入稽核），不再由前端直接操作資料表；readOnly 的監控事件確認亦經同一 action。
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -417,28 +415,22 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
     if (spec.table === 'materials' && editor.category_id) payload.category_id = editor.category_id;
 
     setBusy(true); setNote('');
-    const client = getSupabase();
     const id = editor[spec.pk];
-    if (id) {
-      if (spec.updatedBy) payload[spec.updatedBy] = profile.user_id;
-      const { error } = await client.from(spec.table).update(payload).eq(spec.pk, id);
-      if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    } else {
-      if (spec.createdBy) payload[spec.createdBy] = profile.user_id;
-      const { error } = await client.from(spec.table).insert(payload);
-      if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    }
-    setEditor(null); await load(); setNote(id ? '資料已更新' : '資料已新增');
+    try {
+      await invokeAppApi('equipment_save', id
+        ? { kind: 'save', table: spec.table, id, payload }
+        : { kind: 'save', table: spec.table, payload });
+      setEditor(null); await load(); setNote(id ? '資料已更新' : '資料已新增');
+    } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
   // 監控事件的唯一寫入動作：確認事件。
   const acknowledge = async (row: Row) => {
     setBusy(true); setNote('');
-    const { error } = await getSupabase().from('equipment_monitor_events')
-      .update({ event_state: 'acknowledged', acknowledged_at: new Date().toISOString(), acknowledged_by: profile.user_id })
-      .eq('event_id', row.event_id).eq('event_state', 'open');
-    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    await load(); setNote('事件已確認');
+    try {
+      await invokeAppApi('equipment_save', { kind: 'ack_event', event_id: row.event_id });
+      await load(); setNote('事件已確認');
+    } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
   const canEdit = !spec.readOnly;

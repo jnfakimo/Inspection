@@ -49,6 +49,11 @@ function text(value: unknown, max = 500) {
   return String(value ?? '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
 }
 
+function id(value: unknown) {
+  const result = text(value, 80);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result) ? result : '';
+}
+
 function relationName(value: unknown) {
   const relation = Array.isArray(value) ? value[0] : value;
   if (!relation || typeof relation !== 'object' || !('name' in relation)) return '';
@@ -157,6 +162,74 @@ const MODULE_SOURCES:Record<string,ModuleSource>={
   'meetingroom/notifications':source('meeting_booking_notifications','meetingroom','預約提醒',[['created_at','建立時間'],['booking_id','預約'],['notification_type','類型'],['sent_at','發送時間'],['status','狀態']],'created_at'),
 };
 
+// SYS-05 設備八模組寫入的欄位白名單（對應 equipment-workspace.tsx 的 SPECS.fields）。
+type EquipmentFieldType = 'text' | 'number' | 'boolean';
+type EquipmentTableConfig = { pk: string; createdBy?: string; updatedBy?: string; fields: Record<string, { type?: EquipmentFieldType }> };
+const EQUIPMENT_TABLES: Record<string, EquipmentTableConfig> = {
+  equipment: {
+    pk: 'equipment_id', createdBy: 'created_by', updatedBy: 'updated_by',
+    fields: {
+      asset_code: {}, name: {}, category: {}, floor: {}, location: {}, department: {},
+      brand: {}, model: {}, serial_no: {}, manufactured_year: { type: 'number' },
+      installed_on: {}, accepted_on: {}, service_life_y: { type: 'number' }, voltage: {},
+      power_kw: { type: 'number' }, criticality: {}, status: {}, original_manufacturer: {},
+      original_contact: {}, original_phone: {}, distributor: {}, distributor_contact: {},
+      distributor_phone: {}, warranty_from: {}, warranty_until: {}, has_maintenance_contract: { type: 'boolean' },
+      maintenance_vendor: {}, maintenance_cycle: {}, last_maintenance_on: {}, next_maintenance_on: {},
+      responsible_name: {}, emergency_phone: {}, remarks: {},
+    },
+  },
+  equipment_maintenance_plans: {
+    pk: 'plan_id', createdBy: 'created_by', updatedBy: 'updated_by',
+    fields: {
+      equipment_id: {}, item_name: {}, maintenance_type: {}, cycle_text: {},
+      interval_value: { type: 'number' }, interval_unit: {}, responsible_name: {},
+      last_performed_on: {}, next_due_on: {}, last_result: {}, status: {}, note: {},
+    },
+  },
+  equipment_maintenance_records: {
+    pk: 'record_id', createdBy: 'created_by',
+    fields: {
+      equipment_id: {}, record_type: {}, performed_on: {}, technician: {}, result: {},
+      fault_description: {}, fault_cause: {}, action_taken: {}, replacement_parts: {},
+      downtime_hours: { type: 'number' }, maintenance_cost: { type: 'number' },
+      parts_cost: { type: 'number' }, downtime_loss: { type: 'number' }, next_due_on: {}, note: {},
+    },
+  },
+  equipment_contracts: {
+    pk: 'contract_id', createdBy: 'created_by', updatedBy: 'updated_by',
+    fields: {
+      equipment_id: {}, vendor: {}, contract_no: {}, contact_name: {}, contact_phone: {},
+      starts_on: {}, ends_on: {}, sla_hours: { type: 'number' }, contract_amount: { type: 'number' },
+      status: {}, service_scope: {}, note: {},
+    },
+  },
+  equipment_documents: {
+    pk: 'document_id', createdBy: 'uploaded_by',
+    fields: {
+      equipment_id: {}, document_type: {}, title: {}, version: {}, effective_on: {},
+      expires_on: {}, is_current: { type: 'boolean' }, file_url: {}, note: {},
+    },
+  },
+  equipment_annual_costs: {
+    pk: 'annual_cost_id', createdBy: 'created_by', updatedBy: 'updated_by',
+    fields: {
+      equipment_id: {}, fiscal_year: { type: 'number' }, source: {},
+      repair_cost: { type: 'number' }, maintenance_cost: { type: 'number' },
+      parts_cost: { type: 'number' }, downtime_loss: { type: 'number' }, note: {},
+    },
+  },
+  materials: {
+    pk: 'material_id', createdBy: 'created_by', updatedBy: 'updated_by',
+    fields: {
+      category_id: {}, material_code: {}, material_name: {}, material_alias: {},
+      sub_category: {}, material_type: {}, floor: {}, brand: {}, manufacturer: {}, model: {},
+      specification: {}, unit: {}, size: {}, voltage: {}, power: {}, supplier: {},
+      purchase_price: { type: 'number' }, status: {},
+    },
+  },
+};
+
 export async function handleAppApiRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return reply(req, { ok: false, message: 'Method not allowed' }, 405);
@@ -209,7 +282,13 @@ export async function handleAppApiRequest(req: Request) {
       open_inspection_cycle: 'admin-api:write',
       create_cost_record: 'admin-api:write',
       save_official_vehicle: 'admin-api:write',
+      vehicle_create_request: 'admin-api:write',
+      vehicle_roster_update: 'admin-api:write',
+      patrol_shift_delete: 'admin-api:write',
+      handover_save: 'admin-api:write',
+      equipment_save: 'admin-api:write',
       save_floor_model: 'admin-api:write',
+      move_structuremap_marker: 'admin-api:write',
       guardpatrol_checkin: 'patrol-checkin',
       workorder_list: 'app-api',
       workorder_prepare_upload: 'app-api',
@@ -796,6 +875,235 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, { ok: true, data: { vehicle_id: data.vehicle_id, created: true } });
     }
 
+    if (action === 'vehicle_create_request') {
+      if (!can('vehicle')) return reply(req, { ok: false, message: '目前角色沒有派車系統權限' }, 403);
+      const tripDate = text(body.trip_date, 10);
+      const departure = text(body.planned_departure_time, 5), returnTime = text(body.planned_return_time, 5);
+      const origin = text(body.origin_location, 200), destination = text(body.destination_location, 200);
+      const purpose = text(body.trip_purpose, 500);
+      const passengerCount = Number(body.passenger_count);
+      const timePattern = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(tripDate)) return reply(req, { ok: false, message: '用車日期格式無效' }, 400);
+      if (!timePattern.test(departure) || !timePattern.test(returnTime) || returnTime <= departure) return reply(req, { ok: false, message: '起訖時間必須有效且回程晚於出發' }, 400);
+      if (!origin || !destination || !purpose) return reply(req, { ok: false, message: '出發地、目的地與用途皆為必填' }, 400);
+      if (!Number.isInteger(passengerCount) || passengerCount < 1 || passengerCount > 99) return reply(req, { ok: false, message: '搭乘人數必須為 1–99 的整數' }, 400);
+      const payload = {
+        applicant_id: profile.user_id, applicant_name: text(profile.name, 160) || text(profile.username, 160),
+        applicant_department: text(profile.department, 200) || null,
+        trip_date: tripDate, planned_departure_time: departure, planned_return_time: returnTime,
+        origin_location: origin, destination_location: destination, trip_purpose: purpose,
+        passenger_count: passengerCount, applicant_phone: text(body.applicant_phone, 50) || null,
+        applicant_note: text(body.applicant_note, 500) || null, status: 'pending_approval',
+      };
+      const { data, error } = await userDb.from('vehicle_dispatch_requests').insert(payload).select('request_id').single();
+      if (error) {
+        const raw = String(error.message || '');
+        if (/exclusion constraint|23P01|overlap/i.test(raw)) return reply(req, { ok: false, message: '該時段已有其他派車申請，請改選其他時段' }, 409);
+        if (/預計出發時間已經過去|past/i.test(raw)) return reply(req, { ok: false, message: '預計出發時間已經過去，請選擇目前時間之後的時段' }, 400);
+        throw error;
+      }
+      await writeAudit(userDb, profile.user_id, 'vehicle_dispatch_requests', data.request_id, 'insert', null, payload);
+      return reply(req, { ok: true, data });
+    }
+
+    if (action === 'vehicle_roster_update') {
+      if (!can('vehicle') || !isAdmin) return reply(req, { ok: false, message: '只有管理者可以維護派車名單' }, 403);
+      const rosterTable = text(body.table, 60);
+      if (rosterTable !== 'vehicle_dispatch_drivers' && rosterTable !== 'vehicle_dispatch_managers') return reply(req, { ok: false, message: '名單類型無效' }, 400);
+      const targetUser = text(body.user_id, 80);
+      if (!/^[0-9a-f-]{36}$/i.test(targetUser)) return reply(req, { ok: false, message: '人員識別碼無效' }, 400);
+      const active = body.active ? true : false;
+      const { data: before } = await userDb.from(rosterTable).select('user_id,active,assigned_by').eq('user_id', targetUser).maybeSingle();
+      const payload: Record<string, unknown> = { user_id: targetUser, active, updated_at: new Date().toISOString() };
+      if (!before) payload.assigned_by = profile.user_id;
+      const { data, error } = await userDb.from(rosterTable).upsert(payload, { onConflict: 'user_id' }).select('user_id').single();
+      if (error) throw error;
+      await writeAudit(userDb, profile.user_id, rosterTable, targetUser, before ? 'update' : 'insert', before || null, { active });
+      return reply(req, { ok: true, data });
+    }
+
+    if (action === 'patrol_shift_delete') {
+      if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有巡邏系統權限' }, 403);
+      const scope = text(body.scope, 20);
+      if (scope === 'template') {
+        const templateId = text(body.template_id, 80);
+        if (!/^[0-9a-f-]{36}$/i.test(templateId)) return reply(req, { ok: false, message: '班別範本識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('patrol_shift_template').select('template_id,name,status').eq('template_id', templateId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的班別範本' }, 404);
+        const { error } = await userDb.from('patrol_shift_template').update({ status: 'inactive' }).eq('template_id', templateId);
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'patrol_shift_template', templateId, 'status_change', { status: before.status }, { status: 'inactive' });
+        return reply(req, { ok: true });
+      }
+      if (scope === 'date') {
+        const shiftId = text(body.shift_id, 80);
+        if (!/^[0-9a-f-]{36}$/i.test(shiftId)) return reply(req, { ok: false, message: '班別識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('patrol_shifts').select('shift_id,name,assigned_user_ids').eq('shift_id', shiftId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的班別' }, 404);
+        // patrol_shifts 受資料庫保護無法 DELETE 且無 status 欄位，故以名稱前綴隱藏（與前端同規則）。
+        const { error } = await userDb.from('patrol_shifts').update({ name: `[已刪除] ${before.name}`, assigned_user_ids: [] }).eq('shift_id', shiftId);
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'patrol_shifts', shiftId, 'update', { name: before.name }, { name: `[已刪除] ${before.name}` });
+        return reply(req, { ok: true });
+      }
+      return reply(req, { ok: false, message: '刪除範圍無效' }, 400);
+    }
+
+    if (action === 'handover_save') {
+      if (!can('handover')) return reply(req, { ok: false, message: '目前角色沒有電子交接簿權限' }, 403);
+      const kind = text(body.kind, 30);
+
+      if (kind === 'record') {
+        const shiftDate = text(body.shift_date, 10), shiftType = text(body.shift_type, 20);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) return reply(req, { ok: false, message: '交接日期格式無效' }, 400);
+        const handoverBy = id(body.handover_by), takeoverBy = id(body.takeover_by);
+        const status = body.status === 'confirmed' ? 'confirmed' : 'draft';
+        if (status === 'confirmed') {
+          if (!handoverBy || !takeoverBy) return reply(req, { ok: false, message: '送出交接必須同時指定交接人與接班人' }, 400);
+          if (handoverBy !== profile.user_id) return reply(req, { ok: false, message: '交接人必須是目前登入的帳號，禁止代替他人送出' }, 403);
+          if (handoverBy === takeoverBy) return reply(req, { ok: false, message: '交接人與接班人不可為同一人' }, 400);
+        }
+        const deptId = id(body.dept_id) || null;
+        const payload = {
+          shift_date: shiftDate, shift_type: shiftType, dept_id: deptId,
+          handover_by: handoverBy || null, takeover_by: takeoverBy || null,
+          eq_normal: Number(body.eq_normal) || 0, eq_abnormal: Number(body.eq_abnormal) || 0,
+          issues: text(body.issues, 20000) || null, pending: text(body.pending, 20000) || null,
+          notes: text(body.notes, 2000) || null, status, confirmed_at: null, confirmed_by: null,
+          created_by: profile.user_id,
+        };
+        const { data, error } = await userDb.from('handover_records').insert(payload).select('record_id').single();
+        if (error) {
+          const raw = String(error.message || '');
+          if (/row-level security/i.test(raw)) return reply(req, { ok: false, message: '沒有建立交接單的權限（需要電子交接簿系統權限）' }, 403);
+          if (/已經結束|不能建立過去班次/i.test(raw)) return reply(req, { ok: false, message: '所選交接日期與班別已經結束，不能建立過去班次的交接單' }, 400);
+          throw error;
+        }
+        await writeAudit(userDb, profile.user_id, 'handover_records', data.record_id, 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'receive') {
+        const recordId = id(body.record_id);
+        if (!recordId) return reply(req, { ok: false, message: '交接單識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('handover_records')
+          .select('record_id,status,takeover_by').eq('record_id', recordId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的交接單' }, 404);
+        if (String(before.takeover_by) !== profile.user_id) return reply(req, { ok: false, message: '你不是這筆交接單指定的接班人' }, 403);
+        if (before.status !== 'confirmed') return reply(req, { ok: false, message: '這筆交接單目前狀態不可接收' }, 409);
+        const { data: updated, error } = await userDb.from('handover_records')
+          .update({ confirmed_by: profile.user_id, confirmed_at: new Date().toISOString() })
+          .eq('record_id', recordId).eq('status', 'confirmed').select('record_id').maybeSingle();
+        if (error) throw error;
+        if (!updated) return reply(req, { ok: false, message: '這筆交接單已被處理，請重新整理' }, 409);
+        await writeAudit(userDb, profile.user_id, 'handover_records', recordId, 'status_change', { status: 'confirmed' }, { status: 'done' });
+        return reply(req, { ok: true });
+      }
+
+      if (kind === 'create_case') {
+        const caseNo = text(body.case_no, 40), title = text(body.title, 300), shiftType = text(body.shift_type, 20);
+        const anomalyCategory = text(body.anomaly_category, 100);
+        if (!caseNo || !title || !shiftType || !anomalyCategory) return reply(req, { ok: false, message: '案件編號、標題、班別與異常大類為必填' }, 400);
+        const payload = {
+          case_no: caseNo, title, shift_type: shiftType,
+          reporter: text(body.reporter, 160) || null,
+          reporter_unit: text(body.reporter_unit, 200) || null,
+          incident_time: body.incident_time ? new Date(String(body.incident_time)).toISOString() : null,
+          incident_location: text(body.incident_location, 300) || null,
+          anomaly_category: anomalyCategory,
+          anomaly_sub: text(body.anomaly_sub, 100) || null, anomaly_other: text(body.anomaly_other, 300) || null,
+          description: text(body.description, 5000) || null, action_taken: text(body.action_taken, 5000) || null,
+          followup: text(body.followup, 5000) || null, note: text(body.note, 2000) || null,
+          status: 'open', created_by: profile.user_id,
+        };
+        const { data, error } = await userDb.from('handover_cases').insert(payload).select('case_id').single();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'handover_cases', data.case_id, 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'add_attachment') {
+        const caseId = id(body.case_id);
+        const fileName = text(body.file_name, 160), storagePath = text(body.storage_path, 300);
+        const fileSize = Number(body.file_size);
+        if (!caseId || !fileName || !storagePath || !Number.isFinite(fileSize) || fileSize < 0 || fileSize > 10 * 1024 * 1024) {
+          return reply(req, { ok: false, message: '附件資料格式無效' }, 400);
+        }
+        const { data, error } = await userDb.from('handover_case_attachments').insert({
+          case_id: caseId, file_name: fileName, file_type: text(body.file_type, 100) || null,
+          file_size: fileSize, storage_path: storagePath, uploaded_by: profile.user_id,
+        }).select('attachment_id').single();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'handover_case_attachments', data.attachment_id, 'insert', null, { case_id: caseId, file_name: fileName, file_size: fileSize });
+        return reply(req, { ok: true, data });
+      }
+
+      return reply(req, { ok: false, message: '交接簿操作類型無效' }, 400);
+    }
+
+    if (action === 'equipment_save') {
+      if (!can('equipment')) return reply(req, { ok: false, message: '目前角色沒有設備系統權限' }, 403);
+      const kind = text(body.kind, 30);
+
+      if (kind === 'ack_event') {
+        const eventId = id(body.event_id);
+        if (!eventId) return reply(req, { ok: false, message: '事件識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('equipment_monitor_events').select('event_id,event_state,title').eq('event_id', eventId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定事件' }, 404);
+        if (before.event_state !== 'open') return reply(req, { ok: false, message: '此事件已被確認或已解除' }, 409);
+        const { data: updated, error } = await userDb.from('equipment_monitor_events')
+          .update({ event_state: 'acknowledged', acknowledged_at: new Date().toISOString(), acknowledged_by: profile.user_id })
+          .eq('event_id', eventId).eq('event_state', 'open').select('event_id').maybeSingle();
+        if (error) throw error;
+        if (!updated) return reply(req, { ok: false, message: '此事件已被處理，請重新整理' }, 409);
+        await writeAudit(userDb, profile.user_id, 'equipment_monitor_events', eventId, 'status_change', { event_state: before.event_state }, { event_state: 'acknowledged', title: before.title });
+        return reply(req, { ok: true });
+      }
+
+      if (kind === 'save') {
+        const table = text(body.table, 60);
+        const tableConfig = EQUIPMENT_TABLES[table];
+        if (!tableConfig) return reply(req, { ok: false, message: '設備資料表無效' }, 400);
+        const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
+        const payload: Record<string, unknown> = {};
+        for (const [key, field] of Object.entries(tableConfig.fields)) {
+          if (!(key in raw)) continue;
+          const value = raw[key];
+          if (field.type === 'number') {
+            const parsed = Number(value);
+            payload[key] = (value === null || value === '' || !Number.isFinite(parsed)) ? null : parsed;
+          } else if (field.type === 'boolean') {
+            payload[key] = value === true || value === 'true';
+          } else {
+            payload[key] = text(value, 2000) || null;
+          }
+        }
+        if (Object.keys(payload).length === 0) return reply(req, { ok: false, message: '沒有可儲存的欄位資料' }, 400);
+        const pkValue = id(body.id);
+        if (pkValue) {
+          if (tableConfig.updatedBy) payload[tableConfig.updatedBy] = profile.user_id;
+          const { data: before, error: readError } = await userDb.from(table).select(tableConfig.pk).eq(tableConfig.pk, pkValue).maybeSingle();
+          if (readError) throw readError;
+          if (!before) return reply(req, { ok: false, message: '找不到指定的資料' }, 404);
+          const { error } = await userDb.from(table).update(payload).eq(tableConfig.pk, pkValue);
+          if (error) throw error;
+          await writeAudit(userDb, profile.user_id, table, pkValue, 'update', null, payload);
+          return reply(req, { ok: true });
+        }
+        if (tableConfig.createdBy) payload[tableConfig.createdBy] = profile.user_id;
+        const { data, error } = await userDb.from(table).insert(payload).select(tableConfig.pk).single();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, table, String((data as unknown as Record<string, unknown>)[tableConfig.pk]), 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      return reply(req, { ok: false, message: '設備操作類型無效' }, 400);
+    }
+
     if (action === 'equipment_map') {
       if (!can('structuremap') && !can('equipment')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
       const [equipment, markers, locations] = await Promise.all([
@@ -836,6 +1144,25 @@ export async function handleAppApiRequest(req: Request) {
       if (error) throw error;
       await writeAudit(userDb, profile.user_id, 'floor_models', floorId, before ? 'update' : 'insert', before, payload);
       return reply(req, { ok: true, data });
+    }
+
+    if (action === 'move_structuremap_marker') {
+      if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
+      const markerId = text(body.marker_id, 80);
+      const x = Number(body.x), y = Number(body.y);
+      if (!/^[0-9a-f-]{36}$/i.test(markerId)) return reply(req, { ok: false, message: '標記識別碼無效' }, 400);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > 1 || y > 1) {
+        return reply(req, { ok: false, message: '座標必須是 0–1 之間的數字' }, 400);
+      }
+      const { data: before, error: readError } = await userDb.from('plan_markers')
+        .select('marker_id,floor_id,x,y,label').eq('marker_id', markerId).maybeSingle();
+      if (readError) throw readError;
+      if (!before) return reply(req, { ok: false, message: '找不到指定標記' }, 404);
+      const { error } = await userDb.from('plan_markers')
+        .update({ x, y, updated_at: new Date().toISOString() }).eq('marker_id', markerId);
+      if (error) throw error;
+      await writeAudit(userDb, profile.user_id, 'plan_markers', markerId, 'update', { x: before.x, y: before.y }, { x, y });
+      return reply(req, { ok: true, data: { marker_id: markerId, x, y } });
     }
 
     // ---- SYS-08 會議室預約 ----------------------------------------------
