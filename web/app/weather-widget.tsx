@@ -66,7 +66,7 @@ export function WeatherWidget() {
 
   const loadMap = useCallback(async () => {
     try {
-      const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || '') + '/taiwan-counties.svg');
+      const res = await fetch('/Inspection/v2/taiwan-counties.svg');
       if (res.ok) {
         const text = await res.text();
         const parser = new DOMParser();
