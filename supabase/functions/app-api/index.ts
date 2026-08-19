@@ -945,7 +945,10 @@ export async function handleAppApiRequest(req: Request) {
         // patrol_shifts 受資料庫保護無法 DELETE 且無 status 欄位，故以名稱前綴隱藏（與前端同規則）。
         const { error } = await userDb.from('patrol_shifts').update({ name: `[已刪除] ${before.name}`, assigned_user_ids: [] }).eq('shift_id', shiftId);
         if (error) throw error;
-        await writeAudit(userDb, profile.user_id, 'patrol_shifts', shiftId, 'update', { name: before.name }, { name: `[已刪除] ${before.name}` });
+        // 指派人員會被清空且無法從別處還原，before 必須連同人員一起留存才救得回來。
+        await writeAudit(userDb, profile.user_id, 'patrol_shifts', shiftId, 'update',
+          { name: before.name, assigned_user_ids: before.assigned_user_ids },
+          { name: `[已刪除] ${before.name}`, assigned_user_ids: [] });
         return reply(req, { ok: true });
       }
       return reply(req, { ok: false, message: '刪除範圍無效' }, 400);
