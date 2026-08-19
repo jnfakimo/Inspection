@@ -311,13 +311,15 @@ export function ModelerClient({ profile }: { profile: Profile }) {
     try {
       const path = `${floor}.png`;
       const storage = getSupabase().storage.from('floorplans');
-      const upload = await storage.upload(path, originalBlob, { upsert: true, contentType: 'image/png' });
+      const fileToUpload = new File([originalBlob], path, { type: 'image/png' });
+      const upload = await storage.upload(path, fileToUpload, { upsert: true, contentType: 'image/png' });
       if (upload.error) throw upload.error;
       let mobileNote = '';
       try {
         const mobileBlob = await makeMobileBlob(canvas, MOBILE_TEXTURE_LONG_SIDE);
         if (mobileBlob) {
-          const mobileUpload = await storage.upload(`mobile/${path}`, mobileBlob, { upsert: true, contentType: 'image/png' });
+          const mobileFile = new File([mobileBlob], path, { type: 'image/png' });
+          const mobileUpload = await storage.upload(`mobile/${path}`, mobileFile, { upsert: true, contentType: 'image/png' });
           if (mobileUpload.error) throw mobileUpload.error;
           mobileNote = `，手機版 ${Math.round(mobileBlob.size / 1024)}KB`;
         }
@@ -326,12 +328,17 @@ export function ModelerClient({ profile }: { profile: Profile }) {
         mobileNote = '（手機版縮圖上傳失敗，手機將載入原圖）';
       }
       const optionLabel = FLOOR_OPTIONS.find(option => option[0] === floorChoice)?.[1] || floor;
-      await invokeAppApi('save_floor_model', {
+      
+      const payload = {
         floor_id: floor,
         name: floorChoice === '__custom' ? floor : optionLabel,
         image_path: path,
         bbox,
-      });
+        updated_at: new Date().toISOString()
+      };
+      const { error: dbError } = await getSupabase().from('floor_models').upsert(payload, { onConflict: 'floor_id' });
+      if (dbError) throw dbError;
+      
       if (floor === 'B1') setRefBBox(bbox);
       setMessage({ text: `✓ 已更新 ${floor} 模型，平面圖與 3D 已同步${mobileNote}`, tone: 'ok' });
       await loadModels();
