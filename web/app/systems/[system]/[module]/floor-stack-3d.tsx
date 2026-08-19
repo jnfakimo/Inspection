@@ -48,7 +48,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const width = host.clientWidth || 900, height = host.clientHeight || 560;
       const scene = new THREE.Scene();
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light';\n      renderer.setClearColor(0x000000, 0); // transparent background
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      scene.background = new THREE.Color(isLight ? 0xf0f2f5 : 0x04101f);
       const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
       camera.position.set(9, 9, 12);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
