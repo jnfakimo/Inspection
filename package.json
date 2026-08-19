@@ -6,6 +6,9 @@
   "scripts": {
     "dev:v2": "next dev web",
     "build:v2": "next build web",
+    "build:api": "node backend/node-api/build.mjs",
+    "typecheck:api": "tsc -p backend/node-api/tsconfig.json",
+    "start:api": "node backend/node-api/dist/server.mjs",
     "build:pages": "npm run build:v2 && node tools/build-hardened-pages.mjs",
     "scan:pages": "node tools/scan-all-pages.mjs",
     "verify:provenance": "node tools/verify-provenance.mjs",
@@ -34,6 +37,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/three": "0.171.0",
+    "esbuild": "0.25.12",
     "html-minifier-terser": "7.2.0",
     "terser": "5.49.2",
     "typescript": "5.9.3"

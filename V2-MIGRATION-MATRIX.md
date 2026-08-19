@@ -156,8 +156,8 @@ SYS-06 與 SYS-03 的模組，再做一頁只會多一層轉跳。**2026-08-19 �
 SYS-06 的 `models` 模組改為該導覽頁（`structuremap-modelhub.tsx`），版型與功能對齊 V1，
 五張卡的版型、文字與操作目的維持 V1。HUB-01 已於 2026-08-19 改接
 `/Inspection/v2/systems/structuremap/modeler/`：DXF 仍在瀏覽器解析與產生原圖／行動版 PNG，
-Storage 上傳由 RLS 授權，模型清單與 `floor_models` 更新則經 `app-api` 完成 JWT、啟用帳號、
-RBAC、限流、RLS 與稽核檢查。其餘四張卡仍保留原目的地，待各自獨立驗收後再切換。
+Storage 上傳由 RLS 授權，模型清單與 `floor_models` 更新則經 Node.js `app-api` 完成 JWT、
+啟用帳號、RBAC、限流、RLS 與稽核檢查。其餘四張卡仍保留原目的地，待各自獨立驗收後再切換。
 
 原本掛在 models 模組的 `floor_models` 通用維護表格維持移除；正式建模入口改為上述 V2
 專用頁。V2 的立體樓層檢視器與巡檢工作區繼續共用同一份 `floor_models` 貼圖來源。

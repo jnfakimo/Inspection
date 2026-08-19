@@ -1,13 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+type PortableRuntime = {
+  env?: { get: (name: string) => string | undefined };
+  serve?: (handler: (request: Request) => Promise<Response>) => unknown;
+};
+
+const denoRuntime = (globalThis as typeof globalThis & { Deno?: PortableRuntime }).Deno;
+const nodeEnvironment = (globalThis as typeof globalThis & {
+  process?: { env?: Record<string, string | undefined> };
+}).process?.env;
+
+function requiredEnvironment(name: string) {
+  const value = denoRuntime?.env?.get(name) || nodeEnvironment?.[name];
+  if (!value) throw new Error(`Missing required environment variable: ${name}`);
+  return value;
+}
+
+const SUPABASE_URL = requiredEnvironment('SUPABASE_URL');
+const SERVICE_ROLE_KEY = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
+const ANON_KEY = requiredEnvironment('SUPABASE_ANON_KEY');
 
 const allowedOrigins = new Set([
   'https://jnfakimo.github.io',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
+  ...(denoRuntime?.env?.get('APP_ALLOWED_ORIGINS') || nodeEnvironment?.APP_ALLOWED_ORIGINS || '')
+    .split(',').map(origin => origin.trim()).filter(Boolean),
 ]);
 
 function cors(req: Request) {
@@ -119,7 +137,7 @@ const MODULE_SOURCES:Record<string,ModuleSource>={
   'meetingroom/notifications':source('meeting_booking_notifications','meetingroom','預約提醒',[['created_at','建立時間'],['booking_id','預約'],['notification_type','類型'],['sent_at','發送時間'],['status','狀態']],'created_at'),
 };
 
-Deno.serve(async (req) => {
+export async function handleAppApiRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return reply(req, { ok: false, message: 'Method not allowed' }, 405);
 
@@ -469,4 +487,9 @@ Deno.serve(async (req) => {
     console.error('app-api failed', error instanceof Error ? error.message : String(error));
     return reply(req, { ok: false, message: 'API 處理失敗，請稍後再試' }, 500);
   }
-});
+}
+
+// Supabase Edge Functions continue to use this adapter during the migration.
+// The Node.js service imports the same handler, so authentication and business
+// rules remain identical in both runtimes.
+if (denoRuntime?.serve) denoRuntime.serve(handleAppApiRequest);

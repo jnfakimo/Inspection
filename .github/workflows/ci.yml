@@ -30,6 +30,9 @@ jobs:
         run: |
           if npm test; then echo "Tests passed"; else echo "No tests defined or tests failed"; fi
 
+      - name: Build Node.js API
+        run: npm run typecheck:api && npm run build:api
+
       # Lint HTML files using htmlhint
       - name: Lint HTML with htmlhint
         run: |

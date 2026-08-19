@@ -104,29 +104,27 @@ npm run build:pages
 | 後端 | FastAPI（Python）或 Node.js | 負責權限、流程、API、通知、資料分析 |
 | 資料庫 | PostgreSQL | 若希望部署簡單，可直接使用 Supabase |
 
-### 後端 runtime 選型決策（2026-08-16）
+### 後端 runtime 選型決策（2026-08-19 更新）
 
-基準的資料庫欄註明「若希望部署簡單，可直接使用 Supabase」，本專案已採此路線，因此後端 runtime
-選用 **Supabase Edge Function（Deno / TypeScript）**，而非另行架設 FastAPI 或 Node.js 服務。
+依業主再次確認，V2 正式後端改採 **Node.js 22 / TypeScript**；Supabase 保留為 PostgreSQL、
+Auth、Storage、Realtime 與 RLS 平台。Node.js 服務由 `backend/node-api/` 建置，以
+`POST /api/app-api` 提供統一業務 API，並透過 `NEXT_PUBLIC_APP_API_URL` 注入 GitHub Pages。
+既有 Supabase Edge Function 在遷移期間作為回退入口，兩種 runtime 共用同一個
+`handleAppApiRequest()`，因此不複製權限或業務規則。
 規格要求後端承擔的職責均已落實：
 
 | 職責 | 實作位置 |
 | --- | --- |
 | 權限 | `app-api` / `admin-api` 驗證 JWT、`users` 啟用狀態與 `role_permissions`，再疊加資料庫 RLS |
 | 流程 | `app-api` 各 action，以及 PostgreSQL SECURITY DEFINER 函式（如 `create_meeting_booking_series`、`complete_repair_order`） |
-| API | `supabase/functions/` 共 11 支函式，`app-api`、`admin-api` 為業務主體 |
+| API | Node.js `app-api` 為 V2 業務主入口；既有 Edge Functions 保留通知與遷移回退 |
 | 通知 | `line-notify`、`patrol-timeout-check`、`meeting-booking-check`、FCM 推播 |
 | 資料分析 | `app-api` 的 `dashboard` action 聚合 30 日巡檢、異常率、設備與未結維修 |
 
-選擇 Edge Function 而非自架服務的理由：與資料庫同專案、延遲低；JWT 由 Supabase 閘道層先驗；
-零維運且無額外主機費用；本站前端託管於 GitHub Pages，本身無法執行後端程式。
-
-**何時應重新評估**：需要脫離 Supabase 以避免供應商鎖定時；或分析需求成長到必須使用 Deno 生態
-無法滿足的 Python 套件時。屆時 `app-api` / `admin-api` 的業務邏輯即為搬遷起點。
-
-**2026-08-17 再次確認**：對照規格基準重新評估後，維持 Edge Function，不另建 FastAPI／Node.js
-服務。主因是本站前端託管於 GitHub Pages，自建後端需另尋主機並重做一套 JWT 驗證層，
-而規格要求後端承擔的五項職責目前皆已有對應實作。
+Node.js API 使用 Supabase access token 驗證使用者，再檢查啟用帳號、RBAC 與 action 限流；
+資料操作使用帶入使用者 JWT 的 Supabase client，讓 PostgreSQL RLS 繼續作最後一道防線。
+service role key 僅存在 Node 主機環境變數。Node.js 服務可使用根目錄 `render.yaml` 部署，
+GitHub Pages 仍只負責 Next.js 靜態前端。
 
 **已清理（2026-08-17）**：正式專案原有 4 支已部署但原始碼不在本 repo 的函式
 （`hyper-worker`、`smart-function`、`bright-function`、`dynamic-processor`），皆停在 v12、
@@ -176,9 +174,10 @@ LINE 群組，`verify_jwt` 為 true——任一持有有效 JWT 的使用者皆�
 Browser / Mobile
   └─ GitHub Pages /Inspection/v2 (Next.js static export)
        ├─ Supabase Auth / username-login
-       ├─ Supabase Edge Function / app-api
+       ├─ Node.js 22 /api/app-api
        │    ├─ JWT / active user / RBAC validation
        │    └─ user-scoped Supabase client → PostgreSQL RLS
+       ├─ Supabase Edge Functions（通知與遷移回退）
        ├─ Supabase Realtime
        ├─ Supabase Storage
        └─ Firebase FCM

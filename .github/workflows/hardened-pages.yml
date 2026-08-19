@@ -35,6 +35,7 @@ jobs:
         run: npm run build:pages
         env:
           PROVENANCE_PRIVATE_KEY: ${{ secrets.PROVENANCE_PRIVATE_KEY }}
+          NEXT_PUBLIC_APP_API_URL: ${{ vars.NEXT_PUBLIC_APP_API_URL }}
 
       - name: Verify signed provenance manifest
         run: npm run verify:provenance
