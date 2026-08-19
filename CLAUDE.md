@@ -1,33 +1,32 @@
-# sensebar-agent-knowledge-vault-builder
+# CLAUDE.md
 
-## 知識庫查詢規則
+本檔由 Claude Code 進入這個 repo 時自動載入。
 
-涉及下列主題時，**必須先查閱 `Clipping/` 內的逐字稿檔**，再根據內容回答，不得憑空推測：
+## 先讀這個
 
-- 三師爸的意見、觀點、評論
-- 三師爸的教學方法、工作流程
-- @sensebar 頻道影片中的具體內容
-- 三師爸對特定工具（Claude、Codex、AntiGravity、OpenCode 等）的評價
+**這個 repo 是臺北農產運銷第一果菜市場的巡檢／報修／派工系統。**
+完整的技術慣例、資料庫順序、RBAC、Git 流程一律以 **[`AGENTS.md`](AGENTS.md)** 為準——
+那是所有 AI 代理（Claude Code、OpenCode、Antigravity）共用的單一事實來源，動工前請讀完。
 
-## 聲音克隆
+其餘背景：`PROJECT_CONTEXT.md`（架構與上手）、`ARCHITECTURE_V2.md`、
+`V2-MIGRATION-MATRIX.md`（V1→V2 對照）、`SECURITY_POSTURE.md`、
+`handoff.md`（**每次收工改寫，記載目前做到哪與待驗收項目，開工必讀**）。
 
-需要以三師爸的聲音回答時，使用 `..\voxcpm_clone.py` 進行推論：
+## 幾條最容易踩的
 
-- 參考音檔：`..\ref_voice.wav`
-- 範例輸出：`..\clone_demo.wav`、`..\ultimate_clone.wav`
+這些在 `AGENTS.md` 都有完整版，列在這裡是因為踩過：
 
-## 資料夾結構
+- **多個 agent 會同時推送**。動工前 `git fetch`，推之前再 fetch 一次並 rebase。
+  已經發生過兩個 agent 在同一小時內修同一個缺陷、方向相反的情況。
+- **不要寫死承載文字的顏色**。V2 預設是淺色主題，而淺色主題的白名單保護已於
+  2026-08-18 廢除，寫死深色背景沒有東西接得住。詳見 `AGENTS.md` 的 Conventions。
+- **不做實體刪除**。41 張表有 `trg_prevent_removal`，只能用狀態停用。
+- **未經明確允許不要開 PR**。推送依 `AGENTS.md` 的 Git workflow。
+- **共用頁首的圖示、順序與元件是鎖定的**，除非使用者明確要求更改該項標準。
 
-| 路徑 | 用途 |
-|------|------|
-| `Clipping/` | YouTube 字幕原始逐字稿（不修改） |
-| `創作庫/` | 自訂教材、講義、腳本 |
-| `知識庫/` | Agent 管理的結構化知識 |
-| `extract_videos.py` | 掃描 @sensebar 頻道影片+直播，過濾 AI 相關影片 |
-| `download_all_subs.py` | 下載字幕並去重清理，存入 Clipping/ |
+## 附註：repo 內與本系統無關的內容
 
-## 資料來源
-
-- 頻道：[@sensebar](https://www.youtube.com/@sensebar)
-- 過濾關鍵字：claude, codex, antigravity, opencode, agent, googlea
-- 目前收錄：64 支影片（含 21 支直播）
+`Clipping/`、`創作庫/`、`知識庫/`、`extract_videos.py`、`download_all_subs.py`
+屬於另一個 YouTube 逐字稿知識庫專案，於 `66e070d`（2026-07-10）被誤推進本 repo，
+與巡檢系統無關。尚未清理，但**不要把它們當成本系統的一部分**；本檔在 2026-08-19
+之前的內容全部是在描述那個專案，導致 Claude Code 在此 repo 讀不到任何生產慣例。

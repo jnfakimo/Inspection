@@ -80,6 +80,24 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
 - **Match the surrounding style**: cyberpunk dark theme. Core vars: `--bg:#020b18`,
   `--cyan:#00d4ff`, `--green:#00ff9d`, `--amber:#ffb300`, `--red:#ff3b3b`; fonts
   Noto Sans TC + Rajdhani. UI text is Traditional Chinese.
+- **Never hardcode a colour that carries text — there is no light-theme safety net.**
+  V2 defaults to the **light** theme (`data-theme="light"`; the dark one is `"tech"`).
+  `v1-layout.css` used to whitelist every class that needed flipping to a white
+  background, but that list silently missed each new component, so on 2026-08-18 it
+  was removed on the premise that components derive their colours from theme vars.
+  **That premise is now load-bearing**: a hardcoded dark background added afterwards
+  has nothing to catch it and renders dark-on-dark in the default theme.
+  - Backgrounds: `var(--panel)` / `var(--panel2)` / `var(--bg)`. For a tint, use
+    `color-mix(in srgb, var(--cyan) 8%, transparent)` — never a raw `rgba()` of the
+    dark palette. Low-alpha accent tints (≤0.15) over a themed surface are fine.
+  - Legitimate exceptions, all of which already exist: modal backdrops (a dark scrim
+    is correct in both themes), blocks whose background **and** text colour are
+    hardcoded together as a pair (e.g. the `<pre>` in `.admin-modal`), and viewer
+    canvases that hold no text (`.plan-stage`, `.floor-canvas`).
+  - Before pushing a style change, load the page with `data-theme="light"` and check
+    text contrast is ≥ 4.5:1. This has already regressed once: `.dash-widget` was
+    fixed on 08-18, had `rgba(2,11,24,0.7)` put back on 08-19 by a different agent,
+    and shipped at 1.84:1 on the post-login landing page until it was caught.
 - **Dates**: unified format is 西元 `YYYY-MM-DD` (datetime `YYYY-MM-DD HH:mm`);
   date inputs use a calendar picker; forms show a 填表日期 (today). Use the local
   `fmtDate()`/`todayISO()` helpers.
