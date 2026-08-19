@@ -1,9 +1,16 @@
+/* 這一頁刻意是淺色的：.page 在此把 --ink／--muted／--line 遮蔽成自己的淺色值，
+   底色也全部固定，因此深淺兩個主題下長得一樣，不隨 data-theme 改變。
+   唯二的例外原本是兩個全域的 sky 變數——它們會跟著主題走，科技版下文字色是
+   #bae6fd，印在寫死的 #fff 上只有 1.33:1，頁首標籤等於消失。改成模組自有的
+   --accent／--accent-text，取淺色主題原本的值，外觀不變但不再受主題影響。 */
 .page {
   --ink: #172033;
   --muted: #64748b;
   --line: #dbe4ee;
   --soft: #f4f7fa;
   --primary: #007fa3;
+  --accent: #7dd3fc;
+  --accent-text: #0369a1;
   color: var(--ink);
   min-height: 100%;
   padding-bottom: 48px;
@@ -38,7 +45,7 @@
     linear-gradient(120deg, rgba(0, 169, 214, 0.08), rgba(255, 255, 255, 0) 48%),
     #fff;
   border: 1px solid var(--line);
-  border-left: 5px solid var(--icon-sky);
+  border-left: 5px solid var(--accent);
   box-shadow: 0 10px 28px rgba(15, 35, 58, 0.07);
   display: flex;
   justify-content: space-between;
@@ -48,7 +55,7 @@
 }
 
 .hero span {
-  color: var(--icon-sky-text);
+  color: var(--accent-text);
   display: block;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.72rem;
@@ -87,7 +94,7 @@
 
 .hero button:hover,
 .detailNav button:hover {
-  border-color: var(--icon-sky);
+  border-color: var(--accent);
   color: #006f8c;
 }
 
@@ -104,7 +111,7 @@
 }
 
 .card {
-  --settings-accent: var(--icon-sky);
+  --settings-accent: var(--accent);
   appearance: none;
   background: #fff;
   border: 1px solid var(--line);
@@ -487,7 +494,7 @@
 }
 
 .toggleRow input {
-  accent-color: var(--icon-sky-text);
+  accent-color: var(--accent-text);
   height: 20px;
   width: 20px;
 }
