@@ -174,11 +174,15 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       setError(`資料載入失敗：${(requestResult.error || orderResult.error)?.message || '請稍後再試'}`);
       setBusy(false); return;
     }
-    // 巡邏點、打卡與班別失敗時不擋整頁——維修資料仍然有效——但一定要說出來。
+    // 巡邏點、打卡、班別與月趨勢失敗時不擋整頁——維修資料仍然有效——但一定要說出來。
     // 少了這段，「今天沒有排班」與「patrol_shifts 查詢被 RLS 擋下」在畫面上
-    // 都只會顯示「目前無進行中班別」，無從分辨。
+    // 都只會顯示「目前無進行中班別」，無從分辨；月趨勢同理，RPC 掛掉與真的沒案件
+    // 都是一條全 0 的線。兩者可能同時失敗，因此一起列出而不是互相覆蓋。
+    const notices: string[] = [];
     const patrolFailure = markerResult.error || checkinResult.error || shiftResult.error;
-    if (patrolFailure) setError(`當班巡檢資料載入失敗：${patrolFailure.message || '請稍後再試'}`);
+    if (patrolFailure) notices.push(`當班巡檢資料載入失敗：${patrolFailure.message || '請稍後再試'}`);
+    if (trendResult.error) notices.push(`月趨勢統計載入失敗（repair_monthly_counts）：${trendResult.error.message || '請稍後再試'}`);
+    if (notices.length) setError(notices.join('；'));
     setRequests((requestResult.data || []).filter(row => !row.hidden));
     setOrders((orderResult.data || []).filter(row => !row.hidden));
 
