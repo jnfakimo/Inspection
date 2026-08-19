@@ -190,6 +190,10 @@ export async function handleAppApiRequest(req: Request) {
       create_cost_record: 'app-api:create_cost_record',
       save_official_vehicle: 'app-api:save_official_vehicle',
       save_floor_model: 'app-api:save_floor_model',
+      workorder_list: 'app-api:workorder_list',
+      workorder_options: 'app-api:workorder_options',
+      workorder_detail: 'app-api:workorder_detail',
+      workorder_workflow: 'app-api:workorder_workflow',
     } as Record<string, string>)[action];
     if (actionScope) {
       const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
@@ -249,6 +253,176 @@ export async function handleAppApiRequest(req: Request) {
       rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
       const summary=[{label:'目前資料',value:rows.length},...[...statusCounts.entries()].slice(0,3).map(([label,value])=>({label,value}))];
       return reply(req,{ok:true,data:{title:config.title,table:config.table,columns:config.columns.map(([key,label])=>({key,label})),rows,summary}});
+    }
+
+    if (action === 'workorder_list') {
+      if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      const moduleKey = text(body.module, 20);
+      if (!['requests', 'dispatch', 'orders'].includes(moduleKey)) {
+        return reply(req, { ok: false, message: '維修子系統參數無效' }, 400);
+      }
+      const requests = await userDb.from('repair_requests').select('*')
+        .order('updated_at', { ascending: false }).limit(500);
+      if (requests.error) throw requests.error;
+      let rows = (requests.data || []) as Array<Record<string, unknown>>;
+      if (moduleKey !== 'requests' && rows.length) {
+        const requestIds = rows.map(row => text(row.request_id, 80)).filter(Boolean);
+        const orders = requestIds.length
+          ? await userDb.from('maintenance_orders')
+              .select('order_id,request_id,assignee_id,status,created_at')
+              .in('request_id', requestIds).order('created_at', { ascending: false }).limit(1000)
+          : { data: [], error: null };
+        if (orders.error) throw orders.error;
+        const latestOrders = new Map<string, Record<string, unknown>>();
+        for (const order of (orders.data || []) as Array<Record<string, unknown>>) {
+          const requestId = text(order.request_id, 80);
+          if (requestId && !latestOrders.has(requestId)) latestOrders.set(requestId, order);
+        }
+        const assigneeIds = [...new Set([...latestOrders.values()].map(order => text(order.assignee_id, 80)).filter(Boolean))];
+        const people = assigneeIds.length
+          ? await userDb.from('users').select('user_id,name').in('user_id', assigneeIds)
+          : { data: [], error: null };
+        if (people.error) throw people.error;
+        const names = new Map((people.data || []).map(person => [String(person.user_id), text(person.name, 100)]));
+        rows = rows.map(row => {
+          const order = latestOrders.get(text(row.request_id, 80));
+          const assigneeId = text(order?.assignee_id || row.assignee_id, 80);
+          return {
+            ...row,
+            order_id: order?.order_id || null,
+            order_status: order?.status || null,
+            assignee_id: assigneeId || null,
+            assignee_name: names.get(assigneeId) || '',
+          };
+        });
+      }
+      const statusCounts = new Map<string, number>();
+      rows.forEach(row => {
+        const status = text(row.status, 50);
+        if (status) statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+      });
+      const titles: Record<string, string> = { requests: '報修案件', dispatch: '派工作業', orders: '維修工單' };
+      return reply(req, { ok: true, data: {
+        title: titles[moduleKey],
+        table: 'repair_requests',
+        rows,
+        summary: [{ label: '目前資料', value: rows.length }, ...[...statusCounts.entries()].slice(0, 3).map(([label, value]) => ({ label, value }))],
+      } });
+    }
+
+    if (action === 'workorder_options') {
+      if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      const [people, equipment, departments, contact] = await Promise.all([
+        userDb.from('users').select('user_id,name,department,role,rbac_role').eq('status', 'active').order('name').limit(500),
+        userDb.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
+        userDb.from('departments').select('name').eq('status', 'active').order('sort_order').limit(200),
+        userDb.from('users').select('phone,department').eq('user_id', profile.user_id).maybeSingle(),
+      ]);
+      if (people.error) throw people.error;
+      if (equipment.error) throw equipment.error;
+      if (departments.error) throw departments.error;
+      if (contact.error) throw contact.error;
+      const technicians = (people.data || []).filter(row => {
+        const role = text(row.rbac_role || row.role, 40);
+        return role === 'technician' || role === 'maintenance';
+      }).map(row => ({
+        user_id: String(row.user_id),
+        name: text(row.name, 100),
+        department: text(row.department, 100) || null,
+      })).filter(row => row.user_id && row.name);
+      return reply(req, { ok: true, data: {
+        technicians,
+        equipment: equipment.data || [],
+        departments: (departments.data || []).map(row => text(row.name, 100)).filter(Boolean),
+        contact: {
+          phone: text(contact.data?.phone, 40),
+          department: text(contact.data?.department || profile.department, 100),
+        },
+      } });
+    }
+
+    if (action === 'workorder_detail') {
+      if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      const requestId = text(body.request_id, 80);
+      const requestNo = text(body.req_no, 80);
+      if (requestId && !/^[0-9a-f-]{36}$/i.test(requestId)) return reply(req, { ok: false, message: '報修案件識別碼無效' }, 400);
+      if (!requestId && !requestNo) return reply(req, { ok: false, message: '找不到報修案件識別碼' }, 400);
+      let requestQuery = userDb.from('repair_requests').select('*,equipment(name,category,qr_code)');
+      requestQuery = requestId ? requestQuery.eq('request_id', requestId) : requestQuery.eq('req_no', requestNo);
+      const requestResult = await requestQuery.limit(1).maybeSingle();
+      if (requestResult.error) throw requestResult.error;
+      if (!requestResult.data) return reply(req, { ok: false, message: '找不到這筆報修案件' }, 404);
+      const fullRequestId = String(requestResult.data.request_id);
+      const [orderResult, attachmentsResult, logsResult] = await Promise.all([
+        userDb.from('maintenance_orders').select('*,users:assignee_id(name)').eq('request_id', fullRequestId)
+          .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        userDb.from('repair_attachments').select('*').eq('request_id', fullRequestId).order('uploaded_at', { ascending: true }),
+        userDb.from('case_status_log').select('*').eq('request_id', fullRequestId).order('created_at', { ascending: true }),
+      ]);
+      const warnings: string[] = [];
+      if (orderResult.error) warnings.push(`維修工單：${text(orderResult.error.message, 300)}`);
+      if (attachmentsResult.error) warnings.push(`附件：${text(attachmentsResult.error.message, 300)}`);
+      if (logsResult.error) warnings.push(`處理歷程：${text(logsResult.error.message, 300)}`);
+      const attachments = ((attachmentsResult.data || []) as Array<Record<string, unknown>>).map(item => ({ ...item }));
+      if (attachments.length) {
+        const paths = attachments.map(item => text(item.file_path, 1000)).filter(Boolean);
+        const signedResult = await userDb.storage.from('repair-files').createSignedUrls(paths, 3600);
+        if (signedResult.error) warnings.push(`附件網址：${text(signedResult.error.message, 300)}`);
+        const signedMap = new Map((signedResult.data || []).map(item => [item.path, item.signedUrl]));
+        attachments.forEach(item => { item.signed_url = signedMap.get(text(item.file_path, 1000)) || ''; });
+      }
+      return reply(req, { ok: true, data: {
+        request: requestResult.data,
+        order: orderResult.data || null,
+        attachments,
+        logs: logsResult.data || [],
+        warnings,
+      } });
+    }
+
+    if (action === 'workorder_workflow') {
+      if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      const requestId = text(body.request_id, 80);
+      const workflowAction = text(body.workflow_action, 40);
+      const allowedActions = new Set(['dispatch', 'engineer_accept', 'engineer_start', 'engineer_complete', 'reporter_accept', 'supervisor_accept', 'cancel']);
+      if (!/^[0-9a-f-]{36}$/i.test(requestId)) return reply(req, { ok: false, message: '報修案件識別碼無效' }, 400);
+      if (!allowedActions.has(workflowAction)) return reply(req, { ok: false, message: '維修流程動作無效' }, 400);
+      const rawPayload = body.payload && typeof body.payload === 'object' && !Array.isArray(body.payload)
+        ? body.payload as Record<string, unknown>
+        : {};
+      const payload: Record<string, unknown> = {};
+      if (workflowAction === 'dispatch') {
+        const technician = text(rawPayload.technician, 80);
+        if (technician && !/^[0-9a-f-]{36}$/i.test(technician)) return reply(req, { ok: false, message: '維修人員識別碼無效' }, 400);
+        payload.technician = technician || null;
+        payload.vendor = text(rawPayload.vendor, 200) || null;
+        for (const key of ['expected_arrival', 'expected_finish'] as const) {
+          const value = text(rawPayload[key], 40);
+          if (value && Number.isNaN(Date.parse(value))) return reply(req, { ok: false, message: '派工日期時間格式無效' }, 400);
+          payload[key] = value || null;
+        }
+        payload.work_content = text(rawPayload.work_content, 1000) || null;
+        payload.need_shutdown = rawPayload.need_shutdown === true;
+        payload.need_approval = rawPayload.need_approval === true;
+      } else if (workflowAction === 'engineer_complete') {
+        payload.fault_cause = text(rawPayload.fault_cause, 1000);
+        payload.handle_method = text(rawPayload.handle_method, 2000);
+        payload.parts_used = text(rawPayload.parts_used, 1000) || null;
+        payload.materials = text(rawPayload.materials, 1000) || null;
+        const laborHours = rawPayload.labor_hours === null || rawPayload.labor_hours === '' ? null : Number(rawPayload.labor_hours);
+        if (laborHours !== null && (!Number.isFinite(laborHours) || laborHours < 0 || laborHours > 100000)) {
+          return reply(req, { ok: false, message: '工時必須是零以上的數字' }, 400);
+        }
+        payload.labor_hours = laborHours;
+        payload.note = text(rawPayload.note, 1000) || null;
+      }
+      const { data, error } = await userDb.rpc('apply_repair_workflow', {
+        p_request_id: requestId,
+        p_action: workflowAction,
+        p_payload: payload,
+      });
+      if (error) return reply(req, { ok: false, message: text(error.message, 500) || '維修流程更新失敗' }, 400);
+      return reply(req, { ok: true, data });
     }
 
     if (action === 'dashboard') {

@@ -209,9 +209,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setDispatchSaving(true);
       setDispatchMessage('');
       try {
-        const client = getSupabase();
-        const result = await client.rpc('apply_repair_workflow', { p_request_id: requestId, p_action: action, p_payload: payload });
-        if (result.error) throw result.error;
+        await invokeAppApi('workorder_workflow', { request_id: requestId, workflow_action: action, payload });
         await load();
         void openRepairDetail({ ...row, request_id: requestId, status: nextStatus });
       } catch (caught) {
@@ -232,11 +230,10 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setDispatchSaving(true);
       setDispatchMessage('');
       try {
-        const client = getSupabase();
-        const result = await client.rpc('apply_repair_workflow', {
-          p_request_id: requestId,
-          p_action: 'dispatch',
-          p_payload: {
+        await invokeAppApi('workorder_workflow', {
+          request_id: requestId,
+          workflow_action: 'dispatch',
+          payload: {
             technician: technician || null,
             vendor: vendor || null,
             expected_arrival: toIso(dispatchForm.expectedArrival),
@@ -246,7 +243,6 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             need_approval: dispatchForm.needApproval,
           },
         });
-        if (result.error) throw result.error;
         setShowDispatchForm(false);
         setDispatchForm({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
         await load();
@@ -282,11 +278,10 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setDispatchSaving(true);
       setDispatchMessage('');
       try {
-        const client = getSupabase();
-        const result = await client.rpc('apply_repair_workflow', {
-          p_request_id: requestId,
-          p_action: 'engineer_complete',
-          p_payload: {
+        await invokeAppApi('workorder_workflow', {
+          request_id: requestId,
+          workflow_action: 'engineer_complete',
+          payload: {
             fault_cause: completionForm.faultCause.trim(),
             handle_method: completionForm.handleMethod.trim(),
             parts_used: completionForm.partsUsed.trim() || null,
@@ -295,7 +290,6 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             note: completionForm.note.trim() || null,
           },
         });
-        if (result.error) throw result.error;
         setShowCompletionForm(false);
         await load();
         void openRepairDetail({ ...current, status: 'pending_review' });
@@ -340,34 +334,16 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setShowCompletionForm(false);
       setDispatchMessage('');
       try {
-        const client = getSupabase();
         const requestId = String(row.request_id || row.id || '');
         const requestNo = String(row.req_no || '');
         if (!requestId && !requestNo) throw new Error('找不到報修案件識別碼');
-        let requestQuery = client.from('repair_requests').select('*,equipment(name,category,qr_code)');
-        requestQuery = requestId ? requestQuery.eq('request_id', requestId) : requestQuery.eq('req_no', requestNo);
-        const requestResult = await requestQuery.limit(1).maybeSingle();
-        if (requestResult.error) throw new Error(requestResult.error.message);
-        if (!requestResult.data) throw new Error('找不到這筆報修案件');
-        const fullRequest = requestResult.data as Record<string, unknown>;
-        const fullRequestId = String(fullRequest.request_id || requestId);
-        const [orderResult, attachmentsResult, logsResult] = await Promise.all([
-          client.from('maintenance_orders').select('*,users:assignee_id(name)').eq('request_id', fullRequestId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-          client.from('repair_attachments').select('*').eq('request_id', fullRequestId).order('uploaded_at', { ascending: true }),
-          client.from('case_status_log').select('*').eq('request_id', fullRequestId).order('created_at', { ascending: true }),
-        ]);
+        const detail = await invokeAppApi<RepairDetail & { warnings?: string[] }>('workorder_detail', {
+          request_id: requestId || undefined,
+          req_no: requestNo || undefined,
+        });
         if (seq !== detailRequestSeq.current) return;
-        const relationErrors = [orderResult.error, attachmentsResult.error, logsResult.error].filter(Boolean).map(item => item?.message).filter(Boolean);
-        const detailAttachments = ((attachmentsResult.data || []) as Array<Record<string, unknown>>).map(item => ({ ...item }));
-        if (detailAttachments.length) {
-          const signedResult = await client.storage.from('repair-files').createSignedUrls(detailAttachments.map(item => String(item.file_path || '')), 3600);
-          if (seq !== detailRequestSeq.current) return;
-          if (signedResult.error) relationErrors.push(`附件網址：${signedResult.error.message}`);
-          const signedMap = new Map((signedResult.data || []).map(item => [item.path, item.signedUrl]));
-          detailAttachments.forEach(item => { item.signed_url = signedMap.get(String(item.file_path || '')) || ''; });
-        }
-        setRepairDetail({ request: fullRequest, order: (orderResult.data || null) as Record<string, unknown> | null, attachments: detailAttachments, logs: (logsResult.data || []) as Array<Record<string, unknown>> });
-        if (relationErrors.length) setDetailError(`部分關聯資料無法載入：${relationErrors.join('；')}`);
+        setRepairDetail(detail);
+        if (detail.warnings?.length) setDetailError(`部分關聯資料無法載入：${detail.warnings.join('；')}`);
       } catch (caught) {
         if (seq === detailRequestSeq.current) setDetailError(caught instanceof Error ? `案件詳情載入失敗：${caught.message}` : '案件詳情載入失敗');
       } finally {
@@ -379,32 +355,14 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setSyncing(true);
       setError('');
       try {
-        const moduleData = await invokeAppApi<ModuleData>('module_data', { system: system.key, module: module.key });
         if (isRepairTableModule) {
-          const client = getSupabase();
-          const direct = await client.from('repair_requests').select('*').order('updated_at', { ascending: false }).limit(500);
-          let repairRows = (direct.error ? moduleData.rows : direct.data || []) as Array<Record<string, unknown>>;
-          if ((isDispatchModule || isOrdersModule) && repairRows.length) {
-            const requestIds = [...new Set(repairRows.map(row => String(row.request_id || '')).filter(Boolean))];
-            const orderResult = requestIds.length
-              ? await client.from('maintenance_orders').select('order_id,request_id,assignee_id,status,created_at').in('request_id', requestIds).order('created_at', { ascending: false }).limit(1000)
-              : { data: [], error: null };
-            const latestOrders = new Map<string, Record<string, unknown>>();
-            for (const order of (orderResult.data || []) as Array<Record<string, unknown>>) {
-              const requestId = String(order.request_id || '');
-              if (requestId && !latestOrders.has(requestId)) latestOrders.set(requestId, order);
-            }
-            const assigneeIds = [...new Set([...latestOrders.values()].map(order => String(order.assignee_id || '')).filter(Boolean))];
-            const people = assigneeIds.length ? await client.from('users').select('user_id,name').in('user_id', assigneeIds) : { data: [], error: null };
-            const names = new Map((people.data || []).map(person => [String(person.user_id), String(person.name || '')]));
-            repairRows = repairRows.map(row => {
-              const order = latestOrders.get(String(row.request_id || ''));
-              const assigneeId = String(order?.assignee_id || row.assignee_id || '');
-              return { ...row, order_id: order?.order_id || null, order_status: order?.status || null, assignee_id: assigneeId || null, assignee_name: names.get(assigneeId) || '' };
-            });
-          }
-          setData({ ...moduleData, columns: isDispatchModule ? DISPATCH_COLUMNS : isOrdersModule ? ORDER_COLUMNS : REQUEST_COLUMNS, rows: repairRows });
-        } else { setData(moduleData); }
+          const workorderData = await invokeAppApi<Omit<ModuleData, 'columns'>>('workorder_list', { module: module.key });
+          const repairRows = workorderData.rows || [];
+          setData({ ...workorderData, columns: isDispatchModule ? DISPATCH_COLUMNS : isOrdersModule ? ORDER_COLUMNS : REQUEST_COLUMNS, rows: repairRows });
+        } else {
+          const moduleData = await invokeAppApi<ModuleData>('module_data', { system: system.key, module: module.key });
+          setData(moduleData);
+        }
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : '資料讀取失敗');
       } finally {
@@ -416,33 +374,24 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     useEffect(() => {
       if (!isRepairTableModule) return;
       let active = true;
-      void getSupabase().from('users').select('user_id,name,department,role,rbac_role').eq('status', 'active').order('name').limit(500).then(result => {
-        if (!active || result.error) return;
-        const technicianRoles = new Set(['technician', 'maintenance']);
-        setDispatchTechnicians((result.data || []).filter(row => technicianRoles.has(String(row.rbac_role || row.role || ''))).map(row => ({ user_id: String(row.user_id || ''), name: String(row.name || ''), department: String(row.department || '') || null })).filter(row => row.user_id && row.name));
-      });
-      return () => { active = false; };
-    }, [isRepairTableModule]);
-    useEffect(() => {
-      if (!isRequestModule) return;
-      let active = true;
-      const client = getSupabase();
-      void Promise.all([
-        client.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
-        client.from('departments').select('name').eq('status', 'active').order('sort_order').limit(200),
-        client.from('users').select('phone,department').eq('user_id', profile.user_id).maybeSingle(),
-      ]).then(([equipmentResult, departmentResult, profileResult]) => {
+      void invokeAppApi<{
+        technicians: DispatchTechnician[];
+        equipment: RepairEquipmentOption[];
+        departments: string[];
+        contact: { phone: string; department: string };
+      }>('workorder_options').then(result => {
         if (!active) return;
-        if (!equipmentResult.error) setEquipmentOptions((equipmentResult.data || []) as RepairEquipmentOption[]);
-        if (!departmentResult.error) setDepartmentOptions((departmentResult.data || []).map(row => String(row.name || '')).filter(Boolean));
-        if (!profileResult.error && profileResult.data) {
-          const contact = { phone: String(profileResult.data.phone || ''), department: String(profileResult.data.department || profile.department || '') };
+        setDispatchTechnicians(result.technicians || []);
+        if (isRequestModule) {
+          setEquipmentOptions(result.equipment || []);
+          setDepartmentOptions(result.departments || []);
+          const contact = result.contact || { phone: '', department: profile.department || '' };
           setProfileContact(contact);
           setForm(current => ({ ...current, phone: current.phone || contact.phone, department: current.department || contact.department }));
         }
-      });
+      }).catch(caught => { if (active) setError(caught instanceof Error ? caught.message : '維修選項載入失敗'); });
       return () => { active = false; };
-    }, [isRequestModule, profile.department, profile.user_id]);
+    }, [isRepairTableModule, isRequestModule, profile.department]);
     useEffect(() => {
       if (!data?.table) return;
       const channel = getSupabase().channel(`v2-${system.key}-${module.key}`)
