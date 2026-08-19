@@ -33,12 +33,24 @@ function darkenColor(hex: string): string {
   return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
 }
 
-export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors }: {
+/** 場景建立後交給呼叫端的相機操作介面（SYS-06 的 3D模型圖用來做「重置」與「俯視」）。 */
+export type FloorStackApi = {
+  /** 回到預設的四分之三視角。 */
+  resetView: () => void;
+  /** 從正上方俯視。 */
+  topView: () => void;
+  /** 把鏡頭拉到指定標記（供 ?marker= 深連結使用）。找不到時回傳 false。 */
+  focusMarker: (markerId: string) => boolean;
+};
+
+export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, apiRef }: {
   models: StackModel[]; markers: StackMarker[]; showMarkers?: boolean; gap?: number;
   xPan?: number; yPan?: number;
   visibleKinds?: Record<string, boolean>;
   showLabels?: boolean;
   visibleFloors?: Record<string, boolean>;
+  /** 可選。ref 物件的識別碼是穩定的，列入相依也不會多觸發場景重建。 */
+  apiRef?: { current: FloorStackApi | null };
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
@@ -141,6 +153,38 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       let raf = 0;
       const tick = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(tick); };
       tick();
+
+      // V1 的 resetView／topView 是直接設定自製球座標的 theta／phi／r；這裡場景尺度不同
+      // （V1 以公尺計、本元件的平面固定為 10×7 單位），因此改以等效視角表達：
+      // 重置＝預設的四分之三視角，俯視＝正上方。
+      const stackTop = models.length * gap;
+      if (apiRef) {
+        apiRef.current = {
+          resetView: () => {
+            controls.target.set(xPan, stackTop / 2 + yPan, 0);
+            camera.position.set(9, 9, 12);
+            controls.update();
+          },
+          topView: () => {
+            controls.target.set(xPan, stackTop / 2 + yPan, 0);
+            camera.position.set(xPan + 0.001, stackTop / 2 + yPan + 18, 0);
+            controls.update();
+          },
+          focusMarker: markerId => {
+            const marker = markers.find(item => item.id === markerId);
+            if (!marker) return false;
+            const index = models.findIndex(row => String(row.floor_id) === marker.floor_id);
+            if (index < 0) return false;
+            const y = (useLevel ? Number(models[index].level) || 0 : index * gap) + 0.12;
+            const px = marker.x * PLANE_W - PLANE_W / 2;
+            const pz = marker.y * PLANE_H - PLANE_H / 2;
+            controls.target.set(px, y, pz);
+            camera.position.set(px + 3, y + 3, pz + 4);
+            controls.update();
+            return true;
+          },
+        };
+      }
       const onResize = () => {
         const w = host.clientWidth || width, h = host.clientHeight || height;
         camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
@@ -148,6 +192,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       window.addEventListener('resize', onResize);
 
       cleanupRef.current = () => {
+        if (apiRef) apiRef.current = null;
         cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
         controls.dispose();
@@ -163,7 +208,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       };
     })();
     return () => { disposed = true; cleanupRef.current(); cleanupRef.current = () => {}; };
-  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors]);
+  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors, apiRef]);
 
   return <div ref={hostRef} className="plan-stage" style={{ width: '100%', height: '100%' }} />;
 }

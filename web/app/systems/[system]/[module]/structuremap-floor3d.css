@@ -1,0 +1,422 @@
+/* SYS-06 3D模型圖｜V1 floor3d.html 的版型移植
+ *
+ * 全螢幕工具頁，配置與 V1 相同：
+ *   topbar 50px｜3D 場景 inset 50px 0 0 0
+ *   立體控制 左上｜樓層顯示 右上｜標記顯示 左下（V1 原始碼標註「獨立面板，左下」）
+ *   焦點提示 置中於 topbar 下方
+ *
+ * V1 為這些面板寫了十條 :root[data-theme="light"] 的逐條覆寫；改用 V2 的 token
+ * 之後全部不需要。唯一固定色值是 3D 畫布底色，理由寫在該規則上。
+ */
+
+.f3-root {
+  /* 青色當文字色時需要比 --cyan 更深才過 AA，與整合標記系統採同一個作法。 */
+  --f3-accent-text: var(--cyan);
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  color: var(--text);
+  font-family: var(--font);
+}
+
+:root[data-theme='light'] .f3-root {
+  --f3-accent-text: color-mix(in srgb, var(--cyan) 80%, black);
+}
+
+/* ── 載入畫面 ───────────────────────────────────────────────────────── */
+
+.f3-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--bg);
+}
+
+.f3-loading .ld-t {
+  color: var(--f3-accent-text);
+  font-size: 13px;
+  letter-spacing: .1em;
+}
+
+.f3-loading .ld-bar {
+  width: 220px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.f3-loading .ld-fill {
+  height: 100%;
+  background: var(--cyan);
+  transition: width .3s;
+}
+
+.f3-loading .ld-m {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+/* ── 頂列 ───────────────────────────────────────────────────────────── */
+
+.f3-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 97%, transparent);
+  overflow-x: auto;
+}
+
+.f3-topbar .tb-logo {
+  color: var(--f3-accent-text);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.f3-topbar .tb-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--line);
+}
+
+.f3-topbar .tb-title {
+  flex: 0 0 auto;
+  color: var(--dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.f3-topbar .tb-space { flex: 1 0 auto; }
+
+.f3-topbar .tb-back {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--dim);
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.f3-topbar .tb-back:hover {
+  border-color: var(--cyan);
+  color: var(--f3-accent-text);
+}
+
+/* ── 3D 場景 ────────────────────────────────────────────────────────── */
+
+/* 底色固定深藍：立體模型的貼圖是黑底霓虹線稿，淺色主題翻成白底會讓樓層邊線消失。
+   FloorStack3D 自己也會依主題決定場景背景，此處只是容器的保險色。 */
+.f3-stage {
+  position: fixed;
+  inset: 50px 0 0 0;
+  background: #04101f;
+}
+
+.f3-stage canvas {
+  display: block;
+  touch-action: none;
+}
+
+.f3-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(420px, 88vw);
+  margin: 0;
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.8;
+  text-align: center;
+  transform: translate(-50%, -50%);
+}
+
+.f3-error {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 170;
+  padding: 8px 14px;
+  border: 1px solid var(--red);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--red);
+  font-size: 12px;
+  transform: translateX(-50%);
+}
+
+.f3-focus {
+  position: fixed;
+  left: 50%;
+  top: 62px;
+  z-index: 170;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(720px, calc(100vw - 28px));
+  padding: 7px 12px;
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  transform: translateX(-50%);
+}
+
+.f3-focus button {
+  margin-left: auto;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+/* ── 收合按鈕 ───────────────────────────────────────────────────────── */
+
+.f3-toggle {
+  position: fixed;
+  z-index: 150;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--panel) 95%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.f3-toggle:hover { border-color: var(--cyan); }
+.f3-toggle.ctrl { left: 14px; top: 62px; }
+.f3-toggle.floors { right: 14px; top: 62px; }
+.f3-toggle.marks { left: 14px; bottom: 14px; }
+
+/* ── 面板共用 ───────────────────────────────────────────────────────── */
+
+.f3-panel,
+.f3-floors,
+.f3-mkpanel {
+  position: fixed;
+  z-index: 160;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  font-size: 12px;
+}
+
+.f3-panel,
+.f3-mkpanel { padding: 10px 13px; }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+}
+
+.panel-head .p-t {
+  color: var(--f3-accent-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.panel-head .head-acts {
+  display: flex;
+  gap: 6px;
+}
+
+.panel-close {
+  display: inline-flex;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: none;
+  color: var(--dim);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.panel-close:hover { border-color: var(--cyan); color: var(--f3-accent-text); }
+.panel-close.on { border-color: var(--cyan); color: var(--f3-accent-text); }
+
+/* ── 立體控制（左上）───────────────────────────────────────────────── */
+
+.f3-panel {
+  left: 14px;
+  top: 62px;
+  width: 216px;
+  /* 標記面板固定在左下；矮螢幕時讓本面板改為捲動，兩者才不會疊在一起。 */
+  max-height: calc(100vh - 76px);
+  overflow: hidden auto;
+}
+
+.f3-panel label {
+  display: block;
+  margin: 8px 0 3px;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.f3-panel input[type='range'] {
+  width: 100%;
+  accent-color: var(--cyan);
+}
+
+.f3-panel .h-r {
+  margin-top: 4px;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.f3-panel .h-r span { color: var(--text); }
+
+.f3-panel .btnrow {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.f3-panel .mini {
+  flex: 1;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  color: var(--f3-accent-text);
+  font-size: 10px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+.f3-panel .mini:hover {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 16%, transparent);
+}
+
+/* ── 樓層顯示（右上）───────────────────────────────────────────────── */
+
+.f3-floors {
+  right: 14px;
+  top: 62px;
+  width: 172px;
+  max-height: calc(100vh - 90px);
+  overflow: hidden auto;
+}
+
+.f3-floors .panel-head {
+  margin: 0;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.f3-floors .fbtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.f3-floors .fbtn:hover { background: color-mix(in srgb, var(--cyan) 8%, transparent); }
+.f3-floors .fbtn.on { color: var(--text); }
+
+.f3-floors .fbtn .dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border: 1px solid var(--cyan);
+  border-radius: 2px;
+}
+
+.f3-floors .fbtn.on .dot {
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+}
+
+.f3-floors-count {
+  padding: 8px 16px;
+  color: var(--dim);
+  font-size: 11px;
+}
+
+/* ── 標記顯示（左下）───────────────────────────────────────────────── */
+
+.f3-mkpanel {
+  left: 14px;
+  bottom: 14px;
+  width: 176px;
+  z-index: 151;
+}
+
+.f3-mkpanel .chk {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 5px;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+/* 五個類型的識別色是為深底設計的霓虹色，印在白色面板上只有 1.33〜3.11:1。
+   淺色主題壓深五成後最低 5.03:1，色相不變、仍能一眼分辨是哪一類。
+   3D 場景裡的圖釘由 FloorStack3D 自行處理（darkenColor）。 */
+.f3-mkpanel .chk.kind { color: var(--kind-color); }
+:root[data-theme='light'] .f3-mkpanel .chk.kind {
+  color: color-mix(in srgb, var(--kind-color) 50%, black);
+}
+
+.f3-mkpanel .chk input { accent-color: var(--cyan); }
+.f3-mkpanel .chk input:disabled { cursor: not-allowed; }
+
+.f3-mkpanel .chk.all {
+  margin-top: 2px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+
+.f3-mkpanel .chk.labels {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .f3-panel { width: min(216px, 60vw); }
+  .f3-floors { width: min(172px, 46vw); }
+  .f3-mkpanel { width: min(176px, 46vw); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f3-loading .ld-fill,
+  .f3-panel .mini { transition: none; }
+}

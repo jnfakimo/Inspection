@@ -7,11 +7,14 @@
 import { AuthGate } from '@/components/AuthGate';
 import { StructureMapWorkspace } from './structuremap-workspace';
 import { StructureMapViewers } from './structuremap-viewers';
+import { Floor3DBoardModule } from './structuremap-floor3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 
-const VIEWER_MODULES = new Set(['floor2d', 'floor3d']);
+const VIEWER_MODULES = new Set(['floor2d']);
 
 export function StructureMapModules({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   if (VIEWER_MODULES.has(module.key)) return <StructureMapViewers system={system} module={module} />;
+  // 3D模型圖是 V1 floor3d.html 的全螢幕移植，自帶 topbar，不套 AppShell。
+  if (module.key === 'floor3d') return <AuthGate>{profile => <Floor3DBoardModule profile={profile} />}</AuthGate>;
   return <AuthGate>{profile => <StructureMapWorkspace system={system} module={module} profile={profile} />}</AuthGate>;
 }
