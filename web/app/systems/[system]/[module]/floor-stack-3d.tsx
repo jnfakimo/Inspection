@@ -48,7 +48,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const width = host.clientWidth || 900, height = host.clientHeight || 560;
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color(0x04101f);
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';\n      renderer.setClearColor(0x000000, 0); // transparent background
       const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
       camera.position.set(9, 9, 12);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -76,7 +76,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         const isVisible = visibleFloors ? visibleFloors[String(row.floor_id)] !== false : true;
         if (!isVisible) return;
         
-        const material = new THREE.MeshBasicMaterial({ color: 0x0a2036, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+        const material = new THREE.MeshBasicMaterial({ color: isLight ? 0xe0e0e0 : 0x0a2036, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
         const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PLANE_W, PLANE_H), material);
         mesh.rotation.x = -Math.PI / 2;
         mesh.position.y = y;
@@ -92,7 +92,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
         const edges = new THREE.LineSegments(
           new THREE.EdgesGeometry(new THREE.PlaneGeometry(PLANE_W, PLANE_H)),
-          new THREE.LineBasicMaterial({ color: 0x1a4a70 }));
+          new THREE.LineBasicMaterial({ color: isLight ? 0xcccccc : 0x1a4a70 }));
         edges.rotation.x = -Math.PI / 2; edges.position.y = y + 0.002;
         scene.add(edges);
 
