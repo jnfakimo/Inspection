@@ -14,3 +14,15 @@
 /* Table Zebra Striping */
 .operations-table tbody tr:nth-child(odd) { background: #ffffff; }
 .operations-table tbody tr:nth-child(even) { background: rgba(0, 212, 255, 0.08); }
+
+/* 日期列：LocalizedDateInput 的外層 span 帶 width:100%，在 flex 容器裡會吃掉整行
+   把前後按鈕擠到下一行，所以在這裡收成固定寬度。 */
+.operations-datebar>.localized-date-input{flex:0 0 auto;width:180px}
+.operations-datebar{flex-wrap:nowrap;overflow-x:auto}
+.operations-datebar>button{flex:0 0 auto;white-space:nowrap}
+/* 樓層可展開列出各巡檢點 */
+.operations-matrix .floor-toggle{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0}
+.operations-matrix .floor-toggle:disabled{cursor:default;opacity:.55}
+.operations-matrix .floor-orphan{margin-left:6px;color:var(--amber);font-size:11px}
+.operations-matrix .point-row td{background:var(--surface-soft)}
+.operations-matrix .point-row .point-name{padding-left:22px;color:var(--dim)}
