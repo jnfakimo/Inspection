@@ -32,6 +32,11 @@ const MARKER_POSITIONS: Record<string, [number, number]> = {
 // 圖示離海岸線的固定間距（外層座標）。距離是以台灣輪廓為基準量出來的，
 // 不是相對畫布的比例——沿岸每個圖示與陸地的空隙才會一致。
 const COAST_MARGIN = 26;
+// 個別縣市的額外外推量（外層座標，正值往外）。海岸線量測對多數縣市夠用，
+// 但有些縣市的形狀會讓圖示落得太靠近鄰居或壓到內陸，這裡逐一微調。
+const COUNTY_MARGIN_OFFSET: Record<string, number> = {
+  新北市: 10,
+};
 // 找不到輪廓時（地圖還沒渲染完）的退路：沿用原本的外圍座標插值。
 const MARKER_PULL = 0.72;
 const MAP_SCALE = 0.65;
@@ -50,6 +55,7 @@ function coastAnchor(
   paths: SVGGeometryElement[],
   centerLocal: [number, number],
   originLocal: [number, number],
+  extraMargin = 0,
 ): [number, number] {
   const dx = centerLocal[0] - originLocal[0];
   const dy = centerLocal[1] - originLocal[1];
@@ -67,7 +73,7 @@ function coastAnchor(
   while (travelled < MAX && onLand(centerLocal[0] + ux * travelled, centerLocal[1] + uy * travelled)) {
     travelled += STEP;
   }
-  const margin = COAST_MARGIN / MAP_SCALE; // 邊距以外層座標定義，換算回地圖本身的座標系
+  const margin = (COAST_MARGIN + extraMargin) / MAP_SCALE; // 邊距以外層座標定義，換算回地圖本身的座標系
   return [centerLocal[0] + ux * (travelled + margin), centerLocal[1] + uy * (travelled + margin)];
 }
 
@@ -224,7 +230,7 @@ export function WeatherWidget() {
     ];
     const spots: Record<string, [number, number]> = {};
     names.forEach((name, index) => {
-      const [lx, ly] = coastAnchor(paths, locals[index], origin);
+      const [lx, ly] = coastAnchor(paths, locals[index], origin, COUNTY_MARGIN_OFFSET[name] || 0);
       spots[name] = [lx * MAP_SCALE + MAP_TX, ly * MAP_SCALE + MAP_TY];
     });
     setCoastSpots(spots);
