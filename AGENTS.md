@@ -68,7 +68,7 @@ fresh Supabase project, run in the SQL Editor in this order:
 → `supabase/migrations/20260806030000_floorplan_storage_scope.sql`
 → `supabase/migrations/20260806031000_notification_log_scope.sql`
 → `supabase/migrations/20260806032000_disable_email_lookup_rpc.sql`
-→ `permanent_data_protection.sql`.
+→ `system/sql/pii_deidentify.sql` → `permanent_data_protection.sql`.
 `permanent_data_protection.sql` must be applied last. Production data is append/update/
 deactivate only: never reset the database, truncate tables, or physically delete personnel.
 RLS is enforced in production. Bootstrap `allow_all_for_now` policies apply only to
