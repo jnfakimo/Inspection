@@ -19,7 +19,9 @@ export function LocalizedDateInput({ value, onFocus, onBlur, onChange, ...props 
     try { element.showPicker?.(); } catch { element.click(); }
   };
 
-  return <span className="localized-date-input" style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+  // 基礎樣式放在 v1-layout.css 的 .localized-date-input，不要寫成行內樣式——
+  // 行內樣式的優先序高於任何選擇器，頁面就再也無法調整這個欄位的寬度。
+  return <span className="localized-date-input">
     <input
       {...props}
       type="text"

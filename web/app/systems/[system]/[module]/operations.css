@@ -22,7 +22,7 @@
 .operations-datebar{flex-wrap:nowrap;overflow:visible;gap:6px;font-size:.8em}
 /* 再收 20%（96→77px）。這個寬度容不下文字加日曆圖示，而 LocalizedDateInput 的
    文字欄位本身點下去就會開日曆，圖示是多餘的，隱藏後把空間讓給日期本體。 */
-.operations-datebar>.localized-date-input{flex:0 0 auto;width:77px}
+.operations-datebar .localized-date-input{flex:0 0 auto;width:104px}
 .operations-datebar .localized-date-input input{width:100%;box-sizing:border-box;padding:5px 4px;text-align:center;font:inherit}
 .operations-datebar .localized-date-input button{display:none}
 .operations-datebar>button{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
@@ -38,7 +38,7 @@
 .operations-filter-row{flex-wrap:nowrap;overflow:visible;gap:6px;font-size:.8em;align-items:flex-end}
 .operations-filter-row>label{flex:0 1 auto;min-width:0;gap:3px}
 .operations-filter-row input,.operations-filter-row select{width:104px;box-sizing:border-box;padding:5px 6px;font:inherit}
-.operations-filter-row .localized-date-input{width:96px}
+.operations-filter-row .localized-date-input{flex:0 0 auto;width:104px}
 .operations-filter-row .localized-date-input input{width:100%;padding:5px 20px 5px 6px;text-align:center}
 .operations-filter-row .localized-date-input button{right:4px;font-size:.9em}
 .operations-filter-row .operations-export{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
