@@ -676,6 +676,7 @@ export async function handleAppApiRequest(req: Request) {
         ? body.payload as Record<string, unknown>
         : {};
       const payload: Record<string, unknown> = {};
+      const completionCost: { parts_cost?: number; labor_cost?: number } = {};
       if (workflowAction === 'dispatch') {
         const technician = text(rawPayload.technician, 80);
         if (technician && !/^[0-9a-f-]{36}$/i.test(technician)) return reply(req, { ok: false, message: '維修人員識別碼無效' }, 400);
@@ -699,6 +700,17 @@ export async function handleAppApiRequest(req: Request) {
           return reply(req, { ok: false, message: '工時必須是零以上的數字' }, 400);
         }
         payload.labor_hours = laborHours;
+        // 費用不進 apply_repair_workflow 的 payload，流程推進成功後另外呼叫
+        // record_repair_completion_cost 寫入 cost_records，介接設備生命週期成本。
+        for (const key of ['parts_cost', 'labor_cost'] as const) {
+          const raw = rawPayload[key];
+          if (raw === null || raw === undefined || raw === '') continue;
+          const value = Number(raw);
+          if (!Number.isFinite(value) || value < 0 || value > 9999999999) {
+            return reply(req, { ok: false, message: '費用必須是零以上的數字' }, 400);
+          }
+          completionCost[key] = value;
+        }
         payload.note = text(rawPayload.note, 1000) || null;
       }
       const { data, error } = await userDb.rpc('apply_repair_workflow', {
@@ -707,7 +719,23 @@ export async function handleAppApiRequest(req: Request) {
         p_payload: payload,
       });
       if (error) return reply(req, { ok: false, message: text(error.message, 500) || '維修流程更新失敗' }, 400);
-      return reply(req, { ok: true, data });
+
+      // 完工是現場事實，費用寫入失敗不回滾流程——費用可以事後在費用統計頁補登，
+      // 但把完工擋下來會讓工程師卡在現場。失敗只回報警告。
+      let costWarning = '';
+      if (workflowAction === 'engineer_complete'
+          && (completionCost.parts_cost !== undefined || completionCost.labor_cost !== undefined)) {
+        const { error: costError } = await userDb.rpc('record_repair_completion_cost', {
+          p_request_id: requestId,
+          p_parts_cost: completionCost.parts_cost ?? null,
+          p_labor_cost: completionCost.labor_cost ?? null,
+        });
+        if (costError) {
+          console.error('record_repair_completion_cost failed:', costError.message);
+          costWarning = '，但費用未寫入費用系統，請至費用統計頁補登';
+        }
+      }
+      return reply(req, { ok: true, data, message: costWarning ? `已完工${costWarning}` : undefined });
     }
 
     if (action === 'dashboard') {

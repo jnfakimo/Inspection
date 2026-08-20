@@ -22,7 +22,7 @@ type ModuleData = {
 type RepairEquipmentOption = { equipment_id: string; name: string; asset_code?: string | null; location?: string | null; category?: string | null };
 type DispatchTechnician = { user_id: string; name: string; department?: string | null };
 type DispatchForm = { technician: string; vendor: string; expectedArrival: string; expectedFinish: string; workContent: string; needShutdown: boolean; needApproval: boolean };
-type CompletionForm = { faultCause: string; handleMethod: string; partsUsed: string; materials: string; laborHours: string; note: string };
+type CompletionForm = { faultCause: string; handleMethod: string; partsUsed: string; materials: string; laborHours: string; partsCost: string; laborCost: string; note: string };
 type RepairDetail = {
   request: Record<string, unknown>;
   order: Record<string, unknown> | null;
@@ -209,7 +209,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [dispatchTechnicians, setDispatchTechnicians] = useState<DispatchTechnician[]>([]);
     const [dispatchForm, setDispatchForm] = useState<DispatchForm>({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
     const [showDispatchForm, setShowDispatchForm] = useState(false);
-    const [completionForm, setCompletionForm] = useState<CompletionForm>({ faultCause: '', handleMethod: '', partsUsed: '', materials: '', laborHours: '', note: '' });
+    const [completionForm, setCompletionForm] = useState<CompletionForm>({ faultCause: '', handleMethod: '', partsUsed: '', materials: '', laborHours: '', partsCost: '', laborCost: '', note: '' });
     const [showCompletionForm, setShowCompletionForm] = useState(false);
     const [dispatchSaving, setDispatchSaving] = useState(false);
     const [dispatchMessage, setDispatchMessage] = useState('');
@@ -291,6 +291,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         partsUsed: String(order?.parts_used || ''),
         materials: String(order?.materials || ''),
         laborHours: order?.labor_hours == null ? '' : String(order.labor_hours),
+        partsCost: '', laborCost: '',
         note: String(order?.note || ''),
       });
       setDispatchMessage('');
@@ -304,6 +305,12 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       if (!completionForm.faultCause.trim()) { setDispatchMessage('請填寫故障原因'); return; }
       if (!completionForm.handleMethod.trim()) { setDispatchMessage('請填寫處理方式'); return; }
       const laborHours = completionForm.laborHours.trim() ? Number(completionForm.laborHours) : null;
+      // 費用填了才送；金額直接介接費用系統，會產生綁設備的費用紀錄。
+      const money = (raw: string) => (raw.trim() ? Number(raw) : null);
+      const partsCost = money(completionForm.partsCost), laborCost = money(completionForm.laborCost);
+      for (const [label, value] of [['零件費用', partsCost], ['工資費用', laborCost]] as const) {
+        if (value !== null && (!Number.isFinite(value) || value < 0)) { setDispatchMessage(`${label}必須是零以上的數字`); return; }
+      }
       if (laborHours != null && (!Number.isFinite(laborHours) || laborHours < 0)) { setDispatchMessage('工時必須是零以上的數字'); return; }
       setDispatchSaving(true);
       setDispatchMessage('');
@@ -317,6 +324,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             parts_used: completionForm.partsUsed.trim() || null,
             materials: completionForm.materials.trim() || null,
             labor_hours: laborHours,
+            parts_cost: partsCost,
+            labor_cost: laborCost,
             note: completionForm.note.trim() || null,
           },
         });
@@ -679,6 +688,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
                 <label><span>更換零件</span><input value={completionForm.partsUsed} onChange={event => setCompletionForm(current => ({ ...current, partsUsed: event.target.value }))} /></label>
                 <label><span>使用材料</span><input value={completionForm.materials} onChange={event => setCompletionForm(current => ({ ...current, materials: event.target.value }))} /></label>
                 <label><span>工時（小時）</span><input type="number" min="0" step="0.5" value={completionForm.laborHours} onChange={event => setCompletionForm(current => ({ ...current, laborHours: event.target.value }))} /></label>
+                <label><span>零件費用（元）</span><input type="number" min="0" step="1" value={completionForm.partsCost} onChange={event => setCompletionForm(current => ({ ...current, partsCost: event.target.value }))} /></label>
+                <label><span>工資費用（元）</span><input type="number" min="0" step="1" value={completionForm.laborCost} onChange={event => setCompletionForm(current => ({ ...current, laborCost: event.target.value }))} /></label>
                 <label><span>完工備註</span><input value={completionForm.note} onChange={event => setCompletionForm(current => ({ ...current, note: event.target.value }))} /></label>
               </div>
               <div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowCompletionForm(false)}>取消</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '送出中…' : '送出完工'}</button></div>
