@@ -43,6 +43,40 @@ export type FloorStackApi = {
   focusMarker: (markerId: string) => boolean;
 };
 
+/**
+ * 把平面圖貼圖重畫成「黑線 + 透明底」。
+ *
+ * 線條顏色是烘在 PNG 裡的青色，用 material.color 相乘雖然能把青色壓成黑色，
+ * 但只要圖檔是不透明白底，整片平面就會一起變黑。逐像素判斷才安全：
+ * 亮度接近白的視為背景（轉全透明），其餘視為線條（塗黑並保留原本的濃淡）。
+ */
+function recolourPlanTexture(THREE: typeof import('three'), texture: import('three').Texture): import('three').Texture {
+  const image = texture.image as HTMLImageElement | undefined;
+  if (!image?.width) return texture;
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return texture;
+  ctx.drawImage(image, 0, 0);
+  try {
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = data.data;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] === 0) continue; // 原本就透明，不動
+      const luma = (pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114);
+      if (luma > 232) { pixels[i + 3] = 0; continue; } // 近白＝背景
+      pixels[i] = 0; pixels[i + 1] = 0; pixels[i + 2] = 0;
+    }
+    ctx.putImageData(data, 0, 0);
+  } catch {
+    return texture; // 跨網域貼圖會讓 canvas 汙染，取不到像素時沿用原圖
+  }
+  const recoloured = new THREE.CanvasTexture(canvas);
+  recoloured.colorSpace = THREE.SRGBColorSpace;
+  return recoloured;
+}
+
 export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, apiRef }: {
   models: StackModel[]; markers: StackMarker[]; showMarkers?: boolean; gap?: number;
   xPan?: number; yPan?: number;
@@ -85,6 +119,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       dir.position.set(8, 14, 6);
       scene.add(dir);
 
+      // 標籤沿用 depthTest:false，會全部疊著畫；收集起來在每次算繪時做螢幕空間剔除。
+      const labelSprites: Array<import('three').Sprite> = [];
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
       // level 目前資料皆為 0，故以清單順序乘間距堆疊；日後 level 有值則優先採用。
@@ -106,7 +142,13 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         if (url) {
           loader.load(url, texture => {
             texture.colorSpace = THREE.SRGBColorSpace;
-            material.map = texture; material.color.set(0xffffff); material.needsUpdate = true;
+            // 平面圖的線條顏色烘在圖檔裡（青色）。淺色主題要黑線，但不能用
+            // material.color 相乘——若圖檔是不透明白底，整片平面會變黑。
+            // 改為逐像素重畫：近白視為背景轉全透明，其餘一律塗黑。
+            // 這同時讓堆疊的樓層彼此看得穿，不再互相遮擋。
+            material.map = isLight ? recolourPlanTexture(THREE, texture) : texture;
+            material.color.set(0xffffff);
+            material.needsUpdate = true;
           }, undefined, () => { /* 貼圖載入失敗時保留底色，不中斷場景 */ });
         }
 
@@ -131,27 +173,69 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             if (showLabels && marker.label) {
               const canvas = document.createElement('canvas');
               const ctx = canvas.getContext('2d')!;
-              ctx.font = '16px sans-serif';
+              const FONT = '14px sans-serif';
+              ctx.font = FONT;
               const textWidth = ctx.measureText(marker.label).width;
-              canvas.width = Math.max(textWidth + 10, 64);
-              canvas.height = 24;
-              ctx.font = '16px sans-serif';
+              canvas.width = Math.max(textWidth + 12, 64);
+              canvas.height = 22;
+              ctx.font = FONT;
+              // 先描邊再填字：標籤會疊在圖面線條上，沒有描邊在淺色主題幾乎讀不出來。
+              ctx.lineWidth = 3;
+              ctx.strokeStyle = isLight ? '#ffffff' : '#04101f';
+              ctx.strokeText(marker.label, 6, 16);
               ctx.fillStyle = isLight ? '#000000' : '#ffffff';
-              ctx.fillText(marker.label, 5, 18);
+              ctx.fillText(marker.label, 6, 16);
               
               const tex = new THREE.CanvasTexture(canvas);
               const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
               const sprite = new THREE.Sprite(mat);
               sprite.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.35, marker.y * PLANE_H - PLANE_H / 2);
-              sprite.scale.set(canvas.width / 40, canvas.height / 40, 1);
+              sprite.scale.set(canvas.width / 44, canvas.height / 44, 1);
               scene.add(sprite);
+              labelSprites.push(sprite);
             }
           }
         }
       });
 
       let raf = 0;
-      const tick = () => { controls.update(); renderer.render(scene, camera); raf = requestAnimationFrame(tick); };
+      // 螢幕空間網格剔除：把畫面切成格子，每格只留離鏡頭最近的一個標籤。
+      // 不做精確的矩形碰撞是刻意的——標籤的螢幕尺寸隨距離變動，用固定格子既穩定
+      // 又便宜，密集區會自動只顯示代表性的幾個，轉動視角時即時重算。
+      const LABEL_CELL_W = 104;
+      const LABEL_CELL_H = 22;
+      const occupied = new Set<string>();
+      const projected = new THREE.Vector3();
+      const cullLabels = () => {
+        if (!labelSprites.length) return;
+        const { clientWidth: vw, clientHeight: vh } = host;
+        occupied.clear();
+        const ordered = labelSprites
+          .map(sprite => ({ sprite, distance: camera.position.distanceTo(sprite.position) }))
+          .sort((a, b) => a.distance - b.distance);
+        for (const { sprite } of ordered) {
+          projected.copy(sprite.position).project(camera);
+          if (projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1) {
+            sprite.visible = false;
+            continue;
+          }
+          const sx = (projected.x + 1) / 2 * vw;
+          const sy = (1 - projected.y) / 2 * vh;
+          const key = `${Math.floor(sx / LABEL_CELL_W)}:${Math.floor(sy / LABEL_CELL_H)}`;
+          if (occupied.has(key)) { sprite.visible = false; continue; }
+          occupied.add(key);
+          sprite.visible = true;
+        }
+      };
+      let frame = 0;
+      const tick = () => {
+        controls.update();
+        // 每四格畫面重算一次即可，肉眼看不出延遲，卻省下大部分計算。
+        if (frame % 4 === 0) cullLabels();
+        frame += 1;
+        renderer.render(scene, camera);
+        raf = requestAnimationFrame(tick);
+      };
       tick();
 
       // V1 的 resetView／topView 是直接設定自製球座標的 theta／phi／r；這裡場景尺度不同

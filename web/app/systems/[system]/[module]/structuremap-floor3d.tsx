@@ -62,8 +62,9 @@ export function Floor3DBoardModule({ profile }: Props) {
     () => Object.fromEntries(KIND_ORDER.map(kind => [kind, true])));
   const [showLabels, setShowLabels] = useState(false);
 
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [floorsOpen, setFloorsOpen] = useState(true);
+  // 三個面板一律預設收合：進場先看到完整的模型，需要調整時再自行展開。
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [floorsOpen, setFloorsOpen] = useState(false);
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
   const [markerPanelPinned, setMarkerPanelPinned] = useState(false);
   const [focusNotice, setFocusNotice] = useState('');
