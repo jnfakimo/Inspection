@@ -371,12 +371,12 @@
 .deleteButton,
 .rowActions button,
 .modalActions button {
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font: inherit;
   font-size: 0.78rem;
   font-weight: 750;
-  min-height: 38px;
+  min-height: 40px;
   padding: 8px 13px;
 }
 
@@ -384,7 +384,7 @@
   background: #dbeafe;
   border: 1px solid #7dd3fc;
   color: #075985;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.85rem;
   line-height: 1.2;
   min-height: 40px;
@@ -591,8 +591,8 @@
   background: #fff;
   border: 1px solid #c6d3df;
   color: #3d556c;
-  min-height: 32px;
-  padding: 5px 9px;
+  min-height: 40px;
+  padding: 10px 14px;
 }
 
 .rowActions button:hover {
@@ -830,9 +830,9 @@
 }
 
 .modalActions .primaryButton {
-  background: #0089ad;
-  border-color: #0089ad;
-  color: #fff;
+  background: #dbeafe;
+  border-color: #7dd3fc;
+  color: #075985;
 }
 
 .denied {

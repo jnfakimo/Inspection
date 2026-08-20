@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
-import { AdminHeader, type AdminProps, errorMessage, fmtTime, type Row } from './shared';
+import { AdminHeader, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, type Row } from './shared';
 
 const NOTICE_EVENT_LABELS: Record<string, string> = {
   new_repair: '新報修', dispatch: '已派工', return: '退件', overdue: '逾期提醒',
@@ -13,7 +13,7 @@ const NOTICE_EVENT_LABELS: Record<string, string> = {
 };
 
 export function NoticesAdmin({ profile, module }: AdminProps) {
-  const [notices, setNotices] = useState<Row[]>([]), [busy, setBusy] = useState(true), [note, setNote] = useState(''), [tab, setTab] = useState<'all' | 'unread' | 'read'>('all'), [query, setQuery] = useState('');
+  const [notices, setNotices] = useState<Row[]>([]), [busy, setBusy] = useState(true), [note, setNote] = useState(''), [tab, setTab] = useState<'all' | 'unread' | 'read'>('all'), [query, setQuery] = useState(''), [page, setPage] = useState(1);
   const load = useCallback(async (options: { preserveNote?: boolean } = {}) => {
     setBusy(true); if (!options.preserveNote) setNote('');
     const { data, error } = await getSupabase().from('notifications').select('*').eq('recipient_id', profile.user_id).order('created_at', { ascending: false }).limit(1000);
@@ -31,6 +31,8 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
     const q = query.trim().toLowerCase(); const read = Boolean(row.is_read);
     return (tab === 'all' || (tab === 'read' ? read : !read)) && (!q || [row.title, row.body, row.event].some(value => String(value || '').toLowerCase().includes(q)));
   }), [notices, query, tab]);
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [query, tab]);
   const mark = async (notifId?: string) => {
     setBusy(true); setNote('');
     try {
@@ -43,7 +45,8 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={() => { void load(); }} action={<button className="primary-btn compact" disabled={busy || unread === 0} onClick={() => window.confirm(`確定將 ${unread} 筆未讀通知全部標記為已讀？`) && void mark()}>全部標記已讀</button>}/>
     <section className="panel admin-panel"><div className="admin-tabs"><button className={tab === 'all' ? 'active' : ''} onClick={() => setTab('all')}>全部 {notices.length}</button><button className={tab === 'unread' ? 'active' : ''} onClick={() => setTab('unread')}>未讀 {unread}</button><button className={tab === 'read' ? 'active' : ''} onClick={() => setTab('read')}>已讀 {notices.length - unread}</button></div><div className="admin-toolbar"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋通知標題、內容或事件"/></div>
-      <div className="admin-notice-list">{rows.map(row => <article className={row.is_read ? 'read' : 'unread'} key={row.notif_id}><div><span className="notice-event">{NOTICE_EVENT_LABELS[String(row.event || '')] || '系統通知'}</span><h3>{row.title || '系統通知'}</h3><p>{row.body || '—'}</p><time>{fmtTime(row.created_at)}</time></div>{!row.is_read && <button className="secondary-btn" disabled={busy} onClick={() => void mark(row.notif_id)}>標記已讀</button>}</article>)}{!busy && rows.length === 0 && <p className="empty">目前沒有符合條件的通知</p>}</div>
+      <div className="admin-notice-list">{pageRows.map(row => <article className={row.is_read ? 'read' : 'unread'} key={row.notif_id}><div><span className="notice-event">{NOTICE_EVENT_LABELS[String(row.event || '')] || '系統通知'}</span><h3>{row.title || '系統通知'}</h3><p>{row.body || '—'}</p><time>{fmtTime(row.created_at)}</time></div>{!row.is_read && <button className="secondary-btn" disabled={busy} onClick={() => void mark(row.notif_id)}>標記已讀</button>}</article>)}{!busy && rows.length === 0 && <p className="empty">目前沒有符合條件的通知</p>}</div>
+      {rows.length > 0 && <Pager page={page} total={rows.length} onPage={setPage} />}
     </section>
   </AppShell>;
 }

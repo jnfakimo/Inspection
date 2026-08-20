@@ -6,6 +6,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { LEGACY_BASE } from '@/lib/config';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { zhValue } from '@/lib/zh-tw';
+import { PAGE_SIZE, Pager } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -27,7 +28,6 @@ type RepairDetail = {
   logs: Array<Record<string, unknown>>;
 };
 
-const REQUEST_PAGE_SIZE = 10;
 const EMPTY_FILTER_VALUE = '__empty__';
 const REQUEST_COLUMNS = [
   { key: 'req_no', label: '報修單號' },
@@ -457,12 +457,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       }
       return options;
     }, [data]);
-    const totalPages = isRepairTableModule ? Math.max(1, Math.ceil(rows.length / REQUEST_PAGE_SIZE)) : 1;
-    const visibleRows = isRepairTableModule ? rows.slice((page - 1) * REQUEST_PAGE_SIZE, page * REQUEST_PAGE_SIZE) : rows;
-    const paginationPages = useMemo(() => {
-      if (totalPages <= 7) return Array.from({ length: totalPages }, (_, index) => index + 1);
-      return [...new Set([1, page - 1, page, page + 1, totalPages])].filter(item => item >= 1 && item <= totalPages).sort((a, b) => a - b);
-    }, [page, totalPages]);
+    const totalPages = isRepairTableModule ? Math.max(1, Math.ceil(rows.length / PAGE_SIZE)) : 1;
+    const visibleRows = isRepairTableModule ? rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : rows;
 
     useEffect(() => { setPage(1); }, [columnFilters, query, statusFilter]);
     useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
@@ -631,14 +627,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             </table>
             {data && rows.length === 0 && <p className="empty">查無資料</p>}
           </div>
-          {isRepairTableModule && rows.length > 0 && <nav className="request-pagination" aria-label="報修案件分頁">
-            <span>每頁 {REQUEST_PAGE_SIZE} 筆，第 {page}／{totalPages} 頁，共 {rows.length} 筆</span>
-            <div>
-              <button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={page === 1} aria-label="上一頁">‹</button>
-              {paginationPages.map((pageNumber, index) => <span key={pageNumber} className="request-page-item">{index > 0 && pageNumber - paginationPages[index - 1] > 1 && <i>…</i>}<button type="button" className={page === pageNumber ? 'active' : ''} onClick={() => setPage(pageNumber)} aria-current={page === pageNumber ? 'page' : undefined}>{pageNumber}</button></span>)}
-              <button type="button" onClick={() => setPage(current => Math.min(totalPages, current + 1))} disabled={page === totalPages} aria-label="下一頁">›</button>
-            </div>
-          </nav>}
+          {isRepairTableModule && rows.length > 0 && <Pager page={page} total={rows.length} onPage={setPage} />}
         </>}
       </section>
       {selectedRow && detailRequest && <div className="request-detail-backdrop" role="dialog" aria-modal="true" aria-labelledby="repair-detail-title"><section className="request-detail-modal">

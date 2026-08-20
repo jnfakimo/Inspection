@@ -824,6 +824,7 @@ function RosterModule({ module, profile }: Props) {
   const roleWord = module.key === 'drivers' ? '駕駛' : '派車管理員';
   const { isAdmin } = useFleetRole(profile);
   const [rows, setRows] = useState<Row[]>([]);
+  const [page, setPage] = useState(1);
   const [candidates, setCandidates] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [picking, setPicking] = useState(false), [pick, setPick] = useState('');
 
@@ -853,6 +854,9 @@ function RosterModule({ module, profile }: Props) {
   };
 
   const listed = new Set(rows.map(row => String(row.user_id)));
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
@@ -862,7 +866,7 @@ function RosterModule({ module, profile }: Props) {
         {!isAdmin && <span className="inline-message">僅系統管理員可調整此名單</span>}</div>
       <div className="responsive-table"><table>
         <thead><tr><th>姓名</th><th>帳號</th><th>單位</th><th>狀態</th><th>設定時間</th>{isAdmin && <th>操作</th>}</tr></thead>
-        <tbody>{rows.map(row => {
+        <tbody>{pageRows.map(row => {
           const user = (row.users as Row) || {};
           return <tr key={String(row.user_id)}>
             <td><strong>{fmt(user.name)}</strong>{user.status === 'inactive' ? <small>帳號已停用</small> : null}</td>
@@ -877,6 +881,7 @@ function RosterModule({ module, profile }: Props) {
         })}</tbody>
       </table></div>
       {!busy && rows.length === 0 && <p className="empty">尚未設定任何{roleWord}</p>}
+      {rows.length > 0 && <Pager page={page} total={rows.length} onPage={setPage} />}
     </section>
 
     {picking && <AdminModal title={`新增${roleWord}`} onClose={() => setPicking(false)}>
