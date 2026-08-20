@@ -16,6 +16,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -514,7 +515,11 @@ function FieldInput({ field, value, onChange }: { field: Field; value: unknown; 
         />
       : field.type === 'textarea'
         ? <textarea rows={2} placeholder={field.placeholder} {...common} />
-        : <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
-            step={field.step} placeholder={field.placeholder} {...common} />}
+        // 日期一律走 LocalizedDateInput；原生 date 欄位在空值時會蓋上瀏覽器自己的
+        // 格式提示，繁中環境會顯示成「yyyy/月/dd」這種中英混雜。
+        : field.type === 'date'
+          ? <LocalizedDateInput {...common} value={String(common.value ?? '')} />
+          : <input type={field.type === 'number' ? 'number' : 'text'}
+              step={field.step} placeholder={field.placeholder} {...common} />}
   </label>;
 }

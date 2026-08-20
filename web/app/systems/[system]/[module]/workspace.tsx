@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { LEGACY_BASE } from '@/lib/config';
@@ -8,6 +8,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { zhValue } from '@/lib/zh-tw';
 import { PAGE_SIZE, Pager } from '@/components/admin/shared';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { locationOptions, type LocationLike } from '@/lib/locations';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -154,7 +155,12 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
 
   if (column.key === 'created_at' || column.key === 'desired_finish') {
-    return <th><input className='request-filter-date' type={columnFilters[column.key] ? 'date' : 'text'} placeholder='年/月/日' value={columnFilters[column.key] || ''} onChange={event => update(event.target.value)} onFocus={e => { e.currentTarget.type = 'date'; try { e.currentTarget.showPicker(); } catch(err){} }} onBlur={e => { if (!e.currentTarget.value) e.currentTarget.type = 'text'; }} aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
+    // 原本是自己在 text／date 之間切換 type 的土炮寫法，一旦切成 date 且值為空，
+    // 瀏覽器就會蓋上自己的格式提示，在繁中環境顯示成「yyyy/月/dd」這種中英混雜。
+    // 一律改用 LocalizedDateInput：空值顯示「年/月/日」，聚焦才開原生日曆。
+    return <th><LocalizedDateInput className='request-filter-date' value={columnFilters[column.key] || ''}
+      onChange={(event: ChangeEvent<HTMLInputElement>) => update(event.target.value)}
+      aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
   }
 
   const isStatus = column.key === 'status';

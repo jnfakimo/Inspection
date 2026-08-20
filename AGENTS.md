@@ -99,8 +99,13 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
     fixed on 08-18, had `rgba(2,11,24,0.7)` put back on 08-19 by a different agent,
     and shipped at 1.84:1 on the post-login landing page until it was caught.
 - **Date inputs**: unified format is 西元 `YYYY-MM-DD` (datetime `YYYY-MM-DD HH:mm`);
-  date inputs use a calendar picker; forms show a 填表日期 (today). Use the local
-  `fmtDate()`/`todayISO()` helpers.
+  forms show a 填表日期 (today). Use the local `fmtDate()`/`todayISO()` helpers.
+  **Always render date fields with `@/components/LocalizedDateInput`, never a bare
+  `<input type="date">`** (and never hand-roll a text↔date type swap). An empty native
+  date field is painted with the browser's own format hint, which in a Traditional Chinese
+  environment comes out as the mixed 「yyyy/月/dd」. `LocalizedDateInput` shows 「年/月/日」
+  while empty and only opens the native calendar on focus, so every date field looks the
+  same on every machine.
 - **Every user-facing string is Traditional Chinese.** Status codes, action codes and
   enum values are stored in English (`create`, `closed`, `pending`, …) but must never
   reach the screen raw — map them through a `Record<string, string>` label table next
