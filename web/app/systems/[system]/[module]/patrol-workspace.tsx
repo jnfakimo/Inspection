@@ -225,10 +225,7 @@ function RecordsModule({ module, profile }: Props) {
 // 用單位過濾而不是寫死人名，日後新進同仁只要單位設對就會自動出現在清單裡。
 // 完全比不到時寧可留白並說明原因，也不要悄悄退回顯示全公司的人。
 const PATROL_UNIT_KEYWORDS = ['駐警', '駐衛'];
-const inPatrolUnit = (user: Row) => {
-  const unit = String(user.department ?? '');
-  return PATROL_UNIT_KEYWORDS.some(keyword => unit.includes(keyword));
-};
+const matchesPatrolUnit = (unit: string) => PATROL_UNIT_KEYWORDS.some(keyword => unit.includes(keyword));
 
 type StaffConfig = {
   templates: Record<string, string[]>;
@@ -241,6 +238,7 @@ function ShiftsModule({ module, profile }: Props) {
   const [shifts, setShifts] = useState<Row[]>([]);
   const [templates, setTemplates] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
+  const [departments, setDepartments] = useState<Row[]>([]);
   const [config, setConfig] = useState<StaffConfig | null>(null);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [editor, setEditor] = useState<Row | null>(null);
@@ -250,24 +248,32 @@ function ShiftsModule({ module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
-    const [s, t, u, c] = await Promise.all([
+    const [s, t, u, c, d] = await Promise.all([
       client.from('patrol_shifts').select('*').eq('shift_date', date).order('sort_order').order('start_time'),
       client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
-      client.from('users').select('user_id,name,username,department').eq('status', 'active').order('name').limit(2000),
+      client.from('users').select('user_id,name,username,department,dept_id').eq('status', 'active').order('name').limit(2000),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
+      client.from('departments').select('dept_id,name').limit(1000),
     ]);
     if (s.error || t.error || u.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error, '排班資料載入失敗')}`);
     setShifts((s.data || []).filter(row => !isDeletedShift(row.name)));
     setTemplates(t.data || []); 
     setUsers(u.data || []);
+    setDepartments(d.data || []);
     // system_settings 為 admin-only，非管理者讀不到；此時通報時段留白即可，不擋畫面。
     try { setConfig(c.data?.value ? JSON.parse(String(c.data.value)) : null); } catch { setConfig(null); }
     setBusy(false);
   }, [date]);
   useEffect(() => { void load(); }, [load]);
 
-  // 名稱查詢仍用完整名冊：早期指派、後來調離駐衛隊的人，名字才不會退化成 UUID。
-  const patrolStaff = useMemo(() => users.filter(inPatrolUnit), [users]);
+  // 單位以 dept_id 對 departments 為準、users.department 只當後備：後台那張表就是
+  // 這樣解析的，只讀副本會出現「後台看得到單位、排班卻抓不到人」而查不出原因。
+  // 名稱查詢仍用完整名冊：早期指派、後來調離的人，名字才不會退化成 UUID。
+  const patrolStaff = useMemo(() => {
+    const nameOfDept = new Map(departments.map(dept => [dept.dept_id, String(dept.name ?? '')]));
+    return users.filter(user => matchesPatrolUnit(
+      nameOfDept.get(user.dept_id) || String(user.department ?? '')));
+  }, [users, departments]);
   const nameOf = useCallback((id: unknown) => users.find(u => u.user_id === id)?.name || String(id ?? ''), [users]);
   const namesOf = useCallback((ids: unknown) => Array.isArray(ids) && ids.length ? ids.map(nameOf).join('、') : '—', [nameOf]);
   const workTimeOf = (scope: 'date' | 'template', name: string) => {
