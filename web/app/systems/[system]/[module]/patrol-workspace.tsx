@@ -220,6 +220,11 @@ function RecordsModule({ module, profile }: Props) {
 
 /* ──────────────────────────── 巡檢排班 ──────────────────────────── */
 
+// 排班只從駐衛隊帶人。比對用關鍵字而非完整名稱，「駐衛隊」「駐衛警隊」都吃得到；
+// 完全比不到時寧可留白並說明原因，也不要悄悄退回顯示全公司的人。
+const PATROL_UNIT_KEYWORD = '駐衛';
+const inPatrolUnit = (user: Row) => String(user.department ?? '').includes(PATROL_UNIT_KEYWORD);
+
 type StaffConfig = {
   templates: Record<string, string[]>;
   dates: Record<string, Record<string, string[]>>;
@@ -234,6 +239,8 @@ function ShiftsModule({ module, profile }: Props) {
   const [config, setConfig] = useState<StaffConfig | null>(null);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [editor, setEditor] = useState<Row | null>(null);
+  const [applyTpl, setApplyTpl] = useState<Row | null>(null);
+  const [applyRange, setApplyRange] = useState({ from: taipeiToday(), to: taipeiToday() });
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -254,6 +261,8 @@ function ShiftsModule({ module, profile }: Props) {
   }, [date]);
   useEffect(() => { void load(); }, [load]);
 
+  // 名稱查詢仍用完整名冊：早期指派、後來調離駐衛隊的人，名字才不會退化成 UUID。
+  const patrolStaff = useMemo(() => users.filter(inPatrolUnit), [users]);
   const nameOf = useCallback((id: unknown) => users.find(u => u.user_id === id)?.name || String(id ?? ''), [users]);
   const namesOf = useCallback((ids: unknown) => Array.isArray(ids) && ids.length ? ids.map(nameOf).join('、') : '—', [nameOf]);
   const workTimeOf = (scope: 'date' | 'template', name: string) => {
@@ -302,10 +311,22 @@ function ShiftsModule({ module, profile }: Props) {
     return { ...prev, assigned_user_ids: list.includes(id) ? list.filter(x => x !== id) : [...list, id] };
   });
 
-  const applyTemplate = (tpl: Row) => openEditor({
-    name: tpl.name, start_time: tpl.start_time, end_time: tpl.end_time, sort_order: tpl.sort_order,
-    assigned_user_ids: Array.isArray(tpl.assigned_user_ids) ? tpl.assigned_user_ids : [],
-  }, 'date');
+  const openApply = (tpl: Row) => { setApplyRange({ from: date, to: date }); setApplyTpl(tpl); };
+
+  // 整段區間在資料庫端的單一交易內完成，中途失敗不會留下半套班表。
+  const runApply = async () => {
+    if (!applyTpl) return;
+    if (!applyRange.from || !applyRange.to) { setNote('失敗：請填寫套用的起訖日期'); return; }
+    if (applyRange.to < applyRange.from) { setNote('失敗：迄日不可早於起日'); return; }
+    setBusy(true); setNote('');
+    const { data, error } = await getSupabase().rpc('apply_patrol_shift_template_range', {
+      p_template_id: applyTpl.template_id, p_from: applyRange.from, p_to: applyRange.to,
+    });
+    if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
+    const name = String(applyTpl.name);
+    setApplyTpl(null); await load();
+    setNote(`已套用「${name}」到 ${applyRange.from} ～ ${applyRange.to}，共 ${Number(data ?? 0)} 天`);
+  };
 
   const confirmDelete = async (row: Row, scope: 'date' | 'template') => {
     if (!confirm(`確定要刪除${scope === 'template' ? '範本' : '班別'}「${row.name}」嗎？`)) return;
@@ -359,7 +380,7 @@ function ShiftsModule({ module, profile }: Props) {
           <td>{workTimeOf('template', String(row.name))}</td>
           <td>{namesOf(row.assigned_user_ids)}</td>
           <td><div className="admin-row-actions">
-            <button onClick={() => applyTemplate(row)}>套用到 {date}</button>
+            <button onClick={() => openApply(row)}>套用到期間</button>
             <button onClick={() => openEditor(row, 'template')}>編輯範本</button>
             <button onClick={() => confirmDelete(row, 'template')} className="danger">刪除</button>
           </div></td>
@@ -381,18 +402,38 @@ function ShiftsModule({ module, profile }: Props) {
       <div className="detail-timeline">
         <h3>排定人員（{Array.isArray(editor.assigned_user_ids) ? editor.assigned_user_ids.length : 0} 人）</h3>
         <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
-          {users.map(user => {
+          {patrolStaff.map(user => {
             const on = Array.isArray(editor.assigned_user_ids) && editor.assigned_user_ids.includes(user.user_id);
             return <button key={String(user.user_id)} type="button"
               className={on ? 'primary-btn compact' : 'secondary-btn'}
               onClick={() => toggleStaff(String(user.user_id))}>{on ? '✓ ' : ''}{user.name}</button>;
           })}
         </div>
+        {!busy && patrolStaff.length === 0 && <p className="inline-message danger">
+          找不到單位含「{PATROL_UNIT_KEYWORD}」的啟用中人員。請到後台的人員管理確認駐衛隊同仁的單位設定。
+        </p>}
       </div>
       <p className="inline-message">班別時段與通報時段是兩組獨立的值：前者存在班別資料表，後者存在排班設定的 workTimes，儲存時會各自寫入。</p>
       <footer>
         <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
+      </footer>
+    </AdminModal>}
+
+    {applyTpl && <AdminModal title={`套用班別範本｜${fmt(applyTpl.name)}`} onClose={() => setApplyTpl(null)}>
+      <div className="admin-form-grid">
+        <label>起<LocalizedDateInput aria-label="套用起日（年/月/日）" value={applyRange.from}
+          onChange={e => setApplyRange(prev => ({ ...prev, from: e.target.value }))} /></label>
+        <label>迄<LocalizedDateInput aria-label="套用迄日（年/月/日）" value={applyRange.to}
+          onChange={e => setApplyRange(prev => ({ ...prev, to: e.target.value }))} /></label>
+      </div>
+      <p className="inline-message">
+        區間內的每一天都會建立「{fmt(applyTpl.name)}」，時段、排定人員與通報時段沿用範本；
+        某天已經有同名班別時會以範本內容覆寫。一次最多 366 天。
+      </p>
+      <footer>
+        <button className="secondary-btn" onClick={() => setApplyTpl(null)}>取消</button>
+        <button className="primary-btn compact" disabled={busy} onClick={() => void runApply()}>{busy ? '套用中…' : '套用'}</button>
       </footer>
     </AdminModal>}
   </AppShell>;
