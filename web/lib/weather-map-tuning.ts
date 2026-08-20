@@ -48,7 +48,7 @@ export const COUNTY_MARGIN_OFFSET: Record<string, number> = {
   // ── 北部 ──
   基隆市: 0,
   臺北市: 0,
-  新北市: 20,
+  新北市: 50,
   桃園市: 0,
   新竹市: 0,
   新竹縣: 0,
