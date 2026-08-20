@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { setErrorTrackerUser } from '@/lib/error-tracker';
 import type { Profile } from '@/types/app';
 
 export function AuthGate({ children }: { children: (profile: Profile) => React.ReactNode }) {
@@ -21,6 +22,9 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
       }
       try {
         const current = await invokeAppApi<Profile>('profile');
+        // 身分確定後才送得出錯誤紀錄：client_error_logs 的 insert 政策要求
+        // user_id 為 null 或本人，在此之前發生的事件會留在佇列裡等這一刻。
+        setErrorTrackerUser(current?.user_id ? String(current.user_id) : null);
         if (active) setProfile(current);
       } catch (error) {
         if (active) setMessage(error instanceof Error ? error.message : '登入驗證失敗');

@@ -2,6 +2,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
+import { reportIfInfrastructureError } from './error-tracker';
 
 let client: SupabaseClient | null = null;
 const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
@@ -45,7 +46,10 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
 
     if (response) {
       const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) throw new Error(result?.message || '系統服務回傳失敗');
+      if (!response.ok || !result?.ok) {
+        reportIfInfrastructureError(result?.message, { action, via: 'node-api' });
+        throw new Error(result?.message || '系統服務回傳失敗');
+      }
       return result.data as T;
     }
   }
@@ -64,6 +68,9 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
     }
     throw new Error(`Edge Function 失敗: ${msg}`);
   }
-  if (!data?.ok) throw new Error(data?.message || '系統服務回傳失敗');
+  if (!data?.ok) {
+    reportIfInfrastructureError(data?.message, { action, via: 'edge-function' });
+    throw new Error(data?.message || '系統服務回傳失敗');
+  }
   return data.data as T;
 }
