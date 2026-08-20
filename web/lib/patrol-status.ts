@@ -87,7 +87,8 @@ const overridePromises = new Map<string, Promise<any[]>>();
 function getBaseData(client: Client) {
   if (!baseDataPromise) {
     baseDataPromise = Promise.all([
-      client.from('patrol_shift_template').select('*').order('sort_order'),
+      // 已軟刪除的範本不得再產生通報時窗，過濾規則要與排班頁一致。
+      client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
     ]).then(([templateResult, settingResult]) => ({
       templates: templateResult.data || [], setting: settingResult.data,
