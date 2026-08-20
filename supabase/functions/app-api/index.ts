@@ -256,9 +256,16 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     const { data: profile, error: profileError } = await admin.from('users')
-      .select('user_id,username,email,name,phone,department,role,rbac_role,status')
+      .select('user_id,username,email,name,phone,department,dept_id,role,rbac_role,status')
       .eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
+    // users.department 只是依 dept_id 從 departments 查出來後寫回的副本，兩者可能不同步
+    // （例如帳號的單位是用其他途徑設定的）。副本空白時改以 dept_id 為準，否則頁首會
+    // 顯示「未設定單位」，但後台人員清單同一個帳號卻看得到單位，使用者無從理解。
+    if (!text(profile.department, 100) && profile.dept_id) {
+      const { data: dept } = await admin.from('departments').select('name').eq('dept_id', profile.dept_id).maybeSingle();
+      if (dept?.name) profile.department = dept.name;
+    }
 
     const roleId = profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor', maintenance: 'technician', inspector: 'reporter' } as Record<string, string>)[profile.role] || profile.role;
     const isSysadmin = roleId === 'sysadmin' || profile.role === 'admin';
