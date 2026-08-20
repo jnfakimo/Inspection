@@ -30,3 +30,13 @@
 .operations-matrix .floor-orphan{margin-left:6px;color:var(--amber);font-size:11px}
 .operations-matrix .point-row td{background:var(--surface-soft)}
 .operations-matrix .point-row .point-name{padding-left:22px;color:var(--dim)}
+
+/* 篩選／匯出列：與日期列採同一套尺寸（80%），兩列看起來才是一組的。
+   七個控制項要排進一行，寬度逐項收斂，不靠捲軸。 */
+.operations-filter-row{flex-wrap:nowrap;overflow:visible;gap:6px;font-size:.8em;align-items:flex-end}
+.operations-filter-row>label{flex:0 1 auto;min-width:0;gap:3px}
+.operations-filter-row input,.operations-filter-row select{width:104px;box-sizing:border-box;padding:5px 6px;font:inherit}
+.operations-filter-row .localized-date-input{width:96px}
+.operations-filter-row .localized-date-input input{width:100%;padding:5px 20px 5px 6px;text-align:center}
+.operations-filter-row .localized-date-input button{right:4px;font-size:.9em}
+.operations-filter-row .operations-export{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
