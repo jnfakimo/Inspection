@@ -81,7 +81,9 @@
   padding: 0 14px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 97%, transparent);
-  overflow-x: auto;
+  /* 與 3D 模型圖同樣的問題：overflow-x:auto 的捲軸軌道會在頂列下方畫出一條
+     深色橫線，看起來像多了一條分隔線。內容排得下，不需要捲動。 */
+  overflow: hidden;
 }
 
 .mb-topbar .tb-logo {

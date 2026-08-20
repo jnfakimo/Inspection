@@ -77,7 +77,9 @@
   padding: 0 14px;
   border-bottom: 1px solid var(--line);
   background: color-mix(in srgb, var(--panel) 97%, transparent);
-  overflow-x: auto;
+  /* 原本是 overflow-x:auto，捲軸軌道會在頂列與 3D 畫面之間畫出一條深色橫線，
+     看起來像多了一條分隔線。內容本來就排得下，不需要捲動。 */
+  overflow: hidden;
 }
 
 .f3-topbar .tb-logo {
@@ -209,7 +211,8 @@
 .f3-toggle:hover { border-color: var(--cyan); }
 .f3-toggle.ctrl { left: 14px; top: 62px; }
 .f3-toggle.floors { right: 14px; top: 62px; }
-.f3-toggle.marks { left: 14px; bottom: 14px; }
+/* 標記顯示改置於立體控制正下方，三個入口沿左上／右上排列，不再散落到左下角。 */
+.f3-toggle.marks { left: 14px; top: 104px; }
 
 /* ── 面板共用 ───────────────────────────────────────────────────────── */
 
@@ -371,16 +374,18 @@
 
 .f3-mkpanel {
   left: 14px;
-  bottom: 14px;
-  width: 176px;
+  top: 104px;
+  /* 176px 放不下標題加上「釘住」「隱藏」兩顆按鈕，會擠成一團。 */
+  width: 214px;
   z-index: 151;
 }
 
 .f3-mkpanel .chk {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 5px;
+  gap: 9px;
+  margin-top: 8px;
+  line-height: 1.5;
   color: var(--dim);
   cursor: pointer;
 }
@@ -420,3 +425,8 @@
   .f3-loading .ld-fill,
   .f3-panel .mini { transition: none; }
 }
+
+/* 標題列的兩顆按鈕：縮小字級並允許換行，短面板寬度下才不會互相擠壓。 */
+.f3-mkpanel .panel-head{flex-wrap:wrap;gap:6px}
+.f3-mkpanel .head-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.f3-mkpanel .head-acts .panel-close{padding:2px 6px;font-size:11px;white-space:nowrap}

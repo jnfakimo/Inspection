@@ -176,15 +176,31 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
               const FONT = '14px sans-serif';
               ctx.font = FONT;
               const textWidth = ctx.measureText(marker.label).width;
-              canvas.width = Math.max(textWidth + 12, 64);
-              canvas.height = 22;
+              canvas.width = Math.max(textWidth + 16, 64);
+              canvas.height = 24;
+              // 底色板：描邊只能救單一字元的邊緣，標籤疊在密集的圖面線條上仍然難讀。
+              // 鋪一塊半透明底再寫字，字才會從圖面裡跳出來。
+              const radius = 5;
+              ctx.beginPath();
+              ctx.moveTo(radius, 0);
+              ctx.lineTo(canvas.width - radius, 0);
+              ctx.quadraticCurveTo(canvas.width, 0, canvas.width, radius);
+              ctx.lineTo(canvas.width, canvas.height - radius);
+              ctx.quadraticCurveTo(canvas.width, canvas.height, canvas.width - radius, canvas.height);
+              ctx.lineTo(radius, canvas.height);
+              ctx.quadraticCurveTo(0, canvas.height, 0, canvas.height - radius);
+              ctx.lineTo(0, radius);
+              ctx.quadraticCurveTo(0, 0, radius, 0);
+              ctx.closePath();
+              ctx.fillStyle = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(4,16,31,0.88)';
+              ctx.fill();
+              ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)';
+              ctx.lineWidth = 1;
+              ctx.stroke();
+
               ctx.font = FONT;
-              // 先描邊再填字：標籤會疊在圖面線條上，沒有描邊在淺色主題幾乎讀不出來。
-              ctx.lineWidth = 3;
-              ctx.strokeStyle = isLight ? '#ffffff' : '#04101f';
-              ctx.strokeText(marker.label, 6, 16);
               ctx.fillStyle = isLight ? '#000000' : '#ffffff';
-              ctx.fillText(marker.label, 6, 16);
+              ctx.fillText(marker.label, 8, 17);
               
               const tex = new THREE.CanvasTexture(canvas);
               const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
