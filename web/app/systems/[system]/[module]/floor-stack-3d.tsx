@@ -122,6 +122,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       // 標籤沿用 depthTest:false，會全部疊著畫；收集起來在每次算繪時做螢幕空間剔除。
       const labelSprites: Array<import('three').Sprite> = [];
+      const leaderLines: Array<{ leader: import('three').Line; sprite: import('three').Sprite }> = [];
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
       // level 目前資料皆為 0，故以清單順序乘間距堆疊；日後 level 有值則優先採用。
@@ -165,7 +166,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             if (!isKindVisible) continue;
             
             const dot = new THREE.Mesh(
-              new THREE.SphereGeometry(0.075, 12, 12),
+              // 原點縮小為原本的 60%：標記密集時球體互相重疊，看不出實際分布。
+              new THREE.SphereGeometry(0.045, 12, 12),
               new THREE.MeshBasicMaterial({ color: new THREE.Color(isLight ? darkenColor(marker.color) : marker.color) }));
             // 標記的 x／y 為 0–1 相對座標，換算到平面尺寸並置中。
             dot.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.12, marker.y * PLANE_H - PLANE_H / 2);
@@ -174,11 +176,12 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             if (showLabels && marker.label) {
               const canvas = document.createElement('canvas');
               const ctx = canvas.getContext('2d')!;
-              const FONT = '14px sans-serif';
+              // 字級縮為 80%（14 → 11.2，取 11）。
+              const FONT = '11px sans-serif';
               ctx.font = FONT;
               const textWidth = ctx.measureText(marker.label).width;
-              canvas.width = Math.max(textWidth + 16, 64);
-              canvas.height = 24;
+              canvas.width = Math.max(textWidth + 14, 56);
+              canvas.height = 20;
               // 底色板：描邊只能救單一字元的邊緣，標籤疊在密集的圖面線條上仍然難讀。
               // 鋪一塊半透明底再寫字，字才會從圖面裡跳出來。
               const radius = 5;
@@ -193,23 +196,40 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
               ctx.lineTo(0, radius);
               ctx.quadraticCurveTo(0, 0, radius, 0);
               ctx.closePath();
-              ctx.fillStyle = isLight ? 'rgba(255,255,255,0.92)' : 'rgba(4,16,31,0.88)';
+              // 螢光青底：在黑白線稿的圖面上對比最強，深淺兩個主題都跳得出來。
+              ctx.fillStyle = 'rgba(0, 245, 212, 0.92)';
               ctx.fill();
-              ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)';
+              ctx.strokeStyle = 'rgba(0, 90, 82, 0.85)';
               ctx.lineWidth = 1;
               ctx.stroke();
 
               ctx.font = FONT;
-              ctx.fillStyle = isLight ? '#000000' : '#ffffff';
-              ctx.fillText(marker.label, 8, 17);
+              // 底色是亮螢光，文字一律用黑色才有足夠對比，不隨主題改變。
+              ctx.fillStyle = '#0a1a18';
+              ctx.fillText(marker.label, 7, 14);
               
               const tex = new THREE.CanvasTexture(canvas);
               const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
               const sprite = new THREE.Sprite(mat);
-              sprite.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.35, marker.y * PLANE_H - PLANE_H / 2);
-              sprite.scale.set(canvas.width / 44, canvas.height / 44, 1);
+              // 標籤抬高並拉一條引線回到原點：貼在原點上會蓋住標記本身，抬高之後
+              // 密集區的文字彼此錯開，靠引線仍看得出對應哪一顆。
+              const px = marker.x * PLANE_W - PLANE_W / 2;
+              const pz = marker.y * PLANE_H - PLANE_H / 2;
+              const LEADER = 0.42;
+              sprite.position.set(px, y + 0.12 + LEADER, pz);
+              sprite.scale.set(canvas.width / 52, canvas.height / 52, 1);
               scene.add(sprite);
               labelSprites.push(sprite);
+
+              const leader = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([
+                  new THREE.Vector3(px, y + 0.12, pz),
+                  new THREE.Vector3(px, y + 0.12 + LEADER, pz),
+                ]),
+                new THREE.LineBasicMaterial({ color: 0x00b39c, transparent: true, opacity: 0.85, depthTest: false }));
+              scene.add(leader);
+              // 標籤被剔除時引線也要跟著消失，否則會留下一堆指向空白的線。
+              leaderLines.push({ leader, sprite });
             }
           }
         }
@@ -243,6 +263,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
           occupied.add(key);
           sprite.visible = true;
         }
+        for (const { leader, sprite } of leaderLines) leader.visible = sprite.visible;
       };
       let frame = 0;
       const tick = () => {
