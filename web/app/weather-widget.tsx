@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 
 type Row = Record<string, any>;
@@ -29,12 +29,47 @@ const MARKER_POSITIONS: Record<string, [number, number]> = {
   '宜蘭縣': [597, 404],
   '南投縣': [452, 468]
 };
-// 天氣圖示與縣市中心的距離比例：1 = 原本的外圍位置，0 = 完全貼在縣市上。
-// 拉近之後靠相對位置就看得出屬於哪一縣市，不必再用虛線連過去。
+// 圖示離海岸線的固定間距（外層座標）。距離是以台灣輪廓為基準量出來的，
+// 不是相對畫布的比例——沿岸每個圖示與陸地的空隙才會一致。
+const COAST_MARGIN = 26;
+// 找不到輪廓時（地圖還沒渲染完）的退路：沿用原本的外圍座標插值。
 const MARKER_PULL = 0.72;
+const MAP_SCALE = 0.65;
+const MAP_TX = 180;
+const MAP_TY = 140;
 // 圖示之間的最小間距（圓半徑 17＋氣溫文字＋呼吸空間）。單純調小 MARKER_PULL
 // 會讓北部那一叢縣市擠在一起，所以拉近之後再跑一次分離，兩個條件才能同時成立。
 const MARKER_MIN_GAP = 46;
+
+/**
+ * 從縣市中心沿「離島中心」的方向往外走，直到離開陸地為止，再加上固定邊距。
+ * 判定是否還在陸地上用 SVG 的 isPointInFill()，量的是真正的輪廓而不是外框，
+ * 所以西部平直海岸與東部山線都能得到一致的空隙。
+ */
+function coastAnchor(
+  paths: SVGGeometryElement[],
+  centerLocal: [number, number],
+  originLocal: [number, number],
+): [number, number] {
+  const dx = centerLocal[0] - originLocal[0];
+  const dy = centerLocal[1] - originLocal[1];
+  const length = Math.hypot(dx, dy) || 1;
+  const ux = dx / length;
+  const uy = dy / length;
+  const onLand = (x: number, y: number) => {
+    const point = new DOMPoint(x, y);
+    return paths.some(path => { try { return path.isPointInFill(point); } catch { return false; } });
+  };
+  const STEP = 4;
+  const MAX = 400;
+  let travelled = 0;
+  // 先走出陸地。中心點理論上一定在陸地上，但離島或破碎海岸可能一開始就在外面。
+  while (travelled < MAX && onLand(centerLocal[0] + ux * travelled, centerLocal[1] + uy * travelled)) {
+    travelled += STEP;
+  }
+  const margin = COAST_MARGIN / MAP_SCALE; // 邊距以外層座標定義，換算回地圖本身的座標系
+  return [centerLocal[0] + ux * (travelled + margin), centerLocal[1] + uy * (travelled + margin)];
+}
 
 /**
  * 把圖示往各自的縣市中心拉近，再用簡單的鬆弛法把過近的推開。
@@ -95,6 +130,9 @@ export function WeatherWidget() {
   const [error, setError] = useState('');
   const [mapSvg, setMapSvg] = useState<string>('');
   const [countyCenters, setCountyCenters] = useState<Record<string, [number, number]>>({});
+  // 依台灣輪廓量出來的圖示落點；地圖尚未渲染前為空，render 會退回比例插值。
+  const [coastSpots, setCoastSpots] = useState<Record<string, [number, number]>>({});
+  const mapGroupRef = useRef<SVGGElement>(null);
   const [townsOpen, setTownsOpen] = useState(false);
 
   const loadMap = useCallback(async () => {
@@ -170,6 +208,28 @@ export function WeatherWidget() {
     }
   }, [county, townsOpen]);
 
+  useEffect(() => {
+    const group = mapGroupRef.current;
+    const names = Object.keys(countyCenters);
+    if (!group || !mapSvg || !names.length) return;
+    const paths = Array.from(group.querySelectorAll('.county')) as SVGGeometryElement[];
+    if (!paths.length) return;
+    const toLocal = ([x, y]: [number, number]): [number, number] =>
+      [(x - MAP_TX) / MAP_SCALE, (y - MAP_TY) / MAP_SCALE];
+    const locals = names.map(name => toLocal(countyCenters[name]));
+    // 以所有縣市中心的平均當島中心，決定每個圖示要往哪個方向離開陸地。
+    const origin: [number, number] = [
+      locals.reduce((sum, point) => sum + point[0], 0) / locals.length,
+      locals.reduce((sum, point) => sum + point[1], 0) / locals.length,
+    ];
+    const spots: Record<string, [number, number]> = {};
+    names.forEach((name, index) => {
+      const [lx, ly] = coastAnchor(paths, locals[index], origin);
+      spots[name] = [lx * MAP_SCALE + MAP_TX, ly * MAP_SCALE + MAP_TY];
+    });
+    setCoastSpots(spots);
+  }, [mapSvg, countyCenters]);
+
   if (busy && !summary) return <p className="empty">正在取得中央氣象署資料…</p>;
   if (error && !summary) return <p className="empty">氣象服務暫時無法使用：{error}</p>;
 
@@ -201,8 +261,21 @@ export function WeatherWidget() {
               fill: rgba(34, 211, 238, 0.2);
             }
           `}</style>
+          {/* 地圖是以 dangerouslySetInnerHTML 注入的，React 無法對裡面的節點加 class，
+              所以改用 data-county 屬性選擇器點亮選取的縣市。縣市名同時比對「臺」與
+              「台」兩種寫法，SVG 用哪一種都吃得到。
+              county 只可能是 COUNTIES 裡的固定值，這裡再擋一次，避免任何外部字串
+              被插進樣式表。 */}
+          {COUNTIES.includes(county) && <style>{`
+            .weather-map-container svg .county[data-county="${county}"],
+            .weather-map-container svg .county[data-county="${county.replace('臺', '台')}"] {
+              fill: color-mix(in srgb, var(--cyan) 42%, transparent);
+              stroke: var(--cyan);
+              stroke-width: 2px;
+            }
+          `}</style>}
           
-          <g transform="translate(180, 140) scale(0.65)" dangerouslySetInnerHTML={{ __html: mapSvg }} />
+          <g ref={mapGroupRef} transform="translate(180, 140) scale(0.65)" dangerouslySetInnerHTML={{ __html: mapSvg }} />
 
           <g className="weather-marker-layer">
             {(() => {
@@ -210,11 +283,14 @@ export function WeatherWidget() {
               const center = countyCenters[name];
               const outer = MARKER_POSITIONS[name];
               if (!center || !outer) return [];
-              return [{
-                name,
-                x: center[0] + (outer[0] - center[0]) * MARKER_PULL,
-                y: center[1] + (outer[1] - center[1]) * MARKER_PULL,
-              }];
+              const anchored = coastSpots[name];
+              return [anchored
+                ? { name, x: anchored[0], y: anchored[1] }
+                : {
+                  name,
+                  x: center[0] + (outer[0] - center[0]) * MARKER_PULL,
+                  y: center[1] + (outer[1] - center[1]) * MARKER_PULL,
+                }];
             }));
             return COUNTIES.map(name => {
               const data = (summary?.counties || []).find((r: Row) => r.county.replace('台', '臺') === name) || {};
