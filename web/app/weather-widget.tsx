@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
+// 版面微調集中在 web/lib/weather-map-tuning.ts，那支檔案不含邏輯，可直接改數字。
+import { COAST_MARGIN, MARKER_MIN_GAP, COUNTY_MARGIN_OFFSET } from '@/lib/weather-map-tuning';
 
 type Row = Record<string, any>;
 
@@ -31,20 +33,13 @@ const MARKER_POSITIONS: Record<string, [number, number]> = {
 };
 // 圖示離海岸線的固定間距（外層座標）。距離是以台灣輪廓為基準量出來的，
 // 不是相對畫布的比例——沿岸每個圖示與陸地的空隙才會一致。
-const COAST_MARGIN = 26;
-// 個別縣市的額外外推量（外層座標，正值往外）。海岸線量測對多數縣市夠用，
-// 但有些縣市的形狀會讓圖示落得太靠近鄰居或壓到內陸，這裡逐一微調。
-const COUNTY_MARGIN_OFFSET: Record<string, number> = {
-  新北市: 10,
-};
+
 // 找不到輪廓時（地圖還沒渲染完）的退路：沿用原本的外圍座標插值。
 const MARKER_PULL = 0.72;
 const MAP_SCALE = 0.65;
 const MAP_TX = 180;
 const MAP_TY = 140;
-// 圖示之間的最小間距（圓半徑 17＋氣溫文字＋呼吸空間）。單純調小 MARKER_PULL
-// 會讓北部那一叢縣市擠在一起，所以拉近之後再跑一次分離，兩個條件才能同時成立。
-const MARKER_MIN_GAP = 46;
+
 
 /**
  * 從縣市中心沿「離島中心」的方向往外走，直到離開陸地為止，再加上固定邊距。
