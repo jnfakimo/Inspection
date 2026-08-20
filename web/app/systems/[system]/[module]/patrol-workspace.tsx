@@ -220,10 +220,15 @@ function RecordsModule({ module, profile }: Props) {
 
 /* ──────────────────────────── 巡檢排班 ──────────────────────────── */
 
-// 排班只從駐衛隊帶人。比對用關鍵字而非完整名稱，「駐衛隊」「駐衛警隊」都吃得到；
+// 排班只從駐警隊帶人。比對用關鍵字而非完整名稱：正式環境的單位叫「駐警隊」，
+// 但需求與文件裡也出現過「駐衛隊」「駐衛警隊」的寫法，兩個關鍵字都收才不會漏。
+// 用單位過濾而不是寫死人名，日後新進同仁只要單位設對就會自動出現在清單裡。
 // 完全比不到時寧可留白並說明原因，也不要悄悄退回顯示全公司的人。
-const PATROL_UNIT_KEYWORD = '駐衛';
-const inPatrolUnit = (user: Row) => String(user.department ?? '').includes(PATROL_UNIT_KEYWORD);
+const PATROL_UNIT_KEYWORDS = ['駐警', '駐衛'];
+const inPatrolUnit = (user: Row) => {
+  const unit = String(user.department ?? '');
+  return PATROL_UNIT_KEYWORDS.some(keyword => unit.includes(keyword));
+};
 
 type StaffConfig = {
   templates: Record<string, string[]>;
@@ -410,7 +415,7 @@ function ShiftsModule({ module, profile }: Props) {
           })}
         </div>
         {!busy && patrolStaff.length === 0 && <p className="inline-message danger">
-          找不到單位含「{PATROL_UNIT_KEYWORD}」的啟用中人員。請到後台的人員管理確認駐衛隊同仁的單位設定。
+          找不到單位含「{PATROL_UNIT_KEYWORDS.join('」或「')}」的啟用中人員。請到後台的人員管理確認駐警隊同仁的單位設定。
         </p>}
       </div>
       <p className="inline-message">班別時段與通報時段是兩組獨立的值：前者存在班別資料表，後者存在排班設定的 workTimes，儲存時會各自寫入。</p>
