@@ -274,6 +274,15 @@ function ShiftsModule({ module, profile }: Props) {
     return users.filter(user => matchesPatrolUnit(
       nameOfDept.get(user.dept_id) || String(user.department ?? '')));
   }, [users, departments]);
+  // 可勾選清單 = 駐警隊 ∪ 目前已指派的人。過濾只限制「能加誰」，不能把已經指派的
+  // 人藏起來——藏起來就等於取消不掉、換不了人。
+  const staffChoices = useMemo(() => {
+    const assigned = new Set((Array.isArray(editor?.assigned_user_ids) ? editor.assigned_user_ids : []).map(String));
+    const inUnit = new Set(patrolStaff.map(user => String(user.user_id)));
+    const outsiders = users.filter(user => assigned.has(String(user.user_id)) && !inUnit.has(String(user.user_id)));
+    return [...patrolStaff, ...outsiders];
+  }, [patrolStaff, users, editor]);
+
   const nameOf = useCallback((id: unknown) => users.find(u => u.user_id === id)?.name || String(id ?? ''), [users]);
   const namesOf = useCallback((ids: unknown) => Array.isArray(ids) && ids.length ? ids.map(nameOf).join('、') : '—', [nameOf]);
   const workTimeOf = (scope: 'date' | 'template', name: string) => {
@@ -413,14 +422,16 @@ function ShiftsModule({ module, profile }: Props) {
       <div className="detail-timeline">
         <h3>排定人員（{Array.isArray(editor.assigned_user_ids) ? editor.assigned_user_ids.length : 0} 人）</h3>
         <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: 6 }}>
-          {patrolStaff.map(user => {
+          {staffChoices.map(user => {
             const on = Array.isArray(editor.assigned_user_ids) && editor.assigned_user_ids.includes(user.user_id);
+            const outsider = !patrolStaff.some(member => member.user_id === user.user_id);
             return <button key={String(user.user_id)} type="button"
               className={on ? 'primary-btn compact' : 'secondary-btn'}
-              onClick={() => toggleStaff(String(user.user_id))}>{on ? '✓ ' : ''}{user.name}</button>;
+              title={outsider ? '此人不在駐警隊，僅因既有指派而列出，取消後就不會再出現' : undefined}
+              onClick={() => toggleStaff(String(user.user_id))}>{on ? '✓ ' : ''}{user.name}{outsider ? '（非駐警隊）' : ''}</button>;
           })}
         </div>
-        {!busy && patrolStaff.length === 0 && <p className="inline-message danger">
+        {!busy && staffChoices.length === 0 && <p className="inline-message danger">
           找不到單位含「{PATROL_UNIT_KEYWORDS.join('」或「')}」的啟用中人員。請到後台的人員管理確認駐警隊同仁的單位設定。
         </p>}
       </div>
