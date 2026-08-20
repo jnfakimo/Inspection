@@ -1,0 +1,163 @@
+name: Edge functions deployment
+
+# 前端由 hardened-pages.yml 自動部署，edge function 過去只能靠人記得手動跑
+# `supabase functions deploy`。2026-08-20 早上因此連續出現兩次「前端已改呼叫新
+# action、後端還是舊版」的空窗（7a3bcfb、0085621），現場會看到「不支援的動作」。
+# 本 workflow 讓兩者跟著同一次 push 一起上線。
+#
+# 只部署這次 push 真正改到的 function，不做全量部署：supabase/functions/ 底下
+# 有十四支，全量會把沒動過的一併重推（google-calendar 三支是從別的結構部署的，
+# 全量尤其危險）。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: '要部署的 function slug，以空白分隔；留空代表全部'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+# 同時間只跑一個部署，避免兩個 push 交錯把舊版蓋回去。
+concurrency:
+  group: supabase-edge-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require access token
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::缺少 secret SUPABASE_ACCESS_TOKEN，無法部署 edge function。" \
+                 "請到 repo Settings → Secrets and variables → Actions 新增。"
+            exit 1
+          fi
+
+      - name: Resolve project ref
+        id: project
+        run: |
+          ref="$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' supabase/config.toml | head -1)"
+          if [ -z "$ref" ]; then
+            echo "::error::supabase/config.toml 讀不到 project_id。"
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Collect changed functions
+        id: changed
+        env:
+          MANUAL_INPUT: ${{ github.event.inputs.functions }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -eu
+          all() { find supabase/functions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort; }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "$MANUAL_INPUT" ]; then
+              slugs="$(printf '%s\n' $MANUAL_INPUT | sort -u)"
+            else
+              slugs="$(all)"
+            fi
+          else
+            # 首次推送或 force push 時 before 可能是全 0，退回跟前一個 commit 比。
+            base="$BEFORE"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base="$(git rev-parse HEAD^ 2>/dev/null || echo '')"
+            fi
+            if [ -z "$base" ]; then
+              slugs="$(all)"
+            else
+              changed="$(git diff --name-only "$base" "${{ github.sha }}" -- supabase/functions/)"
+              slugs="$(printf '%s\n' "$changed" \
+                | sed -n 's|^supabase/functions/\([^/]*\)/.*|\1|p' | sort -u)"
+              # config.toml 改動（例如 verify_jwt）要讓相關 function 重新套用設定。
+              if git diff --name-only "$base" "${{ github.sha }}" -- supabase/config.toml | grep -q .; then
+                slugs="$(printf '%s\n%s\n' "$slugs" "$(all)" | sed '/^$/d' | sort -u)"
+              fi
+            fi
+          fi
+
+          # 只保留仍然存在的目錄，避免部署已刪除的 function。
+          kept=''
+          for slug in $slugs; do
+            # 不寫成 [ -d ... ] && kept=...：測試失敗時整個 AND 串回傳非 0，
+            # set -e 會把這一步判定為失敗。
+            if [ -d "supabase/functions/$slug" ]; then kept="$kept $slug"; fi
+          done
+          kept="$(echo $kept)"
+
+          echo "slugs=$kept" >> "$GITHUB_OUTPUT"
+          if [ -z "$kept" ]; then
+            echo "沒有需要部署的 function。"
+          else
+            echo "本次部署：$kept"
+          fi
+
+      - name: Set up Deno
+        if: steps.changed.outputs.slugs != ''
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check before deploying
+        if: steps.changed.outputs.slugs != ''
+        run: |
+          set -eu
+          for slug in ${{ steps.changed.outputs.slugs }}; do
+            entry="supabase/functions/$slug/index.ts"
+            if [ -f "$entry" ]; then
+              echo "── deno check $entry"
+              deno check --no-lock "$entry"
+            fi
+          done
+
+      - name: Set up Supabase CLI
+        if: steps.changed.outputs.slugs != ''
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy
+        if: steps.changed.outputs.slugs != ''
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy ${{ steps.changed.outputs.slugs }} \
+            --project-ref ${{ steps.project.outputs.ref }}
+
+      - name: Smoke-check deployed endpoints
+        if: steps.changed.outputs.slugs != ''
+        run: |
+          set -eu
+          fail=0
+          for slug in ${{ steps.changed.outputs.slugs }}; do
+            url="https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/$slug"
+            # 用 OPTIONS 而不是 POST：只走 CORS 預檢分支，不觸發任何業務邏輯。
+            # verify_jwt=false 的函式（line-notify、google-calendar-worker 等）
+            # 若用 POST 試探，等於真的把它叫起來做事。
+            code="$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS "$url" -H 'Origin: https://jnfakimo.github.io' -H 'Access-Control-Request-Method: POST' || echo 000)"
+            # 2xx/4xx 都代表函式已開機並在回應；5xx 或 000 才是真的掛了。
+            case "$code" in
+              5*|000) echo "::error::$slug 部署後回應 $code，函式可能無法開機。"; fail=1 ;;
+              *) echo "$slug → HTTP $code" ;;
+            esac
+          done
+          exit $fail

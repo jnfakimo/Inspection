@@ -174,4 +174,10 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
   instruction. Preserve unrelated working-tree changes and never include them.
 - Multiple agents may push concurrently; if a push is rejected, do
   `git fetch origin main && git rebase origin/main` then push again.
+- **Edge functions deploy themselves now.** `.github/workflows/deploy-edge-functions.yml`
+  deploys only the functions changed by the push (type-checked with `deno check` first).
+  Before it existed, `supabase/functions/**` changes shipped only when someone remembered
+  to run `supabase functions deploy` by hand, and twice on 2026-08-20 the front end went
+  live calling actions the deployed function did not have yet. Don't reintroduce a manual
+  step; if a deploy must be rerun, use the workflow's `workflow_dispatch` input.
 - Don't open a PR unless asked.
