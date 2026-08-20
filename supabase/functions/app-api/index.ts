@@ -107,12 +107,14 @@ function repairRequestSummary(rows: Array<Record<string, unknown>>) {
   const statusOf = (row: Record<string, unknown>) => String(row.status ?? '');
   const urgencyOf = (row: Record<string, unknown>) => String(row.urgency ?? '');
   const SETTLED = new Set(['closed', 'completed']);
+  // 依案件生命週期排序：指派 → 處理中 → 結案 → 取消，讓一整列讀起來就是流程本身。
   return [
     { label: '目前資料', value: rows.length },
     { label: '急迫性案件', value: rows.filter(row =>
         (urgencyOf(row) === 'urgent' || urgencyOf(row) === 'high') && !SETTLED.has(statusOf(row))).length },
-    { label: '已結案', value: rows.filter(row => statusOf(row) === 'closed').length },
     { label: '已指派', value: rows.filter(row => statusOf(row) === 'assigned').length },
+    { label: '處理中', value: rows.filter(row => statusOf(row) === 'in_progress').length },
+    { label: '已結案', value: rows.filter(row => statusOf(row) === 'closed').length },
     { label: '已取消', value: rows.filter(row => statusOf(row) === 'cancelled').length },
   ];
 }
