@@ -10,8 +10,8 @@
 // 2.「定位」仍跳往 V1 的整合標記系統——V2 的 markers 模組目前是資料表，
 //    沒有 ?marker= 的圖面定位能力，改連 V2 會讓這個動作失去意義。
 //
-// 寫入政策由 20260817110000 收斂為 has_system_access('sys_structuremap') 加上
-// has_app_permission('create')／('update')，伺服器端把關已存在，因此直接走資料表。
+// 寫入統一走 app-api 的 area_save（後端驗證 sys_structuremap 權限、依欄位白名單清洗、
+// 檢查空間是否被整合標記系統使用，並寫入稽核）；讀取仍直接走資料表。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
@@ -20,7 +20,7 @@ import './structuremap-arealist.css';
 import { AppShell } from '@/components/AppShell';
 import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import type { ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -242,16 +242,12 @@ export function AreaListModule({ module, profile }: Props) {
     if (!floor) { setEditor({ ...editor, message: '請輸入樓層' }); return; }
     if (!name) { setEditor({ ...editor, message: '請輸入空間名稱' }); return; }
     const payload = { market_id: MARKET_ID, floor, floor_order: floorOrder(floor), space_name: name };
-    const client = getSupabase();
-    const { error } = editor.id
-      ? await client.from('floor_spaces').update(payload).eq('space_id', editor.id)
-      : await client.from('floor_spaces').insert(payload);
-    if (error) {
-      const code = (error as { code?: string }).code;
-      setEditor({
-        ...editor,
-        message: code === '23505' ? '該樓層已有相同空間名稱' : `儲存失敗：${translateError(error)}`,
-      });
+    try {
+      await invokeAppApi('area_save', editor.id
+        ? { kind: 'save', space_id: editor.id, payload }
+        : { kind: 'save', payload });
+    } catch (error) {
+      setEditor({ ...editor, message: translateError(error) });
       return;
     }
     const wasEdit = Boolean(editor.id);
@@ -277,9 +273,9 @@ export function AreaListModule({ module, profile }: Props) {
       return;
     }
     if (!window.confirm(`確定停用「${space.floor} · ${space.space_name}」？歷史資料會永久保留。`)) return;
-    const { error } = await getSupabase().from('floor_spaces')
-      .update({ status: 'inactive' }).eq('space_id', space.space_id);
-    if (error) { notify(`停用失敗：${translateError(error)}`, true); return; }
+    try {
+      await invokeAppApi('area_save', { kind: 'deactivate', space_id: space.space_id });
+    } catch (error) { notify(`停用失敗：${translateError(error)}`, true); return; }
     notify('已停用，歷史資料仍保留');
     await load();
   };
@@ -308,10 +304,10 @@ export function AreaListModule({ module, profile }: Props) {
       message += `\n\n以下 ${kept.length} 筆因已被整合標記系統標記，將被保留：\n${sample}${kept.length > 8 ? '\n…等' : ''}`;
     }
     if (!window.confirm(`${message}\n\n確定停用？所有歷史資料仍會保留。`)) return;
-    const { error: updateError } = await getSupabase().from('floor_spaces')
-      .update({ status: 'inactive' }).in('space_id', removable.map(row => row.space_id));
-    if (updateError) { notify(`停用失敗：${translateError(updateError)}`, true); return; }
-    notify(`已停用 ${removable.length} 筆${kept.length ? `，保留啟用 ${kept.length} 筆（已被標記）` : ''}`);
+    try {
+      const result = await invokeAppApi<{ removable: string[]; usedCount: number }>('area_save', { kind: 'deactivate_many', space_ids: removable.map(row => row.space_id) });
+      notify(`已停用 ${result.removable.length} 筆${result.usedCount ? `，保留啟用 ${result.usedCount} 筆（已被標記）` : ''}`);
+    } catch (error) { notify(`停用失敗：${translateError(error)}`, true); }
     await load();
   };
 
@@ -415,9 +411,10 @@ export function AreaListModule({ module, profile }: Props) {
     let inserted = 0;
     for (let index = 0; index < payload.length; index += chunkSize) {
       const chunk = payload.slice(index, index + chunkSize);
-      const { error: insertError } = await getSupabase().from('floor_spaces').insert(chunk);
-      if (insertError) {
-        notify(`匯入失敗（已匯入 ${inserted} 筆後中斷）：${translateError(insertError)}`, true);
+      try {
+        await invokeAppApi('area_save', { kind: 'import', rows: chunk });
+      } catch (error) {
+        notify(`匯入失敗（已匯入 ${inserted} 筆後中斷）：${translateError(error)}`, true);
         await load();
         return;
       }

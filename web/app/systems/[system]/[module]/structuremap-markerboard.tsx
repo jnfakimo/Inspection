@@ -24,7 +24,7 @@ import { canonicalFloor, floorOrder } from '@/lib/floor';
 import {
   computePatrolStatus, invalidatePatrolMarkers, PATROL_COLORS, type PatrolState,
 } from '@/lib/patrol-status';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 
 type Props = { profile: Profile };
@@ -375,11 +375,11 @@ export function MarkerBoardModule({ profile }: Props) {
       repair_id: editor.kind === 'repair' ? (editor.repairId || null) : null,
       note: editor.note.trim() || null,
     };
-    const client = getSupabase();
-    const { error } = editor.id
-      ? await client.from('plan_markers').update(payload).eq('marker_id', editor.id)
-      : await client.from('plan_markers').insert(payload);
-    if (error) { setEditor({ ...editor, message: `儲存失敗：${translateError(error)}` }); return; }
+    try {
+      await invokeAppApi('marker_save', editor.id
+        ? { kind: 'save', marker_id: editor.id, payload }
+        : { kind: 'save', payload });
+    } catch (error) { setEditor({ ...editor, message: `儲存失敗：${translateError(error)}` }); return; }
     invalidatePatrolMarkers();
     setEditor(null);
     await loadData();
@@ -387,9 +387,9 @@ export function MarkerBoardModule({ profile }: Props) {
 
   const deleteMarker = async (markerId: string, fromEditor: boolean) => {
     if (!window.confirm('確定停用此標記？歷史資料會永久保留。')) return;
-    const { error } = await getSupabase().from('plan_markers')
-      .update({ status: 'inactive' }).eq('marker_id', markerId);
-    if (error) {
+    try {
+      await invokeAppApi('marker_save', { kind: 'deactivate', marker_id: markerId });
+    } catch (error) {
       const text = `停用失敗：${translateError(error)}`;
       if (fromEditor && editor) setEditor({ ...editor, message: text }); else window.alert(text);
       return;

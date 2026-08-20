@@ -287,6 +287,9 @@ export async function handleAppApiRequest(req: Request) {
       patrol_shift_delete: 'admin-api:write',
       handover_save: 'admin-api:write',
       equipment_save: 'admin-api:write',
+      area_save: 'admin-api:write',
+      marker_save: 'admin-api:write',
+      field_pilot_save: 'admin-api:write',
       save_floor_model: 'admin-api:write',
       move_structuremap_marker: 'admin-api:write',
       guardpatrol_checkin: 'patrol-checkin',
@@ -1107,6 +1110,35 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, { ok: false, message: '設備操作類型無效' }, 400);
     }
 
+    if (action === 'field_pilot_save') {
+      if (!can('handover')) return reply(req, { ok: false, message: '目前角色沒有交接系統權限' }, 403);
+      const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
+      const payload: Record<string, unknown> = {};
+      for (const key of ['record_date', 'shift_code', 'shift_start', 'shift_end', 'handover_by', 'instruction', 'notes', 'supervisor_note', 'reviewed_at', 'status', 'updated_at']) {
+        if (!(key in raw)) continue;
+        payload[key] = text(raw[key], 4000) || null;
+      }
+      for (const key of ['items', 'attachments']) {
+        if (!(key in raw)) continue;
+        payload[key] = Array.isArray(raw[key]) ? JSON.parse(JSON.stringify(raw[key])) : null;
+      }
+      if (!payload['record_date'] || !payload['shift_code']) return reply(req, { ok: false, message: '請輸入日期與班別' }, 400);
+      const recordId = text(raw['record_id'], 80);
+      if (recordId && !recordId.startsWith('seed-') && !recordId.startsWith('local-')) payload['record_id'] = recordId;
+      try {
+        const { data, error } = await userDb.from('handover_field_pilot_records').upsert(payload, { onConflict: 'record_date,shift_code' }).select('record_id').maybeSingle();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'handover_field_pilot_records', String((data as unknown as Record<string, unknown>)?.record_id ?? recordId), 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      } catch (error) {
+        const e = error as { code?: string; message?: string };
+        if (String(e.code) === '42P01' || String(e.message).includes('handover_field_pilot_records')) {
+          return reply(req, { ok: false, message: '尚未建立現場試用資料表，請先執行 handover_field_pilot_schema.sql' }, 500);
+        }
+        throw error;
+      }
+    }
+
     if (action === 'equipment_map') {
       if (!can('structuremap') && !can('equipment')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
       const [equipment, markers, locations] = await Promise.all([
@@ -1147,6 +1179,153 @@ export async function handleAppApiRequest(req: Request) {
       if (error) throw error;
       await writeAudit(userDb, profile.user_id, 'floor_models', floorId, before ? 'update' : 'insert', before, payload);
       return reply(req, { ok: true, data });
+    }
+
+    if (action === 'area_save') {
+      if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有場域結構圖權限' }, 403);
+      const kind = text(body.kind, 30);
+
+      if (kind === 'deactivate') {
+        const spaceId = id(body.space_id);
+        if (!spaceId) return reply(req, { ok: false, message: '空間識別碼無效' }, 400);
+        const { data: markers } = await userDb.from('plan_markers').select('marker_id').eq('space_id', spaceId).eq('status', 'active').limit(1);
+        if (markers && markers.length) return reply(req, { ok: false, message: '此空間已於「整合標記系統」使用中，請先停用該標記後再操作' }, 409);
+        const { data: before, error: readError } = await userDb.from('floor_spaces').select('space_id,space_name,status').eq('space_id', spaceId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的空間' }, 404);
+        const { error } = await userDb.from('floor_spaces').update({ status: 'inactive' }).eq('space_id', spaceId);
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'floor_spaces', spaceId, 'status_change', { status: before.status }, { status: 'inactive', space_name: before.space_name });
+        return reply(req, { ok: true });
+      }
+
+      if (kind === 'deactivate_many') {
+        const spaceIds: string[] = (Array.isArray(body.space_ids) ? body.space_ids as unknown[] : []).map((v: unknown) => id(v)).filter(Boolean);
+        if (!spaceIds.length) return reply(req, { ok: false, message: '沒有可停用的空間' }, 400);
+        const { data: markers } = await userDb.from('plan_markers').select('space_id').in('space_id', spaceIds).eq('status', 'active');
+        const used = new Set((markers || []).map(row => String(row.space_id)));
+        const removable = spaceIds.filter(s => !used.has(s));
+        if (!removable.length) return reply(req, { ok: false, message: '所有空間都已於「整合標記系統」使用中，無法停用' }, 409);
+        const { error } = await userDb.from('floor_spaces').update({ status: 'inactive' }).in('space_id', removable);
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'floor_spaces', removable.join(','), 'status_change', null, { status: 'inactive' });
+        return reply(req, { ok: true, data: { removable, usedCount: spaceIds.length - removable.length } });
+      }
+
+      if (kind === 'import') {
+        const rows = Array.isArray(body.rows) ? body.rows : [];
+        if (!rows.length) return reply(req, { ok: false, message: '沒有可匯入的資料' }, 400);
+        const cleanRows: Record<string, unknown>[] = [];
+        for (const raw of rows) {
+          if (!raw || typeof raw !== 'object') continue;
+          const row = raw as Record<string, unknown>;
+          const marketId = text(row.market_id, 40);
+          const floor = text(row.floor, 20);
+          const floorOrderValue = row.floor_order === undefined || row.floor_order === null ? null : Number(row.floor_order);
+          const spaceName = text(row.space_name, 120);
+          if (!marketId || !floor || !spaceName) continue;
+          cleanRows.push({ market_id: marketId, floor, floor_order: Number.isFinite(floorOrderValue) ? floorOrderValue : null, space_name: spaceName });
+        }
+        if (!cleanRows.length) return reply(req, { ok: false, message: '匯入資料皆無效' }, 400);
+        const chunkSize = 50;
+        let inserted = 0;
+        for (let index = 0; index < cleanRows.length; index += chunkSize) {
+          const { error } = await userDb.from('floor_spaces').insert(cleanRows.slice(index, index + chunkSize));
+          if (error) {
+            if (String(error.code) === '23505') return reply(req, { ok: false, message: '該樓層已有相同空間名稱' }, 409);
+            throw error;
+          }
+          inserted += cleanRows.slice(index, index + chunkSize).length;
+        }
+        await writeAudit(userDb, profile.user_id, 'floor_spaces', `import:${inserted}`, 'insert', null, { count: inserted });
+        return reply(req, { ok: true, data: { inserted } });
+      }
+
+      if (kind === 'save') {
+        const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
+        const payload: Record<string, unknown> = {};
+        for (const key of ['market_id', 'floor', 'floor_order', 'space_name', 'status', 'note']) {
+          if (!(key in raw)) continue;
+          const value = raw[key];
+          if (key === 'floor_order') {
+            const parsed = Number(value);
+            payload[key] = (value === null || value === '' || !Number.isFinite(parsed)) ? null : parsed;
+          } else {
+            payload[key] = text(value, 2000) || null;
+          }
+        }
+        if (!payload['market_id'] || !payload['floor'] || !payload['space_name']) return reply(req, { ok: false, message: '請輸入樓層與空間名稱' }, 400);
+        const spaceId = id(body.space_id);
+        if (spaceId) {
+          const { data: before, error: readError } = await userDb.from('floor_spaces').select('space_id').eq('space_id', spaceId).maybeSingle();
+          if (readError) throw readError;
+          if (!before) return reply(req, { ok: false, message: '找不到指定的空間' }, 404);
+          const { error } = await userDb.from('floor_spaces').update(payload).eq('space_id', spaceId);
+          if (error) throw error;
+          await writeAudit(userDb, profile.user_id, 'floor_spaces', spaceId, 'update', null, payload);
+          return reply(req, { ok: true });
+        }
+        const { data, error } = await userDb.from('floor_spaces').insert(payload).select('space_id').single();
+        if (error) {
+          if (String(error.code) === '23505') return reply(req, { ok: false, message: '該樓層已有相同空間名稱' }, 409);
+          throw error;
+        }
+        await writeAudit(userDb, profile.user_id, 'floor_spaces', String((data as unknown as Record<string, unknown>).space_id), 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      return reply(req, { ok: false, message: '區域位置表操作類型無效' }, 400);
+    }
+
+    if (action === 'marker_save') {
+      if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有場域結構圖權限' }, 403);
+      const kind = text(body.kind, 30);
+
+      if (kind === 'deactivate') {
+        const markerId = id(body.marker_id);
+        if (!markerId) return reply(req, { ok: false, message: '標記識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('plan_markers').select('marker_id,status').eq('marker_id', markerId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的標記' }, 404);
+        const { error } = await userDb.from('plan_markers').update({ status: 'inactive' }).eq('marker_id', markerId);
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'plan_markers', markerId, 'status_change', { status: before.status }, { status: 'inactive' });
+        return reply(req, { ok: true });
+      }
+
+      if (kind === 'save') {
+        const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
+        const payload: Record<string, unknown> = {};
+        for (const key of ['floor_id', 'x', 'y', 'kind', 'label', 'equipment_id', 'space_id', 'repair_id', 'note', 'status']) {
+          if (!(key in raw)) continue;
+          const value = raw[key];
+          if (key === 'x' || key === 'y') {
+            const parsed = Number(value);
+            payload[key] = (value === null || value === '' || !Number.isFinite(parsed)) ? null : parsed;
+          } else {
+            payload[key] = text(value, 2000) || null;
+          }
+        }
+        if (payload['x'] !== null && payload['x'] !== undefined && (Number(payload['x']) < 0 || Number(payload['x']) > 1)) return reply(req, { ok: false, message: '標記座標須介於 0 到 1' }, 400);
+        if (payload['y'] !== null && payload['y'] !== undefined && (Number(payload['y']) < 0 || Number(payload['y']) > 1)) return reply(req, { ok: false, message: '標記座標須介於 0 到 1' }, 400);
+        if (!payload['floor_id'] || !payload['kind'] || !payload['label']) return reply(req, { ok: false, message: '請輸入樓層、標記類型與名稱' }, 400);
+        const markerId = id(body.marker_id);
+        if (markerId) {
+          const { data: before, error: readError } = await userDb.from('plan_markers').select('marker_id').eq('marker_id', markerId).maybeSingle();
+          if (readError) throw readError;
+          if (!before) return reply(req, { ok: false, message: '找不到指定的標記' }, 404);
+          const { error } = await userDb.from('plan_markers').update(payload).eq('marker_id', markerId);
+          if (error) throw error;
+          await writeAudit(userDb, profile.user_id, 'plan_markers', markerId, 'update', null, payload);
+          return reply(req, { ok: true });
+        }
+        const { data, error } = await userDb.from('plan_markers').insert(payload).select('marker_id').single();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'plan_markers', String((data as unknown as Record<string, unknown>).marker_id), 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      return reply(req, { ok: false, message: '標記操作類型無效' }, 400);
     }
 
     if (action === 'move_structuremap_marker') {

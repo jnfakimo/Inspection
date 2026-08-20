@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
-import { getSupabase } from '@/lib/supabase';
+import { invokeAppApi } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 
 type ShiftCode = 'early' | 'day' | 'late';
@@ -110,12 +110,8 @@ function Pilot({ profile }: { profile: Profile }) {
     };
     if (!record.record_id.startsWith('seed-') && !record.record_id.startsWith('local-')) payload.record_id = record.record_id;
     try {
-      const { error } = await getSupabase().from('handover_field_pilot_records').upsert(payload, { onConflict: 'record_date,shift_code' });
-      if (!error) return { ok: true };
-      const detail = error.message.includes('handover_field_pilot_records')
-        ? '尚未建立現場試用資料表，請先執行 handover_field_pilot_schema.sql'
-        : error.message;
-      return { ok: false, error: detail };
+      await invokeAppApi('field_pilot_save', { payload });
+      return { ok: true };
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : 'Supabase 連線失敗' };
     }
