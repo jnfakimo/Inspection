@@ -231,7 +231,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
 
     const runRepairWorkflow = async (row: Record<string, unknown>, action: string, nextStatus: string, payload: Record<string, unknown> = {}) => {
       const requestId = String(row.request_id || row.id || '');
-      if (!requestId) { setDispatchMessage('案件缺少 request_id'); return; }
+      if (!requestId) { setDispatchMessage('案件缺少報修單編號'); return; }
       setDispatchSaving(true);
       setDispatchMessage('');
       try {
@@ -250,7 +250,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       const technician = dispatchForm.technician.trim();
       const vendor = dispatchForm.vendor.trim();
       if (!canDispatch) { setDispatchMessage('僅限主管或派工管理人員派工'); return; }
-      if (!requestId) { setDispatchMessage('案件缺少 request_id'); return; }
+      if (!requestId) { setDispatchMessage('案件缺少報修單編號'); return; }
       if (!technician && !vendor) { setDispatchMessage('請選擇維修人員或填寫委外廠商'); return; }
       const toIso = (value: string) => { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
       setDispatchSaving(true);

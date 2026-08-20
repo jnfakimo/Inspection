@@ -108,6 +108,8 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
   `CASE_LOG_ACTION_LABELS` in `handover-workspace.tsx` do, and fall back to the raw
   value only so an unmapped code still shows something. This includes timeline entries,
   table cells, filter dropdowns and toast messages.
+  Database column names must not appear in prose either — write 「已綁定場域位置」,
+  not 「有填 location_id」. Identifiers belong in code and comments, not on screen.
 - **Time inputs**: always use `@/components/TimeSelect` (a 30-minute-step `<select>`),
   never `<input type="time">`. The native field's `step` only constrains validation,
   so users can still type 08:17, and its rendering (上午/下午 vs 24-hour) is decided by

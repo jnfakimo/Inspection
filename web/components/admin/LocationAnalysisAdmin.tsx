@@ -199,7 +199,7 @@ export function LocationAnalysisAdmin({ profile, module }: AdminProps) {
       </table></div>
       {!busy && rows.length === 0 && <p className="empty">沒有綁定場域位置的巡檢或報修紀錄</p>}
       <p className="inline-message">
-        只統計有填 location_id 的紀錄，未綁定位置者不計入；點擊市場或樓層列可收合下層。
+        只統計已綁定場域位置的紀錄，未綁定位置者不計入；點擊市場或樓層列可收合下層。
         本頁彙總 {fmt(inspections.length)} 筆巡檢與 {fmt(repairs.length)} 筆報修（各取最近 5000 筆）。
       </p>
     </section>

@@ -162,7 +162,7 @@ export function CostsAdmin({ profile, module }: AdminProps) {
         </tr>)}</tbody>
       </table></div>
       {!busy && ranking.length === 0 && <p className="empty">目前沒有費用記錄</p>}
-      <p className="inline-message">費用以 equipment_id 綁定，可據此彙總單一設備自購置到報廢的生命週期成本。</p>
+      <p className="inline-message">費用以設備為單位綁定，可據此彙總單一設備自購置到報廢的生命週期成本。</p>
     </section>
 
     {creating && <AdminModal title="新增費用記錄" onClose={() => setCreating(false)}>
