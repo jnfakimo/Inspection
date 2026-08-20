@@ -7,6 +7,8 @@ import { LEGACY_BASE } from '@/lib/config';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { zhValue } from '@/lib/zh-tw';
 import { PAGE_SIZE, Pager } from '@/components/admin/shared';
+import { ComboboxSelect } from '@/components/ComboboxSelect';
+import { locationOptions, type LocationLike } from '@/lib/locations';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -181,7 +183,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const canSupervisorAccept = ['sysadmin', 'unit_supervisor', 'mgmt_supervisor'].includes(normalizedRole);
     const reporterLabel = [profile.department, profile.name].filter(Boolean).join(' / ');
     const [profileContact, setProfileContact] = useState({ phone: '', department: profile.department || '' });
-    const emptyRepairForm = () => ({ reporter: reporterLabel, phone: profileContact.phone, mobile: '', department: profileContact.department, equipment: '', location: '', type: '', urgency: 'normal', description: '' });
+    const emptyRepairForm = () => ({ reporter: reporterLabel, phone: profileContact.phone, mobile: '', department: profileContact.department, equipment: '', location: '', locationId: '', type: '', urgency: 'normal', description: '' });
     const [data, setData] = useState<ModuleData | null>(null);
     const [error, setError] = useState('');
     const [query, setQuery] = useState('');
@@ -199,6 +201,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [form, setForm] = useState(emptyRepairForm);
     const [equipmentOptions, setEquipmentOptions] = useState<RepairEquipmentOption[]>([]);
     const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+    // 綁定場域位置後這筆報修才會進入位置分析的彙總；fault_location 只是現場自由描述。
+    const [locationChoices, setLocationChoices] = useState<LocationLike[]>([]);
     const [locationPhoto, setLocationPhoto] = useState<File | null>(null);
     const [equipmentPhoto, setEquipmentPhoto] = useState<File | null>(null);
     const [formMessage, setFormMessage] = useState('');
@@ -404,6 +408,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         technicians: DispatchTechnician[];
         equipment: RepairEquipmentOption[];
         departments: string[];
+        locations: LocationLike[];
         contact: { phone: string; department: string };
       }>('workorder_options').then(result => {
         if (!active) return;
@@ -411,6 +416,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         if (isRequestModule) {
           setEquipmentOptions(result.equipment || []);
           setDepartmentOptions(result.departments || []);
+          setLocationChoices(result.locations || []);
           const contact = result.contact || { phone: '', department: profile.department || '' };
           setProfileContact(contact);
           setForm(current => ({ ...current, phone: current.phone || contact.phone, department: current.department || contact.department }));
@@ -483,6 +489,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             equipment_id: form.equipment || null,
             equipment_category: selectedEquipment?.category || null,
             fault_location: form.location.trim() || null,
+            location_id: form.locationId || null,
             fault_type: form.type.trim() || null,
             urgency: form.urgency,
             fault_desc: faultDesc,
@@ -532,6 +539,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             equipment_id: form.equipment || null,
             equipment_category: selectedEquipment?.category || null,
             fault_location: form.location.trim() || null,
+            location_id: form.locationId || null,
             fault_type: form.type.trim() || null,
             urgency: form.urgency,
             fault_desc: faultDesc,
@@ -707,7 +715,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               <label className="repair-form-field">手機（必填）<input required value={form.mobile} onChange={e => setForm({ ...form, mobile: e.target.value })} placeholder="請填手機號碼" /></label>
               <label className="repair-form-field">所屬單位<input list="repair-department-list" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} /><datalist id="repair-department-list">{departmentOptions.map(department => <option key={department} value={department} />)}</datalist></label>
             </div>
-            <label className="repair-form-field">關聯設備（選填）<select value={form.equipment} onChange={e => { const equipmentId = e.target.value; const selected = equipmentOptions.find(item => item.equipment_id === equipmentId); setForm(current => ({ ...current, equipment: equipmentId, location: current.location.trim() || selected?.location || '' })); }}><option value="">-- 未指定設備 --</option>{equipmentOptions.map(item => <option key={item.equipment_id} value={item.equipment_id}>{item.asset_code ? `${item.asset_code}｜` : ''}{item.name}</option>)}</select></label>
+            <label className="repair-form-field">關聯設備（選填）<select value={form.equipment} onChange={e => { const equipmentId = e.target.value; const selected = equipmentOptions.find(item => item.equipment_id === equipmentId); setForm(current => ({ ...current, equipment: equipmentId, location: current.location.trim() || selected?.location || '' })); }}><option value="">-- 未指定設備 --</option>{equipmentOptions.map(item => <option key={item.equipment_id} value={item.equipment_id}>{item.asset_code ? `${item.asset_code}｜` : ''}{item.name}</option>)}</select></label><label className="repair-form-field">場域位置（選填，供位置統計）<ComboboxSelect value={form.locationId} onChange={value => setForm(current => ({ ...current, locationId: value }))} options={locationOptions(locationChoices)} placeholder="輸入可篩選，留白代表不綁定" ariaLabel="場域位置" /></label>
             <label className="repair-form-field">故障位置<input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="請描述故障位置，例如：第一市場 2F 配電盤旁" /></label>
             <label className="repair-form-field">故障位置照片（必填，請上傳一張照片）<input required type="file" accept="image/*" onChange={e => setLocationPhoto(e.target.files?.[0] || null)} /></label>
             <label className="repair-form-field">故障類型<select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option value="">-- 請選擇故障類型 --</option><option value="電氣">電氣</option><option value="機械">機械</option><option value="漏水">漏水</option><option value="異音">異音</option><option value="停機">停機</option><option value="其他">其他</option></select></label>

@@ -27,6 +27,8 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { DELETED_SHIFT_PREFIX, isDeletedShift } from '@/lib/patrol-status';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { TimeSelect } from '@/components/TimeSelect';
+import { ComboboxSelect } from '@/components/ComboboxSelect';
+import { locationOptions, type LocationLike } from '@/lib/locations';
 import { FloorStack3D, floorOrder, type StackMarker } from './floor-stack-3d';
 import { PointListModule } from './patrol-pointlist';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -132,13 +134,15 @@ function RecordsModule({ module, profile }: Props) {
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [query, setQuery] = useState(''), [status, setStatus] = useState(''), [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '' });
+  // location_point 是自由文字的現場描述；location_id 綁場域位置主檔，位置分析才統計得到。
+  const [form, setForm] = useState({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
+  const [locationChoices, setLocationChoices] = useState<LocationLike[]>([]);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     try {
-      const data = await invokeAppApi<{ rows: Row[]; equipment: Row[] }>('inspections');
-      setRows(data.rows || []); setEquipment(data.equipment || []);
+      const data = await invokeAppApi<{ rows: Row[]; equipment: Row[]; locations?: LocationLike[] }>('inspections');
+      setRows(data.rows || []); setEquipment(data.equipment || []); setLocationChoices(data.locations || []);
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     finally { setBusy(false); }
   }, []);
@@ -162,8 +166,9 @@ function RecordsModule({ module, profile }: Props) {
         equipment_id: form.equipment_id, run_status: form.run_status,
         location_point: form.location_point.trim() || null,
         abnormal_note: form.run_status === 'abnormal' ? form.abnormal_note.trim() : null,
+        location_id: form.location_id || null,
       });
-      setCreating(false); setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '' });
+      setCreating(false); setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
       await load(); setNote('巡檢紀錄已新增');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
@@ -207,6 +212,7 @@ function RecordsModule({ module, profile }: Props) {
           <option value="normal">正常</option><option value="abnormal">異常</option>
         </select></label>
         <label>位置說明<input value={form.location_point} onChange={e => setForm({ ...form, location_point: e.target.value })} /></label>
+        <label>場域位置（選填，供位置統計）<ComboboxSelect value={form.location_id} onChange={value => setForm(current => ({ ...current, location_id: value }))} options={locationOptions(locationChoices)} placeholder="輸入可篩選，留白代表不綁定" ariaLabel="場域位置" /></label>
         {form.run_status === 'abnormal' && <label className="wide">異常說明（必填）
           <textarea rows={2} value={form.abnormal_note} onChange={e => setForm({ ...form, abnormal_note: e.target.value })} /></label>}
       </div>

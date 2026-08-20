@@ -417,16 +417,20 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'workorder_options') {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
-      const [people, equipment, departments, contact] = await Promise.all([
+      const [people, equipment, departments, contact, locations] = await Promise.all([
         userDb.from('users').select('user_id,name,department,role,rbac_role').eq('status', 'active').order('name').limit(500),
         userDb.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
         userDb.from('departments').select('name').eq('status', 'active').order('sort_order').limit(200),
         userDb.from('users').select('phone,department').eq('user_id', profile.user_id).maybeSingle(),
+        // 報修建立時要能綁場域位置，位置分析頁才有資料來源。
+        userDb.from('locations').select('location_id,market_id,floor,area,detail,floor_order,area_order,detail_order,markets(name)')
+          .eq('status', 'active').order('floor_order').order('area_order').order('detail_order').limit(2000),
       ]);
       if (people.error) throw people.error;
       if (equipment.error) throw equipment.error;
       if (departments.error) throw departments.error;
       if (contact.error) throw contact.error;
+      if (locations.error) throw locations.error;
       const technicians = (people.data || []).filter(row => {
         const role = text(row.rbac_role || row.role, 40);
         return role === 'technician' || role === 'maintenance';
@@ -439,6 +443,7 @@ export async function handleAppApiRequest(req: Request) {
         technicians,
         equipment: equipment.data || [],
         departments: (departments.data || []).map(row => text(row.name, 100)).filter(Boolean),
+        locations: locations.data || [],
         contact: {
           phone: text(contact.data?.phone, 40),
           department: text(contact.data?.department || profile.department, 100),
@@ -613,6 +618,8 @@ export async function handleAppApiRequest(req: Request) {
         equipment_id: /^[0-9a-f-]{36}$/i.test(text(requestData.equipment_id, 80)) ? text(requestData.equipment_id, 80) : null,
         equipment_category: text(requestData.equipment_category, 120) || null,
         fault_location: text(requestData.fault_location, 200) || null,
+        // fault_location 保留現場自由描述，location_id 綁場域位置主檔供彙總統計。
+        location_id: /^[0-9a-f-]{36}$/i.test(text(requestData.location_id, 80)) ? text(requestData.location_id, 80) : null,
         fault_type: text(requestData.fault_type, 80) || null,
         urgency: text(requestData.urgency, 20) || 'normal',
         fault_desc: text(requestData.fault_desc, 2000),
@@ -736,13 +743,17 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'inspections') {
       if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有巡檢系統權限' }, 403);
-      const [records, equipment] = await Promise.all([
+      const [records, equipment, locations] = await Promise.all([
         userDb.from('inspection_records').select('record_id,inspect_time,run_status,light_status,abnormal_note,location_point,equipment(name,asset_code,floor),users!inspection_records_inspector_id_fkey(name)').order('inspect_time', { ascending: false }).limit(200),
         userDb.from('equipment').select('equipment_id,name,asset_code,floor').neq('status', 'retired').order('name').limit(1000),
+        // 建立巡檢時要能綁場域位置，位置分析頁才有資料來源。
+        userDb.from('locations').select('location_id,market_id,floor,area,detail,floor_order,area_order,detail_order,markets(name)')
+          .eq('status', 'active').order('floor_order').order('area_order').order('detail_order').limit(2000),
       ]);
       if (records.error) throw records.error;
       if (equipment.error) throw equipment.error;
-      return reply(req, { ok: true, data: { rows: records.data || [], equipment: equipment.data || [] } });
+      if (locations.error) throw locations.error;
+      return reply(req, { ok: true, data: { rows: records.data || [], equipment: equipment.data || [], locations: locations.data || [] } });
     }
 
     if (action === 'create_inspection') {
@@ -752,10 +763,14 @@ export async function handleAppApiRequest(req: Request) {
       if (!/^[0-9a-f-]{36}$/i.test(equipmentId)) return reply(req, { ok: false, message: '請選擇有效設備' }, 400);
       const abnormalNote = text(body.abnormal_note, 1000);
       if (runStatus === 'abnormal' && !abnormalNote) return reply(req, { ok: false, message: '異常巡檢必須填寫說明' }, 400);
+      // location_point 是自由文字、無法統計；location_id 綁到場域位置主檔，
+      // 位置分析頁才有資料來源。兩者並存：前者記現場描述，後者供彙總。
+      const locationId = text(body.location_id, 80);
       const { data, error } = await userDb.from('inspection_records').insert({
         equipment_id: equipmentId, inspector_id: profile.user_id, run_status: runStatus,
         light_status: runStatus === 'abnormal' ? 'red' : 'green',
         location_point: text(body.location_point, 240) || null, abnormal_note: abnormalNote || null,
+        location_id: /^[0-9a-f-]{36}$/i.test(locationId) ? locationId : null,
       }).select('record_id').single();
       if (error) throw error;
       return reply(req, { ok: true, data });
