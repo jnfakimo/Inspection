@@ -110,6 +110,12 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
   table cells, filter dropdowns and toast messages.
   Database column names must not appear in prose either — write 「已綁定場域位置」,
   not 「有填 location_id」. Identifiers belong in code and comments, not on screen.
+- **The repair-request stat cards have one definition.** `repairRequestSummary()` in
+  `supabase/functions/app-api/index.ts` feeds both the 報修案件 table page (`workorder_list`)
+  and the 維修／派工／完工 system hub (`module_data`). Add or change a card there and both
+  pages follow; never add one in a component. Before this, each side computed its own
+  「top 3 statuses」 and the front end spliced in an extra card, so the two pages showed
+  different cards from the same data — and the set silently changed as the data changed.
 - **Time inputs**: always use `@/components/TimeSelect` (a 30-minute-step `<select>`),
   never `<input type="time">`. The native field's `step` only constrains validation,
   so users can still type 08:17, and its rendering (上午/下午 vs 24-hour) is decided by

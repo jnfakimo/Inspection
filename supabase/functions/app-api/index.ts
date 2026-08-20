@@ -95,6 +95,28 @@ type AuditClient = {
     insert: (values: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }>;
   };
 };
+/**
+ * 報修案件的統計圖卡——報修案件頁（workorder_list）與維修系統入口（module_data）
+ * 共用這一份定義。
+ *
+ * 原本兩邊各算各的，而且都取「出現次數最多的前 3 個狀態」，於是同一批資料在兩個
+ * 頁面會顯示不同的圖卡，資料一變還會自己換掉。改為單一來源＋固定類別：新增或調整
+ * 圖卡只要改這裡，兩個頁面自動一致，不會有人只改一邊。
+ */
+function repairRequestSummary(rows: Array<Record<string, unknown>>) {
+  const statusOf = (row: Record<string, unknown>) => String(row.status ?? '');
+  const urgencyOf = (row: Record<string, unknown>) => String(row.urgency ?? '');
+  const SETTLED = new Set(['closed', 'completed']);
+  return [
+    { label: '目前資料', value: rows.length },
+    { label: '急迫性案件', value: rows.filter(row =>
+        (urgencyOf(row) === 'urgent' || urgencyOf(row) === 'high') && !SETTLED.has(statusOf(row))).length },
+    { label: '已結案', value: rows.filter(row => statusOf(row) === 'closed').length },
+    { label: '已指派', value: rows.filter(row => statusOf(row) === 'assigned').length },
+    { label: '已取消', value: rows.filter(row => statusOf(row) === 'cancelled').length },
+  ];
+}
+
 async function writeAudit(
   db: AuditClient, operatorId: string, table: string, recordId: string,
   auditAction: 'insert' | 'update' | 'status_change', before: unknown, after: unknown,
@@ -363,7 +385,9 @@ export async function handleAppApiRequest(req: Request) {
       });
       const statusCounts=new Map<string,number>();
       rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
-      const summary=[{label:'目前資料',value:rows.length},...[...statusCounts.entries()].slice(0,3).map(([label,value])=>({label,value}))];
+      const summary = systemKey === 'workorder' && moduleKey === 'requests'
+        ? repairRequestSummary(rows)
+        : [{label:'目前資料',value:rows.length},...[...statusCounts.entries()].slice(0,3).map(([label,value])=>({label,value}))];
       return reply(req,{ok:true,data:{title:config.title,table:config.table,columns:config.columns.map(([key,label])=>({key,label})),rows,summary}});
     }
 
@@ -418,7 +442,7 @@ export async function handleAppApiRequest(req: Request) {
         title: titles[moduleKey],
         table: 'repair_requests',
         rows,
-        summary: [{ label: '目前資料', value: rows.length }, ...[...statusCounts.entries()].slice(0, 3).map(([label, value]) => ({ label, value }))],
+        summary: repairRequestSummary(rows),
       } });
     }
 
