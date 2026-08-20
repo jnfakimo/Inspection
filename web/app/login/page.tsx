@@ -28,6 +28,7 @@ function friendlyError(raw: unknown, fallback: string) {
 export default function LoginPage() {
   const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
   const [view, setView] = useState<'login' | 'forgot' | 'reset'>('login');
+  const [resetReady, setResetReady] = useState(false);
   const [message, setMessage] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,7 +55,24 @@ export default function LoginPage() {
   useEffect(() => {
     const hash = window.location.hash;
     // 從重設密碼信回來：Supabase 會把 recovery session 放在網址 hash。
-    if (hash.includes('type=recovery')) { setView('reset'); return; }
+    // 但 lib/supabase.ts 設了 detectSessionInUrl:false，supabase-js 不會自己去讀
+    // 這段 hash，必須像下方登入流程那樣手動 setSession。少了這一步，
+    // updateUser 會因為沒有 session 而失敗，而 friendlyError 的 /session/i 規則
+    // 又會把它翻成「重設連結已失效」，把使用者指向完全錯誤的原因。
+    if (hash.includes('type=recovery')) {
+      setView('reset');
+      const params = new URLSearchParams(hash.replace(/^#/, ''));
+      const accessToken = params.get('access_token') || '', refreshToken = params.get('refresh_token') || '';
+      if (!accessToken || !refreshToken) { setMessage('重設連結不完整，請重新申請'); return; }
+      void getSupabase().auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          // token 進了 session 就不該繼續留在網址列與瀏覽紀錄裡。
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          if (error) setMessage(friendlyError(error, '重設連結已失效，請重新申請'));
+          else setResetReady(true);
+        });
+      return;
+    }
     if (hash.includes('error=')) {
       const params = new URLSearchParams(hash.replace(/^#/, ''));
       const description = params.get('error_description') || params.get('error_code') || params.get('error') || '';
@@ -118,7 +136,7 @@ export default function LoginPage() {
       <label>再次輸入新密碼<input type="password" value={password2} autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••" /></label>
       {message && <p className="form-error">{message}</p>}
       {notice && <p className="inline-message">{notice}</p>}
-      <button className="primary-btn" disabled={busy} onClick={() => void saveNewPassword()}>{busy ? '儲存中…' : '設定新密碼'}</button>
+      <button className="primary-btn" disabled={busy || !resetReady} onClick={() => void saveNewPassword()}>{busy ? '儲存中…' : resetReady ? '設定新密碼' : '驗證連結中…'}</button>
     </div>
     <footer>臺北農產運銷股份有限公司 第一果菜市場 ｜ 整合管理系統 ｜ 第二版</footer>
   </main>;
