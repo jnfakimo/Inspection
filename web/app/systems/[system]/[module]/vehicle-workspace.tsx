@@ -16,6 +16,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { TimeSelect } from '@/components/TimeSelect';
 import { escHtml } from '@/lib/html-escape';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -565,8 +566,8 @@ function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; on
     <div className="admin-form-grid">
       <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
-      <label>預計出發時間（必填）<input type="time" step="1800" value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
-      <label>預計回程時間（必填）<input type="time" step="1800" value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
+      <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
+      <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
       <label>出發地<input value={form.origin_location} onChange={e => set('origin_location', e.target.value)} /></label>
       <label>目的地（必填）<input value={form.destination_location} onChange={e => set('destination_location', e.target.value)} placeholder="例：第二果菜市場" /></label>
       <label>聯絡電話<input value={form.applicant_phone} onChange={e => set('applicant_phone', e.target.value)} placeholder="分機或手機" /></label>

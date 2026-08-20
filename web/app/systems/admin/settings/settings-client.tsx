@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
+import { TimeSelect } from '@/components/TimeSelect';
 import { invokeAdminApi } from '@/lib/admin-api';
 import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
@@ -704,9 +705,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
             </label>
             <label>
               <span>開始</span>
-              <input
-                type="time"
-                step="1800"
+              <TimeSelect
                 value={shift.start}
                 onChange={event => setShifts(current => current.map((item, itemIndex) =>
                   itemIndex === index ? { ...item, start: event.target.value } : item,
@@ -715,9 +714,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
             </label>
             <label>
               <span>結束</span>
-              <input
-                type="time"
-                step="1800"
+              <TimeSelect
                 value={shift.end}
                 onChange={event => setShifts(current => current.map((item, itemIndex) =>
                   itemIndex === index ? { ...item, end: event.target.value } : item,

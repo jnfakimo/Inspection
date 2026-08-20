@@ -26,6 +26,7 @@ import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { DELETED_SHIFT_PREFIX, isDeletedShift } from '@/lib/patrol-status';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { TimeSelect } from '@/components/TimeSelect';
 import { FloorStack3D, floorOrder, type StackMarker } from './floor-stack-3d';
 import { PointListModule } from './patrol-pointlist';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -372,10 +373,10 @@ function ShiftsModule({ module, profile }: Props) {
       <div className="admin-form-grid">
         <label>班別名稱（必填）<input value={String(editor.name || '')} onChange={e => setEditor({ ...editor, name: e.target.value })} /></label>
         <label>排序<input type="number" value={String(editor.sort_order ?? 0)} onChange={e => setEditor({ ...editor, sort_order: e.target.value })} /></label>
-        <label>班別開始<input type="time" step="1800" value={String(editor.start_time || '')} onChange={e => setEditor({ ...editor, start_time: e.target.value })} /></label>
-        <label>班別結束<input type="time" step="1800" value={String(editor.end_time || '')} onChange={e => setEditor({ ...editor, end_time: e.target.value })} /></label>
-        <label>通報開始<input type="time" step="1800" value={String(editor.work_start || '')} onChange={e => setEditor({ ...editor, work_start: e.target.value })} /></label>
-        <label>通報結束<input type="time" step="1800" value={String(editor.work_end || '')} onChange={e => setEditor({ ...editor, work_end: e.target.value })} /></label>
+        <label>班別開始<TimeSelect value={String(editor.start_time || '')} onChange={e => setEditor({ ...editor, start_time: e.target.value })} /></label>
+        <label>班別結束<TimeSelect value={String(editor.end_time || '')} onChange={e => setEditor({ ...editor, end_time: e.target.value })} /></label>
+        <label>通報開始<TimeSelect value={String(editor.work_start || '')} onChange={e => setEditor({ ...editor, work_start: e.target.value })} /></label>
+        <label>通報結束<TimeSelect value={String(editor.work_end || '')} onChange={e => setEditor({ ...editor, work_end: e.target.value })} /></label>
       </div>
       <div className="detail-timeline">
         <h3>排定人員（{Array.isArray(editor.assigned_user_ids) ? editor.assigned_user_ids.length : 0} 人）</h3>

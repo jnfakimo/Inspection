@@ -101,6 +101,12 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
 - **Date inputs**: unified format is 西元 `YYYY-MM-DD` (datetime `YYYY-MM-DD HH:mm`);
   date inputs use a calendar picker; forms show a 填表日期 (today). Use the local
   `fmtDate()`/`todayISO()` helpers.
+- **Time inputs**: always use `@/components/TimeSelect` (a 30-minute-step `<select>`),
+  never `<input type="time">`. The native field's `step` only constrains validation,
+  so users can still type 08:17, and its rendering (上午/下午 vs 24-hour) is decided by
+  the browser locale, which made the same system look different on different machines.
+  `TimeSelect` emits 24-hour `HH:mm`, matching the tables and the DB `time` columns, and
+  keeps an off-step legacy value as an extra option so editing another field can't erase it.
 - **Table Filters / Dropdowns**: Whenever creating a filter dropdown in a table header, use a combobox design (`<input list="..."><datalist>`) rather than a native `<select>`. This allows users to type to filter while providing a dropdown list. Ensure the `<option>` values in the datalist use the localized display labels (e.g. `緊急` instead of `urgent`), and update the filtering logic to match against labels so the UI shows Traditional Chinese properly.
 - **Floor naming differs between systems**: area/material data may use `B1F`,
   while plan/3D use `B1`. Reconcile with a `canonicalFloor()` (B1≈B1F, 1F≈1, RF≈頂樓).
