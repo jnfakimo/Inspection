@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -99,17 +99,33 @@ type AuditClient = {
  * 報修案件的統計圖卡——報修案件頁（workorder_list）與維修系統入口（module_data）
  * 共用這一份定義。
  *
- * 原本兩邊各算各的，而且都取「出現次數最多的前 3 個狀態」，於是同一批資料在兩個
- * 頁面會顯示不同的圖卡，資料一變還會自己換掉。改為單一來源＋固定類別：新增或調整
- * 圖卡只要改這裡，兩個頁面自動一致，不會有人只改一邊。
+ * 兩點刻意的設計：
+ * 1. 單一來源。原本兩邊各算各的、又都取「出現次數最多的前 3 個狀態」，同一批資料
+ *    在兩個頁面會顯示不同的圖卡，資料一變還會自己換掉。
+ * 2. 自己查一次，不吃呼叫端已取回的資料列。module_data 上限 100 筆、workorder_list
+ *    上限 500 筆，案件數超過 100 之後兩頁的數字就會靜默地對不起來。
+ *
+ * 新增或調整圖卡只要改這裡，兩個頁面自動一致。
  */
-function repairRequestSummary(rows: Array<Record<string, unknown>>) {
+async function repairRequestSummary(db: SupabaseClient) {
+  const { data, error } = await db.from('repair_requests').select('status,urgency,created_at').limit(5000);
+  if (error) throw error;
+  const rows = (data || []) as Array<Record<string, unknown>>;
   const statusOf = (row: Record<string, unknown>) => String(row.status ?? '');
   const urgencyOf = (row: Record<string, unknown>) => String(row.urgency ?? '');
   const SETTLED = new Set(['closed', 'completed']);
-  // 依案件生命週期排序：指派 → 處理中 → 結案 → 取消，讓一整列讀起來就是流程本身。
+  const taipeiDay = (value: unknown) => {
+    const parsed = Date.parse(String(value ?? ''));
+    return Number.isFinite(parsed)
+      ? new Date(parsed).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
+      : '';
+  };
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+  // 依案件生命週期排序：新增 → 急迫 → 指派 → 處理 → 結案 → 取消，
+  // 一整列讀下來就是流程本身。
   return [
     { label: '目前資料', value: rows.length },
+    { label: '今日增加案件', value: rows.filter(row => taipeiDay(row.created_at) === today).length },
     { label: '急迫性案件', value: rows.filter(row =>
         (urgencyOf(row) === 'urgent' || urgencyOf(row) === 'high') && !SETTLED.has(statusOf(row))).length },
     { label: '已指派', value: rows.filter(row => statusOf(row) === 'assigned').length },
@@ -388,7 +404,7 @@ export async function handleAppApiRequest(req: Request) {
       const statusCounts=new Map<string,number>();
       rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
       const summary = systemKey === 'workorder' && moduleKey === 'requests'
-        ? repairRequestSummary(rows)
+        ? await repairRequestSummary(userDb)
         : [{label:'目前資料',value:rows.length},...[...statusCounts.entries()].slice(0,3).map(([label,value])=>({label,value}))];
       return reply(req,{ok:true,data:{title:config.title,table:config.table,columns:config.columns.map(([key,label])=>({key,label})),rows,summary}});
     }
@@ -444,7 +460,7 @@ export async function handleAppApiRequest(req: Request) {
         title: titles[moduleKey],
         table: 'repair_requests',
         rows,
-        summary: repairRequestSummary(rows),
+        summary: await repairRequestSummary(userDb),
       } });
     }
 
