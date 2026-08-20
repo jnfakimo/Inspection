@@ -488,11 +488,22 @@ export async function handleAppApiRequest(req: Request) {
         const signedMap = new Map((signedResult.data || []).map(item => [item.path, item.signedUrl]));
         attachments.forEach(item => { item.signed_url = signedMap.get(text(item.file_path, 1000)) || ''; });
       }
+      // 完工回報寫入的費用要能顯示在處理歷程上，否則使用者看不出這張單花了多少。
+      let costs: Array<Record<string, unknown>> = [];
+      const detailOrderId = orderResult.data?.order_id;
+      if (detailOrderId) {
+        const costResult = await userDb.from('cost_records')
+          .select('cost_id,cost_type,amount,cost_date,note')
+          .eq('order_id', detailOrderId).order('cost_date');
+        if (costResult.error) warnings.push(`費用紀錄：${text(costResult.error.message, 300)}`);
+        else costs = costResult.data || [];
+      }
       return reply(req, { ok: true, data: {
         request: requestResult.data,
         order: orderResult.data || null,
         attachments,
         logs: logsResult.data || [],
+        costs,
         warnings,
       } });
     }

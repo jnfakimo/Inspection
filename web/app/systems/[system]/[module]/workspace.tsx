@@ -28,7 +28,12 @@ type RepairDetail = {
   order: Record<string, unknown> | null;
   attachments: Array<Record<string, unknown>>;
   logs: Array<Record<string, unknown>>;
+  costs?: Array<Record<string, unknown>>;
 };
+
+// 綁在維修工單上的費用類型。完工回報只會產生這兩種，其餘（購置、委外）不會帶 order_id。
+const ORDER_COST_LABELS: Record<string, string> = { parts: '零件', labor: '工資', outsource: '委外', other: '其他' };
+const twd = (value: unknown) => Number(value || 0).toLocaleString('zh-TW', { maximumFractionDigits: 0 });
 
 const EMPTY_FILTER_VALUE = '__empty__';
 const REQUEST_COLUMNS = [
@@ -572,6 +577,17 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const detailAssignee = recordValue(detailOrder?.users);
     const detailStatus = String(detailRequest?.status || 'pending');
     const detailOrderStatus = String(detailOrder?.status || '');
+    // 完工回報寫入的費用，接在「工程師完工」那則歷程底下。金額為 0 或留白時不會有
+    // 紀錄，這裡自然就不顯示——沒填費用和填了 0 元在畫面上是同一件事。
+    const orderCostSummary = (() => {
+      const items = (repairDetail?.costs || []).filter(row => Number(row.amount || 0) > 0);
+      if (!items.length) return '';
+      const parts = items.map(row => `${ORDER_COST_LABELS[String(row.cost_type)] || display(row.cost_type)} ${twd(row.amount)} 元`);
+      const total = items.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+      return items.length > 1
+        ? `維修費用：${parts.join('｜')}（合計 ${twd(total)} 元）`
+        : `維修費用：${parts[0]}`;
+    })();
     const canEngineerAct = normalizedRole === 'sysadmin' || (normalizedRole === 'technician' && String(detailOrder?.assignee_id || '') === profile.user_id);
     const canReporterAccept = normalizedRole === 'sysadmin' || String(detailRequest?.created_by || '') === profile.user_id;
     const workflowSteps = ['報修', '主管派工', '工程師接單', '完工', '報修人驗收', '主管驗收'];
@@ -663,7 +679,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             {detailOrder && Boolean(detailOrder.fault_cause) && <div className="full"><span>維修結果：</span><p>{[detailOrder.fault_cause, detailOrder.handle_method, detailOrder.parts_used ? `更換：${display(detailOrder.parts_used)}` : '', detailOrder.labor_hours ? `工時：${display(detailOrder.labor_hours)}h` : ''].filter(Boolean).map(display).join('｜')}</p></div>}
           </div>
           {repairDetail.attachments.length > 0 && <section className="request-detail-section"><h3>附件</h3><div className="request-detail-attachments">{repairDetail.attachments.map((attachment, index) => { const url = String(attachment.signed_url || ''); const name = String(attachment.file_name || attachment.kind || `附件 ${index + 1}`); const isImage = ['photo', 'location_photo', 'equipment_photo'].includes(String(attachment.kind || '')) || /\.(jpe?g|png|webp|heic)$/i.test(name); return url ? <a key={String(attachment.attach_id || index)} href={url} target="_blank" rel="noopener noreferrer" className={isImage ? 'is-image' : ''}>{isImage ? <img src={url} alt={name} /> : <>📎 {name}</>}</a> : <span key={String(attachment.attach_id || index)}>附件暫時無法開啟：{name}</span>; })}</div></section>}
-          <section className="request-detail-section"><h3>處理歷程</h3>{repairDetail.logs.length ? <ol className="request-detail-timeline">{repairDetail.logs.map((log, index) => <li key={String(log.log_id || index)}><strong>{repairTimelineStatusLabel(log.to_status)}</strong>{Boolean(log.note) && <p>{display(log.note)}</p>}<small>{[log.operator_name ? display(log.operator_name) : '', display(log.created_at)].filter(Boolean).join(' · ')}</small></li>)}</ol> : <p className="request-detail-empty">尚無歷程</p>}</section>
+          <section className="request-detail-section"><h3>處理歷程</h3>{repairDetail.logs.length ? <ol className="request-detail-timeline">{repairDetail.logs.map((log, index) => <li key={String(log.log_id || index)}><strong>{repairTimelineStatusLabel(log.to_status)}</strong>{Boolean(log.note) && <p>{display(log.note)}</p>}{String(log.to_status) === 'pending_review' && orderCostSummary && <p className="repair-cost-note">{orderCostSummary}</p>}<small>{[log.operator_name ? display(log.operator_name) : '', display(log.created_at)].filter(Boolean).join(' · ')}</small></li>)}</ol> : <p className="request-detail-empty">尚無歷程</p>}</section>
           {isRepairTableModule && !detailLoading && <section className="request-detail-section request-dispatch-actions">
             <h3>維修流程</h3>
             <ol className="repair-workflow-steps">
