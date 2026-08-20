@@ -105,7 +105,12 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
   date field is painted with the browser's own format hint, which in a Traditional Chinese
   environment comes out as the mixed 「yyyy/月/dd」. `LocalizedDateInput` shows 「年/月/日」
   while empty and only opens the native calendar on focus, so every date field looks the
-  same on every machine.
+  same on every machine. Date+time fields use `@/components/LocalizedDateTimeInput`
+  (LocalizedDateInput + TimeSelect, emitting the same `YYYY-MM-DDTHH:mm` value), never
+  `<input type="datetime-local">` — its `step="1800"` only constrained validation, so
+  users could still type 08:17. `security:audit` now fails the build on native `date`,
+  `datetime-local` and `time` inputs, including a dynamic `type={cond ? 'date' : 'text'}`
+  swap, which is how one of these slipped through before.
 - **Every user-facing string is Traditional Chinese.** Status codes, action codes and
   enum values are stored in English (`create`, `closed`, `pending`, …) but must never
   reach the screen raw — map them through a `Record<string, string>` label table next

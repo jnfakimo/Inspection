@@ -29,6 +29,7 @@ import { AppShell } from '@/components/AppShell';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -749,7 +750,7 @@ function CaseFormModal({ users, departments, profile, onClose, onDone }: {
         {reporters.map(u => <option key={String(u.user_id)} value={String(u.user_id)}>{u.name}</option>)}
       </select></label>
       <label>發生地點<input value={form.incident_location} onChange={e => set('incident_location', e.target.value)} placeholder="發生地點" /></label>
-      <label>發生時間<input type="datetime-local" step="1800" aria-label="發生時間（年/月/日 上午/下午 時 分）" value={form.incident_time} onChange={e => set('incident_time', e.target.value)} /></label>
+      <label>發生時間<LocalizedDateTimeInput ariaLabel="發生時間" value={form.incident_time} onChange={value => set('incident_time', value)} /></label>
       <label>異常大類（必填）<select value={form.anomaly_category} onChange={e => { set('anomaly_category', e.target.value); set('anomaly_sub', ''); }}>
         <option value="">— 選擇大類 —</option>
         {Object.keys(ANOMALY_SUBS).map(key => <option key={key} value={key}>{key}</option>)}

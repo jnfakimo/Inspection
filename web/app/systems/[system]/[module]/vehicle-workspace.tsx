@@ -17,6 +17,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { TimeSelect } from '@/components/TimeSelect';
+import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { escHtml } from '@/lib/html-escape';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -706,8 +707,8 @@ function TripReportModal({ row, vehicles, onClose, onDone }: { row: Row; vehicle
   return <AdminModal title={`行車回報｜${fmt(row.request_no)}　${fmt(row.plate_no)}`} onClose={onClose}>
     <div className="admin-form-grid">
       <label>實際搭乘人數<input type="number" min={0} value={form.actual_passenger_count} onChange={e => set('actual_passenger_count', e.target.value)} /></label>
-      <label>實際出發時間<input type="datetime-local" step="1800" aria-label="實際出發時間（年/月/日 上午/下午 時 分）" value={form.actual_departure_at} onChange={e => set('actual_departure_at', e.target.value)} /></label>
-      <label>實際回程時間<input type="datetime-local" step="1800" aria-label="實際回程時間（年/月/日 上午/下午 時 分）" value={form.actual_return_at} onChange={e => set('actual_return_at', e.target.value)} /></label>
+      <label>實際出發時間<LocalizedDateTimeInput ariaLabel="實際出發時間" value={form.actual_departure_at} onChange={value => set('actual_departure_at', value)} /></label>
+      <label>實際回程時間<LocalizedDateTimeInput ariaLabel="實際回程時間" value={form.actual_return_at} onChange={value => set('actual_return_at', value)} /></label>
       <label>起始里程（km）<input type="number" step="0.1" value={form.odometer_start} onChange={e => set('odometer_start', e.target.value)} /></label>
       <label>回程里程（km）<input type="number" step="0.1" value={form.odometer_end} onChange={e => set('odometer_end', e.target.value)} /></label>
       <label>上次加油里程<input type="number" step="0.1" value={form.last_refuel_odometer} onChange={e => set('last_refuel_odometer', e.target.value)} /></label>

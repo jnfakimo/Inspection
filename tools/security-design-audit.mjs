@@ -48,10 +48,16 @@ if (fs.existsSync(modulesFile)) {
   }
 }
 for (const file of walk(path.join(root, 'web'))) {
-  if (file.endsWith('LocalizedDateInput.tsx')) continue;
+  // 這兩支就是規範本身的實作，內部必然出現原生欄位或提及它。
+  if (['LocalizedDateInput.tsx', 'LocalizedDateTimeInput.tsx', 'TimeSelect.tsx'].some(name => file.endsWith(name))) continue;
   const text = fs.readFileSync(file, 'utf8');
   if (/type=["']date["']/.test(text)) add('error', file, '原生日期欄位', '可見日期欄位必須使用 LocalizedDateInput，避免瀏覽器顯示 yyyy/月/dd。');
-  if (/type=["']datetime-local["']/.test(text) && !/type=["']datetime-local["'][^>]*step=["']1800["']/.test(text)) add('error', file, '時間間隔', '日期時間欄位必須限制為每 30 分鐘一格（step=1800）。');
+  // 動態切換 type 也算——曾經有欄位寫成 type={cond ? 'date' : 'text'} 而躲過這條規則。
+  if (/type=\{[^}]*['"]date['"]/.test(text)) add('error', file, '原生日期欄位', '不得以動態 type 切換成原生日期欄位，一律使用 LocalizedDateInput。');
+  // datetime-local 同樣不得直接使用：step=1800 只約束驗證，使用者仍可打出 08:17，
+  // 而且空值時瀏覽器會顯示 yyyy/mm/dd --:--。改用 LocalizedDateTimeInput。
+  if (/type=["']datetime-local["']/.test(text)) add('error', file, '原生日期時間欄位', '日期時間欄位必須使用 LocalizedDateTimeInput（日期＋30 分鐘級距時間）。');
+  if (/type=["']time["']/.test(text)) add('error', file, '原生時間欄位', '時間欄位必須使用 TimeSelect（30 分鐘級距下拉）。');
 }
 const finalErrors = findings.filter(item => item.severity === 'error');
 const finalWarnings = findings.filter(item => item.severity === 'warning');
