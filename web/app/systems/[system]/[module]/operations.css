@@ -17,9 +17,13 @@
 
 /* 日期列：LocalizedDateInput 的外層 span 帶 width:100%，在 flex 容器裡會吃掉整行
    把前後按鈕擠到下一行，所以在這裡收成固定寬度。 */
-.operations-datebar>.localized-date-input{flex:0 0 auto;width:180px}
-.operations-datebar{flex-wrap:nowrap;overflow-x:auto}
-.operations-datebar>button{flex:0 0 auto;white-space:nowrap}
+/* 整列縮到 80%：字級與間距一起收，四個控制項才排得進一行而不需要捲動。
+   上一版用 overflow-x:auto 只是把換行換成橫向捲軸，並沒有真的排進去。 */
+.operations-datebar{flex-wrap:nowrap;overflow:visible;gap:6px;font-size:.8em}
+.operations-datebar>.localized-date-input{flex:0 0 auto;width:96px}
+.operations-datebar .localized-date-input input{width:100%;box-sizing:border-box;padding:5px 20px 5px 6px;text-align:center;font:inherit}
+.operations-datebar .localized-date-input button{right:4px;font-size:.9em}
+.operations-datebar>button{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
 /* 樓層可展開列出各巡檢點 */
 .operations-matrix .floor-toggle{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0}
 .operations-matrix .floor-toggle:disabled{cursor:default;opacity:.55}
