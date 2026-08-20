@@ -29,6 +29,10 @@ const MARKER_POSITIONS: Record<string, [number, number]> = {
   '宜蘭縣': [597, 404],
   '南投縣': [452, 468]
 };
+// 天氣圖示與縣市中心的距離比例：1 = 原本的外圍位置，0 = 完全貼在縣市上。
+// 拉近之後靠相對位置就看得出屬於哪一縣市，不必再用虛線連過去。
+const MARKER_PULL = 0.55;
+
 const LEFT_TEMP_COUNTIES = new Set(['苗栗縣', '臺中市', '彰化縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣']);
 
 const ENDPOINT = `${SUPABASE_URL}/functions/v1/cwa-weather`;
@@ -180,15 +184,15 @@ export function WeatherWidget() {
               
               const isLeft = LEFT_TEMP_COUNTIES.has(name);
               const isSelected = name === county;
+              // 圖示往各自的縣市中心拉近，靠位置本身表達歸屬，就不需要虛線指引。
+              // 外圍座標保留原本的排列，只縮短距離，因此不會互相重疊。
+              const mx = cx[0] + (pos[0] - cx[0]) * MARKER_PULL;
+              const my = cx[1] + (pos[1] - cx[1]) * MARKER_PULL;
               
               return (
                 <g key={name} onClick={() => setCounty(name)} style={{ cursor: 'pointer', outline: 'none' }} tabIndex={0}>
-                  {/* 連接線 */}
-                  <line x1={cx[0]} y1={cx[1]} x2={pos[0]} y2={pos[1]} stroke="var(--cyan)" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.6" />
-                  <path d={`M${cx[0]} ${cx[1]} a3,3 0 1,1 0,0.1`} fill="var(--cyan)" />
-                  
                   {/* 圖示與氣溫卡 */}
-                  <g transform={`translate(${pos[0]} ${pos[1]})`}>
+                  <g transform={`translate(${mx} ${my})`}>
                     <circle r={isSelected ? "20" : "17"} fill={isSelected ? "var(--cyan)" : "var(--panel)"} stroke="var(--cyan)" strokeWidth={isSelected ? "0" : "1.5"} opacity={isSelected ? "1" : "0.9"} />
                     <text y="-1" textAnchor="middle" dominantBaseline="central" fontSize={isSelected ? "18px" : "16px"}>
                       {weatherIcon(data.weather, data.weatherCode)}
@@ -198,10 +202,10 @@ export function WeatherWidget() {
                       x={isLeft ? "-26" : "0"} 
                       textAnchor={isLeft ? "end" : "middle"} 
                       dominantBaseline="central" 
-                      fontSize="14px" 
-                      fontWeight="normal" 
+                      fontSize="13px" 
+                      fontWeight="400" 
                       fill="var(--text-hi)" 
-                      style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}
+                      style={{ textShadow: '0 1px 2px rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}
                     >
                       {data.temperature ? Math.round(Number(data.temperature)) + '°' : ''}
                     </text>
