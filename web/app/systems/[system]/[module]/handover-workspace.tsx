@@ -428,6 +428,14 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
 
 /* ──────────────────────────── 未結事項（案件） ──────────────────────────── */
 
+// 處理歷程存的是英文動作代碼（handover_case_action 與 log_handover_case_created
+// 寫入 create／assign／transfer／close／update／reopen），直接印出來畫面上就會出現
+// 英文。對照表的做法沿用稽核頁的 ACTION_LABELS。
+const CASE_LOG_ACTION_LABELS: Record<string, string> = {
+  create: '案件建立', assign: '指派', transfer: '轉派',
+  close: '結案', update: '更新', reopen: '重新開啟',
+};
+
 function CasesModule({ module, profile }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
@@ -560,7 +568,7 @@ function CasesModule({ module, profile }: Props) {
 
       {logs.length > 0 && <div className="detail-timeline"><h3>處理歷程</h3>
         <ol>{logs.map(log => <li key={String(log.log_id)}>
-          <b>{fmt(log.action)}</b><span>{nameOf(log.created_by)}</span><time>{fmtTime(log.created_at)}</time>
+          <b>{CASE_LOG_ACTION_LABELS[String(log.action)] || fmt(log.action)}</b><span>{nameOf(log.created_by)}</span><time>{fmtTime(log.created_at)}</time>
           {log.content ? <p>{String(log.content)}</p> : null}
         </li>)}</ol></div>}
 

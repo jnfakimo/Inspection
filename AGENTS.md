@@ -101,6 +101,13 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
 - **Date inputs**: unified format is 西元 `YYYY-MM-DD` (datetime `YYYY-MM-DD HH:mm`);
   date inputs use a calendar picker; forms show a 填表日期 (today). Use the local
   `fmtDate()`/`todayISO()` helpers.
+- **Every user-facing string is Traditional Chinese.** Status codes, action codes and
+  enum values are stored in English (`create`, `closed`, `pending`, …) but must never
+  reach the screen raw — map them through a `Record<string, string>` label table next
+  to the component, the way `ACTION_LABELS` in `AuditAdminV2.tsx` and
+  `CASE_LOG_ACTION_LABELS` in `handover-workspace.tsx` do, and fall back to the raw
+  value only so an unmapped code still shows something. This includes timeline entries,
+  table cells, filter dropdowns and toast messages.
 - **Time inputs**: always use `@/components/TimeSelect` (a 30-minute-step `<select>`),
   never `<input type="time">`. The native field's `step` only constrains validation,
   so users can still type 08:17, and its rendering (上午/下午 vs 24-hour) is decided by
