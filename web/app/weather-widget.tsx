@@ -31,7 +31,36 @@ const MARKER_POSITIONS: Record<string, [number, number]> = {
 };
 // 天氣圖示與縣市中心的距離比例：1 = 原本的外圍位置，0 = 完全貼在縣市上。
 // 拉近之後靠相對位置就看得出屬於哪一縣市，不必再用虛線連過去。
-const MARKER_PULL = 0.55;
+const MARKER_PULL = 0.72;
+// 圖示之間的最小間距（圓半徑 17＋氣溫文字＋呼吸空間）。單純調小 MARKER_PULL
+// 會讓北部那一叢縣市擠在一起，所以拉近之後再跑一次分離，兩個條件才能同時成立。
+const MARKER_MIN_GAP = 46;
+
+/**
+ * 把圖示往各自的縣市中心拉近，再用簡單的鬆弛法把過近的推開。
+ * 推開時兩點各退一半，方向沿著連線，所以整體排列仍保持原本的方位關係。
+ */
+function layoutMarkers(points: Array<{ name: string; x: number; y: number }>) {
+  for (let round = 0; round < 60; round += 1) {
+    let adjusted = false;
+    for (let i = 0; i < points.length; i += 1) {
+      for (let j = i + 1; j < points.length; j += 1) {
+        const dx = points[j].x - points[i].x;
+        const dy = points[j].y - points[i].y;
+        const distance = Math.hypot(dx, dy) || 0.001;
+        if (distance >= MARKER_MIN_GAP) continue;
+        const push = (MARKER_MIN_GAP - distance) / 2;
+        const ux = dx / distance;
+        const uy = dy / distance;
+        points[i].x -= ux * push; points[i].y -= uy * push;
+        points[j].x += ux * push; points[j].y += uy * push;
+        adjusted = true;
+      }
+    }
+    if (!adjusted) break;
+  }
+  return new Map(points.map(point => [point.name, point]));
+}
 
 const LEFT_TEMP_COUNTIES = new Set(['苗栗縣', '臺中市', '彰化縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣']);
 
@@ -176,7 +205,18 @@ export function WeatherWidget() {
           <g transform="translate(180, 140) scale(0.65)" dangerouslySetInnerHTML={{ __html: mapSvg }} />
 
           <g className="weather-marker-layer">
-            {COUNTIES.map(name => {
+            {(() => {
+            const placed = layoutMarkers(COUNTIES.flatMap(name => {
+              const center = countyCenters[name];
+              const outer = MARKER_POSITIONS[name];
+              if (!center || !outer) return [];
+              return [{
+                name,
+                x: center[0] + (outer[0] - center[0]) * MARKER_PULL,
+                y: center[1] + (outer[1] - center[1]) * MARKER_PULL,
+              }];
+            }));
+            return COUNTIES.map(name => {
               const data = (summary?.counties || []).find((r: Row) => r.county.replace('台', '臺') === name) || {};
               const pos = MARKER_POSITIONS[name];
               const cx = countyCenters[name];
@@ -184,10 +224,11 @@ export function WeatherWidget() {
               
               const isLeft = LEFT_TEMP_COUNTIES.has(name);
               const isSelected = name === county;
-              // 圖示往各自的縣市中心拉近，靠位置本身表達歸屬，就不需要虛線指引。
-              // 外圍座標保留原本的排列，只縮短距離，因此不會互相重疊。
-              const mx = cx[0] + (pos[0] - cx[0]) * MARKER_PULL;
-              const my = cx[1] + (pos[1] - cx[1]) * MARKER_PULL;
+              // 位置已於 layoutMarkers 統一算好：先往縣市中心拉近，再把過近的推開。
+              const spot = placed.get(name);
+              if (!spot) return null;
+              const mx = spot.x;
+              const my = spot.y;
               
               return (
                 <g key={name} onClick={() => setCounty(name)} style={{ cursor: 'pointer', outline: 'none' }} tabIndex={0}>
@@ -212,7 +253,8 @@ export function WeatherWidget() {
                   </g>
                 </g>
               );
-            })}
+            });
+            })()}
           </g>
         </svg>
         <div style={{ 
