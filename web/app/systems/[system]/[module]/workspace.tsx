@@ -697,7 +697,14 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               {(!detailOrder || ['pending', 'transferred', 'returned', 'rejected'].includes(detailStatus)) && canDispatch && !['closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-assign-button" onClick={startDispatch}>{detailOrder ? '主管派工' : detailStatus === 'pending' ? '主管派工' : '建立／補建派工'}</button>}
               {detailStatus === 'assigned' && detailOrderStatus === 'assigned' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void runRepairWorkflow(detailRequest, 'engineer_accept', 'assigned')}>工程師接單</button>}
               {detailStatus === 'assigned' && detailOrderStatus === 'accepted' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void runRepairWorkflow(detailRequest, 'engineer_start', 'in_progress')}>開始維修</button>}
-              {detailStatus === 'in_progress' && Boolean(detailOrder) && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={openCompletionForm}>完工回報</button>}
+              {/* 完工的前置條件是「報修單與工單都在維修中」（apply_repair_workflow 的
+                  engineer_complete 分支）。這裡原本只看報修單狀態，於是工單停在
+                  accepted／waiting_vendor 時按鈕照樣出現，按下去必定失敗並回一句
+                  「案件尚未進入維修中」——按鈕給按卻永遠不可能成功。 */}
+              {detailStatus === 'in_progress' && detailOrderStatus === 'in_progress' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={openCompletionForm}>完工回報</button>}
+              {detailStatus === 'in_progress' && detailOrderStatus !== 'in_progress' && Boolean(detailOrder) && canEngineerAct && <p className="workflow-waiting">
+                工單目前是「{repairTimelineStatusLabel(detailOrderStatus)}」，尚未進入維修中，還不能回報完工。
+              </p>}
               {detailStatus === 'pending_review' && canReporterAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptByReporter()}>報修人驗收通過</button>}
               {detailStatus === 'completed' && canSupervisorAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptBySupervisor()}>主管驗收並結案</button>}
               {!detailOrder && !canDispatch && !['closed', 'cancelled'].includes(detailStatus) && <p className="workflow-waiting">尚未建立維修工單，等待主管派工。</p>}
