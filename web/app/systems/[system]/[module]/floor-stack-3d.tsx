@@ -166,8 +166,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             if (!isKindVisible) continue;
             
             const dot = new THREE.Mesh(
-              // 原點縮小為原本的 60%：標記密集時球體互相重疊，看不出實際分布。
-              new THREE.SphereGeometry(0.045, 12, 12),
+              // 原點再縮 50%（0.045 → 0.0225）：密集區才看得出每一顆的位置。
+              new THREE.SphereGeometry(0.0225, 12, 12),
               new THREE.MeshBasicMaterial({ color: new THREE.Color(isLight ? darkenColor(marker.color) : marker.color) }));
             // 標記的 x／y 為 0–1 相對座標，換算到平面尺寸並置中。
             dot.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.12, marker.y * PLANE_H - PLANE_H / 2);
@@ -204,8 +204,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
               ctx.stroke();
 
               ctx.font = FONT;
-              // 底色是亮螢光，文字一律用黑色才有足夠對比，不隨主題改變。
-              ctx.fillStyle = '#0a1a18';
+              // 底色是亮螢光，文字一律用純黑才有足夠對比，不隨主題改變。
+              ctx.fillStyle = '#000000';
               ctx.fillText(marker.label, 7, 14);
               
               const tex = new THREE.CanvasTexture(canvas);
@@ -215,9 +215,11 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
               // 密集區的文字彼此錯開，靠引線仍看得出對應哪一顆。
               const px = marker.x * PLANE_W - PLANE_W / 2;
               const pz = marker.y * PLANE_H - PLANE_H / 2;
-              const LEADER = 0.42;
+              const LEADER = 0.24;
               sprite.position.set(px, y + 0.12 + LEADER, pz);
-              sprite.scale.set(canvas.width / 52, canvas.height / 52, 1);
+              // 縮小 50% 用 sprite 縮放而不是縮小畫布字級：畫布字級是貼圖的解析度，
+              // 調到 5～6px 會糊掉；維持 11px 再把貼圖縮小顯示，字反而更銳利。
+              sprite.scale.set(canvas.width / 104, canvas.height / 104, 1);
               scene.add(sprite);
               labelSprites.push(sprite);
 
@@ -239,8 +241,9 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       // 螢幕空間網格剔除：把畫面切成格子，每格只留離鏡頭最近的一個標籤。
       // 不做精確的矩形碰撞是刻意的——標籤的螢幕尺寸隨距離變動，用固定格子既穩定
       // 又便宜，密集區會自動只顯示代表性的幾個，轉動視角時即時重算。
-      const LABEL_CELL_W = 104;
-      const LABEL_CELL_H = 22;
+      // 標籤縮小一半後占用的螢幕空間也減半，格子跟著縮才不會白白剔掉還放得下的標籤。
+      const LABEL_CELL_W = 58;
+      const LABEL_CELL_H = 14;
       const occupied = new Set<string>();
       const projected = new THREE.Vector3();
       const cullLabels = () => {
