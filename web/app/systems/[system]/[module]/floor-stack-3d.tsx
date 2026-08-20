@@ -102,7 +102,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       const width = host.clientWidth || 900, height = host.clientHeight || 560;
       const scene = new THREE.Scene();
       const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      scene.background = new THREE.Color(isLight ? 0xf0f2f5 : 0x04101f);
+      // 與 .f3-stage 的 var(--bg) 對齊：兩者一旦有色差，畫布邊緣就會露出一條異色線。
+      scene.background = new THREE.Color(isLight ? 0xf4f6fa : 0x020b18);
       const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
       camera.position.set(9, 9, 12);
       const renderer = new THREE.WebGLRenderer({ antialias: true });

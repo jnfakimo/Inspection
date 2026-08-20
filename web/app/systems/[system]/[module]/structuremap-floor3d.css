@@ -128,7 +128,10 @@
 .f3-stage {
   position: fixed;
   inset: 50px 0 0 0;
-  background: #04101f;
+  /* 這裡原本寫死 #04101f。淺色主題下 Three.js 把畫布塗成淺灰，但底下的容器仍是
+     近黑色，畫布尺寸只要差一兩像素，深色底就從頂端露出來，看起來像多了一條黑線。
+     依 AGENTS.md：承載畫面的顏色不得寫死，淺色主題沒有保險絲接得住。 */
+  background: var(--bg);
 }
 
 .f3-stage canvas {

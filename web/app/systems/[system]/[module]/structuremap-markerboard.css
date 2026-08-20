@@ -330,7 +330,8 @@
 .mb-osd {
   position: fixed;
   inset: 50px 0 0 0;
-  background: #04101f;
+  /* 同 3D 模型圖：寫死深色會在淺色主題露出黑邊，改用主題變數。 */
+  background: var(--bg);
   transition: left .22s;
 }
 
