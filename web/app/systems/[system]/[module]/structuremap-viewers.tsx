@@ -185,7 +185,20 @@ function Floor2DViewer({ module, profile }: Props) {
         </>}
       </div>
       {!model && !busy && <p className="empty">這個樓層沒有對應的平面材質，請先於「模型管理」設定 image_path。</p>}
-      <div ref={hostRef} className="plan-stage" />
+      {/* 圖面右下角標示現在看的是哪一層，並補上操作說明——與 3D 模型圖同一套做法。
+          操作說明依 OpenSeadragon 的實際預設寫：滑鼠是拖曳平移、滾輪縮放、
+          單擊放大（dblClickToZoom 對滑鼠預設為 false），觸控才是雙指縮放。
+          本頁只覆寫 flick，其餘手勢維持預設。 */}
+      <div className="plan-stage-wrap">
+        <div ref={hostRef} className="plan-stage" />
+        <div className="plan-bottomright">
+          <div className="plan-hint">拖曳：平移　｜　滾輪：縮放　｜　點擊空白處：放大　｜　雙指：縮放</div>
+          <div className="plan-hud">
+            <div className="h-t">平面模型圖</div>
+            <div className="h-r">顯示樓層：<span>{model ? String(model.name || model.floor_id) : '—'}</span></div>
+          </div>
+        </div>
+      </div>
       <p className="inline-message">
         點選圖面上的標記可選取，再按「重新定位」後點圖面即可更新座標（存回 plan_markers 的 x／y，0–1 相對座標）。
         標記的新增與屬性維護請用「整合標記」模組。
