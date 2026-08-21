@@ -167,6 +167,21 @@ function computeBBox(polylines: Polyline[]): BBox {
   return { mnx, mny, mxx, mxy, w: mxx - mnx, h: mxy - mny };
 }
 
+/**
+ * 把 DXF 折線烘成樓層貼圖（floor_models.image_path）。
+ *
+ * **這是下游三個檢視器的資料來源，改動要一併同步**：3D 模型圖、平面模型圖、
+ * 立體巡檢雲臺都直接讀這張 PNG。它們對這裡的產出有兩個硬性假設：
+ *
+ * 1. **底是透明的**（本函式只 clearRect、從不填色）。淺色主題會用
+ *    `recolourPlanCanvas`（floor-stack-3d.tsx）把線條塗黑、近白視為背景轉透明；
+ *    若這裡改成不透明底，那套重畫會把整片平面變黑。該函式已加保險絲會放棄重畫
+ *    並在 console 留訊息，但畫面就回到青線，不會是預期的黑線。
+ * 2. **線條顏色是烘進圖檔的**，不是可以在檢視器端用 CSS 或材質相乘改掉的。
+ *
+ * 改這裡的顏色、底色或 TEXTURE_LONG_SIDE 之前，請一併確認上述三頁，
+ * 並參考 AGENTS.md 的「圖資頁面的共同規範」。
+ */
 function renderNeon(canvas: HTMLCanvasElement, polylines: Polyline[], bbox: BBox) {
   const padding = 40;
   const aspectRatio = bbox.w / bbox.h;

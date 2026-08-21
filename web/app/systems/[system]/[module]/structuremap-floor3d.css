@@ -597,3 +597,38 @@
   border-color: var(--green);
   color: var(--green);
 }
+
+/* ── 立體巡檢雲臺專屬（patrol-map3d.tsx）──────────────────────────────── */
+
+/* 圖例列：沒有核取方塊，用一顆同色圓點代替，顏色跟著 .chk.kind 的文字色走，
+   說明與圖面上的點永遠一致。 */
+.f3-mkpanel .chk.legend { cursor: default; }
+
+.f3-mkpanel .chk .legend-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+/* 日期欄位在標記面板裡要撐滿，否則會維持瀏覽器預設寬度、被面板切掉。
+   只針對 .localized-date-input：專案禁用原生 date 欄位，寫成 input[type=date]
+   會被 security:audit 擋下（規則來自 f9f628d）。 */
+.f3-mkpanel .localized-date-input {
+  width: 100%;
+  margin-top: 3px;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.f3-mkpanel > label:not(.chk) {
+  display: block;
+  margin-top: 8px;
+  color: var(--dim);
+  font-size: 11px;
+}
