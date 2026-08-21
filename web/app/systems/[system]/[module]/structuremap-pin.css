@@ -9,6 +9,9 @@
 /* ── 圖釘 ───────────────────────────────────────────────────────────── */
 
 .mb-pin {
+  /* 標籤相對於圓點抬高的距離，由版面計算逐一指定（見 structuremap-viewers.tsx
+     的 layoutLabels）。預設 0＝貼在圓點正上方，整合標記系統維持原本的行為。 */
+  --lead: 0px;
   position: relative;
   border: 0;
   padding: 0;
@@ -16,6 +19,9 @@
   cursor: pointer;
   transform: translate(-50%, -50%);
 }
+
+/* 滑過的圖釘要浮到最上層，否則被旁邊的標籤蓋住就點不到也看不全。 */
+.mb-pin:hover { z-index: 5; }
 
 /* 放大可點擊範圍（透明），視覺圓點維持小尺寸，方便在密集圖面上點選。 */
 .mb-pin::before {
@@ -45,10 +51,26 @@
 .mb-pin.on .mb-pdot { outline: 3px solid color-mix(in srgb, var(--text) 50%, transparent); outline-offset: 2px; }
 
 /* 標籤固定黑底白字：它疊在平面圖上，而圖面底色不隨主題改變。 */
-.mb-pin .mb-plab {
+/* 引線：從圓點拉到錯開後的標籤底緣。長度與角度由版面計算逐一指定，因此標籤可以
+   往上、也可以往左右讓開，仍看得出對應哪一顆圓點。
+   顏色沿用 3D 模型圖引線的同一個綠松色，兩邊看起來是同一種指引。 */
+.mb-pin .mb-lead {
   position: absolute;
   left: 50%;
-  top: -3px;
+  top: 50%;
+  width: var(--llen, 0);
+  height: 1px;
+  background: #00b39c;
+  opacity: 0;
+  transform-origin: 0 50%;
+  transform: rotate(var(--lang, 0deg));
+  transition: opacity .15s;
+}
+
+.mb-pin .mb-plab {
+  position: absolute;
+  left: calc(50% + var(--lx, 0px));
+  top: var(--ly, -3px);
   padding: 1px 6px;
   border: 1px solid rgba(255, 255, 255, .42);
   border-radius: 3px;
@@ -64,6 +86,14 @@
 
 .mb-pin:hover .mb-plab,
 .mb-pin.show-lab .mb-plab { opacity: 1; }
+
+.mb-pin:hover .mb-lead,
+.mb-pin.show-lab .mb-lead { opacity: .85; }
+
+/* 讓位的標籤不另立 class：版面計算直接把該圖釘的 show-lab 拿掉，落回上面的預設
+   （opacity 0），滑過去仍會浮現。先前用 .lab-off 疊一條 opacity:0 上去，與
+   .show-lab 特異度相同、只靠順序取勝，實測在瀏覽器裡並未生效——同一個效果用既有
+   規則就做得到，就不要再多疊一層互相打架的宣告。 */
 
 @media (prefers-reduced-motion: reduce) {
   .mb-pin .mb-pdot,

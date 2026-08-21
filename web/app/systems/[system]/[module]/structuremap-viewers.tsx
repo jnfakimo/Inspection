@@ -182,10 +182,12 @@ function Floor2DViewer({ module, profile }: Props) {
         const dot = document.createElement('span');
         dot.className = 'mb-pdot';
         dot.style.background = String(marker.color || KIND_COLOR[String(marker.kind)] || '#00d4ff');
+        const lead = document.createElement('span');
+        lead.className = 'mb-lead';
         const lab = document.createElement('span');
         lab.className = 'mb-plab';
         lab.textContent = String(marker.label || MARKER_KIND[String(marker.kind)] || marker.kind || '');
-        el.append(dot, lab);
+        el.append(dot, lead, lab);
         el.title = `${marker.label ?? ''}（${MARKER_KIND[String(marker.kind)] || marker.kind}）`;
         el.onclick = event => { event.stopPropagation(); setSelected(marker); };
         try {
@@ -205,10 +207,105 @@ function Floor2DViewer({ module, profile }: Props) {
       }
       // 一顆都掛不上去代表是系統性問題，要說出來，不能只是留一張空圖。
       if (failed && !overlayRef.current.size) setNote(`失敗：${failed} 個標記無法顯示在圖面上`);
+      scheduleLayout();
+    };
+
+    // 標籤排版：錯開位置、以引線指回圓點，真的排不下的才讓位。
+    //
+    // 策略與 3D 模型圖一致（抬高＋引線＋螢幕空間剔除），但這裡做的是**精確矩形碰撞**
+    // 而不是 3D 的格子近似：DOM 標籤的螢幕尺寸不隨縮放改變，量得到真實寬高。
+    // 候選位置同時包含左右偏移——只往上疊的話，密集區的寬標籤幾乎全部排不下
+    // （實測 20 個只放得下 3 個），引線改為可傾斜就能往兩側讓開。
+    const LABEL_DY = [-22, -40, -58, -76, -94, -112, -130];
+    const LABEL_DX = [0, -78, 78, -156, 156, -234, 234];
+    // 先近後遠：垂直位移比水平便宜，標籤盡量留在圓點正上方。
+    const CANDIDATES = LABEL_DY.flatMap(dy => LABEL_DX.map(dx => ({ dx, dy })))
+      .sort((a, b) => (Math.abs(a.dy) + Math.abs(a.dx) * 0.9) - (Math.abs(b.dy) + Math.abs(b.dx) * 0.9));
+
+    const layoutLabels = () => {
+      const pins = [...overlayRef.current.values()] as HTMLElement[];
+      if (!pins.length) return;
+      for (const pin of pins) {
+        pin.style.removeProperty('--lx');
+        pin.style.removeProperty('--ly');
+        pin.style.removeProperty('--llen');
+        pin.style.removeProperty('--lang');
+        pin.classList.toggle('show-lab', showLabels);
+      }
+      if (!showLabels) return;   // 標籤沒開就沒有重疊問題
+
+      // 由上而下、由左而右決定順序：上方的先占位，結果穩定，重畫不會跳來跳去。
+      const entries = pins.map(pin => {
+        const label = pin.querySelector('.mb-plab') as HTMLElement | null;
+        const pinRect = pin.getBoundingClientRect();
+        const labelRect = label?.getBoundingClientRect();
+        return {
+          pin,
+          width: labelRect?.width || 0,
+          height: labelRect?.height || 0,
+          centreX: pinRect.left + pinRect.width / 2,
+          top: pinRect.top,
+          half: pinRect.height / 2,
+        };
+      }).filter(entry => entry.width > 0)
+        .sort((a, b) => a.top - b.top || a.centreX - b.centreX);
+
+      const placed: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+      for (const entry of entries) {
+        const fitted = CANDIDATES.find(candidate => {
+          const bottom = entry.top + candidate.dy;
+          const box = {
+            left: entry.centreX + candidate.dx - entry.width / 2,
+            right: entry.centreX + candidate.dx + entry.width / 2,
+            top: bottom - entry.height,
+            bottom,
+          };
+          const hit = placed.some(other =>
+            box.left < other.right && box.right > other.left &&
+            box.top < other.bottom && box.bottom > other.top);
+          if (!hit) placed.push(box);
+          return !hit;
+        });
+        if (!fitted) {
+          // 一個位置都排不下：拿掉 show-lab 讓它回到預設隱藏，滑過去仍看得到。
+          entry.pin.classList.remove('show-lab');
+          continue;
+        }
+        // 引線從圓點中心拉到標籤底緣中點。
+        const vectorX = fitted.dx;
+        const vectorY = fitted.dy - entry.half;
+        entry.pin.style.setProperty('--lx', `${fitted.dx}px`);
+        entry.pin.style.setProperty('--ly', `${fitted.dy}px`);
+        entry.pin.style.setProperty('--llen', `${Math.hypot(vectorX, vectorY)}px`);
+        entry.pin.style.setProperty('--lang', `${Math.atan2(vectorY, vectorX) * 180 / Math.PI}deg`);
+      }
+    };
+
+    let raf = 0;
+    const scheduleLayout = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = 0; layoutLabels(); });
     };
     viewer.addHandler('open', attach);
+    // 平移與縮放都會改變標籤在畫面上的相對位置，必須重排。animation 每幀都發，
+    // 用 rAF 收斂成一幀一次。
+    viewer.addHandler('animation', scheduleLayout);
+    viewer.addHandler('animation-finish', scheduleLayout);
+    viewer.addHandler('resize', scheduleLayout);
+    // update-viewport 是保險：attach 之後那一幀 OSD 未必已把覆蓋層放到最終位置，
+    // 只靠 attach 觸發的那次 rAF 有機會量到還沒定位的座標。
+    viewer.addHandler('update-viewport', scheduleLayout);
     attach();
-    return () => { try { viewer.removeHandler('open', attach); } catch { /* 忽略 */ } };
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      try {
+        viewer.removeHandler('open', attach);
+        viewer.removeHandler('animation', scheduleLayout);
+        viewer.removeHandler('animation-finish', scheduleLayout);
+        viewer.removeHandler('resize', scheduleLayout);
+        viewer.removeHandler('update-viewport', scheduleLayout);
+      } catch { /* 忽略 */ }
+    };
   }, [visible, showLabels, selected, setNote, viewerReady]);
 
   // 定位模式：點擊圖面把選取的標記移到該處。

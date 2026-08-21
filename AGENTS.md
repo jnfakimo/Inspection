@@ -195,6 +195,33 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
     不是誤把 V2 頁面當成 V1 的 `floor3d.html`——**請勿再以「全螢幕工具頁不掛導覽」
     為由還原**。V1 的 `floor3d.html` 不在此例外內，維持不掛。
 
+## 圖資頁面的共同規範（模型圖／標記圖臺／雲台，2026-08-21 訂）
+
+適用於任何呈現樓層平面或立體模型並在上面放標記的頁面：3D 模型圖、平面模型圖、
+整合標記系統，以及日後任何用到同一批圖資的功能（雲台、巡檢圖臺等）。
+**這些是共用資產，不要各自再抄一份**——V1 的 `floor3d.html` 與 `guardpatrol3d.html`
+就是各寫一份之後逐漸分岔的前例。
+
+- **全螢幕外殼**：`structuremap-floor3d.css` 的 `.f3-*`（頂列、`.f3-stage`、三個可收合
+  浮動面板、底部右側的操作說明與 HUD）。頂列的六個共用動作取自 `lib/shared-actions`。
+- **圖釘**：`structuremap-pin.css` 的 `.mb-pin` / `.mb-pdot` / `.mb-plab` / `.mb-lead`。
+- **標籤一定要做防重疊排版**。密集樓層直接疊上去會糊成一片（B1 有 30 個標記）。
+  規則：標籤可往上、也可往左右錯開，一律以引線指回圓點；`--lx`／`--ly` 決定位置，
+  `--llen`／`--lang` 決定引線長度與角度；候選位置由近而遠嘗試，**真的排不下才拿掉該
+  圖釘的 `show-lab`**（落回預設隱藏，滑過仍會浮現）。實作見
+  `structuremap-viewers.tsx` 的 `layoutLabels`；3D 側是等效的螢幕空間剔除。
+  平移、縮放、視窗改變都要重排，用 rAF 收斂成一幀一次。
+- **淺色主題的線稿要重畫成黑線**。青色是烘在 PNG 裡的，用 `recolourPlanCanvas`／
+  `recolourPlanObjectUrl`（`floor-stack-3d.tsx`）逐像素重畫：近白視為背景轉透明、
+  其餘塗黑。**不要用 material.color 相乘或 CSS filter** ——圖檔若是不透明白底，
+  整片平面會一起變黑。
+- **OpenSeadragon 的縮圖顏色只能由選項給**（`navigatorBackground` 等），OSD 在建構時
+  寫成行內樣式，CSS 蓋不掉。值一律讀主題 token，不要寫死。
+- **不可以用 `window.OpenSeadragon`**。它是 UMD 包裝，在打包環境走 `module.exports`
+  分支、不會掛上全域，取 `.Point` 會丟 TypeError。請用 import 進來的命名空間。
+- **覆蓋層的錯誤不可以用空 catch 吞掉**。平面模型圖曾因此從上線起一顆標記都沒畫出來，
+  畫面只是「空的」，現場不會回報成故障。至少記到 console，整批失敗要顯示在畫面上。
+
 ## Do NOT
 - Do **not** delete `system/plans/*` — those textures/DZI tiles are used live by
   `floor3d.html` and `b1plan.html`.
