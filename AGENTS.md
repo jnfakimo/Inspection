@@ -237,6 +237,27 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
 - **覆蓋層的錯誤不可以用空 catch 吞掉**。平面模型圖曾因此從上線起一顆標記都沒畫出來，
   畫面只是「空的」，現場不會回報成故障。至少記到 console，整批失敗要顯示在畫面上。
 
+### 上下游關係：3D建模系統是唯一的圖資來源
+
+```
+3D建模系統（modeler，DXF → renderNeon → floor_models.image_path）
+        │
+        ├─ 3D 模型圖      /v2/systems/structuremap/floor3d/
+        ├─ 平面模型圖     /v2/systems/structuremap/floor2d/
+        └─ 立體巡檢雲臺   /v2/systems/guardpatrol/map3d/
+```
+
+- **建模系統只有一個、檢視器有三個。上游改了，三頁都要一起確認**，反之新增檢視器
+  也要回頭確認上游的產出符合下列假設。
+- 檢視器對 `renderNeon` 產出的兩個硬性假設：**底是透明的**（該函式只 `clearRect`、
+  從不填色），以及**線條顏色烘在圖檔裡**、無法在檢視器端用 CSS 或材質相乘改掉。
+  淺色主題的黑線重畫（`recolourPlanCanvas`）就是建立在這兩點上。
+- 改 `renderNeon` 的顏色、底色或 `TEXTURE_LONG_SIDE` 之前，請先讀該函式上方的註解。
+  `recolourPlanCanvas` 已加保險絲：底圖若不透明會放棄重畫並在 console 留訊息，
+  但畫面會退回青線，不是預期的黑線——**保險絲只防止畫面全黑，不會幫你同步**。
+- 3D建模系統本身是**上傳與管理頁**，不是檢視器，因此維持 AppShell 版型，不套上面的
+  全螢幕外殼；它的圖面只是匯入後的預覽。
+
 ## Do NOT
 - Do **not** delete `system/plans/*` — those textures/DZI tiles are used live by
   `floor3d.html` and `b1plan.html`.

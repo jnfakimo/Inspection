@@ -75,11 +75,22 @@ export function recolourPlanCanvas(image: HTMLImageElement): HTMLCanvasElement |
   try {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = data.data;
+    let clear = 0;
     for (let i = 0; i < pixels.length; i += 4) {
-      if (pixels[i + 3] === 0) continue; // 原本就透明，不動
+      if (pixels[i + 3] === 0) { clear += 1; continue; } // 原本就透明，不動
       const luma = (pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114);
-      if (luma > 232) { pixels[i + 3] = 0; continue; } // 近白＝背景
+      if (luma > 232) { pixels[i + 3] = 0; clear += 1; continue; } // 近白＝背景
       pixels[i] = 0; pixels[i + 1] = 0; pixels[i + 2] = 0;
+    }
+    // 保險絲：這套重畫的前提是貼圖為「線條＋透明（或近白）底」，也就是 3D建模系統
+    // renderNeon 目前產出的樣子（實測 B1.png 約 89% 全透明）。若哪天建模端改成不透明
+    // 深色底，逐像素塗黑會把整片平面變成一塊黑色——那比不重畫還糟，而且是靜默的。
+    // 判定為底圖不透明時直接放棄重畫，沿用原圖並留下線索。
+    const clearRatio = clear / (pixels.length / 4);
+    if (clearRatio < 0.2) {
+      console.warn(`平面圖底圖不透明（可視為背景的像素僅 ${(clearRatio * 100).toFixed(1)}%），`
+        + '略過淺色主題的黑線重畫。請確認 3D建模系統 renderNeon 的產出格式是否變更。');
+      return null;
     }
     ctx.putImageData(data, 0, 0);
   } catch {
