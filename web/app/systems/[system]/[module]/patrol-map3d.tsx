@@ -127,8 +127,9 @@ export function PatrolMap3DModule({ module, profile }: Props) {
           </a>)}
       </nav>
       <span className="tb-space" />
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
+      {/* 帶 ?kind=patrol：從駐衛警巡檢跳過去只看巡邏點，不摻雜設備、報修、空間等標記。 */}
+      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/?kind=patrol">3D模型圖</a>
+      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/?kind=patrol">平面模型圖</a>
       <a className="tb-back" href="/Inspection/v2/systems/guardpatrol/map3d/">立體巡檢雲臺</a>
     </div>
 

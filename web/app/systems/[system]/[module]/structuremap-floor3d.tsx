@@ -61,8 +61,15 @@ export function Floor3DBoardModule({ profile }: Props) {
   const [visibleFloors, setVisibleFloors] = useState<Record<string, boolean>>({});
 
   const [showMarkers, setShowMarkers] = useState(true);
-  const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(KIND_ORDER.map(kind => [kind, true])));
+  // ?kind=patrol：從駐衛警巡檢的立體巡檢雲臺跳過來時只看巡邏點。不另外複製一份
+  // 頁面，也不改預設——直接進本頁仍是全部類型都顯示。
+  const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(() => {
+    // 只認得的類型才套用。給了不存在的值就當沒給——否則會全部關掉變成空圖，
+    // 而且提示也不會出現，看起來就像資料沒進來。
+    const raw = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('kind');
+    const only = raw && KIND[raw] ? raw : null;
+    return Object.fromEntries(KIND_ORDER.map(kind => [kind, only ? kind === only : true]));
+  });
   const [showLabels, setShowLabels] = useState(false);
 
   // 三個面板一律預設收合：進場先看到完整的模型，需要調整時再自行展開。
@@ -70,7 +77,12 @@ export function Floor3DBoardModule({ profile }: Props) {
   const [floorsOpen, setFloorsOpen] = useState(false);
   const [markerPanelOpen, setMarkerPanelOpen] = useState(false);
   const [markerPanelPinned, setMarkerPanelPinned] = useState(false);
-  const [focusNotice, setFocusNotice] = useState('');
+  // 篩選是靠網址參數帶進來的，而標記面板預設收合——不主動說一聲，使用者只會覺得
+  // 「怎麼少了東西」。沿用深連結那條提示列，可自行關閉。
+  const [focusNotice, setFocusNotice] = useState(() => {
+    const only = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('kind');
+    return only && KIND[only] ? `已套用篩選：只顯示「${KIND[only].n}」，其餘標記類型已隱藏` : '';
+  });
 
   const apiRef = useRef<FloorStackApi | null>(null);
   const deepLinkRef = useRef<string | null>(null);
