@@ -24,7 +24,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
-import { floorOrder, floorTextureUrl, recolourPlanObjectUrl } from './floor-stack-3d';
+import { floorOrder, floorTextureUrl, preparePlanObjectUrl } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -154,14 +154,13 @@ function Floor2DViewer({ module, profile }: Props) {
         navigator.style.borderColor = token('--line', '#173952');
       }
 
-      // 線條的青色是烘在 PNG 裡的。淺色主題要黑線，與 3D 模型圖共用同一套逐像素重畫
-      // （recolourPlanCanvas）：近白視為背景轉透明，其餘塗黑。兩頁的淺色呈現才會一致。
+      // 兩種主題都要預處理，與 3D 模型圖共用同一份 preparePlanCanvas：
+      // 淺色把線條重畫成黑線，科技版保留原色但濾掉光暈——光暈是 renderNeon 疊出來的，
+      // 不濾掉會讓科技版的線看起來比一般版粗一截。
       let source = url;
-      if (theme === 'light') {
-        const recoloured = await recolourPlanObjectUrl(url);
-        if (disposed) { if (recoloured) URL.revokeObjectURL(recoloured); return; }
-        if (recoloured) source = recoloured;
-      }
+      const prepared = await preparePlanObjectUrl(url, theme === 'light' ? 'light' : 'tech');
+      if (disposed) { if (prepared) URL.revokeObjectURL(prepared); return; }
+      if (prepared) source = prepared;
 
       overlayRef.current.clear();
       viewerRef.current.open({ type: 'image', url: source });
