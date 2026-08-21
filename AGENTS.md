@@ -195,6 +195,25 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
     不是誤把 V2 頁面當成 V1 的 `floor3d.html`——**請勿再以「全螢幕工具頁不掛導覽」
     為由還原**。V1 的 `floor3d.html` 不在此例外內，維持不掛。
 
+## 讀取存取稽核與資安告警（2026-08-21 訂）
+
+- **資安告警不是資料庫觸發器產生的**。`security_alerts` 由 `audit-event` edge function
+  在 5 分鐘視窗內判定「非互動高頻讀取」後建立（門檻：同一人同 IP ≥40 次非互動讀取、
+  且跨 ≥8 個不同資源），而該函式**必須由前端主動呼叫**。
+- **V2 的呼叫端是 `web/lib/access-audit.ts`**，掛在根版面（`ErrorTrackerMount`），
+  以包裝 `window.fetch` 的方式攔截所有 GET／HEAD 的 `/rest/v1/*` 與
+  `/storage/v1/object/*`。**新增頁面或查詢不必、也不該自己補呼叫**；在呼叫端各自加
+  只會重複計數並破壞去重。
+- **`details.user_initiated` 必須是布林**。偵測用嚴格比較 `=== false` 篩選自動化讀取，
+  送成字串 `"false"` 會讓該筆永遠不列入判定——這種錯誤不會有任何徵兆，只會讓告警
+  再也不觸發。`access_origin` 同理只認 `page_load` / `user_action`。
+- 稽核自身的資料表（`audit_logs`、`security_alerts`）不列入記錄，否則開稽核頁會不斷
+  自我產生紀錄。
+- 回應中的 `security_action` 是**實際的資安控制**（大量讀取切斷），收到就要強制登出，
+  不可以只當提示忽略。
+- V1 的對應實作在 `system/theme.js` 的 `installReadAccessAudit`，payload 格式相同；
+  兩邊改動要一起看，否則同一張表會混入兩種格式。
+
 ## 介面風格切換（一般版／科技版，2026-08-21 訂）
 
 - **切換入口是右下角的浮動圖示，不是頂列的文字按鈕**。一般版顯示 🌙（點了切到科技
