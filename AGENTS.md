@@ -28,6 +28,7 @@ system/*.html           # the actual application pages (see table below)
 system/sql/*.sql        # Supabase schema — idempotent, run in SQL Editor
 system/plans/*          # LIVE floor-plan assets (DZI tiles + textures) — do NOT delete
 supabase/functions/     # edge function (LINE notify)
+supabase/templates/     # 認證信件的繁中範本（見該目錄 README；**不要**跑 config push）
 ```
 
 ### Key pages (`system/`)
