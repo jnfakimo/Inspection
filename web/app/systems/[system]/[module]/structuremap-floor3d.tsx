@@ -136,7 +136,18 @@ export function Floor3DBoardModule({ profile }: Props) {
     window.setTimeout(() => { apiRef.current?.focusMarker(id); }, 600);
   }, [models, markers]);
 
-  const floorsShown = models.filter(row => visibleFloors[String(row.floor_id)] !== false).length;
+  const shownFloors = models.filter(row => visibleFloors[String(row.floor_id)] !== false);
+  const floorsShown = shownFloors.length;
+
+  // HUD 標示的是「現在看到的是哪一層」，不是數量——數量右側面板已經有了。
+  // 單層時給全名（B1 地下一層），多層時只給代號免得撐爆，全開就直接說全部。
+  // 由上而下列出，與樓層面板的排列一致。
+  const shownFloorText = !models.length ? '—'
+    : floorsShown === 0 ? '未選取任何樓層'
+    : floorsShown === 1 ? (shownFloors[0].name || String(shownFloors[0].floor_id))
+    : floorsShown === models.length ? `全部 ${models.length} 層`
+    : shownFloors.slice().reverse().map(row => String(row.floor_id)).join('、');
+
   const resetControls = () => { setExplode(EXPLODE_DEFAULT); setXPan(0); setYPan(0); apiRef.current?.resetView(); };
 
   return <div className="f3-root">
@@ -186,6 +197,18 @@ export function Floor3DBoardModule({ profile }: Props) {
       {focusNotice}
       <button onClick={() => setFocusNotice('')} aria-label="關閉">✕</button>
     </div>}
+
+    {/* 底部右側：操作說明與目前顯示的樓層，對應 V1 的 #bottomRightRow。
+        操作說明**沒有**照抄 V1 的文案。V1 是自寫的控制（左鍵平移、右鍵旋轉），
+        本元件用的是 three.js 內建 OrbitControls 且未覆寫 mouseButtons，預設剛好
+        相反：左鍵旋轉、右鍵平移。照抄會變成把人指向錯誤的操作方式。 */}
+    <div className="f3-bottomright">
+      <div className="f3-hint">左鍵拖曳：旋轉環繞　｜　右鍵拖曳：平移　｜　滾輪／雙指：縮放</div>
+      <div className="f3-hud">
+        <div className="h-t">3D 模型圖</div>
+        <div className="h-r">顯示樓層：<span>{shownFloorText}</span></div>
+      </div>
+    </div>
 
     {!panelOpen && <button className="f3-toggle ctrl" onClick={() => setPanelOpen(true)}>立體控制</button>}
     {!floorsOpen && <button className="f3-toggle floors" onClick={() => setFloorsOpen(true)}>樓層顯示</button>}

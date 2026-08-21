@@ -400,19 +400,85 @@
 .f3-floors .fbtn.on { color: var(--text); }
 
 /* 取消顯示的樓層一律不著色：底色與外框都收回中性灰，只有顯示中的才是青色。
-   原本關閉狀態仍留著青色外框，一整排看起來全部都還開著。 */
+   background 與 margin 必須明寫——globals.css 有一條全域的
+   `.dot{...background:var(--green);margin-top:6px}`，不覆蓋的話關閉狀態會吃到
+   那個深綠底（正是「未選取卻顯示深綠色」的來源），圓點也會被往下推。 */
 .f3-floors .fbtn .dot {
   width: 9px;
   height: 9px;
   flex-shrink: 0;
+  margin: 0;
   border: 1px solid var(--dim);
   border-radius: 2px;
+  background: transparent;
 }
 
 .f3-floors .fbtn.on .dot {
   border-color: var(--cyan);
   background: var(--cyan);
   box-shadow: 0 0 6px var(--cyan);
+}
+
+/* ── 底部右側：操作說明與目前顯示的樓層（V1 #bottomRightRow 的移植）─── */
+
+.f3-bottomright {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.f3-hint {
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1.8;
+  text-align: right;
+  pointer-events: none;
+}
+
+.f3-hud {
+  min-width: 110px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.f3-hud .h-t {
+  margin-bottom: 2px;
+  color: var(--f3-accent-text);
+  font-weight: 700;
+}
+
+.f3-hud .h-r { color: var(--dim); }
+.f3-hud .h-r span { color: var(--text); font-weight: 600; }
+
+/* 窄螢幕改為上下堆疊並橫跨整列。V1 在這個斷點是直接把 HUD 藏掉，這裡保留——
+   「現在看的是哪一層」在小螢幕上更需要，而不是更不需要。 */
+@media (max-width: 720px) {
+  .f3-bottomright {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .f3-hint {
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--panel) 80%, transparent);
+    text-align: center;
+  }
+
+  .f3-hud { text-align: center; }
 }
 
 .f3-floors-count {
