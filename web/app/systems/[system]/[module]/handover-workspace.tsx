@@ -177,22 +177,24 @@ function RecordsModule({ module, profile }: Props) {
         <span>待接收 {rows.filter(r => stateOf(r) === 'waiting').length}／共 {filtered.length} 筆</span>
       </div>
       <div className="responsive-table"><table>
-        <thead><tr><th>日期／班別</th><th>部門</th><th>交接人 → 接班人</th><th style={{ textAlign: 'right' }}>正常／異常</th><th>事項摘要</th><th>狀態</th><th>操作</th></tr></thead>
+        {/* 事項摘要是唯一該吸收剩餘寬度的欄；其餘四欄標成 nowrap，否則日期會斷成
+            「2026-08-」「05」、部門斷成「系統管理」「課」、按鈕文字直排。 */}
+        <thead><tr><th className="nowrap">日期／班別</th><th className="nowrap">部門</th><th>交接人 → 接班人</th><th className="nowrap" style={{ textAlign: 'right' }}>正常／異常</th><th className="center">事項摘要</th><th className="nowrap">狀態</th><th className="nowrap">操作</th></tr></thead>
         <tbody>{paged.map(row => {
           const state = stateOf(row);
           const mine = String(row.takeover_by) === profile.user_id;
           const summary = [...lines(row.issues).slice(0, 1), ...lines(row.pending).slice(0, 1)];
           return <tr key={String(row.record_id)}>
-            <td><strong>{fmt(row.shift_date)}</strong><small>{shiftLabel(row.shift_type)}</small></td>
-            <td>{deptOf(row.dept_id)}</td>
+            <td className="nowrap"><strong>{fmt(row.shift_date)}</strong><small>{shiftLabel(row.shift_type)}</small></td>
+            <td className="nowrap">{deptOf(row.dept_id)}</td>
             <td>{nameOf(row.handover_by)} → {nameOf(row.takeover_by)}
               {row.confirmed_at ? <small>接收於 {fmtTime(row.confirmed_at)}</small> : null}</td>
-            <td style={{ textAlign: 'right' }}>{Number(row.eq_normal || 0)}／{Number(row.eq_abnormal || 0)}</td>
-            <td>{summary.length ? summary.join('；') : '—'}
+            <td className="nowrap" style={{ textAlign: 'right' }}>{Number(row.eq_normal || 0)}／{Number(row.eq_abnormal || 0)}</td>
+            <td className="center">{summary.length ? summary.join('；') : '—'}
               <small>異常 {lines(row.issues).length}｜待辦 {lines(row.pending).length}</small></td>
-            <td><span className={`status-pill ${state === 'done' ? 'closed' : state === 'waiting' ? 'review' : 'pending'}`}>
+            <td className="nowrap"><span className={`status-pill ${state === 'done' ? 'closed' : state === 'waiting' ? 'review' : 'pending'}`}>
               {state === 'done' ? '交接完成' : state === 'waiting' ? '待接班人接收' : '草稿'}</span></td>
-            <td><div className="admin-row-actions">
+            <td className="nowrap"><div className="admin-row-actions">
               <button onClick={() => setDetail(row)}>詳細</button>
               {state === 'waiting' && mine && <button onClick={() => void receive(row)}>接收交接</button>}
             </div></td>
