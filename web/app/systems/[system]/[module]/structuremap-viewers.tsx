@@ -74,10 +74,21 @@ function Floor2DViewer({ module, profile }: Props) {
   // 類型篩選由單選下拉改為逐項核取，與 3D 模型圖的標記面板一致：現場常要「只看報修
   // 加巡檢點」，單選做不到。
   const [showMarkers, setShowMarkers] = useState(true);
-  const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(
-    () => Object.fromEntries(Object.keys(MARKER_KIND).map(kind => [kind, true])));
+  // ?kind=patrol：從駐衛警巡檢的立體巡檢雲臺跳過來時只看巡檢點。不另外複製一份
+  // 頁面，也不改預設——直接進本頁仍是全部類型都顯示。
+  const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(() => {
+    // 只認得的類型才套用，理由同 3D 模型圖：給了不存在的值會全部關掉變成空圖。
+    const raw = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('kind');
+    const only = raw && MARKER_KIND[raw] ? raw : null;
+    return Object.fromEntries(Object.keys(MARKER_KIND).map(kind => [kind, only ? kind === only : true]));
+  });
   // 與 3D 模型圖同名同語意的開關：關閉時標籤只在滑過圖釘時浮現。
   const [showLabels, setShowLabels] = useState(false);
+  // 同上：篩選由網址參數帶入，標記面板預設收合，必須主動說明。
+  const [kindNotice, setKindNotice] = useState(() => {
+    const only = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('kind');
+    return only && MARKER_KIND[only] ? `已套用篩選：只顯示「${MARKER_KIND[only]}」，其餘標記類型已隱藏` : '';
+  });
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
@@ -390,6 +401,11 @@ function Floor2DViewer({ module, profile }: Props) {
     </div>
 
     {note && <div className={`f3-error${noteIsError ? '' : ' ok'}`}>{note}</div>}
+
+    {kindNotice && !placing && <div className="f3-focus">
+      {kindNotice}
+      <button onClick={() => setKindNotice('')} aria-label="關閉">✕</button>
+    </div>}
 
     {placing && <div className="f3-focus">
       定位模式：點圖面上的位置，即可更新「{fmt(selected?.label)}」的座標
