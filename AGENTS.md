@@ -245,10 +245,13 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
   圖釘的 `show-lab`**（落回預設隱藏，滑過仍會浮現）。實作見
   `structuremap-viewers.tsx` 的 `layoutLabels`；3D 側是等效的螢幕空間剔除。
   平移、縮放、視窗改變都要重排，用 rAF 收斂成一幀一次。
-- **淺色主題的線稿要重畫成黑線**。青色是烘在 PNG 裡的，用 `recolourPlanCanvas`／
-  `recolourPlanObjectUrl`（`floor-stack-3d.tsx`）逐像素重畫：近白視為背景轉透明、
-  其餘塗黑。**不要用 material.color 相乘或 CSS filter** ——圖檔若是不透明白底，
-  整片平面會一起變黑。
+- **兩種主題都要先預處理貼圖**，用 `preparePlanCanvas`／`preparePlanObjectUrl`
+  （`floor-stack-3d.tsx`）：
+  - `light`：近白視為背景轉透明、其餘塗黑。青色是烘在 PNG 裡的，
+    **不要用 material.color 相乘或 CSS filter**——圖檔若是不透明白底，整片平面會變黑。
+  - `tech`：保留原色，但濾掉 alpha < 64 的光暈。`renderNeon` 的發光是三道疊出來的，
+    不濾掉會讓科技版的線比一般版粗一截（實測光暈像素是核心線的兩倍多）。
+  兩邊用同一支函式，粗細才會一致；只處理其中一種主題就會再度不對稱。
 - **OpenSeadragon 的縮圖顏色只能由選項給**（`navigatorBackground` 等），OSD 在建構時
   寫成行內樣式，CSS 蓋不掉。值一律讀主題 token，不要寫死。切換主題時要自己補寫一次
   行內樣式，選項只在建構當下生效。
