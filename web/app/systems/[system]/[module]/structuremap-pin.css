@@ -1,0 +1,71 @@
+/* 平面圖上的圖釘 —— 整合標記系統與平面模型圖共用。
+ *
+ * 兩頁都在 OpenSeadragon 的圖面上放同一種標記：一個圓點加一個可切換的文字標籤。
+ * 原本只存在於 structuremap-markerboard.css，平面模型圖要用就只能再抄一份，
+ * 兩邊必然逐漸走鐘（V1 的 floor3d.html 與 guardpatrol3d.html 正是這樣分岔的）。
+ * 類別名維持 mb-* 以免大量改動；這裡是唯一定義。
+ */
+
+/* ── 圖釘 ───────────────────────────────────────────────────────────── */
+
+.mb-pin {
+  position: relative;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+/* 放大可點擊範圍（透明），視覺圓點維持小尺寸，方便在密集圖面上點選。 */
+.mb-pin::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.mb-pin .mb-pdot {
+  display: block;
+  width: 9px;
+  height: 9px;
+  margin: 0 auto;
+  border: 1px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  box-shadow: 0 0 4px rgba(0, 0, 0, .6);
+  transform: rotate(-45deg);
+  transition: transform .12s;
+}
+
+.mb-pin:hover .mb-pdot { transform: rotate(-45deg) scale(1.25); }
+.mb-pin.on .mb-pdot { outline: 3px solid color-mix(in srgb, var(--text) 50%, transparent); outline-offset: 2px; }
+
+/* 標籤固定黑底白字：它疊在平面圖上，而圖面底色不隨主題改變。 */
+.mb-pin .mb-plab {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, .42);
+  border-radius: 3px;
+  background: #000;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -100%);
+  transition: opacity .15s;
+}
+
+.mb-pin:hover .mb-plab,
+.mb-pin.show-lab .mb-plab { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mb-pin .mb-pdot,
+  .mb-pin .mb-plab { transition: none; }
+}
