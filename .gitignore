@@ -34,3 +34,9 @@ __pycache__/
 *.m4a
 *.mp3
 temp_sub.*
+
+# next dev 自動生成的 agent 說明（node_modules/next/.../generate-agent-files.js）。
+# 只有 next dev 會產生，next build 不會。刻意不納入版控：專案的 agent 指示以根目錄
+# 的 AGENTS.md 為唯一來源，同名檔案出現在 web/ 底下容易被誤認成專案規範。
+web/AGENTS.md
+web/CLAUDE.md
