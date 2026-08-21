@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script src="theme.js?v=20260814-patrol-session1"></script>
-<script src="floor-utils.js?v=20260806-1"></script>
+<script src="floor-utils.js?v=20260821-recursionfix"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>臺北農產公司 第一果菜市場 — 整合標記系統</title>
@@ -339,8 +339,9 @@ function tryFocusDeepLink(){
 }
 
 // 樓層正規化，讓「B1 / B1F」、「1F / 1」等視為同一層（區域位置表與平面圖命名不一致時仍能對應）
-// 正規化邏輯統一由 system/floor-utils.js?v=20260806-1 提供，避免各頁各自實作出現不相容結果。
-function canonicalFloor(f){ return window.FloorUtils.canonicalFloor(f); }
+// 正規化邏輯統一由 system/floor-utils.js?v=20260821-recursionfix 提供，避免各頁各自實作出現不相容結果。
+// 使用區域詞法繫結，避免覆蓋 theme.js 提供給 FloorUtils 的全域正規化函式（會造成相互遞迴）。
+const canonicalFloor = function(f){ return window.FloorUtils.canonicalFloor(f); };
 
 const FLOORS=[
   {id:'B1', label:'B1 地下一層', dzi:'plans/b1.dzi', idx:null},
