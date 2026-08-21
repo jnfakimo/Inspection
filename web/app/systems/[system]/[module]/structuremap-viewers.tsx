@@ -9,13 +9,20 @@
 // 兩個函式庫都以動態 import 載入，不會進入其他頁面的初始 bundle。
 // 平面圖採 OpenSeadragon 的 { type:'image' } 單張影像模式，與 V1 b1plan.html 現行
 // 作法一致（該頁的 .dzi 圖磚是另一條未啟用的路徑）。
+//
+// 2026-08-21 起本頁改為全螢幕工具頁，與 3D 模型圖同一套版面：自帶頂列（含共用的六個
+// 動作）、圖面滿版、控制項收進三個可收合的浮動面板。原本套的是 AppShell ＋ 後台面板
+// 版型，圖面被擠在卡片裡，與相鄰的 3D 模型圖看起來像兩個系統。
+// 外殼樣式沿用 structuremap-floor3d.css 的 .f3-* 類別，不另寫一份——那份現在是兩個
+// 檢視器共用的骨架，只有本檔專屬的 .f2-* 是額外加的。
 
+import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import '@/app/admin-workspace.css';
-import { AppShell } from '@/components/AppShell';
+import './structuremap-floor3d.css';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { AdminHeader, errorMessage, fmt, type Row } from '@/components/admin/shared';
+import { errorMessage, fmt, type Row } from '@/components/admin/shared';
+import { allowedActions } from '@/lib/shared-actions';
 import { floorOrder, floorTextureUrl } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -63,10 +70,18 @@ function useFloorData() {
 function Floor2DViewer({ module, profile }: Props) {
   const { models, markers, busy, note, setNote, reload } = useFloorData();
   const [floor, setFloor] = useState('');
-  const [kindFilter, setKindFilter] = useState('');
+  // 類型篩選由單選下拉改為逐項核取，與 3D 模型圖的標記面板一致：現場常要「只看報修
+  // 加巡檢點」，單選做不到。
+  const [showMarkers, setShowMarkers] = useState(true);
+  const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(Object.keys(MARKER_KIND).map(kind => [kind, true])));
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
+  // 三個面板一律預設收合，與 3D 模型圖相同：進場先看到完整圖面。
+  const [floorsOpen, setFloorsOpen] = useState(false);
+  const [kindsOpen, setKindsOpen] = useState(false);
+  const [placePanelOpen, setPlacePanelOpen] = useState(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
   const osRef = useRef<any>(null);
@@ -74,8 +89,9 @@ function Floor2DViewer({ module, profile }: Props) {
 
   useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
   const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
-  const visible = useMemo(() => markers.filter(m =>
-    String(m.floor_id) === floor && (!kindFilter || String(m.kind) === kindFilter)), [markers, floor, kindFilter]);
+  const visible = useMemo(() => (showMarkers ? markers.filter(m =>
+    String(m.floor_id) === floor && visibleKinds[String(m.kind)] !== false) : []),
+    [markers, floor, visibleKinds, showMarkers]);
 
   // 建立／切換 OpenSeadragon。函式庫以動態 import 載入。
   useEffect(() => {
@@ -164,45 +180,115 @@ function Floor2DViewer({ module, profile }: Props) {
     return () => { try { viewer.removeHandler('canvas-click', onCanvasClick); } catch { /* 忽略 */ } };
   }, [placing, selected, setNote, reload]);
 
-  return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy || saving} note={note} onReload={reload} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
-        <select value={floor} onChange={e => { setFloor(e.target.value); setSelected(null); setPlacing(false); }}>
-          {models.map(m => <option key={String(m.floor_id)} value={String(m.floor_id)}>{m.name || m.floor_id}</option>)}
-        </select>
-        <select value={kindFilter} onChange={e => setKindFilter(e.target.value)}>
-          <option value="">全部類型</option>
-          {Object.entries(MARKER_KIND).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <span>{visible.length} 個標記</span>
-        {selected && <>
-          <span>已選：<b>{fmt(selected.label)}</b></span>
-          <button className={placing ? 'primary-btn compact' : 'secondary-btn'} onClick={() => setPlacing(v => !v)}>
-            {placing ? '點圖面完成定位（再按取消）' : '重新定位'}
-          </button>
-          <button className="secondary-btn" onClick={() => { setSelected(null); setPlacing(false); }}>取消選取</button>
-        </>}
+  const shownFloor = model ? String(model.name || model.floor_id) : '—';
+  const noteIsError = note.startsWith('失敗');
+
+  return <div className="f3-root">
+    {busy && <div className="f3-loading">
+      <div className="ld-t">載入樓層平面圖…</div>
+      <div className="ld-bar"><div className="ld-fill" style={{ width: '70%' }} /></div>
+      <div className="ld-m">讀取樓層模型與標記…</div>
+    </div>}
+
+    <div className="f3-topbar">
+      <span className="tb-logo">臺北農產公司 第一果菜市場</span>
+      <span className="tb-sep" />
+      <span className="tb-title">{module.title}</span>
+      {/* 與 AppShell、3D 模型圖同一份定義（lib/shared-actions），依帳號可用的系統過濾。 */}
+      <nav className="tb-nav" aria-label="共用系統導覽">
+        {allowedActions(profile.allowed_systems).map(item =>
+          <a key={item.href} href={`/Inspection/v2${item.href}`}>
+            <img src={item.icon} alt="" /><span>{item.label}</span>
+          </a>)}
+      </nav>
+      <span className="tb-space" />
+      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
+      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
+    </div>
+
+    {/* OSD 自己會在 host 裡增刪節點，所以空狀態訊息放在 host 外面、由 .f3-stage 承載。 */}
+    <div className="f3-stage">
+      <div ref={hostRef} className="f2-osd" />
+      {!model && !busy && <p className="f3-empty">
+        這個樓層沒有對應的平面材質，請先於「模型管理」設定 image_path。
+      </p>}
+    </div>
+
+    {note && <div className={`f3-error${noteIsError ? '' : ' ok'}`}>{note}</div>}
+
+    {placing && <div className="f3-focus">
+      定位模式：點圖面上的位置，即可更新「{fmt(selected?.label)}」的座標
+      <button onClick={() => setPlacing(false)} aria-label="取消定位">✕</button>
+    </div>}
+
+    {!placePanelOpen && <button className="f3-toggle ctrl" onClick={() => setPlacePanelOpen(true)}>標記定位</button>}
+    {!kindsOpen && <button className="f3-toggle marks" onClick={() => setKindsOpen(true)}>標記顯示</button>}
+    {!floorsOpen && <button className="f3-toggle floors" onClick={() => setFloorsOpen(true)}>樓層顯示</button>}
+
+    {floorsOpen && <div className="f3-floors">
+      <div className="panel-head">
+        <span className="p-t">樓層顯示</span>
+        <button className="panel-close" onClick={() => setFloorsOpen(false)}>隱藏</button>
       </div>
-      {!model && !busy && <p className="empty">這個樓層沒有對應的平面材質，請先於「模型管理」設定 image_path。</p>}
-      {/* 圖面右下角標示現在看的是哪一層，並補上操作說明——與 3D 模型圖同一套做法。
-          操作說明依 OpenSeadragon 的實際預設寫：滑鼠是拖曳平移、滾輪縮放、
-          單擊放大（dblClickToZoom 對滑鼠預設為 false），觸控才是雙指縮放。
-          本頁只覆寫 flick，其餘手勢維持預設。 */}
-      <div className="plan-stage-wrap">
-        <div ref={hostRef} className="plan-stage" />
-        <div className="plan-bottomright">
-          <div className="plan-hint">拖曳：平移　｜　滾輪：縮放　｜　點擊空白處：放大　｜　雙指：縮放</div>
-          <div className="plan-hud">
-            <div className="h-t">平面模型圖</div>
-            <div className="h-r">顯示樓層：<span>{model ? String(model.name || model.floor_id) : '—'}</span></div>
-          </div>
-        </div>
+      {/* 由上而下排列，與實際樓層高低一致。平面圖一次只呈現一層，所以是單選而非開關。 */}
+      {models.slice().reverse().map(row => {
+        const id = String(row.floor_id);
+        const on = id === floor;
+        return <button key={id} className={`fbtn${on ? ' on' : ''}`} aria-pressed={on}
+          onClick={() => { setFloor(id); setSelected(null); setPlacing(false); }}>
+          <span className="dot" />{String(row.name || id)}
+        </button>;
+      })}
+      <div className="f3-floors-count">一次顯示一層，共 {models.length} 層</div>
+    </div>}
+
+    {kindsOpen && <div className="f3-mkpanel">
+      <div className="panel-head">
+        <span className="p-t">標記顯示</span>
+        <button className="panel-close" onClick={() => setKindsOpen(false)}>隱藏</button>
       </div>
-      <p className="inline-message">
-        點選圖面上的標記可選取，再按「重新定位」後點圖面即可更新座標（存回 plan_markers 的 x／y，0–1 相對座標）。
-        標記的新增與屬性維護請用「整合標記」模組。
+      <label className="chk all">
+        <input type="checkbox" checked={showMarkers}
+          onChange={event => setShowMarkers(event.target.checked)} />所有標記
+      </label>
+      {/* 類型色以自訂屬性傳給 CSS，淺色主題才有機會把霓虹色壓深到可讀。 */}
+      {Object.entries(MARKER_KIND).map(([kind, label]) => <label key={kind} className="chk kind"
+        style={{ '--kind-color': KIND_COLOR[kind] } as React.CSSProperties}>
+        <input type="checkbox" disabled={!showMarkers} checked={visibleKinds[kind] !== false}
+          onChange={event => setVisibleKinds(current => ({ ...current, [kind]: event.target.checked }))} />
+        {label}
+      </label>)}
+      <div className="f3-floors-count">本層 {visible.length} 個標記</div>
+    </div>}
+
+    {placePanelOpen && <div className="f3-panel">
+      <div className="panel-head">
+        <span className="p-t">標記定位</span>
+        <button className="panel-close" onClick={() => setPlacePanelOpen(false)}>隱藏</button>
+      </div>
+      <div className="h-r">已選標記：<span>{selected ? fmt(selected.label) : '尚未選取'}</span></div>
+      <p className="f2-note">
+        點圖面上的標記即可選取，再按「重新定位」後點圖面，就會把座標更新到該處
+        （存回 plan_markers 的 x／y，0–1 相對座標）。標記的新增與屬性維護請用「整合標記」模組。
       </p>
-    </section>
-  </AppShell>;
+      <div className="btnrow">
+        <button className="mini" disabled={!selected || saving}
+          onClick={() => setPlacing(value => !value)}>{placing ? '定位中…' : '重新定位'}</button>
+        <button className="mini" disabled={!selected}
+          onClick={() => { setSelected(null); setPlacing(false); }}>取消選取</button>
+        <button className="mini" disabled={busy || saving} onClick={() => void reload()}>⟳ 重新載入</button>
+      </div>
+    </div>}
+
+    {/* 底部右側：操作說明與目前顯示的樓層，與 3D 模型圖同一套。
+        說明依 OpenSeadragon 的實際預設寫——滑鼠是拖曳平移、滾輪縮放、單擊放大
+        （dblClickToZoom 對滑鼠預設為 false，只有觸控預設開啟），本頁只覆寫 flick。 */}
+    <div className="f3-bottomright">
+      <div className="f3-hint">拖曳：平移　｜　滾輪：縮放　｜　點擊空白處：放大　｜　雙指：縮放</div>
+      <div className="f3-hud">
+        <div className="h-t">{module.title}</div>
+        <div className="h-r">顯示樓層：<span>{shownFloor}</span></div>
+      </div>
+    </div>
+  </div>;
 }

@@ -1,4 +1,9 @@
-/* SYS-06 3D模型圖｜V1 floor3d.html 的版型移植
+/* SYS-06 模型圖的全螢幕外殼｜V1 floor3d.html 的版型移植
+ *
+ * 2026-08-21 起這份不只服務 3D 模型圖：平面模型圖（structuremap-viewers.tsx）也套
+ * 同一組 .f3-* 類別——頂列、.f3-stage、三個浮動面板、底部右側的說明與 HUD。兩頁的
+ * 外殼只有一份，改動一次兩邊同步，不會再各自長歪。檔名維持 floor3d 是為了避免大量
+ * 改動；本檔末尾另有平面模型圖專屬的 .f2-* 區塊。
  *
  * 全螢幕工具頁，配置與 V1 相同：
  *   topbar 50px｜3D 場景 inset 50px 0 0 0
@@ -548,3 +553,45 @@
 .f3-mkpanel .head-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .f3-mkpanel .head-acts .panel-close{padding:2px 6px;font-size:11px;white-space:nowrap}
 
+
+/* ── 平面模型圖專屬（structuremap-viewers.tsx）────────────────────────── */
+
+/* OpenSeadragon 的 host。不直接把 .f3-stage 當 host——OSD 會自行增刪其子節點，
+   空狀態訊息放進去會被清掉。 */
+.f2-osd {
+  position: absolute;
+  inset: 0;
+}
+
+.f2-osd canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* 圖面上的標記。原本定義在 admin-workspace.css，隨本頁改為全螢幕工具頁一併搬過來，
+   那份後台樣式表不再是這頁的相依。 */
+.plan-marker {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), 0 0 10px rgba(0, 212, 255, .5);
+}
+
+.plan-marker:hover { transform: scale(1.25); }
+
+.f2-note {
+  margin: 9px 0 4px;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.75;
+}
+
+/* 成功訊息沿用 .f3-error 的版位，只換掉語意色——底部置中那個位置本來就是這頁唯一
+   的訊息區，另開一個會兩條並排。 */
+.f3-error.ok {
+  border-color: var(--green);
+  color: var(--green);
+}
