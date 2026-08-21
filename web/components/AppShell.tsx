@@ -21,7 +21,6 @@ function taipeiClock() {
 export function AppShell({ profile, title, children }: { profile: Profile; title: string; children: React.ReactNode }) {
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
-  const [theme, setTheme] = useState('light');
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDetails, setProfileDetails] = useState<Profile>(profile);
   const [profileBusy, setProfileBusy] = useState(false);
@@ -33,9 +32,8 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   const isAdminArea = pathname === '/systems/admin/' || pathname.startsWith('/systems/admin/');
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('siteTheme') === 'tech' ? 'tech' : 'light';
-    document.documentElement.dataset.theme = savedTheme;
-    setTheme(savedTheme);
+    // 主題屬性由 layout.tsx 的行內腳本在算繪前就設好，切換由全站的 ThemeToggle
+    // 負責；這裡只留時鐘。
     const timer = window.setInterval(() => setClock(taipeiClock()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -106,12 +104,6 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     await getSupabase().auth.signOut({ scope: 'local' });
     location.replace('/Inspection/v2/login/');
   }
-  function toggleTheme() {
-    const nextTheme = theme === 'light' ? 'tech' : 'light';
-    document.documentElement.dataset.theme = nextTheme;
-    localStorage.setItem('siteTheme', nextTheme);
-    setTheme(nextTheme);
-  }
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -166,7 +158,8 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
         <span>{profileDetails.department || '未設定單位'}｜{profileDetails.name}</span>
         <i><em />系統連線中</i>
         <time>{clock}</time>
-        <button onClick={toggleTheme}>{theme === 'light' ? '科技版' : '一般版'}</button>
+        {/* 介面風格切換改為全站右下角的浮動圖示（components/ThemeToggle.tsx），
+            不再占用頂列，行動裝置上也不會被擠掉。 */}
         <button onClick={openProfile}>個人資料</button>
         <button onClick={logout}>登出</button>
       </div>

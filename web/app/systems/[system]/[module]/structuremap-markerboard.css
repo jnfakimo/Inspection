@@ -415,10 +415,11 @@
 
 /* 提示與 HUD 併成一列（對應 V1 的 #bottomRightRow）。HUD 的寬度隨縮放百分比與
    旋轉角度變動，兩者各自靠右絕對定位會在數字變長時互相疊到。 */
+/* bottom 讓出全站介面風格切換鈕的位置（.theme-toggle，右下 16px、44px 高）。 */
 .mb-bottomright {
   position: fixed;
   right: 14px;
-  bottom: 14px;
+  bottom: 70px;
   z-index: 150;
   display: flex;
   align-items: flex-end;
