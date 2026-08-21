@@ -433,3 +433,10 @@
 .f3-mkpanel .panel-head{flex-wrap:wrap;gap:6px}
 .f3-mkpanel .head-acts{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .f3-mkpanel .head-acts .panel-close{padding:2px 6px;font-size:11px;white-space:nowrap}
+
+/* 頂列的共用導覽：與其他頁面同一組六個動作，全螢幕工具頁也要有。 */
+.f3-topbar .tb-nav{display:flex;align-items:center;gap:6px;margin-left:10px}
+.f3-topbar .tb-nav a{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--line);border-radius:6px;color:var(--text);text-decoration:none;font-size:12px;white-space:nowrap}
+.f3-topbar .tb-nav a:hover{border-color:var(--cyan);color:var(--f3-accent-text)}
+.f3-topbar .tb-nav img{width:16px;height:16px;object-fit:contain}
+@media (max-width:1100px){.f3-topbar .tb-nav a span{display:none}}

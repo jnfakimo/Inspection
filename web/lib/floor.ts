@@ -9,9 +9,15 @@
 
 /** 比對與分組用的鍵值：B1F→B1、1→1F、頂樓→RF。顯示文字請改用 floorLabel()。 */
 export function canonicalFloor(value: unknown) {
-  const raw = String(value ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  // 資料來源不只一處（V1 靜態頁、DXF 匯入、後台手key），實際值出現過
+  // 「RF 頂樓」「B1F」「1 樓」這類混寫。先抽掉空白與中文的「樓」「層」再比對，
+  // 否則會落到最後的 return raw、排序權重變成 500，樓層順序就亂掉。
+  const raw = String(value ?? '').trim().toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/[樓層]/g, '');
   const basement = raw.match(/^B(\d+)F?$/); if (basement) return `B${basement[1]}`;
-  if (['RF', 'R', '頂樓', 'PH', 'ROOF'].includes(raw)) return 'RF';
+  if (['RF', 'R', 'PH', 'ROOF', '頂', '屋頂'].includes(raw)) return 'RF';
+  if (/^RF/.test(raw)) return 'RF';               // 例：RF頂
   const above = raw.match(/^(\d+)F?$/); if (above) return `${above[1]}F`;
   return raw;
 }

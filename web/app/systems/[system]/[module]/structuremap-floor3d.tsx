@@ -24,6 +24,7 @@ import { floorOrder } from '@/lib/floor';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
+import { allowedActions } from '@/lib/shared-actions';
 
 type Props = { profile: Profile };
 type FloorModel = { floor_id: string; name: string | null; image_path: string | null; level: number | null };
@@ -147,10 +148,18 @@ export function Floor3DBoardModule({ profile }: Props) {
       <span className="tb-logo">臺北農產公司 第一果菜市場</span>
       <span className="tb-sep" />
       <span className="tb-title">3D 模型圖</span>
+      {/* 全站共用的六個動作，與其他頁面同一份定義（lib/shared-actions）。
+          全螢幕工具頁不套 AppShell，先前只能自己另寫導覽，兩邊必然逐漸走鐘。 */}
+      <nav className="tb-nav" aria-label="共用系統導覽">
+        {allowedActions(profile.allowed_systems).map(item => (
+          <a key={item.href} href={`/Inspection/v2${item.href}`}>
+            <img src={item.icon} alt="" /><span>{item.label}</span>
+          </a>
+        ))}
+      </nav>
       <span className="tb-space" />
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
-      <a className="tb-back" href={`${LEGACY_BASE}/admin.html`}>後台</a>
     </div>
 
     <div className="f3-stage">

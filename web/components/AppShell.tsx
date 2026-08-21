@@ -8,15 +8,8 @@ import { ResponsiveTableLabels } from '@/components/ResponsiveTableLabels';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import type { Profile } from '@/types/app';
+import { allowedActions } from '@/lib/shared-actions';
 
-const sharedActions = [
-  { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons/home-icon.svg' },
-  { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons/admin-icon.png' },
-  { href: '/systems/workorder/', label: '維修／派完工', icon: '/Inspection/assets/system-icons/maintenance-icon.png', sysKey: 'workorder' },
-  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', sysKey: 'guardpatrol' },
-  { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons/handover-icon.png', sysKey: 'handover' },
-  { href: '/systems/admin/', label: '後台', icon: '/Inspection/assets/system-icons/admin-icon.png', sysKey: 'admin' },
-];
 
 function taipeiClock() {
   return new Intl.DateTimeFormat('en-CA', {
@@ -108,7 +101,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     };
   }, [adminMenuOpen]);
 
-  const actions = sharedActions.filter(item => !item.sysKey || profile.allowed_systems.includes('*') || profile.allowed_systems.includes(item.sysKey));
+  const actions = allowedActions(profile.allowed_systems);
   async function logout() {
     await getSupabase().auth.signOut({ scope: 'local' });
     location.replace('/Inspection/v2/login/');
