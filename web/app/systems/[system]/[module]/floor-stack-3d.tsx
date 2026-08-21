@@ -8,7 +8,7 @@
 //
 // three 以動態 import 載入，不會進入其他頁面的初始 bundle。
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { SUPABASE_URL } from '@/lib/config';
 
@@ -130,6 +130,18 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
   const hostRef = useRef<HTMLDivElement | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
 
+  // 主題會影響場景底色、樓層板顏色、邊線顏色與貼圖重畫，而這些全在建場景時就決定。
+  // 必須跟著 data-theme 變動重建，否則切換主題後畫面停在舊主題直到重新整理——
+  // 這個缺口一直存在，只是全螢幕工具頁先前沒有切換入口，切不了也就看不出來。
+  const [theme, setTheme] = useState(() =>
+    (typeof document === 'undefined' ? 'light' : document.documentElement.getAttribute('data-theme')) || 'light');
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setTheme(document.documentElement.getAttribute('data-theme') || 'light'));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     let disposed = false;
     if (!hostRef.current || !models.length) return;
@@ -142,7 +154,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const width = host.clientWidth || 900, height = host.clientHeight || 560;
       const scene = new THREE.Scene();
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      const isLight = theme === 'light';
       // 與 .f3-stage 的 var(--bg) 對齊：兩者一旦有色差，畫布邊緣就會露出一條異色線。
       scene.background = new THREE.Color(isLight ? 0xf4f6fa : 0x020b18);
       const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
@@ -374,7 +386,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       };
     })();
     return () => { disposed = true; cleanupRef.current(); cleanupRef.current = () => {}; };
-  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors, apiRef]);
+  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors, apiRef, theme]);
 
   return <div ref={hostRef} className="plan-stage" style={{ width: '100%', height: '100%' }} />;
 }

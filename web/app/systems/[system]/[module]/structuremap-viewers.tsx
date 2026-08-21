@@ -93,6 +93,17 @@ function Floor2DViewer({ module, profile }: Props) {
   const overlayRef = useRef<Map<string, HTMLElement>>(new Map());
   // 淺色主題重畫後的 blob 網址，換樓層與卸載時要釋放。
   const planUrlRef = useRef<string | null>(null);
+  // 主題決定線稿要不要重畫成黑線，而那是在開圖當下決定的。必須跟著 data-theme
+  // 變動重開，否則切換主題後圖面停在舊主題直到重新整理（與 FloorStack3D 同一個坑）。
+  const [theme, setTheme] = useState(() =>
+    (typeof document === 'undefined' ? 'light' : document.documentElement.getAttribute('data-theme')) || 'light');
+  useEffect(() => {
+    const observer = new MutationObserver(() =>
+      setTheme(document.documentElement.getAttribute('data-theme') || 'light'));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
   // viewer 是非同步建立的。覆蓋層與定位這兩個 effect 都要等它就緒才掛得上去——
   // 用 state 而非 ref 才會觸發重跑，否則它們在首次載入時 early return 之後就再也
   // 不會執行，'open' 監聽根本沒註冊，圖面永遠是空的。
@@ -134,10 +145,19 @@ function Floor2DViewer({ module, profile }: Props) {
         });
       }
 
+      // 縮圖的顏色是建構時寫成行內樣式的，切換主題不會自己更新；這裡補寫一次。
+      const navigator = viewerRef.current?.navigator?.element as HTMLElement | undefined;
+      if (navigator) {
+        const token = (name: string, fallback: string) =>
+          getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+        navigator.style.background = token('--bg', '#020b18');
+        navigator.style.borderColor = token('--line', '#173952');
+      }
+
       // 線條的青色是烘在 PNG 裡的。淺色主題要黑線，與 3D 模型圖共用同一套逐像素重畫
       // （recolourPlanCanvas）：近白視為背景轉透明，其餘塗黑。兩頁的淺色呈現才會一致。
       let source = url;
-      if (document.documentElement.getAttribute('data-theme') === 'light') {
+      if (theme === 'light') {
         const recoloured = await recolourPlanObjectUrl(url);
         if (disposed) { if (recoloured) URL.revokeObjectURL(recoloured); return; }
         if (recoloured) source = recoloured;
@@ -153,7 +173,7 @@ function Floor2DViewer({ module, profile }: Props) {
       planUrlRef.current = source.startsWith('blob:') ? source : null;
     })();
     return () => { disposed = true; };
-  }, [model]);
+  }, [model, theme]);
 
   // 銷毀 viewer 並釋放重畫後的 blob（僅在元件卸載時）。
   useEffect(() => () => {
@@ -359,6 +379,7 @@ function Floor2DViewer({ module, profile }: Props) {
       <span className="tb-space" />
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
+      <a className="tb-back" href="/Inspection/v2/systems/guardpatrol/map3d/">立體巡檢雲臺</a>
     </div>
 
     {/* OSD 自己會在 host 裡增刪節點，所以空狀態訊息放在 host 外面、由 .f3-stage 承載。 */}
