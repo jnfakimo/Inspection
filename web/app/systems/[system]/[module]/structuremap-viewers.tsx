@@ -23,7 +23,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
-import { floorOrder, floorTextureUrl } from './floor-stack-3d';
+import { floorOrder, floorTextureUrl, recolourPlanObjectUrl } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -85,6 +85,8 @@ function Floor2DViewer({ module, profile }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
   const overlayRef = useRef<Map<string, HTMLElement>>(new Map());
+  // 淺色主題重畫後的 blob 網址，換樓層與卸載時要釋放。
+  const planUrlRef = useRef<string | null>(null);
 
   useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
   const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
@@ -101,10 +103,17 @@ function Floor2DViewer({ module, profile }: Props) {
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
       if (!viewerRef.current) {
+        // 縮圖的底色／框線／視窗框由 OSD 在建構時寫成行內樣式，CSS 蓋不掉，只能由選項給。
+        // 直接讀主題 token，跟頁面共用同一組值，日後改 token 這裡自動跟著變。
+        const token = (name: string, fallback: string) =>
+          getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
         viewerRef.current = OpenSeadragon({
           element: hostRef.current, prefixUrl: '',
           showNavigationControl: false, showNavigator: true, navigatorPosition: 'BOTTOM_LEFT',
           navigatorAutoFade: false,
+          navigatorBackground: token('--bg', '#020b18'),
+          navigatorBorderColor: token('--line', '#173952'),
+          navigatorDisplayRegionColor: token('--cyan', '#00d4ff'),
           minZoomLevel: 0.2, maxZoomPixelRatio: 4, zoomPerScroll: 1.3,
           animationTime: 0.5, springStiffness: 7,
           panHorizontal: true, panVertical: true, constrainDuringPan: false,
@@ -113,14 +122,33 @@ function Floor2DViewer({ module, profile }: Props) {
           gestureSettingsMouse: { flickEnabled: true, flickMomentum: 0.4 },
         });
       }
+
+      // 線條的青色是烘在 PNG 裡的。淺色主題要黑線，與 3D 模型圖共用同一套逐像素重畫
+      // （recolourPlanCanvas）：近白視為背景轉透明，其餘塗黑。兩頁的淺色呈現才會一致。
+      let source = url;
+      if (document.documentElement.getAttribute('data-theme') === 'light') {
+        const recoloured = await recolourPlanObjectUrl(url);
+        if (disposed) { if (recoloured) URL.revokeObjectURL(recoloured); return; }
+        if (recoloured) source = recoloured;
+      }
+
       overlayRef.current.clear();
-      viewerRef.current.open({ type: 'image', url });
+      viewerRef.current.open({ type: 'image', url: source });
+
+      // 換樓層時才釋放上一張，不在 cleanup 釋放——cleanup 跑在新圖開啟之前，
+      // 提早 revoke 會讓還沒解碼完的那張變成空白。
+      if (planUrlRef.current && planUrlRef.current !== source) URL.revokeObjectURL(planUrlRef.current);
+      planUrlRef.current = source.startsWith('blob:') ? source : null;
     })();
     return () => { disposed = true; };
   }, [model]);
 
-  // 銷毀 viewer（僅在元件卸載時）。
-  useEffect(() => () => { try { viewerRef.current?.destroy(); } catch { /* 忽略 */ } viewerRef.current = null; }, []);
+  // 銷毀 viewer 並釋放重畫後的 blob（僅在元件卸載時）。
+  useEffect(() => () => {
+    try { viewerRef.current?.destroy(); } catch { /* 忽略 */ }
+    viewerRef.current = null;
+    if (planUrlRef.current) { URL.revokeObjectURL(planUrlRef.current); planUrlRef.current = null; }
+  }, []);
 
   // 依 marker 清單重建覆蓋層。plan_markers 的 x／y 為 0–1 的相對座標。
   useEffect(() => {
