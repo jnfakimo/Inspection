@@ -73,6 +73,8 @@ function fmtMD(d: Date) { return `${d.getMonth() + 1}/${d.getDate()}`; }
 const hhmm = (v: unknown) => v ? String(v).slice(0, 5) : '';
 // 以台北時區判斷時段是否已過（與資料庫 guard_meeting_booking_input 的判斷一致）。
 function slotStartAt(dateStr: string, start: string) { return new Date(`${dateStr}T${start}:00+08:00`); }
+/** 一天最後一個可預約的 30 分鐘刻度；用來判斷「今天是否還有時段」。 */
+const LAST_SLOT = '23:30';
 function bookingEndAt(row: Row) { return new Date(`${row.booking_date}T${String(row.end_time).slice(0, 8)}+08:00`); }
 
 /* ── 三段式時間（上/下午 · 1–12 · 00/30），與 V1 完全相同 ── */
@@ -90,17 +92,44 @@ function valueToParts(value: string): TimeParts {
   const h = Number(hStr);
   return { period: h >= 12 ? 'pm' : 'am', hour: String(h % 12 === 0 ? 12 : h % 12), minute: m };
 }
-function TimeSelect({ value, onChange, label }: { value: TimeParts; onChange: (v: TimeParts) => void; label: string }) {
+// 已過去的時段直接停用，不是等到送出才擋。判斷一律走 slotStartAt——與送出前的
+// startPast 用同一個函式，UI 與驗證才不可能各說各話（時區也只有那一處要維護）。
+// 停用而非移除：使用者若先選好時間再把日期改到今天，移除選項會讓下拉變成空白，
+// 停用則仍看得到自己選了什麼，配合上方的提示列比較好理解。
+function TimeSelect({ value, onChange, label, date, now }: {
+  value: TimeParts; onChange: (v: TimeParts) => void; label: string;
+  /** 有給日期與現在時刻才做時間管制；未給（例如週期截止日）維持全部可選。 */
+  date?: string; now?: number;
+}) {
+  const isPast = (parts: TimeParts) => {
+    if (!date || now === undefined) return false;
+    const candidate = partsToValue(parts);
+    return Boolean(candidate) && slotStartAt(date, candidate).getTime() <= now;
+  };
+  const MINUTES = ['00', '30'];
+  // 半天／整點只要還有任一個 30 分鐘刻度沒過去，就仍可選。
+  const periodPast = (period: string) =>
+    Array.from({ length: 12 }, (_, i) => String(i + 1))
+      .every(hour => MINUTES.every(minute => isPast({ period, hour, minute })));
+  const hourPast = (hour: string) =>
+    Boolean(value.period) && MINUTES.every(minute => isPast({ period: value.period, hour, minute }));
+  const minutePast = (minute: string) =>
+    Boolean(value.period && value.hour) && isPast({ period: value.period, hour: value.hour, minute });
+
   return <div className="field"><label>{label}</label><div className="time-parts">
     <select aria-label={`${label}上午或下午`} value={value.period} onChange={e => onChange({ ...value, period: e.target.value })}>
-      <option value="">上／下午</option><option value="am">上午</option><option value="pm">下午</option>
+      <option value="">上／下午</option>
+      <option value="am" disabled={periodPast('am')}>上午</option>
+      <option value="pm" disabled={periodPast('pm')}>下午</option>
     </select>
     <select aria-label={`${label}小時`} value={value.hour} onChange={e => onChange({ ...value, hour: e.target.value })}>
       <option value="">時</option>
-      {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={String(i + 1)}>{pad(i + 1)}</option>)}
+      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map(hour =>
+        <option key={hour} value={hour} disabled={hourPast(hour)}>{pad(Number(hour))}</option>)}
     </select>
     <select aria-label={`${label}分鐘`} value={value.minute} onChange={e => onChange({ ...value, minute: e.target.value })}>
-      <option value="">分</option><option value="00">00</option><option value="30">30</option>
+      <option value="">分</option>
+      {MINUTES.map(minute => <option key={minute} value={minute} disabled={minutePast(minute)}>{minute}</option>)}
     </select>
   </div></div>;
 }
@@ -241,13 +270,16 @@ function MeetingRoomPage({ module, profile }: Props) {
                   const dateStr = isoDate(d);
                   const weekend = d.getDay() === 0 || d.getDay() === 6;
                   // 過去日期整格停用；今天仍保留可預約狀態，個別已結束的時段另行灰化。
-                  const past = dateStr < today;
+                  // 以時間判定而不是整天：今天要到最後一個可預約刻度（23:30）都過去了
+                  // 才算「已過去」，在那之前仍可預約當天剩下的時段。
+                  const past = dateStr < today
+                    || (dateStr === today && slotStartAt(dateStr, LAST_SLOT).getTime() <= tick);
                   const items = weekBookings
                     .filter(b => b.room_id === room.room_id && b.booking_date === dateStr)
                     .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
                   return <td key={dateStr}
                     className={[weekend ? 'weekend' : '', past ? 'past' : '', !past && room.status === 'active' ? 'selectable' : ''].filter(Boolean).join(' ')}
-                    title={past ? '過去日期不可預約' : room.status !== 'active' ? '會議室已停用' : '點選選擇預約日期'}
+                    title={past ? '此日已無可預約時段' : room.status !== 'active' ? '會議室已停用' : '點選選擇預約日期'}
                     aria-disabled={past || room.status !== 'active' ? true : undefined}
                     onClick={() => { if (!past && room.status === 'active') setBooking({ room_id: String(room.room_id), date: dateStr }); }}>
                     {items.map(b => {
@@ -465,8 +497,8 @@ function BookingModal({ rooms, init, myPhone, now, calendarStatus, onClose, onDo
         <section className="booking-form-section">
           <div className="booking-section-head"><span>02</span><div><b>使用時段</b><small>設定開始與結束時間，系統將自動檢查衝突</small></div></div>
           <div className="row2">
-            <TimeSelect label="開始時間（上午／下午・時・分）" value={start} onChange={setStart} />
-            <TimeSelect label="結束時間（上午／下午・時・分）" value={end} onChange={setEnd} />
+            <TimeSelect label="開始時間（上午／下午・時・分）" value={start} onChange={setStart} date={date} now={now} />
+            <TimeSelect label="結束時間（上午／下午・時・分）" value={end} onChange={setEnd} date={date} now={now} />
           </div>
         </section>
         <section className="booking-form-section">
