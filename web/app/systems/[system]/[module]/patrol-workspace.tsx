@@ -24,7 +24,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { DELETED_SHIFT_PREFIX, isDeletedShift } from '@/lib/patrol-status';
+import { isDeletedShift } from '@/lib/patrol-status';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { TimeSelect } from '@/components/TimeSelect';
 import { ComboboxSelect } from '@/components/ComboboxSelect';

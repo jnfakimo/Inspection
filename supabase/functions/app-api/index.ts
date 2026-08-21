@@ -54,6 +54,29 @@ function id(value: unknown) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result) ? result : '';
 }
 
+function isUuid(value: unknown) {
+  return id(value) !== '';
+}
+
+// 嚴格驗證 YYYY-MM-DD 且為真實存在的日期，避免 2026-13-99 這類假格式進 DB。
+function validISODate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+// 將常見 PostgreSQL 錯誤碼轉成使用者看得懂的中文訊息，避免把內部表名/約束名洩漏給前端。
+function dbMessage(error: { code?: string; message?: string } | null, fallback: string) {
+  const code = String(error?.code || '');
+  if (code === '23505') return '資料已存在，請勿重複提交';
+  if (code === '23503') return '關聯資料不存在，請先確認相關資料';
+  if (code === '23514') return '資料不符合系統規則';
+  if (code === '22P02') return '數值或格式不正確';
+  if (code === '42501') return '沒有執行此操作的權限';
+  const message = text(error?.message, 300);
+  return message || fallback;
+}
+
 function relationName(value: unknown) {
   const relation = Array.isArray(value) ? value[0] : value;
   if (!relation || typeof relation !== 'object' || !('name' in relation)) return '';
@@ -421,23 +444,29 @@ export async function handleAppApiRequest(req: Request) {
       let rows = (requests.data || []) as Array<Record<string, unknown>>;
       if (moduleKey !== 'requests' && rows.length) {
         const requestIds = rows.map(row => text(row.request_id, 80)).filter(Boolean);
-        const orders = requestIds.length
-          ? await userDb.from('maintenance_orders')
-              .select('order_id,request_id,assignee_id,status,created_at')
-              .in('request_id', requestIds).order('created_at', { ascending: false }).limit(1000)
-          : { data: [], error: null };
-        if (orders.error) throw orders.error;
         const latestOrders = new Map<string, Record<string, unknown>>();
-        for (const order of (orders.data || []) as Array<Record<string, unknown>>) {
-          const requestId = text(order.request_id, 80);
-          if (requestId && !latestOrders.has(requestId)) latestOrders.set(requestId, order);
+        // in() 查詢會直接拼進 URL，超過約 200 筆就可能超過代理層 8KB 上限，故分批查詢。
+        for (let index = 0; index < requestIds.length; index += 100) {
+          const chunk = requestIds.slice(index, index + 100);
+          const { data, error } = await userDb.from('maintenance_orders')
+            .select('order_id,request_id,assignee_id,status,created_at')
+            .in('request_id', chunk).order('created_at', { ascending: false }).limit(1000);
+          if (error) throw error;
+          for (const order of (data || []) as Array<Record<string, unknown>>) {
+            const requestId = text(order.request_id, 80);
+            if (requestId && !latestOrders.has(requestId)) latestOrders.set(requestId, order);
+          }
         }
         const assigneeIds = [...new Set([...latestOrders.values()].map(order => text(order.assignee_id, 80)).filter(Boolean))];
-        const people = assigneeIds.length
-          ? await userDb.from('users').select('user_id,name').in('user_id', assigneeIds)
-          : { data: [], error: null };
-        if (people.error) throw people.error;
-        const names = new Map((people.data || []).map(person => [String(person.user_id), text(person.name, 100)]));
+        const names = new Map<string, string>();
+        for (let index = 0; index < assigneeIds.length; index += 100) {
+          const chunk = assigneeIds.slice(index, index + 100);
+          const { data, error } = await userDb.from('users').select('user_id,name').in('user_id', chunk);
+          if (error) throw error;
+          for (const person of (data || []) as Array<Record<string, unknown>>) {
+            names.set(String(person.user_id), text(person.name, 100));
+          }
+        }
         rows = rows.map(row => {
           const order = latestOrders.get(text(row.request_id, 80));
           const assigneeId = text(order?.assignee_id || row.assignee_id, 80);
@@ -646,6 +675,11 @@ export async function handleAppApiRequest(req: Request) {
       if (!locationPath || !equipmentPath) return reply(req, { ok: false, message: '上傳檔案資訊不完整' }, 400);
       if (!locationPath.startsWith(`${requestId}/`) || !equipmentPath.startsWith(`${requestId}/`)) return reply(req, { ok: false, message: '上傳檔案路徑不符案件' }, 400);
       if (!locationFileName || !equipmentFileName) return reply(req, { ok: false, message: '上傳檔名不完整' }, 400);
+      // create 端重新驗證業務必填欄位，不信任 prepare 階段的 snapshot，
+      // 防止攻擊者走完 prepare 後在 create 階段竄改欄位。
+      if (!text(requestData.fault_desc, 2000)) return reply(req, { ok: false, message: '故障描述不可空白' }, 400);
+      if (!text(requestData.mobile, 40)) return reply(req, { ok: false, message: '手機號碼為必填欄位' }, 400);
+      if (!['normal', 'urgent', 'emergency'].includes(text(requestData.urgency, 20))) return reply(req, { ok: false, message: '急迫度設定無效' }, 400);
 
       const uploadedList = await admin.storage.from('repair-files').list(requestId);
       if (uploadedList.error) return reply(req, { ok: false, message: text(uploadedList.error.message, 300) || '驗證附件上傳結果失敗' }, 503);
@@ -707,18 +741,21 @@ export async function handleAppApiRequest(req: Request) {
       }
       const created = createResponse.data;
 
+      // 補償路徑不再 DELETE（repair_requests 受永久資料保護 trigger 禁止刪除），
+      // 改將該單標記為 cancelled 並清理已上傳檔案，避免殘留孤立的 pending 單。
+      const rollback = async () => {
+        await admin.storage.from('repair-files').remove([locationPath, equipmentPath]);
+        await admin.from('repair_requests').update({ status: 'cancelled' }).eq('request_id', requestId);
+      };
       const initLog = await admin.from('case_status_log').insert(logRow);
       if (initLog.error) {
-        await admin.storage.from('repair-files').remove([locationPath, equipmentPath]);
-        await admin.from('repair_requests').delete().eq('request_id', requestId);
+        await rollback();
         return reply(req, { ok: false, message: text(initLog.error.message, 300) || '建立歷程失敗' }, 400);
       }
 
       const attachmentInsert = await admin.from('repair_attachments').insert(attachmentsRows).select('attach_id').limit(10);
       if (attachmentInsert.error) {
-        await admin.storage.from('repair-files').remove([locationPath, equipmentPath]);
-        await admin.from('repair_requests').delete().eq('request_id', requestId);
-        await admin.from('case_status_log').delete().eq('request_id', requestId);
+        await rollback();
         return reply(req, { ok: false, message: text(attachmentInsert.error.message, 300) || '建立附件失敗' }, 400);
       }
 
@@ -810,6 +847,9 @@ export async function handleAppApiRequest(req: Request) {
         userDb.from('inspection_records').select('record_id,inspect_time,run_status,equipment(name)').order('inspect_time', { ascending: false }).limit(8),
       ]);
       const buckets = new Map<string, { date: string; total: number; abnormal: number }>();
+      if (trendResult.error) console.warn('dashboard trend query failed:', trendResult.error.message);
+      if (repairsResult.error) console.warn('dashboard repairs query failed:', repairsResult.error.message);
+      if (recentResult.error) console.warn('dashboard recent query failed:', recentResult.error.message);
       for (let offset = 29; offset >= 0; offset--) {
         const date = new Date(Date.now() - offset * 86400_000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
         buckets.set(date, { date, total: 0, abnormal: 0 });
@@ -943,7 +983,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!/^[0-9a-f-]{36}$/i.test(equipmentId)) return reply(req, { ok: false, message: '設備識別碼無效' }, 400);
       if (!['purchase', 'outsource', 'parts', 'labor', 'other'].includes(costType)) return reply(req, { ok: false, message: '費用類型無效' }, 400);
       if (!Number.isFinite(amount) || amount < 0 || amount > 9999999999) return reply(req, { ok: false, message: '金額必須介於 0 至 9,999,999,999' }, 400);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(costDate)) return reply(req, { ok: false, message: '日期格式無效' }, 400);
+      if (!validISODate(costDate)) return reply(req, { ok: false, message: '日期格式無效' }, 400);
       const { data, error } = await userDb.from('cost_records').insert({
         equipment_id: equipmentId, cost_type: costType, vendor, cost_date: costDate,
         amount, note, created_by: profile.user_id,
@@ -989,7 +1029,7 @@ export async function handleAppApiRequest(req: Request) {
       const purpose = text(body.trip_purpose, 500);
       const passengerCount = Number(body.passenger_count);
       const timePattern = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(tripDate)) return reply(req, { ok: false, message: '用車日期格式無效' }, 400);
+      if (!validISODate(tripDate)) return reply(req, { ok: false, message: '用車日期格式無效' }, 400);
       if (!timePattern.test(departure) || !timePattern.test(returnTime) || returnTime <= departure) return reply(req, { ok: false, message: '起訖時間必須有效且回程晚於出發' }, 400);
       if (!origin || !destination || !purpose) return reply(req, { ok: false, message: '出發地、目的地與用途皆為必填' }, 400);
       if (!Number.isInteger(passengerCount) || passengerCount < 1 || passengerCount > 99) return reply(req, { ok: false, message: '搭乘人數必須為 1–99 的整數' }, 400);
@@ -1029,7 +1069,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'patrol_shift_delete') {
-      if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有巡邏系統權限' }, 403);
+      if (!can('guardpatrol') || !isAdmin) return reply(req, { ok: false, message: '只有巡邏系統管理者可以刪除班別' }, 403);
       const scope = text(body.scope, 20);
       if (scope === 'template') {
         const templateId = text(body.template_id, 80);
@@ -1049,12 +1089,14 @@ export async function handleAppApiRequest(req: Request) {
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的班別' }, 404);
         // patrol_shifts 受資料庫保護無法 DELETE 且無 status 欄位，故以名稱前綴隱藏（與前端同規則）。
-        const { error } = await userDb.from('patrol_shifts').update({ name: `[已刪除] ${before.name}`, assigned_user_ids: [] }).eq('shift_id', shiftId);
+        // 名稱加上隨機後綴，避免同日同班別重複刪除時撞 idx_patrol_shifts_date_name 唯一索引。
+        const hiddenName = `[已刪除] ${before.name} ${nextRequestRequestId().slice(0, 8)}`;
+        const { error } = await userDb.from('patrol_shifts').update({ name: hiddenName, assigned_user_ids: [] }).eq('shift_id', shiftId);
         if (error) throw error;
         // 指派人員會被清空且無法從別處還原，before 必須連同人員一起留存才救得回來。
         await writeAudit(userDb, profile.user_id, 'patrol_shifts', shiftId, 'update',
           { name: before.name, assigned_user_ids: before.assigned_user_ids },
-          { name: `[已刪除] ${before.name}`, assigned_user_ids: [] });
+          { name: hiddenName, assigned_user_ids: [] });
         return reply(req, { ok: true });
       }
       return reply(req, { ok: false, message: '刪除範圍無效' }, 400);
@@ -1066,7 +1108,7 @@ export async function handleAppApiRequest(req: Request) {
 
       if (kind === 'record') {
         const shiftDate = text(body.shift_date, 10), shiftType = text(body.shift_type, 20);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) return reply(req, { ok: false, message: '交接日期格式無效' }, 400);
+        if (!validISODate(shiftDate)) return reply(req, { ok: false, message: '交接日期格式無效' }, 400);
         const handoverBy = id(body.handover_by), takeoverBy = id(body.takeover_by);
         const status = body.status === 'confirmed' ? 'confirmed' : 'draft';
         if (status === 'confirmed') {
@@ -1105,10 +1147,13 @@ export async function handleAppApiRequest(req: Request) {
         if (before.status !== 'confirmed') return reply(req, { ok: false, message: '這筆交接單目前狀態不可接收' }, 409);
         const { data: updated, error } = await userDb.from('handover_records')
           .update({ confirmed_by: profile.user_id, confirmed_at: new Date().toISOString() })
-          .eq('record_id', recordId).eq('status', 'confirmed').select('record_id').maybeSingle();
+          .eq('record_id', recordId).eq('status', 'confirmed').select('record_id,confirmed_at').maybeSingle();
         if (error) throw error;
         if (!updated) return reply(req, { ok: false, message: '這筆交接單已被處理，請重新整理' }, 409);
-        await writeAudit(userDb, profile.user_id, 'handover_records', recordId, 'status_change', { status: 'confirmed' }, { status: 'done' });
+        // 交接狀態仍是 confirmed（DB 無 'done' 狀態），接收完成以 confirmed_at 為準，
+        // 稽核記錄更新而非不存在的狀態轉換。
+        await writeAudit(userDb, profile.user_id, 'handover_records', recordId, 'update',
+          { status: 'confirmed' }, { status: 'confirmed', confirmed_by: profile.user_id, confirmed_at: updated.confirmed_at });
         return reply(req, { ok: true });
       }
 
@@ -1116,11 +1161,17 @@ export async function handleAppApiRequest(req: Request) {
         const caseNo = text(body.case_no, 40), title = text(body.title, 300), shiftType = text(body.shift_type, 20);
         const anomalyCategory = text(body.anomaly_category, 100);
         if (!caseNo || !title || !shiftType || !anomalyCategory) return reply(req, { ok: false, message: '案件編號、標題、班別與異常大類為必填' }, 400);
+        let incidentTime: string | null = null;
+        if (body.incident_time !== null && body.incident_time !== undefined && body.incident_time !== '') {
+          const parsed = Date.parse(String(body.incident_time));
+          if (Number.isNaN(parsed)) return reply(req, { ok: false, message: '事件發生時間格式無效' }, 400);
+          incidentTime = new Date(parsed).toISOString();
+        }
         const payload = {
           case_no: caseNo, title, shift_type: shiftType,
           reporter: text(body.reporter, 160) || null,
           reporter_unit: text(body.reporter_unit, 200) || null,
-          incident_time: body.incident_time ? new Date(String(body.incident_time)).toISOString() : null,
+          incident_time: incidentTime,
           incident_location: text(body.incident_location, 300) || null,
           anomaly_category: anomalyCategory,
           anomaly_sub: text(body.anomaly_sub, 100) || null, anomaly_other: text(body.anomaly_other, 300) || null,
@@ -1183,8 +1234,13 @@ export async function handleAppApiRequest(req: Request) {
           if (!(key in raw)) continue;
           const value = raw[key];
           if (field.type === 'number') {
-            const parsed = Number(value);
-            payload[key] = (value === null || value === '' || !Number.isFinite(parsed)) ? null : parsed;
+            if (value === null || value === '') {
+              payload[key] = null;
+            } else {
+              const parsed = Number(value);
+              if (!Number.isFinite(parsed)) return reply(req, { ok: false, message: `欄位「${key}」必須是數字` }, 400);
+              payload[key] = parsed;
+            }
           } else if (field.type === 'boolean') {
             payload[key] = value === true || value === 'true';
           } else {
@@ -1217,7 +1273,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('handover')) return reply(req, { ok: false, message: '目前角色沒有交接系統權限' }, 403);
       const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
       const payload: Record<string, unknown> = {};
-      for (const key of ['record_date', 'shift_code', 'shift_start', 'shift_end', 'handover_by', 'instruction', 'notes', 'supervisor_note', 'reviewed_at', 'status', 'updated_at']) {
+      for (const key of ['record_date', 'shift_code', 'shift_start', 'shift_end', 'handover_by', 'instruction', 'notes', 'updated_at']) {
         if (!(key in raw)) continue;
         payload[key] = text(raw[key], 4000) || null;
       }
@@ -1226,12 +1282,32 @@ export async function handleAppApiRequest(req: Request) {
         payload[key] = Array.isArray(raw[key]) ? JSON.parse(JSON.stringify(raw[key])) : null;
       }
       if (!payload['record_date'] || !payload['shift_code']) return reply(req, { ok: false, message: '請輸入日期與班別' }, 400);
-      const recordId = text(raw['record_id'], 80);
-      if (recordId && !recordId.startsWith('seed-') && !recordId.startsWith('local-')) payload['record_id'] = recordId;
+      // 主管批示欄位（status/reviewed_at/reviewed_by/supervisor_note）只有管理者能寫，
+      // 避免一般使用者自審自批；reviewed_by 一律以登入者為準，不接受客戶端指定。
+      if (isAdmin) {
+        if ('status' in raw) {
+          const nextStatus = text(raw['status'], 20);
+          if (!['draft', 'submitted', 'reviewed', 'closed'].includes(nextStatus)) {
+            return reply(req, { ok: false, message: '交接狀態值無效' }, 400);
+          }
+          payload['status'] = nextStatus;
+        }
+        if ('reviewed_at' in raw) payload['reviewed_at'] = text(raw['reviewed_at'], 40) || null;
+        if ('supervisor_note' in raw) payload['supervisor_note'] = text(raw['supervisor_note'], 4000) || null;
+        if (payload['status'] === 'reviewed') payload['reviewed_by'] = profile.user_id;
+      } else {
+        const clientStatus = text(raw['status'], 20);
+        if (clientStatus && !['draft', 'submitted'].includes(clientStatus)) {
+          return reply(req, { ok: false, message: '只有管理者可以執行主管批示' }, 403);
+        }
+        if (clientStatus) payload['status'] = clientStatus;
+      }
+      // record_id 不寫入 payload：upsert 以 (record_date, shift_code) 定位，防止客戶端覆寫他人 PK。
       try {
         const { data, error } = await userDb.from('handover_field_pilot_records').upsert(payload, { onConflict: 'record_date,shift_code' }).select('record_id').maybeSingle();
         if (error) throw error;
-        await writeAudit(userDb, profile.user_id, 'handover_field_pilot_records', String((data as unknown as Record<string, unknown>)?.record_id ?? recordId), 'insert', null, payload);
+        const savedId = String((data as unknown as Record<string, unknown>)?.record_id ?? '');
+        await writeAudit(userDb, profile.user_id, 'handover_field_pilot_records', savedId, 'insert', null, payload);
         return reply(req, { ok: true, data });
       } catch (error) {
         const e = error as { code?: string; message?: string };
@@ -1249,7 +1325,9 @@ export async function handleAppApiRequest(req: Request) {
         userDb.from('plan_markers').select('marker_id,equipment_id,floor,x,y,label').limit(5000),
         userDb.from('locations').select('location_id,name,floor').limit(2000),
       ]);
-      if (equipment.error) throw equipment.error;
+if (equipment.error) throw equipment.error;
+      if (markers.error) console.warn('equipment_map markers failed:', markers.error.message);
+      if (locations.error) console.warn('equipment_map locations failed:', locations.error.message);
       return reply(req, { ok: true, data: {
         equipment: (equipment.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
         markers: markers.error ? [] : (markers.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
@@ -1305,12 +1383,19 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'deactivate_many') {
         const spaceIds: string[] = (Array.isArray(body.space_ids) ? body.space_ids as unknown[] : []).map((v: unknown) => id(v)).filter(Boolean);
         if (!spaceIds.length) return reply(req, { ok: false, message: '沒有可停用的空間' }, 400);
-        const { data: markers } = await userDb.from('plan_markers').select('space_id').in('space_id', spaceIds).eq('status', 'active');
-        const used = new Set((markers || []).map(row => String(row.space_id)));
+        const used = new Set<string>();
+        for (let index = 0; index < spaceIds.length; index += 50) {
+          const chunk = spaceIds.slice(index, index + 50);
+          const { data: markers } = await userDb.from('plan_markers').select('space_id').in('space_id', chunk).eq('status', 'active');
+          (markers || []).forEach(row => used.add(String(row.space_id)));
+        }
         const removable = spaceIds.filter(s => !used.has(s));
         if (!removable.length) return reply(req, { ok: false, message: '所有空間都已於「整合標記系統」使用中，無法停用' }, 409);
-        const { error } = await userDb.from('floor_spaces').update({ status: 'inactive' }).in('space_id', removable);
-        if (error) throw error;
+        for (let index = 0; index < removable.length; index += 50) {
+          const chunk = removable.slice(index, index + 50);
+          const { error } = await userDb.from('floor_spaces').update({ status: 'inactive' }).in('space_id', chunk);
+          if (error) throw error;
+        }
         await writeAudit(userDb, profile.user_id, 'floor_spaces', removable.join(','), 'status_change', null, { status: 'inactive' });
         return reply(req, { ok: true, data: { removable, usedCount: spaceIds.length - removable.length } });
       }
@@ -1330,18 +1415,31 @@ export async function handleAppApiRequest(req: Request) {
           cleanRows.push({ market_id: marketId, floor, floor_order: Number.isFinite(floorOrderValue) ? floorOrderValue : null, space_name: spaceName });
         }
         if (!cleanRows.length) return reply(req, { ok: false, message: '匯入資料皆無效' }, 400);
-        const chunkSize = 50;
+        // 先以 (market_id, floor, space_name) 預先過濾已存在的資料，降低撞 unique 的機率，
+        // 剩餘資料仍分批插入，部分失敗時回報數量讓使用者知道哪些未匯入。
+        const existing = new Set<string>();
+        for (let index = 0; index < cleanRows.length; index += 50) {
+          const chunk = cleanRows.slice(index, index + 50);
+          const floors = [...new Set(chunk.map(r => text(r.floor, 20)).filter(Boolean))];
+          const { data: found } = await userDb.from('floor_spaces')
+            .select('market_id,floor,space_name').in('floor', floors);
+          (found || []).forEach((row) => existing.add(`${text(row.market_id, 40)}|${text(row.floor, 20)}|${text(row.space_name, 120)}`));
+        }
+        const toInsert = cleanRows.filter(row => !existing.has(`${text(row.market_id, 40)}|${text(row.floor, 20)}|${text(row.space_name, 120)}`));
+        if (!toInsert.length) return reply(req, { ok: false, message: '匯入資料皆已存在' }, 409);
         let inserted = 0;
-        for (let index = 0; index < cleanRows.length; index += chunkSize) {
-          const { error } = await userDb.from('floor_spaces').insert(cleanRows.slice(index, index + chunkSize));
+        let failed = 0;
+        for (let index = 0; index < toInsert.length; index += 50) {
+          const chunk = toInsert.slice(index, index + 50);
+          const { error } = await userDb.from('floor_spaces').insert(chunk);
           if (error) {
-            if (String(error.code) === '23505') return reply(req, { ok: false, message: '該樓層已有相同空間名稱' }, 409);
+            if (String(error.code) === '23505') { failed += chunk.length; continue; }
             throw error;
           }
-          inserted += cleanRows.slice(index, index + chunkSize).length;
+          inserted += chunk.length;
         }
-        await writeAudit(userDb, profile.user_id, 'floor_spaces', `import:${inserted}`, 'insert', null, { count: inserted });
-        return reply(req, { ok: true, data: { inserted } });
+        await writeAudit(userDb, profile.user_id, 'floor_spaces', `import:${inserted}`, 'insert', null, { count: inserted, failed });
+        return reply(req, { ok: true, data: { inserted, skipped: cleanRows.length - inserted, failed } });
       }
 
       if (kind === 'save') {

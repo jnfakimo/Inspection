@@ -344,14 +344,18 @@ drop policy if exists "authenticated_only" on equipment_annual_costs;
 drop policy if exists "authenticated_only" on equipment_external_links;
 drop policy if exists "authenticated_only" on equipment_monitor_points;
 drop policy if exists "authenticated_only" on equipment_monitor_events;
-create policy "authenticated_only" on equipment_maintenance_plans for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_maintenance_records for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_contracts for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_documents for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_annual_costs for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_external_links for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_monitor_points for all to authenticated using (true) with check (true);
-create policy "authenticated_only" on equipment_monitor_events for all to authenticated using (true) with check (true);
+-- 僅在該表沒有任何正式政策（已被 full_commercial_hardening 收緊為 *_managed_*）時才建立開放政策，
+-- 避免重跑本檔把監控表 RLS 重新打開。
+do $$
+declare t text; policy_count int;
+begin
+  foreach t in array array['equipment_maintenance_plans','equipment_maintenance_records','equipment_contracts','equipment_documents','equipment_annual_costs','equipment_external_links','equipment_monitor_points','equipment_monitor_events'] loop
+    select count(*) into policy_count from pg_policies where schemaname='public' and tablename=t;
+    if policy_count = 0 then
+      execute format('create policy "authenticated_only" on public.%I for all to authenticated using (true) with check (true)', t);
+    end if;
+  end loop;
+end $$;
 
 -- ── 11. 查詢檢視：設備生命週期、年度成本、監控介接清冊 ─────
 create or replace view equipment_lifecycle_overview as

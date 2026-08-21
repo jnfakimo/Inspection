@@ -11,14 +11,18 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [editor, setEditor] = useState<Row | null>(null);
   const [tab, setTab] = useState<'matrix' | 'systems' | 'users'>('matrix'), [busy, setBusy] = useState(true), [note, setNote] = useState(''), [query, setQuery] = useState('');
   const load = useCallback(async () => {
-    setBusy(true); setNote(''); const client = getSupabase();
-    const [rolesResult, permissionResult, usersResult] = await Promise.all([
-      client.from('roles').select('role_id,name,sort_order').order('sort_order'),
-      client.from('role_permissions').select('role_id,permission:perm,allowed').limit(2000),
-      client.from('users').select('user_id,name,username,email,department,role,rbac_role,status').order('name').limit(2000),
-    ]);
-    if (rolesResult.error || permissionResult.error || usersResult.error) setNote(`失敗：${errorMessage(rolesResult.error || permissionResult.error || usersResult.error, '角色權限載入失敗')}`);
-    setRoles((rolesResult.data || []).filter(row => row.role_id !== 'mgmt_supervisor')); setPermissions(permissionResult.data || []); setUsers(usersResult.data || []); setBusy(false);
+    setBusy(true); setNote('');
+    try {
+      const client = getSupabase();
+      const [rolesResult, permissionResult, usersResult] = await Promise.all([
+        client.from('roles').select('role_id,name,sort_order').order('sort_order'),
+        client.from('role_permissions').select('role_id,permission:perm,allowed').limit(2000),
+        client.from('users').select('user_id,name,username,email,department,role,rbac_role,status').order('name').limit(2000),
+      ]);
+      if (rolesResult.error || permissionResult.error || usersResult.error) setNote(`失敗：${errorMessage(rolesResult.error || permissionResult.error || usersResult.error, '角色權限載入失敗')}`);
+      setRoles((rolesResult.data || []).filter(row => row.role_id !== 'mgmt_supervisor')); setPermissions(permissionResult.data || []); setUsers(usersResult.data || []);
+    } catch (error) { setNote(`失敗：${errorMessage(error, '角色權限載入失敗')}`); }
+    finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   const isAllowed = (role: string, permission: string) => role === 'sysadmin' || Boolean(permissions.find(row => row.role_id === role && row.permission === permission)?.allowed);

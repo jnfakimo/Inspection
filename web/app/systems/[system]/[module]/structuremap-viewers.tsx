@@ -69,6 +69,7 @@ function Floor2DViewer({ module, profile }: Props) {
   const [saving, setSaving] = useState(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
+  const osRef = useRef<any>(null);
   const overlayRef = useRef<Map<string, HTMLElement>>(new Map());
 
   useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
@@ -84,6 +85,7 @@ function Floor2DViewer({ module, profile }: Props) {
     (async () => {
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
+      osRef.current = OpenSeadragon;
       if (!viewerRef.current) {
         viewerRef.current = OpenSeadragon({
           element: hostRef.current, prefixUrl: '',
@@ -121,7 +123,11 @@ function Floor2DViewer({ module, profile }: Props) {
         el.title = `${marker.label ?? ''}（${MARKER_KIND[String(marker.kind)] || marker.kind}）`;
         el.onclick = event => { event.stopPropagation(); setSelected(marker); };
         try {
-          viewer.addOverlay({ element: el, location: new (window as any).OpenSeadragon.Point(Number(marker.x) || 0, Number(marker.y) || 0), placement: 'CENTER' });
+          // OpenSeadragon 是動態 import 的模組，不會掛在 window 上；Point 建構函式
+          // 從 import 結果取用，避免在未載入時以 (window as any).OpenSeadragon 建立覆蓋層。
+          const Point = osRef.current?.Point;
+          if (!Point) throw new Error('viewer 尚未就緒');
+          viewer.addOverlay({ element: el, location: new Point(Number(marker.x) || 0, Number(marker.y) || 0), placement: 'CENTER' });
           overlayRef.current.set(String(marker.marker_id), el);
         } catch { /* viewer 尚未就緒時略過，open 事件會再觸發一次 */ }
       }

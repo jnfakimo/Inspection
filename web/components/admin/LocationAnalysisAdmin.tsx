@@ -33,18 +33,21 @@ export function LocationAnalysisAdmin({ profile, module }: AdminProps) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const client = getSupabase();
-    const [i, r] = await Promise.all([
-      client.from('inspection_records')
-        .select('location_id,run_status,inspect_time,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
-        .not('location_id', 'is', null).limit(5000),
-      client.from('repair_requests')
-        .select('location_id,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
-        .not('location_id', 'is', null).limit(5000),
-    ]);
-    if (i.error || r.error) setNote(`失敗：${errorMessage(i.error || r.error, '位置分析資料載入失敗')}`);
-    setInspections(i.data || []); setRepairs(r.data || []);
-    setUpdatedAt(fmtTime(new Date().toISOString())); setBusy(false);
+    try {
+      const client = getSupabase();
+      const [i, r] = await Promise.all([
+        client.from('inspection_records')
+          .select('location_id,run_status,inspect_time,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
+          .not('location_id', 'is', null).limit(5000),
+        client.from('repair_requests')
+          .select('location_id,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
+          .not('location_id', 'is', null).limit(5000),
+      ]);
+      if (i.error || r.error) setNote(`失敗：${errorMessage(i.error || r.error, '位置分析資料載入失敗')}`);
+      setInspections(i.data || []); setRepairs(r.data || []);
+      setUpdatedAt(fmtTime(new Date().toISOString()));
+    } catch (error) { setNote(`失敗：${errorMessage(error, '位置分析資料載入失敗')}`); }
+    finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 

@@ -28,13 +28,15 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
   const [rows, setRows] = useState<Row[]>([]); const [points, setPoints] = useState<Point[]>([]); const [schedules, setSchedules] = useState<PatrolSchedule[]>([]); const [selected, setSelected] = useState(''); const [exportFrom, setExportFrom] = useState(today()); const [exportTo, setExportTo] = useState(today()); const [date, setDate] = useState(today()); const [floor, setFloor] = useState(''); const [shift, setShift] = useState(''); const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false); const [note, setNote] = useState('');
   const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult, floorResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), client.from('patrol_shifts').select('shift_id,name,start_time,end_time').eq('shift_date', date).order('sort_order').order('start_time'), client.from('floor_models').select('floor_id,name,level').limit(200)]); setRows(data.rows || []); setPoints(markerResult.data || []); setFloorModels(floorResult.data || []); setSchedules((scheduleResult.data || []).filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); } }, [client, date]);
   useEffect(() => { void load(); }, [load]);
-  const visibleRows = useMemo(() => rows.filter(row => (!floor || String(row.floor_id || '') === floor) && (!date || String(row.checkin_at || '').slice(0, 10) === date) && (!shift || !row.shift_type || String(row.shift_type) === shift) && (!status || status === 'ok')), [rows, floor, date, shift, status]);
+  // 打卡明細表只有已打卡的記錄，狀態篩選（待打卡／逾期）是給下方巡檢點矩陣用的；
+  // 若在此套用 status，選待打卡或逾期未打卡時明細表會恆空。
+  const visibleRows = useMemo(() => rows.filter(row => (!floor || String(row.floor_id || '') === floor) && (!date || String(row.checkin_at || '').slice(0, 10) === date) && (!shift || !row.shift_type || String(row.shift_type) === shift)), [rows, floor, date, shift]);
   // 樓層以 3D 建模系統的 floor_models 為單一來源，依 floorOrder 排序（B1 在 1F 之前）。
-  // 巡邏點若落在建模系統已經沒有的樓層，仍然列出並標示「未建模」——直接濾掉會讓
+  // 巡邏點若落在建模系統已經沒有的樓層，仍然列出並標示未建模——直接濾掉會讓
   // 現場的巡邏點無聲消失，看不出是資料有問題還是真的沒有點。
   const floors = useMemo(() => {
     const modelled = floorModels.map(item => String(item.floor_id));
-    const orphans = [...new Set(points.map(point => String(point.floor_id || '未分類')))]
+    const orphans = [...new Set(points.map(point => String(point.floor_id || '未分類')))
       .filter(value => !modelled.includes(value));
     return [...modelled, ...orphans].sort((a, b) => floorOrder(a) - floorOrder(b));
   }, [floorModels, points]);

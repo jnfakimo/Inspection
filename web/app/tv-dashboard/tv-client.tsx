@@ -6,7 +6,7 @@ import '../dashboard.css';
 
 type TvClientProps = { profile: Profile };
 
-export function TvClient({ profile }: TvClientProps) {
+export function TvClient({ profile: _profile }: TvClientProps) {
   const [time, setTime] = useState(new Date());
   
   useEffect(() => {

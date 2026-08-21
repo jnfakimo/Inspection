@@ -16,8 +16,12 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
   const [notices, setNotices] = useState<Row[]>([]), [busy, setBusy] = useState(true), [note, setNote] = useState(''), [tab, setTab] = useState<'all' | 'unread' | 'read'>('all'), [query, setQuery] = useState(''), [page, setPage] = useState(1);
   const load = useCallback(async (options: { preserveNote?: boolean } = {}) => {
     setBusy(true); if (!options.preserveNote) setNote('');
-    const { data, error } = await getSupabase().from('notifications').select('*').eq('recipient_id', profile.user_id).order('created_at', { ascending: false }).limit(1000);
-    if (error) setNote(`失敗：${errorMessage(error, '通知載入失敗')}`); setNotices(data || []); setBusy(false);
+    try {
+      const { data, error } = await getSupabase().from('notifications').select('*').eq('recipient_id', profile.user_id).order('created_at', { ascending: false }).limit(1000);
+      if (error) setNote(`失敗：${errorMessage(error, '通知載入失敗')}`);
+      setNotices(data || []);
+    } catch (error) { setNote(`失敗：${errorMessage(error, '通知載入失敗')}`); }
+    finally { setBusy(false); }
   }, [profile.user_id]);
   useEffect(() => {
     void load();
@@ -33,6 +37,8 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
   }), [notices, query, tab]);
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   useEffect(() => { setPage(1); }, [query, tab]);
+  const noticePages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  useEffect(() => { if (page > noticePages) setPage(noticePages); }, [page, noticePages]);
   const mark = async (notifId?: string) => {
     setBusy(true); setNote('');
     try {

@@ -39,13 +39,16 @@ export function CostsAdmin({ profile, module }: AdminProps) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const client = getSupabase();
-    const [c, e] = await Promise.all([
-      client.from('cost_records').select('*,equipment(name,asset_code)').order('cost_date', { ascending: false }).limit(2000),
-      client.from('equipment').select('equipment_id,asset_code,name,status').order('name').limit(2000),
-    ]);
-    if (c.error || e.error) setNote(`失敗：${errorMessage(c.error || e.error, '費用資料載入失敗')}`);
-    setRows(c.data || []); setEquipment(e.data || []); setBusy(false);
+    try {
+      const client = getSupabase();
+      const [c, e] = await Promise.all([
+        client.from('cost_records').select('*,equipment(name,asset_code)').order('cost_date', { ascending: false }).limit(2000),
+        client.from('equipment').select('equipment_id,asset_code,name,status').order('name').limit(2000),
+      ]);
+      if (c.error || e.error) setNote(`失敗：${errorMessage(c.error || e.error, '費用資料載入失敗')}`);
+      setRows(c.data || []); setEquipment(e.data || []);
+    } catch (error) { setNote(`失敗：${errorMessage(error, '費用資料載入失敗')}`); }
+    finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [equipmentFilter, typeFilter, from, to]);
@@ -58,6 +61,8 @@ export function CostsAdmin({ profile, module }: AdminProps) {
   }), [rows, equipmentFilter, typeFilter, from, to]);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const total = filtered.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const costPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => { if (page > costPages) setPage(costPages); }, [page, costPages]);
 
   // 排名以目前篩選結果計算，與明細表看到的數字一致。
   const ranking = useMemo(() => {
@@ -73,16 +78,21 @@ export function CostsAdmin({ profile, module }: AdminProps) {
   }, [filtered]);
 
   const submit = async () => {
-    const amount = Number(form.amount);
     if (!form.equipment_id) { setNote('失敗：請選擇設備'); return; }
     if (!form.cost_date) { setNote('失敗：請填寫日期'); return; }
+    // Number('') === 0，必須先擋空值再轉換，避免漏填金額時靜默建立 0 元記錄。
+    if (!String(form.amount).trim()) { setNote('失敗：請填寫金額'); return; }
+    const amount = Number(form.amount);
     if (!Number.isFinite(amount) || amount < 0) { setNote('失敗：請填寫有效金額'); return; }
     setBusy(true); setNote('');
-    try { await invokeAppApi('create_cost_record', {
-      equipment_id: form.equipment_id, cost_type: form.cost_type, vendor: form.vendor,
-      cost_date: form.cost_date, amount, note: form.note,
-    }); } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
-    setCreating(false); setForm(emptyForm()); await load(); setNote('費用記錄已新增');
+    try {
+      await invokeAppApi('create_cost_record', {
+        equipment_id: form.equipment_id, cost_type: form.cost_type, vendor: form.vendor,
+        cost_date: form.cost_date, amount, note: form.note,
+      });
+      setCreating(false); setForm(emptyForm()); await load(); setNote('費用記錄已新增');
+    } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
+    finally { setBusy(false); }
   };
 
   const exportXlsx = async () => {
@@ -165,7 +175,7 @@ export function CostsAdmin({ profile, module }: AdminProps) {
       <p className="inline-message">費用以設備為單位綁定，可據此彙總單一設備自購置到報廢的生命週期成本。</p>
     </section>
 
-    {creating && <AdminModal title="新增費用記錄" onClose={() => setCreating(false)}>
+    {creating && <AdminModal title="新增費用記錄" onClose={() => { setCreating(false); setForm(emptyForm()); }}>
       <div className="admin-form-grid">
         <label className="wide">設備（必填）<select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })}>
           <option value="">-- 請選擇 --</option>

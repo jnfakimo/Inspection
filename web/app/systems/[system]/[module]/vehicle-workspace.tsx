@@ -11,7 +11,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
-import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
@@ -454,7 +453,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
 
 /* ──────────────────── 公務車主檔快速管理彈窗 ──────────────────── */
 
-function VehicleMasterModal({ onClose }: { profile: Profile; onClose: () => void }) {
+function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; onClose: () => void }) {
   const [vehicles, setVehicles] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true);
   const [editing, setEditing] = useState<Row | null>(null);
@@ -533,7 +532,7 @@ function VehicleMasterModal({ onClose }: { profile: Profile; onClose: () => void
 
 /* ──────────────────────────── 表單與彈窗邏輯 ──────────────────────────── */
 
-function CreateRequestModal({ profile, onClose, onDone }: { profile: Profile; onClose: () => void; onDone: (message: string) => void }) {
+function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: Profile; onClose: () => void; onDone: (message: string) => void }) {
   const [form, setForm] = useState({
     trip_date: taipeiToday(), planned_departure_time: '09:00', planned_return_time: '12:00',
     origin_location: '第一果菜市場', destination_location: '', trip_purpose: '',

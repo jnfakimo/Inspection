@@ -27,5 +27,13 @@ create index if not exists idx_checkin_logs_time   on checkin_logs(checkin_at de
 alter table checkin_logs enable row level security;
 drop policy if exists "allow_all_for_now" on checkin_logs;
 drop policy if exists "authenticated_only" on checkin_logs;
-create policy "authenticated_only" on checkin_logs
-  for all to authenticated using (true) with check (true);
+-- 僅在沒有任何正式政策（已被 full_commercial_hardening / 後續 migration 收緊）時才建立開放政策，
+-- 避免重跑本檔重新打開權限。
+do $$
+declare policy_count int;
+begin
+  select count(*) into policy_count from pg_policies where schemaname='public' and tablename='checkin_logs';
+  if policy_count = 0 then
+    execute 'create policy "authenticated_only" on checkin_logs for all to authenticated using (true) with check (true)';
+  end if;
+end $$;

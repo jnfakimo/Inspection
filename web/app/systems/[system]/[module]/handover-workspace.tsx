@@ -26,7 +26,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
-import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
@@ -429,7 +428,7 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
 
 /* ──────────────────────────── 未結事項（案件） ──────────────────────────── */
 
-// 處理歷程存的是英文動作代碼（handover_case_action 與 log_handover_case_created
+<// 處理歷程存的是英文動作代碼（handover_case_action 與 log_handover_case_created
 // 寫入 create／assign／transfer／close／update／reopen），直接印出來畫面上就會出現
 // 英文。對照表的做法沿用稽核頁的 ACTION_LABELS。
 const CASE_LOG_ACTION_LABELS: Record<string, string> = {
@@ -437,7 +436,7 @@ const CASE_LOG_ACTION_LABELS: Record<string, string> = {
   close: '結案', update: '更新', reopen: '重新開啟',
 };
 
-function CasesModule({ module, profile }: Props) {
+function CasesModule({ module, profile: _profile }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
   const [departments, setDepartments] = useState<Row[]>([]);
@@ -598,7 +597,7 @@ function CasesModule({ module, profile }: Props) {
 
 /* ──────────────────────────── 案件附件 ──────────────────────────── */
 
-function CaseAttachments({ caseId, rows, profile, onOpen, onChanged, onError }: {
+function CaseAttachments({ caseId, rows, profile: _profile, onOpen, onChanged, onError }: {
   caseId: unknown; rows: Row[]; profile: Profile;
   onOpen: (row: Row) => void; onChanged: () => void; onError: (message: string) => void;
 }) {
@@ -624,7 +623,7 @@ function CaseAttachments({ caseId, rows, profile, onOpen, onChanged, onError }: 
           kind: 'add_attachment', case_id: caseId, file_name: file.name, file_type: file.type,
           file_size: file.size, storage_path: path,
         });
-      } catch (error) {
+      } catch {
         // 檔案已上傳但索引寫入失敗時把檔案收回，避免留下查不到的孤兒物件。
         await client.storage.from('handover-attachments').remove([path]);
         onError(`失敗：附件紀錄寫入失敗 ${file.name}`);
@@ -650,7 +649,7 @@ function CaseAttachments({ caseId, rows, profile, onOpen, onChanged, onError }: 
 
 /* ──────────────────────────── 新增案件 ──────────────────────────── */
 
-function CaseFormModal({ users, departments, profile, onClose, onDone }: {
+function CaseFormModal({ users, departments, profile: _profile, onClose, onDone }: {
   users: Row[]; departments: Row[]; profile: Profile; onClose: () => void; onDone: (message: string) => void;
 }) {
   const [form, setForm] = useState({
@@ -717,7 +716,7 @@ function CaseFormModal({ users, departments, profile, onClose, onDone }: {
           kind: 'add_attachment', case_id: caseId, file_name: file.name, file_type: file.type,
           file_size: file.size, storage_path: path,
         });
-      } catch (error) {
+      } catch {
         await client.storage.from('handover-attachments').remove([path]);
         attachmentWarning = `，但附件「${file.name}」紀錄寫入失敗`;
       }

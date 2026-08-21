@@ -332,7 +332,7 @@ const SPECS: Record<string, Spec> = {
 
 /* ──────────────────────────── 共用引擎 ──────────────────────────── */
 
-export function EquipmentWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
+export function EquipmentWorkspace({ system: _system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   const spec = SPECS[module.key];
   return <AuthGate>{profile => spec
     ? <EntityWorkspace spec={spec} module={module} profile={profile} />

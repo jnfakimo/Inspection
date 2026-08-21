@@ -46,7 +46,7 @@ const EXPLODE_MIN = 1, EXPLODE_MAX = 20, EXPLODE_STEP = 0.5, EXPLODE_DEFAULT = 6
 const GAP_PER_STEP = 1.6 / EXPLODE_DEFAULT;   // 6× ↔ FloorStack3D 原本的預設間距 1.6
 const METERS_PER_UNIT = 22;                   // V1 的 ±220 m ↔ 場景的 ±10 單位
 
-export function Floor3DBoardModule({ profile }: Props) {
+export function Floor3DBoardModule({ profile: _profile }: Props) {
   const [models, setModels] = useState<FloorModel[]>([]);
   const [markers, setMarkers] = useState<MarkerRow[]>([]);
   const [patrolStatus, setPatrolStatus] = useState<Map<string, PatrolState>>(new Map());

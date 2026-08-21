@@ -21,26 +21,33 @@ export function CyclesAdmin({ profile, module }: AdminProps) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const client = getSupabase();
-    const [c, u] = await Promise.all([
-      client.from('inspection_cycles').select('*').order('started_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name').limit(2000),
-    ]);
-    if (c.error) setNote(`失敗：${errorMessage(c.error, '巡檢週期載入失敗')}`);
-    setRows(c.data || []); setUsers(u.data || []); setBusy(false);
+    try {
+      const client = getSupabase();
+      const [c, u] = await Promise.all([
+        client.from('inspection_cycles').select('*').order('started_at', { ascending: false }).limit(500),
+        client.from('users').select('user_id,name').limit(2000),
+      ]);
+      if (c.error) setNote(`失敗：${errorMessage(c.error, '巡檢週期載入失敗')}`);
+      setRows(c.data || []); setUsers(u.data || []);
+    } catch (error) { setNote(`失敗：${errorMessage(error, '巡檢週期載入失敗')}`); }
+    finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
 
   const nameOf = (id: unknown) => users.find(user => user.user_id === id)?.name || (id ? String(id) : '—');
   const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const running = rows.find(row => !row.ended_at);
+  const cyclePages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  useEffect(() => { if (page > cyclePages) setPage(cyclePages); }, [page, cyclePages]);
 
   const createCycle = async () => {
     if (!window.confirm('確定要開啟新巡檢週期？所有設備將重置為未巡檢（紅燈）。')) return;
     setBusy(true); setNote('');
-    try { await invokeAppApi('open_inspection_cycle', { cycle_type: cycleType }); }
-    catch (error) { setNote(`失敗：${errorMessage(error, '開啟巡檢週期失敗')}`); setBusy(false); return; }
-    await load(); setNote('新巡檢週期已開啟，所有設備已重置為未巡檢');
+    try {
+      await invokeAppApi('open_inspection_cycle', { cycle_type: cycleType });
+      await load(); setNote('新巡檢週期已開啟，所有設備已重置為未巡檢');
+    } catch (error) { setNote(`失敗：${errorMessage(error, '開啟巡檢週期失敗')}`); }
+    finally { setBusy(false); }
   };
 
   return <AppShell profile={profile} title={module.title}>

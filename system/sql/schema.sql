@@ -120,10 +120,14 @@ alter table inspection_cycles   enable row level security;
 
 -- Bootstrap access is restricted to signed-in users and remains idempotent.
 -- full_commercial_hardening.sql replaces these temporary policies with row-scoped rules.
-do $$ declare t text; begin
+-- 若該表已有其它正式政策（已被收緊），重跑本檔不會重新建立開放政策。
+do $$ declare t text; policy_count int; begin
   foreach t in array array['users','equipment','inspection_records','repair_requests','maintenance_orders','cost_records','audit_logs','inspection_cycles'] loop
     execute format('drop policy if exists allow_all_for_now on public.%I',t);
-    execute format('create policy allow_all_for_now on public.%I for all to authenticated using (true) with check (true)',t);
+    select count(*) into policy_count from pg_policies where schemaname='public' and tablename=t;
+    if policy_count = 0 then
+      execute format('create policy allow_all_for_now on public.%I for all to authenticated using (true) with check (true)',t);
+    end if;
   end loop;
 end $$;
 

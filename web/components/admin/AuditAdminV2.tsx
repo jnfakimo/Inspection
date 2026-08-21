@@ -74,35 +74,39 @@ export function AuditAdminV2({ profile, module }: AdminProps) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    if (from && to && from > to) {
-      setLogs([]); setTotal(0); setBusy(false);
-      setNote('失敗：日期區間錯誤，起始日期不可晚於結束日期');
-      return;
-    }
-    const offset = (page - 1) * PAGE_SIZE;
-    let request = getSupabase().from('audit_logs')
-      .select('*,users(name,username,email,department,role,rbac_role)', { count: 'exact' })
-      .order('operated_at', { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
-    if (resource) request = request.eq('table_name', resource);
-    if (action) request = EVENT_ACTIONS.has(action) ? request.contains('changes', { event_type: action }) : request.eq('action', action);
-    if (from) request = request.gte('operated_at', `${from}T00:00:00+08:00`);
-    if (to) request = request.lte('operated_at', `${to}T23:59:59.999+08:00`);
-    const term = query.trim().replace(/[%_,()*]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (term) request = request.or(`table_name.ilike.%${term}%,action.ilike.%${term}%,record_id.ilike.%${term}%,source.ilike.%${term}%`);
-    const { data, error, count } = await request;
-    if (error) {
-      setLogs([]); setTotal(0); setBusy(false);
-      setNote(`失敗：${errorMessage(error, '稽核紀錄載入失敗')}`);
-      return;
-    }
-    const nextTotal = count || 0;
-    const pages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE));
-    if (page > pages) {
-      setPage(pages); setBusy(false);
-      return;
-    }
-    setLogs(data || []); setTotal(nextTotal); setBusy(false);
+    try {
+      if (from && to && from > to) {
+        setLogs([]); setTotal(0);
+        setNote('失敗：日期區間錯誤，起始日期不可晚於結束日期');
+        return;
+      }
+      const offset = (page - 1) * PAGE_SIZE;
+      let request = getSupabase().from('audit_logs')
+        .select('*,users(name,username,email,department,role,rbac_role)', { count: 'exact' })
+        .order('operated_at', { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+      if (resource) request = request.eq('table_name', resource);
+      if (action) request = EVENT_ACTIONS.has(action) ? request.contains('changes', { event_type: action }) : request.eq('action', action);
+      if (from) request = request.gte('operated_at', `${from}T00:00:00+08:00`);
+      if (to) request = request.lte('operated_at', `${to}T23:59:59.999+08:00`);
+      const term = query.trim().replace(/[%_,()*]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (term) request = request.or(`table_name.ilike.%${term}%,action.ilike.%${term}%,record_id.ilike.%${term}%,source.ilike.%${term}%`);
+      const { data, error, count } = await request;
+      if (error) {
+        setLogs([]); setTotal(0);
+        setNote(`失敗：${errorMessage(error, '稽核紀錄載入失敗')}`);
+        return;
+      }
+      const nextTotal = count || 0;
+      const pages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE));
+      if (page > pages) {
+        // 頁碼越界時清空舊資料，避免短暫顯示上一篩選條件的紀錄。
+        setLogs([]); setTotal(0); setPage(pages);
+        return;
+      }
+      setLogs(data || []); setTotal(nextTotal);
+    } catch (error) { setLogs([]); setTotal(0); setNote(`失敗：${errorMessage(error, '稽核紀錄載入失敗')}`); }
+    finally { setBusy(false); }
   }, [action, from, page, query, resource, to]);
 
   useEffect(() => { void load(); }, [load]);

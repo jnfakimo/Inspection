@@ -13,7 +13,7 @@
 // 寫入統一走 app-api 的 area_save（後端驗證 sys_structuremap 權限、依欄位白名單清洗、
 // 檢查空間是否被整合標記系統使用，並寫入稽核）；讀取仍直接走資料表。
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@/app/admin-workspace.css';
 import './v1-listpage.css';
 import './structuremap-arealist.css';
@@ -131,7 +131,7 @@ export function AreaListModule({ module, profile }: Props) {
   const [query, setQuery] = useState('');
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [collapsedReady, setCollapsedReady] = useState(false);
+  const collapsedReadyRef = useRef(false);
   const [floorPages, setFloorPages] = useState<Map<string, number>>(new Map());
 
   const [editor, setEditor] = useState<{ id: string | null; floor: string; name: string; message: string } | null>(null);
@@ -184,12 +184,12 @@ export function AreaListModule({ module, profile }: Props) {
     setUsedSpaces(used);
     setSpaceMarker(markers);
     setLastCheckin(checkins);
-    if (!collapsedReady) {
+    if (!collapsedReadyRef.current) {
       setCollapsed(new Set(spaces.map(row => row.floor)));
-      setCollapsedReady(true);
+      collapsedReadyRef.current = true;
     }
     setBusy(false);
-  }, [collapsedReady, notify]);
+  }, [notify]);
   useEffect(() => { void load(); }, [load]);
 
   const isSpaceUsed = useCallback((id: string) => usedSpaces.has(id), [usedSpaces]);

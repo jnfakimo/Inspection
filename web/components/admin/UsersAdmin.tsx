@@ -11,14 +11,18 @@ export function UsersAdmin({ profile, module }: AdminProps) {
   const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [query, setQuery] = useState(''), [status, setStatus] = useState('active'), [page, setPage] = useState(1);
   const [editor, setEditor] = useState<Row | null>(null), [passwordUser, setPasswordUser] = useState<Row | null>(null), [password, setPassword] = useState(''), [password2, setPassword2] = useState('');
   const load = useCallback(async () => {
-    setBusy(true); setNote(''); const client = getSupabase();
-    const [u, r, d] = await Promise.all([
-      client.from('users').select('user_id,auth_id,username,email,name,phone,department,dept_id,role,rbac_role,status,created_at').order('name').limit(2000),
-      client.from('roles').select('role_id,name,sort_order').order('sort_order'),
-      client.from('departments').select('dept_id,parent_id,name,code,level,status,sort_order').order('sort_order'),
-    ]);
-    if (u.error || r.error || d.error) setNote(`失敗：${errorMessage(u.error || r.error || d.error, '人員主檔載入失敗')}`);
-    setUsers(u.data || []); setRoles((r.data || []).filter(row => row.role_id !== 'mgmt_supervisor')); setDepartments(d.data || []); setBusy(false);
+    setBusy(true); setNote('');
+    try {
+      const client = getSupabase();
+      const [u, r, d] = await Promise.all([
+        client.from('users').select('user_id,auth_id,username,email,name,phone,department,dept_id,role,rbac_role,status,created_at').order('name').limit(2000),
+        client.from('roles').select('role_id,name,sort_order').order('sort_order'),
+        client.from('departments').select('dept_id,parent_id,name,code,level,status,sort_order').order('sort_order'),
+      ]);
+      if (u.error || r.error || d.error) setNote(`失敗：${errorMessage(u.error || r.error || d.error, '人員主檔載入失敗')}`);
+      setUsers(u.data || []); setRoles((r.data || []).filter(row => row.role_id !== 'mgmt_supervisor')); setDepartments(d.data || []);
+    } catch (error) { setNote(`失敗：${errorMessage(error, '人員主檔載入失敗')}`); }
+    finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   const deptName = useCallback((id: unknown) => departments.find(row => row.dept_id === id)?.name || '—', [departments]);
@@ -28,6 +32,8 @@ export function UsersAdmin({ profile, module }: AdminProps) {
   }), [users, query, status, deptName]);
   useEffect(() => setPage(1), [query, status]);
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const userPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => { if (page > userPages) setPage(userPages); }, [page, userPages]);
   const run = async (payload: AdminAction, success: string) => {
     setBusy(true); setNote('');
     try { await invokeAdminApi(payload.action, payload); setEditor(null); setPasswordUser(null); setPassword(''); setPassword2(''); await load(); setNote(success); }
@@ -46,6 +52,6 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       {!busy && rows.length === 0 && <p className="empty">查無符合條件的人員</p>}<Pager page={page} total={filtered.length} onPage={setPage}/>
     </section>
     {editor && <AdminModal title={editor.user_id ? '編輯人員帳號' : '新增人員帳號'} onClose={() => setEditor(null)}><div className="admin-form-grid"><label>姓名（必填）<input value={editor.name || ''} onChange={event => setEditor({ ...editor, name: event.target.value })}/></label><label>登入帳號（必填）<input value={editor.username || ''} onChange={event => setEditor({ ...editor, username: event.target.value })}/></label><label>電子郵件（{editor.user_id ? '唯讀' : '必填'}）<input type="email" readOnly={Boolean(editor.user_id)} value={editor.email || ''} onChange={event => setEditor({ ...editor, email: event.target.value })}/></label><label>聯絡電話<input value={editor.phone || ''} onChange={event => setEditor({ ...editor, phone: event.target.value })}/></label><label>所屬單位<select value={editor.dept_id || ''} onChange={event => setEditor({ ...editor, dept_id: event.target.value || null })}><option value="">-- 未指定 --</option>{departments.filter(dept => dept.status === 'active').map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select></label><label>系統角色<select value={editor.rbac_role || 'reporter'} disabled={editor.user_id === profile.user_id} onChange={event => setEditor({ ...editor, rbac_role: event.target.value })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select>{editor.user_id === profile.user_id && <small>為避免中斷管理權限，不可變更自己的角色</small>}</label>{!editor.user_id && <label className="wide">初始密碼（至少 8 個字元）<input type="password" value={editor.password || ''} onChange={event => setEditor({ ...editor, password: event.target.value })}/></label>}</div><footer><button className="secondary-btn" onClick={() => setEditor(null)}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => void saveUser()}>{busy ? '儲存中…' : '儲存'}</button></footer></AdminModal>}
-    {passwordUser && <AdminModal title={`重設密碼｜${passwordUser.name}`} onClose={() => setPasswordUser(null)}><div className="admin-form-grid"><label className="wide">新密碼（至少 8 個字元）<input type="password" value={password} onChange={event => setPassword(event.target.value)}/></label><label className="wide">再次輸入新密碼<input type="password" value={password2} onChange={event => setPassword2(event.target.value)}/></label></div><footer><button className="secondary-btn" onClick={() => setPasswordUser(null)}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => { if (password.length < 8) { setNote('失敗：密碼至少 8 個字元'); return; } if (password !== password2) { setNote('失敗：兩次密碼不一致'); return; } void run({ action: 'admin_reset_password', user_id: passwordUser.user_id, password }, '密碼已重設'); }}>確認重設</button></footer></AdminModal>}
+    {passwordUser && <AdminModal title={`重設密碼｜${passwordUser.name}`} onClose={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}><div className="admin-form-grid"><label className="wide">新密碼（至少 8 個字元）<input type="password" value={password} onChange={event => setPassword(event.target.value)}/></label><label className="wide">再次輸入新密碼<input type="password" value={password2} onChange={event => setPassword2(event.target.value)}/></label></div><footer><button className="secondary-btn" onClick={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => { if (password.length < 8) { setNote('失敗：密碼至少 8 個字元'); return; } if (password !== password2) { setNote('失敗：兩次密碼不一致'); return; } void run({ action: 'admin_reset_password', user_id: passwordUser.user_id, password }, '密碼已重設'); }}>確認重設</button></footer></AdminModal>}
   </AppShell>;
 }

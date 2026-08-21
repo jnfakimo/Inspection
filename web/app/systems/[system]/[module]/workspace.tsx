@@ -156,9 +156,9 @@ function RequestFilterCell({ column, statusFilter, columnFilters, columnFilterOp
   const update = (value: string) => setColumnFilters((current: Record<string, string>) => ({ ...current, [column.key]: value }));
 
   if (column.key === 'created_at' || column.key === 'desired_finish') {
-    // 原本是自己在 text／date 之間切換 type 的土炮寫法，一旦切成 date 且值為空，
-    // 瀏覽器就會蓋上自己的格式提示，在繁中環境顯示成「yyyy/月/dd」這種中英混雜。
-    // 一律改用 LocalizedDateInput：空值顯示「年/月/日」，聚焦才開原生日曆。
+    // 文本框自己在 text／date 之間切換 type 的寫法不一致——空值時用 date 且值為空，
+    // 瀏覽器就會馬上自己跳出日曆或提示，在繁中環境顯示成「yyyy/mm/dd」這種中英混雜。
+    // 一律改用 LocalizedDateInput：空值顯示「年/月/日」，聚焦後才切換原生日曆選擇器
     return <th><LocalizedDateInput className='request-filter-date' value={columnFilters[column.key] || ''}
       onChange={(event: ChangeEvent<HTMLInputElement>) => update(event.target.value)}
       aria-label={column.key === 'created_at' ? '依報修時間篩選' : '依希望完成日期篩選'} /></th>;
@@ -207,6 +207,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState('');
     const detailRequestSeq = useRef(0);
+    const dataKeyRef = useRef('');
     const [syncing, setSyncing] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -403,21 +404,40 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     };
 
     const load = useCallback(async () => {
+      const key = `${system.key}/${module.key}`;
+      if (dataKeyRef.current !== key) {
+        dataKeyRef.current = key;
+        detailRequestSeq.current += 1;
+        setData(null);
+        setSelectedRow(null);
+        setRepairDetail(null);
+        setDetailError('');
+        setDetailLoading(false);
+        setShowDispatchForm(false);
+        setShowCompletionForm(false);
+        setDispatchMessage('');
+        setQuery('');
+        setStatusFilter('');
+        setColumnFilters({});
+        setPage(1);
+      }
       setSyncing(true);
       setError('');
       try {
         if (isRepairTableModule) {
           const workorderData = await invokeAppApi<Omit<ModuleData, 'columns'>>('workorder_list', { module: module.key });
+          if (dataKeyRef.current !== key) return;
           const repairRows = workorderData.rows || [];
           setData({ ...workorderData, columns: isDispatchModule ? DISPATCH_COLUMNS : isOrdersModule ? ORDER_COLUMNS : REQUEST_COLUMNS, rows: repairRows });
         } else {
           const moduleData = await invokeAppApi<ModuleData>('module_data', { system: system.key, module: module.key });
+          if (dataKeyRef.current !== key) return;
           setData(moduleData);
         }
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : '資料讀取失敗');
+        if (dataKeyRef.current === key) setError(caught instanceof Error ? caught.message : '資料讀取失敗');
       } finally {
-        setSyncing(false);
+        if (dataKeyRef.current === key) setSyncing(false);
       }
     }, [isDispatchModule, isOrdersModule, isRepairTableModule, module.key, system.key]);
 
@@ -713,15 +733,15 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               <div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowCompletionForm(false)}>取消</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '送出中…' : '送出完工'}</button></div>
             </form> : <div className="dispatch-detail-actions">
               {(!detailOrder || ['pending', 'transferred', 'returned', 'rejected'].includes(detailStatus)) && canDispatch && !['closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-assign-button" onClick={startDispatch}>{detailOrder ? '主管派工' : detailStatus === 'pending' ? '主管派工' : '建立／補建派工'}</button>}
-              {detailStatus === 'assigned' && detailOrderStatus === 'assigned' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void runRepairWorkflow(detailRequest, 'engineer_accept', 'assigned')}>工程師接單</button>}
-              {detailStatus === 'assigned' && detailOrderStatus === 'accepted' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={() => void runRepairWorkflow(detailRequest, 'engineer_start', 'in_progress')}>開始維修</button>}
-              {/* 完工的前置條件是「報修單與工單都在維修中」（apply_repair_workflow 的
-                  engineer_complete 分支）。這裡原本只看報修單狀態，於是工單停在
-                  accepted／waiting_vendor 時按鈕照樣出現，按下去必定失敗並回一句
-                  「案件尚未進入維修中」——按鈕給按卻永遠不可能成功。 */}
+              {detailStatus === 'assigned' && detailOrderStatus === 'assigned' && canEngineerAct && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void runRepairWorkflow(detailRequest, 'engineer_accept', 'assigned')}>工程師接單</button>}
+              {detailStatus === 'assigned' && detailOrderStatus === 'accepted' && canEngineerAct && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void runRepairWorkflow(detailRequest, 'engineer_start', 'in_progress')}>開始維修</button>}
+              {/* 完工按鈕配置：報修單與工單都在維修中時才允許 engineer_complete（對應
+                  apply_repair_workflow 的分支）。這裡原本只要報修是維修中就顯示工單按鈕，在
+                  accepted／waiting_vendor 等狀態下照樣顯示，會造成流程卡死並誤導
+                  以為可「完工」——實際後端永遠不會放行 */}
               {detailStatus === 'in_progress' && detailOrderStatus === 'in_progress' && canEngineerAct && <button type="button" className="dispatch-step-button" onClick={openCompletionForm}>完工回報</button>}
               {detailStatus === 'in_progress' && detailOrderStatus !== 'in_progress' && Boolean(detailOrder) && canEngineerAct && <p className="workflow-waiting">
-                工單目前是「{repairTimelineStatusLabel(detailOrderStatus)}」，尚未進入維修中，還不能回報完工。
+                工單仍處於「{repairTimelineStatusLabel(detailOrderStatus)}」階段尚未進入維修中，請先完成接單與開始維修
               </p>}
               {detailStatus === 'pending_review' && canReporterAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptByReporter()}>報修人驗收通過</button>}
               {detailStatus === 'completed' && canSupervisorAccept && <button type="button" className="dispatch-step-button" disabled={dispatchSaving} onClick={() => void acceptBySupervisor()}>主管驗收並結案</button>}
@@ -732,7 +752,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               {detailStatus === 'pending_review' && !canReporterAccept && <p className="workflow-waiting">等待原報修人驗收。</p>}
               {detailStatus === 'completed' && !canSupervisorAccept && <p className="workflow-waiting">報修人已驗收，等待主管最終驗收。</p>}
               {detailStatus === 'closed' && <p className="workflow-finished">主管驗收完成，案件已結案。</p>}
-              {canDispatch && !['pending_review', 'completed', 'closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-cancel-button" onClick={() => void runRepairWorkflow(detailRequest, 'cancel', 'cancelled')}>取消案件</button>}
+              {canDispatch && !['pending_review', 'completed', 'closed', 'cancelled'].includes(detailStatus) && <button type="button" className="dispatch-cancel-button" disabled={dispatchSaving} onClick={() => void runRepairWorkflow(detailRequest, 'cancel', 'cancelled')}>取消案件</button>}
             </div>}
             {dispatchMessage && <p className="dispatch-detail-message" role="alert">{dispatchMessage}</p>}
           </section>}

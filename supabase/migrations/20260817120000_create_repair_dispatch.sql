@@ -114,6 +114,15 @@ begin
     (request_id, order_id, from_status, to_status, note, operator_id, operator_name)
   values (p_request_id, v_order.order_id, v_from, 'assigned', v_note, v_actor, v_actor_nm);
 
+  -- 站內通知技師：前端直接 insert notifications 的權限已撤銷（backend_security_state_machine），
+  -- 改由本函式在交易內以 security definer 寫入，與建單、歷程一起成功或一起回滾。
+  if p_assignee_id is not null then
+    insert into public.notifications (recipient_id, event, title, body, request_id, order_id)
+    values (p_assignee_id, 'dispatch', '新派工通知',
+      coalesce(v_req.req_no, '') || '｜' || coalesce(v_req.fault_type, '設備') || '｜' || coalesce(v_req.fault_desc, ''),
+      p_request_id, v_order.order_id);
+  end if;
+
   return v_order;
 end;
 $$;

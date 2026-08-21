@@ -101,14 +101,24 @@ function Pilot({ profile }: { profile: Profile }) {
 
   async function syncToSupabase(record: HandoverRecord): Promise<{ ok: boolean; error?: string }> {
     if (!online) return { ok: false, error: '目前離線' };
+    const isAdmin = profile.rbac_role === 'sysadmin' || profile.role === 'admin';
+    const reviewed = record.status === 'reviewed';
     const payload: Record<string, unknown> = {
       record_date: record.record_date, shift_code: record.shift_code,
-      shift_start: record.shift_start, shift_end: record.shift_end, handover_by: null,
+      shift_start: record.shift_start, shift_end: record.shift_end,
+      handover_by: String(record.handover_by || '').trim() || null,
       instruction: record.instruction, items: record.items, notes: record.notes,
-      supervisor_note: record.supervisor_note, reviewed_at: record.status === 'reviewed' ? record.updated_at : null,
-      attachments: record.attachments, status: record.status, updated_at: record.updated_at,
+      attachments: record.attachments,
+      status: !isAdmin && reviewed ? 'submitted' : record.status,
+      updated_at: record.updated_at,
     };
-    if (!record.record_id.startsWith('seed-') && !record.record_id.startsWith('local-')) payload.record_id = record.record_id;
+    // 主管批示欄位（status=reviewed／reviewed_at／supervisor_note）只有管理員能由後端寫入；
+    // 非管理員即使在本機存了批示，雲端也以 submitted 送出，避免 403 或雲端悄悄漏寫造成「已同步」誤導。
+    // record_id 由後端以 (record_date, shift_code) 定位既有列，前端不回傳。
+    if (isAdmin) {
+      payload.supervisor_note = record.supervisor_note;
+      payload.reviewed_at = reviewed ? record.updated_at : null;
+    }
     try {
       await invokeAppApi('field_pilot_save', { payload });
       return { ok: true };
@@ -138,7 +148,8 @@ function Pilot({ profile }: { profile: Profile }) {
     const saved = next.find(row => row.record_id === current.record_id);
     if (saved) {
       const result = await syncToSupabase(saved);
-      setMessage(result.ok ? '主管批示已同步 Supabase' : `本機已儲存；雲端尚未同步：${result.error}`);
+      const isAdmin = profile.rbac_role === 'sysadmin' || profile.role === 'admin';
+      setMessage(result.ok ? (isAdmin ? '主管批示已同步 Supabase' : '批示已存於本機；雲端以送出狀態同步（主管批示需管理員帳號）') : `本機已儲存；雲端尚未同步：${result.error}`);
     }
   }
 

@@ -103,7 +103,8 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
 
   const actions = allowedActions(profile.allowed_systems);
   async function logout() {
-    await getSupabase().auth.signOut({ scope: 'local' });
+    try { await getSupabase().auth.signOut({ scope: 'local' }); }
+    catch (error) { console.warn('logout failed:', error); }
     location.replace('/Inspection/v2/login/');
   }
   function toggleTheme() {
@@ -119,10 +120,12 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     const confirm = String(form.get('confirm') || '');
     if (password.length < 8) return setPasswordMessage('密碼至少需要 8 個字元');
     if (password !== confirm) return setPasswordMessage('兩次輸入的密碼不一致');
-    const { error } = await getSupabase().auth.updateUser({ password });
-    if (error) return setPasswordMessage('密碼更新失敗，請確認密碼格式後再試');
-    setPasswordMessage('密碼已更改');
-    event.currentTarget.reset();
+    try {
+      const { error } = await getSupabase().auth.updateUser({ password });
+      if (error) return setPasswordMessage('密碼更新失敗，請確認密碼格式後再試');
+      setPasswordMessage('密碼已更改');
+      event.currentTarget.reset();
+    } catch (error) { setPasswordMessage(error instanceof Error ? error.message : '密碼更新失敗，請檢查網路後重試'); }
   }
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -214,7 +217,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
           <section className="profile-section google-calendar-section">
             <div className="profile-section-title"><span>02</span><div><b>Google 個人行事曆</b><small>只連結目前登入者自己的 Google 帳號</small></div></div>
             <div className={`google-connection-card${calendarStatus?.connected ? ' is-connected' : ''}`}>
-              <div className="google-calendar-mark">G</div><div><b>{calendarStatus?.connected ? '已連結' : calendarStatus?.status === 'error' ? '需要重新連結' : '尚未連結'}</b><span>{calendarStatus?.connected ? calendarStatus.google_email : calendarStatus?.status === 'error' ? 'Google 授權已失效，請重新完成帳號授權' : '連結後可將本人會議室預約同步到個人行事曆'}</span>{calendarStatus?.last_sync_at && <small>最後同步：{new Date(calendarStatus.last_sync_at).toLocaleString('zh-TW')}</small>}</div>
+              <div className="google-calendar-mark">G</div><div><b>{calendarStatus?.connected ? '已連結' : calendarStatus?.status === 'error' ? '需要重新連結' : '尚未連結'}</b><span>{calendarStatus?.connected ? calendarStatus.google_email : calendarStatus?.status === 'error' ? 'Google 授權已失效，請重新完成帳號授權' : '連結後可將本人會議室預約同步到個人行事曆'}</span>{calendarStatus?.last_sync_at && <small>最後同步：{Number.isNaN(new Date(calendarStatus.last_sync_at).getTime()) ? '—' : new Date(calendarStatus.last_sync_at).toLocaleString('zh-TW')}</small>}</div>
               {calendarStatus?.connected ? <button type="button" onClick={disconnectGoogle} disabled={profileBusy}>解除連結</button> : <button type="button" className="primary-btn compact" onClick={connectGoogle} disabled={profileBusy}>連結 Google 帳號</button>}
             </div>
             <p className="google-policy-links">連結即表示您已閱讀並同意 <a href="/Inspection/v2/privacy/" target="_blank" rel="noreferrer">隱私權政策</a> 與 <a href="/Inspection/v2/terms/" target="_blank" rel="noreferrer">服務條款</a>。</p>

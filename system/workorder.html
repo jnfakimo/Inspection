@@ -996,9 +996,6 @@ async function doDispatch(reqId){
     p_need_shutdown:document.getElementById('x-shut').value==='true',
     p_need_approval:document.getElementById('x-appr').value==='true'});
   if(error||!data){toast('派工失敗：'+translateError(error?.message||'未取得工單資料'),true);return;}
-  // 站內通知技師（§九）
-  if(tech){ try{ await db.from('notifications').insert({recipient_id:tech,event:'dispatch',title:'新派工通知',
-    body:`${r.req_no||''}｜${r.equipment?.name||'設備'}｜${r.fault_desc||''}`,request_id:reqId,order_id:data.order_id}); }catch(e){} }
   await refreshAndReopen(reqId); toast('已派工');
   }finally{
     dispatchSubmitting=false;

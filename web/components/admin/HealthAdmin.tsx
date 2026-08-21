@@ -80,10 +80,13 @@ export function HealthAdmin({ profile, module }: AdminProps) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const { data, error } = await getSupabase().from('client_error_logs')
-      .select('*,users(name,username)').order('occurred_at', { ascending: false }).limit(1000);
-    if (error) setNote(`失敗：${errorMessage(error, '系統健康紀錄載入失敗')}`);
-    setRows(data || []); setBusy(false);
+    try {
+      const { data, error } = await getSupabase().from('client_error_logs')
+        .select('*,users(name,username)').order('occurred_at', { ascending: false }).limit(1000);
+      if (error) setNote(`失敗：${errorMessage(error, '系統健康紀錄載入失敗')}`);
+      setRows(data || []);
+    } catch (error) { setNote(`失敗：${errorMessage(error, '系統健康紀錄載入失敗')}`); }
+    finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [kind, query, days]);
