@@ -1,4 +1,11 @@
-.admin-page-actions{align-items:flex-start}.admin-page-actions>div:last-child,.admin-row-actions,.admin-layout-actions>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.admin-page-actions p{margin:0 0 6px}.admin-panel{padding:24px}.admin-panel table{width:100%;border-collapse:collapse}.admin-panel th,.admin-panel td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.admin-panel th{color:var(--muted);font-size:.82rem}.admin-panel td small,.admin-panel td strong{display:block}.admin-panel td small{margin-top:4px;color:var(--muted)}
+.admin-page-actions{align-items:flex-start}.admin-page-actions>div:last-child,.admin-row-actions,.admin-layout-actions>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.admin-page-actions p{margin:0 0 6px}.admin-panel{padding:24px}.admin-panel table{width:100%;border-collapse:collapse}.admin-panel th,.admin-panel td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}.admin-panel th{color:var(--muted);font-size:.82rem}.admin-panel td small,.admin-panel td strong{display:block}
+/* 表格裡不該被折行的欄位：日期、部門、數量、狀態與操作按鈕。標成 nowrap 之後，
+   剩餘寬度由沒有標記的欄（例如交接紀錄的「事項摘要」）吸收。
+   .admin-row-actions 本身是 flex-wrap:wrap，按鈕文字仍可能直排，一併鎖住。 */
+.admin-panel th.nowrap,.admin-panel td.nowrap{white-space:nowrap}
+.admin-panel th.center,.admin-panel td.center{text-align:center}
+.admin-panel td.nowrap .admin-row-actions{flex-wrap:nowrap}
+.admin-panel td.nowrap .admin-row-actions button{white-space:nowrap}.admin-panel td small{margin-top:4px;color:var(--muted)}
 .admin-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}.admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}.admin-toolbar>input{min-width:min(420px,100%);flex:1}.admin-toolbar>span{color:var(--muted);font-size:.88rem}
 /* LocalizedDateInput 的外層 span 帶著 inline width:100%（其他頁面都包在 <label>
    裡所以看不出來）。它若直接放進 .admin-toolbar 這個 flex 容器，會要求整列寬度，
