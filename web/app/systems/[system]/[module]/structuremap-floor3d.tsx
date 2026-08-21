@@ -170,8 +170,8 @@ export function Floor3DBoardModule({ profile }: Props) {
       </nav>
       <span className="tb-space" />
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
-      {/* 後台原本另外掛一個指向 V1 admin.html 的連結，共用導覽已含 V2 的後台，不再重複。 */}
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
+      <a className="tb-back" href="/Inspection/v2/systems/guardpatrol/map3d/">立體巡檢雲臺</a>
     </div>
 
     <div className="f3-stage">

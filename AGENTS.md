@@ -250,7 +250,15 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
   其餘塗黑。**不要用 material.color 相乘或 CSS filter** ——圖檔若是不透明白底，
   整片平面會一起變黑。
 - **OpenSeadragon 的縮圖顏色只能由選項給**（`navigatorBackground` 等），OSD 在建構時
-  寫成行內樣式，CSS 蓋不掉。值一律讀主題 token，不要寫死。
+  寫成行內樣式，CSS 蓋不掉。值一律讀主題 token，不要寫死。切換主題時要自己補寫一次
+  行內樣式，選項只在建構當下生效。
+- **凡是在「建場景／開圖當下」讀 `data-theme` 決定顏色的，都必須監看該屬性並重建**。
+  three.js 的 `scene.background`、樓層板與邊線顏色、貼圖黑線重畫，OSD 的線稿重畫都屬
+  此類：只讀一次的話，切換主題後畫面會停在舊主題直到重新整理。作法見
+  `floor-stack-3d.tsx` 與 `structuremap-viewers.tsx` 的 `MutationObserver`，並把
+  theme 列入該 effect 的相依。
+  這個缺口 2026-08-21 之前一直存在，只是全螢幕工具頁沒有主題切換入口、切不了也就
+  看不出來；切換鈕改為全站之後才顯現。
 - **不可以用 `window.OpenSeadragon`**。它是 UMD 包裝，在打包環境走 `module.exports`
   分支、不會掛上全域，取 `.Point` 會丟 TypeError。請用 import 進來的命名空間。
 - **覆蓋層的錯誤不可以用空 catch 吞掉**。平面模型圖曾因此從上線起一顆標記都沒畫出來，
