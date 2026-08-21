@@ -53,11 +53,24 @@ export type FloorStackApi = {
 function recolourPlanTexture(THREE: typeof import('three'), texture: import('three').Texture): import('three').Texture {
   const image = texture.image as HTMLImageElement | undefined;
   if (!image?.width) return texture;
+  const canvas = recolourPlanCanvas(image);
+  if (!canvas) return texture;
+  const recoloured = new THREE.CanvasTexture(canvas);
+  recoloured.colorSpace = THREE.SRGBColorSpace;
+  return recoloured;
+}
+
+/**
+ * 逐像素重畫的實作本體，與 three.js 無關，平面模型圖也用同一份。
+ * 取不到像素（跨網域讓 canvas 汙染）時回傳 null，由呼叫端決定退回原圖。
+ */
+export function recolourPlanCanvas(image: HTMLImageElement): HTMLCanvasElement | null {
+  if (!image.width) return null;
   const canvas = document.createElement('canvas');
   canvas.width = image.width;
   canvas.height = image.height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return texture;
+  if (!ctx) return null;
   ctx.drawImage(image, 0, 0);
   try {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -70,11 +83,28 @@ function recolourPlanTexture(THREE: typeof import('three'), texture: import('thr
     }
     ctx.putImageData(data, 0, 0);
   } catch {
-    return texture; // 跨網域貼圖會讓 canvas 汙染，取不到像素時沿用原圖
+    return null;
   }
-  const recoloured = new THREE.CanvasTexture(canvas);
-  recoloured.colorSpace = THREE.SRGBColorSpace;
-  return recoloured;
+  return canvas;
+}
+
+/**
+ * 載入平面圖、重畫成黑線，回傳可直接餵給 OpenSeadragon 的 blob 網址。
+ * 失敗時回傳 null（呼叫端沿用原網址）。用 blob 而非 dataURL：長邊 2400px 的圖轉成
+ * base64 會多出三分之一體積，而且無法釋放。呼叫端負責 revokeObjectURL。
+ */
+export function recolourPlanObjectUrl(url: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const canvas = recolourPlanCanvas(image);
+      if (!canvas) return resolve(null);
+      canvas.toBlob(blob => resolve(blob ? URL.createObjectURL(blob) : null), 'image/png');
+    };
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
 }
 
 export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, apiRef }: {
