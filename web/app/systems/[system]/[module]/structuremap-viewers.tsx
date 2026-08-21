@@ -87,9 +87,16 @@ function Floor2DViewer({ module, profile }: Props) {
   const [placePanelOpen, setPlacePanelOpen] = useState(false);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<any>(null);
+  // OpenSeadragon 的命名空間。**不可以改回 window.OpenSeadragon**：它是 UMD 包裝，
+  // 在打包環境走 module.exports 分支，根本不會掛上全域，取 .Point 會丟 TypeError。
+  const osdRef = useRef<any>(null);
   const overlayRef = useRef<Map<string, HTMLElement>>(new Map());
   // 淺色主題重畫後的 blob 網址，換樓層與卸載時要釋放。
   const planUrlRef = useRef<string | null>(null);
+  // viewer 是非同步建立的。覆蓋層與定位這兩個 effect 都要等它就緒才掛得上去——
+  // 用 state 而非 ref 才會觸發重跑，否則它們在首次載入時 early return 之後就再也
+  // 不會執行，'open' 監聽根本沒註冊，圖面永遠是空的。
+  const [viewerReady, setViewerReady] = useState(false);
 
   useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
   const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
@@ -105,6 +112,7 @@ function Floor2DViewer({ module, profile }: Props) {
     (async () => {
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
+      osdRef.current = OpenSeadragon;
       if (!viewerRef.current) {
         // 縮圖的底色／框線／視窗框由 OSD 在建構時寫成行內樣式，CSS 蓋不掉，只能由選項給。
         // 直接讀主題 token，跟頁面共用同一組值，日後改 token 這裡自動跟著變。
@@ -137,6 +145,7 @@ function Floor2DViewer({ module, profile }: Props) {
 
       overlayRef.current.clear();
       viewerRef.current.open({ type: 'image', url: source });
+      setViewerReady(true);
 
       // 換樓層時才釋放上一張，不在 cleanup 釋放——cleanup 跑在新圖開啟之前，
       // 提早 revoke 會讓還沒解碼完的那張變成空白。
@@ -158,8 +167,11 @@ function Floor2DViewer({ module, profile }: Props) {
     const viewer = viewerRef.current;
     if (!viewer) return;
     const attach = () => {
+      const OSD = osdRef.current;
       overlayRef.current.forEach(el => { try { viewer.removeOverlay(el); } catch { /* 忽略 */ } });
       overlayRef.current.clear();
+      if (!OSD) return; // 函式庫還沒載完；open 事件會再觸發一次
+      let failed = 0;
       for (const marker of visible) {
         // 圖釘結構與整合標記系統共用（structuremap-pin.css）：圓點加可切換的文字標籤。
         // 原本只有一顆純色圓點、標籤靠 title 提示，滑過才看得到，也印不出來。
@@ -177,15 +189,27 @@ function Floor2DViewer({ module, profile }: Props) {
         el.title = `${marker.label ?? ''}（${MARKER_KIND[String(marker.kind)] || marker.kind}）`;
         el.onclick = event => { event.stopPropagation(); setSelected(marker); };
         try {
-          viewer.addOverlay({ element: el, location: new (window as any).OpenSeadragon.Point(Number(marker.x) || 0, Number(marker.y) || 0), placement: 'CENTER' });
+          viewer.addOverlay({
+            element: el,
+            location: new OSD.Point(Number(marker.x) || 0, Number(marker.y) || 0),
+            placement: OSD.Placement.CENTER,
+          });
           overlayRef.current.set(String(marker.marker_id), el);
-        } catch { /* viewer 尚未就緒時略過，open 事件會再觸發一次 */ }
+        } catch (error) {
+          // 先前這裡是空的 catch。當時取的是 window.OpenSeadragon（UMD 在打包環境
+          // 不會掛全域），每一顆標記都丟 TypeError 卻被吞掉——圖面從上線起就一顆
+          // 標記都沒有，畫面只是「空的」，沒有人會回報成故障。
+          failed += 1;
+          if (failed === 1) console.error('平面圖標記覆蓋層建立失敗：', error);
+        }
       }
+      // 一顆都掛不上去代表是系統性問題，要說出來，不能只是留一張空圖。
+      if (failed && !overlayRef.current.size) setNote(`失敗：${failed} 個標記無法顯示在圖面上`);
     };
     viewer.addHandler('open', attach);
     attach();
     return () => { try { viewer.removeHandler('open', attach); } catch { /* 忽略 */ } };
-  }, [visible, showLabels, selected]);
+  }, [visible, showLabels, selected, setNote, viewerReady]);
 
   // 定位模式：點擊圖面把選取的標記移到該處。
   useEffect(() => {
@@ -212,7 +236,7 @@ function Floor2DViewer({ module, profile }: Props) {
     };
     viewer.addHandler('canvas-click', onCanvasClick);
     return () => { try { viewer.removeHandler('canvas-click', onCanvasClick); } catch { /* 忽略 */ } };
-  }, [placing, selected, setNote, reload]);
+  }, [placing, selected, setNote, reload, viewerReady]);
 
   const shownFloor = model ? String(model.name || model.floor_id) : '—';
   const noteIsError = note.startsWith('失敗');
