@@ -19,6 +19,7 @@
 import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
+import './structuremap-pin.css';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
@@ -75,6 +76,8 @@ function Floor2DViewer({ module, profile }: Props) {
   const [showMarkers, setShowMarkers] = useState(true);
   const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(
     () => Object.fromEntries(Object.keys(MARKER_KIND).map(kind => [kind, true])));
+  // 與 3D 模型圖同名同語意的開關：關閉時標籤只在滑過圖釘時浮現。
+  const [showLabels, setShowLabels] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
@@ -160,10 +163,19 @@ function Floor2DViewer({ module, profile }: Props) {
       overlayRef.current.forEach(el => { try { viewer.removeOverlay(el); } catch { /* 忽略 */ } });
       overlayRef.current.clear();
       for (const marker of visible) {
+        // 圖釘結構與整合標記系統共用（structuremap-pin.css）：圓點加可切換的文字標籤。
+        // 原本只有一顆純色圓點、標籤靠 title 提示，滑過才看得到，也印不出來。
         const el = document.createElement('button');
         el.type = 'button';
-        el.className = 'plan-marker';
-        el.style.background = String(marker.color || KIND_COLOR[String(marker.kind)] || '#00d4ff');
+        const isOn = String(selected?.marker_id || '') === String(marker.marker_id);
+        el.className = `mb-pin${showLabels ? ' show-lab' : ''}${isOn ? ' on' : ''}`;
+        const dot = document.createElement('span');
+        dot.className = 'mb-pdot';
+        dot.style.background = String(marker.color || KIND_COLOR[String(marker.kind)] || '#00d4ff');
+        const lab = document.createElement('span');
+        lab.className = 'mb-plab';
+        lab.textContent = String(marker.label || MARKER_KIND[String(marker.kind)] || marker.kind || '');
+        el.append(dot, lab);
         el.title = `${marker.label ?? ''}（${MARKER_KIND[String(marker.kind)] || marker.kind}）`;
         el.onclick = event => { event.stopPropagation(); setSelected(marker); };
         try {
@@ -179,7 +191,7 @@ function Floor2DViewer({ module, profile }: Props) {
     viewer.addHandler('open', attach);
     attach();
     return () => { try { viewer.removeHandler('open', attach); } catch { /* 忽略 */ } };
-  }, [visible]);
+  }, [visible, showLabels, selected]);
 
   // 定位模式：點擊圖面把選取的標記移到該處。
   useEffect(() => {
@@ -286,6 +298,10 @@ function Floor2DViewer({ module, profile }: Props) {
           onChange={event => setVisibleKinds(current => ({ ...current, [kind]: event.target.checked }))} />
         {label}
       </label>)}
+      <label className="chk labels">
+        <input type="checkbox" disabled={!showMarkers} checked={showLabels}
+          onChange={event => setShowLabels(event.target.checked)} />文字標籤
+      </label>
       <div className="f3-floors-count">本層 {visible.length} 個標記</div>
     </div>}
 

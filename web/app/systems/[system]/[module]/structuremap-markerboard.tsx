@@ -19,6 +19,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-markerboard.css';
+import './structuremap-pin.css';
 import { LEGACY_BASE, MARKET_ID, SUPABASE_URL } from '@/lib/config';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
 import {
