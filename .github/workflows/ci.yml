@@ -34,9 +34,12 @@ jobs:
         run: npm run typecheck:api && npm run build:api
 
       # Lint HTML files using htmlhint
+      # supabase/templates/** 是 Supabase Auth 的信件範本，不是網站頁面——它們是
+      # 刻意不帶 doctype 的片段（主控台會把內容包進信件本體），套網頁規則只會拿到
+      # 六個 doctype-first 假警報。
       - name: Lint HTML with htmlhint
         run: |
-          npx htmlhint "**/*.html" --ignore "google620de73073c56d88.html"
+          npx htmlhint "**/*.html" --ignore "google620de73073c56d88.html,supabase/templates/**"
 
       # Validate HTML semantics using html-validate
       - name: Validate HTML semantics
