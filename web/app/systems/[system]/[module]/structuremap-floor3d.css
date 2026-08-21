@@ -121,6 +121,51 @@
   color: var(--f3-accent-text);
 }
 
+/* 共用的六個動作（lib/shared-actions）。樣式對齊 AppShell 的 .v1-actions，讓這頁的
+   頂列與其他頁面看起來是同一條；不直接沿用該 class，是因為它在 760px 以下會攤成
+   三欄格線，會把這頁固定 50px 的頂列撐破。 */
+.f3-topbar .tb-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+}
+
+.f3-topbar .tb-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  color: var(--dim);
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.f3-topbar .tb-nav a:hover {
+  border-color: var(--cyan);
+  color: var(--f3-accent-text);
+  background: color-mix(in srgb, var(--cyan) 7%, transparent);
+}
+
+.f3-topbar .tb-nav img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+}
+
+/* 窄螢幕只留圖示，再窄就把品牌字樣收掉，優先保住導覽本身。 */
+@media (max-width: 1180px) {
+  .f3-topbar .tb-nav a span { display: none; }
+}
+
+@media (max-width: 720px) {
+  .f3-topbar .tb-logo,
+  .f3-topbar .tb-sep { display: none; }
+}
+
 /* ── 3D 場景 ────────────────────────────────────────────────────────── */
 
 /* 底色固定深藍：立體模型的貼圖是黑底霓虹線稿，淺色主題翻成白底會讓樓層邊線消失。
@@ -354,15 +399,18 @@
 .f3-floors .fbtn:hover { background: color-mix(in srgb, var(--cyan) 8%, transparent); }
 .f3-floors .fbtn.on { color: var(--text); }
 
+/* 取消顯示的樓層一律不著色：底色與外框都收回中性灰，只有顯示中的才是青色。
+   原本關閉狀態仍留著青色外框，一整排看起來全部都還開著。 */
 .f3-floors .fbtn .dot {
   width: 9px;
   height: 9px;
   flex-shrink: 0;
-  border: 1px solid var(--cyan);
+  border: 1px solid var(--dim);
   border-radius: 2px;
 }
 
 .f3-floors .fbtn.on .dot {
+  border-color: var(--cyan);
   background: var(--cyan);
   box-shadow: 0 0 6px var(--cyan);
 }

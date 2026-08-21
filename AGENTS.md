@@ -187,6 +187,12 @@ rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
     (`index.html`, `login.html`, `app.html`, `materials.html`) intentionally do **not**
     get the brand bar — the toolbar is too narrow and the entry pages have their own
     branding. Don't force it onto these without an explicit request.
+  - **Exception, requested 2026-08-21**: V2 的 3D 模型圖
+    (`/v2/systems/structuremap/floor3d/`) 的頂列**要**掛共用的六個動作，比照
+    3D建模系統 (`/v2/systems/structuremap/modeler/`)。動作定義取自
+    `web/lib/shared-actions.ts`（AppShell 用的是同一份）。這是使用者明確要求，
+    不是誤把 V2 頁面當成 V1 的 `floor3d.html`——**請勿再以「全螢幕工具頁不掛導覽」
+    為由還原**。V1 的 `floor3d.html` 不在此例外內，維持不掛。
 
 ## Do NOT
 - Do **not** delete `system/plans/*` — those textures/DZI tiles are used live by

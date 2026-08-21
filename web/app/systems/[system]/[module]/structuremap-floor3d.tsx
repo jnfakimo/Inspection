@@ -2,8 +2,11 @@
 
 // SYS-06 3D模型圖 = V1 `floor3d.html` 的移植。
 //
-// 與整合標記系統同樣是全螢幕工具頁，刻意不套 AppShell（V1 自帶 topbar；AGENTS.md
-// 也把 floor3d 列為不掛品牌列的固定工具頁）。
+// 與整合標記系統同樣是全螢幕工具頁，不套 AppShell（V1 自帶 topbar，面板與 HUD 都是
+// 絕對定位貼齊視窗邊緣，整層 shell 會把版面擠掉）。但頂列本身要掛上全站共用的六個
+// 動作——AGENTS.md 把 floor3d 列為不掛品牌列的工具頁，同一條也寫明「除非使用者明確
+// 要求」，2026-08-21 使用者已明確要求比照 3D建模系統。動作定義取自 lib/shared-actions，
+// 與 AppShell 共用同一份，兩邊才不會逐漸走鐘。
 //
 // 3D 算繪沿用既有的 FloorStack3D，不另寫一套 Three.js——SYS-03 的立體巡檢雲臺用的
 // 是同一個元件，V1 的 floor3d.html 與 guardpatrol3d.html 正是因為各寫一份而分岔。
@@ -19,8 +22,8 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { FloorStack3D, type FloorStackApi, type StackMarker } from './floor-stack-3d';
-import { LEGACY_BASE } from '@/lib/config';
 import { floorOrder } from '@/lib/floor';
+import { allowedActions } from '@/lib/shared-actions';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
@@ -147,10 +150,17 @@ export function Floor3DBoardModule({ profile }: Props) {
       <span className="tb-logo">臺北農產公司 第一果菜市場</span>
       <span className="tb-sep" />
       <span className="tb-title">3D 模型圖</span>
+      {/* 依帳號可用的系統過濾，與 AppShell 同一份定義、同一個順序。 */}
+      <nav className="tb-nav" aria-label="共用系統導覽">
+        {allowedActions(profile.allowed_systems).map(item =>
+          <a key={item.href} href={`/Inspection/v2${item.href}`}>
+            <img src={item.icon} alt="" /><span>{item.label}</span>
+          </a>)}
+      </nav>
       <span className="tb-space" />
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
+      {/* 後台原本另外掛一個指向 V1 admin.html 的連結，共用導覽已含 V2 的後台，不再重複。 */}
       <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
-      <a className="tb-back" href={`${LEGACY_BASE}/admin.html`}>後台</a>
     </div>
 
     <div className="f3-stage">
