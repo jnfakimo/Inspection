@@ -683,10 +683,13 @@
       container.insertBefore(target,container.firstChild);
     }
     target.className=(target.className?target.className+' ':'')+'brand-bar-unified';
-    target.innerHTML='<span class="sys-tag-unified">■ TAIPEC-MKT-1'+(label?(' '+label):'')+'</span>'+
+    // label 來自 .nav-title 的文字或 document.title，兩者都可能帶到後台設定或資料庫來的
+    // 內容。拼進 innerHTML 等於把純文字重新當 HTML 解析，改成先建結構再用 textContent 塞。
+    target.innerHTML='<span class="sys-tag-unified"></span>'+
       '<span class="brand-org-unified" data-sysname="org">臺北農產公司</span>'+
       '<span class="brand-sep-unified">／</span>'+
       '<span class="brand-site-unified" data-sysname="site">第一果菜市場</span>';
+    target.firstChild.textContent='■ TAIPEC-MKT-1'+(label?(' '+label):'');
   }
   // 機構／場所名稱可在後台「系統設定」修改；全站沿用 data-sysname 屬性作為統一掛勾點，
   // 抓一次 system_settings 就能同步套用到品牌列與其他既有沿用同一屬性的頁面內容。
