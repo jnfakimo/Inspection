@@ -1,0 +1,133 @@
+name: Apply database migration
+
+# 正式資料庫 schema 過去仰賴人工複製到 SQL Editor，容易出現「程式已上線，
+# migration 尚未套用」的空窗。本流程只允許管理者手動指定一個已提交、具時間戳的
+# migration，並以 Supabase Management API 執行。它不會在 push 時自動改資料庫。
+on:
+  workflow_dispatch:
+    inputs:
+      migration:
+        description: "supabase/migrations/ 下的單一 migration 檔名"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-database-migration
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve project and validate migration
+        id: migration
+        env:
+          REQUESTED_MIGRATION: ${{ inputs.migration }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$REQUESTED_MIGRATION" =~ ^[0-9]{14}_[a-z0-9_]+\.sql$ ]]; then
+            echo "::error::Migration 檔名必須是 14 位時間戳、小寫名稱與 .sql。"
+            exit 1
+          fi
+
+          path="supabase/migrations/$REQUESTED_MIGRATION"
+          if [ ! -f "$path" ]; then
+            echo "::error::找不到 $path。"
+            exit 1
+          fi
+          if [ "$(wc -c < "$path")" -gt 524288 ]; then
+            echo "::error::Migration 超過 512 KiB，請拆分後再執行。"
+            exit 1
+          fi
+
+          # 正式資料依規範只能追加、更新或停用。DROP POLICY/FUNCTION 屬於冪等
+          # schema 維護，可保留；資料表刪除、TRUNCATE 與實體 DELETE 一律拒絕。
+          MIGRATION_GUARD_PATH="$path" node <<'NODE'
+          const fs = require('fs');
+          const source = fs.readFileSync(process.env.MIGRATION_GUARD_PATH, 'utf8');
+          // 先移除 SQL 註解再掃描；block comment 以空字串移除，可同時攔下
+          // DE/**/LETE 之類拆字。字串與 dollar body 故意保留，連動態 SQL 也檢查。
+          const sql = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\r\n]*/g, '');
+          const forbidden = [
+            /\bdrop\s+table\b/i,
+            /\bdelete\s+from\b/i,
+            /\btruncate\s+(?!on\b)/i,
+          ];
+          if (forbidden.some(pattern => pattern.test(sql))) {
+            console.error('::error::Migration 含禁止的刪表、清空或實體刪除語句。');
+            process.exit(1);
+          }
+          NODE
+          if ! grep -Eiq '^[[:space:]]*begin[[:space:]]*;' "$path" \
+            || ! grep -Eiq '^[[:space:]]*commit[[:space:]]*;' "$path"; then
+            echo "::error::正式 migration 必須以 BEGIN/COMMIT 包住完整交易。"
+            exit 1
+          fi
+
+          ref="$(sed -n 's/^project_id *= *"\(.*\)"/\1/p' supabase/config.toml | head -1)"
+          if [ -z "$ref" ]; then
+            echo "::error::supabase/config.toml 讀不到 project_id。"
+            exit 1
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "name=$REQUESTED_MIGRATION" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
+      - name: Require database access token
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::缺少 SUPABASE_ACCESS_TOKEN。"
+            exit 1
+          fi
+
+      - name: Apply migration through Supabase Management API
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          MIGRATION_PATH: ${{ steps.migration.outputs.path }}
+          PROJECT_REF: ${{ steps.migration.outputs.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/migration-payload.json"
+          response="$RUNNER_TEMP/migration-response.json"
+          PAYLOAD_PATH="$payload" node <<'NODE'
+          const fs = require('fs');
+          const query = fs.readFileSync(process.env.MIGRATION_PATH, 'utf8');
+          fs.writeFileSync(process.env.PAYLOAD_PATH, JSON.stringify({ query, read_only: false }));
+          NODE
+
+          code="$(curl --silent --show-error \
+            --output "$response" --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            --header 'Content-Type: application/json' \
+            --data-binary "@$payload" \
+            "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query")"
+          if [[ ! "$code" =~ ^2 ]]; then
+            echo "::error::Supabase migration API 回應 HTTP $code。"
+            node -e "const fs=require('fs');const p=process.argv[1];try{const r=JSON.parse(fs.readFileSync(p,'utf8'));console.error(r.message||r.error||'Migration 執行失敗')}catch{console.error('Migration 執行失敗')}" "$response"
+            exit 1
+          fi
+          echo "Migration 已成功套用（HTTP $code）。"
+
+      - name: Record deployment evidence
+        env:
+          MIGRATION_NAME: ${{ steps.migration.outputs.name }}
+        run: |
+          {
+            echo "## Supabase migration"
+            echo "- 檔案：\`$MIGRATION_NAME\`"
+            echo "- Commit：\`${GITHUB_SHA}\`"
+            echo "- 執行者：\`${GITHUB_ACTOR}\`"
+            echo "- 結果：成功"
+          } >> "$GITHUB_STEP_SUMMARY"
