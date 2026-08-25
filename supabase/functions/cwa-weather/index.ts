@@ -416,7 +416,9 @@ async function fetchTyphoonHomepageStatus() {
   });
   if (!response.ok) throw new Error(`中央氣象署颱風消息回應 ${response.status}`);
   const script = await response.text();
-  const timeText = script.match(/var\s+TY_TIME\s*=\s*\{[\s\S]*?'C'\s*:\s*'((?:\\.|[^'])*)'/u)?.[1] || null;
+  // [^'] 原本也吃得下反斜線，跟 \\. 這個分支重疊；含大量 \\& 的輸入會逼出指數回溯。
+  // 從字元類排除反斜線後，逸出序列只剩 \\. 一條路徑，語意不變但沒有歧義。
+  const timeText = script.match(/var\s+TY_TIME\s*=\s*\{[\s\S]*?'C'\s*:\s*'((?:\\.|[^'\\])*)'/u)?.[1] || null;
   const counts = script.match(/var\s+TY_COUNT\s*=\s*\[\s*(\d+)\s*,\s*(\d+)\s*\]/u);
   const tropicalDepressionCount = Number(counts?.[1] || 0);
   const typhoonCount = Number(counts?.[2] || 0);
