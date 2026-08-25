@@ -35,10 +35,18 @@ export async function invokeAdminApi<T = Record<string, unknown>>(action: string
     }
 
     if (response) {
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.ok) throw new Error(result?.message || '後台管理服務回傳失敗');
-      recordAdminRead(action);
-      return result as T;
+      const result = await response.json().catch(() => null) as { ok?: boolean; message?: string } | null;
+      const actionNotAvailableDuringRollout = response.status === 400
+        && result?.message === '不支援的後台管理動作';
+      if (!actionNotAvailableDuringRollout) {
+        if (!response.ok || !result?.ok) throw new Error(result?.message || '後台管理服務回傳失敗');
+        recordAdminRead(action);
+        return result as T;
+      }
+      // Render 與 Edge Function 是兩條獨立部署線。新前端在 Node API 尚未
+      // 完成滾動更新時，只針對「未知動作」改走已部署的 Edge 版本；該
+      // 回覆發生於任何業務寫入之前，因此不會造成同一動作重複執行。
+      console.warn('Node.js admin API does not support this action yet; falling back to Supabase Edge Function');
     }
   }
 
