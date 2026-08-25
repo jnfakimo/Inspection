@@ -69,11 +69,18 @@ const SOURCE_CONFIG = {
     errorLabel: "登入／授權錯誤訊號",
   },
   function_logs: {
-    title: "Edge Function 平台層執行異常",
+    title: "Edge Function 內部執行異常",
     alertType: "error_threshold",
     severity: "critical",
     signalThreshold: integerEnv("PLATFORM_FUNCTION_SIGNAL_THRESHOLD", 5, 1, 5000),
     errorLabel: "例外／逾時／失敗訊號",
+  },
+  function_edge_logs: {
+    title: "Edge Function 網路層異常",
+    alertType: "error_threshold",
+    severity: "critical",
+    errorThreshold: integerEnv("PLATFORM_FUNCTION_EDGE_ERROR_THRESHOLD", 5, 1, 5000),
+    errorLabel: "HTTP 4xx／5xx 或網路錯誤訊號",
   },
 };
 
@@ -96,7 +103,7 @@ SELECT
     OR positionCaseInsensitive(event_message, 'rate') > 0
   ) AS signal_count
 FROM logs
-WHERE source IN ('edge_logs', 'storage_logs', 'auth_logs', 'function_logs')
+WHERE source IN ('edge_logs', 'storage_logs', 'auth_logs', 'function_logs', 'function_edge_logs')
 GROUP BY source, path
 ORDER BY request_count DESC
 LIMIT 2000`;

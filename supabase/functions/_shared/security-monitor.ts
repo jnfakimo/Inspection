@@ -111,6 +111,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   "platform:storage_logs": "Storage 平台日誌",
   "platform:auth_logs": "Auth 平台日誌",
   "platform:function_logs": "Edge Function 平台日誌",
+  "platform:function_edge_logs": "Edge Function 網路日誌",
   "platform:management_api": "Supabase Logs API 監測",
 };
 
