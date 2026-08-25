@@ -40,3 +40,11 @@ temp_sub.*
 # 的 AGENTS.md 為唯一來源，同名檔案出現在 web/ 底下容易被誤認成專案規範。
 web/AGENTS.md
 web/CLAUDE.md
+
+# 環境變數與祕密值：Supabase CLI 的 --env-file 慣用 supabase/.env，
+# 那份會裝著 Edge Function 的正式祕密值，絕對不能進版控。
+# security:secrets 只掃 web/ 與 system/，擋不到這裡。
+.env
+.env.*
+!.env.example
+supabase/.env
