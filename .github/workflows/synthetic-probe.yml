@@ -36,7 +36,7 @@ jobs:
           SYNTHETIC_PROBE_TIMEOUT_MS: 15000
           SYNTHETIC_PROBE_LATENCY_WARNING_MS: 3000
           SYNTHETIC_PROBE_LATENCY_CRITICAL_MS: 10000
-          SYNTHETIC_EDGE_TRAFFIC_THRESHOLD: 300
-          SYNTHETIC_STORAGE_TRAFFIC_THRESHOLD: 100
+          SYNTHETIC_EDGE_TRAFFIC_THRESHOLD: 750
+          SYNTHETIC_STORAGE_TRAFFIC_THRESHOLD: 375
           SYNTHETIC_PROBE_ALERT_FUNCTION_URL: https://qztffronusdhgxhjjubt.supabase.co/functions/v1/platform-log-alert
         run: node tools/synthetic-probe.mjs
