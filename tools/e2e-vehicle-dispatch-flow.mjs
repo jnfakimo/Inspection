@@ -227,6 +227,22 @@ async function vehicleAction(token, requestId, action, extra = {}) {
   return data;
 }
 
+function sameDayTripSlot() {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  }).formatToParts(new Date()).filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  const date = `${parts.year}-${parts.month}-${parts.day}`;
+  const nowMinutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const departureMinutes = Math.ceil((nowMinutes + 15) / 30) * 30;
+  const returnMinutes = departureMinutes + 60;
+  if (returnMinutes > 23 * 60 + 30) {
+    throw new Error('目前時間已接近午夜，無法在今日建立可供司機接單的測試時段；請於明日白天重跑');
+  }
+  const hhmm = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+  return { date, departure: hhmm(departureMinutes), returnTime: hhmm(returnMinutes) };
+}
+
 const fixture = BOOTSTRAP ? await createBootstrapFixture() : null;
 if (!fixture) throw new Error('目前 P0 派車驗收需要 SUPABASE_E2E_BOOTSTRAP=1，以確保四種角色彼此分離');
 
@@ -238,12 +254,13 @@ try {
   const supervisorToken = await signIn(fixture.supervisor.email, fixture.supervisor.password);
   const dispatcherToken = await signIn(fixture.dispatcher.email, fixture.dispatcher.password);
   const driverToken = await signIn(fixture.driver.email, fixture.driver.password);
+  const trip = sameDayTripSlot();
 
   // 先確認派車管理員不能越權代替單位主管核可。
   const created = await invokeFunction('app-api', {
     action: 'vehicle_create_request',
-    trip_date: new Date(Date.now() + 86400000 + 8 * 3600000).toISOString().slice(0, 10),
-    planned_departure_time: '09:00', planned_return_time: '10:00',
+    trip_date: trip.date,
+    planned_departure_time: trip.departure, planned_return_time: trip.returnTime,
     origin_location: '第一果菜市場', destination_location: 'P0 驗收目的地',
     trip_purpose: 'P0 帳號申請與派車階層驗收', passenger_count: 1,
     applicant_phone: '0900000000', applicant_note: 'P0 E2E，保留流程歷程',
