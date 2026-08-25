@@ -75,8 +75,8 @@ async function edgeAction(token, action, body = {}) {
 
 async function createBootstrapUsers() {
   const suffix = `${Date.now()}-${randomUUID().slice(0, 8)}`;
-  const createActor = async ({ label, usernamePrefix, role, rbacRole, supervisorId = null }) => {
-    const email = `p0-e2e-${label}-${suffix}@example.invalid`;
+  const createActor = async ({ label, emailLabel, usernamePrefix, role, rbacRole, supervisorId = null }) => {
+    const email = `p0-e2e-${emailLabel}-${suffix}@example.invalid`;
     const password = `P0E2E!${randomUUID().replaceAll('-', '').slice(0, 18)}a1`;
     const authUser = await authAdmin('/users', {
       method: 'POST',
@@ -102,9 +102,9 @@ async function createBootstrapUsers() {
     }))[0];
     return { email, password, authUserId: authUser.id, profile };
   };
-  const supervisor = await createActor({ label: '單位主管測試', usernamePrefix: 'p0_sup', role: 'supervisor', rbacRole: 'unit_supervisor' });
-  const reporter = await createActor({ label: '一般報修測試', usernamePrefix: 'p0_reporter', role: 'inspector', rbacRole: 'reporter', supervisorId: supervisor.profile.user_id });
-  const technician = await createActor({ label: '維修技師測試', usernamePrefix: 'p0_tech', role: 'maintenance', rbacRole: 'technician', supervisorId: supervisor.profile.user_id });
+  const supervisor = await createActor({ label: '單位主管測試', emailLabel: 'supervisor', usernamePrefix: 'p0_sup', role: 'supervisor', rbacRole: 'unit_supervisor' });
+  const reporter = await createActor({ label: '一般報修測試', emailLabel: 'reporter', usernamePrefix: 'p0_reporter', role: 'inspector', rbacRole: 'reporter', supervisorId: supervisor.profile.user_id });
+  const technician = await createActor({ label: '維修技師測試', emailLabel: 'technician', usernamePrefix: 'p0_tech', role: 'maintenance', rbacRole: 'technician', supervisorId: supervisor.profile.user_id });
   return { supervisor, reporter, technician, roleSeparated: true };
 }
 
