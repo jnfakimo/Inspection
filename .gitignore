@@ -48,3 +48,11 @@ web/CLAUDE.md
 .env.*
 !.env.example
 supabase/.env
+
+# 資料庫備份的產物。內容是全公司人員個資與巡檢／報修紀錄，而本 repo 是 public，
+# 一旦誤 commit 就等於直接公開。備份只存在 Actions 的加密 artifact 與離線歸檔裡，
+# 本機解開來還原時請用下列路徑，不要放在其他地方。詳見 docs/DATABASE_BACKUP_RECOVERY.md
+backup/
+restore-workspace/
+*.tar.gz.gpg
+inspection-backup-*

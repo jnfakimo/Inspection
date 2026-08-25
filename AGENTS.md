@@ -75,7 +75,16 @@ deactivate only: never reset the database, truncate tables, or physically delete
 RLS is enforced in production. Bootstrap `allow_all_for_now` policies apply only to
 `authenticated`; the commercial hardening migrations replace them with row-scoped
 rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
-`vehicle-dispatch-files`.
+`vehicle-dispatch-files` (all private), plus `inspection-photos`, which is **public**
+and currently empty — anything uploaded there is anonymously readable.
+
+**Backups** (2026-08-25): the Free tier has no automatic backups and no PITR, and
+`trg_prevent_removal` only stops DELETE/TRUNCATE — a bad UPDATE is unrecoverable.
+`.github/workflows/database-backup.yml` dumps every `public` table plus Storage nightly
+and uploads it AES256-encrypted, because this repo is public and artifacts are world-
+readable. Restoring is manual, dry-run unless `--execute`, and never deletes rows.
+**Auth accounts are deliberately out of scope** — after a full restore nobody can log in
+until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md`.
 
 ## Conventions (follow these)
 - **Match the surrounding style**: cyberpunk dark theme. Core vars: `--bg:#020b18`,

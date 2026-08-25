@@ -1,0 +1,119 @@
+name: Database backup
+
+# Supabase Free 方案沒有自動備份，也沒有 PITR：資料被 UPDATE 寫壞就回不去了
+# （trg_prevent_removal 只擋得住 DELETE/TRUNCATE）。這個流程每天把 public schema
+# 與 Storage 附件抓下來，加密後存成 artifact。
+#
+# 備份含全公司人員個資與巡檢／報修紀錄，而本 repo 是 public——artifact 任何人都
+# 下載得到。所以明文備份「絕對不會」離開 runner：一律先以 AES256 加密再上傳，
+# 解密密語只存在 GitHub secret 與保管人手上。
+on:
+  schedule:
+    - cron: '0 18 * * *' # 台北時間每天凌晨 2 點，離峰
+  workflow_dispatch:
+    inputs:
+      include_storage:
+        description: '是否一併備份 Storage 附件'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Require secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::error::缺少 SUPABASE_ACCESS_TOKEN。"
+            exit 1
+          fi
+          # 沒有密語就中止，絕不退回產生未加密的備份。
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::缺少 BACKUP_PASSPHRASE，備份不會以未加密的形式產生。請先設定該 secret。"
+            exit 1
+          fi
+
+      - name: Dump database and storage
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          BACKUP_OUT_DIR: ${{ runner.temp }}/backup
+          BACKUP_INCLUDE_STORAGE: ${{ inputs.include_storage == false && 'false' || 'true' }}
+        run: node tools/database-backup.mjs
+
+      - name: Verify backup integrity
+        env:
+          BACKUP_OUT_DIR: ${{ runner.temp }}/backup
+        run: node tools/database-backup-verify.mjs
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          BACKUP_OUT_DIR: ${{ runner.temp }}/backup
+        run: |
+          set -euo pipefail
+          stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+          archive="$RUNNER_TEMP/inspection-backup-$stamp.tar.gz"
+          tar -czf "$archive" -C "$BACKUP_OUT_DIR" .
+          # 密語走 stdin，不進 process 參數，避免被同機處理程序看到。
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes --quiet \
+            --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 \
+            --output "$archive.gpg" "$archive"
+          rm -f "$archive"
+          rm -rf "$BACKUP_OUT_DIR"
+          echo "ARCHIVE=$archive.gpg" >> "$GITHUB_ENV"
+          echo "ARCHIVE_NAME=inspection-backup-$stamp.tar.gz.gpg" >> "$GITHUB_ENV"
+          ls -la "$archive.gpg"
+
+      - name: Confirm ciphertext
+        run: |
+          set -euo pipefail
+          # 確認上傳的真的是密文：解得開的話 file 會認得，這裡只驗格式不解密。
+          if ! file "$ARCHIVE" | grep -qi 'GPG\|PGP\|encrypted'; then
+            echo "::error::產出的檔案不是 GPG 密文，中止上傳。"
+            exit 1
+          fi
+          if tar -tzf "$ARCHIVE" >/dev/null 2>&1; then
+            echo "::error::產出的檔案可以直接當 tar 解開，代表沒有加密，中止上傳。"
+            exit 1
+          fi
+          echo "已確認為加密檔。"
+
+      - name: Upload encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARCHIVE_NAME }}
+          path: ${{ env.ARCHIVE }}
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          {
+            echo "## 資料庫備份"
+            echo "- 檔案：\`$ARCHIVE_NAME\`（AES256 加密）"
+            echo "- 保留：90 天（GitHub artifact 上限）"
+            echo "- 解密：\`gpg --decrypt --output backup.tar.gz <檔案>\`，再 \`tar -xzf\`"
+            echo "- 還原步驟見 \`docs/DATABASE_BACKUP_RECOVERY.md\`"
+            echo ""
+            echo "> 90 天後 artifact 會自動消失。長期保存需依文件定期下載歸檔到公司內部。"
+          } >> "$GITHUB_STEP_SUMMARY"
