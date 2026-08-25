@@ -278,7 +278,10 @@ function normalizeSettings(result: unknown): SettingsSnapshot {
         line.line_notify_security_alerts ?? flat.line_notify_security_alerts ?? line.line_notify_security ?? flat.line_notify_security,
         true,
       ),
-      errorThresholdEnabled: booleanOf(line.line_notify_error_threshold ?? flat.line_notify_error_threshold, false),
+      // 資安監測在資料庫與排程端預設為啟用。Node API 滾動部署期間若
+      // 暫時尚未回傳新欄位，畫面也必須與實際保護狀態一致，避免管理員
+      // 誤以為告警已關閉，或儲存其他 LINE 設定時反向把它關掉。
+      errorThresholdEnabled: booleanOf(line.line_notify_error_threshold ?? flat.line_notify_error_threshold, true),
       errorThresholdWindowMinutes: numberOf(line.error_threshold_window_minutes ?? flat.error_threshold_window_minutes, 15),
       errorThresholdCount: numberOf(line.error_threshold_count ?? flat.error_threshold_count, 20),
       errorThresholdCooldownMinutes: numberOf(line.error_threshold_cooldown_minutes ?? flat.error_threshold_cooldown_minutes, 60),
@@ -309,7 +312,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     notifyRepair: false,
     notifyCase: false,
     notifySecurity: true,
-    errorThresholdEnabled: false,
+    errorThresholdEnabled: true,
     errorThresholdWindowMinutes: 15,
     errorThresholdCount: 20,
     errorThresholdCooldownMinutes: 60,
