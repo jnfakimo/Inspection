@@ -64,8 +64,8 @@ const endpoints = [
   },
   {
     key: "supabase_rest",
-    name: "Supabase REST floor_models",
-    url: `${SUPABASE_URL}/rest/v1/floor_models?select=floor_id&limit=1`,
+    name: "Supabase REST 匿名拒絕邊界",
+    url: `${SUPABASE_URL}/rest/v1/locations?select=location_id&limit=1`,
     method: "GET",
     headers: {
       Accept: "application/json",
@@ -73,7 +73,10 @@ const endpoints = [
       Authorization: `Bearer ${ANON_KEY}`,
       Prefer: "count=none",
     },
-    expected: (status) => status >= 200 && status < 300,
+    // The production RLS baseline intentionally denies the anonymous role.
+    // Check the error code as well so an invalid key is not hidden by 401.
+    expected: [401],
+    expectedBody: /42501|permission denied for table/i,
   },
   {
     key: "supabase_storage",
@@ -92,6 +95,7 @@ async function requestEndpoint(endpoint) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let status = 0;
+  let bodyPreview = "";
   let error = null;
   try {
     const response = await fetch(endpoint.url, {
@@ -103,7 +107,11 @@ async function requestEndpoint(endpoint) {
     status = response.status;
     // Do not download page or object bodies. The REST response is capped by
     // limit=1; cancelling it keeps this probe deliberately small.
-    if (response.body) await response.body.cancel();
+    if (endpoint.method === "GET") {
+      bodyPreview = clean(await response.text(), 400);
+    } else if (response.body) {
+      await response.body.cancel();
+    }
   } catch (caught) {
     error = caught?.name === "AbortError"
       ? `逾時（>${REQUEST_TIMEOUT_MS} ms）`
@@ -112,7 +120,8 @@ async function requestEndpoint(endpoint) {
     clearTimeout(timeout);
   }
   const latencyMs = Math.round(performance.now() - started);
-  const expected = !error && statusMatches({ status }, endpoint.expected);
+  const expected = !error && statusMatches({ status }, endpoint.expected) &&
+    (!endpoint.expectedBody || endpoint.expectedBody.test(bodyPreview));
   const statusClass = error
     ? "network_error"
     : status >= 500
@@ -130,6 +139,7 @@ async function requestEndpoint(endpoint) {
     latency_ms: latencyMs,
     expected,
     expected_blocked_status: Boolean(endpoint.expectedBlockedStatus),
+    body_preview: bodyPreview,
     error,
   };
 }
@@ -223,6 +233,7 @@ function endpointSignals(results) {
         status_class: result.status_class,
         expected: result.expected,
         expected_blocked_status: result.expected_blocked_status,
+        body_preview: result.body_preview,
         latency_ms: result.latency_ms,
         error: result.error,
       },
