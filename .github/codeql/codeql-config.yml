@@ -1,0 +1,7 @@
+name: Inspection CodeQL configuration
+
+# These sources are retained as historical documentation only. They are not
+# copied by the Pages build and are not deployed as Edge Functions. Keeping
+# them out of the product analysis prevents retired code from reopening alerts.
+paths-ignore:
+  - docs/removed-edge-functions/**
