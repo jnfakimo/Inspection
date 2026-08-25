@@ -16,6 +16,7 @@
     "security:audit": "node tools/security-design-audit.mjs",
     "security:secrets": "node tools/security-secret-scan.mjs",
     "test:e2e:repair": "node tools/e2e-repair-flow.mjs",
+    "test:e2e:vehicle": "node tools/e2e-vehicle-dispatch-flow.mjs",
     "test:security-audit": "node --test web/lib/security-audit-sanitize.test.ts",
     "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit"
   },
