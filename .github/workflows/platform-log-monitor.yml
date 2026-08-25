@@ -1,0 +1,35 @@
+name: Supabase platform log monitor
+
+on:
+  schedule:
+    # Free 方案日誌只保留 1 天；每 10 分鐘查詢最近 20 分鐘，吸收排程延遲。
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-platform-log-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout monitor
+        uses: actions/checkout@v7
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - name: Query Supabase platform logs
+        env:
+          SUPABASE_PROJECT_REF: qztffronusdhgxhjjubt
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          PLATFORM_LOG_WINDOW_MINUTES: 20
+          PLATFORM_LOG_ALERT_FUNCTION_URL: https://qztffronusdhgxhjjubt.supabase.co/functions/v1/platform-log-alert
+        run: node tools/platform-log-monitor.mjs

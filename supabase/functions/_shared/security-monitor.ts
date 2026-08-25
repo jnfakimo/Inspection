@@ -107,6 +107,11 @@ const RESOURCE_LABELS: Record<string, string> = {
   "username-login:account_application": "帳號申請",
   "username-login:login": "帳號登入",
   client_error_logs: "前端錯誤紀錄",
+  "platform:edge_logs": "API Gateway 平台日誌",
+  "platform:storage_logs": "Storage 平台日誌",
+  "platform:auth_logs": "Auth 平台日誌",
+  "platform:function_logs": "Edge Function 平台日誌",
+  "platform:management_api": "Supabase Logs API 監測",
 };
 
 const isCompatibilityError = (error: any) => {
