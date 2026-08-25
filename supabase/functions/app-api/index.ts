@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/security-monitor.ts';
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
+import { canonicalFloor } from '../_shared/floor.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -105,12 +106,11 @@ function extractClientIp(req: Request) {
   return text(raw.split(',')[0], 80) || null;
 }
 
-function canonicalFloor(value: unknown) {
-  const raw = text(value, 20).toUpperCase().replace(/\s+/g, '');
-  if (raw === 'B1' || raw === 'B1F') return 'B1F';
-  if (raw === 'RF' || raw === 'ROOF' || raw === '頂樓') return 'RF';
-  const match = raw.match(/^(\d+)F?$/);
-  return match ? `${match[1]}F` : (raw || '未設定');
+function normalizeFloorFields(row: Record<string, unknown>) {
+  const next = { ...row };
+  if ('floor' in next) next.floor = canonicalFloor(next.floor) || null;
+  if ('floor_id' in next) next.floor_id = canonicalFloor(next.floor_id) || null;
+  return next;
 }
 
 // 稽核寫入改由後端負責：與業務操作同一次請求完成，前端無法略過，
@@ -460,10 +460,10 @@ export async function handleAppApiRequest(req: Request) {
       const {data,error}=await query;
       if(error){console.error('module_data query failed',config.table,error.message);return reply(req,{ok:false,message:`${config.title}資料讀取失敗`},500);}
       const rows=((data||[]) as unknown as Array<Record<string,unknown>>).map(row=>{
-        if(systemKey!=='guardpatrol'||moduleKey!=='records')return row;
+        if(systemKey!=='guardpatrol'||moduleKey!=='records')return normalizeFloorFields(row);
         const equipmentName=relationName(row.equipment);
         const inspectorName=relationName(row.users);
-        return {...row,equipment_id:equipmentName||row.equipment_id,inspector_id:inspectorName||row.inspector_id};
+        return normalizeFloorFields({...row,equipment_id:equipmentName||row.equipment_id,inspector_id:inspectorName||row.inspector_id});
       });
       const statusCounts=new Map<string,number>();
       rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
@@ -922,7 +922,20 @@ export async function handleAppApiRequest(req: Request) {
       if (records.error) throw records.error;
       if (equipment.error) throw equipment.error;
       if (locations.error) throw locations.error;
-      return reply(req, { ok: true, data: { rows: records.data || [], equipment: equipment.data || [], locations: locations.data || [] } });
+      const normalizeNested = (row: Record<string, unknown>) => {
+        const relation = row.equipment;
+        const equipmentRow = Array.isArray(relation)
+          ? relation.map(item => normalizeFloorFields(item as Record<string, unknown>))
+          : relation && typeof relation === 'object'
+            ? normalizeFloorFields(relation as Record<string, unknown>)
+            : relation;
+        return normalizeFloorFields({ ...row, equipment: equipmentRow });
+      };
+      return reply(req, { ok: true, data: {
+        rows: (records.data || []).map(row => normalizeNested(row as Record<string, unknown>)),
+        equipment: (equipment.data || []).map(row => normalizeFloorFields(row as Record<string, unknown>)),
+        locations: (locations.data || []).map(row => normalizeFloorFields(row as Record<string, unknown>)),
+      } });
     }
 
     if (action === 'create_inspection') {
@@ -1285,7 +1298,7 @@ export async function handleAppApiRequest(req: Request) {
           } else if (field.type === 'boolean') {
             payload[key] = value === true || value === 'true';
           } else {
-            payload[key] = text(value, 2000) || null;
+            payload[key] = key === 'floor' ? (canonicalFloor(value) || null) : (text(value, 2000) || null);
           }
         }
         if (Object.keys(payload).length === 0) return reply(req, { ok: false, message: '沒有可儲存的欄位資料' }, 400);
@@ -1378,7 +1391,7 @@ if (equipment.error) throw equipment.error;
 
     if (action === 'save_floor_model') {
       if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
-      const floorId = text(body.floor_id, 20).toUpperCase().replace(/\s+/g, '');
+      const floorId = canonicalFloor(text(body.floor_id, 20));
       const name = text(body.name, 100);
       const imagePath = text(body.image_path, 100);
       const bboxSource = body.bbox && typeof body.bbox === 'object' ? body.bbox as Record<string, unknown> : {};
@@ -1449,7 +1462,7 @@ if (equipment.error) throw equipment.error;
           if (!raw || typeof raw !== 'object') continue;
           const row = raw as Record<string, unknown>;
           const marketId = text(row.market_id, 40);
-          const floor = text(row.floor, 20);
+          const floor = canonicalFloor(text(row.floor, 20));
           const floorOrderValue = row.floor_order === undefined || row.floor_order === null ? null : Number(row.floor_order);
           const spaceName = text(row.space_name, 120);
           if (!marketId || !floor || !spaceName) continue;
@@ -1493,7 +1506,7 @@ if (equipment.error) throw equipment.error;
             const parsed = Number(value);
             payload[key] = (value === null || value === '' || !Number.isFinite(parsed)) ? null : parsed;
           } else {
-            payload[key] = text(value, 2000) || null;
+            payload[key] = key === 'floor' ? (canonicalFloor(value) || null) : (text(value, 2000) || null);
           }
         }
         if (!payload['market_id'] || !payload['floor'] || !payload['space_name']) return reply(req, { ok: false, message: '請輸入樓層與空間名稱' }, 400);
@@ -1545,7 +1558,7 @@ if (equipment.error) throw equipment.error;
             const parsed = Number(value);
             payload[key] = (value === null || value === '' || !Number.isFinite(parsed)) ? null : parsed;
           } else {
-            payload[key] = text(value, 2000) || null;
+            payload[key] = key === 'floor_id' ? (canonicalFloor(value) || null) : (text(value, 2000) || null);
           }
         }
         if (payload['x'] !== null && payload['x'] !== undefined && (Number(payload['x']) < 0 || Number(payload['x']) > 1)) return reply(req, { ok: false, message: '標記座標須介於 0 到 1' }, 400);
@@ -1630,7 +1643,7 @@ if (equipment.error) throw equipment.error;
       const name = text(body.name, 120);
       if (!name) return reply(req, { ok: false, message: '請輸入會議室名稱' }, 400);
       const status = body.status === 'inactive' ? 'inactive' : 'active';
-      const floor = text(body.floor, 40) || null;
+      const floor = canonicalFloor(text(body.floor, 40)) || null;
       const note = text(body.note, 500) || null;
       let capacity: number | null = null;
       if (body.capacity !== null && body.capacity !== undefined && body.capacity !== '') {

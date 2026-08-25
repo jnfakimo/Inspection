@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
+import { canonicalFloor } from '../_shared/floor.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -87,14 +88,6 @@ function normalizeFixedShifts(value: unknown) {
     };
   });
 }
-function canonicalFloor(value: string) {
-  const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
-  if (normalized === 'B1' || normalized === 'B1F' || normalized === '地下1樓' || normalized === '地下一樓') return 'B1F';
-  if (normalized === 'RF' || normalized === 'R' || normalized === '頂樓' || normalized === '屋頂') return 'RF';
-  const match = normalized.match(/^(\d+)(?:F|樓)?$/);
-  return match ? `${Number(match[1])}F` : value.trim();
-}
-
 export async function handleAdminApiRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return reply(req, { ok: false, message: '僅支援 POST' }, 405);

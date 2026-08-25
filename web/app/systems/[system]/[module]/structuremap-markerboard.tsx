@@ -137,9 +137,13 @@ export function MarkerBoardModule({ profile }: Props) {
       });
       window.alert('部分資料載入失敗，畫面可能不完整，請重新整理頁面。');
     }
-    setMarkers((markerResult.data || []) as Marker[]);
+    setMarkers((markerResult.data || []).map(row => ({
+      ...(row as Marker), floor_id: canonicalFloor(row.floor_id),
+    })));
     setEquipment((equipmentResult.data || []) as Equipment[]);
-    setSpaces((spaceResult.data || []) as Space[]);
+    setSpaces((spaceResult.data || []).map(row => ({
+      ...(row as Space), floor: canonicalFloor(row.floor),
+    })));
     setRepairs(((repairResult.data || []) as Repair[]).filter(row => !CLOSED_REPAIR.includes(row.status)));
     // patrol_shifts 尚未建表時靜默略過，圖釘維持原色。
     try {
@@ -159,7 +163,7 @@ export function MarkerBoardModule({ profile }: Props) {
       const list = (data || [])
         .filter(row => row.image_path)
         .map(row => ({
-          id: String(row.floor_id), label: String(row.name || row.floor_id),
+          id: canonicalFloor(row.floor_id), label: String(row.name || canonicalFloor(row.floor_id)),
           url: textureUrl(String(row.image_path), row.updated_at), index: null as number | null,
         }))
         .sort((a, b) => floorOrder(a.id) - floorOrder(b.id));

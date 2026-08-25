@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { MetricCard } from '@/components/MetricCard';
+import { canonicalFloor } from '@/lib/floor';
 import { invokeAppApi } from '@/lib/supabase';
 import type { EquipmentMapData, Profile } from '@/types/app';
 
@@ -23,7 +24,17 @@ function EquipmentMap({ profile }: { profile: Profile }) {
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => { invokeAppApi<EquipmentMapData>('equipment_map').then(setData).catch(e => setError(e.message)); }, []);
+  useEffect(() => {
+    invokeAppApi<EquipmentMapData>('equipment_map').then(result => setData({
+      equipment: result.equipment.map(item => ({ ...item, floor: canonicalFloor(item.floor) })),
+      markers: result.markers.map(item => ({
+        ...item,
+        floor: canonicalFloor(item.floor),
+        floor_id: canonicalFloor(item.floor_id ?? item.floor),
+      })),
+      locations: result.locations.map(item => ({ ...item, floor: canonicalFloor(item.floor) })),
+    })).catch(e => setError(e.message));
+  }, []);
 
   const floors = useMemo(() => [...new Set(data.equipment.map(e => String(e.floor || '未設定')))].sort(), [data]);
   useEffect(() => { if (!floor && floors.length) setFloor(floors[0]); }, [floors, floor]);
@@ -35,7 +46,7 @@ function EquipmentMap({ profile }: { profile: Profile }) {
   }), [data.equipment, floor, query]);
 
   const repairing = current.filter(item => item.status === 'repair').length;
-  const markerCount = data.markers.filter(marker => String(marker.floor_id || '') === floor).length;
+  const markerCount = data.markers.filter(marker => canonicalFloor(marker.floor_id ?? marker.floor) === floor).length;
 
   return <AppShell profile={profile} title="設備樓層分布">
     <div className="page-actions">

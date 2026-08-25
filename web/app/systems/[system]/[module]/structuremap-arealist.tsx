@@ -162,7 +162,9 @@ export function AreaListModule({ module, profile }: Props) {
       setBusy(false);
       return;
     }
-    const spaces = (spaceResult.data || []) as Space[];
+    const spaces = (spaceResult.data || []).map(row => ({
+      ...(row as Space), floor: canonicalFloor(row.floor),
+    })) as Space[];
     const used = new Map<string, Set<string>>();
     const markers = new Map<string, string>();
     if (!markerResult.error) {
@@ -170,7 +172,7 @@ export function AreaListModule({ module, profile }: Props) {
         const id = String(marker.space_id || '');
         if (!id) return;
         if (!used.has(id)) used.set(id, new Set());
-        if (marker.floor_id) used.get(id)!.add(String(marker.floor_id));
+        if (marker.floor_id) used.get(id)!.add(canonicalFloor(marker.floor_id));
         if (!markers.has(id)) markers.set(id, String(marker.marker_id));
       });
     }
@@ -261,7 +263,7 @@ export function AreaListModule({ module, profile }: Props) {
     const { data, error } = await getSupabase().from('plan_markers')
       .select('floor_id').eq('space_id', spaceId).eq('status', 'active');
     if (error) throw error;
-    return [...new Set((data || []).map(row => String(row.floor_id)))];
+    return [...new Set((data || []).map(row => canonicalFloor(row.floor_id)))];
   };
 
   const delSpace = async (space: Space) => {
@@ -289,7 +291,7 @@ export function AreaListModule({ module, profile }: Props) {
     (data || []).forEach(marker => {
       const id = String(marker.space_id);
       if (!refFloors.has(id)) refFloors.set(id, new Set());
-      refFloors.get(id)!.add(String(marker.floor_id));
+      refFloors.get(id)!.add(canonicalFloor(marker.floor_id));
     });
     const removable = rows.filter(row => !refFloors.has(row.space_id));
     const kept = rows.filter(row => refFloors.has(row.space_id));

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChangeEvent, DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { canonicalFloor } from '@/lib/floor';
 import type { Profile } from '@/types/app';
 import './modeler.css';
 
@@ -250,12 +251,13 @@ export function ModelerClient({ profile }: { profile: Profile }) {
   const lastBlobRef = useRef<Blob | null>(null);
   const lastBBoxRef = useRef<BBox | null>(null);
 
-  const currentFloor = useCallback(() => floorChoice === '__custom' ? (customFloor.trim().toUpperCase() || 'NEW') : floorChoice, [customFloor, floorChoice]);
+  const currentFloor = useCallback(() => floorChoice === '__custom' ? (canonicalFloor(customFloor) || 'NEW') : canonicalFloor(floorChoice), [customFloor, floorChoice]);
 
   const loadModels = useCallback(async () => {
     try {
       const result = await invokeAppApi<ModuleData>('module_data', { system: 'structuremap', module: 'models' });
-      const rows = [...(result.rows || [])].sort((a, b) => String(a.floor_id).localeCompare(String(b.floor_id), 'zh-TW'));
+      const rows = [...(result.rows || [])].map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
+        .sort((a, b) => String(a.floor_id).localeCompare(String(b.floor_id), 'zh-TW'));
       setSavedModels(rows);
       setRefBBox(rows.find(row => row.floor_id === 'B1')?.bbox || null);
       setSavedError(false);

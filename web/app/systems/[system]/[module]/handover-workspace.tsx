@@ -27,6 +27,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { canonicalFloor } from '@/lib/floor';
 import { recordSecurityAudit } from '@/lib/security-audit';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
@@ -813,7 +814,7 @@ function EquipmentOverview({ module, profile }: Props) {
       .select('equipment_id,asset_code,qr_code,name,category,floor,location,status,next_maintenance_on,responsible_name')
       .order('floor').order('name').limit(2000);
     if (error) setNote(`失敗：${errorMessage(error, '設備概況載入失敗')}`);
-    setRows(data || []); setBusy(false);
+    setRows((data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) }))); setBusy(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, status, floor]);

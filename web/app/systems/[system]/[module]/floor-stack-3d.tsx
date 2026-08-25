@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { SUPABASE_URL } from '@/lib/config';
+import { canonicalFloor } from '@/lib/floor';
 
 // 樓層排序沿用全站唯一的 web/lib/floor.ts；此處再匯出，既有匯入端不必改寫。
 export { floorOrder } from '@/lib/floor';
@@ -158,7 +159,9 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
   useEffect(() => {
     let disposed = false;
-    if (!hostRef.current || !models.length) return;
+    const normalizedModels = models.map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }));
+    const normalizedMarkers = markers.map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }));
+    if (!hostRef.current || !normalizedModels.length) return;
     (async () => {
       const THREE = await import('three');
       const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
@@ -180,7 +183,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.target.set(xPan, models.length * gap / 2 + yPan, 0);
+      controls.target.set(xPan, normalizedModels.length * gap / 2 + yPan, 0);
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.1));
       const dir = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -193,9 +196,9 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       const loader = new THREE.TextureLoader();
       loader.setCrossOrigin('anonymous');
       // level 目前資料皆為 0，故以清單順序乘間距堆疊；日後 level 有值則優先採用。
-      const useLevel = models.some(m => Number(m.level) !== 0);
+      const useLevel = normalizedModels.some(m => Number(m.level) !== 0);
 
-      models.forEach((row, index) => {
+      normalizedModels.forEach((row, index) => {
         const y = useLevel ? Number(row.level) || 0 : index * gap;
         
         const isVisible = visibleFloors ? visibleFloors[String(row.floor_id)] !== false : true;
@@ -228,7 +231,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         scene.add(edges);
 
         if (showMarkers) {
-          for (const marker of markers.filter(m => m.floor_id === String(row.floor_id))) {
+          for (const marker of normalizedMarkers.filter(m => m.floor_id === String(row.floor_id))) {
             const isKindVisible = visibleKinds ? visibleKinds[marker.kind || ''] !== false : true;
             if (!isKindVisible) continue;
             
@@ -349,7 +352,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       // V1 的 resetView／topView 是直接設定自製球座標的 theta／phi／r；這裡場景尺度不同
       // （V1 以公尺計、本元件的平面固定為 10×7 單位），因此改以等效視角表達：
       // 重置＝預設的四分之三視角，俯視＝正上方。
-      const stackTop = models.length * gap;
+      const stackTop = normalizedModels.length * gap;
       if (apiRef) {
         apiRef.current = {
           resetView: () => {
@@ -363,11 +366,11 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             controls.update();
           },
           focusMarker: markerId => {
-            const marker = markers.find(item => item.id === markerId);
+            const marker = normalizedMarkers.find(item => item.id === markerId);
             if (!marker) return false;
-            const index = models.findIndex(row => String(row.floor_id) === marker.floor_id);
+            const index = normalizedModels.findIndex(row => String(row.floor_id) === marker.floor_id);
             if (index < 0) return false;
-            const y = (useLevel ? Number(models[index].level) || 0 : index * gap) + 0.12;
+            const y = (useLevel ? Number(normalizedModels[index].level) || 0 : index * gap) + 0.12;
             const px = marker.x * PLANE_W - PLANE_W / 2;
             const pz = marker.y * PLANE_H - PLANE_H / 2;
             controls.target.set(px, y, pz);

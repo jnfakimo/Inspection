@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
+import { canonicalFloor } from "../_shared/floor.ts";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type, x-cron-secret"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
@@ -146,9 +147,9 @@ Deno.serve(async req=>{
       }
       assignedDepartments=[...new Set(assignedDepartments)];
       const expected=(markers||[]).length,checked=expected-unchecked.length,rate=expected?((checked/expected)*100).toFixed(1):"100.0";
-      const floorCount:Record<string,number>={};unchecked.forEach((m:{floor_id:string})=>floorCount[m.floor_id||"未設定"]=(floorCount[m.floor_id||"未設定"]||0)+1);
+      const floorCount:Record<string,number>={};unchecked.forEach((m:{floor_id:string})=>{const floor=canonicalFloor(m.floor_id)||"未設定";floorCount[floor]=(floorCount[floor]||0)+1;});
       const floorText=Object.entries(floorCount).map(([f,n])=>`${f}：${n} 點`).join("\n")||"無";
-      const pointText=rule.include_points&&unchecked.length?"\n\n未完成點位：\n"+unchecked.slice(0,20).map((m:{floor_id:string;label:string})=>`${m.floor_id||""}－${m.label||"未命名"}`).join("\n")+(unchecked.length>20?`\n另有 ${unchecked.length-20} 點`:""):"";
+      const pointText=rule.include_points&&unchecked.length?"\n\n未完成點位：\n"+unchecked.slice(0,20).map((m:{floor_id:string;label:string})=>`${canonicalFloor(m.floor_id)||""}－${m.label||"未命名"}`).join("\n")+(unchecked.length>20?`\n另有 ${unchecked.length-20} 點`:""):"";
       const text=`⚠️ 駐衛警巡檢逾時通知\n\n日期：${shiftDate}\n巡邏時段：${rule.label}\n巡邏時間：${effectiveStart}～${effectiveEnd}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
       if(body.dryRun){results.push({rule:rule.id,shift:rule.label,shiftDate,start:effectiveStart,end:effectiveEnd,expected,checked,unchecked:unchecked.length,dryRun:true});continue;}
       const record={rule_id:rule.id,shift_date:shiftDate,shift_name:rule.label,scheduled_end:endIso,expected_count:expected,checked_count:checked,unchecked_count:unchecked.length,assigned_departments:assignedDepartments,assigned_names:assignedNames,actual_names:actual,status:"pending"};

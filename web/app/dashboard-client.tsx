@@ -29,6 +29,7 @@ import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { isDeletedShift } from '@/lib/patrol-status';
+import { canonicalFloor } from '@/lib/floor';
 import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
@@ -198,11 +199,13 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     setTrend(months);
 
     // 當班巡檢：以當日打卡對照巡邏點，班別取此刻進行中者，與 SYS-03 打卡矩陣同口徑。
-    const points = (markerResult.data || []).filter(row => row.status !== 'inactive');
+    const points = (markerResult.data || [])
+      .filter(row => row.status !== 'inactive')
+      .map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }));
     const checked = new Set<string>();
     (checkinResult.data || []).forEach(row => {
       if (row.target_id) checked.add(String(row.target_id));
-      checked.add(`${row.floor_id}|${row.label}`);
+      checked.add(`${canonicalFloor(row.floor_id)}|${row.label}`);
     });
     const isDone = (point: Row) => checked.has(String(point.marker_id)) || checked.has(`${point.floor_id}|${point.label}`);
     const nowMinutes = now.getHours() * 60 + now.getMinutes();

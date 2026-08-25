@@ -9,7 +9,7 @@ if (location.hash === '#repairs') {
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-auth1"></script>
+<script src="theme.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1833,7 +1833,7 @@ function populateSupervisorSelect(selectId, deptId, roleId, selectedId) {
 
 function fmtLoc(loc) {
   if (!loc) return '—';
-  const parts = [loc.markets?.name, loc.floor, loc.area];
+  const parts = [loc.markets?.name, window.canonicalFloor?.(loc.floor) || loc.floor, loc.area];
   if (loc.detail) parts.push(loc.detail);
   return parts.filter(Boolean).join(' › ');
 }
@@ -4174,8 +4174,9 @@ async function loadLocationAnalysis() {
       .select('location_id,locations(market_id,floor,floor_order,area,area_order,detail,markets(name))')
       .not('location_id', 'is', null)
   ]);
-  _laInsp   = insp   || [];
-  _laRepair = repair || [];
+  const normalizeLocation = row => row?.locations ? { ...row, locations: { ...row.locations, floor: window.canonicalFloor?.(row.locations.floor) || row.locations.floor } } : row;
+  _laInsp   = (insp   || []).map(normalizeLocation);
+  _laRepair = (repair || []).map(normalizeLocation);
   document.getElementById('laUpdated').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW');
 
   // Populate market filter

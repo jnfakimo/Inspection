@@ -5,8 +5,8 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
 <script>{const p=new URLSearchParams(location.search);if(p.get('embed')==='1')document.documentElement.classList.add('embed-mode');if(p.get('patrol')==='1')document.documentElement.classList.add('patrol-only');}</script>
-<script src="theme.js?v=20260825-auth1"></script>
-<script src="floor-utils.js?v=20260821-recursionfix"></script>
+<script src="theme.js?v=20260825-floor1"></script>
+<script src="floor-utils.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -273,7 +273,8 @@ async function buildSources(){
       // renderFloorSelect()、showFloor('B1') 會先跑完，動態加進來的樓層來不及進選單。
       data.forEach(m => {
         if (!m.image_path) return;
-        const fl = FLOORS.find(f => f.id === m.floor_id);
+        const floorId = window.FloorUtils.canonicalFloor(m.floor_id);
+        const fl = FLOORS.find(f => f.id === floorId);
         // 已有本地縮圖的樓層（B1〜3F）：手機沿用 plans/tex/mobile/，
         // 不換成 Storage 原圖（每張 1.5〜2.3MB）。
         if (fl && mobileModel) return;
@@ -291,7 +292,7 @@ async function buildSources(){
           // 沒有本地圖檔的樓層（4F/5F/RF 等後來上傳的）只有 Storage 這一個來源，
           // 手機若一併跳過就整層不會出現。手機優先抓 modeler.html 一併上傳的
           // mobile/ 縮圖；舊資料沒有縮圖時 open-failed 會退回 fallbackSrc 的原圖。
-          FLOORS.push({ id: m.floor_id, label: m.name || m.floor_id, file: null,
+          FLOORS.push({ id: floorId, label: m.name || floorId, file: null,
                         src: { type: 'image', url: mobileModel ? mobileUrl : url },
                         fallbackSrc: { type: 'image', url } });
         }
@@ -361,7 +362,7 @@ async function loadPlanMarkers(){
     let query=db.from('plan_markers').select('marker_id,floor_id,x,y,kind,label').eq('status','active');
     if(PATROL_ONLY) query=query.eq('kind','patrol');
     const {data,error}=await query;
-    if(!error) planMarkers=data||[];
+    if(!error) planMarkers=(data||[]).map(m=>({...m,floor_id:window.FloorUtils.canonicalFloor(m.floor_id)}));
   }catch(e){}
   drawPlanMarkers();
   refreshPatrolStatus();
@@ -411,7 +412,7 @@ function renderPlanMarkers(){
   let visibleCount=0;
   planMarkers.forEach((m,i)=>{
     const key=markerKey(m,i);
-    const shouldShow=m.floor_id===curFloor && KV[m.kind]!==false;
+    const shouldShow=window.FloorUtils.canonicalFloor(m.floor_id)===curFloor && KV[m.kind]!==false;
     let cached=markerOverlayCache.get(key);
     if(!cached){
       cached=makeMarkerOverlay(m);

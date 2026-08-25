@@ -19,7 +19,7 @@ import './v1-listpage.css';
 import './patrol-pointlist.css';
 import { AppShell } from '@/components/AppShell';
 import { LEGACY_BASE } from '@/lib/config';
-import { floorOrder } from '@/lib/floor';
+import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { getSupabase } from '@/lib/supabase';
 import type { ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -99,7 +99,9 @@ export function PointListModule({ module, profile }: Props) {
       setStatus(`讀取失敗：${translateError(failure)}`);
       return;
     }
-    const points = (markerResult.data || []) as Point[];
+    const points = (markerResult.data || []).map(row => ({
+      ...(row as Point), floor_id: canonicalFloor(row.floor_id),
+    })) as Point[];
     const checkins = new Map<string, string>();
     // 已依 checkin_at 遞減排序，同一巡邏點的第一筆即最近一次。
     (checkinResult.data || []).forEach(row => {

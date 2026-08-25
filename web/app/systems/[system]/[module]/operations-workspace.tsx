@@ -11,7 +11,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import type { Profile } from '@/types/app';
 import { PatrolWorkspace } from './patrol-workspace';
 import { HandoverModules } from './handover-workspace';
-import { floorOrder } from '@/lib/floor';
+import { canonicalFloor, floorOrder } from '@/lib/floor';
 
 type Row = Record<string, any>;
 type Point = { marker_id: string; floor_id?: string | null; label?: string | null; note?: string | null };
@@ -26,7 +26,7 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
   const [floorModels, setFloorModels] = useState<Array<{ floor_id: string; name?: string | null; level?: number | null }>>([]);
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<Row[]>([]); const [points, setPoints] = useState<Point[]>([]); const [schedules, setSchedules] = useState<PatrolSchedule[]>([]); const [selected, setSelected] = useState(''); const [exportFrom, setExportFrom] = useState(today()); const [exportTo, setExportTo] = useState(today()); const [date, setDate] = useState(today()); const [floor, setFloor] = useState(''); const [shift, setShift] = useState(''); const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false); const [note, setNote] = useState('');
-  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult, floorResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), client.from('patrol_shifts').select('shift_id,name,start_time,end_time').eq('shift_date', date).order('sort_order').order('start_time'), client.from('floor_models').select('floor_id,name,level').limit(200)]); setRows(data.rows || []); setPoints(markerResult.data || []); setFloorModels(floorResult.data || []); setSchedules((scheduleResult.data || []).filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); } }, [client, date]);
+  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult, floorResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), client.from('patrol_shifts').select('shift_id,name,start_time,end_time').eq('shift_date', date).order('sort_order').order('start_time'), client.from('floor_models').select('floor_id,name,level').limit(200)]); setRows((data.rows || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setPoints((markerResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setFloorModels((floorResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setSchedules((scheduleResult.data || []).filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); } }, [client, date]);
   useEffect(() => { void load(); }, [load]);
   // 打卡明細表只有已打卡的記錄，狀態篩選（待打卡／逾期）是給下方巡檢點矩陣用的；
   // 若在此套用 status，選待打卡或逾期未打卡時明細表會恆空。

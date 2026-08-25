@@ -10,6 +10,7 @@ import { AppShell } from '@/components/AppShell';
 import { MetricCard } from '@/components/MetricCard';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, type AdminProps, errorMessage, fmt, fmtTime, type Row } from './shared';
+import { canonicalFloor } from '@/lib/floor';
 
 type Cell = { insp: number; abn: number; repair: number; lastTime: string | null };
 type DetailNode = Cell & { name: string; order: number };
@@ -44,7 +45,13 @@ export function LocationAnalysisAdmin({ profile, module }: AdminProps) {
           .not('location_id', 'is', null).limit(5000),
       ]);
       if (i.error || r.error) setNote(`失敗：${errorMessage(i.error || r.error, '位置分析資料載入失敗')}`);
-      setInspections(i.data || []); setRepairs(r.data || []);
+      const normalize = (row: Row) => {
+        const location = Array.isArray(row.locations) ? row.locations[0] : row.locations;
+        return location && typeof location === 'object'
+          ? { ...row, locations: { ...(location as Row), floor: canonicalFloor((location as Row).floor) } }
+          : row;
+      };
+      setInspections((i.data || []).map(normalize)); setRepairs((r.data || []).map(normalize));
       setUpdatedAt(fmtTime(new Date().toISOString()));
     } catch (error) { setNote(`失敗：${errorMessage(error, '位置分析資料載入失敗')}`); }
     finally { setBusy(false); }

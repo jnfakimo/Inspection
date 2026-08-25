@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-auth1"></script>
-<script src="floor-utils.js?v=20260821-recursionfix"></script>
+<script src="theme.js?v=20260825-floor1"></script>
+<script src="floor-utils.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>臺北農產公司 第一果菜市場 — 整合標記系統</title>
@@ -339,7 +339,7 @@ function tryFocusDeepLink(){
 }
 
 // 樓層正規化，讓「B1 / B1F」、「1F / 1」等視為同一層（區域位置表與平面圖命名不一致時仍能對應）
-// 正規化邏輯統一由 system/floor-utils.js?v=20260821-recursionfix 提供，避免各頁各自實作出現不相容結果。
+// 正規化邏輯統一由 system/floor-utils.js?v=20260825-floor1 提供，避免各頁各自實作出現不相容結果。
 // 使用區域詞法繫結，避免覆蓋 theme.js 提供給 FloorUtils 的全域正規化函式（會造成相互遞迴）。
 const canonicalFloor = function(f){ return window.FloorUtils.canonicalFloor(f); };
 
@@ -387,11 +387,12 @@ async function buildSources(){
     if(data&&data.length){
       data.forEach(m=>{
         if(!m.image_path) return;
+        const floorId=window.FloorUtils.canonicalFloor(m.floor_id);
         const t=encodeURIComponent(m.updated_at||'');
         const base=`${SUPA_URL}/storage/v1/object/public/floorplans`;
         const url=`${base}/${m.image_path}?t=${t}`;
         const mobileUrl=`${base}/mobile/${m.image_path}?t=${t}`;
-        const fl=FLOORS.find(f=>f.id===m.floor_id);
+        const fl=FLOORS.find(f=>f.id===floorId);
         if(fl){ fl.src={type:'image', url}; }
         // floor_id not in the static FLOORS list -> newly uploaded floor (via
         // modeler.html); add it dynamically. It has no static .dzi fallback,
@@ -399,7 +400,7 @@ async function buildSources(){
         // deleted, since FLOORS is rebuilt from scratch on every page load.
         // 手機優先抓 modeler.html 一併上傳的 mobile/ 縮圖（原圖 1.5〜2.3MB）；
         // 舊資料沒有縮圖時由下方的 fallbackSrc 退回原圖。
-        else{ FLOORS.push({ id:m.floor_id, label:m.name||m.floor_id, dzi:null, idx:null,
+        else{ FLOORS.push({ id:floorId, label:m.name||floorId, dzi:null, idx:null,
                             src:{type:'image', url: mobileModel?mobileUrl:url},
                             fallbackSrc:{type:'image', url} }); }
       });
@@ -453,7 +454,7 @@ async function loadData(){
     console.warn('loadData partial failure',{markers:mk.error,equipment:eq.error,spaces:sp.error,repairs:rp.error});
     alert('部分資料載入失敗，畫面可能不完整，請重新整理頁面。');
   }
-  markers=mk.data||[]; equip=eq.data||[]; spaces=sp.data||[]; repairs=(rp.data||[]).filter(r=>!['done','closed','completed','已完成','已結案'].includes(r.status));
+  markers=(mk.data||[]).map(m=>({...m,floor_id:window.FloorUtils.canonicalFloor(m.floor_id)})); equip=eq.data||[]; spaces=(sp.data||[]).map(s=>({...s,floor:window.FloorUtils.canonicalFloor(s.floor)})); repairs=(rp.data||[]).filter(r=>!['done','closed','completed','已完成','已結案'].includes(r.status));
   fillLinkSelects();
   drawMarkers(); renderList();
   dataReady=true; tryFocusDeepLink();
@@ -738,7 +739,7 @@ async function saveMk(){
   const label=document.getElementById('mkLabel').value.trim();
   const msg=document.getElementById('mkMsg');
   if(!label){msg.textContent='請輸入標記名稱';return;}
-  const rec={floor_id:editId?markers.find(m=>m.marker_id===editId).floor_id:curFloor,
+  const rec={floor_id:window.FloorUtils.canonicalFloor(editId?markers.find(m=>m.marker_id===editId).floor_id:curFloor),
     x:pendX, y:pendY, kind:curKind, label,
     equipment_id:(curKind==='equipment'?(document.getElementById('mkEqp').value||null):null),
     space_id:(curKind==='space'?(document.getElementById('mkSpace').value||null):null),

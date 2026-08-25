@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
+import { canonicalFloor } from "../_shared/floor.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
 const allowedOrigin = (req: Request) => {
@@ -140,7 +141,7 @@ Deno.serve(async (req) => {
       if (!data || data.kind !== "patrol" || data.status !== "active") {
         return reply(req, { ok: false, code: "invalid_target", message: "此巡檢點已停用或不存在" }, 404);
       }
-      point = { floor_id: data.floor_id, label: cleanText(data.label, 200) || "未命名巡檢點" };
+      point = { floor_id: canonicalFloor(data.floor_id) || null, label: cleanText(data.label, 200) || "未命名巡檢點" };
     } else {
       const { data, error } = await admin.from("floor_spaces")
         .select("space_id,floor,space_name,status").eq("space_id", targetId).maybeSingle();
@@ -148,7 +149,7 @@ Deno.serve(async (req) => {
       if (!data || (data.status && data.status !== "active")) {
         return reply(req, { ok: false, code: "invalid_target", message: "此巡檢區域已停用或不存在" }, 404);
       }
-      point = { floor_id: data.floor, label: cleanText(data.space_name, 200) || "未命名巡檢區域" };
+      point = { floor_id: canonicalFloor(data.floor) || null, label: cleanText(data.space_name, 200) || "未命名巡檢區域" };
     }
 
     const { data: duplicate, error: duplicateError } = await admin.from("checkin_logs")

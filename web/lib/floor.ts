@@ -15,11 +15,17 @@ export function canonicalFloor(value: unknown) {
   const raw = String(value ?? '').trim().toUpperCase()
     .replace(/\s+/g, '')
     .replace(/[樓層]/g, '');
-  const basement = raw.match(/^B(\d+)F?$/); if (basement) return `B${basement[1]}`;
-  if (['RF', 'R', 'PH', 'ROOF', '頂', '屋頂'].includes(raw)) return 'RF';
-  if (/^RF/.test(raw)) return 'RF';               // 例：RF頂
-  const above = raw.match(/^(\d+)F?$/); if (above) return `${above[1]}F`;
+  if (!raw) return '';
+  const basementText = raw.match(/^地下(\d+)$/); if (basementText) return `B${Number(basementText[1])}`;
+  const basement = raw.match(/^B(\d+)F?$/); if (basement) return `B${Number(basement[1])}`;
+  if (['RF', 'R', 'PH', 'ROOF', '頂', '屋頂'].includes(raw) || /^RF/.test(raw)) return 'RF';
+  const above = raw.match(/^(\d+)F?$/); if (above) return `${Number(above[1])}F`;
   return raw;
+}
+
+/** 只比較正規化後的樓層鍵值，不直接比較資料庫原始文字。 */
+export function sameFloor(left: unknown, right: unknown) {
+  return canonicalFloor(left) === canonicalFloor(right);
 }
 
 /** 畫面顯示文字。內部鍵值固定用 'RF'，顯示固定用「頂樓」，兩者不要混用。 */

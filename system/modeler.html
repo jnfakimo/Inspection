@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-auth1"></script>
+<script src="theme.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
@@ -174,7 +174,7 @@ document.getElementById('floorSel').onchange=e=>{
 };
 function currentFloor(){
   const v=document.getElementById('floorSel').value;
-  return v==='__custom' ? (document.getElementById('floorCustom').value.trim().toUpperCase()||'NEW') : v;
+  return window.canonicalFloor(v==='__custom' ? (document.getElementById('floorCustom').value.trim().toUpperCase()||'NEW') : v);
 }
 
 // ─── file input / drop ───
@@ -349,6 +349,7 @@ async function loadSaved(){
   if(error){box.innerHTML=`<div class="stat" style="color:var(--amber)">尚未建立 floor_models 表<br><small>請先執行 system/sql/floor_models.sql</small></div>`;return;}
   if(!data?.length){box.innerHTML='<div class="stat">尚無樓層模型</div>';return;}
   box.innerHTML=data.map(d=>{
+    d={...d,floor_id:window.canonicalFloor(d.floor_id)};
     const dt=SystemDate.formatDateTime(d.updated_at);
     return `<div class="saved-item"><span class="dot"></span><span class="fl">${escHtml(d.floor_id)}</span><span>${escHtml(d.name||'')}</span><span class="dt">${dt}</span></div>`;
   }).join('');

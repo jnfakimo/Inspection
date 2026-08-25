@@ -22,7 +22,7 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { FloorStack3D, type FloorStackApi, type StackMarker } from './floor-stack-3d';
-import { floorOrder } from '@/lib/floor';
+import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { allowedActions } from '@/lib/shared-actions';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
@@ -103,12 +103,16 @@ export function Floor3DBoardModule({ profile }: Props) {
     // 標記查詢失敗不擋畫面：樓層模型仍可檢視，但要說出來，不能只是沒有標記。
     if (markerResult.error) setLoadError('標記載入失敗，畫面只呈現樓層模型。');
 
-    const rows = ((modelResult.data || []) as FloorModel[])
+    const rows = (modelResult.data || []).map(row => ({
+      ...(row as FloorModel), floor_id: canonicalFloor(row.floor_id),
+    }))
       .filter(row => row.image_path)
       .sort((a, b) => floorOrder(a.floor_id) - floorOrder(b.floor_id));
     setModels(rows);
     setVisibleFloors(Object.fromEntries(rows.map(row => [String(row.floor_id), true])));
-    setMarkers((markerResult.data || []) as MarkerRow[]);
+    setMarkers((markerResult.data || []).map(row => ({
+      ...(row as MarkerRow), floor_id: canonicalFloor(row.floor_id),
+    })));
 
     setProgress({ pct: 80, msg: '計算巡邏狀態…' });
     try {

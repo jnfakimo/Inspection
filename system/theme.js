@@ -15,10 +15,12 @@
   // Shared floor normalization keeps B1/B1F and numeric floors consistent
   // across equipment, patrol and marker pages.
   window.canonicalFloor=function(value){
-    var raw=String(value||'').trim().toUpperCase().replace(/\s+/g,'');
-    var basement=raw.match(/^B(\d+)F?$/); if(basement)return 'B'+basement[1];
-    if(raw==='RF'||raw==='R'||raw==='頂樓'||raw==='PH'||raw==='ROOF')return 'RF';
-    var above=raw.match(/^(\d+)F?$/); if(above)return above[1]+'F';
+    var raw=String(value==null?'':value).trim().toUpperCase().replace(/\s+/g,'').replace(/[樓層]/g,'');
+    if(!raw)return '';
+    var basementText=raw.match(/^地下(\d+)$/); if(basementText)return 'B'+Number(basementText[1]);
+    var basement=raw.match(/^B(\d+)F?$/); if(basement)return 'B'+Number(basement[1]);
+    if(raw==='RF'||raw==='R'||raw==='頂'||raw==='PH'||raw==='ROOF'||raw==='屋頂'||/^RF/.test(raw))return 'RF';
+    var above=raw.match(/^(\d+)F?$/); if(above)return Number(above[1])+'F';
     return raw;
   };
   window.SystemDate={

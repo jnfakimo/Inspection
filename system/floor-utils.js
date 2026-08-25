@@ -14,7 +14,7 @@ window.FloorUtils = (function () {
   var impl = typeof window.canonicalFloor === 'function' ? window.canonicalFloor : null;
 
   function canonicalFloor(raw) {
-    return impl ? impl(raw) : String(raw == null ? '' : raw).trim();
+    return impl ? impl(raw) : String(raw == null ? '' : raw).trim().toUpperCase();
   }
 
   function floorLabel(canonicalKey) {

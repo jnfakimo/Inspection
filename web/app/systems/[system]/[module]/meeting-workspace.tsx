@@ -20,6 +20,7 @@ import '@/app/meetingroom-v1.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { canonicalFloor } from '@/lib/floor';
 import { invokeGoogleCalendar, openPersonalProfile, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -180,7 +181,12 @@ function MeetingRoomPage({ module, profile }: Props) {
       client.from('users').select('phone').eq('user_id', profile.user_id).maybeSingle(),
     ]);
     if (r.error || w.error) setNote(`失敗：${errorMessage(r.error || w.error, '會議室資料載入失敗')}`);
-    setRooms(r.data || []); setWeekBookings(w.data || []); setMyBookings(mine.data || []);
+    setRooms((r.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })));
+    setWeekBookings(w.data || []);
+    setMyBookings((mine.data || []).map(row => {
+      const room = Array.isArray(row.meeting_rooms) ? row.meeting_rooms[0] : row.meeting_rooms;
+      return room && typeof room === 'object' ? { ...row, meeting_rooms: { ...room, floor: canonicalFloor((room as Row).floor) } } : row;
+    }));
     setRequests(req.data || []); setUsers(u.data || []);
     setMyPhone(String((me.data as Row)?.phone || ''));
     setBusy(false);

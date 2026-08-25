@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { canonicalFloor } from '@/lib/floor';
 import { AdminHeader, AdminModal, type AdminProps, errorMessage, PAGE_SIZE, Pager, type Row, StatusPill } from './shared';
 
 export function LocationsAdmin({ profile, module }: AdminProps) {
@@ -19,7 +20,8 @@ export function LocationsAdmin({ profile, module }: AdminProps) {
         client.from('markets').select('market_id,name,short_name,status').order('name'),
       ]);
       if (locationResult.error || departmentResult.error || marketResult.error) setNote(`失敗：${errorMessage(locationResult.error || departmentResult.error || marketResult.error, '場域位置載入失敗')}`);
-      setLocations(locationResult.data || []); setDepartments(departmentResult.data || []); setMarkets(marketResult.data || []);
+      setLocations((locationResult.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })));
+      setDepartments(departmentResult.data || []); setMarkets(marketResult.data || []);
     } catch (error) { setNote(`失敗：${errorMessage(error, '場域位置載入失敗')}`); }
     finally { setBusy(false); }
   }, []);

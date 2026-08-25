@@ -20,6 +20,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { errorMessage, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
+import { canonicalFloor } from '@/lib/floor';
 import { FloorStack3D, floorOrder, type FloorStackApi, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -69,10 +70,12 @@ export function PatrolMap3DModule({ module, profile }: Props) {
         .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(5000),
     ]);
     if (m.error || p.error || c.error) setNote(`失敗：${errorMessage(m.error || p.error || c.error, '立體巡檢資料載入失敗')}`);
-    const sorted = (m.data || []).slice().sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
+      .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
     setModels(sorted);
     setVisibleFloors(Object.fromEntries(sorted.map(row => [String(row.floor_id), true])));
-    setPoints(p.data || []); setCheckins(c.data || []); setBusy(false);
+    setPoints((p.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
+    setCheckins((c.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setBusy(false);
   }, [date]);
   useEffect(() => { void load(); }, [load]);
 

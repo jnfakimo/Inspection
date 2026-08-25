@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { MARKET_ID } from '@/lib/config';
-import { floorOrder } from '@/lib/floor';
+import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, errorMessage, fmt, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { AreaListModule } from './structuremap-arealist';
@@ -53,7 +53,7 @@ function RelationsModule({ module, profile }: Props) {
     const { data, error } = await getSupabase().from('locations').select('*')
       .eq('market_id', MARKET_ID).order('floor_order').order('area_order').order('detail_order').limit(5000);
     if (error) setNote(`失敗：${errorMessage(error, '場域位置載入失敗')}`);
-    setRows(data || []); setBusy(false);
+    setRows((data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) }))); setBusy(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, floor]);

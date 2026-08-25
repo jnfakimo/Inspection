@@ -24,6 +24,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
+import { canonicalFloor } from '@/lib/floor';
 import { floorOrder, floorTextureUrl, preparePlanObjectUrl } from './floor-stack-3d';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -59,8 +60,11 @@ function useFloorData() {
       client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status,note,equipment_id').limit(5000),
     ]);
     if (m.error || k.error) setNote(`失敗：${errorMessage(m.error || k.error, '圖臺資料載入失敗')}`);
-    const sorted = (m.data || []).slice().sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
-    setModels(sorted); setMarkers(k.data || []); setBusy(false);
+    const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
+      .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    setModels(sorted);
+    setMarkers((k.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
+    setBusy(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
   return { models, markers, busy, note, setNote, reload: load };
