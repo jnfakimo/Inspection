@@ -603,9 +603,19 @@ function renderList(){
   const emptyText=baseTotal
     ? '查無符合目前篩選的項目。'
     : (src==='space'?'本層（區域位置表）尚無空間資料。<br>可於「區域位置表」新增或匯入，或切換樓層。':'目前清單無資料或查無符合項目。');
+  // 舊版把 it.id 直接內插進 onclick 屬性。esc() 產生的 &#39; 會先被 HTML 解析器還原成 '，
+  // 再交給 JS 解析器，逸出等於沒做——含單引號的 id 可以跳出字串執行任意程式。改成 data
+  // 屬性（只經 HTML 解析一層，esc() 就足夠）＋掛在固定容器上的事件委派。
+  if(!box.dataset.pickBound){
+    box.dataset.pickBound='1';
+    box.addEventListener('click',ev=>{
+      const el=ev.target.closest('.mk-item[data-pick-id]');
+      if(el&&box.contains(el)) pickListItem(el.dataset.pickKind,el.dataset.pickId);
+    });
+  }
   box.innerHTML=listed.length?listed.map(it=>{
     const mk=it.mk;
-    return `<div class="mk-item" onclick="pickListItem('${kind}','${it.id}')">
+    return `<div class="mk-item" data-pick-kind="${esc(kind)}" data-pick-id="${esc(it.id)}">
       <span class="cdot" style="background:${col};${mk?'':'opacity:.35'}"></span>
       <span class="mk-name">${esc(it.name)}${it.sub?` <small style="color:var(--text2)">· ${esc(it.sub)}</small>`:''}</span>
       <span class="mk-kind" style="${mk?'border-color:'+col+';color:'+col:''}">${mk?'已設置':'未設置'}</span></div>`;
