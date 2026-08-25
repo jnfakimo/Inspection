@@ -981,7 +981,12 @@
     var offsetSelectors='#c3d,#osd,#panel,#panelToggle,#floorsToggle,#floors,#mkToggle,#mkpanel,#tools,#focusNotice';
     var observed=Array.prototype.slice.call(document.querySelectorAll(offsetSelectors));
     function captureOffsets(){
-      observed.forEach(function(el){el.classList.remove('system-fixed-below-header');});
+      // 清掉前一次量測留下的自訂偏移，否則 resize 後 getComputedStyle() 會
+      // 把舊偏移當成原始 top，再次加上新頁首高度，造成畫布逐次下移。
+      observed.forEach(function(el){
+        el.classList.remove('system-fixed-below-header');
+        el.style.removeProperty('--system-header-offset');
+      });
       observed.forEach(function(el){
         var cs=getComputedStyle(el);
         var top=parseFloat(cs.top);
