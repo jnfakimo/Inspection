@@ -812,7 +812,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
           <div class="field field-name"><label>姓名</label><input id="u-name" type="text" placeholder="請輸入姓名" autocomplete="name"></div>
           <div class="field field-username"><label>登入帳號（英數字／底線）</label><input id="u-username" type="text" placeholder="例：tcfm_admin" autocomplete="off"></div>
           <div class="field field-email"><label>電子郵件（密碼找回用）</label><input id="u-email" type="email" placeholder="user@example.com" autocomplete="email"></div>
-          <div class="field field-pass"><label>初始密碼（至少 6 碼）</label><input id="u-pass" type="password" placeholder="請輸入初始密碼" autocomplete="new-password"></div>
+          <div class="field field-pass"><label>初始密碼（至少 12 個字元，需含至少 3 類字元）</label><input id="u-pass" type="password" minlength="12" maxlength="200" placeholder="請輸入初始密碼" autocomplete="new-password"></div>
           <div class="field field-phone"><label>聯絡電話</label><input id="u-phone" type="tel" placeholder="市話或手機號碼" autocomplete="tel"></div>
           <div class="field field-dept-l1"><label>第一層部門</label><select id="u-dept-l1" onchange="onAdminDeptL1Change()"><option value="">-- 選擇第一層 --</option></select></div>
           <div class="field field-dept-l2"><label>第二層部門（課）</label><select id="u-dept-l2" disabled><option value="">-- 無下級單位 --</option></select></div>
@@ -826,6 +826,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
               <option value="sysadmin">系統管理員</option>
             </select>
           </div>
+          <div class="field field-supervisor"><label>直屬課室主管（一般人員必填）</label><select id="u-supervisor"><option value="">-- 請先選擇單位 --</option></select></div>
         </div>
         <div style="margin-top:14px"><button class="btn btn-primary" onclick="createUser()">+ 建立帳號</button></div>
       </div>
@@ -1512,6 +1513,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
           <option value="sysadmin">系統管理員</option>
         </select>
       </div>
+      <div class="field"><label>直屬課室主管（一般人員必填）</label><select id="edit-u-supervisor"><option value="">-- 請選擇 --</option></select></div>
       <!-- 密碼重設區塊 -->
       <div class="field" style="grid-column:1/-1;margin-top:4px">
         <div style="border:1px solid rgba(255,179,0,.3);border-radius:3px;overflow:hidden">
@@ -1523,8 +1525,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
             <p style="font-size:.75rem;color:var(--text-dim);margin-bottom:10px">若不需要變更密碼，請保持空白。填寫密碼則儲存時同步重設。</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div class="field">
-                <label>新密碼（至少 6 碼）</label>
-                <input id="edit-u-newpw" type="password" placeholder="不變更請留空" autocomplete="new-password">
+                <label>新密碼（至少 12 個字元，需含至少 3 類字元）</label>
+                <input id="edit-u-newpw" type="password" minlength="12" maxlength="200" placeholder="不變更請留空" autocomplete="new-password">
               </div>
               <div class="field">
                 <label>確認新密碼</label>
@@ -1550,8 +1552,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
     <p id="resetPwTarget" style="font-size:.85rem;color:var(--text-dim);margin-bottom:16px"></p>
     <div class="form-grid">
       <div class="field" style="grid-column:1/-1">
-        <label>新密碼（至少 6 碼）</label>
-        <input id="reset-new-pw" type="password" placeholder="輸入新密碼" autocomplete="new-password">
+        <label>新密碼（至少 12 個字元，需含至少 3 類字元）</label>
+        <input id="reset-new-pw" type="password" minlength="12" maxlength="200" placeholder="輸入新密碼" autocomplete="new-password">
       </div>
       <div class="field" style="grid-column:1/-1">
         <label>確認新密碼</label>
@@ -1618,8 +1620,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   <div class="modal">
     <div class="modal-title"><span class="ic ic-inspection"></span> 更改密碼</div>
     <div class="form-grid">
-      <div class="field"><label>新密碼</label><input id="new-pw" type="password" placeholder="至少 8 個字元" autocomplete="new-password"></div>
-      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" placeholder="再輸入一次" autocomplete="new-password"></div>
+      <div class="field"><label>新密碼（至少 12 個字元，需含至少 3 類字元）</label><input id="new-pw" type="password" minlength="12" maxlength="200" placeholder="至少 12 個字元" autocomplete="new-password"></div>
+      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" minlength="12" maxlength="200" placeholder="再輸入一次" autocomplete="new-password"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="closeModal('changePwModal')">取消</button>
@@ -1811,6 +1813,22 @@ function selectRoleCheckbox(prefix, roleId) {
 
 function applyRolePreset(prefix) {
   setPermissionValues(prefix);
+  const role = normalizeRoleId(document.getElementById(permissionSelectId(prefix))?.value || 'reporter');
+  if (prefix === 'c') populateSupervisorSelect('u-supervisor', getAdminDeptId(), role, document.getElementById('u-supervisor')?.value || '');
+  if (prefix === 'e') populateSupervisorSelect('edit-u-supervisor', getEditDeptId(), role, document.getElementById('edit-u-supervisor')?.value || '');
+}
+
+function populateSupervisorSelect(selectId, deptId, roleId, selectedId) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const requiresSupervisor = !['unit_supervisor', 'sysadmin'].includes(normalizeRoleId(roleId));
+  const candidates = allUsers.filter(user => user.status === 'active' && ['unit_supervisor', 'sysadmin'].includes(normalizeRoleId(user)) &&
+    (normalizeRoleId(user) === 'sysadmin' || !deptId || !user.dept_id || user.dept_id === deptId));
+  select.innerHTML = (requiresSupervisor ? '<option value="">-- 請選擇 --</option>' : '<option value="">-- 不需指定 --</option>') +
+    candidates.map(user => `<option value="${user.user_id}">${escHtml(user.name)}｜${escHtml(getDeptPath(user.dept_id))}</option>`).join('');
+  select.disabled = !requiresSupervisor;
+  if (requiresSupervisor && selectedId && candidates.some(user => user.user_id === selectedId)) select.value = selectedId;
+  if (!requiresSupervisor) select.value = '';
 }
 
 function fmtLoc(loc) {
@@ -1940,6 +1958,7 @@ async function loadAll() {
   allEquipment.forEach(e => eqMap[e.equipment_id] = e);
   allDepts.forEach(d => deptMap[d.dept_id] = d);
   populateAdminDeptSelects();
+  applyRolePreset('c');
   populateEqFilter('cost-eq');
 }
 
@@ -1978,10 +1997,15 @@ function onAdminDeptL1Change() {
       children.map(c => `<option value="${c.dept_id}">${escHtml(c.name)}</option>`).join('');
     l2Sel.disabled = false;
   }
+  applyRolePreset('c');
 }
 
 function getAdminDeptId() {
   return document.getElementById('u-dept-l2')?.value || document.getElementById('u-dept-l1')?.value || null;
+}
+
+function getEditDeptId() {
+  return document.getElementById('edit-u-dept-l2')?.value || document.getElementById('edit-u-dept-l1')?.value || null;
 }
 
 function getDeptPath(deptId) {
@@ -2030,6 +2054,7 @@ function onEditUserDeptL1Change() {
       children.map(c => `<option value="${c.dept_id}">${escHtml(c.name)}</option>`).join('');
     l2Sel.disabled = false;
   }
+  applyRolePreset('e');
 }
 
 function editUser(userId) {
@@ -2049,6 +2074,7 @@ function editUser(userId) {
   const rbacRole = normalizeRoleId(u);
   document.getElementById('edit-u-role').value = rbacRole;
   populateEditUserDeptSelects(u.dept_id || null);
+  populateSupervisorSelect('edit-u-supervisor', u.dept_id || null, rbacRole, u.supervisor_id || '');
   renderPermissionList('e', normalizePermissions(u.permissions, rbacRole));
   document.getElementById('editUserModal').classList.add('show');
 }
@@ -2070,6 +2096,7 @@ async function saveEditUser() {
   const rbacRole = document.getElementById('edit-u-role').value;
   const role   = legacyRoleForRbac(rbacRole);
   const deptId = document.getElementById('edit-u-dept-l2').value || document.getElementById('edit-u-dept-l1').value || null;
+  const supervisorId = document.getElementById('edit-u-supervisor').value || null;
   const newPw  = document.getElementById('edit-u-newpw').value;
   const newPw2 = document.getElementById('edit-u-newpw2').value;
   const pwMsg  = document.getElementById('editPwMsg');
@@ -2078,11 +2105,13 @@ async function saveEditUser() {
   if (!/^[一-龥]{2,10}$/.test(name)) { showToast('姓名格式錯誤，請輸入 2~10 個中文字', true); return; }
   if (!username) { showToast('請填寫登入帳號', true); return; }
   if (!/^[a-zA-Z0-9_]+$/.test(username)) { showToast('帳號格式錯誤：僅限英數字與底線', true); return; }
+  if (!['unit_supervisor', 'sysadmin'].includes(rbacRole) && !supervisorId) { showToast('一般人員必須指定直屬課室主管', true); return; }
 
   // 密碼驗證（如果有填寫）
   if (newPw) {
-    if (newPw.length < 6) {
-      pwMsg.textContent = '密碼至少需要 6 個字元'; pwMsg.style.color = 'var(--red)';
+    const passwordError = PasswordPolicy.message(newPw);
+    if (passwordError) {
+      pwMsg.textContent = passwordError; pwMsg.style.color = 'var(--red)';
       document.getElementById('editPwSection').style.display = 'block';
       document.getElementById('editPwToggleIcon').innerHTML = '&#9650;';
       return;
@@ -2097,32 +2126,17 @@ async function saveEditUser() {
 
   const permissions = collectPermissionValues('e');
   const before = userMap[userId];
-  const updates = { name, username, phone: phone || null, role, rbac_role: rbacRole, dept_id: deptId, permissions };
-  const { error } = await db.from('users').update(updates).eq('user_id', userId);
-  if (error) { showToast('儲存失敗：' + translateError(error.message), true); return; }
-
-  // 密碼同步重設
-  if (newPw) {
-    pwMsg.textContent = '密碼重設中…'; pwMsg.style.color = 'var(--cyan)';
-    const targetEmail = document.getElementById('edit-u-email').value;
-    const { error: rpcErr } = await db.rpc('admin_reset_user_password', {
-      p_email: targetEmail,
-      p_new_password: newPw
-    });
-    if (rpcErr) {
-      // fallback: 寄送重設信
-      const redirectTo = window.location.origin + '/word-cloud/system/login.html';
-      const { error: mailErr } = await db.auth.resetPasswordForEmail(targetEmail, { redirectTo });
-      if (mailErr) {
-        showToast('資料儲存成功，但密碼重設失敗：' + translateError(mailErr.message), true);
-      } else {
-        showToast(`資料已更新，密碼重設信已寄至 ${targetEmail}`);
-      }
-    } else {
+  const updates = { user_id: userId, name, username, phone: phone || null, role, rbac_role: rbacRole, dept_id: deptId, supervisor_id: supervisorId };
+  try {
+    await invokeEdgeAction(db, 'admin-api', { action: 'admin_update_user', ...updates });
+    if (newPw) {
+      pwMsg.textContent = '密碼重設中…'; pwMsg.style.color = 'var(--cyan)';
+      await invokeEdgeAction(db, 'admin-api', { action: 'admin_reset_password', user_id: userId, password: newPw });
       showToast(`使用者「${name}」已更新，密碼同步重設完成`);
-    }
-  } else {
-    showToast(`使用者「${name}」已更新`);
+    } else showToast(`使用者「${name}」已更新`);
+  } catch (error) {
+    showToast('儲存失敗：' + translateError(error.message || String(error)), true);
+    return;
   }
 
   await writeAudit('users', userId, 'update', { name: before?.name, phone: before?.phone, role: before?.role, rbac_role: before?.rbac_role, dept_id: before?.dept_id, permissions: before?.permissions }, updates);
@@ -2522,8 +2536,8 @@ async function exportUsersXlsx() {
 
 // 統一標準：下載匯入範本（XLSX）
 async function downloadImportTemplate() {
-  const head = ['姓名','帳號','Email','密碼','電話','角色'];
-  const sample = ['王小明','tcfm_wang','wang@example.com','Password123','0912345678','一般報修人員'];
+  const head = ['姓名','帳號','Email','密碼','電話','角色','直屬主管帳號'];
+  const sample = ['王小明','tcfm_wang','wang@example.com','Password123!','0912345678','系統管理員','—'];
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('帳號匯入範本');
   ws.addRow(head); ws.addRow(sample);
@@ -2531,7 +2545,7 @@ async function downloadImportTemplate() {
 }
 
 function genTempPassword() {
-  return 'Tc' + Math.random().toString(36).slice(2,8).toUpperCase() + Math.floor(10 + Math.random() * 90);
+  return 'Tc!' + Math.random().toString(36).slice(2,10).toUpperCase() + Math.floor(10 + Math.random() * 90);
 }
 
 function isRegisteredAuthUser(authData, authError) {
@@ -2561,49 +2575,14 @@ async function createAuthBackedProfile(profile, password) {
   // Never call signUp on the main client: when email confirmation is disabled,
   // signUp changes that client's session to the newly-created user and the
   // following admin-only profile insert fails, leaving an orphan Auth account.
-  const authClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-  });
-  const { data: authData, error: authError } = await authClient.auth.signUp({
-    email: profile.email,
-    password
-  });
-
-  if (isRegisteredAuthUser(authData, authError)) {
-    const recovered = await recoverAuthProfile(profile);
-    if (recovered.error) return { error: recovered.error, recovered: false };
-    return {
-      authId: recovered.data?.auth_id,
-      userId: recovered.data?.user_id,
-      recovered: true,
-      error: null
-    };
+  try {
+    const data = await invokeEdgeAction(db, 'admin-api', {
+      action: 'admin_create_user', ...profile, password
+    });
+    return { authId: data?.auth_id, userId: data?.user_id, recovered: false, error: null };
+  } catch (error) {
+    return { error, recovered: false };
   }
-  if (authError) return { error: authError, recovered: false };
-  if (!authData?.user?.id) return { error: new Error('Supabase Auth 未回傳使用者識別碼'), recovered: false };
-
-  const row = { ...profile, auth_id: authData.user.id };
-  const { data: inserted, error: profileError } = await db
-    .from('users')
-    .insert(row)
-    .select('user_id,auth_id')
-    .single();
-  if (!profileError) {
-    return { authId: inserted.auth_id, userId: inserted.user_id, recovered: false, error: null };
-  }
-
-  // Auth creation succeeded but the profile write failed. Retry through the
-  // idempotent recovery RPC so this request does not leave another orphan.
-  const recovered = await recoverAuthProfile(profile);
-  if (!recovered.error) {
-    return {
-      authId: recovered.data?.auth_id || authData.user.id,
-      userId: recovered.data?.user_id,
-      recovered: true,
-      error: null
-    };
-  }
-  return { error: profileError, recoveryError: recovered.error, recovered: false };
 }
 
 // 批次匯入產生的臨時密碼只暫存於此，不渲染成畫面文字；管理者以複製按鈕取用後
@@ -2649,6 +2628,7 @@ async function importUsersXlsx() {
   const passwordIndex = findHeader('初始密碼','密碼');
   const phoneIndex = findHeader('聯絡電話','電話');
   const roleIndex = findHeader('角色');
+  const supervisorIndex = findHeader('直屬主管帳號','主管帳號');
   const dataLines = aoa.slice(headerRowIndex + 1);
   let success = 0, failed = 0, skipped = 0;
   const existingUsernames = new Set(allUsers.map(u => (u.username || '').toLowerCase()));
@@ -2670,6 +2650,7 @@ async function importUsersXlsx() {
     const password = passwordIndex >= 0 ? cols[passwordIndex] || '' : '';
     const phone = phoneIndex >= 0 ? cols[phoneIndex] || '' : '';
     const roleRaw = roleIndex >= 0 ? cols[roleIndex] || '' : '';
+    const supervisorUsername = supervisorIndex >= 0 ? cols[supervisorIndex] || '' : '';
     if (!name || !username || !email) {
       log.innerHTML += `<div style="color:var(--amber)">第 ${headerRowIndex+i+2} 行：缺少必填欄位（姓名/帳號/Email），跳過</div>`; failed++; continue;
     }
@@ -2677,11 +2658,19 @@ async function importUsersXlsx() {
       log.innerHTML += `<div style="color:var(--text-dim)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」（${escHtml(username)}）：帳號或Email已存在，跳過</div>`; skipped++; continue;
     }
     const pwd = password || genTempPassword();
+    const passwordError = PasswordPolicy.message(pwd);
+    if (passwordError) {
+      log.innerHTML += `<div style="color:var(--red)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」：${escHtml(passwordError)}</div>`; failed++; continue;
+    }
     // 密碼僅保留在記憶體供複製按鈕使用，不寫入 DOM 文字。
     const rbacRole = roleMap[roleRaw] || 'reporter';
     const userRole = legacyRoleForRbac(rbacRole);
+    const supervisor = allUsers.find(user => user.status === 'active' && (user.username || '').toLowerCase() === supervisorUsername.toLowerCase() && ['unit_supervisor', 'sysadmin'].includes(normalizeRoleId(user)));
+    if (!['unit_supervisor', 'sysadmin'].includes(rbacRole) && !supervisor) {
+      log.innerHTML += `<div style="color:var(--red)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」：請填寫有效的直屬主管帳號</div>`; failed++; continue;
+    }
     const permissions = defaultPermsForRole(rbacRole);
-    const profile = { name, username, email: email.toLowerCase(), phone: phone || null, role: userRole, rbac_role: rbacRole, permissions, status: 'active', created_by: currentUser?.user_id };
+    const profile = { name, username, email: email.toLowerCase(), phone: phone || null, supervisor_id: supervisor?.user_id || null, role: userRole, rbac_role: rbacRole, permissions, status: 'active', created_by: currentUser?.user_id };
     const created = await createAuthBackedProfile(profile, pwd);
     if (created.error) {
       log.innerHTML += `<div style="color:var(--red)">第 ${headerRowIndex+i+2} 行「${escHtml(name)}」：${escHtml(translateError(created.error.message))}</div>`; failed++; continue;
@@ -2713,11 +2702,15 @@ async function createUser() {
   const phone    = document.getElementById('u-phone').value.trim();
   const deptId   = getAdminDeptId();
   const rbacRole = document.getElementById('u-role').value;
+  const supervisorId = document.getElementById('u-supervisor').value || null;
   const role     = legacyRoleForRbac(rbacRole);
   if (!name || !username || !email || !pass) { showToast('請填寫姓名、帳號、郵件與密碼', true); return; }
   if (!/^[一-龥]{2,10}$/.test(name)) { showToast('姓名格式錯誤，請輸入 2~10 個中文字', true); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Email 格式不正確', true); return; }
   if (!/^[A-Za-z0-9_]+$/.test(username)) { showToast('帳號僅限英文、數字、底線', true); return; }
+  const passwordError = PasswordPolicy.message(pass);
+  if (passwordError) { showToast(passwordError, true); return; }
+  if (!['unit_supervisor', 'sysadmin'].includes(rbacRole) && !supervisorId) { showToast('一般人員必須指定直屬課室主管', true); return; }
 
   const permissions = collectPermissionValues('c');
   const { data: duplicateEmail } = await db.from('users').select('user_id').ilike('email', email).limit(1).maybeSingle();
@@ -2725,7 +2718,7 @@ async function createUser() {
   const { data: duplicateUsername } = await db.from('users').select('user_id').ilike('username', username).limit(1).maybeSingle();
   if (duplicateUsername) { showToast('此登入帳號已存在，請使用其他帳號', true); return; }
 
-  const profile = { name, username, email, phone: phone || null, dept_id: deptId, role, rbac_role: rbacRole, permissions, status: 'active', created_by: currentUser.user_id };
+  const profile = { name, username, email, phone: phone || null, dept_id: deptId, supervisor_id: supervisorId, role, rbac_role: rbacRole, permissions, status: 'active', created_by: currentUser.user_id };
   const created = await createAuthBackedProfile(profile, pass);
   if (created.error) {
     const migrationMissing = created.error.message?.includes('recover_auth_user_profile');
@@ -2736,9 +2729,7 @@ async function createUser() {
   }
 
   await writeAudit('users', created.authId || created.userId, 'insert', null, { ...profile, recovered: created.recovered });
-  showToast(created.recovered
-    ? `帳號「${name}」已修復並顯示於帳戶清單；密碼沿用此 Email 原先註冊的密碼`
-    : `帳號「${name}」已建立`);
+  showToast(`帳號「${name}」已建立`);
   ['u-name','u-username','u-email','u-pass','u-phone'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('u-dept-l1').value = '';
   document.getElementById('u-dept-l2').innerHTML = '<option value="">-- 無下級單位 --</option>';
@@ -2750,8 +2741,10 @@ async function createUser() {
 
 // ─── 管理員重設使用者密碼 ─────────────────────────────────────────────────────
 let _resetTargetEmail = '';
+let _resetTargetUserId = '';
 
 function openResetPwModal(userId, name, email) {
+  _resetTargetUserId = userId;
   _resetTargetEmail = email;
   document.getElementById('resetPwTarget').textContent = `對象：${name}（${email}）`;
   document.getElementById('reset-new-pw').value = '';
@@ -2768,42 +2761,26 @@ async function doResetUserPw() {
   const btn = document.getElementById('resetPwSaveBtn');
   msg.textContent = ''; msg.style.cssText = '';
 
-  if (pw.length < 6) {
-    msg.textContent = '密碼至少需要 6 個字元'; msg.style.color = 'var(--red)'; return;
-  }
+  const passwordError = PasswordPolicy.message(pw);
+  if (passwordError) { msg.textContent = passwordError; msg.style.color = 'var(--red)'; return; }
   if (pw !== pw2) {
     msg.textContent = '兩次密碼不一致'; msg.style.color = 'var(--red)'; return;
   }
-  if (!_resetTargetEmail) {
-    msg.textContent = '找不到使用者 Email'; msg.style.color = 'var(--red)'; return;
+  if (!_resetTargetUserId) {
+    msg.textContent = '找不到使用者帳號'; msg.style.color = 'var(--red)'; return;
   }
 
   btn.disabled = true; btn.textContent = '處理中…';
 
-  // 步驟一：呼叫 Supabase RPC admin_reset_user_password（需 DB function）
-  const { error: rpcErr } = await db.rpc('admin_reset_user_password', {
-    p_email: _resetTargetEmail,
-    p_new_password: pw
-  });
-
-  if (rpcErr) {
-    // 若 RPC 不存在，改用寄送重設信（fallback）
-    const redirectTo = window.location.origin + '/word-cloud/system/login.html';
-    const { error: mailErr } = await db.auth.resetPasswordForEmail(_resetTargetEmail, { redirectTo });
-    if (mailErr) {
-      msg.textContent = '重設失敗：' + translateError(mailErr.message);
-      msg.style.cssText = 'color:var(--red);background:rgba(255,59,59,.06);border:1px solid rgba(255,59,59,.2);padding:8px;border-radius:2px';
-    } else {
-      msg.textContent = '✅ 已發送密碼重設信至 ' + _resetTargetEmail + '，請通知使用者收信。';
-      msg.style.cssText = 'color:var(--green);background:rgba(0,255,157,.06);border:1px solid rgba(0,255,157,.2);padding:8px;border-radius:2px';
-      showToast('重設信已寄出');
-      setTimeout(() => closeModal('resetPwModal'), 3000);
-    }
-  } else {
+  try {
+    await invokeEdgeAction(db, 'admin-api', { action: 'admin_reset_password', user_id: _resetTargetUserId, password: pw });
     msg.textContent = '✅ 密碼已重設完成！';
     msg.style.cssText = 'color:var(--green);background:rgba(0,255,157,.06);border:1px solid rgba(0,255,157,.2);padding:8px;border-radius:2px';
     showToast(`${_resetTargetEmail} 密碼已重設`);
     setTimeout(() => closeModal('resetPwModal'), 2000);
+  } catch (error) {
+    msg.textContent = '重設失敗：' + translateError(error.message || String(error));
+    msg.style.cssText = 'color:var(--red);background:rgba(255,59,59,.06);border:1px solid rgba(255,59,59,.2);padding:8px;border-radius:2px';
   }
 
   btn.disabled = false; btn.textContent = '確認重設';
@@ -2811,8 +2788,8 @@ async function doResetUserPw() {
 
 async function toggleUserStatus(userId, status) {
   const before = userMap[userId];
-  const { error } = await db.from('users').update({ status }).eq('user_id', userId);
-  if (error) { showToast('操作失敗', true); return; }
+  try { await invokeEdgeAction(db, 'admin-api', { action: 'admin_toggle_user', user_id: userId, status }); }
+  catch (error) { showToast('操作失敗：' + translateError(error.message || String(error)), true); return; }
   await writeAudit('users', userId, 'status_change', { status: before?.status }, { status });
   showToast(status === 'inactive' ? '帳號已停用' : '帳號已啟用');
   await loadUsers();
@@ -2820,8 +2797,8 @@ async function toggleUserStatus(userId, status) {
 
 async function deidentifyUser(userId, name) {
   if (!confirm(`確定要清除「${name}」的姓名/電話/Email/登入帳號等直接識別資料嗎？\n\n這個動作無法復原（但不會刪除任何歷史稽核紀錄），僅適用於確定不再需要保留聯絡方式的離職人員。`)) return;
-  const { error } = await db.rpc('deidentify_departed_user', { p_user_id: userId });
-  if (error) { showToast('去識別化失敗：' + translateError(error.message), true); return; }
+  try { await invokeEdgeAction(db, 'admin-api', { action: 'admin_deidentify_user', user_id: userId }); }
+  catch (error) { showToast('去識別化失敗：' + translateError(error.message || String(error)), true); return; }
   showToast('已完成個資去識別化');
   await loadUsers();
 }
@@ -4115,12 +4092,13 @@ function openChangePwModal() {
 async function changePassword() {
   const pw  = document.getElementById('new-pw').value;
   const pw2 = document.getElementById('new-pw2').value;
-  if (pw.length < 8) { showToast('密碼至少需要 8 個字元', true); return; }
+  const passwordError = PasswordPolicy.message(pw);
+  if (passwordError) { showToast(passwordError, true); return; }
   if (pw !== pw2) { showToast('兩次密碼不一致', true); return; }
   const { data: { session } } = await db.auth.getSession();
   if (!session) { showToast('請先透過登入頁面登入後再更改密碼', true); return; }
-  const { error } = await db.auth.updateUser({ password: pw });
-  if (error) { showToast('更改失敗：' + translateError(error.message), true); return; }
+  try { await invokeEdgeAction(db, 'app-api', { action: 'change_password', password: pw }); }
+  catch (error) { showToast('更改失敗：' + translateError(error.message || String(error)), true); return; }
   if (currentUser?.user_id) localStorage.setItem('pw_noted_' + currentUser.user_id, '1');
   showToast('密碼已更改');
   closeModal('changePwModal');

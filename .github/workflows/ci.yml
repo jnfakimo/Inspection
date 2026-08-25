@@ -81,6 +81,9 @@ jobs:
           grep -R "<script src=\"https://" -n . | grep -v "integrity" && echo "Missing integrity detected" || echo "All external scripts have integrity attributes"
         shell: bash
 
+      - name: Scan public pages for server secrets
+        run: npm run security:secrets
+
       # Dependency freshness check
       - name: Check outdated npm dependencies
         run: |

@@ -533,7 +533,7 @@
     document.head.appendChild(style);
     var modal=document.createElement('div');
     modal.id='sharedChangePwModal';
-    modal.innerHTML='<div class="spw-box"><h3>更改密碼</h3><label>新密碼</label><input type="password" id="spwNew" autocomplete="new-password" placeholder="至少 8 個字元"><label>確認新密碼</label><input type="password" id="spwNew2" autocomplete="new-password" placeholder="再輸入一次"><div class="spw-msg" id="spwMsg"></div><div class="spw-actions"><button type="button" id="spwCancel">取消</button><button type="button" class="spw-primary" id="spwSubmit">確認更改</button></div></div>';
+    modal.innerHTML='<div class="spw-box"><h3>更改密碼</h3><label>新密碼（至少 12 個字元，需含至少 3 類字元）</label><input type="password" id="spwNew" minlength="12" maxlength="200" autocomplete="new-password" placeholder="至少 12 個字元"><label>確認新密碼</label><input type="password" id="spwNew2" minlength="12" maxlength="200" autocomplete="new-password" placeholder="再輸入一次"><div class="spw-msg" id="spwMsg"></div><div class="spw-actions"><button type="button" id="spwCancel">取消</button><button type="button" class="spw-primary" id="spwSubmit">確認更改</button></div></div>';
     document.body.appendChild(modal);
     modal.addEventListener('click',function(e){ if(e.target===modal)closeChangePwModal(); });
     document.getElementById('spwCancel').addEventListener('click',closeChangePwModal);
@@ -555,27 +555,20 @@
     var pw=document.getElementById('spwNew').value;
     var pw2=document.getElementById('spwNew2').value;
     var msg=document.getElementById('spwMsg');
-    if(pw.length<8){msg.style.color='var(--red,#dc2626)';msg.textContent='密碼至少需要 8 個字元';return;}
+    var passwordError=window.PasswordPolicy&&window.PasswordPolicy.message(pw);
+    if(passwordError){msg.style.color='var(--red,#dc2626)';msg.textContent=passwordError;return;}
     if(pw!==pw2){msg.style.color='var(--red,#dc2626)';msg.textContent='兩次密碼不一致';return;}
-    var auth=storedAuthSessionForAccess();
-    var token=auth&&auth.access_token;
-    if(!token){msg.style.color='var(--red,#dc2626)';msg.textContent='請先登入後再更改密碼';return;}
     msg.style.color='var(--text-dim,#64748b)';
     msg.textContent='處理中…';
-    fetch(SUPABASE_URL+'/auth/v1/user',{method:'PUT',headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
-      .then(function(r){return r.json().then(function(j){return {ok:r.ok,body:j};}).catch(function(){return {ok:r.ok,body:null};});})
-      .then(function(res){
-        if(!res.ok){
-          msg.style.color='var(--red,#dc2626)';
-          var m=(res.body&&(res.body.msg||res.body.error_description||res.body.message))||'';
-          msg.textContent='更改失敗：'+(m.indexOf('Password should be at least')===0||/at least/.test(m)?'密碼長度不足':(m||'請稍後再試'));
-          return;
-        }
+    var client=window.createDb?window.createDb():null;
+    if(!client||!window.invokeEdgeAction){msg.style.color='var(--red,#dc2626)';msg.textContent='系統密碼服務尚未載入，請重新整理';return;}
+    window.invokeEdgeAction(client,'app-api',{action:'change_password',password:pw})
+      .then(function(){
         msg.style.color='var(--green,#059669)';
         msg.textContent='密碼已更改';
         setTimeout(closeChangePwModal,1200);
       })
-      .catch(function(){msg.style.color='var(--red,#dc2626)';msg.textContent='網路連線失敗，請稍後再試';});
+      .catch(function(error){msg.style.color='var(--red,#dc2626)';msg.textContent='更改失敗：'+(error&&error.message||'請稍後再試');});
   }
   window.SystemAccountActions={logout:performLogout,openChangePassword:openChangePwModal};
 

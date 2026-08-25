@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/security-monitor.ts';
+import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -364,6 +365,7 @@ export async function handleAppApiRequest(req: Request) {
       inspections: 'app-api:inspections',
       equipment_map: 'app-api:equipment_map',
       update_personal_profile: 'admin-api:write',
+      change_password: 'admin-api:write',
       open_inspection_cycle: 'admin-api:write',
       create_cost_record: 'admin-api:write',
       save_official_vehicle: 'admin-api:write',
@@ -430,6 +432,16 @@ export async function handleAppApiRequest(req: Request) {
       if (error || !updated) return reply(req, { ok: false, message: '個人資料更新失敗' }, 500);
       await writeAudit(admin, profile.user_id, 'users', profile.user_id, 'update', before, { name: updated.name, phone: updated.phone });
       return reply(req, { ok: true, data: { ...updated, email: updated.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
+    }
+
+    if (action === 'change_password') {
+      const password = String(body.password || '');
+      const passwordError = passwordPolicyMessage(password);
+      if (passwordError) return reply(req, { ok: false, message: passwordError }, 400);
+      const { error } = await admin.auth.admin.updateUserById(authData.user.id, { password });
+      if (error) return reply(req, { ok: false, message: '密碼更新失敗，請確認密碼格式後再試' }, 400);
+      await writeAudit(admin, profile.user_id, 'users', profile.user_id, 'update', null, { event_type: 'password_change' });
+      return reply(req, { ok: true, message: '密碼已更新' });
     }
 
     if (action === 'module_data') {

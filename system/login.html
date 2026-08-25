@@ -233,14 +233,14 @@ input:focus{border-color:#6366f1}
   <div class="card" style="max-width:380px">
     <div class="logo" style="font-size:1.8rem;margin-bottom:12px">🔑</div>
     <h1 style="font-size:1.2rem;margin-bottom:6px">設定新密碼</h1>
-    <div class="subtitle" style="margin-bottom:24px">請輸入您的新密碼（至少 8 個字元）</div>
+    <div class="subtitle" style="margin-bottom:24px">請輸入您的新密碼（至少 12 個字元，需含至少 3 類字元）</div>
     <div class="field">
       <label for="resetPw">新密碼</label>
-      <input id="resetPw" type="password" placeholder="••••••••" autocomplete="new-password">
+      <input id="resetPw" type="password" minlength="12" maxlength="200" placeholder="••••••••••••" autocomplete="new-password">
     </div>
     <div class="field">
       <label for="resetPw2">確認新密碼</label>
-      <input id="resetPw2" type="password" placeholder="••••••••" autocomplete="new-password">
+      <input id="resetPw2" type="password" minlength="12" maxlength="200" placeholder="••••••••••••" autocomplete="new-password">
     </div>
     <button type="button" class="btn" id="resetSaveBtn">設定新密碼</button>
     <div class="err" id="resetErr"></div>
@@ -584,19 +584,21 @@ document.getElementById('resetSaveBtn').addEventListener('click', async () => {
   const err = document.getElementById('resetErr');
   const ok  = document.getElementById('resetOk');
   err.textContent = ''; ok.textContent = '';
-  if (pw.length < 8) { err.textContent = '密碼至少需要 8 個字元'; return; }
+  const passwordError = window.PasswordPolicy && window.PasswordPolicy.message(pw);
+  if (passwordError) { err.textContent = passwordError; return; }
   if (pw !== pw2) { err.textContent = '兩次密碼不一致'; return; }
   btn.disabled = true; btn.textContent = '儲存中…';
-  const { error } = await db.auth.updateUser({ password: pw });
-  btn.disabled = false; btn.textContent = '設定新密碼';
-  if (error) {
-    err.textContent = '設定失敗：' + translateError(error.message);
-  } else {
+  try {
+    await window.invokeEdgeAction(db, 'app-api', { action: 'change_password', password: pw });
+    btn.disabled = false; btn.textContent = '設定新密碼';
     ok.textContent = '密碼已更新！即將跳轉至登入頁面…';
     setTimeout(() => {
       window.location.hash = '';
       window.location.reload();
     }, 2000);
+  } catch (error) {
+    btn.disabled = false; btn.textContent = '設定新密碼';
+    err.textContent = '設定失敗：' + translateError(error.message || String(error));
   }
 });
 </script>

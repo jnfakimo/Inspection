@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
+import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -458,7 +459,8 @@ export async function handleAdminApiRequest(req: Request) {
       const name = clean(body.name, 100), username = clean(body.username, 64), email = clean(body.email, 200).toLowerCase(), phone = clean(body.phone, 50), password = String(body.password || ''), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
       if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) return reply(req, { ok: false, message: '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號' }, 400);
       if (!/^\S+@\S+\.\S+$/.test(email) || /[(),]/.test(email)) return reply(req, { ok: false, message: 'Email 格式不正確' }, 400);
-      if (password.length < 8) return reply(req, { ok: false, message: '初始密碼至少需要 8 個字元' }, 400);
+      const passwordError = passwordPolicyMessage(password);
+      if (passwordError) return reply(req, { ok: false, message: `初始${passwordError}` }, 400);
       if (!ROLES.has(rbacRole) && !(await roleExists(rbacRole))) return reply(req, { ok: false, message: '角色設定無效' }, 400);
       const supervisorValidation = await validateSupervisor(supervisorId, deptId, rbacRole);
       if (supervisorValidation.message) return reply(req, { ok: false, message: supervisorValidation.message }, 400);
@@ -517,7 +519,8 @@ export async function handleAdminApiRequest(req: Request) {
 
     if (action === 'admin_reset_password') {
       const userId = id(body.user_id), password = String(body.password || '');
-      if (!userId || password.length < 8) return reply(req, { ok: false, message: '新密碼至少需要 8 個字元' }, 400);
+      const passwordError = passwordPolicyMessage(password);
+      if (!userId || passwordError) return reply(req, { ok: false, message: passwordError || '使用者識別碼無效' }, 400);
       const { data: target } = await admin.from('users').select('auth_id,name,status').eq('user_id', userId).maybeSingle();
       if (!target?.auth_id) return reply(req, { ok: false, message: '此帳號尚未連結 Supabase Auth' }, 400);
       if (target.status !== 'active') return reply(req, { ok: false, message: '已停用的帳號不可重設密碼，請先重新啟用' }, 409);

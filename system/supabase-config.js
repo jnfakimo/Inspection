@@ -10,6 +10,39 @@
 window.SUPA_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 window.SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 
+// 全站（V1/V2 共用）密碼政策。這只是前端提示；真正檢查由 app-api/admin-api
+// 的受信任後端再次執行，避免繞過畫面直接呼叫 Auth API。
+window.PasswordPolicy = window.PasswordPolicy || {
+  minLength: 12,
+  maxLength: 200,
+  requiredCharacterClasses: 3,
+  message: function (password) {
+    password = String(password || '');
+    if (password.length < this.minLength) return '密碼至少需要 ' + this.minLength + ' 個字元';
+    if (password.length > this.maxLength) return '密碼不可超過 ' + this.maxLength + ' 個字元';
+    if (/\s/.test(password)) return '密碼不可包含空白字元';
+    var classes = [/[a-z]/.test(password), /[A-Z]/.test(password), /\d/.test(password), /[^A-Za-z0-9]/.test(password)].filter(Boolean).length;
+    return classes < this.requiredCharacterClasses ? '密碼需包含大寫、小寫、數字、特殊字元中的至少 3 類' : '';
+  }
+};
+
+// 受控 Edge Function 呼叫器：統一處理 V1 的密碼／管理操作回應，避免各頁
+// 自己把 service-role 或未驗證的 Auth API 暴露在瀏覽器流程中。
+window.invokeEdgeAction = async function (client, functionName, body) {
+  var result = await client.functions.invoke(functionName, { body: body || {} });
+  var data = result && result.data;
+  if (result && result.error) {
+    var message = result.error.message || '服務呼叫失敗';
+    var context = result.error.context;
+    if (context && typeof context.clone === 'function') {
+      try { var payload = await context.clone().json(); if (payload && payload.message) message = payload.message; } catch (_) {}
+    }
+    throw new Error(message);
+  }
+  if (!data || data.ok !== true) throw new Error(data && data.message || '服務呼叫失敗');
+  return data.data;
+};
+
 window.PatrolSessionBridge = (function () {
   var KEY='beinongPatrolTrustedSessionV1';
   var MAX_AGE_MS=2*60*60*1000;

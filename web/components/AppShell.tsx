@@ -9,6 +9,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import type { Profile } from '@/types/app';
 import { allowedActions } from '@/lib/shared-actions';
+import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 
 
 function taipeiClock() {
@@ -119,11 +120,11 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
     const form = new FormData(event.currentTarget);
     const password = String(form.get('password') || '');
     const confirm = String(form.get('confirm') || '');
-    if (password.length < 8) return setPasswordMessage('密碼至少需要 8 個字元');
+    const passwordError = passwordPolicyMessage(password);
+    if (passwordError) return setPasswordMessage(passwordError);
     if (password !== confirm) return setPasswordMessage('兩次輸入的密碼不一致');
     try {
-      const { error } = await getSupabase().auth.updateUser({ password });
-      if (error) return setPasswordMessage('密碼更新失敗，請確認密碼格式後再試');
+      await invokeAppApi('change_password', { password });
       setPasswordMessage('密碼已更改');
       event.currentTarget.reset();
     } catch (error) { setPasswordMessage(error instanceof Error ? error.message : '密碼更新失敗，請檢查網路後重試'); }
@@ -226,8 +227,8 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
           </section>
 
           <form className="profile-section" onSubmit={changePassword}>
-            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>新密碼至少 8 個字元</small></div></div>
-            <div className="profile-form-grid"><label>新密碼<input type="password" name="password" minLength={8} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={8} required autoComplete="new-password" /></label></div>
+            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>至少 {PASSWORD_POLICY.minLength} 個字元，且符合複雜度要求</small></div></div>
+            <div className="profile-form-grid"><label>新密碼<input type="password" name="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} required autoComplete="new-password" /></label></div>
             {passwordMessage && <p className="profile-message">{passwordMessage}</p>}
             <div className="profile-actions"><button className="primary-btn compact">更新密碼</button></div>
           </form>

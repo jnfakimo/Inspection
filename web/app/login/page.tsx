@@ -4,7 +4,7 @@
 //
 // 忘記密碼流程原本只回一句「請洽系統管理員重設密碼」，V1 login.html 其實有完整兩段：
 // 輸入 Email 寄重設連結（auth.resetPasswordForEmail）→ 從信中連結回來時網址帶
-// #type=recovery，改顯示設定新密碼（auth.updateUser）。這裡照搬同一套流程。
+// #type=recovery，改顯示設定新密碼；更新動作改由受信任的 app-api 執行。
 //
 // 注意：redirectTo 是本頁網址（/Inspection/v2/login/），與 V1 的
 // /Inspection/system/login.html 不同，必須在 Supabase Auth 的 Redirect URLs
@@ -12,7 +12,8 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
 function friendlyError(raw: unknown, fallback: string) {
@@ -22,7 +23,7 @@ function friendlyError(raw: unknown, fallback: string) {
   if (/invalid.*email|email.*invalid/i.test(text)) return '電子郵件格式不正確';
   if (/user not found|no user/i.test(text)) return '查無此電子郵件對應的帳號';
   if (/expired|invalid.*token|session/i.test(text)) return '重設連結已失效，請重新申請';
-  if (/password.*(short|least|weak)/i.test(text)) return '密碼強度不足，請至少 8 個字元';
+  if (/password.*(short|least|weak)/i.test(text)) return `密碼強度不足，請至少 ${PASSWORD_POLICY.minLength} 個字元並符合複雜度要求`;
   return text || fallback;
 }
 
@@ -58,7 +59,7 @@ export default function LoginPage() {
     // 從重設密碼信回來：Supabase 會把 recovery session 放在網址 hash。
     // 但 lib/supabase.ts 設了 detectSessionInUrl:false，supabase-js 不會自己去讀
     // 這段 hash，必須像下方登入流程那樣手動 setSession。少了這一步，
-    // updateUser 會因為沒有 session 而失敗，而 friendlyError 的 /session/i 規則
+    // 密碼更新會因為沒有 session 而失敗，而 friendlyError 的 /session/i 規則
     // 又會把它翻成「重設連結已失效」，把使用者指向完全錯誤的原因。
     if (hash.includes('type=recovery')) {
       setView('reset');
@@ -113,12 +114,18 @@ export default function LoginPage() {
 
   async function saveNewPassword() {
     setMessage(''); setNotice('');
-    if (password.length < 8) { setMessage('密碼至少需要 8 個字元'); return; }
+    const passwordError = passwordPolicyMessage(password);
+    if (passwordError) { setMessage(passwordError); return; }
     if (password !== password2) { setMessage('兩次密碼不一致'); return; }
     setBusy(true);
-    const { error } = await getSupabase().auth.updateUser({ password });
+    try {
+      await invokeAppApi('change_password', { password });
+    } catch (error) {
+      setBusy(false);
+      setMessage(`設定失敗：${friendlyError(error, '請重新申請重設連結')}`);
+      return;
+    }
     setBusy(false);
-    if (error) { setMessage(`設定失敗：${friendlyError(error, '請重新申請重設連結')}`); return; }
     setNotice('密碼已更新，即將返回登入頁…');
     setTimeout(() => { window.location.hash = ''; window.location.reload(); }, 2000);
   }
@@ -132,9 +139,9 @@ export default function LoginPage() {
   if (view === 'reset') return <main className="v1-login-page">
     <div className="login-card v1-login-card">
       {brand}
-      <p className="v1-login-hint">設定新密碼（至少 8 個字元）</p>
-      <label>新密碼<input type="password" value={password} autoComplete="new-password" onChange={e => setPassword(e.target.value)} placeholder="••••••••" /></label>
-      <label>再次輸入新密碼<input type="password" value={password2} autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••" /></label>
+      <p className="v1-login-hint">設定新密碼（至少 {PASSWORD_POLICY.minLength} 個字元，需含至少 3 類字元）</p>
+      <label>新密碼<input type="password" value={password} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} autoComplete="new-password" onChange={e => setPassword(e.target.value)} placeholder="••••••••••••" /></label>
+      <label>再次輸入新密碼<input type="password" value={password2} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••••••" /></label>
       {message && <p className="form-error">{message}</p>}
       {notice && <p className="inline-message">{notice}</p>}
       <button className="primary-btn" disabled={busy || !resetReady} onClick={() => void saveNewPassword()}>{busy ? '儲存中…' : resetReady ? '設定新密碼' : '驗證連結中…'}</button>
