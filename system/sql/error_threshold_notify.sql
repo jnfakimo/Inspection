@@ -5,15 +5,17 @@
 -- 可重複執行。
 -- ============================================================
 
--- 預設關閉，需管理員到「系統設定」頁或直接 SQL 開啟：
---   line_notify_error_threshold = 'true'
+-- 正式啟用；管理員仍可在「系統設定」頁調整。
 -- 其餘可調整參數（皆有預設值，不設定也能運作）：
 --   error_threshold_window_minutes   （統計視窗，預設 15 分鐘）
 --   error_threshold_count            （門檻筆數，預設 20）
 --   error_threshold_cooldown_minutes （同一波錯誤的通知冷卻時間，預設 60 分鐘）
 insert into system_settings (key, value) values
-  ('line_notify_error_threshold', 'false')
-on conflict (key) do nothing;
+  ('line_notify_error_threshold', 'true'),
+  ('error_threshold_window_minutes', '15'),
+  ('error_threshold_count', '20'),
+  ('error_threshold_cooldown_minutes', '60')
+on conflict (key) do update set value=excluded.value;
 
 create extension if not exists pg_cron;
 

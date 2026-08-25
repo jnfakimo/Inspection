@@ -17,6 +17,7 @@ import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase } from '@/lib/supabase';
+import { recordSecurityAudit } from '@/lib/security-audit';
 import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -83,6 +84,12 @@ function AttachmentsModule({ module, profile }: Props) {
     const { data, error } = await getSupabase().storage.from('repair-files').createSignedUrl(path, 300);
     setOpening('');
     if (error || !data?.signedUrl) { setNote(`失敗：${errorMessage(error, '無法產生檔案連結')}`); return; }
+    const resource = `repair-files/${path}`;
+    recordSecurityAudit('file_read', {
+      feature: '開啟維修附件', access_kind: 'file', resource,
+      request_path: resource, method: '短效簽章連結', result: '使用者要求開啟',
+      user_initiated: true, access_origin: 'user_action', risk_level: '一般',
+    });
     window.open(data.signedUrl, '_blank', 'noopener');
   };
 

@@ -499,6 +499,56 @@
   width: 20px;
 }
 
+.thresholdGroup {
+  border: 1px solid #dbe4ec;
+  border-radius: 7px;
+  margin: 22px 0 0;
+  padding: 16px;
+}
+
+.thresholdGroup legend {
+  color: #334155;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0 7px;
+}
+
+.thresholdGroup .toggleRow {
+  margin-bottom: 14px;
+}
+
+.thresholdGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.thresholdGrid label {
+  color: #334155;
+  display: grid;
+  font-size: 0.76rem;
+  font-weight: 750;
+  gap: 7px;
+}
+
+.thresholdGrid input {
+  background: #fff;
+  border: 1px solid #c7d3df;
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 42px;
+  padding: 9px 11px;
+  width: 100%;
+}
+
+.thresholdGrid small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 .departmentTree {
   display: grid;
   gap: 12px;
@@ -952,7 +1002,8 @@
 
   .cardGrid,
   .formGrid,
-  .integrationGrid {
+  .integrationGrid,
+  .thresholdGrid {
     grid-template-columns: 1fr;
   }
 

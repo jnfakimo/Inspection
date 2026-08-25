@@ -3,9 +3,25 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { reportIfInfrastructureError } from './error-tracker';
+import { emitSecurityDataRead } from './security-audit-sink';
 
 let client: SupabaseClient | null = null;
 const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
+const READ_ACTION_LABELS: Record<string, string> = {
+  profile: '讀取個人帳號資料',
+  module_data: '讀取系統模組資料',
+  workorder_list: '讀取報修與工單清單',
+  workorder_options: '讀取報修表單選項',
+  workorder_detail: '讀取報修與工單明細',
+  dashboard: '讀取戰情儀表板資料',
+  inspections: '讀取巡檢資料',
+  equipment_map: '讀取設備地圖資料',
+};
+
+const recordAppRead = (action: string) => {
+  const label = READ_ACTION_LABELS[action];
+  if (label) emitSecurityDataRead(label);
+};
 
 export function getSupabase() {
   if (client) return client;
@@ -50,6 +66,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
         reportIfInfrastructureError(result?.message, { action, via: 'node-api' });
         throw new Error(result?.message || '系統服務回傳失敗');
       }
+      recordAppRead(action);
       return result.data as T;
     }
   }
@@ -72,5 +89,6 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
     reportIfInfrastructureError(data?.message, { action, via: 'edge-function' });
     throw new Error(data?.message || '系統服務回傳失敗');
   }
+  recordAppRead(action);
   return data.data as T;
 }

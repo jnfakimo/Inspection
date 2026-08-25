@@ -2,6 +2,7 @@ name: Error threshold notification
 
 on:
   schedule:
+    # 避開 GitHub Actions 每小時整點最擁擠的排程尖峰；函式另有延遲回溯。
     - cron: "4,9,14,19,24,29,34,39,44,49,54,59 * * * *"
   workflow_dispatch:
 
@@ -15,20 +16,36 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - name: Trigger error threshold check
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
+          set -euo pipefail
           test -n "$SUPABASE_ANON_KEY"
           test -n "$CRON_SECRET"
-          curl --fail-with-body --retry 2 --retry-all-errors \
-            --max-time 45 \
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          http_status="$(curl --silent --show-error --retry 3 --retry-all-errors \
+            --retry-delay 2 --retry-max-time 120 --connect-timeout 10 --max-time 45 \
+            --output "$response_file" --write-out '%{http_code}' \
             -X POST \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
             -H "x-cron-secret: $CRON_SECRET" \
             -H "Content-Type: application/json" \
             -d '{"scheduled":true}' \
-            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/error-threshold-check
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/error-threshold-check)"
+          cat "$response_file"
+          jq -e . "$response_file" >/dev/null
+          if [[ ! "$http_status" =~ ^2 ]]; then
+            echo "error-threshold-check HTTP $http_status" >&2
+            exit 1
+          fi
+          state="$(jq -r '.state // "missing"' "$response_file")"
+          ok="$(jq -r '.ok // false' "$response_file")"
+          if [[ "$ok" != "true" || "$state" == "disabled" || "$state" == "degraded" || "$state" == "missing" ]]; then
+            echo "error-threshold-check unhealthy state: $state" >&2
+            exit 1
+          fi

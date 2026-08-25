@@ -47,11 +47,39 @@ begin
     username = 'deidentified-' || p_user_id::text
   where user_id = p_user_id;
 
+  -- 稽核歷程保留 operator_id 關聯，但舊 JSON 快照不得殘留姓名、帳號、Email
+  -- 或部門名稱等直接識別資料。
+  update audit_logs
+  set changes = jsonb_set(
+    coalesce(changes, '{}'::jsonb), '{actor}',
+    (coalesce(changes -> 'actor', '{}'::jsonb)
+      - 'username' - 'email' - 'name' - 'department')
+      || jsonb_build_object('user_id', p_user_id, 'display', '已去識別化'),
+    true
+  )
+  where operator_id = p_user_id
+    and jsonb_typeof(changes -> 'actor') = 'object';
+
   -- users 表上既有的 trg_users_history（permanent_data_protection.sql）
   -- 會在這次 UPDATE 後自動補一筆快照，記錄「誰、何時執行了這次去識別化」，
   -- 不需要在這裡額外手動寫入 users_history。
 end;
 $$;
+
+-- 補清理在本版函式上線前已完成去識別化的人員稽核 JSON；只更新直接識別欄位，
+-- 不刪除任何歷程。
+update audit_logs a
+set changes = jsonb_set(
+  coalesce(a.changes, '{}'::jsonb), '{actor}',
+  (coalesce(a.changes -> 'actor', '{}'::jsonb)
+    - 'username' - 'email' - 'name' - 'department')
+    || jsonb_build_object('user_id', a.operator_id, 'display', '已去識別化'),
+  true
+)
+from users u
+where a.operator_id = u.user_id
+  and u.username like 'deidentified-%'
+  and jsonb_typeof(a.changes -> 'actor') = 'object';
 
 revoke all on function deidentify_departed_user(uuid) from public;
 grant execute on function deidentify_departed_user(uuid) to authenticated;

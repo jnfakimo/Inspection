@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
+import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -23,7 +24,9 @@ const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_sup
 const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom']);
 const SAFE_SETTING_KEYS = new Set([
   'org_name', 'site_name', 'shifts', 'line_group_id', 'line_notify_anomaly', 'line_notify_repair',
-  'line_notify_case', 'line_notify_security', 'line_notify_patrol_timeout', 'fcm_notify_patrol_timeout',
+  'line_notify_case', 'line_notify_security', 'line_notify_security_alerts', 'line_notify_error_threshold',
+  'error_threshold_window_minutes', 'error_threshold_count', 'error_threshold_cooldown_minutes',
+  'line_notify_patrol_timeout', 'fcm_notify_patrol_timeout',
   'patrol_timeout_rules',
 ]);
 const FIXED_SHIFT_IDS = ['morning', 'afternoon', 'night'];
@@ -57,6 +60,10 @@ function dbMessage(error: { code?: string; message?: string } | null, fallback: 
 }
 function safeDetails(value: unknown) { return value && typeof value === 'object' ? value : {}; }
 function boolText(value: unknown) { return value === true || value === 'true' ? 'true' : 'false'; }
+function boundedInteger(value: unknown, fallback: number, minimum: number, maximum: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum ? parsed : fallback;
+}
 function validTime(value: string) { return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(value); }
 function normalizeFixedShifts(value: unknown) {
   const source = Array.isArray(value) ? value : [];
@@ -90,22 +97,35 @@ function canonicalFloor(value: string) {
 export async function handleAdminApiRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return reply(req, { ok: false, message: '僅支援 POST' }, 405);
+  const securityEventRequestId = securityRequestId();
   try {
     const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
     if (!token) return reply(req, { ok: false, message: '尚未登入' }, 401);
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, message: '登入狀態無效，請重新登入' }, 401);
-    const { data: globalRateAllowed, error: globalRateError } = await admin.rpc('enforce_request_rate_limit', {
-      p_subject: authData.user.id,
-      p_scope: 'admin-api',
+    const globalRate = await enforceDurableRateLimit(admin, req, {
+      subject: authData.user.id,
+      scope: 'admin-api',
+      requestId: securityEventRequestId,
     });
-    if (globalRateError) {
-      console.error('admin-api rate limit failed:', globalRateError.message);
+    if (globalRate.error) {
+      console.error('admin-api rate limit failed:', globalRate.error.message);
       return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
     }
-    if (globalRateAllowed !== true) {
-      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+    if (!globalRate.allowed) {
+      const { data: rateProfile } = await admin.from('users')
+        .select('user_id,username,email,name').eq('auth_id', authData.user.id).maybeSingle();
+      try {
+        await recordRateLimitDenial(admin, req, {
+          scope: 'admin-api', requestId: securityEventRequestId, profile: rateProfile,
+          eventCount: globalRate.requestCount, title: '後台 API 異常流量已阻擋',
+          historyAlreadyRecorded: globalRate.durable,
+        });
+      } catch (alertError) {
+        console.error('admin-api rate-limit alert failed:', alertError instanceof Error ? alertError.message : String(alertError));
+      }
+      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試', request_id: securityEventRequestId }, 429);
     }
     const { data: profile, error: profileError } = await admin.from('users').select('user_id,auth_id,name,username,role,rbac_role,status').eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
@@ -113,16 +133,27 @@ export async function handleAdminApiRequest(req: Request) {
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = clean(body.action, 50);
     if (action !== 'admin_get_settings') {
-      const { data: writeRateAllowed, error: writeRateError } = await admin.rpc('enforce_request_rate_limit', {
-        p_subject: authData.user.id,
-        p_scope: 'admin-api:write',
+      const writeRate = await enforceDurableRateLimit(admin, req, {
+        subject: authData.user.id,
+        scope: 'admin-api:write',
+        actorId: profile.user_id,
+        requestId: securityEventRequestId,
       });
-      if (writeRateError) {
-        console.error('admin-api:write rate limit failed:', writeRateError.message);
+      if (writeRate.error) {
+        console.error('admin-api:write rate limit failed:', writeRate.error.message);
         return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
       }
-      if (writeRateAllowed !== true) {
-        return reply(req, { ok: false, message: '操作過於頻繁，請稍後再試' }, 429);
+      if (!writeRate.allowed) {
+        try {
+          await recordRateLimitDenial(admin, req, {
+            scope: 'admin-api:write', requestId: securityEventRequestId, profile,
+            eventCount: writeRate.requestCount, title: '後台寫入操作異常頻繁，已阻擋',
+            historyAlreadyRecorded: writeRate.durable,
+          });
+        } catch (alertError) {
+          console.error('admin-api:write rate-limit alert failed:', alertError instanceof Error ? alertError.message : String(alertError));
+        }
+        return reply(req, { ok: false, message: '操作過於頻繁，請稍後再試', request_id: securityEventRequestId }, 429);
       }
     }
     const isAdmin = roleId === 'sysadmin' || profile.role === 'admin';
@@ -168,6 +199,9 @@ export async function handleAdminApiRequest(req: Request) {
       try { shifts = normalizeFixedShifts(JSON.parse(settings.shifts || '[]')); } catch { /* 使用固定三班預設 */ }
       try { const parsed = JSON.parse(settings.patrol_timeout_rules || '[]'); if (Array.isArray(parsed)) patrolRules = parsed; } catch { /* 使用空規則 */ }
       const enabled = (key: string) => settings[key] === 'true';
+      const securityLineEnabled = settings.line_notify_security_alerts !== undefined
+        ? enabled('line_notify_security_alerts')
+        : enabled('line_notify_security');
       return reply(req, { ok: true, data: {
         identity: { org_name: settings.org_name || '臺北農產運銷股份有限公司', site_name: settings.site_name || '第一果菜市場' },
         shifts: { shifts },
@@ -177,7 +211,12 @@ export async function handleAdminApiRequest(req: Request) {
           line_notify_anomaly: enabled('line_notify_anomaly'),
           line_notify_repair: enabled('line_notify_repair'),
           line_notify_case: enabled('line_notify_case'),
-          line_notify_security: enabled('line_notify_security'),
+          line_notify_security_alerts: securityLineEnabled,
+          line_notify_security: securityLineEnabled,
+          line_notify_error_threshold: enabled('line_notify_error_threshold'),
+          error_threshold_window_minutes: boundedInteger(settings.error_threshold_window_minutes, 15, 1, 1440),
+          error_threshold_count: boundedInteger(settings.error_threshold_count, 20, 1, 5000),
+          error_threshold_cooldown_minutes: boundedInteger(settings.error_threshold_cooldown_minutes, 60, 1, 10080),
           line_notify_patrol_timeout: enabled('line_notify_patrol_timeout'),
           fcm_notify_patrol_timeout: enabled('fcm_notify_patrol_timeout'),
           patrol_timeout_rules: patrolRules,
@@ -220,10 +259,44 @@ export async function handleAdminApiRequest(req: Request) {
       const input = (body.line && typeof body.line === 'object' ? body.line : body) as Record<string, unknown>;
       const groupId = clean(input.line_group_id ?? input.group_id, 200);
       const newToken = clean(input.line_channel_token ?? input.channel_token ?? input.token, 1000);
-      const { data: currentTokenRow } = await admin.from('system_settings').select('value').eq('key', 'line_channel_token').maybeSingle();
+      const { data: currentRows } = await admin.from('system_settings').select('key,value').in('key', [
+        'line_channel_token', 'line_notify_anomaly', 'line_notify_repair', 'line_notify_case',
+        'line_notify_security_alerts', 'line_notify_security', 'line_notify_error_threshold',
+        'error_threshold_window_minutes', 'error_threshold_count', 'error_threshold_cooldown_minutes',
+        'line_notify_patrol_timeout', 'fcm_notify_patrol_timeout', 'patrol_timeout_rules',
+      ]);
+      const currentSettings = Object.fromEntries((currentRows || []).map(row => [String(row.key), String(row.value ?? '')]));
       if (!groupId) return reply(req, { ok: false, message: 'LINE 群組 ID 為必填' }, 400);
-      if (!newToken && !clean(currentTokenRow?.value, 1000)) return reply(req, { ok: false, message: '尚未設定 LINE Channel Token，請先輸入 Token' }, 400);
-      const rawRules = Array.isArray(input.patrol_timeout_rules) ? input.patrol_timeout_rules : [];
+      if (!newToken && !clean(currentSettings.line_channel_token, 1000)) return reply(req, { ok: false, message: '尚未設定 LINE Channel Token，請先輸入 Token' }, 400);
+      let rawRules: unknown[] = [];
+      if (Array.isArray(input.patrol_timeout_rules)) {
+        rawRules = input.patrol_timeout_rules;
+      } else {
+        try {
+          const currentRules = JSON.parse(currentSettings.patrol_timeout_rules || '[]');
+          if (Array.isArray(currentRules)) rawRules = currentRules;
+        } catch {
+          rawRules = [];
+        }
+      }
+      const securityLineEnabled = boolText(
+        input.line_notify_security_alerts ?? input.line_notify_security ??
+          currentSettings.line_notify_security_alerts ?? currentSettings.line_notify_security,
+      );
+      // 舊 V2 前端不會送出這些新欄位；部署窗口中必須保留 DB 現值，
+      // 不可因一次舊版「儲存 LINE 設定」而意外關閉錯誤門檻監測。
+      const errorThresholdEnabled = boolText(
+        input.line_notify_error_threshold ?? currentSettings.line_notify_error_threshold ?? true,
+      );
+      const errorWindowMinutes = boundedInteger(
+        input.error_threshold_window_minutes ?? currentSettings.error_threshold_window_minutes, 15, 1, 1440,
+      );
+      const errorThresholdCount = boundedInteger(
+        input.error_threshold_count ?? currentSettings.error_threshold_count, 20, 1, 5000,
+      );
+      const errorCooldownMinutes = boundedInteger(
+        input.error_threshold_cooldown_minutes ?? currentSettings.error_threshold_cooldown_minutes, 60, 1, 10080,
+      );
       const patrolRules = rawRules.map((item, index) => {
         const row = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
         const days = Array.isArray(row.days) ? row.days.map(Number).filter(day => Number.isInteger(day) && day >= 0 && day <= 6) : [];
@@ -232,12 +305,19 @@ export async function handleAdminApiRequest(req: Request) {
       if (patrolRules.some(row => !row.label || !validTime(row.start) || !validTime(row.end) || !Number.isFinite(row.grace_minutes))) return reply(req, { ok: false, message: '巡檢逾時規則的名稱與有效時段為必填' }, 400);
       const rows = [
         { key: 'line_group_id', value: groupId },
-        { key: 'line_notify_anomaly', value: boolText(input.line_notify_anomaly) },
-        { key: 'line_notify_repair', value: boolText(input.line_notify_repair) },
-        { key: 'line_notify_case', value: boolText(input.line_notify_case) },
-        { key: 'line_notify_security', value: boolText(input.line_notify_security) },
-        { key: 'line_notify_patrol_timeout', value: boolText(input.line_notify_patrol_timeout) },
-        { key: 'fcm_notify_patrol_timeout', value: boolText(input.fcm_notify_patrol_timeout) },
+        { key: 'line_notify_anomaly', value: boolText(input.line_notify_anomaly ?? currentSettings.line_notify_anomaly) },
+        { key: 'line_notify_repair', value: boolText(input.line_notify_repair ?? currentSettings.line_notify_repair) },
+        { key: 'line_notify_case', value: boolText(input.line_notify_case ?? currentSettings.line_notify_case) },
+        // 正式真實來源為 line_notify_security_alerts；舊鍵同步寫入，
+        // 確保 migration 尚未套用的短暫部署窗口仍不會分歧。
+        { key: 'line_notify_security_alerts', value: securityLineEnabled },
+        { key: 'line_notify_security', value: securityLineEnabled },
+        { key: 'line_notify_error_threshold', value: errorThresholdEnabled },
+        { key: 'error_threshold_window_minutes', value: String(errorWindowMinutes) },
+        { key: 'error_threshold_count', value: String(errorThresholdCount) },
+        { key: 'error_threshold_cooldown_minutes', value: String(errorCooldownMinutes) },
+        { key: 'line_notify_patrol_timeout', value: boolText(input.line_notify_patrol_timeout ?? currentSettings.line_notify_patrol_timeout) },
+        { key: 'fcm_notify_patrol_timeout', value: boolText(input.fcm_notify_patrol_timeout ?? currentSettings.fcm_notify_patrol_timeout) },
         { key: 'patrol_timeout_rules', value: JSON.stringify(patrolRules) },
       ].map(row => ({ ...row, updated_at: new Date().toISOString() }));
       if (newToken) rows.push({ key: 'line_channel_token', value: newToken, updated_at: new Date().toISOString() });
@@ -245,6 +325,44 @@ export async function handleAdminApiRequest(req: Request) {
       if (error) return reply(req, { ok: false, message: `LINE 推播設定儲存失敗：${error.message}` }, 400);
       await audit('system_settings', 'line', 'update', { changed_keys: rows.map(row => row.key).filter(key => key !== 'line_channel_token'), token_replaced: Boolean(newToken) });
       return reply(req, { ok: true, data: { line_token_configured: true } });
+    }
+
+    if (action === 'admin_test_error_threshold_notification') {
+      const windowMinutes = boundedInteger(body.window_minutes, 15, 1, 1440);
+      const thresholdCount = boundedInteger(body.threshold_count, 20, 1, 5000);
+      const cooldownMinutes = boundedInteger(body.cooldown_minutes, 60, 1, 10080);
+      try {
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/error-threshold-check`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(12000),
+          headers: {
+            Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            test: true,
+            window_minutes: windowMinutes,
+            threshold_count: thresholdCount,
+            cooldown_minutes: cooldownMinutes,
+          }),
+        });
+        const result = await response.json().catch(() => ({ ok: false, message: '通知服務回應格式無效' }));
+        await audit('system_settings', 'error_threshold_test', 'status_change', {
+          result: response.ok && result?.ok === true ? '送達' : '失敗',
+          http_status: response.status,
+          window_minutes: windowMinutes,
+          threshold_count: thresholdCount,
+          cooldown_minutes: cooldownMinutes,
+        });
+        if (!response.ok || result?.ok !== true) {
+          return reply(req, { ok: false, message: clean(result?.message || result?.msg, 300) || '測試通知發送失敗' }, 502);
+        }
+        return reply(req, { ok: true, data: result, message: '測試通知已送達，不影響正式告警冷卻時間' });
+      } catch (error) {
+        await audit('system_settings', 'error_threshold_test', 'status_change', { result: '失敗', reason: '通知服務連線異常' });
+        console.error('Error threshold notification test failed:', error instanceof Error ? error.message : String(error));
+        return reply(req, { ok: false, message: '測試通知服務連線逾時或無法使用' }, 502);
+      }
     }
 
     if (action === 'admin_list_account_applications') {

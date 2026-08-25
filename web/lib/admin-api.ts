@@ -1,6 +1,16 @@
 import { getSupabase } from '@/lib/supabase';
+import { emitSecurityDataRead } from '@/lib/security-audit-sink';
 
 const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
+const READ_ACTION_LABELS: Record<string, string> = {
+  admin_get_settings: '讀取系統設定',
+  admin_list_account_applications: '讀取帳號申請清單',
+};
+
+const recordAdminRead = (action: string) => {
+  const label = READ_ACTION_LABELS[action];
+  if (label) emitSecurityDataRead(label);
+};
 
 export async function invokeAdminApi<T = Record<string, unknown>>(action: string, payload: Record<string, unknown> = {}) {
   const client = getSupabase();
@@ -27,6 +37,7 @@ export async function invokeAdminApi<T = Record<string, unknown>>(action: string
     if (response) {
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.ok) throw new Error(result?.message || '後台管理服務回傳失敗');
+      recordAdminRead(action);
       return result as T;
     }
   }
@@ -43,5 +54,6 @@ export async function invokeAdminApi<T = Record<string, unknown>>(action: string
     }
     throw new Error(detail || error.message || '後台管理服務連線失敗');
   }
+  recordAdminRead(action);
   return data as T;
 }

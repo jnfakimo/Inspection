@@ -1,6 +1,6 @@
 // 全站前端錯誤回報 — 自架、輕量，不依賴第三方監控帳號。
-// 攔截未捕捉的 JS 例外與 Promise rejection，寫入 Supabase 的 client_error_logs
-// 表（system/sql/error_logging.sql），供後台「系統健康」頁面查看。
+// 攔截未捕捉的 JS 例外與 Promise rejection，經受信任 audit-event Edge Function
+// 寫入 client_error_logs，後端會綁定登入者、伺服器時間並限制回報頻率。
 //
 // 使用目前登入者的 access token 直接寫入 REST，不建立第二個 Auth client；
 // 未登入時不蒐集，也不保存網址 query/hash，避免密碼重設資訊進入錯誤紀錄。
@@ -26,10 +26,14 @@
     var url=window.SUPA_URL,key=window.SUPA_KEY,token=authToken();
     if(!url||!key||!token){queue.length=0;return;} // 未登入頁不蒐集瀏覽器錯誤或重設連結資訊
     flushing = true;
-    var batch = queue.splice(0, queue.length);
-    fetch(url+'/rest/v1/client_error_logs',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+token,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(batch)})
-      .catch(function(){})
-      .finally(function(){flushing=false;});
+    var batch = queue.splice(0, queue.length).slice(0,10);
+    var send=function(index){
+      if(index>=batch.length)return Promise.resolve();
+      return fetch(url+'/functions/v1/audit-event',{method:'POST',headers:{apikey:key,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({event_type:'client_error',error:batch[index]})})
+        .then(function(response){if(response.status===401||response.status===403||response.status===429)return;return send(index+1);})
+        .catch(function(){});
+    };
+    send(0).finally(function(){flushing=false;});
   }
 
   function currentUserId() {

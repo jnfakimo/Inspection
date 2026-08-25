@@ -13,14 +13,14 @@ on:
   push:
     branches: [main]
     paths:
-      - 'supabase/functions/**'
-      - 'supabase/config.toml'
+      - "supabase/functions/**"
+      - "supabase/config.toml"
   workflow_dispatch:
     inputs:
       functions:
-        description: '要部署的 function slug，以空白分隔；留空代表全部'
+        description: "要部署的 function slug，以空白分隔；留空代表全部"
         required: false
-        default: ''
+        default: ""
 
 permissions:
   contents: read
@@ -67,7 +67,13 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: |
           set -eu
-          all() { find supabase/functions -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort; }
+          # `_shared` 是共用原始碼，不是可獨立部署的 Edge Function。
+          all() { find supabase/functions -mindepth 1 -maxdepth 1 -type d ! -name '_*' -printf '%f\n' | sort; }
+          shared_users() {
+            grep -RIl --include='*.ts' "../_shared/" supabase/functions 2>/dev/null \
+              | sed -n 's|^supabase/functions/\([^/]*\)/.*|\1|p' \
+              | sed '/^_/d' | sort -u
+          }
 
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -n "$MANUAL_INPUT" ]; then
@@ -88,6 +94,11 @@ jobs:
               changed="$(git diff --name-only "$base" "${{ github.sha }}" -- supabase/functions/)"
               slugs="$(printf '%s\n' "$changed" \
                 | sed -n 's|^supabase/functions/\([^/]*\)/.*|\1|p' | sort -u)"
+              # 共用 helper 變更時，所有實際 import 它的 function 都必須重新
+              # type-check 與部署；不可把 `_shared` 本身當成 function slug。
+              if printf '%s\n' "$changed" | grep -q '^supabase/functions/_shared/'; then
+                slugs="$(printf '%s\n%s\n' "$slugs" "$(shared_users)" | sed '/^$/d;/^_shared$/d' | sort -u)"
+              fi
               # config.toml 改動（例如 verify_jwt）要讓相關 function 重新套用設定。
               if git diff --name-only "$base" "${{ github.sha }}" -- supabase/config.toml | grep -q .; then
                 slugs="$(printf '%s\n%s\n' "$slugs" "$(all)" | sed '/^$/d' | sort -u)"
@@ -100,7 +111,7 @@ jobs:
           for slug in $slugs; do
             # 不寫成 [ -d ... ] && kept=...：測試失敗時整個 AND 串回傳非 0，
             # set -e 會把這一步判定為失敗。
-            if [ -d "supabase/functions/$slug" ]; then kept="$kept $slug"; fi
+            if [ "$slug" != "_shared" ] && [ -f "supabase/functions/$slug/index.ts" ]; then kept="$kept $slug"; fi
           done
           kept="$(echo $kept)"
 

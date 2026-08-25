@@ -40,8 +40,9 @@ const sidebarItems: SidebarItem[] = [
     label: '系統紀錄',
     icon: '/Inspection/assets/system-icons/audit-icon.png',
     adminOnly: true,
-    activePaths: ['/systems/admin/audit/', '/systems/admin/alerts/'],
   },
+  { href: '/systems/admin/alerts/', label: '資安告警', icon: '/Inspection/assets/system-icons/audit-icon.png', adminOnly: true },
+  { href: '/systems/admin/health/', label: '系統健康', icon: '/Inspection/assets/system-icons/settings-icon.png', adminOnly: true },
 ];
 
 function isAdministrator(profile: Profile) {

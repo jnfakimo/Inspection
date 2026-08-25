@@ -27,6 +27,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { recordSecurityAudit } from '@/lib/security-audit';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -502,6 +503,12 @@ function CasesModule({ module, profile }: Props) {
     setNote('');
     const { data, error } = await getSupabase().storage.from('handover-attachments').createSignedUrl(String(row.storage_path), 300);
     if (error || !data?.signedUrl) { setNote(`失敗：${errorMessage(error, '附件連結產生失敗')}`); return; }
+    const resource = `handover-attachments/${String(row.storage_path)}`;
+    recordSecurityAudit('file_read', {
+      feature: '開啟交接附件', access_kind: 'file', resource,
+      request_path: resource, method: '短效簽章連結', result: '使用者要求開啟',
+      user_initiated: true, access_origin: 'user_action', risk_level: '一般',
+    });
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 

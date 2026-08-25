@@ -1,4 +1,9 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.2";
+import {
+  enforceDurableRateLimit,
+  recordRateLimitDenial,
+  securityRequestId,
+} from "../_shared/security-monitor.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
 const allowedOrigin = (req: Request) => {
@@ -20,7 +25,10 @@ const cleanText = (value: unknown, max = 500) => String(value ?? "").replace(/\s
 // 這三個輔助函式只需要 PostgREST 的 from()。避免用 ReturnType<typeof createClient>：
 // supabase-js 2.110 的未帶 Database 泛型版本會被 Deno 推成 never，讓每次部署的
 // `deno check` 對既有 insert/update 全部誤報型別錯誤。
-type AdminClient = { from: (relation: string) => any };
+type AdminClient = {
+  from: (relation: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: any; error: any }>;
+};
 const clientIp = (req: Request) => {
   const raw = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") ||
     req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
@@ -28,7 +36,6 @@ const clientIp = (req: Request) => {
 };
 const CAPTCHA_TTL_SECONDS = 300;
 const CAPTCHA_LENGTH = 6;
-const CAPTCHA_RATE_LIMIT = 30;
 const CAPTCHA_SEGMENTS: Record<string, string[]> = {
   "0": ["a", "b", "c", "d", "e", "f"],
   "1": ["b", "c"],
@@ -111,17 +118,33 @@ const captchaImage = (code: string) => {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
-async function issueCaptcha(admin: AdminClient, req: Request) {
+async function issueCaptcha(admin: AdminClient, req: Request, requestId: string) {
   const ipAddress = clientIp(req);
   if (ipAddress) {
-    const since = new Date(Date.now() - 10 * 60_000).toISOString();
-    const { count, error } = await admin.from("login_captcha_challenges")
-      .select("challenge_id", { count: "exact", head: true })
-      .eq("ip_address", ipAddress)
-      .gte("created_at", since);
-    if (error) throw error;
-    if ((count || 0) >= CAPTCHA_RATE_LIMIT) {
-      return reply(req, { ok: false, message: "驗證碼索取過於頻繁，請稍後再試" }, 429);
+    const rate = await enforceDurableRateLimit(admin, req, {
+      subject: ipAddress,
+      scope: "username-login:captcha",
+      requestId,
+    });
+    if (rate.error) {
+      console.error("Captcha rate limit failed", cleanText(rate.error.message, 300));
+      return reply(req, { ok: false, message: "安全限流服務暫時無法使用" }, 503);
+    }
+    if (!rate.allowed) {
+      try {
+        await recordRateLimitDenial(admin, req, {
+          scope: "username-login:captcha",
+          requestId,
+          eventCount: rate.requestCount,
+          historyAlreadyRecorded: rate.durable,
+          title: "驗證碼索取異常頻繁，已阻擋",
+          message: "同一來源在短時間內過度索取登入驗證碼，受信任後端已阻擋請求。",
+          windowMinutes: 10,
+        });
+      } catch (alertError) {
+        console.error("Captcha rate-limit alert failed", alertError instanceof Error ? alertError.message : String(alertError));
+      }
+      return reply(req, { ok: false, message: "驗證碼索取過於頻繁，請稍後再試", request_id: requestId }, 429);
     }
   }
 
@@ -236,6 +259,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== "POST") return reply(req, { ok: false, message: "Method not allowed" }, 405);
 
+  const securityEventRequestId = securityRequestId();
   try {
     const body = await req.json().catch(() => ({}));
     const admin = createClient(
@@ -243,7 +267,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false, autoRefreshToken: false } }
     );
-    if (body.action === "captcha") return await issueCaptcha(admin, req);
+    if (body.action === "captcha") return await issueCaptcha(admin, req, securityEventRequestId);
     if (body.action === "account_application_options") {
       const { data, error } = await admin.from("departments")
         .select("dept_id,parent_id,name,code,level,sort_order")
@@ -272,13 +296,31 @@ Deno.serve(async (req) => {
 
       const ipAddress = clientIp(req);
       if (ipAddress) {
-        const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-        const { count, error } = await admin.from("account_applications")
-          .select("application_id", { count: "exact", head: true })
-          .eq("source_ip", ipAddress)
-          .gte("created_at", since);
-        if (error) throw error;
-        if ((count || 0) >= 5) return reply(req, { ok: false, message: "帳號申請過於頻繁，請稍後再試" }, 429);
+        const rate = await enforceDurableRateLimit(admin, req, {
+          subject: ipAddress,
+          scope: "username-login:account_application",
+          requestId: securityEventRequestId,
+        });
+        if (rate.error) {
+          console.error("Account application rate limit failed", cleanText(rate.error.message, 300));
+          return reply(req, { ok: false, message: "安全限流服務暫時無法使用" }, 503);
+        }
+        if (!rate.allowed) {
+          try {
+            await recordRateLimitDenial(admin, req, {
+              scope: "username-login:account_application",
+              requestId: securityEventRequestId,
+              eventCount: rate.requestCount,
+              historyAlreadyRecorded: rate.durable,
+              title: "帳號申請異常頻繁，已阻擋",
+              message: "同一來源一日內送出過多帳號申請，受信任後端已阻擋請求。",
+              windowMinutes: 1440,
+            });
+          } catch (alertError) {
+            console.error("Account application rate-limit alert failed", alertError instanceof Error ? alertError.message : String(alertError));
+          }
+          return reply(req, { ok: false, message: "帳號申請過於頻繁，請稍後再試", request_id: securityEventRequestId }, 429);
+        }
       }
 
       const [{ data: department }, { count: userCount }, { count: pendingCount }] = await Promise.all([
@@ -311,22 +353,35 @@ Deno.serve(async (req) => {
     const ipAddress = clientIp(req);
     let recentAttempts = 0;
     if (ipAddress) {
-      const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      const { count } = await admin.from("audit_logs")
-        .select("audit_id", { count: "exact", head: true })
-        .eq("table_name", "auth")
-        .eq("action", "login")
-        .eq("ip_address", ipAddress)
-        .eq("changes->>event_type", "login_attempt")
-        .neq("changes->details->>result", "成功")
-        .gte("operated_at", since);
-      recentAttempts = count || 0;
-    }
-
-    if (recentAttempts >= 20) {
-      const audited = await writeLoginAttempt(admin, req, identifier || "未提供", method, null, "已阻擋", "短時間登入嘗試次數過多", recentAttempts);
-      if (!audited) return reply(req, { ok: false, message: "登入稽核服務暫時無法使用" }, 503);
-      return reply(req, { ok: false, message: "登入嘗試過於頻繁，請稍後再試" }, 429);
+      const rate = await enforceDurableRateLimit(admin, req, {
+        subject: ipAddress,
+        scope: "username-login:login",
+        requestId: securityEventRequestId,
+      });
+      if (rate.error) {
+        console.error("Login rate limit failed", cleanText(rate.error.message, 300));
+        return reply(req, { ok: false, message: "安全限流服務暫時無法使用" }, 503);
+      }
+      recentAttempts = Math.max(0, rate.requestCount - 1);
+      if (!rate.allowed) {
+        const audited = await writeLoginAttempt(admin, req, identifier || "未提供", method, null, "已阻擋", "短時間登入嘗試次數過多", recentAttempts);
+        if (!audited) return reply(req, { ok: false, message: "登入稽核服務暫時無法使用" }, 503);
+        try {
+          await recordRateLimitDenial(admin, req, {
+            scope: "username-login:login",
+            requestId: securityEventRequestId,
+            eventCount: rate.requestCount,
+            historyAlreadyRecorded: rate.durable,
+            alertType: "login_bruteforce",
+            title: "疑似登入暴力嘗試，已阻擋",
+            message: "同一來源十分鐘內發生過多登入嘗試，系統已阻擋後續請求。",
+            windowMinutes: 10,
+          });
+        } catch (alertError) {
+          console.error("Login brute-force alert failed", alertError instanceof Error ? alertError.message : String(alertError));
+        }
+        return reply(req, { ok: false, message: "登入嘗試過於頻繁，請稍後再試", request_id: securityEventRequestId }, 429);
+      }
     }
     const captchaValid = await consumeCaptcha(admin, req, body.captcha_id, body.captcha_answer);
     if (!captchaValid) {

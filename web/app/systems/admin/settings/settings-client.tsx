@@ -53,6 +53,10 @@ type LineSettings = {
   notifyRepair: boolean;
   notifyCase: boolean;
   notifySecurity: boolean;
+  errorThresholdEnabled: boolean;
+  errorThresholdWindowMinutes: number;
+  errorThresholdCount: number;
+  errorThresholdCooldownMinutes: number;
 };
 
 type SettingsSnapshot = {
@@ -234,6 +238,11 @@ function normalizeShifts(value: unknown): Shift[] {
   });
 }
 
+function numberOf(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function normalizeSettings(result: unknown): SettingsSnapshot {
   const outer = recordOf(result);
   const payload = Object.keys(recordOf(outer.data)).length ? recordOf(outer.data) : outer;
@@ -266,9 +275,13 @@ function normalizeSettings(result: unknown): SettingsSnapshot {
       notifyRepair: booleanOf(line.line_notify_repair ?? flat.line_notify_repair),
       notifyCase: booleanOf(line.line_notify_case ?? flat.line_notify_case),
       notifySecurity: booleanOf(
-        line.line_notify_security ?? flat.line_notify_security ?? line.line_notify_security_alerts ?? flat.line_notify_security_alerts,
+        line.line_notify_security_alerts ?? flat.line_notify_security_alerts ?? line.line_notify_security ?? flat.line_notify_security,
         true,
       ),
+      errorThresholdEnabled: booleanOf(line.line_notify_error_threshold ?? flat.line_notify_error_threshold, false),
+      errorThresholdWindowMinutes: numberOf(line.error_threshold_window_minutes ?? flat.error_threshold_window_minutes, 15),
+      errorThresholdCount: numberOf(line.error_threshold_count ?? flat.error_threshold_count, 20),
+      errorThresholdCooldownMinutes: numberOf(line.error_threshold_cooldown_minutes ?? flat.error_threshold_cooldown_minutes, 60),
     },
   };
 }
@@ -296,6 +309,10 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     notifyRepair: false,
     notifyCase: false,
     notifySecurity: true,
+    errorThresholdEnabled: false,
+    errorThresholdWindowMinutes: 15,
+    errorThresholdCount: 20,
+    errorThresholdCooldownMinutes: 60,
   });
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentEditor, setDepartmentEditor] = useState<DepartmentEditor | null>(null);
@@ -423,12 +440,23 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       setNotice({ kind: 'error', text: '請填寫 LINE Group ID。' });
       return;
     }
+    const windowMinutes = Math.trunc(line.errorThresholdWindowMinutes);
+    const thresholdCount = Math.trunc(line.errorThresholdCount);
+    const cooldownMinutes = Math.trunc(line.errorThresholdCooldownMinutes);
+    if (windowMinutes < 5 || windowMinutes > 60 || thresholdCount < 1 || thresholdCount > 5000 || cooldownMinutes < 5 || cooldownMinutes > 1440) {
+      setNotice({ kind: 'error', text: '錯誤爆量統計視窗須為 5–60 分鐘、門檻須為 1–5000 筆、冷卻時間須為 5–1440 分鐘。' });
+      return;
+    }
     const payload: Record<string, unknown> = {
       line_group_id: groupId,
       line_notify_anomaly: line.notifyInspect,
       line_notify_repair: line.notifyRepair,
       line_notify_case: line.notifyCase,
-      line_notify_security: line.notifySecurity,
+      line_notify_security_alerts: line.notifySecurity,
+      line_notify_error_threshold: line.errorThresholdEnabled,
+      error_threshold_window_minutes: windowMinutes,
+      error_threshold_count: thresholdCount,
+      error_threshold_cooldown_minutes: cooldownMinutes,
     };
     if (token) payload.line_channel_token = token;
 
@@ -440,6 +468,9 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
         groupId,
         tokenDraft: '',
         tokenConfigured: current.tokenConfigured || Boolean(token),
+        errorThresholdWindowMinutes: windowMinutes,
+        errorThresholdCount: thresholdCount,
+        errorThresholdCooldownMinutes: cooldownMinutes,
       }));
       setNotice({
         kind: 'success',
@@ -466,6 +497,33 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       setNotice({ kind: 'success', text: '測試訊息已送出，請至設定的 LINE 群組確認。' });
     } catch (error) {
       setNotice({ kind: 'error', text: `LINE 測試推播失敗：${messageOf(error)}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const testErrorThresholdPush = async () => {
+    const windowMinutes = Math.trunc(line.errorThresholdWindowMinutes);
+    const thresholdCount = Math.trunc(line.errorThresholdCount);
+    const cooldownMinutes = Math.trunc(line.errorThresholdCooldownMinutes);
+    if (windowMinutes < 5 || windowMinutes > 60 || thresholdCount < 1 || thresholdCount > 5000 || cooldownMinutes < 5 || cooldownMinutes > 1440) {
+      setNotice({ kind: 'error', text: '請先輸入有效設定：統計視窗 5–60 分鐘、門檻 1–5000 筆、冷卻 5–1440 分鐘。' });
+      return;
+    }
+    setBusy('error-threshold-test');
+    setNotice({ kind: 'info', text: '正在測試錯誤爆量告警與 LINE 投遞…' });
+    try {
+      const result = await invokeAdminApi<Record<string, unknown>>('admin_test_error_threshold_notification', {
+        window_minutes: windowMinutes,
+        threshold_count: thresholdCount,
+        cooldown_minutes: cooldownMinutes,
+      });
+      const payload = recordOf(recordOf(result).data);
+      const ok = booleanOf(payload.ok, false) && booleanOf(recordOf(result).ok, false);
+      if (!ok) throw new Error(stringOf(payload.message ?? payload.msg ?? recordOf(result).message, '測試未成功'));
+      setNotice({ kind: 'success', text: '測試訊息已送出，未影響正式告警冷卻；請至 LINE 群組確認。' });
+    } catch (error) {
+      setNotice({ kind: 'error', text: `錯誤爆量測試失敗：${messageOf(error)}` });
     } finally {
       setBusy(null);
     }
@@ -808,6 +866,38 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
           </label>
         ))}
       </fieldset>
+      <fieldset className={styles.thresholdGroup}>
+        <legend>錯誤爆量告警</legend>
+        <label className={styles.toggleRow}>
+          <span>
+            <strong>啟用錯誤爆量告警</strong>
+            <small>統計瀏覽器錯誤紀錄，達門檻時建立永久資安告警並發送 LINE。</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={line.errorThresholdEnabled}
+            onChange={event => setLine(current => ({ ...current, errorThresholdEnabled: event.target.checked }))}
+          />
+        </label>
+        <div className={styles.thresholdGrid}>
+          <label>
+            <span>統計視窗（分鐘）</span>
+            <input type="number" min={5} max={60} step={1} value={line.errorThresholdWindowMinutes} onChange={event => setLine(current => ({ ...current, errorThresholdWindowMinutes: Number(event.target.value) }))} />
+            <small>計算最近幾分鐘內的錯誤筆數。</small>
+          </label>
+          <label>
+            <span>觸發門檻（筆）</span>
+            <input type="number" min={1} max={5000} step={1} value={line.errorThresholdCount} onChange={event => setLine(current => ({ ...current, errorThresholdCount: Number(event.target.value) }))} />
+            <small>視窗內達此筆數即建立告警。</small>
+          </label>
+          <label>
+            <span>通知冷卻（分鐘）</span>
+            <input type="number" min={5} max={1440} step={1} value={line.errorThresholdCooldownMinutes} onChange={event => setLine(current => ({ ...current, errorThresholdCooldownMinutes: Number(event.target.value) }))} />
+            <small>同一波異常再次通知前的等待時間。</small>
+          </label>
+        </div>
+        <p className={styles.helperText}>建議值：15 分鐘內 20 筆，冷卻 60 分鐘。測試只驗證 LINE 投遞，不會計入正式流量或冷卻。</p>
+      </fieldset>
       <div className={styles.formActions}>
         <button className={styles.primaryButton} disabled={busy === 'line'} type="submit">
           {busy === 'line' ? '儲存中…' : '儲存 LINE 設定'}
@@ -819,6 +909,14 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
           onClick={() => void testLinePush()}
         >
           {busy === 'line-test' ? '傳送中…' : '傳送測試訊息'}
+        </button>
+        <button
+          className={styles.secondaryButton}
+          disabled={busy === 'error-threshold-test' || busy === 'line'}
+          type="button"
+          onClick={() => void testErrorThresholdPush()}
+        >
+          {busy === 'error-threshold-test' ? '測試中…' : '測試錯誤爆量告警'}
         </button>
       </div>
     </form>

@@ -1,4 +1,9 @@
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
+import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.112.2";
+import {
+  enforceDurableRateLimit,
+  recordRateLimitDenial,
+  securityRequestId,
+} from "../_shared/security-monitor.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
 const allowedOrigin = (req: Request) => {
@@ -18,6 +23,45 @@ const reply = (req: Request, body: unknown, status = 200) => new Response(JSON.s
 });
 
 const cleanText = (value: unknown, max = 500) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+const ERROR_SECRET_KEY = /password|passwd|token|secret|authorization|cookie|credential|captcha|api[_-]?key|signature/i;
+const ERROR_SECRET_VALUE = /(?:Bearer\s+)[A-Za-z0-9._~+/=-]+|(?:access_token|refresh_token|token|apikey|api_key|authorization|password|passwd|cookie|secret|signature)=[^&#\s]+|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/gi;
+const cleanErrorText = (value: unknown, max = 500) => cleanText(
+  String(value ?? "").replace(ERROR_SECRET_VALUE, "[已遮蔽]"),
+  max,
+);
+const cleanErrorValue = (value: unknown, depth = 0): unknown => {
+  if (depth > 4) return "[內容過深]";
+  if (value === null || value === undefined || typeof value === "boolean" || typeof value === "number") return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith("{") || trimmed.startsWith("[")) && trimmed.length <= 20_000) {
+      try {
+        return cleanErrorValue(JSON.parse(trimmed), depth + 1);
+      } catch { /* 不是 JSON，改走字串遮蔽 */ }
+    }
+    return cleanErrorText(value, 4000);
+  }
+  if (Array.isArray(value)) return value.slice(0, 30).map((item) => cleanErrorValue(item, depth + 1));
+  if (typeof value === "object") {
+    const output: Record<string, unknown> = {};
+    for (const [rawKey, item] of Object.entries(value as Record<string, unknown>).slice(0, 60)) {
+      const key = cleanText(rawKey, 80);
+      if (!key || ERROR_SECRET_KEY.test(key)) continue;
+      output[key] = cleanErrorValue(item, depth + 1);
+    }
+    return output;
+  }
+  return cleanErrorText(value, 4000);
+};
+const safePageUrl = (value: unknown) => {
+  const raw = cleanText(value, 1200);
+  try {
+    const url = new URL(raw);
+    return `${url.origin}${url.pathname}`.slice(0, 1000);
+  } catch {
+    return raw.split(/[?#]/, 1)[0].slice(0, 1000);
+  }
+};
 const cleanValue = (value: unknown, depth = 0): unknown => {
   if (depth > 3) return "[內容過深]";
   if (value === null || value === undefined || typeof value === "boolean" || typeof value === "number") return value;
@@ -349,7 +393,7 @@ async function sendSecurityAlertLine(
   const action = alert.alert_type === "bulk_read"
     ? (isSysadminProfile(profile)
       ? "已保留異常紀錄並通知；系統管理員工作階段未中止"
-      : "已強制中止該使用者目前工作階段")
+      : "已保留紀錄並通知管理員複核；未自動中止工作階段")
     : "已建立高風險告警並保留完整系統紀錄";
   const text = [
     "🚨 北農系統資安告警",
@@ -487,10 +531,10 @@ async function detectSecurityAlert(
       return saveSecurityAlert(admin, profile, ipAddress, {
         alertType: "bulk_read",
         severity: "critical",
-        title: sysadminRead ? "系統管理員非互動高頻讀取" : "疑似非互動高頻讀取，待處置",
+        title: sysadminRead ? "系統管理員非互動高頻讀取" : "疑似非互動高頻讀取，待複核",
         message: sysadminRead
           ? alertActor(profile) + " 在 5 分鐘內出現 " + readCount + " 次非互動讀取，涉及 " + uniqueResourceCount + " 個不同資源；系統已保留紀錄並通知，管理員工作階段不強制中止。"
-          : alertActor(profile) + " 在 5 分鐘內出現 " + readCount + " 次非互動讀取，涉及 " + uniqueResourceCount + " 個不同資源；系統確認可能存在外部程式或自動化工具，將依後端處置結果決定是否中止目前工作階段。",
+          : alertActor(profile) + " 在 5 分鐘內出現 " + readCount + " 次非互動讀取，涉及 " + uniqueResourceCount + " 個不同資源；系統已保留紀錄並通知管理員複核，不會僅因頁面載入或背景更新就自動登出。",
         resource: resourceSummary || resource,
         eventCount: readCount,
         windowMinutes: 5,
@@ -505,7 +549,9 @@ async function detectSecurityAlert(
           user_initiated_read_count: 0,
           resources: resources.slice(0, 20),
           observed_user_agents: userAgentSet.slice(0, 5),
-          enforcement: sysadminRead ? "audit_and_notify_only" : "force_logout_current_session",
+          enforcement: "audit_and_notify_only",
+          requires_human_review: true,
+          client_signal_only: true,
           sysadmin_exempt_from_logout: sysadminRead
         }
       });
@@ -530,15 +576,25 @@ Deno.serve(async (req) => {
     );
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, message: "登入狀態無效" }, 401);
-    const { data: rateAllowed, error: rateError } = await admin.rpc("enforce_request_rate_limit", {
-      p_subject: authData.user.id,
-      p_scope: "audit-event",
+    const requestId = securityRequestId();
+    const auditRate = await enforceDurableRateLimit(admin, req, {
+      subject: authData.user.id,
+      scope: "audit-event",
+      requestId,
     });
-    if (rateError) {
-      console.error("audit-event rate limit failed", rateError.message);
+    if (auditRate.error) {
+      console.error("audit-event rate limit failed", cleanText(auditRate.error.message, 300));
       return reply(req, { ok: false, message: "安全限流服務暫時無法使用" }, 503);
     }
-    if (rateAllowed !== true) {
+    if (!auditRate.allowed) {
+      await recordRateLimitDenial(admin, req, {
+        scope: "audit-event",
+        requestId,
+        eventCount: auditRate.requestCount,
+        historyAlreadyRecorded: auditRate.durable,
+        title: "系統稽核事件異常頻繁，已阻擋",
+        message: "同一工作階段短時間送出過多系統稽核事件，受信任後端已阻擋請求。",
+      }).catch((error) => console.error("audit-event rate-limit alert failed", error));
       return reply(req, { ok: false, message: "系統紀錄請求過於頻繁，請稍後再試" }, 429);
     }
 
@@ -551,8 +607,55 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const eventType = cleanText(body.event_type, 40);
-    if (!["login", "logout", "page_view", "function_use", "data_action", "data_read", "file_read", "access_denied"].includes(eventType)) {
+    if (!["login", "logout", "page_view", "function_use", "data_action", "data_read", "file_read", "access_denied", "client_error"].includes(eventType)) {
       return reply(req, { ok: false, message: "不支援的稽核事件" }, 400);
+    }
+
+    if (eventType === "client_error") {
+      const errorRate = await enforceDurableRateLimit(admin, req, {
+        subject: profile.user_id,
+        actorId: profile.user_id,
+        scope: "client-error-report",
+        requestId,
+      });
+      if (errorRate.error) {
+        console.error("client-error-report rate limit failed", cleanText(errorRate.error.message, 300));
+        return reply(req, { ok: false, message: "錯誤回報限流服務暫時無法使用" }, 503);
+      }
+      if (!errorRate.allowed) {
+        await recordRateLimitDenial(admin, req, {
+          scope: "client-error-report",
+          requestId,
+          eventCount: errorRate.requestCount,
+          historyAlreadyRecorded: errorRate.durable,
+          profile,
+          title: "前端錯誤回報異常頻繁，已阻擋",
+          message: "同一帳號短時間送出過多前端錯誤回報，受信任後端已阻擋請求。",
+          windowMinutes: 15,
+        }).catch((error) => console.error("client-error-report alert failed", error));
+        return reply(req, { ok: false, message: "錯誤回報過於頻繁，請稍後再試" }, 429);
+      }
+      const item = body.error && typeof body.error === "object"
+        ? body.error as Record<string, unknown>
+        : {};
+      const kind = cleanText(item.kind, 40);
+      const message = cleanErrorText(item.message, 2000);
+      if (!["js_error", "unhandled_rejection", "api_error", "manual"].includes(kind) || !message) {
+        return reply(req, { ok: false, message: "錯誤回報內容無效" }, 400);
+      }
+      const { error: reportError } = await admin.from("client_error_logs").insert({
+        kind,
+        message,
+        detail: cleanErrorValue(item.detail),
+        page: cleanErrorText(item.page, 500),
+        url: safePageUrl(item.url),
+        user_id: profile.user_id,
+        user_agent: cleanText(req.headers.get("user-agent"), 500) || null,
+        // 一律採受信任後端時間，忽略瀏覽器提供的 occurred_at。
+        occurred_at: new Date().toISOString(),
+      });
+      if (reportError) throw reportError;
+      return reply(req, { ok: true, request_id: requestId });
     }
 
     const eventId = /^[0-9a-z-]{8,80}$/i.test(String(body.event_id || ""))
@@ -569,12 +672,8 @@ Deno.serve(async (req) => {
       occurred_at: new Date().toISOString(),
       actor: {
         user_id: profile.user_id,
-        username: profile.username,
-        email: profile.email,
-        name: profile.name,
         role: profile.role,
         rbac_role: profile.rbac_role,
-        department: profile.department,
         dept_id: profile.dept_id
       },
       client: { ip_address: ipAddress, user_agent: userAgent },
@@ -602,12 +701,10 @@ Deno.serve(async (req) => {
     let lineNotification = null;
     if (["data_read", "file_read", "access_denied"].includes(eventType)) {
       try {
-        // 告警偵測與大量讀取切斷維持同步：前端會讀回應中的 security_action 來
-        // 強制登出，移到背景會使該資安控制失效。兩者皆為資料庫查詢，成本可控。
+        // 非互動讀取可能來自正常頁面初始化或背景輪詢，僅憑前端互動時間不可
+        // 自動撤銷工作階段；先永久告警並通知複核。真正的異常流量由受信任後端
+        // 限流直接阻擋與記錄，不把「使用者暫時沒操作」等同惡意自動化。
         alert = await detectSecurityAlert(admin, profile, ipAddress, eventType, details);
-        if (alert?.alert_type === "bulk_read" && !isSysadminProfile(profile)) {
-          securityAction = await enforceBulkReadCutoff(admin, profile, token, alert);
-        }
         // LINE 推播改為背景執行：它是本函式唯一的對外呼叫，延遲不可控，而其結果
         // （line_notification）前端並未使用。以 EdgeRuntime.waitUntil 保住 worker
         // 直到背景工作結束，避免回應送出後任務被中斷。

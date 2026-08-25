@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
+import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/security-monitor.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -296,6 +297,7 @@ const EQUIPMENT_TABLES: Record<string, EquipmentTableConfig> = {
 export async function handleAppApiRequest(req: Request) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req) });
   if (req.method !== 'POST') return reply(req, { ok: false, message: 'Method not allowed' }, 405);
+  const securityEventRequestId = nextRequestRequestId();
 
   try {
     const authorization = req.headers.get('authorization') || '';
@@ -306,16 +308,29 @@ export async function handleAppApiRequest(req: Request) {
     const { data: authData, error: authError } = await admin.auth.getUser(token);
     if (authError || !authData.user) return reply(req, { ok: false, message: '登入狀態無效' }, 401);
 
-    const { data: globalRateAllowed, error: globalRateError } = await admin.rpc('enforce_request_rate_limit', {
-      p_subject: authData.user.id,
-      p_scope: 'app-api',
+    const globalRate = await enforceDurableRateLimit(admin, req, {
+      subject: authData.user.id,
+      scope: 'app-api',
+      requestId: securityEventRequestId,
     });
-    if (globalRateError) {
-      console.error('app-api rate limit failed:', globalRateError.message);
+    if (globalRate.error) {
+      console.error('app-api rate limit failed:', globalRate.error.message);
       return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
     }
-    if (globalRateAllowed !== true) {
-      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+    if (!globalRate.allowed) {
+      const { data: rateProfile } = await admin.from('users')
+        .select('user_id,username,email,name').eq('auth_id', authData.user.id).maybeSingle();
+      try {
+        await recordRateLimitDenial(admin, req, {
+          scope: 'app-api', requestId: securityEventRequestId, profile: rateProfile,
+          eventCount: globalRate.requestCount,
+          historyAlreadyRecorded: globalRate.durable,
+          title: 'API 異常流量已阻擋',
+        });
+      } catch (alertError) {
+        console.error('app-api rate-limit alert failed:', alertError instanceof Error ? alertError.message : String(alertError));
+      }
+      return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試', request_id: securityEventRequestId }, 429);
     }
 
     const { data: profile, error: profileError } = await admin.from('users')
@@ -371,16 +386,30 @@ export async function handleAppApiRequest(req: Request) {
       workorder_workflow: 'admin-api:write',
   } as Record<string, string>)[action];
     if (actionScope) {
-      const { data: actionRateAllowed, error: actionRateError } = await admin.rpc('enforce_request_rate_limit', {
-        p_subject: authData.user.id,
-        p_scope: actionScope,
+      const actionRate = await enforceDurableRateLimit(admin, req, {
+        subject: authData.user.id,
+        scope: actionScope,
+        actorId: profile.user_id,
+        requestId: securityEventRequestId,
       });
-      if (actionRateError) {
-        console.error(`${actionScope} rate limit failed:`, actionRateError.message);
+      if (actionRate.error) {
+        console.error(`${actionScope} rate limit failed:`, actionRate.error.message);
         return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
       }
-      if (actionRateAllowed !== true) {
-        return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試' }, 429);
+      if (!actionRate.allowed) {
+        try {
+          await recordRateLimitDenial(admin, req, {
+            scope: actionScope,
+            requestId: securityEventRequestId,
+            profile,
+            eventCount: actionRate.requestCount,
+            historyAlreadyRecorded: actionRate.durable,
+            title: '功能請求異常頻繁，已阻擋',
+          });
+        } catch (alertError) {
+          console.error(`${actionScope} rate-limit alert failed:`, alertError instanceof Error ? alertError.message : String(alertError));
+        }
+        return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試', request_id: securityEventRequestId }, 429);
       }
     }
 

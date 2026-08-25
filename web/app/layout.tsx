@@ -3,6 +3,7 @@ import './globals.css';
 import './handover-pilot/pilot.css';
 import './handover-pilot/pilot-light.css';
 import { ErrorTrackerMount } from '@/components/ErrorTrackerMount';
+import { SecurityAuditMount } from '@/components/SecurityAuditMount';
 
 // CSP 不在這裡定義。React 19 會攔截並重新處理 <head> 裡的 <meta>，手寫的 http-equiv
 // 不會出現在產出的 HTML，Next 的 metadata.other 同樣會被濾掉——兩種寫法都是
@@ -31,7 +32,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'light')" }} />
       </head>
       <body>
-        <ErrorTrackerMount />{children}</body>
+        <ErrorTrackerMount />
+        <SecurityAuditMount />
+        {children}
+      </body>
     </html>
   );
 }
