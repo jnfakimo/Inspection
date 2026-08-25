@@ -742,7 +742,7 @@
       detailCard.innerHTML = `
         <div class="info-row">
           <span class="info-label">節點名稱</span>
-          <span class="info-val" style="color: var(--cyan); font-weight: bold; font-size: 1.05rem;">${node.label.replace('\n', ' ')}</span>
+          <span class="info-val" style="color: var(--cyan); font-weight: bold; font-size: 1.05rem;">${node.label.replace(/\n/g, ' ')}</span>
         </div>
         <div class="info-row">
           <span class="info-label">物件類型</span>
@@ -799,7 +799,7 @@
       eligibleParents.forEach(parent => {
         const option = document.createElement("option");
         option.value = parent.id;
-        option.textContent = parent.label.replace('\n', ' ');
+        option.textContent = parent.label.replace(/\n/g, ' ');
         if (parent.id === currentParentId) {
           option.selected = true;
         }
@@ -852,7 +852,7 @@
       // Brief flash animation to notify user
       network.flash = true;
       setTimeout(() => {
-        alert(`已動態將節點 [${node.label.replace('\n', ' ')}] 搬移移屬到 [${parentNode.label.replace('\n', ' ')}] 下！`);
+        alert(`已動態將節點 [${node.label.replace(/\n/g, ' ')}] 搬移移屬到 [${parentNode.label.replace(/\n/g, ' ')}] 下！`);
       }, 50);
     }
 
