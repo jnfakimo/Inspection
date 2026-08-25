@@ -9,7 +9,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { auditSafeValue } from '@/lib/security-audit-sanitize';
 
 const RESOURCE_LABELS: Record<string, string> = {
-  system_usage: '系統／功能使用', users: '帳號', role_permissions: '角色權限',
+  system_usage: '系統／功能使用', users: '帳號', roles: '系統角色', role_permissions: '角色權限',
   departments: '組織部門', locations: '場域位置', equipment: '設備',
   inspection_records: '巡檢記錄', checkin_logs: '巡檢打卡', patrol_shifts: '巡檢班別',
   repair_requests: '報修單', maintenance_orders: '維修單', cost_records: '費用',

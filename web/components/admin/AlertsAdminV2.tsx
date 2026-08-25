@@ -43,6 +43,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   system_settings: '系統設定',
   auth: '登入驗證',
   users: '帳號資料',
+  roles: '系統角色',
   role_permissions: '角色權限',
   departments: '組織部門',
   locations: '場域位置',
