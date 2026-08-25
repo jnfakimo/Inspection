@@ -27,8 +27,8 @@ jobs:
       - name: Probe GitHub Pages, REST and Storage
         env:
           SYNTHETIC_PAGES_URL: https://jnfakimo.github.io/Inspection/
-          SUPABASE_PROJECT_REF: qztffronusdhgxhjjub
-          SUPABASE_URL: https://qztffronusdhgxhjjub.supabase.co
+          SUPABASE_PROJECT_REF: qztffronusdhgxhjjubt
+          SUPABASE_URL: https://qztffronusdhgxhjjubt.supabase.co
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -38,5 +38,5 @@ jobs:
           SYNTHETIC_PROBE_LATENCY_CRITICAL_MS: 10000
           SYNTHETIC_EDGE_TRAFFIC_THRESHOLD: 300
           SYNTHETIC_STORAGE_TRAFFIC_THRESHOLD: 100
-          SYNTHETIC_PROBE_ALERT_FUNCTION_URL: https://qztffronusdhgxhjjub.supabase.co/functions/v1/platform-log-alert
+          SYNTHETIC_PROBE_ALERT_FUNCTION_URL: https://qztffronusdhgxhjjubt.supabase.co/functions/v1/platform-log-alert
         run: node tools/synthetic-probe.mjs

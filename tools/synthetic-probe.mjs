@@ -9,7 +9,7 @@
  * Logs API so a short-lived volume spike is visible alongside the HTTP probe.
  */
 
-const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || "qztffronusdhgxhjjub";
+const PROJECT_REF = process.env.SUPABASE_PROJECT_REF || "qztffronusdhgxhjjubt";
 const SUPABASE_URL = process.env.SUPABASE_URL ||
   `https://${PROJECT_REF}.supabase.co`;
 const ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
