@@ -113,6 +113,11 @@ const RESOURCE_LABELS: Record<string, string> = {
   "platform:function_logs": "Edge Function 平台日誌",
   "platform:function_edge_logs": "Edge Function 網路日誌",
   "platform:management_api": "Supabase Logs API 監測",
+  "synthetic:github_pages": "GitHub Pages 無腳本探針",
+  "synthetic:supabase_rest": "Supabase REST 無腳本探針",
+  "synthetic:supabase_storage": "Supabase Storage 無腳本探針",
+  "synthetic:traffic:edge_logs": "API Gateway／REST 無腳本流量探針",
+  "synthetic:traffic:storage_logs": "Storage 無腳本流量探針",
 };
 
 const isCompatibilityError = (error: any) => {

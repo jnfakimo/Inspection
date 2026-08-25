@@ -38,6 +38,11 @@ const RESOURCE_LABELS: Record<string, string> = {
   'patrol-checkin': '巡檢打卡介面',
   'ipcam-proxy': '監視影像介面',
   'line-notify': 'LINE 推播服務',
+  'synthetic:github_pages': 'GitHub Pages 無腳本探針',
+  'synthetic:supabase_rest': 'Supabase REST 無腳本探針',
+  'synthetic:supabase_storage': 'Supabase Storage 無腳本探針',
+  'synthetic:traffic:edge_logs': 'API Gateway／REST 無腳本流量探針',
+  'synthetic:traffic:storage_logs': 'Storage 無腳本流量探針',
   data_access: '資料讀取',
   file_access: '檔案存取',
   security_alerts: '資安告警',
@@ -75,6 +80,11 @@ function localizeResource(value: unknown) {
     if (/^patrol-checkin(?:\b|[:/])/i.test(item)) return '巡檢打卡介面';
     if (/^ipcam-proxy(?:\b|[:/])/i.test(item)) return '監視影像介面';
     if (/^line-notify(?:\b|[:/])/i.test(item)) return 'LINE 推播服務';
+    if (/^synthetic:github_pages(?:\b|[:/])/i.test(item)) return 'GitHub Pages 無腳本探針';
+    if (/^synthetic:supabase_rest(?:\b|[:/])/i.test(item)) return 'Supabase REST 無腳本探針';
+    if (/^synthetic:supabase_storage(?:\b|[:/])/i.test(item)) return 'Supabase Storage 無腳本探針';
+    if (/^synthetic:traffic:edge_logs(?:\b|[:/])/i.test(item)) return 'API Gateway／REST 無腳本流量探針';
+    if (/^synthetic:traffic:storage_logs(?:\b|[:/])/i.test(item)) return 'Storage 無腳本流量探針';
     return item;
   }).join('、');
 }
