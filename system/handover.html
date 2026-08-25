@@ -795,7 +795,10 @@ function applyPerms() {
 
   const [{ data: depts }, { data: users }] = await Promise.all([
     db.from('departments').select('*').eq('status','active').order('sort_order'),
-    db.from('users').select('*').eq('status','active').order('name')
+    // 只取下拉選單真正用到的三個欄位。這裡原本是 select('*')，等於把全公司的
+    // email、phone、auth_id、permissions、supervisor_id 全部下載到每一位值班人員的
+    // 瀏覽器——交接簿是一般人員都會開的頁面，開 F12 就看得到。
+    db.from('users').select('user_id,name,dept_id').eq('status','active').order('name')
   ]);
   allDepts = depts || [];
   allUsers = users || [];
