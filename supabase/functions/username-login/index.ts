@@ -17,6 +17,10 @@ const reply = (req: Request, body: unknown, status = 200) => new Response(JSON.s
   headers: { ...cors(req), "Content-Type": "application/json", "Cache-Control": "no-store" }
 });
 const cleanText = (value: unknown, max = 500) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+// 這三個輔助函式只需要 PostgREST 的 from()。避免用 ReturnType<typeof createClient>：
+// supabase-js 2.110 的未帶 Database 泛型版本會被 Deno 推成 never，讓每次部署的
+// `deno check` 對既有 insert/update 全部誤報型別錯誤。
+type AdminClient = { from: (relation: string) => any };
 const clientIp = (req: Request) => {
   const raw = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") ||
     req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
@@ -107,7 +111,7 @@ const captchaImage = (code: string) => {
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
-async function issueCaptcha(admin: ReturnType<typeof createClient>, req: Request) {
+async function issueCaptcha(admin: AdminClient, req: Request) {
   const ipAddress = clientIp(req);
   if (ipAddress) {
     const since = new Date(Date.now() - 10 * 60_000).toISOString();
@@ -140,7 +144,7 @@ async function issueCaptcha(admin: ReturnType<typeof createClient>, req: Request
 }
 
 async function consumeCaptcha(
-  admin: ReturnType<typeof createClient>,
+  admin: AdminClient,
   req: Request,
   challengeIdValue: unknown,
   answerValue: unknown
@@ -176,7 +180,7 @@ type LoginProfile = {
 };
 
 async function writeLoginAttempt(
-  admin: ReturnType<typeof createClient>,
+  admin: AdminClient,
   req: Request,
   identifier: string,
   method: "username" | "email" | "unknown",
@@ -240,6 +244,64 @@ Deno.serve(async (req) => {
       { auth: { persistSession: false, autoRefreshToken: false } }
     );
     if (body.action === "captcha") return await issueCaptcha(admin, req);
+    if (body.action === "account_application_options") {
+      const { data, error } = await admin.from("departments")
+        .select("dept_id,parent_id,name,code,level,sort_order")
+        .eq("status", "active")
+        .order("sort_order")
+        .limit(500);
+      if (error) throw error;
+      return reply(req, { ok: true, departments: data || [] });
+    }
+    if (body.action === "account_application") {
+      const captchaValid = await consumeCaptcha(admin, req, body.captcha_id, body.captcha_answer);
+      if (!captchaValid) return reply(req, { ok: false, message: "驗證碼錯誤或已過期，請重新輸入" }, 400);
+
+      const name = cleanText(body.name, 100);
+      const username = cleanText(body.username, 64);
+      const email = cleanText(body.email, 200).toLowerCase();
+      const phone = cleanText(body.phone, 50) || null;
+      const deptId = cleanText(body.dept_id, 80);
+      const reason = cleanText(body.reason, 1000) || null;
+      if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)
+          || !/^[^\s@%]+@[^\s@%]+\.[^\s@%]+$/.test(email)
+          || /[(),]/.test(email)
+          || !/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(deptId)) {
+        return reply(req, { ok: false, message: "請完整填寫姓名、英數字帳號、電子郵件與所屬單位" }, 400);
+      }
+
+      const ipAddress = clientIp(req);
+      if (ipAddress) {
+        const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+        const { count, error } = await admin.from("account_applications")
+          .select("application_id", { count: "exact", head: true })
+          .eq("source_ip", ipAddress)
+          .gte("created_at", since);
+        if (error) throw error;
+        if ((count || 0) >= 5) return reply(req, { ok: false, message: "帳號申請過於頻繁，請稍後再試" }, 429);
+      }
+
+      const [{ data: department }, { count: userCount }, { count: pendingCount }] = await Promise.all([
+        admin.from("departments").select("dept_id").eq("dept_id", deptId).eq("status", "active").maybeSingle(),
+        admin.from("users").select("user_id", { count: "exact", head: true }).or(`username.ilike.${username},email.ilike.${email}`),
+        admin.from("account_applications").select("application_id", { count: "exact", head: true })
+          .eq("status", "pending").or(`username.ilike.${username},email.ilike.${email}`),
+      ]);
+      if (!department) return reply(req, { ok: false, message: "所屬單位不存在或已停用" }, 400);
+      if ((userCount || 0) > 0) return reply(req, { ok: false, message: "此帳號或電子郵件已存在，請改用登入或忘記密碼" }, 409);
+      if ((pendingCount || 0) > 0) return reply(req, { ok: false, message: "此帳號或電子郵件已有待審申請" }, 409);
+
+      const { data, error } = await admin.from("account_applications").insert({
+        name, username, email, phone, dept_id: deptId, reason,
+        source_ip: ipAddress,
+        user_agent: cleanText(req.headers.get("user-agent"), 1000) || null,
+      }).select("application_id").single();
+      if (error) {
+        if (error.code === "23505") return reply(req, { ok: false, message: "此帳號或電子郵件已有待審申請" }, 409);
+        throw error;
+      }
+      return reply(req, { ok: true, application_id: data.application_id, message: "帳號申請已送出，請等待系統管理員審核" });
+    }
 
     const identifier = cleanText(body.identifier || body.username, 120);
     const password = String(body.password || "");

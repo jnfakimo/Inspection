@@ -115,6 +115,22 @@ export async function handleAdminApiRequest(req: Request) {
       const { data } = await admin.from('roles').select('role_id').eq('role_id', rbacRole).maybeSingle();
       return Boolean(data);
     };
+    const validateSupervisor = async (supervisorId: string | null, deptId: string | null, rbacRole: string, targetUserId = '') => {
+      if (['unit_supervisor', 'sysadmin'].includes(rbacRole)) return { supervisorId: null, message: '' };
+      if (!supervisorId) return { supervisorId: null, message: '一般人員必須指定直屬課室主管' };
+      if (supervisorId === targetUserId) return { supervisorId: null, message: '直屬主管不可設定為本人' };
+      const { data: supervisor } = await admin.from('users')
+        .select('user_id,dept_id,role,rbac_role,status')
+        .eq('user_id', supervisorId).eq('status', 'active').maybeSingle();
+      const supervisorRole = supervisor?.rbac_role || (supervisor?.role === 'admin' ? 'sysadmin' : supervisor?.role === 'supervisor' ? 'unit_supervisor' : supervisor?.role);
+      if (!supervisor || !['unit_supervisor', 'sysadmin'].includes(String(supervisorRole || ''))) {
+        return { supervisorId: null, message: '直屬主管必須是啟用中的單位主管或系統管理員' };
+      }
+      if (supervisorRole !== 'sysadmin' && deptId && supervisor.dept_id !== deptId) {
+        return { supervisorId: null, message: '一般人員與直屬課室主管必須屬於同一單位' };
+      }
+      return { supervisorId, message: '' };
+    };
 
     if (action === 'admin_get_settings') {
       const keys = [...SAFE_SETTING_KEYS, 'line_channel_token'];
@@ -208,34 +224,127 @@ export async function handleAdminApiRequest(req: Request) {
       return reply(req, { ok: true, data: { line_token_configured: true } });
     }
 
+    if (action === 'admin_list_account_applications') {
+      const { data, error } = await admin.from('account_applications')
+        .select('application_id,name,username,email,phone,dept_id,reason,status,decision_note,approved_role,approved_supervisor_id,created_at,decided_at,departments(name,code)')
+        .order('created_at', { ascending: false }).limit(1000);
+      if (error) return reply(req, { ok: false, message: dbMessage(error, '帳號申請載入失敗') }, 400);
+      return reply(req, { ok: true, data: data || [] });
+    }
+
+    if (action === 'admin_approve_account_application') {
+      const applicationId = id(body.application_id), rbacRole = clean(body.rbac_role, 40);
+      const supervisorId = id(body.supervisor_id) || null, decisionNote = clean(body.decision_note, 1000) || null;
+      if (!applicationId || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) {
+        return reply(req, { ok: false, message: '帳號申請或角色設定無效' }, 400);
+      }
+      const { data: application } = await admin.from('account_applications')
+        .select('application_id,name,username,email,phone,dept_id,reason,status')
+        .eq('application_id', applicationId).maybeSingle();
+      if (!application) return reply(req, { ok: false, message: '找不到指定的帳號申請' }, 404);
+      if (application.status !== 'pending') return reply(req, { ok: false, message: '此帳號申請已完成審核' }, 409);
+      const supervisorValidation = await validateSupervisor(supervisorId, application.dept_id, rbacRole);
+      if (supervisorValidation.message) return reply(req, { ok: false, message: supervisorValidation.message }, 400);
+      const [{ count: usernameCount }, { count: emailCount }] = await Promise.all([
+        admin.from('users').select('user_id', { count: 'exact', head: true }).ilike('username', application.username),
+        admin.from('users').select('user_id', { count: 'exact', head: true }).ilike('email', application.email),
+      ]);
+      if (Number(usernameCount || 0) + Number(emailCount || 0) > 0) {
+        return reply(req, { ok: false, message: '登入帳號或電子郵件已存在，無法核准此申請' }, 409);
+      }
+
+      const temporaryPassword = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email: application.email, password: temporaryPassword, email_confirm: true,
+        user_metadata: { name: application.name, username: application.username },
+      });
+      if (createError || !created.user) return reply(req, { ok: false, message: `Auth 帳號建立失敗：${createError?.message || '未知錯誤'}` }, 400);
+
+      const profileData = {
+        auth_id: created.user.id, name: application.name, username: application.username,
+        email: application.email, phone: application.phone || null, dept_id: application.dept_id,
+        department: await departmentName(application.dept_id), role: LEGACY_ROLE[rbacRole] ?? 'inspector',
+        rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId,
+        permissions: {}, status: 'active', created_by: profile.user_id,
+      };
+      const { data: createdProfile, error: profileCreateError } = await admin.from('users')
+        .insert(profileData).select('user_id').single();
+      if (profileCreateError || !createdProfile) {
+        await admin.auth.admin.deleteUser(created.user.id);
+        return reply(req, { ok: false, message: dbMessage(profileCreateError, '人員主檔建立失敗') }, 400);
+      }
+
+      const now = new Date().toISOString();
+      const { data: decided, error: decisionError } = await admin.from('account_applications').update({
+        status: 'approved', decided_by: profile.user_id, decided_at: now, decision_note: decisionNote,
+        approved_user_id: createdProfile.user_id, approved_role: rbacRole,
+        approved_supervisor_id: supervisorValidation.supervisorId, updated_at: now,
+      }).eq('application_id', applicationId).eq('status', 'pending').select('application_id').maybeSingle();
+      if (decisionError || !decided) {
+        await admin.from('users').update({ status: 'inactive' }).eq('user_id', createdProfile.user_id);
+        await admin.auth.admin.updateUserById(created.user.id, { ban_duration: '876000h' });
+        return reply(req, { ok: false, message: '帳號已建立但申請狀態同步失敗，帳號已安全停用，請洽系統維護人員' }, 500);
+      }
+
+      const publicAuth = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+      const { error: mailError } = await publicAuth.auth.resetPasswordForEmail(application.email, {
+        redirectTo: 'https://jnfakimo.github.io/Inspection/v2/login/',
+      });
+      await audit('users', createdProfile.user_id, 'insert', {
+        source: 'account_application', application_id: applicationId, name: application.name,
+        username: application.username, email: application.email, dept_id: application.dept_id,
+        rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId,
+        activation_email_sent: !mailError,
+      });
+      return reply(req, { ok: true, data: { user_id: createdProfile.user_id, activation_email_sent: !mailError }, message: mailError ? '帳號已核准，但啟用郵件寄送失敗；請由帳號管理重設密碼' : '帳號已核准，啟用連結已寄出' });
+    }
+
+    if (action === 'admin_reject_account_application') {
+      const applicationId = id(body.application_id), decisionNote = clean(body.decision_note, 1000);
+      if (!applicationId || !decisionNote) return reply(req, { ok: false, message: '退回帳號申請時必須填寫原因' }, 400);
+      const now = new Date().toISOString();
+      const { data, error } = await admin.from('account_applications').update({
+        status: 'rejected', decided_by: profile.user_id, decided_at: now,
+        decision_note: decisionNote, updated_at: now,
+      }).eq('application_id', applicationId).eq('status', 'pending').select('application_id').maybeSingle();
+      if (error) return reply(req, { ok: false, message: dbMessage(error, '帳號申請退回失敗') }, 400);
+      if (!data) return reply(req, { ok: false, message: '此帳號申請已完成審核' }, 409);
+      await audit('account_applications', applicationId, 'status_change', { before: 'pending', after: 'rejected', decision_note: decisionNote });
+      return reply(req, { ok: true, message: '帳號申請已退回' });
+    }
+
     if (action === 'admin_create_user') {
-      const name = clean(body.name, 100), username = clean(body.username, 64), email = clean(body.email, 200).toLowerCase(), phone = clean(body.phone, 50), password = String(body.password || ''), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null;
+      const name = clean(body.name, 100), username = clean(body.username, 64), email = clean(body.email, 200).toLowerCase(), phone = clean(body.phone, 50), password = String(body.password || ''), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
       if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) return reply(req, { ok: false, message: '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號' }, 400);
       if (!/^\S+@\S+\.\S+$/.test(email) || /[(),]/.test(email)) return reply(req, { ok: false, message: 'Email 格式不正確' }, 400);
       if (password.length < 8) return reply(req, { ok: false, message: '初始密碼至少需要 8 個字元' }, 400);
       if (!ROLES.has(rbacRole) && !(await roleExists(rbacRole))) return reply(req, { ok: false, message: '角色設定無效' }, 400);
+      const supervisorValidation = await validateSupervisor(supervisorId, deptId, rbacRole);
+      if (supervisorValidation.message) return reply(req, { ok: false, message: supervisorValidation.message }, 400);
       const [{ count: usernameCount }, { count: emailCount }] = await Promise.all([admin.from('users').select('*', { count: 'exact', head: true }).eq('username', username), admin.from('users').select('*', { count: 'exact', head: true }).eq('email', email)]); const count = Number(usernameCount || 0) + Number(emailCount || 0);
       if (count) return reply(req, { ok: false, message: '登入帳號或 Email 已存在' }, 409);
       const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name, username } });
       if (createError || !created.user) return reply(req, { ok: false, message: `Auth 帳號建立失敗：${createError?.message || '未知錯誤'}` }, 400);
-      const profileData = { auth_id: created.user.id, name, username, email, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, permissions: {}, status: 'active', created_by: profile.user_id };
+      const profileData = { auth_id: created.user.id, name, username, email, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, permissions: {}, status: 'active', created_by: profile.user_id };
       const { data, error } = await admin.from('users').insert(profileData).select('user_id').single();
       if (error) { await admin.auth.admin.deleteUser(created.user.id); return reply(req, { ok: false, message: `人員主檔建立失敗：${error.message}` }, 400); }
-      await audit('users', data.user_id, 'insert', { name, username, email, dept_id: deptId, rbac_role: rbacRole, status: 'active' });
+      await audit('users', data.user_id, 'insert', { name, username, email, dept_id: deptId, rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, status: 'active' });
       return reply(req, { ok: true, data });
     }
 
     if (action === 'admin_update_user') {
-      const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null;
+      const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
       if (!userId || !name || !/^[A-Za-z0-9._-]{3,64}$/.test(username) || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '人員資料或角色設定無效' }, 400);
-      const { data: before } = await admin.from('users').select('user_id,auth_id,name,username,phone,dept_id,department,role,rbac_role,status').eq('user_id', userId).maybeSingle();
+      const { data: before } = await admin.from('users').select('user_id,auth_id,name,username,phone,dept_id,department,role,rbac_role,supervisor_id,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
       if (userId === profile.user_id && rbacRole !== roleId) return reply(req, { ok: false, message: '不可變更目前登入管理員自己的角色' }, 400);
+      const supervisorValidation = await validateSupervisor(supervisorId, deptId, rbacRole, userId);
+      if (supervisorValidation.message) return reply(req, { ok: false, message: supervisorValidation.message }, 400);
       // 更新前檢查 username 是否與其他使用者重複（排除自己），避免重名帳號。
       const { count: usernameCount } = await admin.from('users').select('*', { count: 'exact', head: true }).eq('username', username).neq('user_id', userId);
       if (Number(usernameCount || 0) > 0) return reply(req, { ok: false, message: '登入帳號已存在' }, 409);
       // 更新姓名/電話不應清除個人權限覆寫（permissions 欄位保留原值）。
-      const changes = { name, username, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole };
+      const changes = { name, username, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId };
       const { error } = await admin.from('users').update(changes).eq('user_id', userId);
       if (error) return reply(req, { ok: false, message: dbMessage(error, '人員資料更新失敗') }, 400);
       if (before.auth_id) {

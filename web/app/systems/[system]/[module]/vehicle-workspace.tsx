@@ -71,21 +71,22 @@ export function VehicleWorkspace({ system, module }: { system: SystemDefinition;
 
 function useFleetRole(profile: Profile) {
   const [isManager, setIsManager] = useState(false);
-  const role = String(profile.rbac_role || profile.role || '');
+  const role = String(profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[profile.role] || profile.role || '');
   const isAdmin = role === 'sysadmin' || role === 'admin';
+  const isUnitSupervisor = role === 'unit_supervisor';
   useEffect(() => {
     let active = true;
     getSupabase().from('vehicle_dispatch_managers').select('user_id,active').eq('user_id', profile.user_id).eq('active', true).maybeSingle()
       .then(({ data }) => { if (active) setIsManager(Boolean(data)); });
     return () => { active = false; };
   }, [profile.user_id]);
-  return { isAdmin, isManager, canManageFleet: isAdmin || isManager };
+  return { isAdmin, isUnitSupervisor, isManager, canManageFleet: isAdmin || isManager };
 }
 
 /* ──────────────────────────── 派車申請 (100% V1 視覺對齊) ──────────────────────────── */
 
 function RequestsModule({ module, profile }: Props) {
-  const { isAdmin, canManageFleet } = useFleetRole(profile);
+  const { isAdmin, isUnitSupervisor, canManageFleet } = useFleetRole(profile);
   const [rows, setRows] = useState<Row[]>([]);
   const [vehicles, setVehicles] = useState<Row[]>([]);
   const [drivers, setDrivers] = useState<Row[]>([]);
@@ -129,11 +130,11 @@ function RequestsModule({ module, profile }: Props) {
   const mineRows = useMemo(() => rows.filter(r => r.applicant_id === profile.user_id), [rows, profile.user_id]);
   const driverTodayRows = useMemo(() => rows.filter(r => r.driver_id === profile.user_id && String(r.trip_date) === today && ['assigned', 'completed'].includes(String(r.status))), [rows, profile.user_id, today]);
   const todoRows = useMemo(() => rows.filter(r => {
-    if (r.status === 'pending_approval' && (canManageFleet || isAdmin || r.applicant_department === profile.department)) return true;
+    if (r.status === 'pending_approval' && (isAdmin || (isUnitSupervisor && r.applicant_id !== profile.user_id))) return true;
     if (r.status === 'approved' && (canManageFleet || isAdmin)) return true;
     if (r.status === 'assigned' && r.driver_id === profile.user_id) return true;
     return false;
-  }), [rows, canManageFleet, isAdmin, profile.department, profile.user_id]);
+  }), [rows, canManageFleet, isAdmin, isUnitSupervisor, profile.user_id]);
 
   const tabRows = useMemo(() => {
     if (tab === 'mine') return mineRows;
@@ -273,6 +274,7 @@ function RequestsModule({ module, profile }: Props) {
 
     {detail && <DetailModal row={detail} logs={logs} busy={busy} profile={profile}
       vehicles={vehicles} drivers={drivers} canDispatch={canManageFleet || isAdmin}
+      canApprove={isAdmin || (isUnitSupervisor && detail.applicant_id !== profile.user_id)}
       onClose={() => setDetail(null)} onAct={act} onTrip={() => { setTripFor(detail); setDetail(null); }} />}
 
     {tripFor && <TripReportModal row={tripFor} vehicles={vehicles} onClose={() => setTripFor(null)}
@@ -582,8 +584,8 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
   </AdminModal>;
 }
 
-function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch, onClose, onAct, onTrip }: {
-  row: Row; logs: Row[]; busy: boolean; profile: Profile; vehicles: Row[]; drivers: Row[]; canDispatch: boolean;
+function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch, canApprove, onClose, onAct, onTrip }: {
+  row: Row; logs: Row[]; busy: boolean; profile: Profile; vehicles: Row[]; drivers: Row[]; canDispatch: boolean; canApprove: boolean;
   onClose: () => void; onTrip: () => void;
   onAct: (requestId: string, action: string, extra?: { note?: string; vehicleId?: string; driverId?: string }, success?: string) => Promise<boolean>;
 }) {
@@ -625,7 +627,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch,
       </li>)}</ol>
     </div>}
 
-    {row.status === 'pending_approval' && <div className="admin-form-grid">
+    {row.status === 'pending_approval' && canApprove && <div className="admin-form-grid">
       <label className="wide">主管意見（退回時必填）<input value={reason} onChange={e => setReason(e.target.value)} /></label>
     </div>}
     {row.status === 'approved' && canDispatch && <div className="admin-form-grid">
@@ -645,7 +647,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch,
 
     <footer>
       <button className="secondary-btn" onClick={onClose}>關閉</button>
-      {row.status === 'pending_approval' && <>
+      {row.status === 'pending_approval' && canApprove && <>
         <button className="secondary-btn" disabled={busy} onClick={() => void onAct(row.request_id, 'return', { note: reason }, '已退回申請')}>退回</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'approve', { note: reason }, '已核可申請')}>核可</button>
       </>}
@@ -655,7 +657,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch,
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'accept', {}, '已接單')}>接單</button>}
       {row.status === 'assigned' && isDriver && row.driver_accepted_at &&
         <button className="primary-btn compact" onClick={onTrip}>填寫行車回報</button>}
-      {!['completed', 'cancelled'].includes(String(row.status)) &&
+      {!['completed', 'cancelled'].includes(String(row.status)) && (row.applicant_id === profile.user_id || row.driver_id === profile.user_id || canDispatch) &&
         <button className="secondary-btn danger" disabled={busy} onClick={() => window.confirm('確定取消這筆派車申請？') && void onAct(row.request_id, 'cancel', { note: reason }, '已取消申請')}>取消申請</button>}
     </footer>
   </AdminModal>;

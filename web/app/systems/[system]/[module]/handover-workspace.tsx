@@ -428,7 +428,7 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
 
 /* ──────────────────────────── 未結事項（案件） ──────────────────────────── */
 
-<// 處理歷程存的是英文動作代碼（handover_case_action 與 log_handover_case_created
+// 處理歷程存的是英文動作代碼（handover_case_action 與 log_handover_case_created
 // 寫入 create／assign／transfer／close／update／reopen），直接印出來畫面上就會出現
 // 英文。對照表的做法沿用稽核頁的 ACTION_LABELS。
 const CASE_LOG_ACTION_LABELS: Record<string, string> = {
@@ -436,7 +436,7 @@ const CASE_LOG_ACTION_LABELS: Record<string, string> = {
   close: '結案', update: '更新', reopen: '重新開啟',
 };
 
-function CasesModule({ module, profile: _profile }: Props) {
+function CasesModule({ module, profile }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
   const [departments, setDepartments] = useState<Row[]>([]);

@@ -171,6 +171,96 @@
   }
 }
 
+/* 放在登入卡最終尺寸規則之後，避免 340px 登入框覆蓋申請表寬度。 */
+.v1-login-card.account-apply-card {
+  width: min(92vw, 720px);
+  max-width: 720px;
+  padding: 20px 24px;
+}
+
+@media (max-width: 640px) {
+  .v1-login-card.account-apply-card {
+    width: calc(100% - 16px);
+    max-width: none;
+    padding: 16px;
+  }
+}
+
+/* 帳號申請沿用登入品牌樣式，但需要足夠寬度呈現人員資料。 */
+.account-apply-page {
+  justify-content: flex-start;
+  padding-block: 20px;
+}
+
+.account-apply-card {
+  width: min(92vw, 720px);
+  max-width: 720px;
+  padding: 20px 24px;
+}
+
+@media (min-width: 641px) {
+  .account-apply-card {
+    width: min(92vw, 720px);
+    max-width: 720px;
+    padding: 20px 24px;
+  }
+}
+
+.account-apply-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.account-apply-grid label {
+  margin: 0;
+}
+
+.account-apply-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.account-apply-grid select,
+.account-apply-grid textarea {
+  width: 100%;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font: inherit;
+}
+
+.account-apply-result {
+  padding: 18px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--green) 8%, var(--panel));
+}
+
+.account-apply-result .primary-btn {
+  display: block;
+  margin-top: 16px;
+  text-decoration: none;
+}
+
+@media (max-width: 640px) {
+  .account-apply-card {
+    width: calc(100% - 16px);
+    max-width: none;
+    padding: 16px;
+  }
+
+  .account-apply-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-apply-grid .wide {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .v1-login-card {
     width: 100%;
@@ -260,5 +350,19 @@
   .v1-login-logo {
     width: min(100%, 120px);
     height: 36px;
+  }
+}
+
+.v1-login-card.account-apply-card {
+  width: min(92vw, 720px);
+  max-width: 720px;
+  padding: 20px 24px;
+}
+
+@media (max-width: 640px) {
+  .v1-login-card.account-apply-card {
+    width: calc(100% - 16px);
+    max-width: none;
+    padding: 16px;
   }
 }

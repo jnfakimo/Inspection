@@ -11,6 +11,7 @@
 // 白名單另外加上，否則信中的連結會被拒絕。
 
 import { FormEvent, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
@@ -170,6 +171,7 @@ export default function LoginPage() {
       {message && <p className="form-error">{message}</p>}
       <button className="primary-btn" disabled={busy}>{busy ? '登入中…' : '登入'}</button>
       <button type="button" className="forgot-link" onClick={() => { setView('forgot'); setMessage(''); setNotice(''); }}>忘記密碼？</button>
+      <Link className="forgot-link" href="/account-apply/">申請帳號</Link>
     </form>
     <footer>臺北農產運銷股份有限公司 第一果菜市場 ｜ 整合管理系統 ｜ 第二版</footer>
   </main>;

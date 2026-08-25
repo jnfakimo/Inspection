@@ -36,7 +36,7 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
   // 現場的巡邏點無聲消失，看不出是資料有問題還是真的沒有點。
   const floors = useMemo(() => {
     const modelled = floorModels.map(item => String(item.floor_id));
-    const orphans = [...new Set(points.map(point => String(point.floor_id || '未分類')))
+    const orphans = [...new Set(points.map(point => String(point.floor_id || '未分類')))]
       .filter(value => !modelled.includes(value));
     return [...modelled, ...orphans].sort((a, b) => floorOrder(a) - floorOrder(b));
   }, [floorModels, points]);
