@@ -23,6 +23,7 @@ import './structuremap-pin.css';
 import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
+import { errorMessage } from '@/components/admin/shared';
 import {
   computePatrolStatus, invalidatePatrolMarkers, PATROL_COLORS, type PatrolState,
 } from '@/lib/patrol-status';
