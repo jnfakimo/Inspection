@@ -33,6 +33,30 @@ const robotsDirectives = [
 const robotsContent = robotsDirectives.join(',');
 const robotsMeta = `<meta name="robots" content="${robotsContent}">`;
 
+function configuredHttpsOrigin(rawValue, variableName) {
+  const value = String(rawValue || '').trim();
+  if (!value) return null;
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`${variableName} 必須是有效的 HTTPS URL。`);
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`${variableName} 必須使用 HTTPS。`);
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error(`${variableName} 不得包含帳號或密碼。`);
+  }
+  return parsed.origin;
+}
+
+const nodeAppApiOrigin = configuredHttpsOrigin(
+  process.env.NEXT_PUBLIC_APP_API_URL,
+  'NEXT_PUBLIC_APP_API_URL',
+);
+
 const runtimeSystemDirectories = ['assets', 'icons', 'plans', 'vendor'];
 const runtimeSystemExtensions = new Set([
   '.css',
@@ -130,8 +154,15 @@ function provenanceMarker(relativePath) {
 //
 // Next 靜態匯出的 hydration script 是 inline 且內容每次建置都不同，無法用 hash 白名單，
 // script-src 只能留 unsafe-inline。真正的防線是 connect-src 與 img-src：
-// 即使發生 XSS，也只能連回本站與 Supabase，竊得的權杖送不出去。
+// 即使發生 XSS，也只能連回本站、Supabase 與建置時明確設定的 Node API。
+// Node API 僅取 NEXT_PUBLIC_APP_API_URL 的 HTTPS origin，不把路徑或任意字串帶入 CSP。
 // frame-ancestors 只認 HTTP header，在 meta 形式無效，故不列入以免產生主控台警告。
+const v2ConnectSources = [
+  "'self'",
+  'https://qztffronusdhgxhjjubt.supabase.co',
+  'wss://qztffronusdhgxhjjubt.supabase.co',
+  ...(nodeAppApiOrigin ? [nodeAppApiOrigin] : []),
+].join(' ');
 const v2ContentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
@@ -140,7 +171,7 @@ const v2ContentSecurityPolicy = [
   // data: 供 QR 標籤、blob: 供 3D 貼圖，圖片外部來源僅限 Storage 公開桶。
   // V1 用的是 https:（等於任何 HTTPS 網域），那會留下把資料塞進網址外傳的管道。
   "img-src 'self' data: blob: https://qztffronusdhgxhjjubt.supabase.co",
-  "connect-src 'self' https://qztffronusdhgxhjjubt.supabase.co wss://qztffronusdhgxhjjubt.supabase.co",
+  `connect-src ${v2ConnectSources}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
@@ -175,6 +206,21 @@ function hasCompleteRobotsMeta(html) {
   const content = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i)?.[1] || '';
   const declared = new Set(content.toLowerCase().split(',').map((value) => value.trim()).filter(Boolean));
   return robotsDirectives.every((directive) => declared.has(directive));
+}
+
+function contentSecurityPolicy(html) {
+  const tag = html.match(/<meta\b(?=[^>]*\bhttp-equiv\s*=\s*["']content-security-policy["'])[^>]*>/i)?.[0] || '';
+  return tag.match(/\bcontent\s*=\s*"([^"]*)"/i)?.[1]
+    || tag.match(/\bcontent\s*=\s*'([^']*)'/i)?.[1]
+    || '';
+}
+
+function cspDirectiveSources(policy, directiveName) {
+  const directive = policy
+    .split(';')
+    .map((value) => value.trim())
+    .find((value) => value === directiveName || value.startsWith(`${directiveName} `));
+  return directive ? directive.split(/\s+/).slice(1) : [];
 }
 
 function addJavaScriptProvenance(source, relativePath) {
@@ -324,6 +370,15 @@ async function verifyArtifact() {
     }
     if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !/name="application-provenance" content="TAPM1:[A-Za-z0-9_-]{32}"/.test(text)) {
       throw new Error(`正式頁面缺少隱藏來源指紋：${relative}`);
+    }
+    if (relative.startsWith('v2/') && relative.endsWith('.html')) {
+      const connectSources = cspDirectiveSources(contentSecurityPolicy(text), 'connect-src');
+      if (!connectSources.length) {
+        throw new Error(`V2 正式頁面缺少 connect-src 防護：${relative}`);
+      }
+      if (nodeAppApiOrigin && !connectSources.includes(nodeAppApiOrigin)) {
+        throw new Error(`V2 正式頁面未允許設定的 Node API：${relative}`);
+      }
     }
     if (relative.endsWith('.js') && !relative.includes('/vendor/') && !text.includes(provenanceNamespace)) {
       throw new Error(`正式 JavaScript 缺少隱藏來源指紋：${relative}`);

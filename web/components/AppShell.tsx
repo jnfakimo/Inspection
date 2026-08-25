@@ -30,7 +30,8 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   const [calendarStatus, setCalendarStatus] = useState<GoogleCalendarStatus | null>(null);
   const [calendarMessage, setCalendarMessage] = useState('');
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
-  const isAdminArea = pathname === '/systems/admin/' || pathname.startsWith('/systems/admin/');
+  const isAdminArea = pathname === '/systems/admin/' || pathname.startsWith('/systems/admin/') ||
+    pathname === '/systems/structuremap/relations/' || pathname.startsWith('/systems/structuremap/relations/');
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('siteTheme') === 'tech' ? 'tech' : 'light';

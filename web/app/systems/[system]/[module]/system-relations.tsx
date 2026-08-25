@@ -9,6 +9,8 @@
 //
 // 圖是靜態關係描述，不查資料庫——它描述的是系統之間怎麼接，不是即時狀態。
 
+import { createContext, useContext, type ReactNode } from 'react';
+
 const SYSTEMS = [
   { key: 'admin', code: 'SYS-01', label: '後台管理', x: 40, y: 150 },
   { key: 'workorder', code: 'SYS-02', label: '維修派工', x: 260, y: 150 },
@@ -35,26 +37,55 @@ const LINKS: Array<[string, string, string]> = [
 const CARD_W = 200, CARD_H = 62;
 const center = (item: { x: number; y: number }) => ({ x: item.x + CARD_W / 2, y: item.y + CARD_H / 2 });
 
+const SystemRelationsAccessContext = createContext<readonly string[]>([]);
+
+export function SystemRelationsAccessProvider({ allowedSystems, children }: {
+  allowedSystems: readonly string[];
+  children: ReactNode;
+}) {
+  return <SystemRelationsAccessContext.Provider value={allowedSystems}>{children}</SystemRelationsAccessContext.Provider>;
+}
+
 export function SystemRelations() {
+  const allowedSystems = useContext(SystemRelationsAccessContext);
   const byKey = Object.fromEntries(SYSTEMS.map(item => [item.key, item]));
+  const canOpen = (key: string) => allowedSystems.includes('*') || allowedSystems.includes(key);
 
   return <section className="panel admin-panel">
-    <div className="admin-toolbar"><span>系統關係圖</span><span>點選系統方塊可直接進入該系統</span></div>
+    <div className="admin-toolbar"><span>系統關係圖</span><span>點選已開放的系統方塊可直接進入；未開放的系統以灰色顯示</span></div>
     <div className="responsive-table">
-      <svg viewBox="0 0 960 470" role="img" aria-label="八個子系統與後端服務的關係圖" style={{ width: '100%', minWidth: 720, height: 'auto' }}>
+      <svg viewBox="0 0 960 470" role="group" aria-label="八個子系統與後端服務的關係圖" style={{ width: '100%', minWidth: 720, height: 'auto' }}>
         <defs>
           <marker id="rel-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
           </marker>
+          <style>{`
+            .relations-client-link { cursor: pointer; }
+            .relations-client-link rect { transition: filter .16s ease, stroke-width .16s ease; }
+            .relations-client-link:hover rect { filter: brightness(1.12); stroke: var(--cyan); stroke-width: 2; }
+            .relations-client-link:focus-visible { outline: none; }
+            .relations-client-link:focus-visible rect { filter: drop-shadow(0 0 4px var(--cyan)); stroke: var(--cyan); stroke-width: 3; }
+            .relations-system-link { cursor: pointer; }
+            .relations-system-link rect { transition: filter .16s ease, stroke-width .16s ease; }
+            .relations-system-link:hover rect { filter: brightness(1.12); stroke-width: 2; }
+            .relations-system-link:focus-visible { outline: none; }
+            .relations-system-link:focus-visible rect { filter: drop-shadow(0 0 4px var(--cyan)); stroke-width: 3; }
+          `}</style>
         </defs>
 
         <text x="40" y="42" fill="var(--cyan)" fontSize="15" fontWeight="700">使用端</text>
-        <rect x="40" y="56" width="400" height="52" rx="8" fill="rgba(0,212,255,.08)" stroke="var(--line)" />
-        <text x="60" y="80" fill="var(--text)" fontSize="14">網頁後台（/Inspection/v2）</text>
-        <text x="60" y="98" fill="var(--dim)" fontSize="11">帳號登入 · 驗證碼 · RBAC 導向</text>
-        <rect x="460" y="56" width="460" height="52" rx="8" fill="rgba(167,139,250,.08)" stroke="var(--line)" />
-        <text x="480" y="80" fill="var(--text)" fontSize="14">行動端（/Inspection/v2/mobile）</text>
-        <text x="480" y="98" fill="var(--dim)" fontSize="11">巡邏點打卡 · 快速報修 · 電子交接 · QR 簽到</text>
+        <a className="relations-client-link" href="/Inspection/v2/" aria-label="開啟網頁後台" tabIndex={0}>
+          <title>開啟網頁後台</title>
+          <rect x="40" y="56" width="400" height="52" rx="8" fill="rgba(0,212,255,.08)" stroke="var(--line)" />
+          <text x="60" y="80" fill="var(--text)" fontSize="14">網頁後台（/Inspection/v2）</text>
+          <text x="60" y="98" fill="var(--dim)" fontSize="11">帳號登入 · 驗證碼 · RBAC 導向</text>
+        </a>
+        <a className="relations-client-link" href="/Inspection/v2/mobile/" aria-label="開啟行動端" tabIndex={0}>
+          <title>開啟行動端</title>
+          <rect x="460" y="56" width="460" height="52" rx="8" fill="rgba(167,139,250,.08)" stroke="var(--line)" />
+          <text x="480" y="80" fill="var(--text)" fontSize="14">行動端（/Inspection/v2/mobile）</text>
+          <text x="480" y="98" fill="var(--dim)" fontSize="11">巡邏點打卡 · 快速報修 · 電子交接 · QR 簽到</text>
+        </a>
 
         {/* 業務關聯：先畫線再畫方塊，線才不會蓋住文字 */}
         {LINKS.map(([from, to, label]) => {
@@ -67,14 +98,19 @@ export function SystemRelations() {
           </g>;
         })}
 
-        {SYSTEMS.map(item => <a key={item.key} href={`/Inspection/v2/systems/${item.key}/`}>
-          <g>
+        {SYSTEMS.map(item => {
+          const allowed = canOpen(item.key);
+          const card = <g opacity={allowed ? 1 : 0.42}>
             <rect x={item.x} y={item.y} width={CARD_W} height={CARD_H} rx="8"
-              fill="var(--panel2)" stroke="var(--cyan)" strokeWidth="1.2" />
-            <text x={item.x + 14} y={item.y + 25} fill="var(--cyan)" fontSize="10" fontWeight="700">{item.code}</text>
+              fill="var(--panel2)" stroke={allowed ? 'var(--cyan)' : 'var(--dim)'} strokeWidth="1.2"
+              strokeDasharray={allowed ? undefined : '5 4'} />
+            <text x={item.x + 14} y={item.y + 25} fill={allowed ? 'var(--cyan)' : 'var(--dim)'} fontSize="10" fontWeight="700">{item.code}</text>
             <text x={item.x + 14} y={item.y + 46} fill="var(--text)" fontSize="15">{item.label}</text>
-          </g>
-        </a>)}
+          </g>;
+          return allowed
+            ? <a key={item.key} className="relations-system-link" href={`/Inspection/v2/systems/${item.key}/`} aria-label={`開啟${item.label}系統`}>{card}</a>
+            : <g key={item.key} role="link" aria-disabled="true" aria-label={`${item.label}系統，目前角色未開放`}>{card}</g>;
+        })}
 
         {/* 每個系統都往下接到後端這一層，逐條畫會變成蜘蛛網，改用一條匯流排 */}
         <line x1="480" y1="312" x2="480" y2="350" stroke="var(--line)" strokeWidth="1.4" markerEnd="url(#rel-arrow)" color="var(--line)" />
