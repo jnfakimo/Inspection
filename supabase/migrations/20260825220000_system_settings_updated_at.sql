@@ -16,6 +16,8 @@
 -- vehicle_dispatch_requests 等把 updated_at 當成清單排序鍵，補上 trigger 會改變
 -- 使用者看得到的排序行為，那應該是獨立一筆、單獨驗收。
 
+begin;
+
 create or replace function public.set_row_updated_at()
 returns trigger
 language plpgsql
@@ -36,3 +38,7 @@ create trigger trg_system_settings_updated_at
   before update on public.system_settings
   for each row
   execute function public.set_row_updated_at();
+
+notify pgrst, 'reload schema';
+
+commit;
