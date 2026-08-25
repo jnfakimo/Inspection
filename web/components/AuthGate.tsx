@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { setErrorTrackerUser } from '@/lib/error-tracker';
 import { setSecurityAuditProfile } from '@/lib/security-audit';
+import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import type { Profile } from '@/types/app';
 
 export function AuthGate({ children }: { children: (profile: Profile) => React.ReactNode }) {
@@ -17,6 +18,7 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
       try {
         const { data } = await getSupabase().auth.getSession();
         if (!data.session) {
+          clearProfile();
           setErrorTrackerUser(null);
           setSecurityAuditProfile(null);
           const returnTo = `${location.pathname}${location.search}${location.hash}`;
@@ -27,6 +29,7 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
         }
         const current = await invokeAppApi<Profile>('profile');
         if (!active) return;
+        saveProfile(current);
         // 身分確定後才送得出錯誤紀錄：client_error_logs 的 insert 政策要求
         // user_id 為 null 或本人，在此之前發生的事件會留在佇列裡等這一刻。
         setErrorTrackerUser(current?.user_id ? String(current.user_id) : null, data.session.user.id);
@@ -34,6 +37,7 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
         setSecurityAuditProfile(current?.user_id ? current : null, data.session.user.id);
         if (active) setProfile(current);
       } catch (error) {
+        clearProfile();
         setErrorTrackerUser(null);
         setSecurityAuditProfile(null);
         if (active) setMessage(error instanceof Error ? `${error.message}（請檢查網路後重試）` : '登入驗證失敗，請檢查網路後重試');

@@ -10,6 +10,7 @@ import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-ca
 import type { Profile } from '@/types/app';
 import { allowedActions } from '@/lib/shared-actions';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
+import { clearProfile } from '@/lib/profile-cache';
 
 
 function taipeiClock() {
@@ -105,6 +106,7 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   async function logout() {
     try { await getSupabase().auth.signOut({ scope: 'local' }); }
     catch (error) { console.warn('logout failed:', error); }
+    clearProfile();
     location.replace('/Inspection/v2/login/');
   }
   async function changePassword(event: FormEvent<HTMLFormElement>) {

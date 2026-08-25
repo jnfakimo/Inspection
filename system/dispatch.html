@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260814-patrol-session1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>派工系統 — 報修派工管理系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
   --cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;
@@ -242,33 +242,8 @@ function setOperatorDisplay(){
   if(el) el.textContent=operatorLabel();
 }
 async function hydrateOperatorProfile(){
-  if(me_?.user_id && me_?.phone && operatorDepartment())return;
-  try{
-    let data=null;
-    if(me_?.user_id){
-      const res=await db.from('users').select('user_id,username,name,phone,dept_id,department,role,rbac_role').eq('user_id',me_.user_id).limit(1).maybeSingle();
-      data=res.data||null;
-    }
-    if(!data && me_?.username){
-      const res=await db.from('users').select('user_id,username,name,phone,dept_id,department,role,rbac_role').eq('username',me_.username).eq('status','active').limit(1).maybeSingle();
-      data=res.data||null;
-    }
-    if(!data){
-      const res=await db.from('users').select('user_id,username,name,phone,dept_id,department,role,rbac_role').eq('name',operatorName()).eq('status','active').limit(1).maybeSingle();
-      data=res.data||null;
-    }
-    if(!data)return;
-    me_={...me_,...data,name:cleanOperatorName(data.name||me_.name)};
-    sessionStorage.setItem('user_name',me_.name);
-    if(me_.username) sessionStorage.setItem('user_username',me_.username);
-    if(me_.user_id) sessionStorage.setItem('user_id',me_.user_id);
-    if(me_.dept_id) sessionStorage.setItem('user_dept_id',me_.dept_id);
-    if(me_.department||me_.dep) sessionStorage.setItem('user_department',normalizeDepartmentName(me_.department||me_.dep));
-    if(me_.phone) sessionStorage.setItem('user_phone',me_.phone);
-    else sessionStorage.removeItem('user_phone');
-    if(me_.role) sessionStorage.setItem('user_role',me_.role);
-    if(me_.rbac_role) sessionStorage.setItem('user_rbac_role',me_.rbac_role);
-  }catch(e){}
+  const shared=window.SystemUserProfile&&window.SystemUserProfile.read?window.SystemUserProfile.read():null;
+  if(shared)me_={...me_,...shared,name:cleanOperatorName(shared.name||me_.name)};
 }
 async function hydrateOperatorDepartment(){
   const explicit=normalizeDepartmentName(me_?.departmentName || me_?.department || me_?.dep || sessionStorage.getItem('user_department') || '');
@@ -290,20 +265,12 @@ const PAGE_SIZE=15;
 let reqs=[],orders=[],ordersByReq={},equip=[],locs=[],techs=[],currentTab='pending',filterStatus='',currentPage=1,lastFilterKey='',reqNoDisplayMap={};
 
 async function init(){
-  try{const {data:{session}}=await db.auth.getSession();
-    if(session){const {data,error}=await db.from('users').select('*').eq('auth_id',session.user.id).single();if(error)console.warn('users lookup by auth_id failed',error);if(data){
-      me_={...me_,...data,name:cleanOperatorName(data.name||me_.name)};
-      sessionStorage.setItem('user_name',me_.name);
-      if(me_.username) sessionStorage.setItem('user_username',me_.username);
-      if(me_.user_id) sessionStorage.setItem('user_id',me_.user_id);
-      if(me_.dept_id) sessionStorage.setItem('user_dept_id',me_.dept_id);
-      if(me_.department||me_.dep) sessionStorage.setItem('user_department',normalizeDepartmentName(me_.department||me_.dep));
-      if(me_.phone) sessionStorage.setItem('user_phone',me_.phone);
-      else sessionStorage.removeItem('user_phone');
-      if(me_.role) sessionStorage.setItem('user_role',me_.role);
-      if(me_.rbac_role) sessionStorage.setItem('user_rbac_role',me_.rbac_role);
-    }}
-  }catch(e){}
+  try{
+    const {data:{session}}=await db.auth.getSession();
+    if(!session){location.href='login.html?redirect=dispatch.html';return;}
+    const data=await window.SystemAuth.loadProfile(db);
+    me_={...me_,...data,name:cleanOperatorName(data.name||me_.name)};
+  }catch(e){console.warn('共用人員資料載入失敗',e);location.href='login.html?redirect=dispatch.html';return;}
   await hydrateOperatorProfile();
   await hydrateOperatorDepartment();
   setOperatorDisplay();

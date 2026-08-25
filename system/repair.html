@@ -9,7 +9,7 @@
 <meta http-equiv="Expires" content="0">
 <title>維修完工回報 — 第一果菜市場</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
@@ -303,7 +303,7 @@ a{color:inherit;text-decoration:none}
 }
 </style>
 <script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');}catch(_){document.documentElement.setAttribute('data-theme','tech');}</script>
-<script src="theme.js?v=20260814-patrol-session1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
 </head>
 <body>
@@ -495,8 +495,8 @@ async function hydrateLoginUser(){
   try{
     const {data:{session}}=await db.auth.getSession();
     if(!session)return false;
-    const {data,error}=await db.from('users').select('user_id,username,name,department,role,rbac_role,permissions').eq('auth_id',session.user.id).maybeSingle();
-    if(error||!data?.user_id)return false;
+    const data=await window.SystemAuth.loadProfile(db);
+    if(!data?.user_id)return false;
     me_={...(me_||{}),...data};cacheLoginUser(me_);return true;
   }catch(e){console.warn('hydrateLoginUser',e);return false;}
 }

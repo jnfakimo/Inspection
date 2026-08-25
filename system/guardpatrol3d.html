@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-patrol-offset1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <script src="floor-utils.js?v=20260821-recursionfix"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -216,7 +216,7 @@ body.controls-hidden #panelToggle{display:inline-flex}
 <script src="vendor/three-r128.min.js?v=128"></script>
 <script src="model-theme.js?v=20260808-collapse2"></script>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <script src="patrolstatus.js"></script>
 <script>
 const db = createDb();
@@ -229,7 +229,7 @@ async function initModelAccess(){
   const {data:{session}}=await db.auth.getSession();
   if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol3d.html');return;}
   try{
-    const {data:profile}=await db.from('users').select('role,rbac_role,permissions,status').eq('auth_id',session.user.id).maybeSingle();
+    const profile=await window.SystemAuth.loadProfile(db);
     const permissions=Array.isArray(profile?.permissions)?profile.permissions:[];
     canManageModels=profile?.status!=='inactive'&&(profile?.role==='admin'||profile?.rbac_role==='sysadmin'||permissions.includes('admin'));
   }catch(e){canManageModels=false;}

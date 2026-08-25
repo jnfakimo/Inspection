@@ -14,6 +14,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
+import { clearProfile, saveProfile } from '@/lib/profile-cache';
+import type { Profile } from '@/types/app';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
 function friendlyError(raw: unknown, fallback: string) {
@@ -97,6 +99,16 @@ export default function LoginPage() {
       if (error || !data?.access_token) { setMessage(data?.message || '帳號、密碼或驗證碼錯誤'); setBusy(false); await loadCaptcha(); return; }
       const result = await getSupabase().auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
       if (result.error) { setMessage('登入狀態建立失敗，請重新登入'); setBusy(false); return; }
+      try {
+        const profile = await invokeAppApi<Profile>('profile');
+        saveProfile(profile);
+      } catch (profileError) {
+        clearProfile();
+        await getSupabase().auth.signOut({ scope: 'local' }).catch(() => {});
+        setMessage(friendlyError(profileError, '找不到啟用中的系統帳號，請聯絡管理員'));
+        setBusy(false);
+        return;
+      }
       location.replace(nextPath());
     } catch { setMessage('登入服務暫時無法連線，請稍後重試'); setBusy(false); }
   }

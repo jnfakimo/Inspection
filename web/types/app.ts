@@ -7,6 +7,9 @@ export type Profile = {
   department?: string | null;
   role: string;
   rbac_role?: string | null;
+  status?: string | null;
+  auth_id?: string | null;
+  permissions?: Record<string, boolean> | null;
   allowed_systems: string[];
 };
 

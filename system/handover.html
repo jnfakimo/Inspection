@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260814-patrol-session1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>電子交接簿 — 臺北農產公司</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <style>
 :root{
   --bg:#020b18;--surface:#04111f;--panel:#05101e;
@@ -805,8 +805,7 @@ function applyPerms() {
     const { data: { session } } = await db.auth.getSession();
     _handoverHasSession = !!session;
     if (!session?.user?.id) throw new Error('missing auth session');
-    const { data: u, error: userError } = await db.from('users').select('*').eq('auth_id', session.user.id).maybeSingle();
-    if (userError) throw userError;
+    const u = await window.SystemAuth.loadProfile(db);
     if (!u?.user_id) throw new Error('missing user profile');
     currentUser = u;
     document.getElementById('navUser').textContent = u.name || u.username || '使用者';

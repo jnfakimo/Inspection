@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260814-patrol-session1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>公務車派車管理 — 臺北農產公司</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@500;700&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
@@ -255,12 +255,9 @@ async function init(){
   if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
     const allowed=await window.SystemAccess.enforce('vehicle');if(!allowed)return;
   }
-  const {data:user,error}=await db.from('users').select('*').eq('auth_id',session.user.id).eq('status','active').maybeSingle();
-  if(error||!user){showFatal('找不到登入者的人員資料，請先由管理員完成帳號與人員綁定。');return;}
-  const sharedProfile=window.SystemUserProfile&&typeof window.SystemUserProfile.read==='function'?window.SystemUserProfile.read():null;
-  if(!user.dept_id&&sharedProfile?.dept_id)user.dept_id=sharedProfile.dept_id;
-  if(!user.department&&sharedProfile?.department)user.department=sharedProfile.department;
-  if(!user.phone&&sharedProfile?.phone)user.phone=sharedProfile.phone;
+  let user;
+  try { user=await window.SystemAuth.loadProfile(db); }
+  catch (_) { showFatal('找不到登入者的人員資料，請先由管理員完成帳號與人員綁定。'); return; }
   currentUser=user;
   const storedRole=user.rbac_role||user.role||'reporter';
   currentRole=LEGACY_ROLE[storedRole]||storedRole;

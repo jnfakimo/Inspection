@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260814-patrol-session1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
 <title>通知中心 — 報修派工管理系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <style>
 :root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;--font-head:'Rajdhani',sans-serif}
 :root[data-theme="light"]{--bg:#f4f6fa;--surface:#ffffff;--panel:#ffffff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
@@ -71,9 +71,8 @@ async function init(){
   try{
     const {data:{session}}=await db.auth.getSession();
     if(session){
-      const {data,error}=await db.from('users').select('user_id,name').eq('auth_id',session.user.id).single();
-      if(error){identityFailed=true;console.warn('users lookup by auth_id failed',error);}
-      else if(data)me_=data;
+      try { me_=await window.SystemAuth.loadProfile(db); }
+      catch(error){identityFailed=true;console.warn('共用人員資料載入失敗',error);}
     }
   }catch(e){identityFailed=true;}
   // 查不到自己的身分時絕不能落到 load()：load() 只在 me_.user_id 有值時才會

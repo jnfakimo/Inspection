@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>電子交接簿登入</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <style>
 :root{
   --bg:#eef4fb;
@@ -95,6 +95,11 @@ input:focus{
   border-color:var(--blue);
   box-shadow:0 0 0 3px rgba(0,143,232,.14);
 }
+.captcha-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch;margin-bottom:8px}
+.captcha-image{display:block;width:100%;height:54px;min-width:0;object-fit:fill;border:1px solid var(--line);border-radius:8px;background:#f8fafc}
+.captcha-refresh{width:auto;min-width:94px;min-height:54px;padding:8px 12px;font-size:.84rem;background:var(--panel);color:var(--blue-dark);border:1px solid var(--line)}
+.captcha-refresh:hover{background:#e9f5ff}
+.captcha-status{min-height:20px;margin:-2px 0 10px;color:var(--muted);font-size:.78rem;line-height:1.4}
 button{
   width:100%;
   min-height:48px;
@@ -144,6 +149,13 @@ button:disabled{opacity:.64;cursor:wait}
     <input id="username" name="username" autocomplete="username" required>
     <label for="password">密碼</label>
     <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <label for="captchaAnswer">驗證碼</label>
+    <div class="captcha-row">
+      <img id="captchaImage" class="captcha-image" alt="登入驗證碼">
+      <button id="captchaRefreshBtn" class="captcha-refresh" type="button">重新產生</button>
+    </div>
+    <input id="captchaAnswer" name="captcha" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" placeholder="請輸入圖中的六位數字" required>
+    <div id="captchaStatus" class="captcha-status" aria-live="polite"></div>
     <button id="loginBtn" type="submit">登入交接簿</button>
     <div id="message" class="message" role="alert"></div>
   </form>
@@ -157,31 +169,35 @@ const db = createDb();
 const form = document.getElementById('loginForm');
 const usernameEl = document.getElementById('username');
 const passwordEl = document.getElementById('password');
+const captchaImage = document.getElementById('captchaImage');
+const captchaRefreshBtn = document.getElementById('captchaRefreshBtn');
+const captchaAnswer = document.getElementById('captchaAnswer');
+const captchaStatus = document.getElementById('captchaStatus');
 const buttonEl = document.getElementById('loginBtn');
 const messageEl = document.getElementById('message');
+let captchaChallengeId = '';
 
 function setMessage(text) {
   messageEl.textContent = text || '';
 }
 
-// 記錄登入事件與裝置資訊；IP 應由受控後端擷取，失敗不影響登入流程本身
-async function logAuthEvent(action, profile) {
+async function loadCaptcha() {
+  captchaChallengeId = '';
+  captchaImage.removeAttribute('src');
+  captchaAnswer.value = '';
+  captchaStatus.textContent = '驗證碼載入中…';
+  captchaRefreshBtn.disabled = true;
   try {
-    const { error } = await db.functions.invoke('audit-event', { body: {
-      event_type: action,
-      event_id: crypto.randomUUID(),
-      page: { system:'handover', page:'電子交接簿登入', path:'handover-login.html', url:location.pathname },
-      details: { feature:'登入電子交接簿', result:'成功', login_method:'username' }
-    }});
-    if (!error) return true;
-    await db.from('audit_logs').insert({
-      table_name: 'auth', record_id: String(profile.user_id), action,
-      changes: { event_type: action, actor:profile, details:{ feature:'登入電子交接簿', result:'成功', login_method:'username' } },
-      operator_id: profile.user_id,
-      ip_address: null, user_agent: navigator.userAgent
-    });
-    return true;
-  } catch (e) { return false; }
+    const { data, error } = await db.functions.invoke('username-login', { body: { action: 'captcha' } });
+    if (error || !data?.challenge_id || !data?.image) throw new Error('驗證碼載入失敗');
+    captchaChallengeId = data.challenge_id;
+    captchaImage.src = data.image;
+    captchaStatus.textContent = '5 分鐘內有效，送出後即失效';
+  } catch (_) {
+    captchaStatus.textContent = '驗證碼載入失敗，請重新產生';
+  } finally {
+    captchaRefreshBtn.disabled = false;
+  }
 }
 
 function setBusy(isBusy) {
@@ -191,33 +207,48 @@ function setBusy(isBusy) {
 
 (async function redirectExistingSession() {
   const { data: { session } } = await db.auth.getSession();
-  if (session) location.replace(HANDOVER_TARGET);
+  if (session) {
+    try {
+      if (await window.SystemAuth.restoreProfile(db)) { location.replace(HANDOVER_TARGET); return; }
+    } catch (_) {
+      await db.auth.signOut({ scope: 'local' }).catch(() => {});
+    }
+  }
+  await loadCaptcha();
 })();
+
+captchaRefreshBtn.addEventListener('click', loadCaptcha);
+captchaAnswer.addEventListener('input', () => { captchaAnswer.value = captchaAnswer.value.replace(/\D/g, '').slice(0, 6); });
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   setMessage('');
   const username = usernameEl.value.trim();
   const password = passwordEl.value;
+  const captcha = captchaAnswer.value.trim();
   if (!username || !password) {
     setMessage('請輸入帳號與密碼。');
+    return;
+  }
+  if (!captchaChallengeId || !/^\d{6}$/.test(captcha)) {
+    setMessage(captchaChallengeId ? '請輸入圖中的六位數字驗證碼。' : '驗證碼尚未載入，請重新產生。');
     return;
   }
 
   setBusy(true);
   try {
-    const { data: loginEmail, error: lookupErr } = await db.rpc('login_lookup_email', { p_username: username });
-    if (lookupErr || !loginEmail) throw new Error('帳號不存在或尚未啟用。');
-
-    const { data: signInData, error } = await db.auth.signInWithPassword({ email: loginEmail, password });
-    if (error) throw new Error('帳號或密碼錯誤。');
-
-    const { data: profile } = await db.from('users').select('user_id,username,email,name,role,rbac_role,department,dept_id').eq('auth_id', signInData.user.id).single();
-    if (profile) await logAuthEvent('login', profile);
-
+    const { data, error } = await db.functions.invoke('username-login', { body: {
+      identifier: username,
+      password,
+      captcha_id: captchaChallengeId,
+      captcha_answer: captcha,
+    } });
+    if (error || !data?.access_token || !data?.refresh_token) throw new Error(data?.message || '帳號或密碼錯誤。');
+    await window.SystemAuth.establishSession(db, data);
     location.href = HANDOVER_TARGET;
   } catch (err) {
     setMessage(err.message || '登入失敗，請稍後再試。');
+    await loadCaptcha();
   } finally {
     setBusy(false);
   }

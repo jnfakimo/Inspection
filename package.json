@@ -18,7 +18,8 @@
     "test:e2e:repair": "node tools/e2e-repair-flow.mjs",
     "test:e2e:vehicle": "node tools/e2e-vehicle-dispatch-flow.mjs",
     "test:security-audit": "node --test web/lib/security-audit-sanitize.test.ts",
-    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit"
+    "test:auth-consistency": "node tools/auth-consistency-check.mjs",
+    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:auth-consistency"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.2",

@@ -9,14 +9,14 @@ if (location.hash === '#repairs') {
 }
 </script>
 <script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260814-patrol-session1"></script>
+<script src="theme.js?v=20260825-auth1"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>臺北農產公司 第一果菜市場 後台管理系統</title>
 <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260806-1"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
 <!-- 匯入與匯出一律使用 ExcelJS，只收 .xlsx；SheetJS 已移除（見 xlsx-io.js 的說明）。 -->
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js" integrity="sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz" crossorigin="anonymous"></script>
@@ -1665,7 +1665,7 @@ const DTP=(()=>{
   return{init,getValue,setValue,_tog,_pm,_nm,_pd,_sh,_sm,_cl,_ok};
 })();
 // ─────────────────────────────────────────────────────────────────────────────
-// 別名指向共用設定（system/supabase-config.js?v=20260806-1），保留本檔其餘處對這兩個
+// 別名指向共用設定（system/supabase-config.js?v=20260825-auth1），保留本檔其餘處對這兩個
 // 名稱的既有引用（authClient 建立、LINE 通知 fetch 標頭）不必逐一修改。
 const SUPABASE_URL = window.SUPA_URL, SUPABASE_ANON_KEY = window.SUPA_KEY;
 const db = createDb();
@@ -1849,20 +1849,15 @@ renderPermissionList('c', defaultPermsForRole('reporter'));
 renderPermissionList('e', defaultPermsForRole('reporter'));
 
 (async () => {
-  // 登入驗證已關閉：有 session 用 session 帳號，否則自動套用預設管理者帳號
-  let profile = null;
   const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    const { data, error } = await db.from('users').select('*').eq('auth_id', session.user.id).single();
-    if (error) console.warn('users lookup by auth_id failed', error);
-    profile = data;
+  if (!session) { location.href = 'login.html?redirect=admin.html'; return; }
+  try {
+    currentUser = await window.SystemAuth.loadProfile(db);
+  } catch (error) {
+    console.warn('共用人員資料載入失敗', error);
+    location.href = 'login.html?redirect=admin.html';
+    return;
   }
-  if (!profile) {
-    let { data } = await db.from('users').select('*').eq('role', 'admin').eq('status', 'active').limit(1).maybeSingle();
-    if (!data) ({ data } = await db.from('users').select('*').eq('status', 'active').limit(1).maybeSingle());
-    profile = data;
-  }
-  currentUser = profile || { user_id: null, name: '系統管理者', role: 'admin', status: 'active' };
   document.getElementById('sidebarUser').textContent = `${currentUser.name} [${ROLE_LABEL[normalizeRoleId(currentUser)] || '系統管理員'}]`;
   applyPerms();
   setupNav();

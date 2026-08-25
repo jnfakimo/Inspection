@@ -43,6 +43,70 @@ window.invokeEdgeAction = async function (client, functionName, body) {
   return data.data;
 };
 
+// V1／V2 共用的登入後資料流程：登入憑證只由 username-login 核發，
+// 人員主檔與角色可用系統一律由受保護的 app-api/profile 回傳。
+// 這裡不保存 access/refresh token；Supabase client 仍使用 sessionStorage。
+(function installSystemAuth() {
+  var sharedClient = null;
+  function getClient(client) {
+    if (client) return client;
+    if (sharedClient) return sharedClient;
+    if (typeof window.createDb !== 'function') throw new Error('登入服務尚未初始化');
+    sharedClient = window.createDb();
+    return sharedClient;
+  }
+  async function loadProfile(client) {
+    var db = getClient(client);
+    var profile = await window.invokeEdgeAction(db, 'app-api', { action: 'profile' });
+    if (!profile || !profile.user_id || !profile.name) throw new Error('找不到啟用中的系統帳號');
+    if (window.SystemUserProfile && typeof window.SystemUserProfile.save === 'function') {
+      window.SystemUserProfile.save(profile);
+    }
+    return profile;
+  }
+  async function establishSession(client, tokens) {
+    var db = getClient(client);
+    var result = await db.auth.setSession({
+      access_token: tokens && tokens.access_token,
+      refresh_token: tokens && tokens.refresh_token,
+    });
+    if (result.error || !result.data || !result.data.session) {
+      throw new Error('登入狀態建立失敗，請稍後重試');
+    }
+    try {
+      var profile = await loadProfile(db);
+      return { session: result.data.session, profile: profile };
+    } catch (error) {
+      try { await db.auth.signOut({ scope: 'local' }); } catch (_) {}
+      if (window.SystemUserProfile && typeof window.SystemUserProfile.clear === 'function') {
+        window.SystemUserProfile.clear();
+      }
+      throw error;
+    }
+  }
+  async function restoreProfile(client) {
+    var db = getClient(client);
+    var result = await db.auth.getSession();
+    if (result.error || !result.data || !result.data.session) {
+      if (window.SystemUserProfile && typeof window.SystemUserProfile.clear === 'function') window.SystemUserProfile.clear();
+      return null;
+    }
+    try { return await loadProfile(db); }
+    catch (error) {
+      if (window.SystemUserProfile && typeof window.SystemUserProfile.clear === 'function') window.SystemUserProfile.clear();
+      throw error;
+    }
+  }
+  window.SystemAuth = {
+    loadProfile: loadProfile,
+    establishSession: establishSession,
+    restoreProfile: restoreProfile,
+    clearProfile: function () {
+      if (window.SystemUserProfile && typeof window.SystemUserProfile.clear === 'function') window.SystemUserProfile.clear();
+    },
+  };
+})();
+
 window.PatrolSessionBridge = (function () {
   var KEY='beinongPatrolTrustedSessionV1';
   var MAX_AGE_MS=2*60*60*1000;

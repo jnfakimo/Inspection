@@ -11,7 +11,7 @@
   var PROFILE_KEY='inspectionSystemUserProfile';
   var SUPABASE_URL='https://qztffronusdhgxhjjubt.supabase.co';
   var SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
-  var PROFILE_FIELDS=['user_id','username','email','name','role','rbac_role','dept_id','department','phone'];
+  var PROFILE_FIELDS=['user_id','username','email','name','role','rbac_role','dept_id','department','phone','status','auth_id','allowed_systems','permissions'];
   // Shared floor normalization keeps B1/B1F and numeric floors consistent
   // across equipment, patrol and marker pages.
   window.canonicalFloor=function(value){
@@ -62,6 +62,7 @@
     sessionStorage.removeItem(PROFILE_KEY);
     localStorage.removeItem(PROFILE_KEY);
     ['user_id','user_username','user_email','user_name','user_role','user_rbac_role','user_dept_id','user_department','user_phone'].forEach(function(key){sessionStorage.removeItem(key);});
+    window.dispatchEvent(new CustomEvent('system-user-profile-updated'));
   }
   window.SystemUserProfile={read:readProfile,save:saveProfile,clear:clearProfile};
   var LEGACY_TO_RBAC={admin:'sysadmin',supervisor:'unit_supervisor',maintenance:'technician',inspector:'reporter'};
@@ -91,7 +92,10 @@
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
     if(!token||!authId){clearProfile();return Promise.resolve(null);}
-    return fetchUserRowForAccess(authId,token).then(function(row){
+    var profileLoader=window.SystemAuth&&typeof window.SystemAuth.loadProfile==='function'
+      ?window.SystemAuth.loadProfile()
+      :fetchUserRowForAccess(authId,token);
+    return profileLoader.then(function(row){
       if(row){saveProfile(row);return row;}
       clearProfile();
       return null;
@@ -120,7 +124,10 @@
     var token=auth&&auth.access_token;
     var authId=auth&&auth.user&&auth.user.id;
     if(!token||!authId){clearProfile();return Promise.resolve(false);}
-    return fetchUserRowForAccess(authId,token).then(function(profile){
+    var profileLoader=window.SystemAuth&&typeof window.SystemAuth.loadProfile==='function'
+      ?window.SystemAuth.loadProfile()
+      :fetchUserRowForAccess(authId,token);
+    return profileLoader.then(function(profile){
       if(!profile)return false;
       saveProfile(profile);
       return isSysadminProfile(profile);
@@ -744,10 +751,11 @@
       var authId=auth&&auth.user&&auth.user.id;
       if(!token||!authId)return;
       authLookupStarted=true;
-      var url=SUPABASE_URL+'/rest/v1/users?select=user_id,username,email,name,role,rbac_role,dept_id,department,phone&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1';
-      fetch(url,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}})
-        .then(function(r){return r.ok?r.json():[];})
-        .then(function(rows){if(rows&&rows[0]){saveProfile(rows[0]);updateUser();}})
+      var profileLoader=window.SystemAuth&&typeof window.SystemAuth.loadProfile==='function'
+        ?window.SystemAuth.loadProfile()
+        :fetch(SUPABASE_URL+'/rest/v1/users?select=user_id,username,email,name,role,rbac_role,dept_id,department,phone&auth_id=eq.'+encodeURIComponent(authId)+'&status=eq.active&limit=1',{headers:{apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+token}}).then(function(r){return r.ok?r.json():[];}).then(function(rows){return rows&&rows[0]?rows[0]:null;});
+      Promise.resolve(profileLoader)
+        .then(function(profile){if(profile){saveProfile(profile);updateUser();}})
         .catch(function(){});
     }
     function updateUser(){
