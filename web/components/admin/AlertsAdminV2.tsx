@@ -9,6 +9,7 @@ import { AdminHeader, type AdminProps, errorMessage, fmt, fmtTime, PAGE_SIZE, Pa
 
 const POLL_INTERVAL_MS = 45_000;
 const SEVERITY: Record<string, string> = { critical: '嚴重', warning: '警告', high: '高', medium: '中', low: '低', info: '資訊' };
+const STATUS_FILTERS: Record<string, string> = { open: '未處理', acknowledged: '已處理' };
 const ALERT_TYPES: Record<string, string> = {
   bulk_read: '大量資料讀取', repeated_denied: '重複拒絕存取', suspicious_file: '可疑檔案存取',
   rate_limit: '流量限制觸發', login_bruteforce: '疑似暴力登入', error_threshold: '系統錯誤爆量',
@@ -216,6 +217,19 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
 
   const changeFilter = (setter: (value: string) => void, value: string) => { setter(value); setPage(1); };
   const clear = () => { setQuery(''); setIp(''); setStatus('open'); setSeverity(''); setAlertType(''); setFrom(''); setTo(''); setPage(1); };
+  // 這頁預設就帶著「未處理」篩選，篩到 0 筆時整頁全空，很容易被當成資料沒進來或功能
+  // 壞掉（實際發生過）。把目前生效的條件講出來，並給一顆真的清光的按鈕——clear() 會把
+  // 狀態設回 open，從空畫面按下去可能還是 0 筆。
+  const clearAll = () => { setQuery(''); setIp(''); setStatus(''); setSeverity(''); setAlertType(''); setFrom(''); setTo(''); setPage(1); };
+  const activeFilters = [
+    status ? `狀態為「${STATUS_FILTERS[status] || status}」` : '',
+    severity ? `等級為「${SEVERITY[severity] || severity}」` : '',
+    alertType ? `類型為「${ALERT_TYPES[alertType] || alertType}」` : '',
+    query.trim() ? `關鍵字為「${query.trim()}」` : '',
+    ip.trim() ? `來源 IP 為「${ip.trim()}」` : '',
+    from ? `起日 ${from}` : '',
+    to ? `迄日 ${to}` : '',
+  ].filter(Boolean).join('、');
   const acknowledge = async (row: Row) => {
     if (!window.confirm(`確定將「${row.title || row.alert_id}」標記為已處理？`)) return;
     setBusy(true); setNote('');
@@ -267,7 +281,9 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
           {row.status === 'open' && <button className="primary-btn compact" disabled={busy} onClick={() => void acknowledge(row)}>標記已處理</button>}
           {row.status === 'acknowledged' && <small className="alert-acknowledged">處理時間：{fmtTime(row.acknowledged_at)}</small>}
         </article>;
-      })}{!busy && alerts.length === 0 && <p className="empty">目前沒有符合條件的資安告警</p>}</div>
+      })}{!busy && alerts.length === 0 && (activeFilters
+        ? <div className="admin-empty-filtered"><p>目前生效的篩選條件：<b>{activeFilters}</b></p><p>這個範圍內沒有資安告警。放寬條件後可能就有資料。</p><button className="secondary-btn" type="button" onClick={clearAll}>清除全部條件</button></div>
+        : <p className="empty">目前沒有資安告警</p>)}</div>
       {total > 0 && <Pager page={page} total={total} onPage={setPage} />}
     </section>
   </AppShell>;
