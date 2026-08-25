@@ -1376,16 +1376,23 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('structuremap') && !can('equipment')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
       const [equipment, markers, locations] = await Promise.all([
         userDb.from('equipment').select('equipment_id,name,asset_code,category,status,floor,location,location_id').order('floor').order('name').limit(2000),
-        userDb.from('plan_markers').select('marker_id,equipment_id,floor,x,y,label').limit(5000),
-        userDb.from('locations').select('location_id,name,floor').limit(2000),
+        userDb.from('plan_markers').select('marker_id,equipment_id,floor_id,x,y,label').limit(5000),
+        userDb.from('locations').select('location_id,area,detail,floor').limit(2000),
       ]);
 if (equipment.error) throw equipment.error;
       if (markers.error) console.warn('equipment_map markers failed:', markers.error.message);
       if (locations.error) console.warn('equipment_map locations failed:', locations.error.message);
       return reply(req, { ok: true, data: {
         equipment: (equipment.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
-        markers: markers.error ? [] : (markers.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
-        locations: locations.error ? [] : (locations.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })),
+        markers: markers.error ? [] : (markers.data || []).map(row => {
+          const floorId = canonicalFloor(row.floor_id);
+          return { ...row, floor_id: floorId, floor: floorId };
+        }),
+        locations: locations.error ? [] : (locations.data || []).map(row => ({
+          ...row,
+          floor: canonicalFloor(row.floor),
+          name: [row.area, row.detail].filter(Boolean).join(' / '),
+        })),
       } });
     }
 
