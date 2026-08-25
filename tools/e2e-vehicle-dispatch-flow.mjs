@@ -305,8 +305,15 @@ try {
   result.ok = true;
   console.log(JSON.stringify(result, null, 2));
 } finally {
-  // 保留派車申請與派車紀錄；只停用測試主檔，避免測試人員出現在正式名單。
+  // 保留派車申請與派車紀錄；測試單改為取消以免停用的測試駕駛出現在待派清單，
+  // 再停用測試主檔，避免測試人員出現在正式名單。
   if (fixture) {
+    if (requestId) {
+      await rest(`/vehicle_dispatch_requests?request_id=eq.${requestId}`, {
+        key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH',
+        body: { status: 'cancelled', cancel_reason: 'P0 E2E 驗收資料，流程歷程已保留', cancelled_at: new Date().toISOString() },
+      }).catch(() => undefined);
+    }
     await rest(`/vehicle_dispatch_managers?user_id=eq.${fixture.dispatcher.profile.user_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { active: false } }).catch(() => undefined);
     await rest(`/vehicle_dispatch_drivers?user_id=eq.${fixture.driver.profile.user_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { active: false } }).catch(() => undefined);
     await rest(`/official_vehicles?vehicle_id=eq.${fixture.vehicle.vehicle_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { status: 'inactive' } }).catch(() => undefined);
