@@ -242,8 +242,8 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
         <select value={alertType} onChange={event => changeFilter(setAlertType, event.target.value)} aria-label="告警類型"><option value="">全部類型</option>{ALERT_TYPE_FILTERS.map(value => <option key={value} value={value}>{ALERT_TYPES[value]}</option>)}</select>
         <select value={severity} onChange={event => changeFilter(setSeverity, event.target.value)} aria-label="告警等級"><option value="">全部等級</option><option value="critical">嚴重</option><option value="warning">警告</option></select>
         <select value={status} onChange={event => changeFilter(setStatus, event.target.value)} aria-label="處理狀態"><option value="">全部狀態</option><option value="open">未處理</option><option value="acknowledged">已處理</option></select>
-        <label>起日<LocalizedDateInput aria-label="告警起始日期（年/月/日）" value={from} onChange={event => changeFilter(setFrom, event.target.value)} /></label>
-        <label>迄日<LocalizedDateInput aria-label="告警結束日期（年/月/日）" value={to} onChange={event => changeFilter(setTo, event.target.value)} /></label>
+        <label className="security-alert-date">起日<LocalizedDateInput aria-label="告警起始日期（年/月/日）" value={from} onChange={event => changeFilter(setFrom, event.target.value)} /></label>
+        <label className="security-alert-date">迄日<LocalizedDateInput aria-label="告警結束日期（年/月/日）" value={to} onChange={event => changeFilter(setTo, event.target.value)} /></label>
         <button className="secondary-btn" type="button" onClick={clear}>清除</button>
       </div>
       <div className="admin-alert-list">{alerts.map(row => {
