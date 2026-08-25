@@ -395,7 +395,11 @@ export async function handleAdminApiRequest(req: Request) {
         return reply(req, { ok: false, message: '登入帳號或電子郵件已存在，無法核准此申請' }, 409);
       }
 
-      const temporaryPassword = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
+      // bcrypt（Supabase Auth 的預設密碼雜湊）只處理前 72 bytes；兩組完整
+      // UUID 以連字號串接會剛好變成 73 字元，導致核准帳號時只回傳
+      // 「Auth 帳號建立失敗：Internal Server Error」。臨時密碼只供建立帳號，
+      // 使用者仍會透過啟用連結設定正式密碼，因此保留隨機性並控制在上限內。
+      const temporaryPassword = `P0!${crypto.randomUUID()}${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}A1`;
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email: application.email, password: temporaryPassword, email_confirm: true,
         user_metadata: { name: application.name, username: application.username },

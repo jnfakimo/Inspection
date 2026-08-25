@@ -105,7 +105,8 @@ function decodeCaptcha(image) {
   const groups = [...svg.matchAll(/<g transform="[^"]+">([\s\S]*?)<\/g>/gu)];
   for (const group of groups) {
     const present = Object.entries(CAPTCHA_PATHS)
-      .filter(([, path]) => group[1].includes(`d="${path}"`))
+      // 每個數字的七段 path 會合併在同一個 d 屬性中，不能以完整 d= 比對。
+      .filter(([, path]) => group[1].includes(path))
       .map(([segment]) => segment)
       .sort();
     const digit = Object.entries(CAPTCHA_SEGMENTS).find(([, segments]) => [...segments].sort().join('') === present.join(''))?.[0];
@@ -252,9 +253,6 @@ try {
   result.stages.push({ action: 'account_application_approved', status: 'active', supervisor_id: fixture.applicant.profile.supervisor_id });
   result.stages.push({ action: 'vehicle_create_request', status: 'pending_approval' });
 
-  const unauthorized = await invokeFunctionRaw('app-api', {
-    action: 'noop',
-  }, dispatcherToken);
   // app-api 沒有越權核可 action；直接以 RPC 驗證資料庫 guard。
   try {
     await vehicleAction(dispatcherToken, requestId, 'approve', { note: '不應由派車管理員核可' });
