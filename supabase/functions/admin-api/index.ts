@@ -27,6 +27,11 @@ const SAFE_SETTING_KEYS = new Set([
   'patrol_timeout_rules',
 ]);
 const FIXED_SHIFT_IDS = ['morning', 'afternoon', 'night'];
+const FIXED_SHIFT_DEFAULTS = [
+  { id: 'morning', label: '早班', start: '06:00', end: '14:00' },
+  { id: 'afternoon', label: '中班', start: '14:00', end: '22:00' },
+  { id: 'night', label: '夜班', start: '22:00', end: '06:00' },
+];
 const LEGACY_ROLE: Record<string, string> = { reporter: 'inspector', duty: 'maintenance', dispatcher: 'maintenance', technician: 'maintenance', unit_supervisor: 'supervisor', sysadmin: 'admin', inspector: 'inspector', maintenance: 'maintenance', supervisor: 'supervisor', admin: 'admin' };
 const allowedOrigins = new Set(['https://jnfakimo.github.io', 'http://localhost:3000', 'http://127.0.0.1:3000']);
 
@@ -53,6 +58,27 @@ function dbMessage(error: { code?: string; message?: string } | null, fallback: 
 function safeDetails(value: unknown) { return value && typeof value === 'object' ? value : {}; }
 function boolText(value: unknown) { return value === true || value === 'true' ? 'true' : 'false'; }
 function validTime(value: string) { return /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(value); }
+function normalizeFixedShifts(value: unknown) {
+  const source = Array.isArray(value) ? value : [];
+  const rows = source.map(item => {
+    const row = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+    return {
+      id: clean(row.id, 20),
+      label: clean(row.label, 40),
+      start: clean(row.start, 8).slice(0, 5),
+      end: clean(row.end, 8).slice(0, 5),
+    };
+  });
+  return FIXED_SHIFT_DEFAULTS.map(fallback => {
+    const current = rows.find(row => row.id === fallback.id);
+    return {
+      id: fallback.id,
+      label: current?.label || fallback.label,
+      start: current && validTime(current.start) ? current.start : fallback.start,
+      end: current && validTime(current.end) ? current.end : fallback.end,
+    };
+  });
+}
 function canonicalFloor(value: string) {
   const normalized = value.trim().toUpperCase().replace(/\s+/g, '');
   if (normalized === 'B1' || normalized === 'B1F' || normalized === '地下1樓' || normalized === '地下一樓') return 'B1F';
@@ -137,13 +163,9 @@ export async function handleAdminApiRequest(req: Request) {
       const { data, error } = await admin.from('system_settings').select('key,value').in('key', keys);
       if (error) return reply(req, { ok: false, message: `系統設定載入失敗：${error.message}` }, 400);
       const settings = Object.fromEntries((data || []).map(row => [String(row.key), String(row.value ?? '')]));
-      let shifts = [
-        { id: 'morning', label: '早班', start: '06:00', end: '14:00' },
-        { id: 'afternoon', label: '中班', start: '14:00', end: '22:00' },
-        { id: 'night', label: '夜班', start: '22:00', end: '06:00' },
-      ];
+      let shifts = normalizeFixedShifts([]);
       let patrolRules: unknown[] = [];
-      try { const parsed = JSON.parse(settings.shifts || '[]'); if (Array.isArray(parsed) && parsed.length) shifts = parsed; } catch { /* 使用固定三班預設 */ }
+      try { shifts = normalizeFixedShifts(JSON.parse(settings.shifts || '[]')); } catch { /* 使用固定三班預設 */ }
       try { const parsed = JSON.parse(settings.patrol_timeout_rules || '[]'); if (Array.isArray(parsed)) patrolRules = parsed; } catch { /* 使用空規則 */ }
       const enabled = (key: string) => settings[key] === 'true';
       return reply(req, { ok: true, data: {
@@ -187,10 +209,11 @@ export async function handleAdminApiRequest(req: Request) {
       if (new Set(shifts.map(row => row.id)).size !== 3 || FIXED_SHIFT_IDS.some(shiftId => !shifts.some(row => row.id === shiftId)) || shifts.some(row => !row.label || !validTime(row.start) || !validTime(row.end))) {
         return reply(req, { ok: false, message: '班別代碼不可變更，名稱必填，時間須為有效的 HH:MM' }, 400);
       }
-      const { error } = await admin.from('system_settings').upsert({ key: 'shifts', value: JSON.stringify(shifts), updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      const orderedShifts = FIXED_SHIFT_IDS.map(shiftId => shifts.find(row => row.id === shiftId)!);
+      const { error } = await admin.from('system_settings').upsert({ key: 'shifts', value: JSON.stringify(orderedShifts), updated_at: new Date().toISOString() }, { onConflict: 'key' });
       if (error) return reply(req, { ok: false, message: `班別設定儲存失敗：${error.message}` }, 400);
-      await audit('system_settings', 'shifts', 'update', { shifts });
-      return reply(req, { ok: true, data: { shifts } });
+      await audit('system_settings', 'shifts', 'update', { shifts: orderedShifts });
+      return reply(req, { ok: true, data: { shifts: orderedShifts } });
     }
 
     if (action === 'admin_save_line_settings') {

@@ -213,11 +213,25 @@ function normalizeShifts(value: unknown): Shift[] {
     .map(item => ({
       id: stringOf(item.id).trim(),
       label: stringOf(item.label).trim(),
-      start: stringOf(item.start).trim(),
-      end: stringOf(item.end).trim(),
+      start: stringOf(item.start).trim().slice(0, 5),
+      end: stringOf(item.end).trim().slice(0, 5),
     }))
     .filter(item => item.id || item.label || item.start || item.end);
-  return shifts.length ? shifts : defaultShifts.map(shift => ({ ...shift }));
+  const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+  // 舊版曾允許任意新增班別，正式資料可能仍殘留額外或重複的 ID。
+  // V2 儲存端只接受固定三班，因此載入時先依固定 ID 整理，避免畫面帶著
+  // 第四、第五筆舊資料，造成使用者無論怎麼改時間都無法通過儲存驗證。
+  return defaultShifts.map(fallback => {
+    const current = shifts.find(shift => shift.id === fallback.id);
+    if (!current) return { ...fallback };
+    return {
+      id: fallback.id,
+      label: current.label || fallback.label,
+      start: timePattern.test(current.start) ? current.start : fallback.start,
+      end: timePattern.test(current.end) ? current.end : fallback.end,
+    };
+  });
 }
 
 function normalizeSettings(result: unknown): SettingsSnapshot {
@@ -681,7 +695,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       </div>
       <div className={styles.shiftList}>
         {shifts.map((shift, index) => (
-          <div className={styles.shiftRow} key={index}>
+          <div className={styles.shiftRow} key={shift.id}>
             <label>
               <span>班別名稱</span>
               <input
