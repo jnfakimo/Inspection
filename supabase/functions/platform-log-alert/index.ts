@@ -21,6 +21,9 @@ const safeEqual = (a: string, b: string) => {
   for (let index = 0; index < a.length; index += 1) diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
   return diff === 0;
 };
+// 監測排程每 10 分鐘執行一次；持續中的同一平台事件改以 30 分鐘冷卻，
+// 仍會在 security_alerts 更新 last_seen_at，不讓 LINE 變成每次排程的噪音。
+const PLATFORM_NOTIFICATION_COOLDOWN_MINUTES = 30;
 
 const allowedTypes = new Set([
   "rate_limit",
@@ -90,7 +93,7 @@ Deno.serve(async (req) => {
         windowMinutes,
         details,
         notificationToggleKey: alertType === "error_threshold" ? "line_notify_error_threshold" : "line_notify_security_alerts",
-        notificationCooldownMinutes: 10,
+        notificationCooldownMinutes: PLATFORM_NOTIFICATION_COOLDOWN_MINUTES,
       });
       outcomes.push({
         source,

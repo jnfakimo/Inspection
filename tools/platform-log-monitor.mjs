@@ -79,8 +79,13 @@ const SOURCE_CONFIG = {
     title: "Edge Function 網路層異常",
     alertType: "error_threshold",
     severity: "critical",
-    errorThreshold: integerEnv("PLATFORM_FUNCTION_EDGE_ERROR_THRESHOLD", 5, 1, 5000),
-    errorLabel: "HTTP 4xx／5xx 或網路錯誤訊號",
+    // 4xx 會包含正常的登入拒絕、匿名探測與不存在路由；不能把整個
+    // function_edge_logs 的全域 4xx 量用 5 次當成入侵。真正要即時通知的
+    // 是 5xx、429 與明確的上游／連線錯誤，4xx 仍保留在證據明細中。
+    serverErrorThreshold: integerEnv("PLATFORM_FUNCTION_EDGE_5XX_THRESHOLD", 3, 1, 5000),
+    rateLimitThreshold: integerEnv("PLATFORM_FUNCTION_EDGE_429_THRESHOLD", 10, 1, 5000),
+    networkErrorThreshold: integerEnv("PLATFORM_FUNCTION_EDGE_NETWORK_THRESHOLD", 3, 1, 5000),
+    errorLabel: "HTTP 5xx／429 或網路連線錯誤",
   },
 };
 
@@ -93,6 +98,28 @@ SELECT
     toInt32OrZero(log_attributes['response.status_code']) >= 400
     OR toInt32OrZero(log_attributes['res.statusCode']) >= 400
   ) AS http_error_count,
+  countIf(
+    toInt32OrZero(log_attributes['response.status_code']) >= 500
+    OR toInt32OrZero(log_attributes['res.statusCode']) >= 500
+  ) AS http_5xx_count,
+  countIf(
+    toInt32OrZero(log_attributes['response.status_code']) = 429
+    OR toInt32OrZero(log_attributes['res.statusCode']) = 429
+  ) AS http_429_count,
+  countIf(
+    toInt32OrZero(log_attributes['response.status_code']) < 400
+    AND toInt32OrZero(log_attributes['res.statusCode']) < 400
+    AND (
+      positionCaseInsensitive(event_message, 'timeout') > 0
+      OR positionCaseInsensitive(event_message, 'connection') > 0
+      OR positionCaseInsensitive(event_message, 'upstream') > 0
+      OR positionCaseInsensitive(event_message, 'gateway') > 0
+      OR positionCaseInsensitive(event_message, 'network') > 0
+      OR positionCaseInsensitive(event_message, 'reset') > 0
+      OR positionCaseInsensitive(event_message, 'refused') > 0
+      OR positionCaseInsensitive(event_message, 'unavailable') > 0
+    )
+  ) AS network_error_count,
   countIf(
     positionCaseInsensitive(event_message, 'error') > 0
     OR positionCaseInsensitive(event_message, 'exception') > 0
@@ -133,6 +160,9 @@ function summarize(rows) {
     Object.keys(SOURCE_CONFIG).map((source) => [source, {
       requestCount: 0,
       httpErrorCount: 0,
+      http5xxCount: 0,
+      http429Count: 0,
+      networkErrorCount: 0,
       signalCount: 0,
       paths: [],
     }]),
@@ -143,12 +173,18 @@ function summarize(rows) {
     if (!summary) continue;
     summary.requestCount += finiteNumber(row.request_count);
     summary.httpErrorCount += finiteNumber(row.http_error_count);
+    summary.http5xxCount += finiteNumber(row.http_5xx_count);
+    summary.http429Count += finiteNumber(row.http_429_count);
+    summary.networkErrorCount += finiteNumber(row.network_error_count);
     summary.signalCount += finiteNumber(row.signal_count);
     const path = clean(row.path, 180) || "(未標示路徑)";
     summary.paths.push({
       path,
       requestCount: finiteNumber(row.request_count),
       httpErrorCount: finiteNumber(row.http_error_count),
+      http5xxCount: finiteNumber(row.http_5xx_count),
+      http429Count: finiteNumber(row.http_429_count),
+      networkErrorCount: finiteNumber(row.network_error_count),
       signalCount: finiteNumber(row.signal_count),
     });
   }
@@ -163,17 +199,36 @@ function buildSignals(summaries) {
   const signals = [];
   for (const [source, config] of Object.entries(SOURCE_CONFIG)) {
     const summary = summaries[source];
-    const errorCount = Math.max(summary.httpErrorCount, summary.signalCount);
     const volumeHit = config.volumeThreshold &&
       summary.requestCount >= config.volumeThreshold;
-    const errorHit = config.errorThreshold
-      ? errorCount >= config.errorThreshold
-      : summary.signalCount >= config.signalThreshold;
+    const reasons = [];
+    let errorCount = Math.max(summary.httpErrorCount, summary.signalCount);
+    let errorHit = false;
+    if (source === "function_edge_logs") {
+      // Edge network logs contain expected 401／403／404 responses from login,
+      // anonymous probes and stale routes. Only page 5xx, rate-limit 429 and
+      // explicit network/upstream failures are actionable at this layer.
+      const serverErrorHit = summary.http5xxCount >= config.serverErrorThreshold;
+      const rateLimitHit = summary.http429Count >= config.rateLimitThreshold;
+      const networkErrorHit = summary.networkErrorCount >= config.networkErrorThreshold;
+      errorHit = serverErrorHit || rateLimitHit || networkErrorHit;
+      errorCount = Math.max(
+        summary.http5xxCount,
+        summary.http429Count,
+        summary.networkErrorCount,
+      );
+      if (serverErrorHit) reasons.push(`HTTP 5xx ${summary.http5xxCount} 次達 ${config.serverErrorThreshold} 次`);
+      if (rateLimitHit) reasons.push(`HTTP 429 ${summary.http429Count} 次達 ${config.rateLimitThreshold} 次`);
+      if (networkErrorHit) reasons.push(`網路連線錯誤 ${summary.networkErrorCount} 次達 ${config.networkErrorThreshold} 次`);
+    } else {
+      errorHit = config.errorThreshold
+        ? errorCount >= config.errorThreshold
+        : summary.signalCount >= config.signalThreshold;
+      if (errorHit) reasons.push(`${config.errorLabel} ${errorCount} 次達 ${config.errorThreshold || config.signalThreshold} 次`);
+    }
     if (!volumeHit && !errorHit) continue;
 
-    const reasons = [];
     if (volumeHit) reasons.push(`請求 ${summary.requestCount} 次達 ${config.volumeThreshold} 次`);
-    if (errorHit) reasons.push(`${config.errorLabel} ${errorCount} 次達 ${config.errorThreshold || config.signalThreshold} 次`);
     signals.push({
       source,
       alert_type: config.alertType,
@@ -189,6 +244,9 @@ function buildSignals(summaries) {
         window_end: NOW.toISOString(),
         request_count: summary.requestCount,
         http_error_count: summary.httpErrorCount,
+        http_5xx_count: summary.http5xxCount,
+        http_429_count: summary.http429Count,
+        network_error_count: summary.networkErrorCount,
         signal_count: summary.signalCount,
         top_paths: summary.paths,
       },
