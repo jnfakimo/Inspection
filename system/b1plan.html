@@ -269,6 +269,18 @@ async function buildSources(){
     const {data,error}=await db.from('floor_models').select('*');
     if(error) console.warn('floor_models query failed, using static plans only',error);
     if(data&&data.length){
+      const remotePaths=[...new Set(data.flatMap(m=>{
+        if(!m.image_path) return [];
+        const paths=[String(m.image_path)];
+        if(mobileModel) paths.push(`mobile/${m.image_path}`);
+        return paths;
+      }))];
+      const signedMap=new Map();
+      if(remotePaths.length){
+        const signed=await db.storage.from('floorplans').createSignedUrls(remotePaths,300);
+        (signed.data||[]).forEach(item=>{ if(item?.path&&item?.signedUrl) signedMap.set(item.path,item.signedUrl); });
+        if(signed.error) console.warn('floorplans signed URL failed, using static plans only',signed.error);
+      }
       // 同步處理：先前用 data.forEach(async …) 但沒有 await，下方補 fallbackSrc、
       // renderFloorSelect()、showFloor('B1') 會先跑完，動態加進來的樓層來不及進選單。
       data.forEach(m => {
@@ -278,14 +290,10 @@ async function buildSources(){
         // 已有本地縮圖的樓層（B1〜3F）：手機沿用 plans/tex/mobile/，
         // 不換成 Storage 原圖（每張 1.5〜2.3MB）。
         if (fl && mobileModel) return;
-        // floorplans 是公開儲存桶，與 floor3d.html／b1_integrated_marker_system.html
-        // 走同一種公開網址。先前這裡改用 createSignedUrl 並讀 signed.signedURL，
-        // 但 supabase-js v2 回傳的欄位叫 signedUrl，取到的永遠是 undefined，
-        // 而 fl.src 又已被指派成物件，下方的 fallbackSrc 補救也不會生效。
-        const t = encodeURIComponent(m.updated_at || '');
-        const base = `${SUPA_URL}/storage/v1/object/public/floorplans`;
-        const url = `${base}/${m.image_path}?t=${t}`;
-        const mobileUrl = `${base}/mobile/${m.image_path}?t=${t}`;
+        // floorplans 為私有儲存桶，僅把 5 分鐘短效網址交給圖臺。
+        const url = signedMap.get(String(m.image_path)) || '';
+        const mobileUrl = signedMap.get(`mobile/${m.image_path}`) || url;
+        if(!url) return;
         if (fl) {
           fl.src = { type: 'image', url };
         } else {

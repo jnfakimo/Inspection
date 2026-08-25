@@ -8,7 +8,7 @@
 // 標為刻意不掛品牌列。
 //
 // 與 V1 的差異三處，都是 V2 環境使然：
-// 1. 平面圖來源一律走 floor_models 的 image_path（Supabase Storage 公開桶）。V1 另有
+// 1. 平面圖來源一律走 floor_models 的 image_path（Supabase Storage 私有桶短效網址）。V1 另有
 //    plans/*.dzi 的靜態備援，但那是相對於 /Inspection/system 的路徑，在 /Inspection/v2
 //    底下會 404；而且 modeler 上傳的每一層都會寫 floor_models，備援實際上用不到。
 // 2. OpenSeadragon 以動態 import 載入，不進其他頁面的初始 bundle。
@@ -20,7 +20,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-markerboard.css';
 import './structuremap-pin.css';
-import { LEGACY_BASE, MARKET_ID, SUPABASE_URL } from '@/lib/config';
+import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
+import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
 import {
   computePatrolStatus, invalidatePatrolMarkers, PATROL_COLORS, type PatrolState,
@@ -75,9 +76,6 @@ function translateError(error: unknown) {
   if (/Failed to fetch|NetworkError|Load failed/.test(message)) return '網路連線失敗，請稍後再試';
   return '操作失敗，請稍後再試或聯絡系統管理員';
 }
-
-const textureUrl = (imagePath: string, updatedAt: unknown) =>
-  `${SUPABASE_URL}/storage/v1/object/public/floorplans/${imagePath}?t=${encodeURIComponent(String(updatedAt || ''))}`;
 
 export function MarkerBoardModule({ profile }: Props) {
   const [floors, setFloors] = useState<FloorSource[]>([]);
@@ -160,13 +158,22 @@ export function MarkerBoardModule({ profile }: Props) {
       const { data, error } = await getSupabase().from('floor_models').select('*');
       if (disposed) return;
       if (error) console.warn('floor_models query failed', error);
-      const list = (data || [])
+      const sourceRows = (data || [])
         .filter(row => row.image_path)
+      let signed = new Map<string, string>();
+      try {
+        signed = await signFloorplanPaths(sourceRows.map(row => String(row.image_path)), getSupabase());
+      } catch (signError) {
+        if (!disposed) setProgress({ pct: 100, msg: `樓層圖連結產生失敗：${errorMessage(signError, '請重新登入後再試')}` });
+      }
+      const list = sourceRows
         .map(row => ({
           id: canonicalFloor(row.floor_id), label: String(row.name || canonicalFloor(row.floor_id)),
-          url: textureUrl(String(row.image_path), row.updated_at), index: null as number | null,
+          url: signed.get(String(row.image_path)) || '', index: null as number | null,
         }))
+        .filter(row => row.url)
         .sort((a, b) => floorOrder(a.id) - floorOrder(b.id));
+      if (disposed) return;
       setFloors(list);
       if (!list.length) setProgress({ pct: 100, msg: '尚未建立任何樓層模型' });
     })();

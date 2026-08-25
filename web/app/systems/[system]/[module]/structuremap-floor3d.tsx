@@ -26,10 +26,11 @@ import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { allowedActions } from '@/lib/shared-actions';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
+import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import type { Profile } from '@/types/app';
 
 type Props = { profile: Profile };
-type FloorModel = { floor_id: string; name: string | null; image_path: string | null; level: number | null };
+type FloorModel = { floor_id: string; name: string | null; image_path: string | null; image_url: string | null; level: number | null };
 type MarkerRow = {
   marker_id: string; floor_id: string; x: number; y: number;
   kind: string; label: string | null; color: string | null; status: string | null;
@@ -103,11 +104,21 @@ export function Floor3DBoardModule({ profile }: Props) {
     // 標記查詢失敗不擋畫面：樓層模型仍可檢視，但要說出來，不能只是沒有標記。
     if (markerResult.error) setLoadError('標記載入失敗，畫面只呈現樓層模型。');
 
-    const rows = (modelResult.data || []).map(row => ({
+    const sourceRows = (modelResult.data || []).map(row => ({
       ...(row as FloorModel), floor_id: canonicalFloor(row.floor_id),
     }))
       .filter(row => row.image_path)
       .sort((a, b) => floorOrder(a.floor_id) - floorOrder(b.floor_id));
+    let signed = new Map<string, string>();
+    try {
+      signed = await signFloorplanPaths(sourceRows.map(row => row.image_path), client);
+    } catch {
+      setLoadError('樓層圖連結產生失敗，請重新登入後再試。');
+    }
+    const rows = sourceRows
+      .map(row => ({ ...row, image_url: signed.get(String(row.image_path)) || '' }))
+      .filter(row => row.image_url);
+    if (rows.length < sourceRows.length && sourceRows.length) setLoadError('部分樓層圖無法取得授權連結。');
     setModels(rows);
     setVisibleFloors(Object.fromEntries(rows.map(row => [String(row.floor_id), true])));
     setMarkers((markerResult.data || []).map(row => ({

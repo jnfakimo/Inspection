@@ -17,17 +17,24 @@ alter table floor_models enable row level security;
 drop policy if exists "allow_all_for_now" on floor_models;
 create policy "allow_all_for_now" on floor_models for all using (true) with check (true);
 
--- 2) 建立公開儲存桶 floorplans（存放各樓層 PNG）
+-- 2) 建立私有儲存桶 floorplans（存放各樓層 PNG）
 insert into storage.buckets (id, name, public)
-values ('floorplans','floorplans', true)
-on conflict (id) do update set public = true;
+values ('floorplans','floorplans', false)
+on conflict (id) do update set public = false;
 
--- 3) 允許讀寫該儲存桶（前端以 anon 金鑰上傳）
-drop policy if exists "floorplans_read"   on storage.objects;
-drop policy if exists "floorplans_write"  on storage.objects;
+-- 3) 圖臺由登入帳號以短效 signed URL 讀取；正式環境後續 hardening migration
+--    會把上傳／更新再收斂至設備管理權限。
+drop policy if exists "floorplans_read" on storage.objects;
+drop policy if exists "floorplans_write" on storage.objects;
 drop policy if exists "floorplans_update" on storage.objects;
 drop policy if exists "floorplans_delete" on storage.objects;
-create policy "floorplans_read"   on storage.objects for select using (bucket_id = 'floorplans');
-create policy "floorplans_write"  on storage.objects for insert with check (bucket_id = 'floorplans');
-create policy "floorplans_update" on storage.objects for update using (bucket_id = 'floorplans');
-create policy "floorplans_delete" on storage.objects for delete using (bucket_id = 'floorplans');
+drop policy if exists floorplans_authenticated_read on storage.objects;
+drop policy if exists floorplans_manager_insert on storage.objects;
+drop policy if exists floorplans_manager_update on storage.objects;
+create policy floorplans_authenticated_read on storage.objects for select to authenticated
+  using (bucket_id = 'floorplans' and auth.uid() is not null);
+create policy floorplans_manager_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'floorplans' and auth.uid() is not null);
+create policy floorplans_manager_update on storage.objects for update to authenticated
+  using (bucket_id = 'floorplans' and auth.uid() is not null)
+  with check (bucket_id = 'floorplans' and auth.uid() is not null);

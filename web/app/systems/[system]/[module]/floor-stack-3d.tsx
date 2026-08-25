@@ -10,17 +10,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { SUPABASE_URL } from '@/lib/config';
 import { canonicalFloor } from '@/lib/floor';
 
 // 樓層排序沿用全站唯一的 web/lib/floor.ts；此處再匯出，既有匯入端不必改寫。
 export { floorOrder } from '@/lib/floor';
 
-export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; level?: number | null };
+export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; image_url?: string | null; level?: number | null };
 export type StackMarker = { id: string; floor_id: string; x: number; y: number; color: string; kind?: string; label?: string };
 
-export const floorTextureUrl = (imagePath: unknown) =>
-  imagePath ? `${SUPABASE_URL}/storage/v1/object/public/floorplans/${String(imagePath)}` : '';
+export const floorTextureUrl = (signedUrl: unknown) => signedUrl ? String(signedUrl) : '';
 
 
 const PLANE_W = 10, PLANE_H = 7;
@@ -210,7 +208,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         mesh.position.y = y;
         scene.add(mesh);
 
-        const url = floorTextureUrl(row.image_path);
+        const url = floorTextureUrl(row.image_url);
         if (url) {
           loader.load(url, texture => {
             texture.colorSpace = THREE.SRGBColorSpace;

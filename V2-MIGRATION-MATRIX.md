@@ -123,9 +123,10 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 | 3D建模系統 | V1 `admin.html#modelhub` 的子系統導覽頁：五張 HUB 圖卡＋空間標記覆蓋率統計 |
 | 專案關係 | `locations` 的樓層／區域結構檢視。**唯讀**——維護入口在後台的場域位置模組 |
 
-檢視器的資產來源統一改為公開儲存桶 `floorplans` 的絕對網址（即 `floor_models.image_path`，
-目前為 B1.png～RF.png）。V1 用的是相對路徑 `plans/tex/...`，那掛在 `/Inspection/system`
-底下；V2 位於 `/Inspection/v2`，改走 Storage 才不受站台路徑影響。已確認該桶匿名可讀。
+檢視器的資產來源統一改為私有儲存桶 `floorplans` 的短效 signed URL（由
+`floor_models.image_path` 解析，目前為 B1.png～RF.png）。V1 用的是相對路徑
+`plans/tex/...`，那掛在 `/Inspection/system` 底下；V1／V2 現在都由已啟用帳號取得
+5 分鐘授權網址，避免把完整場域配置暴露給匿名流量。
 
 平面圖採 OpenSeadragon 的 `{ type:'image' }` 單張影像模式，與 V1 `b1plan.html` 現行作法
 一致（該頁的 `.dzi` 圖磚是另一條未啟用的路徑）。`plan_markers` 的 x／y 視為 0–1 相對座標。
@@ -133,8 +134,9 @@ guard trigger（approval／assignment_and_driver／time_window）照常觸發，
 `three` 與 `openseadragon` 皆以動態 import 載入，建置後確認切成獨立 chunk（337 KB／267 KB）
 且沒有任何頁面的初始 HTML 引用它們。
 
-**尚未驗證**：兩個檢視器的實際算繪需登入後才看得到，目前僅確認路由、bundle 切分、
-貼圖網址可取得與型別／建置通過。
+**驗證狀態（2026-08-25）**：匿名請求已被私有 bucket 拒絕；程式碼已涵蓋 V1／V2
+平面、3D、整合標記與巡檢 3D 圖臺，並通過靜態腳本語法檢查。實際登入後算繪仍需在
+具備應用程式帳號的瀏覽器工作階段補做一次視覺冒煙測試。
 
 ## SYS-01 後台管理（2026-08-18 完成）
 

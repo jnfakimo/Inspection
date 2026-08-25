@@ -2,7 +2,7 @@
 
 // SYS-06 的兩個檢視器：2D 平面樓層圖（OpenSeadragon）與 3D 立體樓層（Three.js）。
 //
-// 貼圖來源統一為公開儲存桶 floorplans 的 {image_path}（即 floor_models 那一欄，
+// 貼圖來源統一為私有儲存桶 floorplans 的短效 signed URL（由 floor_models.image_path
 // 目前為 B1.png～RF.png）。V1 用的是相對路徑 plans/tex/...，那是掛在 /Inspection/system
 // 底下的資產；V2 位於 /Inspection/v2，改走 Storage 的絕對網址才不受站台路徑影響。
 //
@@ -26,6 +26,7 @@ import { errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
 import { canonicalFloor } from '@/lib/floor';
 import { floorOrder, floorTextureUrl, preparePlanObjectUrl } from './floor-stack-3d';
+import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -62,7 +63,19 @@ function useFloorData() {
     if (m.error || k.error) setNote(`失敗：${errorMessage(m.error || k.error, '圖臺資料載入失敗')}`);
     const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
       .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
-    setModels(sorted);
+    let signed = new Map<string, string>();
+    try {
+      signed = await signFloorplanPaths(sorted.map(row => String(row.image_path || '')), client);
+    } catch (error) {
+      setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
+    }
+    const secured = sorted
+      .map(row => ({ ...row, image_url: signed.get(String(row.image_path || '')) || '' }))
+      .filter(row => row.image_url);
+    if (secured.length < sorted.length && sorted.length) {
+      setNote('部分樓層圖連結無法產生，畫面僅呈現可授權的樓層。');
+    }
+    setModels(secured);
     setMarkers((k.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
     setBusy(false);
   }, []);
@@ -133,7 +146,7 @@ function Floor2DViewer({ module, profile }: Props) {
   // 建立／切換 OpenSeadragon。函式庫以動態 import 載入。
   useEffect(() => {
     let disposed = false;
-    const url = textureUrl(model?.image_path);
+    const url = textureUrl(model?.image_url);
     if (!hostRef.current || !url) return;
     (async () => {
       const OpenSeadragon = (await import('openseadragon')).default;

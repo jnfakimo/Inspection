@@ -721,13 +721,22 @@ async function applyCustomModels(){
     const {data,error}=await Promise.race([db.from('floor_models').select('*'),timeout]);
     if(error) console.warn('floor_models query failed or timed out, using static textures only',error);
     if(data&&data.length){
+      const remotePaths=[...new Set(data.flatMap(m=>{
+        if(!m.image_path) return [];
+        return [String(m.image_path), `mobile/${m.image_path}`];
+      }))];
+      const signedMap=new Map();
+      if(remotePaths.length){
+        const signed=await db.storage.from('floorplans').createSignedUrls(remotePaths,300);
+        (signed.data||[]).forEach(item=>{ if(item?.path&&item?.signedUrl) signedMap.set(item.path,item.signedUrl); });
+        if(signed.error) console.warn('floorplans signed URL failed, using static textures only',signed.error);
+      }
       data.forEach(m=>{
         if(!m.image_path) return;
         const fl=FLOORS.find(f=>f.id===m.floor_id);
-        const t=encodeURIComponent(m.updated_at||'');
-        const base=`${SUPA_URL}/storage/v1/object/public/floorplans`;
-        const url=`${base}/${m.image_path}?t=${t}`;
-        const mobileUrl=`${base}/mobile/${m.image_path}?t=${t}`;
+        const url=signedMap.get(String(m.image_path))||'';
+        const mobileUrl=signedMap.get(`mobile/${m.image_path}`)||url;
+        if(!url) return;
         if(fl){
           // 已有本地貼圖的樓層（B1〜3F）：手機維持 plans/tex/mobile/ 縮圖，不用 Storage 原圖覆蓋。
           if(!MOBILE_MODEL){
@@ -837,10 +846,11 @@ async function applyModelUpdates(){
   const loader=new THREE.TextureLoader();
   for(const m of updates){
     const fl=FLOORS.find(f=>f.id===m.floor_id); if(!fl) continue;
-    const t=encodeURIComponent(m.updated_at||'');
-    const base=`${SUPA_URL}/storage/v1/object/public/floorplans`;
     // 與初次載入一致：手機的遠端樓層優先抓 mobile/ 縮圖。
-    const url=(MOBILE_MODEL&&fl.remoteTex)?`${base}/mobile/${m.image_path}?t=${t}`:`${base}/${m.image_path}?t=${t}`;
+    const path=(MOBILE_MODEL&&fl.remoteTex)?`mobile/${m.image_path}`:String(m.image_path);
+    const signed=await db.storage.from('floorplans').createSignedUrl(path,300);
+    const url=signed.data?.signedUrl||'';
+    if(signed.error||!url) continue;
     await new Promise(resolve=>{
       loader.load(url, tex=>{
         if(MOBILE_MODEL&&fl.remoteTex) downscaleTexture(tex,1200);

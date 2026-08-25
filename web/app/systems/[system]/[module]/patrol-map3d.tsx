@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
+import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import { errorMessage, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
 import { canonicalFloor } from '@/lib/floor';
@@ -70,8 +71,17 @@ export function PatrolMap3DModule({ module, profile }: Props) {
         .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(5000),
     ]);
     if (m.error || p.error || c.error) setNote(`失敗：${errorMessage(m.error || p.error || c.error, '立體巡檢資料載入失敗')}`);
-    const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
+    const sourceRows = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
       .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    let signed = new Map<string, string>();
+    try {
+      signed = await signFloorplanPaths(sourceRows.map(row => String(row.image_path || '')), client);
+    } catch (error) {
+      setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
+    }
+    const sorted = sourceRows
+      .map(row => ({ ...row, image_url: signed.get(String(row.image_path || '')) || '' }))
+      .filter(row => row.image_url);
     setModels(sorted);
     setVisibleFloors(Object.fromEntries(sorted.map(row => [String(row.floor_id), true])));
     setPoints((p.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
