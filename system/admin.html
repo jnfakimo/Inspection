@@ -2542,11 +2542,14 @@ async function downloadImportTemplate() {
 function genTempPassword() {
   // Math.random() 不是密碼學安全的亂數：V8 用的 xorshift128+ 可由少量輸出還原內部狀態，
   // 批次匯入時前幾組臨時密碼足以推算後續每一組。改用 crypto.getRandomValues。
-  // 字集去掉 I/O/0/1 避免列印給同仁時誤認；長度 32 整除 256，取模不產生偏差。
+  // 字集去掉 I/O/0/1，避免列印給同仁時誤認。長度取 32（2 的冪）不是湊巧：這樣才能用位元
+  // 遮罩取低 5 位，每個字元機率完全均等。改用 % 取模也算得出同樣結果，但那要靠 256 整除
+  // 32 才沒有偏差，意圖藏在算式裡，靜態分析一律當成有偏差的取樣。
   const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const mask = charset.length - 1;
   const bytes = crypto.getRandomValues(new Uint8Array(10));
   let body = '';
-  for (const b of bytes) body += charset[b % charset.length];
+  for (const b of bytes) body += charset[b & mask];
   // 'Tc!' 前綴讓密碼固定含大寫、小寫、符號三類，不必仰賴隨機結果去湊 PasswordPolicy。
   return 'Tc!' + body;
 }
