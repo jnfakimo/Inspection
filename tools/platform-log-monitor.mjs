@@ -47,7 +47,7 @@ function clean(value, max = 240) {
 const SOURCE_CONFIG = {
   edge_logs: {
     title: "API Gateway 平台層異常",
-    alertType: "rate_limit",
+    alertType: "error_threshold",
     severity: "warning",
     errorThreshold: integerEnv("PLATFORM_API_ERROR_THRESHOLD", 20, 1, 5000),
     volumeThreshold: integerEnv("PLATFORM_API_VOLUME_THRESHOLD", 1000, 10, 100000),
@@ -55,7 +55,7 @@ const SOURCE_CONFIG = {
   },
   storage_logs: {
     title: "Storage 平台層異常",
-    alertType: "suspicious_file",
+    alertType: "error_threshold",
     severity: "warning",
     errorThreshold: integerEnv("PLATFORM_STORAGE_ERROR_THRESHOLD", 10, 1, 5000),
     volumeThreshold: integerEnv("PLATFORM_STORAGE_VOLUME_THRESHOLD", 500, 10, 100000),
