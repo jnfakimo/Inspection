@@ -79,11 +79,18 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
     if (response && !isTransientNodeResponse(response)) {
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.ok) {
-        reportIfInfrastructureError(result?.message, { action, via: 'node-api' });
-        throw new Error(result?.message || '系統服務回傳失敗');
+        // Render 服務可能仍在滾動部署舊版 handler；新 V2 動作先由 Edge
+        // Function 提供，遇到明確的「不支援」才安全回退，其他業務錯誤仍直接呈現，
+        // 避免把驗證失敗重送到第二個後端。
+        if (result?.message !== '不支援的 API 動作') {
+          reportIfInfrastructureError(result?.message, { action, via: 'node-api' });
+          throw new Error(result?.message || '系統服務回傳失敗');
+        }
+        console.warn(`Node.js API 尚未支援 ${action}，改由 Supabase Edge Function 處理`);
+      } else {
+        recordAppRead(action);
+        return result.data as T;
       }
-      recordAppRead(action);
-      return result.data as T;
     }
     if (response) {
       console.warn(`Node.js API returned ${response.status}; falling back to Supabase Edge Function`);

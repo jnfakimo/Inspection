@@ -574,6 +574,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     // ---- SYS-09 公文傳送流程 ---------------------------------------------
+    // 2026-08-26：公文動作由 Edge／Node 共用這份 handler，部署時兩端需同步更新。
     // 公文流程的讀寫集中在這裡，前端不直接取得服務角色。每個動作都重新檢查
     // 目前節點、部室與角色，並以狀態條件更新避免兩個視窗同時收文／簽收。
     if (action === 'official_documents') {
