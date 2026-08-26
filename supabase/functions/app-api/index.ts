@@ -86,6 +86,62 @@ function relationName(value: unknown) {
   return text((relation as { name?: unknown }).name, 200);
 }
 
+type DepartmentNode = {
+  dept_id?: unknown;
+  parent_id?: unknown;
+  name?: unknown;
+};
+
+function departmentKey(value: unknown) {
+  return text(value, 200).replace(/\s+/g, ' ').trim().toLocaleLowerCase();
+}
+
+function buildDepartmentPaths(rows: DepartmentNode[]) {
+  const byId = new Map<string, DepartmentNode>();
+  rows.forEach(row => {
+    const deptId = id(row.dept_id);
+    if (deptId) byId.set(deptId, row);
+  });
+  const pathCache = new Map<string, string>();
+  const pathForId = (value: unknown) => {
+    const deptId = id(value);
+    if (!deptId) return '';
+    const cached = pathCache.get(deptId);
+    if (cached) return cached;
+    const names: string[] = [];
+    const visited = new Set<string>();
+    let currentId = deptId;
+    let guard = 0;
+    while (currentId && guard++ < 20 && !visited.has(currentId)) {
+      visited.add(currentId);
+      const current = byId.get(currentId);
+      if (!current) break;
+      const name = text(current.name, 100);
+      if (name) names.unshift(name);
+      currentId = id(current.parent_id);
+    }
+    const path = names.join(' / ');
+    if (path) pathCache.set(deptId, path);
+    return path;
+  };
+  const byName = new Map<string, string>();
+  rows.forEach(row => {
+    const name = text(row.name, 100);
+    if (!name) return;
+    const path = pathForId(row.dept_id) || name;
+    byName.set(departmentKey(name), path);
+  });
+  return { byName, pathForId };
+}
+
+function formatDepartment(value: unknown, byName: Map<string, string>) {
+  const raw = text(value, 200);
+  if (!raw) return '';
+  const parts = raw.split(/\s*(?:\/|／|｜|\|)\s*/).map(part => text(part, 100)).filter(Boolean);
+  if (parts.length > 1) return parts.join(' / ');
+  return byName.get(departmentKey(raw)) || raw;
+}
+
 function extractFileExt(name: string, fallback: string) {
   const match = text(name, 80).toLowerCase().match(/\.([a-z0-9]{2,8})$/);
   return match ? match[1] : fallback;
@@ -338,9 +394,16 @@ export async function handleAppApiRequest(req: Request) {
       .select('user_id,username,email,name,phone,department,dept_id,role,rbac_role,status,permissions')
       .eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
-    // users.department 只是依 dept_id 從 departments 查出來後寫回的副本，兩者可能不同步
-    // （例如帳號的單位是用其他途徑設定的）。副本空白時改以 dept_id 為準，否則頁首會
-    // 顯示「未設定單位」，但後台人員清單同一個帳號卻看得到單位，使用者無從理解。
+    // users.department 只是依 dept_id 從 departments 查出來後寫回的副本，兩者可能不同步。
+    // 以 dept_id 解析完整組織路徑，讓頁首與報修表單都顯示一階／二階單位（例如「管理部 / 總務課」）。
+    if (profile.dept_id || text(profile.department, 100)) {
+      const { data: departmentRows } = await admin.from('departments')
+        .select('dept_id,parent_id,name').eq('status', 'active').limit(5000);
+      const departmentPaths = buildDepartmentPaths((departmentRows || []) as DepartmentNode[]);
+      const path = departmentPaths.pathForId(profile.dept_id)
+        || formatDepartment(profile.department, departmentPaths.byName);
+      if (path) profile.department = path;
+    }
     if (!text(profile.department, 100) && profile.dept_id) {
       const { data: dept } = await admin.from('departments').select('name').eq('dept_id', profile.dept_id).maybeSingle();
       if (dept?.name) profile.department = dept.name;
@@ -465,6 +528,13 @@ export async function handleAppApiRequest(req: Request) {
         const inspectorName=relationName(row.users);
         return normalizeFloorFields({...row,equipment_id:equipmentName||row.equipment_id,inspector_id:inspectorName||row.inspector_id});
       });
+      if (systemKey === 'workorder' && moduleKey === 'requests') {
+        const departmentResult = await userDb.from('departments')
+          .select('dept_id,parent_id,name').eq('status', 'active').limit(5000);
+        if (departmentResult.error) console.warn('Department path lookup skipped:', departmentResult.error.message);
+        const departmentPaths = buildDepartmentPaths((departmentResult.data || []) as DepartmentNode[]);
+        rows.forEach(row => { row.department = formatDepartment(row.department, departmentPaths.byName); });
+      }
       const statusCounts=new Map<string,number>();
       rows.forEach(row=>{const status=text(row.status||row.run_status,50);if(status)statusCounts.set(status,(statusCounts.get(status)||0)+1)});
       const summary = systemKey === 'workorder' && moduleKey === 'requests'
@@ -482,7 +552,14 @@ export async function handleAppApiRequest(req: Request) {
       const requests = await userDb.from('repair_requests').select('*')
         .order('updated_at', { ascending: false }).limit(500);
       if (requests.error) throw requests.error;
-      let rows = (requests.data || []) as Array<Record<string, unknown>>;
+      const departmentResult = await userDb.from('departments')
+        .select('dept_id,parent_id,name').eq('status', 'active').limit(5000);
+      if (departmentResult.error) console.warn('Department path lookup skipped:', departmentResult.error.message);
+      const departmentPaths = buildDepartmentPaths((departmentResult.data || []) as DepartmentNode[]);
+      let rows: Array<Record<string, unknown>> = ((requests.data || []) as Array<Record<string, unknown>>).map(row => ({
+        ...row,
+        department: formatDepartment(row.department, departmentPaths.byName),
+      } as Record<string, unknown>));
       if (moduleKey !== 'requests' && rows.length) {
         const requestIds = rows.map(row => text(row.request_id, 80)).filter(Boolean);
         const latestOrders = new Map<string, Record<string, unknown>>();
@@ -537,9 +614,9 @@ export async function handleAppApiRequest(req: Request) {
     if (action === 'workorder_options') {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
       const [people, equipment, departments, contact, locations] = await Promise.all([
-        userDb.from('users').select('user_id,name,department,role,rbac_role').eq('status', 'active').order('name').limit(500),
+        userDb.from('users').select('user_id,name,department,dept_id,role,rbac_role').eq('status', 'active').order('name').limit(500),
         userDb.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
-        userDb.from('departments').select('name').eq('status', 'active').order('sort_order').limit(200),
+        userDb.from('departments').select('dept_id,parent_id,name').eq('status', 'active').order('sort_order').limit(200),
         userDb.from('users').select('phone,department').eq('user_id', profile.user_id).maybeSingle(),
         // 報修建立時要能綁場域位置，位置分析頁才有資料來源。
         userDb.from('locations').select('location_id,market_id,floor,area,detail,floor_order,area_order,detail_order,markets(name)')
@@ -550,22 +627,27 @@ export async function handleAppApiRequest(req: Request) {
       if (departments.error) throw departments.error;
       if (contact.error) throw contact.error;
       if (locations.error) throw locations.error;
+      const departmentPaths = buildDepartmentPaths((departments.data || []) as DepartmentNode[]);
       const technicians = (people.data || []).filter(row => {
         const role = text(row.rbac_role || row.role, 40);
         return role === 'technician' || role === 'maintenance';
       }).map(row => ({
         user_id: String(row.user_id),
         name: text(row.name, 100),
-        department: text(row.department, 100) || null,
+        department: departmentPaths.pathForId(row.dept_id)
+          || formatDepartment(row.department, departmentPaths.byName) || null,
       })).filter(row => row.user_id && row.name);
+      const departmentOptions = [...new Set((departments.data || [])
+        .map(row => departmentPaths.pathForId(row.dept_id) || text(row.name, 100))
+        .filter(Boolean))];
       return reply(req, { ok: true, data: {
         technicians,
         equipment: equipment.data || [],
-        departments: (departments.data || []).map(row => text(row.name, 100)).filter(Boolean),
+        departments: departmentOptions,
         locations: locations.data || [],
         contact: {
           phone: text(contact.data?.phone, 40),
-          department: text(contact.data?.department || profile.department, 100),
+          department: text(profile.department, 100) || formatDepartment(contact.data?.department, departmentPaths.byName),
         },
       } });
     }
@@ -582,6 +664,13 @@ export async function handleAppApiRequest(req: Request) {
       if (requestResult.error) throw requestResult.error;
       if (!requestResult.data) return reply(req, { ok: false, message: '找不到這筆報修案件' }, 404);
       const fullRequestId = String(requestResult.data.request_id);
+      const departmentResult = await userDb.from('departments')
+        .select('dept_id,parent_id,name').eq('status', 'active').limit(5000);
+      const departmentPaths = buildDepartmentPaths((departmentResult.data || []) as DepartmentNode[]);
+      const detailRequest = {
+        ...(requestResult.data as Record<string, unknown>),
+        department: formatDepartment(requestResult.data.department, departmentPaths.byName),
+      };
       const [orderResult, attachmentsResult, logsResult] = await Promise.all([
         userDb.from('maintenance_orders').select('*,users:assignee_id(name)').eq('request_id', fullRequestId)
           .order('created_at', { ascending: false }).limit(1).maybeSingle(),
@@ -589,6 +678,7 @@ export async function handleAppApiRequest(req: Request) {
         userDb.from('case_status_log').select('*').eq('request_id', fullRequestId).order('created_at', { ascending: true }),
       ]);
       const warnings: string[] = [];
+      if (departmentResult.error) warnings.push(`單位資訊：${text(departmentResult.error.message, 300)}`);
       if (orderResult.error) warnings.push(`維修工單：${text(orderResult.error.message, 300)}`);
       if (attachmentsResult.error) warnings.push(`附件：${text(attachmentsResult.error.message, 300)}`);
       if (logsResult.error) warnings.push(`處理歷程：${text(logsResult.error.message, 300)}`);
@@ -611,7 +701,7 @@ export async function handleAppApiRequest(req: Request) {
         else costs = costResult.data || [];
       }
       return reply(req, { ok: true, data: {
-        request: requestResult.data,
+        request: detailRequest,
         order: orderResult.data || null,
         attachments,
         logs: logsResult.data || [],
