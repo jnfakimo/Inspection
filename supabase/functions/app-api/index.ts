@@ -228,6 +228,69 @@ async function writeAudit(
   if (error) console.warn('audit write skipped:', error.message);
 }
 
+type OfficialDocumentActor = {
+  user_id: string;
+  name: string;
+  role: string;
+  dept_id?: string | null;
+  department?: string | null;
+};
+
+const OFFICIAL_MANAGER_ROLES = new Set(['sysadmin', 'admin', 'dispatcher', 'duty', 'unit_supervisor', 'mgmt_supervisor']);
+const officialDocumentManager = (actor: OfficialDocumentActor, sysadmin: boolean) => {
+  if (sysadmin || OFFICIAL_MANAGER_ROLES.has(String(actor.role || ''))) return true;
+  const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
+  return permissions.official_document_manager === true
+    || String(permissions.official_document_manager || '').toLowerCase() === 'true'
+    || permissions['officialdocs.manage'] === true;
+};
+
+const officialDocumentEvent = async (
+  db: SupabaseClient,
+  actor: OfficialDocumentActor,
+  documentId: string,
+  action: string,
+  idempotencyKey: string,
+  fields: Record<string, unknown> = {},
+) => {
+  const { data, error } = await db.from('official_document_events').insert({
+    document_id: documentId,
+    actor_id: actor.user_id,
+    actor_name: actor.name,
+    actor_role: actor.role,
+    actor_dept_id: actor.dept_id || null,
+    actor_dept_name: actor.department || null,
+    action,
+    idempotency_key: idempotencyKey,
+    ...fields,
+  }).select('event_id').maybeSingle();
+  if (error && String(error.code) === '23505') {
+    const existing = await db.from('official_document_events').select('event_id').eq('idempotency_key', idempotencyKey).maybeSingle();
+    return { duplicate: true, data: existing.data || null };
+  }
+  if (error) throw error;
+  return { duplicate: false, data };
+};
+
+async function officialDocumentNotification(
+  db: SupabaseClient,
+  documentId: string,
+  stepId: string | null,
+  recipientId: string,
+  notificationType: string,
+  title: string,
+  body: string,
+  dueAt: string | null = null,
+) {
+  const row = { document_id: documentId, step_id: stepId, recipient_id: recipientId, notification_type: notificationType, title, body, due_at: dueAt };
+  const { error } = await db.from('official_document_notifications').upsert(row, { onConflict: 'document_id,step_id,recipient_id,notification_type', ignoreDuplicates: true });
+  if (error) console.warn('official document notification skipped:', error.message);
+  const { error: legacyError } = await db.from('notifications').insert({
+    recipient_id: recipientId, event: `official_document_${notificationType}`, title, body, document_id: documentId,
+  });
+  if (legacyError) console.warn('shared notification skipped:', legacyError.message);
+}
+
 async function countQuery(query: PromiseLike<{ count: number | null; error: { message: string } | null }>) {
   const result = await query;
   if (result.error) console.warn('Count query skipped:', result.error.message);
@@ -443,6 +506,9 @@ export async function handleAppApiRequest(req: Request) {
       save_floor_model: 'admin-api:write',
       move_structuremap_marker: 'admin-api:write',
       guardpatrol_checkin: 'patrol-checkin',
+      official_documents: 'official-documents:read',
+      official_document_create: 'official-documents:write',
+      official_document_action: 'official-documents:write',
       workorder_list: 'app-api',
       workorder_prepare_upload: 'app-api',
       workorder_options: 'app-api',
@@ -505,6 +571,250 @@ export async function handleAppApiRequest(req: Request) {
       if (error) return reply(req, { ok: false, message: '密碼更新失敗，請確認密碼格式後再試' }, 400);
       await writeAudit(admin, profile.user_id, 'users', profile.user_id, 'update', null, { event_type: 'password_change' });
       return reply(req, { ok: true, message: '密碼已更新' });
+    }
+
+    // ---- SYS-09 公文傳送流程 ---------------------------------------------
+    // 公文流程的讀寫集中在這裡，前端不直接取得服務角色。每個動作都重新檢查
+    // 目前節點、部室與角色，並以狀態條件更新避免兩個視窗同時收文／簽收。
+    if (action === 'official_documents') {
+      if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      const lookup = text(body.lookup, 200).toLocaleLowerCase();
+      const [documentResult, departmentResult, peopleResult] = await Promise.all([
+        admin.from('official_documents').select('document_id,document_no,subject,originator_id,originator_dept_id,status,current_step_id,barcode_value,created_at,updated_at,closed_at').order('updated_at', { ascending: false }).limit(500),
+        admin.from('departments').select('dept_id,parent_id,name,code,level').eq('status', 'active').order('sort_order').order('name').limit(500),
+        admin.from('users').select('user_id,name,dept_id,role,rbac_role,department').eq('status', 'active').order('name').limit(1000),
+      ]);
+      if (documentResult.error) throw documentResult.error;
+      if (departmentResult.error) throw departmentResult.error;
+      if (peopleResult.error) throw peopleResult.error;
+      const allDocuments = (documentResult.data || []) as Array<Record<string, unknown>>;
+      const ids = allDocuments.map(row => id(row.document_id)).filter(Boolean);
+      const steps: Array<Record<string, unknown>> = [];
+      const events: Array<Record<string, unknown>> = [];
+      for (let index = 0; index < ids.length; index += 100) {
+        const chunk = ids.slice(index, index + 100);
+        const [stepResult, eventResult] = await Promise.all([
+          admin.from('official_document_steps').select('step_id,document_id,step_no,step_type,unit_id,unit_name,status,sent_by,sent_at,received_by,received_at,completed_by,completed_at,note,created_at').in('document_id', chunk).order('step_no'),
+          admin.from('official_document_events').select('event_id,document_id,step_id,action,from_status,to_status,actor_id,actor_name,actor_role,actor_dept_name,target_unit_id,note,details,occurred_at').in('document_id', chunk).order('occurred_at'),
+        ]);
+        if (stepResult.error) throw stepResult.error;
+        if (eventResult.error) throw eventResult.error;
+        steps.push(...((stepResult.data || []) as Array<Record<string, unknown>>));
+        events.push(...((eventResult.data || []) as Array<Record<string, unknown>>));
+      }
+      const stepsByDocument = new Map<string, Array<Record<string, unknown>>>();
+      steps.forEach(step => { const key = id(step.document_id); if (!key) return; const list = stepsByDocument.get(key) || []; list.push(step); stepsByDocument.set(key, list); });
+      const eventsByDocument = new Map<string, Array<Record<string, unknown>>>();
+      events.forEach(event => { const key = id(event.document_id); if (!key) return; const list = eventsByDocument.get(key) || []; list.push(event); eventsByDocument.set(key, list); });
+      const manager = officialDocumentManager({ ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> }, isSysadmin);
+      const visible = allDocuments.filter(row => {
+        const documentId = id(row.document_id);
+        const documentSteps = stepsByDocument.get(documentId) || [];
+        const ownUnit = profile.dept_id && (String(row.originator_dept_id || '') === String(profile.dept_id)
+          || documentSteps.some(step => String(step.unit_id || '') === String(profile.dept_id)));
+        const ownDocument = String(row.originator_id || '') === String(profile.user_id);
+        const textMatch = !lookup || [row.document_no, row.subject, row.barcode_value].some(value => String(value || '').toLocaleLowerCase().includes(lookup));
+        return textMatch && (isAdmin || manager || ownUnit || ownDocument);
+      });
+      const names = new Map<string, string>((peopleResult.data || []).map(row => [String(row.user_id), text(row.name, 100)]));
+      return reply(req, { ok: true, data: {
+        documents: visible.map(row => ({
+          ...row,
+          originator_name: names.get(String(row.originator_id)) || '',
+          steps: stepsByDocument.get(id(row.document_id)) || [],
+          events: eventsByDocument.get(id(row.document_id)) || [],
+        })),
+        departments: departmentResult.data || [],
+        people: peopleResult.data || [],
+      } });
+    }
+
+    if (action === 'official_document_create') {
+      if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      const subject = text(body.subject, 300);
+      const documentNo = text(body.document_no, 100);
+      if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
+      if (!documentNo) return reply(req, { ok: false, message: '公文編號不可空白' }, 400);
+      const documentId = nextRequestRequestId();
+      const barcode = `OD-${documentId}`;
+      const payload = {
+        document_id: documentId,
+        document_no: documentNo,
+        subject,
+        originator_id: profile.user_id,
+        originator_dept_id: profile.dept_id || null,
+        status: 'draft',
+        barcode_value: barcode,
+      };
+      const created = await admin.from('official_documents').insert(payload).select('document_id,document_no,subject,status,barcode_value,created_at').single();
+      if (created.error) {
+        if (String(created.error.code) === '23505') return reply(req, { ok: false, message: '公文編號已存在，請勿重複建立' }, 409);
+        throw created.error;
+      }
+      const actor = { ...profile, role: roleId } as OfficialDocumentActor;
+      await officialDocumentEvent(admin, actor, documentId, 'create', `${documentId}:create`, { to_status: 'draft', note: '建立公文' });
+      await officialDocumentEvent(admin, actor, documentId, 'barcode_generated', `${documentId}:barcode`, { to_status: 'draft', note: '建立公文查詢條碼', details: { barcode_value: barcode } });
+      return reply(req, { ok: true, data: created.data });
+    }
+
+    if (action === 'official_document_action') {
+      if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      const documentId = id(body.document_id);
+      const documentAction = text(body.document_action, 40);
+      const note = text(body.note, 1000) || null;
+      const idempotencyKey = text(body.idempotency_key, 120) || nextRequestRequestId();
+      const targetUnitId = id(body.target_unit_id);
+      const documentResult = await admin.from('official_documents').select('document_id,document_no,subject,originator_id,originator_dept_id,status,current_step_id,barcode_value').eq('document_id', documentId).maybeSingle();
+      if (documentResult.error) throw documentResult.error;
+      const document = documentResult.data as Record<string, unknown> | null;
+      if (!document) return reply(req, { ok: false, message: '找不到這筆公文' }, 404);
+      const prior = await admin.from('official_document_events').select('event_id,action,to_status').eq('idempotency_key', idempotencyKey).maybeSingle();
+      if (prior.data) return reply(req, { ok: true, data: { duplicate: true, status: document.status, event_id: prior.data.event_id } });
+      const stepResult = await admin.from('official_document_steps').select('step_id,document_id,step_no,step_type,unit_id,unit_name,status,sent_at,received_at,completed_at').eq('document_id', documentId).order('step_no', { ascending: false });
+      if (stepResult.error) throw stepResult.error;
+      const steps = (stepResult.data || []) as Array<Record<string, unknown>>;
+      const currentStep = steps.find(step => String(step.step_id) === String(document.current_step_id)) || null;
+      const role = roleId;
+      const actor = { ...profile, role } as OfficialDocumentActor;
+      const manager = officialDocumentManager({ ...actor, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> }, isSysadmin);
+      const inCurrentUnit = Boolean(currentStep && profile.dept_id && String(currentStep.unit_id) === String(profile.dept_id));
+      const isOriginator = String(document.originator_id) === String(profile.user_id);
+      const fail = (message: string, status = 409) => reply(req, { ok: false, message }, status);
+      const updateDocument = async (fromStatus: string | string[], patch: Record<string, unknown>) => {
+        const statuses = Array.isArray(fromStatus) ? fromStatus : [fromStatus];
+        const result = await admin.from('official_documents').update({ ...patch, updated_at: new Date().toISOString() }).eq('document_id', documentId).in('status', statuses).select('status,current_step_id,updated_at').maybeSingle();
+        if (result.error) throw result.error;
+        if (!result.data) return null;
+        return result.data as Record<string, unknown>;
+      };
+      const updateStep = async (fromStatus: string, patch: Record<string, unknown>) => {
+        if (!currentStep) return null;
+        const result = await admin.from('official_document_steps').update(patch).eq('step_id', currentStep.step_id).eq('status', fromStatus).select('step_id,status').maybeSingle();
+        if (result.error) throw result.error;
+        return result.data as Record<string, unknown> | null;
+      };
+      const unitResult = targetUnitId ? await admin.from('departments').select('dept_id,name').eq('dept_id', targetUnitId).eq('status', 'active').maybeSingle() : { data: null, error: null };
+      if (unitResult.error) throw unitResult.error;
+      if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部室', 400);
+      const unitName = text(unitResult.data?.name, 100);
+      const eventFields = (fromStatus: string | null, toStatus: string | null, stepId: string | null = currentStep ? String(currentStep.step_id) : null) => ({
+        step_id: stepId,
+        from_status: fromStatus,
+        to_status: toStatus,
+        target_unit_id: targetUnitId || (currentStep ? currentStep.unit_id : null),
+        note,
+      });
+
+      if (documentAction === 'send_co_sign') {
+        if (!manager) return fail('只有單位公文管理人員可以送出會辦', 403);
+        if (!targetUnitId) return fail('請選擇下一個會辦部室', 400);
+        if (!['draft', 'ready_for_next'].includes(String(document.status))) return fail('目前狀態不可送出會辦');
+        if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個流程節點尚未完成');
+        const stepNo = steps.reduce((max, step) => Math.max(max, Number(step.step_no) || 0), 0) + 1;
+        const createdStep = await admin.from('official_document_steps').insert({ document_id: documentId, step_no: stepNo, step_type: 'co_sign', unit_id: targetUnitId, unit_name: unitName, status: 'sent', sent_by: profile.user_id, sent_at: new Date().toISOString(), note }).select('step_id,step_no,status,unit_id,unit_name,sent_at').single();
+        if (createdStep.error) throw createdStep.error;
+        const nextStatus = 'awaiting_co_sign';
+        const updated = await updateDocument(['draft', 'ready_for_next'], { status: nextStatus, current_step_id: createdStep.data.step_id });
+        if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'send_co_sign', idempotencyKey, eventFields(String(document.status), nextStatus, String(createdStep.data.step_id)));
+        const dueAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        const recipients = await admin.from('users').select('user_id').eq('dept_id', targetUnitId).eq('status', 'active').limit(500);
+        for (const recipient of (recipients.data || []) as Array<Record<string, unknown>>) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文會辦待收文', `${document.document_no}｜${document.subject}`, dueAt);
+        return reply(req, { ok: true, data: { status: nextStatus, step: createdStep.data, event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'send_approval') {
+        if (!manager) return fail('只有單位公文管理人員可以送出陳核', 403);
+        if (!targetUnitId) return fail('請選擇陳核部室', 400);
+        if (String(document.status) !== 'ready_for_next' && !(String(document.status) === 'draft' && steps.length === 0)) return fail('所有會辦完成後才能送出陳核');
+        if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個會辦節點尚未完成');
+        const stepNo = steps.reduce((max, step) => Math.max(max, Number(step.step_no) || 0), 0) + 1;
+        const createdStep = await admin.from('official_document_steps').insert({ document_id: documentId, step_no: stepNo, step_type: 'approval', unit_id: targetUnitId, unit_name: unitName, status: 'sent', sent_by: profile.user_id, sent_at: new Date().toISOString(), note }).select('step_id,step_no,status,unit_id,unit_name,sent_at').single();
+        if (createdStep.error) throw createdStep.error;
+        const nextStatus = 'awaiting_approval';
+        const updated = await updateDocument(['draft', 'ready_for_next'], { status: nextStatus, current_step_id: createdStep.data.step_id });
+        if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'send_approval', idempotencyKey, eventFields(String(document.status), nextStatus, String(createdStep.data.step_id)));
+        const dueAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
+        const recipients = await admin.from('users').select('user_id').eq('dept_id', targetUnitId).eq('status', 'active').limit(500);
+        for (const recipient of (recipients.data || []) as Array<Record<string, unknown>>) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文陳核待收文', `${document.document_no}｜${document.subject}`, dueAt);
+        return reply(req, { ok: true, data: { status: nextStatus, step: createdStep.data, event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'receive') {
+        if (!currentStep || !inCurrentUnit) return fail('只有目前收文部室的人員可以收文', 403);
+        if (currentStep.status !== 'sent') return fail('這個流程節點已收文，請勿重複操作');
+        const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
+        if (!updatedStep) return fail('這筆公文已被其他人收文，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'receive', idempotencyKey, eventFields(String(document.status), String(document.status)));
+        return reply(req, { ok: true, data: { status: document.status, event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'co_sign_complete') {
+        if (!currentStep || currentStep.step_type !== 'co_sign' || !inCurrentUnit) return fail('只有目前會辦部室的人員可以完成會辦', 403);
+        if (currentStep.status !== 'received') return fail('完成會辦前請先收文');
+        const updatedStep = await updateStep('received', { status: 'completed', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });
+        if (!updatedStep) return fail('這個會辦節點已被完成，請重新整理');
+        const nextStatus = 'ready_for_next';
+        const updated = await updateDocument('awaiting_co_sign', { status: nextStatus, current_step_id: currentStep.step_id });
+        if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'co_sign_complete', idempotencyKey, eventFields('awaiting_co_sign', nextStatus));
+        return reply(req, { ok: true, data: { status: nextStatus, event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'approval_receive') {
+        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部室的人員可以簽收', 403);
+        if (currentStep.status !== 'sent') return fail('這筆公文已簽收，請勿重複操作');
+        const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
+        if (!updatedStep) return fail('這筆公文已被其他人簽收，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'approval_receive', idempotencyKey, eventFields(String(document.status), String(document.status)));
+        return reply(req, { ok: true, data: { status: document.status, event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'approve' || documentAction === 'return') {
+        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部室的人員可以核決', 403);
+        if (currentStep.status !== 'received') return fail('核決前請先完成陳核簽收');
+        const nextStatus = documentAction === 'approve' ? 'awaiting_originator' : 'returned';
+        const updatedStep = await updateStep('received', { status: documentAction === 'approve' ? 'completed' : 'returned', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });
+        if (!updatedStep) return fail('這筆公文已被其他人核決，請重新整理');
+        const updated = await updateDocument('awaiting_approval', { status: nextStatus, current_step_id: currentStep.step_id });
+        if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, documentAction, idempotencyKey, eventFields('awaiting_approval', nextStatus));
+        const title = documentAction === 'approve' ? '公文已核決，請原申請人收訖' : '公文退回，請原申請人補正重送';
+        await officialDocumentNotification(admin, documentId, String(currentStep.step_id), String(document.originator_id), documentAction === 'approve' ? 'approved' : 'returned', title, `${document.document_no}｜${document.subject}${note ? `｜${note}` : ''}`);
+        return reply(req, { ok: true, data: { status: nextStatus, event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'resubmit') {
+        if (!isOriginator) return fail('只有原申請人可以補正重送', 403);
+        if (String(document.status) !== 'returned') return fail('目前沒有可補正的退回公文');
+        const updated = await updateDocument('returned', { status: 'draft', current_step_id: null, closed_at: null });
+        if (!updated) return fail('這筆公文已被重新送出，請重新整理');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'resubmit', idempotencyKey, eventFields('returned', 'draft', null));
+        return reply(req, { ok: true, data: { status: 'draft', event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'originator_receive') {
+        if (!isOriginator) return fail('只有原申請人可以收訖公文', 403);
+        if (String(document.status) !== 'awaiting_originator') return fail('目前沒有待收訖的核決公文');
+        const updated = await updateDocument('awaiting_originator', { status: 'closed', closed_at: new Date().toISOString() });
+        if (!updated) return fail('這筆公文已完成收訖，請勿重複操作');
+        const event = await officialDocumentEvent(admin, actor, documentId, 'originator_receive', idempotencyKey, eventFields('awaiting_originator', 'closed', null));
+        return reply(req, { ok: true, data: { status: 'closed', event_id: event.data?.event_id } });
+      }
+
+      if (documentAction === 'barcode_generate') {
+        if (!manager && !isOriginator) return fail('只有原申請人或公文管理人員可以產生條碼', 403);
+        const currentBarcode = text(document.barcode_value, 200);
+        if (currentBarcode) return reply(req, { ok: true, data: { status: document.status, barcode_value: currentBarcode, duplicate: true } });
+        const barcode = `OD-${documentId}`;
+        const updated = await admin.from('official_documents').update({ barcode_value: barcode, updated_at: new Date().toISOString() }).eq('document_id', documentId).is('barcode_value', null).select('barcode_value').maybeSingle();
+        if (updated.error) throw updated.error;
+        const event = await officialDocumentEvent(admin, actor, documentId, 'barcode_generated', idempotencyKey, { ...eventFields(String(document.status), String(document.status), null), details: { barcode_value: barcode } });
+        return reply(req, { ok: true, data: { status: document.status, barcode_value: updated.data?.barcode_value || barcode, event_id: event.data?.event_id } });
+      }
+
+      return fail('公文流程動作無效', 400);
     }
 
     if (action === 'module_data') {

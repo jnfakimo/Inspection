@@ -45,6 +45,10 @@ const StructureMapModules = dynamic<WorkspaceProps>(
   () => import('./structuremap-gate').then((mod) => mod.StructureMapModules),
   { ssr: false, loading: moduleLoading },
 );
+const OfficialDocsWorkspace = dynamic<WorkspaceProps>(
+  () => import('./official-docs-workspace').then((mod) => mod.OfficialDocsWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'handover' || system.key === 'guardpatrol') {
@@ -64,6 +68,9 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   }
   if (system.key === 'structuremap') {
     return <StructureMapModules system={system} module={module} />;
+  }
+  if (system.key === 'officialdocs') {
+    return <OfficialDocsWorkspace system={system} module={module} />;
   }
   return <ModuleWorkspace system={system} module={module} />;
 }

@@ -5,7 +5,7 @@
 // V1 用 vis-network（CDN）畫可拖曳的物理佈局圖，節點是「專案目錄／頁面／錨點／資料庫」，
 // 網址還停在改名前的 word-cloud 且全部指向 V1 頁面。這裡改成固定佈局的內嵌 SVG：
 // 不引入第三方繪圖庫（vis-network 光是 standalone bundle 就比整個 V2 首頁還大），
-// 節點也換成 V2 現行的八個系統與其後端相依，點擊直接進到對應的 V2 系統。
+// 節點也換成 V2 現行的九個系統與其後端相依，點擊直接進到對應的 V2 系統。
 //
 // 圖是靜態關係描述，不查資料庫——它描述的是系統之間怎麼接，不是即時狀態。
 
@@ -20,11 +20,12 @@ const SYSTEMS = [
   { key: 'structuremap', code: 'SYS-06', label: '專案關係與圖臺', x: 260, y: 250 },
   { key: 'vehicle', code: 'SYS-07', label: '公務車派車', x: 480, y: 250 },
   { key: 'meetingroom', code: 'SYS-08', label: '會議室預約', x: 700, y: 250 },
+  { key: 'officialdocs', code: 'SYS-09', label: '公文傳送', x: 700, y: 360 },
 ];
 const BACKEND = [
-  { label: 'app-api / admin-api', hint: 'JWT · RBAC · 業務流程', x: 40, y: 380, w: 260 },
-  { label: 'PostgreSQL + RLS', hint: '最後一道資料庫防線', x: 330, y: 380, w: 260 },
-  { label: 'Storage · Realtime · FCM', hint: '附件、即時更新與推播', x: 620, y: 380, w: 300 },
+  { label: 'app-api / admin-api', hint: 'JWT · RBAC · 業務流程', x: 40, y: 450, w: 260 },
+  { label: 'PostgreSQL + RLS', hint: '最後一道資料庫防線', x: 330, y: 450, w: 260 },
+  { label: 'Storage · Realtime · FCM', hint: '附件、即時更新與推播', x: 620, y: 450, w: 300 },
 ];
 // 系統之間的業務關聯，與 V1 的虛線 correlations 對應。
 const LINKS: Array<[string, string, string]> = [
@@ -54,7 +55,7 @@ export function SystemRelations() {
   return <section className="panel admin-panel">
     <div className="admin-toolbar"><span>系統關係圖</span><span>點選已開放的系統方塊可直接進入；未開放的系統以灰色顯示</span></div>
     <div className="responsive-table">
-      <svg viewBox="0 0 960 470" role="group" aria-label="八個子系統與後端服務的關係圖" style={{ width: '100%', minWidth: 720, height: 'auto' }}>
+      <svg viewBox="0 0 960 540" role="group" aria-label="九個子系統與後端服務的關係圖" style={{ width: '100%', minWidth: 720, height: 'auto' }}>
         <defs>
           <marker id="rel-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
@@ -113,9 +114,9 @@ export function SystemRelations() {
         })}
 
         {/* 每個系統都往下接到後端這一層，逐條畫會變成蜘蛛網，改用一條匯流排 */}
-        <line x1="480" y1="312" x2="480" y2="350" stroke="var(--line)" strokeWidth="1.4" markerEnd="url(#rel-arrow)" color="var(--line)" />
-        <line x1="60" y1="350" x2="900" y2="350" stroke="var(--line)" strokeWidth="1.4" />
-        <text x="496" y="342" fill="var(--dim)" fontSize="11">八個系統共用同一份資料與權限</text>
+        <line x1="480" y1="312" x2="480" y2="420" stroke="var(--line)" strokeWidth="1.4" markerEnd="url(#rel-arrow)" color="var(--line)" />
+        <line x1="60" y1="420" x2="900" y2="420" stroke="var(--line)" strokeWidth="1.4" />
+        <text x="496" y="438" fill="var(--dim)" fontSize="11">九個系統共用同一份資料與權限</text>
 
         {BACKEND.map(item => <g key={item.label}>
           <rect x={item.x} y={item.y} width={item.w} height={CARD_H} rx="8"

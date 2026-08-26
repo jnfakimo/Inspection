@@ -19,7 +19,7 @@ export const PERMISSIONS = [
 export const SYSTEM_PERMISSIONS = [
   ['sys_admin', '後台管理'], ['sys_workorder', '維修／派工／完工'], ['sys_guardpatrol', '駐衛警巡檢'],
   ['sys_handover', '電子交接簿'], ['sys_equipment', '設備建置'], ['sys_structuremap', '設備圖臺'],
-  ['sys_equipment_manage', '設備與圖臺管理'], ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'],
+  ['sys_equipment_manage', '設備與圖臺管理'], ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'], ['sys_officialdocs', '公文傳送'],
 ] as const;
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
