@@ -9,6 +9,7 @@ type WorkTime={start?:string;end?:string};
 type StaffConfig={templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>;workTimes:{templates:Record<string,WorkTime>;dates:Record<string,Record<string,WorkTime>>}};
 const mins=(s:string)=>{const [h,m]=(s||"00:00").split(":").map(Number);return h*60+m;};
 const normalizeShiftName=(name:string)=>String(name||"").trim().replace(/\s*巡邏\s*$/u,"");
+const isNightShiftName=(name:string)=>/夜班|night/i.test(String(name||"").replace(/\s+/g,""));
 const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",weekday:"short",hourCycle:"h23"}).formatToParts(d).forEach(x=>p[x.type]=x.value);return p;};
 const iso=(date:string,time:string)=>new Date(`${date}T${time}:00+08:00`).toISOString();
 const previousDate=(date:string)=>{const d=new Date(`${date}T00:00:00+08:00`);d.setDate(d.getDate()-1);return localParts(d).year+"-"+localParts(d).month+"-"+localParts(d).day;};
@@ -99,10 +100,12 @@ Deno.serve(async req=>{
     }catch(_e){}
     const now=new Date(),p=localParts(now),today=`${p.year}-${p.month}-${p.day}`;
     const yesterday=previousDate(today);
+    const tomorrow=nextDate(today);
+    const dayBeforeYesterday=previousDate(yesterday);
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
     const [{data:templates,error:templateError},{data:dailyShifts,error:dailyShiftError}]=await Promise.all([
       db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").neq("status","inactive").order("sort_order"),
-      db.from("patrol_shifts").select("shift_date,name,start_time,end_time").in("shift_date",[yesterday,today]),
+      db.from("patrol_shifts").select("shift_date,name,start_time,end_time").in("shift_date",[dayBeforeYesterday,yesterday,today,tomorrow]),
     ]);
     if(templateError)throw templateError;
     if(dailyShiftError)throw dailyShiftError;
@@ -130,23 +133,26 @@ Deno.serve(async req=>{
       // 從今天與昨天找出「最近一個已超過通報結束時間」的班別。
       // 這能正確處理跨夜班，並避免 force/手動測試把尚未到期的未來班別提前送出。
       const candidates=[yesterday,today].map(shiftDate=>{
-        const daily=dailyShiftByName.get(`${shiftDate}:${rule.label}`) as {start_time?:string;end_time?:string}|undefined;
+        // 夜班的資料列／通報設定存於實際開始日，但值班日歸前一日；
+        // 因此 8/26 凌晨的夜班會以 8/25 的通知紀錄呈現。
+        const storageDate=isNightShiftName(rule.label)?nextDate(shiftDate):shiftDate;
+        const daily=dailyShiftByName.get(`${storageDate}:${rule.label}`) as {start_time?:string;end_time?:string}|undefined;
         const templateWork=staffAssignments.workTimes.templates[rule.label]||{};
-        const dateWork=staffAssignments.workTimes.dates[shiftDate]?.[rule.label]||{};
+        const dateWork=staffAssignments.workTimes.dates[storageDate]?.[rule.label]||{};
         // 排班頁的 workTimes 是通報時段唯一優先來源；每日班表的 start/end 是班別時段，
         // 沒有另外設定通報時段時才作為相容性退回值。前端與逾時推播因此使用同一時窗。
         const effectiveStart=String(dateWork.start||templateWork.start||daily?.start_time||rule.shift_start||rule.start||"00:00").slice(0,5);
         const effectiveEnd=String(dateWork.end||templateWork.end||daily?.end_time||rule.shift_end||rule.end||"00:00").slice(0,5);
         const overnight=mins(effectiveEnd)<=mins(effectiveStart);
-        const endDay=overnight?nextDate(shiftDate):shiftDate;
+        const endDay=overnight?nextDate(storageDate):storageDate;
         const notifyAt=new Date(new Date(iso(endDay,effectiveEnd)).getTime()+grace*60000);
-        return {shiftDate,effectiveStart,effectiveEnd,overnight,endDay,notifyAt};
+        return {shiftDate,storageDate,effectiveStart,effectiveEnd,overnight,endDay,notifyAt};
       }).filter(x=>x.notifyAt<=now).sort((a,b)=>b.notifyAt.getTime()-a.notifyAt.getTime());
       if(!candidates.length)continue;
-      const {shiftDate,effectiveStart,effectiveEnd,overnight,endDay}=candidates[0];
+      const {shiftDate,storageDate,effectiveStart,effectiveEnd,overnight,endDay}=candidates[0];
       const shiftWeekday=new Date(`${shiftDate}T12:00:00+08:00`).getDay();
       if(rule.days?.length&&!rule.days.includes(shiftWeekday))continue;
-      const startIso=iso(shiftDate,effectiveStart),endIso=iso(endDay,effectiveEnd);
+      const startIso=iso(storageDate,effectiveStart),endIso=iso(endDay,effectiveEnd);
       const {data:existing}=await db.from("patrol_timeout_notifications").select("notification_id,status").eq("rule_id",rule.id).eq("shift_date",shiftDate).maybeSingle();
       if(existing){results.push({rule:rule.id,msg:"already processed"});continue;}
       const {data:markers,error:markerError}=await db.from("plan_markers").select("marker_id,floor_id,label").eq("kind","patrol").eq("status","active");
@@ -157,7 +163,7 @@ Deno.serve(async req=>{
       const unchecked=(markers||[]).filter((m:{marker_id:string})=>!checkedIds.has(m.marker_id));
       const actual=[...new Set((logs||[]).map((x:{user_name:string})=>x.user_name).filter(Boolean))] as string[];
       let assignedNames:string[]=[],assignedDepartments:string[]=[];
-      const assignedIds=staffAssignments.dates?.[shiftDate]?.[rule.label]||staffAssignments.templates?.[rule.label]||[];
+      const assignedIds=staffAssignments.dates?.[storageDate]?.[rule.label]||staffAssignments.templates?.[rule.label]||[];
       if(assignedIds.length){
         const {data:users}=await db.from("users").select("user_id,name,department,dept_id").in("user_id",assignedIds);
         assignedNames=(users||[]).map((u:{name:string})=>u.name).filter(Boolean);
@@ -170,7 +176,7 @@ Deno.serve(async req=>{
       const floorCount:Record<string,number>={};unchecked.forEach((m:{floor_id:string})=>{const floor=canonicalFloor(m.floor_id)||"未設定";floorCount[floor]=(floorCount[floor]||0)+1;});
       const floorText=Object.entries(floorCount).map(([f,n])=>`${f}：${n} 點`).join("\n")||"無";
       const pointText=rule.include_points&&unchecked.length?"\n\n未完成點位：\n"+unchecked.slice(0,20).map((m:{floor_id:string;label:string})=>`${canonicalFloor(m.floor_id)||""}－${m.label||"未命名"}`).join("\n")+(unchecked.length>20?`\n另有 ${unchecked.length-20} 點`:""):"";
-      const text=`⚠️ 駐衛警巡檢逾時通知\n\n日期：${shiftDate}\n巡邏時段：${rule.label}\n巡邏時間：${effectiveStart}～${effectiveEnd}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
+      const text=`⚠️ 駐衛警巡檢逾時通知\n\n值班日：${shiftDate}${isNightShiftName(rule.label)?"（夜班隔夜）":""}\n巡邏時段：${rule.label}\n巡邏時間：${effectiveStart}～${effectiveEnd}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
       if(body.dryRun){results.push({rule:rule.id,shift:rule.label,shiftDate,start:effectiveStart,end:effectiveEnd,expected,checked,unchecked:unchecked.length,dryRun:true});continue;}
       const record={rule_id:rule.id,shift_date:shiftDate,shift_name:rule.label,scheduled_end:endIso,expected_count:expected,checked_count:checked,unchecked_count:unchecked.length,assigned_departments:assignedDepartments,assigned_names:assignedNames,actual_names:actual,status:"pending"};
       await db.from("patrol_timeout_notifications").upsert(record,{onConflict:"rule_id,shift_date"});

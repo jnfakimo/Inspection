@@ -31,12 +31,30 @@ export const PATROL_LABELS: Record<PatrolState, string> = {
   ok: '已打卡', pending: '待打卡', overdue: '逾期未打卡',
 };
 
+/** 夜班的日期歸屬：凌晨時段是前一日夜班的隔夜延續。 */
+export function isNightShiftName(name: unknown) {
+  return /夜班|night/i.test(String(name ?? '').replace(/\s+/g, ''));
+}
+
+export function patrolDateOffset(dateStr: string, days: number) {
+  const date = new Date(`${dateStr}T12:00:00+08:00`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(date);
+}
+
+/** 每日班表的資料列仍以實際開始日保存；夜班欄位顯示在前一個值班日。 */
+export function patrolStorageDate(dutyDate: string, shiftName: unknown) {
+  return isNightShiftName(shiftName) ? patrolDateOffset(dutyDate, 1) : dutyDate;
+}
+
 type Client = SupabaseClient<any, any, any>;
 export type PatrolShift = {
   shift_id: string; name: string;
   start_time: string; end_time: string;
   notify_start_time: string; notify_end_time: string;
   sort_order: number | null;
+  /** 實際班別資料列日期；夜班比 duty_date 晚一天。 */
+  shift_date: string; duty_date: string; base_date: string;
 };
 type ShiftWithBase = PatrolShift & { base: Date };
 type PatrolMarker = { marker_id: string; floor_id: string; label: string };
@@ -133,12 +151,21 @@ export function invalidatePatrolMarkers() {
  * 班別名稱與數量固定來自 patrol_shift_template；patrol_shifts 的時段是每日生效的班別時段。
  * 通報時段另由 system_settings 的 patrol_shift_staff.workTimes 提供，可依樣板或
  * 指定日期設定，沒有設定時才退回班別時段。
+ * 夜班欄位是前一日值班日的隔夜延續，因此查詢 duty date 時要讀下一日的實際資料列。
  */
 export async function getPatrolShiftsForDate(client: Client, dateStr: string): Promise<PatrolShift[]> {
-  const [{ templates, setting, timeoutRules }, overrides] = await Promise.all([
-    getBaseData(client), getOverrides(client, dateStr),
+  const [{ templates, setting, timeoutRules }, overrides, overnightOverrides] = await Promise.all([
+    getBaseData(client), getOverrides(client, dateStr), getOverrides(client, patrolDateOffset(dateStr, 1)),
   ]);
-  const overrideByName = new Map((overrides || []).map(row => [row.name, row]));
+  const overrideByKey = new Map([
+    ...(overrides || []).map(row => [`${dateStr}:${row.name}`, row] as const),
+    ...(overnightOverrides || []).map(row => [`${patrolDateOffset(dateStr, 1)}:${row.name}`, row] as const),
+  ]);
+  // 2026-08-26 以前的排班資料把夜班誤存於值班日；在新資料列建立前先相容讀取，
+  // 但仍以隔日作為畫面與時間計算的實際日期。管理員下次儲存／套用時會寫到正確日期。
+  const legacyNightOverrides = new Map((overrides || [])
+    .filter(row => isNightShiftName(row.name))
+    .map(row => [`${dateStr}:${row.name}`, row] as const));
   let workTimes: { templates: Record<string, any>; dates: Record<string, any> } = { templates: {}, dates: {} };
   try {
     const saved = JSON.parse(setting?.value || '{}').workTimes || {};
@@ -151,9 +178,14 @@ export async function getPatrolShiftsForDate(client: Client, dateStr: string): P
   } catch { /* 舊版或損壞的逾時設定不應阻斷排班顯示 */ }
 
   return (templates || []).map(template => {
-    const override = overrideByName.get(template.name);
+    const storageDate = patrolStorageDate(dateStr, template.name);
+    const override = overrideByKey.get(`${storageDate}:${template.name}`)
+      || (isNightShiftName(template.name) ? legacyNightOverrides.get(`${dateStr}:${template.name}`) : undefined);
+    const usesLegacyNightDate = isNightShiftName(template.name)
+      && !overrideByKey.has(`${storageDate}:${template.name}`)
+      && Boolean(legacyNightOverrides.get(`${dateStr}:${template.name}`));
     const templateWork = workTimes.templates[template.name] || {};
-    const dateWork = (workTimes.dates[dateStr] || {})[template.name] || {};
+    const dateWork = (workTimes.dates[usesLegacyNightDate ? dateStr : storageDate] || {})[template.name] || {};
     const configured = configuredRules.find(rule => String(rule.label || '').trim().replace(/\s*巡邏\s*$/u, '') === String(template.name || '').trim().replace(/\s*巡邏\s*$/u, '')) || {};
     // patrol_shifts／patrol_shift_template 的時間是「班別時段」；
     // system_settings.patrol_shift_staff.workTimes 才是排班頁的「通報時段」。
@@ -162,13 +194,16 @@ export async function getPatrolShiftsForDate(client: Client, dateStr: string): P
     const notifyStart = dateWork.start || templateWork.start || configured.start || shiftStart;
     const notifyEnd = dateWork.end || templateWork.end || configured.end || shiftEnd;
     return {
-      shift_id: override ? override.shift_id : `tpl:${template.template_id}`,
+      shift_id: override ? override.shift_id : `tpl:${template.template_id}:${storageDate}`,
       name: template.name,
       start_time: shiftStart,
       end_time: shiftEnd,
       notify_start_time: notifyStart,
       notify_end_time: notifyEnd,
       sort_order: template.sort_order,
+      shift_date: storageDate,
+      duty_date: dateStr,
+      base_date: storageDate,
     };
   });
 }
@@ -196,8 +231,8 @@ export async function computePatrolStatus(client: Client, dateStr?: string): Pro
   ]);
 
   const allShifts: ShiftWithBase[] = [
-    ...shiftsYesterday.map(shift => ({ ...shift, base: yesterdayBase })),
-    ...shiftsToday.map(shift => ({ ...shift, base: dayBase })),
+    ...shiftsYesterday.map(shift => ({ ...shift, base: new Date(`${shift.base_date}T00:00:00`) })),
+    ...shiftsToday.map(shift => ({ ...shift, base: new Date(`${shift.base_date}T00:00:00`) })),
   ];
 
   let relevant: ShiftWithBase | null = null;

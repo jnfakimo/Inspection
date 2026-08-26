@@ -24,7 +24,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { isDeletedShift } from '@/lib/patrol-status';
+import { isDeletedShift, isNightShiftName } from '@/lib/patrol-status';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { TimeSelect } from '@/components/TimeSelect';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
@@ -186,15 +186,30 @@ function ShiftsModule({ module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
+    const overnightStorageDate = shiftDate(date, 1);
     const [s, t, u, c, d] = await Promise.all([
-      client.from('patrol_shifts').select('*').eq('shift_date', date).order('sort_order').order('start_time'),
+      client.from('patrol_shifts').select('*').in('shift_date', [date, overnightStorageDate]).order('sort_order').order('start_time'),
       client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
       client.from('users').select('user_id,name,username,department,dept_id').eq('status', 'active').order('name').limit(2000),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
       client.from('departments').select('dept_id,name').limit(1000),
     ]);
     if (s.error || t.error || u.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error, '排班資料載入失敗')}`);
-    setShifts((s.data || []).filter(row => !isDeletedShift(row.name)));
+    const rawShifts = (s.data || []).filter(row => !isDeletedShift(row.name));
+    const storedOvernightNames = new Set(rawShifts
+      .filter(row => isNightShiftName(row.name) && String(row.shift_date) === overnightStorageDate)
+      .map(row => String(row.name)));
+    setShifts(rawShifts
+      .filter(row => {
+        if (!isNightShiftName(row.name)) return String(row.shift_date) === date;
+        // 相容 2026-08-26 前已存成值班日的舊夜班；新資料優先使用隔日列。
+        return String(row.shift_date) === overnightStorageDate
+          || (String(row.shift_date) === date && !storedOvernightNames.has(String(row.name)));
+      })
+      .map(row => {
+        const legacyNightDate = isNightShiftName(row.name) && String(row.shift_date) === date && !storedOvernightNames.has(String(row.name));
+        return { ...row, __storageDate: legacyNightDate ? overnightStorageDate : String(row.shift_date), __configDate: legacyNightDate ? date : String(row.shift_date), __dutyDate: date };
+      }));
     setTemplates(t.data || []); 
     setUsers(u.data || []);
     setDepartments(d.data || []);
@@ -223,8 +238,8 @@ function ShiftsModule({ module, profile }: Props) {
 
   const nameOf = useCallback((id: unknown) => users.find(u => u.user_id === id)?.name || String(id ?? ''), [users]);
   const namesOf = useCallback((ids: unknown) => Array.isArray(ids) && ids.length ? ids.map(nameOf).join('、') : '—', [nameOf]);
-  const workTimeOf = (scope: 'date' | 'template', name: string) => {
-    const node = scope === 'date' ? config?.workTimes?.dates?.[date]?.[name] : config?.workTimes?.templates?.[name];
+  const workTimeOf = (scope: 'date' | 'template', name: string, storageDate = date, configDate = storageDate) => {
+    const node = scope === 'date' ? config?.workTimes?.dates?.[configDate]?.[name] : config?.workTimes?.templates?.[name];
     return node?.start && node?.end ? `${node.start} ～ ${node.end}` : '—';
   };
 
@@ -246,17 +261,20 @@ function ShiftsModule({ module, profile }: Props) {
       p_work_start: String(editor.work_start || '').trim() || null,
       p_work_end: String(editor.work_end || '').trim() || null,
     };
+    const storageDate = String(editor.__newDateRow && isNightShiftName(editor.name) ? shiftDate(date, 1) : (editor.__storageDate || date));
     const { error } = isTemplate
       ? await client.rpc('save_patrol_shift_template', { p_template_id: editor.template_id || null, ...args })
-      : await client.rpc('save_patrol_shift', { p_shift_date: date, ...args });
+      : await client.rpc('save_patrol_shift', { p_shift_date: storageDate, ...args });
     if (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); return; }
     setEditor(null); await load(); setNote(isTemplate ? '班別範本已儲存' : '當日班別已儲存');
   };
 
   const openEditor = (row: Row, scope: 'date' | 'template') => {
-    const node = scope === 'date' ? config?.workTimes?.dates?.[date]?.[String(row.name)] : config?.workTimes?.templates?.[String(row.name)];
+    const storageDate = String(row.__storageDate || (isNightShiftName(row.name) ? shiftDate(date, 1) : date));
+    const configDate = String(row.__configDate || storageDate);
+    const node = scope === 'date' ? config?.workTimes?.dates?.[configDate]?.[String(row.name)] : config?.workTimes?.templates?.[String(row.name)];
     setEditor({
-      ...row, __scope: scope,
+      ...row, __scope: scope, __newDateRow: scope === 'date' && !row.shift_id, __storageDate: storageDate, __configDate: configDate, __dutyDate: date,
       start_time: hhmm(row.start_time) === '—' ? '' : hhmm(row.start_time),
       end_time: hhmm(row.end_time) === '—' ? '' : hhmm(row.end_time),
       work_start: node?.start || '', work_end: node?.end || '',
@@ -310,14 +328,14 @@ function ShiftsModule({ module, profile }: Props) {
           <span className="admin-toolbar-date"><LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></span>
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
           <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
-          <span>當日 {shifts.length} 個班別</span>
+          <span>值班日 {date}｜{shifts.length} 個班別（夜班歸前一日隔夜）</span>
         </div>
         <div className="responsive-table"><table>
           <thead><tr><th>班別名稱</th><th>班別時段</th><th>通報時段</th><th>排定人員</th><th>操作</th></tr></thead>
           <tbody>{shifts.map(row => <tr key={String(row.shift_id)}>
-            <td><strong>{fmt(row.name)}</strong></td>
+            <td><strong>{fmt(row.name)}{isNightShiftName(row.name) ? '（隔夜）' : ''}</strong></td>
             <td>{hhmm(row.start_time)} ～ {hhmm(row.end_time)}</td>
-            <td>{workTimeOf('date', String(row.name))}</td>
+            <td>{workTimeOf('date', String(row.name), String(row.__storageDate || date), String(row.__configDate || row.__storageDate || date))}</td>
             <td>{namesOf(row.assigned_user_ids)}</td>
             <td><div className="admin-row-actions">
               <button onClick={() => openEditor(row, 'date')}>編輯</button>
@@ -373,7 +391,7 @@ function ShiftsModule({ module, profile }: Props) {
           找不到單位含「{PATROL_UNIT_KEYWORDS.join('」或「')}」的啟用中人員。請到後台的人員管理確認駐警隊同仁的單位設定。
         </p>}
       </div>
-      <p className="inline-message">班別時段與通報時段是兩組獨立的值：前者存在班別資料表，後者存在排班設定的 workTimes，儲存時會各自寫入。</p>
+      <p className="inline-message">班別時段與通報時段是兩組獨立的值：前者存在班別資料表，後者存在排班設定的 workTimes；夜班資料列存於隔日，但歸屬前一日值班日。</p>
       <footer>
         <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>

@@ -28,7 +28,7 @@ import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
-import { isDeletedShift } from '@/lib/patrol-status';
+import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
 import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
@@ -158,7 +158,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const trendEnd = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     const day = today();
 
-    const [requestResult, orderResult, trendResult, markerResult, checkinResult, shiftResult] = await Promise.all([
+    const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult] = await Promise.all([
       client.from('repair_requests')
         .select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,hidden,equipment(name,category)')
         .gte('created_at', rangeStart).lte('created_at', rangeEnd).limit(5000),
@@ -168,7 +168,8 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       client.from('plan_markers').select('marker_id,floor_id,label,status').eq('kind', 'patrol').limit(5000),
       client.from('checkin_logs').select('checkin_id,target_id,label,floor_id')
         .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(5000),
-      client.from('patrol_shifts').select('shift_id,name,start_time,end_time').eq('shift_date', day).order('sort_order').order('start_time'),
+      getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
+      getPatrolShiftsForDate(client, day),
     ]);
 
     if (requestResult.error || orderResult.error) {
@@ -180,7 +181,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     // 都只會顯示「目前無進行中班別」，無從分辨；月趨勢同理，RPC 掛掉與真的沒案件
     // 都是一條全 0 的線。兩者可能同時失敗，因此一起列出而不是互相覆蓋。
     const notices: string[] = [];
-    const patrolFailure = markerResult.error || checkinResult.error || shiftResult.error;
+    const patrolFailure = markerResult.error || checkinResult.error;
     if (patrolFailure) notices.push(`當班巡檢資料載入失敗：${patrolFailure.message || '請稍後再試'}`);
     if (trendResult.error) notices.push(`月趨勢統計載入失敗（repair_monthly_counts）：${trendResult.error.message || '請稍後再試'}`);
     if (notices.length) setError(notices.join('；'));
@@ -208,13 +209,13 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       checked.add(`${canonicalFloor(row.floor_id)}|${row.label}`);
     });
     const isDone = (point: Row) => checked.has(String(point.marker_id)) || checked.has(`${point.floor_id}|${point.label}`);
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    // 已軟刪除的班別不列入當班判定，否則首頁會顯示「[已刪除] ○班」。
-    const activeShift = (shiftResult.data || []).filter(item => !isDeletedShift(item.name)).find(item => {
-      const toMinutes = (value: unknown) => { const [h, m] = String(value).slice(0, 5).split(':').map(Number); return (h || 0) * 60 + (m || 0); };
-      const start = toMinutes(item.start_time), end = toMinutes(item.end_time);
-      return end > start ? nowMinutes >= start && nowMinutes <= end : nowMinutes >= start || nowMinutes <= end;
-    });
+    // 已軟刪除的班別不列入當班判定，並與巡檢打卡矩陣共用「夜班歸前一日、實際日期為隔日」的時間軸。
+    // 交界時刻若前一班的結束與下一班的開始重疊，取開始時間較晚的班別。
+    const patrolSchedules = [...(patrolYesterdayResult || []), ...(patrolTodayResult || [])]
+      .filter(item => !isDeletedShift(item.name));
+    const activeShift = patrolSchedules.map(item => ({ item, range: shiftRange(item, new Date(`${item.base_date}T00:00:00`)) }))
+      .filter(({ range }) => now >= range.start && now <= range.end)
+      .sort((a, b) => b.range.start.getTime() - a.range.start.getTime())[0]?.item;
     const floorMap: Record<string, number> = {};
     points.filter(point => !isDone(point)).forEach(point => {
       const key = String(point.floor_id || '未分類');
@@ -222,7 +223,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     });
     setPatrol({
       points: points.length, done: points.filter(isDone).length,
-      shift: activeShift ? `${activeShift.name} ${String(activeShift.start_time).slice(0, 5)}–${String(activeShift.end_time).slice(0, 5)}` : '',
+      shift: activeShift ? `${activeShift.name}${isNightShiftName(activeShift.name) ? '（隔夜）' : ''} ${String(activeShift.start_time).slice(0, 5)}–${String(activeShift.end_time).slice(0, 5)}` : '',
       floors: Object.entries(floorMap).sort((a, b) => b[1] - a[1]),
     });
 
