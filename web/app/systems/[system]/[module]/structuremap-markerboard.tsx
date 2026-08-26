@@ -209,24 +209,6 @@ export function MarkerBoardModule({ profile }: Props) {
     (async () => {
       // 3D建模系統輸出的 PNG 將青色線條烘在檔案內。整合標記系統必須與平面模型圖、
       // 3D模型圖共用同一份預處理：一般版重畫為黑線，科技版保留青色但濾掉光暈。
-      // 逐張處理可避免七個樓層的高解析畫布同時占用大量記憶體。
-      const preparedFloors: Array<{ floor: FloorSource; source: string }> = [];
-      for (let index = 0; index < floors.length; index += 1) {
-        if (disposed) break;
-        const floor = floors[index];
-        setProgress({
-          pct: Math.min(18, 8 + Math.round((index + 1) / floors.length * 10)),
-          msg: theme === 'light' ? '轉換一般版黑線圖…' : '整理科技版線條…',
-        });
-        const prepared = await preparePlanObjectUrl(floor.url, theme);
-        if (prepared) preparedUrls.push(prepared);
-        preparedFloors.push({ floor, source: prepared || floor.url });
-      }
-      if (disposed) {
-        preparedUrls.forEach(url => URL.revokeObjectURL(url));
-        return;
-      }
-
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
       const token = (name: string, fallback: string) =>
@@ -245,31 +227,6 @@ export function MarkerBoardModule({ profile }: Props) {
         gestureSettingsMouse: { flickEnabled: true, flickMomentum: 0.4 },
       });
       viewerRef.current = viewer;
-
-      let loaded = 0;
-      const done = () => {
-        loaded += 1;
-        setProgress({ pct: Math.min(96, 20 + loaded * (76 / floors.length)), msg: '載入平面圖…' });
-        if (loaded < floors.length) return;
-        setProgress({ pct: 100, msg: '完成' });
-        window.setTimeout(() => setProgress(null), 420);
-        const selectedFloor = curFloorRef.current || floors[0].id;
-        floors.forEach(floor => {
-          if (floor.index == null) return;
-          viewer.world.getItemAt(floor.index)?.setOpacity(floor.id === selectedFloor ? 1 : 0);
-        });
-        if (!curFloorRef.current) setCurFloor(selectedFloor);
-        // 主題切換會重建 viewer；即使樓層與標記資料都沒變，也要重新掛回圖釘覆蓋層。
-        setViewerGeneration(value => value + 1);
-      };
-      // 全部樓層載進同一個 world，之後只切換透明度。
-      preparedFloors.forEach(({ floor, source }) => {
-        viewer.addTiledImage({
-          tileSource: { type: 'image', url: source }, x: 0, y: 0, width: 1, opacity: 0,
-          success: (event: any) => { floor.index = viewer.world.getIndexOfItem(event.item); done(); },
-          error: () => done(),
-        });
-      });
 
       const syncHud = () => {
         if (!viewer.viewport) return;
@@ -299,6 +256,56 @@ export function MarkerBoardModule({ profile }: Props) {
           setPanelPinned(pinned => { if (!pinned) setPanelOpen(false); return pinned; });
         }
       });
+
+      const initialFloor = curFloorRef.current || floors[0].id;
+      if (!curFloorRef.current) {
+        curFloorRef.current = initialFloor;
+        setCurFloor(initialFloor);
+      }
+      const orderedFloors = [
+        floors.find(floor => floor.id === initialFloor) || floors[0],
+        ...floors.filter(floor => floor.id !== initialFloor),
+      ];
+      const addPreparedFloor = async (floor: FloorSource, foreground: boolean) => {
+        if (disposed) return;
+        if (foreground || floor.id === curFloorRef.current) {
+          setProgress({
+            pct: foreground ? 18 : 55,
+            msg: theme === 'light' ? `轉換${floor.label}為黑線圖…` : `整理${floor.label}科技版線條…`,
+          });
+        }
+        const prepared = await preparePlanObjectUrl(floor.url, theme);
+        if (disposed) {
+          if (prepared) URL.revokeObjectURL(prepared);
+          return;
+        }
+        if (prepared) preparedUrls.push(prepared);
+        const source = prepared || floor.url;
+        await new Promise<void>(resolve => viewer.addTiledImage({
+          tileSource: { type: 'image', url: source }, x: 0, y: 0, width: 1, opacity: 0,
+          success: (event: any) => {
+            floor.index = viewer.world.getIndexOfItem(event.item);
+            if (floor.id === curFloorRef.current) {
+              event.item.setOpacity(1);
+              setProgress(null);
+              // 主題切換會重建 viewer；即使資料沒變，也要重新掛回圖釘覆蓋層。
+              setViewerGeneration(value => value + 1);
+            }
+            resolve();
+          },
+          error: () => {
+            if (floor.id === curFloorRef.current) {
+              setProgress({ pct: 100, msg: `${floor.label}平面圖載入失敗，請重新整理頁面` });
+            }
+            resolve();
+          },
+        }));
+      };
+
+      // 目前樓層先完成並解除載入遮罩，其餘樓層在背景逐張轉換，避免首次進頁等待七層。
+      for (let index = 0; index < orderedFloors.length; index += 1) {
+        await addPreparedFloor(orderedFloors[index], index === 0);
+      }
     })();
     return () => {
       disposed = true;
@@ -316,11 +323,19 @@ export function MarkerBoardModule({ profile }: Props) {
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || !curFloor) return;
+    let available = false;
     floors.forEach(floor => {
       if (floor.index == null) return;
       const item = viewer.world.getItemAt(floor.index);
-      if (item) item.setOpacity(floor.id === curFloor ? 1 : 0);
+      if (item) {
+        item.setOpacity(floor.id === curFloor ? 1 : 0);
+        if (floor.id === curFloor) available = true;
+      }
     });
+    if (!available) {
+      const floor = floors.find(item => item.id === curFloor);
+      setProgress({ pct: 55, msg: `正在準備${floor?.label || curFloor}平面圖…` });
+    } else setProgress(null);
     setDetail(null);
   }, [curFloor, floors]);
 
