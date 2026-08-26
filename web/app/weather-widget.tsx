@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 // 版面微調集中在 web/lib/weather-map-tuning.ts，那支檔案不含邏輯，可直接改數字。
-import { COAST_MARGIN, MARKER_MIN_GAP, COUNTY_MARGIN_OFFSET } from '@/lib/weather-map-tuning';
+import { COAST_MARGIN, MARKER_MIN_GAP, COUNTY_MARGIN_OFFSET, COUNTY_MARKER_POSITIONS } from '@/lib/weather-map-tuning';
 
 type Row = Record<string, any>;
 
@@ -76,7 +76,7 @@ function coastAnchor(
  * 把圖示往各自的縣市中心拉近，再用簡單的鬆弛法把過近的推開。
  * 推開時兩點各退一半，方向沿著連線，所以整體排列仍保持原本的方位關係。
  */
-function layoutMarkers(points: Array<{ name: string; x: number; y: number }>) {
+function layoutMarkers(points: Array<{ name: string; x: number; y: number; manual?: boolean }>) {
   for (let round = 0; round < 60; round += 1) {
     let adjusted = false;
     for (let i = 0; i < points.length; i += 1) {
@@ -85,11 +85,19 @@ function layoutMarkers(points: Array<{ name: string; x: number; y: number }>) {
         const dy = points[j].y - points[i].y;
         const distance = Math.hypot(dx, dy) || 0.001;
         if (distance >= MARKER_MIN_GAP) continue;
-        const push = (MARKER_MIN_GAP - distance) / 2;
         const ux = dx / distance;
         const uy = dy / distance;
-        points[i].x -= ux * push; points[i].y -= uy * push;
-        points[j].x += ux * push; points[j].y += uy * push;
+        const gap = MARKER_MIN_GAP - distance;
+        if (points[i].manual && points[j].manual) continue;
+        if (points[i].manual) {
+          points[j].x += ux * gap; points[j].y += uy * gap;
+        } else if (points[j].manual) {
+          points[i].x -= ux * gap; points[i].y -= uy * gap;
+        } else {
+          const push = gap / 2;
+          points[i].x -= ux * push; points[i].y -= uy * push;
+          points[j].x += ux * push; points[j].y += uy * push;
+        }
         adjusted = true;
       }
     }
@@ -131,7 +139,7 @@ export function WeatherWidget() {
   const [error, setError] = useState('');
   const [mapSvg, setMapSvg] = useState<string>('');
   const [countyCenters, setCountyCenters] = useState<Record<string, [number, number]>>({});
-  // 依台灣輪廓量出來的圖示落點；地圖尚未渲染前為空，render 會退回比例插值。
+  // 依台灣輪廓量出的自動落點；有手動定位時由 COUNTY_MARKER_POSITIONS 優先取用。
   const [coastSpots, setCoastSpots] = useState<Record<string, [number, number]>>({});
   const mapGroupRef = useRef<SVGGElement>(null);
   const [townsOpen, setTownsOpen] = useState(false);
@@ -282,11 +290,12 @@ export function WeatherWidget() {
             {(() => {
             const placed = layoutMarkers(COUNTIES.flatMap(name => {
               const center = countyCenters[name];
-              const outer = MARKER_POSITIONS[name];
+              const outer = COUNTY_MARKER_POSITIONS[name] || MARKER_POSITIONS[name];
               if (!center || !outer) return [];
-              const anchored = coastSpots[name];
+              const manual = COUNTY_MARKER_POSITIONS[name];
+              const anchored = manual || coastSpots[name];
               return [anchored
-                ? { name, x: anchored[0], y: anchored[1] }
+                ? { name, x: anchored[0], y: anchored[1], manual: Boolean(manual) }
                 : {
                   name,
                   x: center[0] + (outer[0] - center[0]) * MARKER_PULL,
@@ -295,7 +304,7 @@ export function WeatherWidget() {
             }));
             return COUNTIES.map(name => {
               const data = (summary?.counties || []).find((r: Row) => r.county.replace('台', '臺') === name) || {};
-              const pos = MARKER_POSITIONS[name];
+              const pos = COUNTY_MARKER_POSITIONS[name] || MARKER_POSITIONS[name];
               const cx = countyCenters[name];
               if (!pos || !cx) return null;
               
