@@ -21,6 +21,7 @@ import { AppShell } from '@/components/AppShell';
 import { LEGACY_BASE } from '@/lib/config';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { getSupabase } from '@/lib/supabase';
+import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -150,7 +151,7 @@ export function PointListModule({ module, profile }: Props) {
   };
 
   const locate = (point: Point) => {
-    location.href = `${LEGACY_BASE}/b1_integrated_marker_system.html?marker=${encodeURIComponent(point.marker_id)}`;
+    location.href = `${STRUCTUREMAP_ROUTES.markers}?marker=${encodeURIComponent(point.marker_id)}`;
   };
 
   /**
@@ -192,12 +193,12 @@ export function PointListModule({ module, profile }: Props) {
           <p>全樓層巡邏點標示彙總</p>
         </div>
         <div className="v1list-nav-links">
-          <a href={`${LEGACY_BASE}/modeler.html?v=2`}>3D建模系統</a>
-          <a href={`${LEGACY_BASE}/arealist.html`}>區域位置表</a>
-          <a href={`${LEGACY_BASE}/b1_integrated_marker_system.html`}>整合標記系統</a>
-          <a href={`${LEGACY_BASE}/patrollist.html`}>巡邏點清單</a>
-          <a href={`${LEGACY_BASE}/guardpatrol.html`}>駐衛警巡檢系統</a>
-          <a href={`${LEGACY_BASE}/admin.html`}>後台</a>
+          <a href={STRUCTUREMAP_ROUTES.modeler}>3D建模系統</a>
+          <a href={STRUCTUREMAP_ROUTES.areas}>區域位置表</a>
+          <a href={STRUCTUREMAP_ROUTES.markers}>整合標記系統</a>
+          <a href={STRUCTUREMAP_ROUTES.patrolPoints}>巡邏點清單</a>
+          <a href={STRUCTUREMAP_ROUTES.patrolHome}>駐衛警巡檢系統</a>
+          <a href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
         </div>
       </nav>
 

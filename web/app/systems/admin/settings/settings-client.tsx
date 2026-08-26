@@ -121,9 +121,9 @@ const cards: SettingsCard[] = [
   },
   {
     id: 'SYS-05',
-    title: '3D 建模',
-    english: '3D MODELING',
-    description: '前往設備與樓層模型管理，維護圖臺所需模型。',
+    title: '圖資專案設定',
+    english: 'MAP PROJECT',
+    description: '統一管理 3D 建模、平面圖、3D 圖、標記與巡檢雲臺的共用圖資。',
     icon: '/Inspection/assets/system-icons/equipment-icon.png',
     accent: '#d14e78',
     href: '/systems/structuremap/models/',

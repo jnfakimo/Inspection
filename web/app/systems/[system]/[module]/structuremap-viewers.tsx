@@ -27,6 +27,7 @@ import { allowedActions } from '@/lib/shared-actions';
 import { canonicalFloor } from '@/lib/floor';
 import { floorOrder, floorTextureUrl, preparePlanObjectUrl } from './floor-stack-3d';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -404,16 +405,16 @@ function Floor2DViewer({ module, profile }: Props) {
           </a>)}
       </nav>
       <span className="tb-space" />
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/guardpatrol/map3d/">立體巡檢雲臺</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor3d}>3D模型圖</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.patrolMap3d}>立體巡檢雲臺</a>
     </div>
 
     {/* OSD 自己會在 host 裡增刪節點，所以空狀態訊息放在 host 外面、由 .f3-stage 承載。 */}
     <div className="f3-stage">
       <div ref={hostRef} className="f2-osd" />
       {!model && !busy && <p className="f3-empty">
-        這個樓層沒有對應的平面材質，請先於「模型管理」設定 image_path。
+        這個樓層尚未建立平面圖，請先至「圖資專案設定」更新該樓層圖資。
       </p>}
     </div>
 

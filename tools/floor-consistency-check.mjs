@@ -40,4 +40,43 @@ for (const relative of requiredSources) {
   const file = fs.readFileSync(path.join(root, relative), 'utf8');
   if (!file.includes('canonicalFloor')) throw new Error(`${relative} 未接入共用樓層正規化規則`);
 }
-console.log('樓層代碼一致性檢查通過：B1/B1F、數字樓層與 RF/頂樓均使用同一規則。');
+
+// 3D 建模系統是 V2 圖資的唯一來源。這些檢查防止新頁面改回靜態圖、
+// 公開網址或 V1 頁面，導致同一樓層在整合標記、平面圖與 3D 圖不同步。
+const projectReaders = [
+  'web/app/systems/[system]/[module]/structuremap-markerboard.tsx',
+  'web/app/systems/[system]/[module]/structuremap-viewers.tsx',
+  'web/app/systems/[system]/[module]/structuremap-floor3d.tsx',
+  'web/app/systems/[system]/[module]/patrol-map3d.tsx',
+];
+for (const relative of projectReaders) {
+  const file = fs.readFileSync(path.join(root, relative), 'utf8');
+  if (!file.includes("from('floor_models')")) throw new Error(`${relative} 未直接讀取 3D 建模專案`);
+  if (!file.includes('signFloorplanPaths')) throw new Error(`${relative} 未使用私有圖資的短效連結`);
+}
+
+const modeler = fs.readFileSync(path.join(root, 'web/app/systems/structuremap/modeler/modeler-client.tsx'), 'utf8');
+for (const token of ["storage.from('floorplans')", "invokeAppApi('save_floor_model'", 'image_path: path']) {
+  if (!modeler.includes(token)) throw new Error(`3D 建模系統未完整寫入共用圖資：缺少 ${token}`);
+}
+
+const v2NavigationSources = [
+  'web/app/systems/[system]/[module]/structuremap-modelhub.tsx',
+  'web/app/systems/[system]/[module]/structuremap-markerboard.tsx',
+  'web/app/systems/[system]/[module]/structuremap-arealist.tsx',
+  'web/app/systems/[system]/[module]/patrol-pointlist.tsx',
+];
+const forbiddenLegacyDestinations = [
+  'modeler.html', 'arealist.html', 'b1_integrated_marker_system.html',
+  'floor3d.html', 'patrollist.html', 'guardpatrol.html', 'admin.html',
+];
+for (const relative of v2NavigationSources) {
+  const file = fs.readFileSync(path.join(root, relative), 'utf8');
+  for (const legacy of forbiddenLegacyDestinations) {
+    if (file.includes('${LEGACY_BASE}/' + legacy)) {
+      throw new Error(`${relative} 仍導向 V1 圖資功能：${legacy}`);
+    }
+  }
+}
+
+console.log('樓層與圖資一致性檢查通過：代碼轉換統一，V2 標記／平面圖／3D 圖／巡檢雲臺共用 3D 建模專案。');

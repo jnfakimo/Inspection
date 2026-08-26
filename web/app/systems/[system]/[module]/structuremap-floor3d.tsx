@@ -27,6 +27,7 @@ import { allowedActions } from '@/lib/shared-actions';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { Profile } from '@/types/app';
 
 type Props = { profile: Profile };
@@ -196,9 +197,9 @@ export function Floor3DBoardModule({ profile }: Props) {
           </a>)}
       </nav>
       <span className="tb-space" />
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/">3D模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/">平面模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/guardpatrol/map3d/">立體巡檢雲臺</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor2d}>平面樓層圖</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.patrolMap3d}>立體巡檢雲臺</a>
     </div>
 
     <div className="f3-stage">

@@ -376,7 +376,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
           <Link href="/systems/structuremap/modeler/">3D建模系統</Link>
           <Link href="/systems/structuremap/areas/">區域位置表</Link>
           <Link href="/systems/structuremap/markers/">整合標記系統</Link>
-          <Link href="/systems/structuremap/models/">← 返回上一層</Link>
+          <Link href="/systems/structuremap/models/">圖資專案設定</Link>
         </div>
       </nav>
 

@@ -20,8 +20,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-markerboard.css';
 import './structuremap-pin.css';
-import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
+import { MARKET_ID } from '@/lib/config';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { errorMessage } from '@/components/admin/shared';
 import {
@@ -615,10 +616,10 @@ export function MarkerBoardModule({ profile }: Props) {
       <span className="tb-sep" />
       <span className="tb-title">整合標記系統</span>
       <span className="tb-space" />
-      <a className="tb-back" href={`${LEGACY_BASE}/modeler.html?v=2`}>3D建模系統</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/areas/">區域位置表</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/markers/">整合標記系統</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/models/">後台</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.modeler}>3D建模系統</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor2d}>平面樓層圖</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor3d}>3D模型圖</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
       <button className="mb-panel-toggle" onClick={() => setPanelOpen(open => !open)}>☰ 標記選單</button>
     </div>
 

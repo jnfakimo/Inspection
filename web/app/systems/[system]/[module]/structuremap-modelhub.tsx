@@ -1,10 +1,10 @@
 'use client';
 
-// SYS-06「模型管理」＝ V1 `admin.html#modelhub` 的 3D建模系統 hub。
+// SYS-06「圖資專案設定」是 3D 建模、平面圖、3D 圖與標記圖臺的共用入口。
 //
-// 這一頁不做資料維護，只有兩件事：把五個子系統的入口排成圖卡，以及算出空間主檔
-// 與平面圖標記的介接覆蓋率。HUB-01 已改接 React／Next.js 的 DXF 建模頁；其餘入口
-// 仍維持 V1 目的地，避免在本次單頁遷移中改變既有功能範圍。
+// 這一頁不做資料維護，只有兩件事：把 V2 圖資子系統入口排成圖卡，以及算出空間主檔
+// 與平面圖標記的介接覆蓋率。所有入口都必須留在 V2；3D 建模頁寫入的樓層圖資是
+// 整合標記、平面樓層、3D 模型與立體巡檢雲臺的唯一來源。
 //
 // 統計沿用 V1 的兩支查詢：floor_spaces 取啟用中的空間主檔，plan_markers 取啟用中
 // 且已綁定 space_id 的標記，兩邊取交集算已標記數。兩張表的讀取權限由
@@ -15,8 +15,9 @@ import '@/app/admin-workspace.css';
 import './structuremap-modelhub.css';
 import { AppShell } from '@/components/AppShell';
 import { errorMessage } from '@/components/admin/shared';
-import { LEGACY_BASE, MARKET_ID } from '@/lib/config';
+import { MARKET_ID } from '@/lib/config';
 import { getSupabase } from '@/lib/supabase';
+import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -43,27 +44,32 @@ const HUB_CARDS: readonly HubCard[] = [
   {
     code: 'HUB-01', accent: 'pink', icon: 'equipment-icon.png', title: '3D建模系統',
     description: ['上傳 DXF 更新樓層平面圖', '同步更新 3D 立體模型'],
-    enter: '▶ 第一步：進入建模', href: '/Inspection/v2/systems/structuremap/modeler/',
+    enter: '▶ 第一步：進入建模', href: STRUCTUREMAP_ROUTES.modeler,
   },
   {
     code: 'HUB-02', accent: 'cyan', icon: 'admin-icon.png', title: '區域位置表',
     description: ['建立樓層與空間名稱主檔', '空間是否使用 / 匯入匯出'],
-    enter: '▶ 第二步：建立主檔', href: `${LEGACY_BASE}/arealist.html`,
+    enter: '▶ 第二步：建立主檔', href: STRUCTUREMAP_ROUTES.areas,
   },
   {
     code: 'HUB-03', accent: 'purple', icon: 'guardpatrol-icon.png', title: '巡邏點清單',
     description: ['讀取全樓層巡邏點標示資料', '彙總檢視與快速定位'],
-    enter: '▶ 檢視巡邏點', href: `${LEGACY_BASE}/patrollist.html`,
+    enter: '▶ 檢視巡邏點', href: STRUCTUREMAP_ROUTES.patrolPoints,
   },
   {
     code: 'HUB-04', accent: 'green', icon: 'handover-icon.png', title: '整合標記系統',
     description: ['讀取區域位置表空間主檔', '平面圖標記與位置定位'],
-    enter: '▶ 第三步：標記定位', href: `${LEGACY_BASE}/b1_integrated_marker_system.html`,
+    enter: '▶ 第三步：標記定位', href: STRUCTUREMAP_ROUTES.markers,
   },
   {
     code: 'HUB-05', accent: 'amber', icon: 'equipment-icon.png', title: '3D模型圖',
     description: ['統一 3D 立體模型資料來源', '供後續多系統介接應用'],
-    enter: '▶ 檢視 3D 模型', href: `${LEGACY_BASE}/floor3d.html`,
+    enter: '▶ 檢視 3D 模型', href: STRUCTUREMAP_ROUTES.floor3d,
+  },
+  {
+    code: 'HUB-06', accent: 'cyan', icon: 'settings-icon.png', title: '平面樓層圖',
+    description: ['直接讀取 3D 建模專案圖資', '與標記及 3D 模型共用樓層'],
+    enter: '▶ 檢視平面圖', href: STRUCTUREMAP_ROUTES.floor2d,
   },
 ];
 
@@ -130,7 +136,7 @@ export function ModelHubModule({ module, profile }: Props) {
 
       {note && <p className="inline-message danger" role="status">{note}</p>}
 
-      <p className="modelhub-note">■ 3D-MODELER v1.0 · 點選卡片進入子系統</p>
+      <p className="modelhub-note">■ V2 共用圖資專案 · 點選卡片進入子系統</p>
 
       <nav className="modelhub-card-grid" aria-label="3D建模系統子系統入口">
         {HUB_CARDS.map(card => <a
@@ -148,9 +154,9 @@ export function ModelHubModule({ module, profile }: Props) {
 
       <section className="modelhub-bridge" aria-labelledby="modelhub-bridge-title">
         <h2 className="modelhub-bridge-title" id="modelhub-bridge-title">介接關係</h2>
-        <p className="modelhub-bridge-flow">3D建模系統 <span>→</span> 區域位置表 <span>→</span> 整合標記系統</p>
+        <p className="modelhub-bridge-flow">3D建模系統 <span>→</span> 共用圖資專案 <span>→</span> 平面圖／3D圖／標記／巡檢雲臺</p>
         <p className="modelhub-bridge-text">
-          先於 3D建模系統更新平面與立體模型，再於區域位置表建立空間主檔，整合標記系統依同一組空間代碼對應標記位置。
+          3D 建模系統是唯一圖資來源；更新樓層後，整合標記、平面樓層、3D 模型與立體巡檢雲臺會共用同一份專案圖資。
         </p>
         <ul className="modelhub-stats" aria-busy={busy}>
           {STAT_ITEMS.map(item => <li key={item.key} className="modelhub-stat">

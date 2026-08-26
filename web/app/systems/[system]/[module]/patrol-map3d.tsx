@@ -19,6 +19,7 @@ import './structuremap-floor3d.css';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import { errorMessage, type Row } from '@/components/admin/shared';
 import { allowedActions } from '@/lib/shared-actions';
 import { canonicalFloor } from '@/lib/floor';
@@ -141,9 +142,9 @@ export function PatrolMap3DModule({ module, profile }: Props) {
       </nav>
       <span className="tb-space" />
       {/* 帶 ?kind=patrol：從駐衛警巡檢跳過去只看巡邏點，不摻雜設備、報修、空間等標記。 */}
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor3d/?kind=patrol">3D模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/structuremap/floor2d/?kind=patrol">平面模型圖</a>
-      <a className="tb-back" href="/Inspection/v2/systems/guardpatrol/map3d/">立體巡檢雲臺</a>
+      <a className="tb-back" href={`${STRUCTUREMAP_ROUTES.floor3d}?kind=patrol`}>3D模型圖</a>
+      <a className="tb-back" href={`${STRUCTUREMAP_ROUTES.floor2d}?kind=patrol`}>平面樓層圖</a>
+      <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
     </div>
 
     <div className="f3-stage">
@@ -157,7 +158,7 @@ export function PatrolMap3DModule({ module, profile }: Props) {
         apiRef={apiRef}
       />}
       {!busy && !models.length && <p className="f3-empty">
-        尚未設定樓層模型，請至圖臺系統的「模型管理」建立。
+        尚未設定樓層圖資，請至「圖資專案設定」由 3D 建模系統建立。
       </p>}
     </div>
 

@@ -1,6 +1,6 @@
-/* SYS-06 模型管理｜3D建模系統 hub
+/* SYS-06 圖資專案設定｜3D建模與圖臺共用 hub
  *
- * 版型與 V1 `admin.html#modelhub` 對齊：五張子系統圖卡 → 介接關係說明 → 三格統計。
+ * 六張 V2 子系統圖卡 → 介接關係說明 → 三格統計。
  *
  * 兩處與 V1 的原始寫法不同，都是為了在 V2 成立，不是版型調整：
  *
@@ -13,7 +13,7 @@
  */
 
 .modelhub-page {
-  /* 科技版沿用 V1 的原始色值，逐張對應 HUB-01～HUB-05。 */
+  /* 科技版沿用原有的識別色，HUB-06 復用平面圖的青色。 */
   --modelhub-pink: #ff5ea0;
   --modelhub-cyan: #00d4ff;
   --modelhub-purple: #c77dff;
