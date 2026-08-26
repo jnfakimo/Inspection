@@ -287,6 +287,9 @@ export function MarkerBoardModule({ profile }: Props) {
         await new Promise<void>(resolve => viewer.addTiledImage({
           tileSource: { type: 'image', url: source }, x: 0, y: 0, width: 1, opacity: 0,
           success: (event: any) => {
+            // 主題切換可能在背景樓層解碼期間發生；舊 viewer 的延遲回呼不可再改寫
+            // 新 viewer 共用的樓層索引與載入狀態，否則新圖會被錯誤索引切成透明。
+            if (disposed || viewerRef.current !== viewer) { resolve(); return; }
             floor.index = viewer.world.getIndexOfItem(event.item);
             if (floor.id === curFloorRef.current) {
               event.item.setOpacity(1);
@@ -297,6 +300,7 @@ export function MarkerBoardModule({ profile }: Props) {
             resolve();
           },
           error: () => {
+            if (disposed || viewerRef.current !== viewer) { resolve(); return; }
             if (floor.id === curFloorRef.current) {
               setProgress({ pct: 100, msg: `${floor.label}平面圖載入失敗，請重新整理頁面` });
             }
