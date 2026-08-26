@@ -153,6 +153,29 @@ function nextRequestRequestId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+function taipeiDateKey(value = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(value);
+  const get = (type: string) => parts.find(part => part.type === type)?.value || '';
+  return `${get('year')}${get('month')}${get('day')}`;
+}
+
+async function nextOfficialDocumentNo(db: SupabaseClient, dateKey: string, minimumSerial = 1) {
+  const prefix = text(dateKey, 8);
+  const { data, error } = await db.from('official_documents')
+    .select('document_no').like('document_no', `${prefix}%`).limit(2000);
+  if (error) throw error;
+  const highest = (data || []).reduce((max, row) => {
+    const value = String(row.document_no || '');
+    if (!new RegExp(`^${prefix}\\d{3}$`).test(value)) return max;
+    return Math.max(max, Number(value.slice(-3)) || 0);
+  }, 0);
+  const serial = Math.max(highest + 1, minimumSerial);
+  if (serial > 999) throw new Error('今日公文編號已達 999 號，請聯絡系統管理員');
+  return `${prefix}${String(serial).padStart(3, '0')}`;
+}
+
 function extractClientIp(req: Request) {
   const raw = req.headers.get('cf-connecting-ip')
     || req.headers.get('x-real-ip')
@@ -236,7 +259,8 @@ type OfficialDocumentActor = {
   department?: string | null;
 };
 
-const OFFICIAL_MANAGER_ROLES = new Set(['sysadmin', 'admin', 'dispatcher', 'duty', 'unit_supervisor', 'mgmt_supervisor']);
+const OFFICIAL_MANAGER_ROLES = new Set(['sysadmin', 'admin', 'dispatcher', 'duty']);
+const OFFICIAL_PEOPLE_VIEWER_ROLES = new Set([...OFFICIAL_MANAGER_ROLES, 'unit_supervisor', 'mgmt_supervisor']);
 const officialDocumentManager = (actor: OfficialDocumentActor, sysadmin: boolean) => {
   if (sysadmin || OFFICIAL_MANAGER_ROLES.has(String(actor.role || ''))) return true;
   const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
@@ -244,6 +268,32 @@ const officialDocumentManager = (actor: OfficialDocumentActor, sysadmin: boolean
     || String(permissions.official_document_manager || '').toLowerCase() === 'true'
     || permissions['officialdocs.manage'] === true;
 };
+const officialDocumentPeopleViewer = (actor: OfficialDocumentActor, sysadmin: boolean) => {
+  if (sysadmin || OFFICIAL_PEOPLE_VIEWER_ROLES.has(String(actor.role || ''))) return true;
+  const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
+  return permissions.official_document_people_view === true
+    || permissions['officialdocs.people'] === true;
+};
+
+function departmentScope(rows: Array<{ dept_id?: unknown; parent_id?: unknown }>, rootId: unknown) {
+  const root = id(rootId);
+  const scope = new Set<string>();
+  if (!root) return scope;
+  scope.add(root);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    rows.forEach(row => {
+      const deptId = id(row.dept_id);
+      const parentId = id(row.parent_id);
+      if (deptId && parentId && scope.has(parentId) && !scope.has(deptId)) {
+        scope.add(deptId);
+        changed = true;
+      }
+    });
+  }
+  return scope;
+}
 
 const officialDocumentEvent = async (
   db: SupabaseClient,
@@ -591,6 +641,13 @@ export async function handleAppApiRequest(req: Request) {
       if (departmentResult.error) throw departmentResult.error;
       if (peopleResult.error) throw peopleResult.error;
       const allDocuments = (documentResult.data || []) as Array<Record<string, unknown>>;
+      const allDepartments = (departmentResult.data || []) as Array<Record<string, unknown>>;
+      const rootDepartments = allDepartments.filter(row => !id(row.parent_id));
+      const departmentPaths = buildDepartmentPaths(allDepartments as DepartmentNode[]);
+      const allPeople = (peopleResult.data || []) as Array<Record<string, unknown>>;
+      const actor = { ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> };
+      const peopleViewer = officialDocumentPeopleViewer(actor, isSysadmin);
+      const actorScope = departmentScope(allDepartments, profile.dept_id);
       const ids = allDocuments.map(row => id(row.document_id)).filter(Boolean);
       const steps: Array<Record<string, unknown>> = [];
       const events: Array<Record<string, unknown>> = [];
@@ -609,17 +666,21 @@ export async function handleAppApiRequest(req: Request) {
       steps.forEach(step => { const key = id(step.document_id); if (!key) return; const list = stepsByDocument.get(key) || []; list.push(step); stepsByDocument.set(key, list); });
       const eventsByDocument = new Map<string, Array<Record<string, unknown>>>();
       events.forEach(event => { const key = id(event.document_id); if (!key) return; const list = eventsByDocument.get(key) || []; list.push(event); eventsByDocument.set(key, list); });
-      const manager = officialDocumentManager({ ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> }, isSysadmin);
       const visible = allDocuments.filter(row => {
         const documentId = id(row.document_id);
         const documentSteps = stepsByDocument.get(documentId) || [];
-        const ownUnit = profile.dept_id && (String(row.originator_dept_id || '') === String(profile.dept_id)
-          || documentSteps.some(step => String(step.unit_id || '') === String(profile.dept_id)));
+        const inUnitScope = peopleViewer && (isAdmin || actorScope.has(String(row.originator_dept_id || ''))
+          || documentSteps.some(step => actorScope.has(String(step.unit_id || ''))));
         const ownDocument = String(row.originator_id || '') === String(profile.user_id);
         const textMatch = !lookup || [row.document_no, row.subject, row.barcode_value].some(value => String(value || '').toLocaleLowerCase().includes(lookup));
-        return textMatch && (isAdmin || manager || ownUnit || ownDocument);
+        return textMatch && (isAdmin || inUnitScope || ownDocument);
       });
-      const names = new Map<string, string>((peopleResult.data || []).map(row => [String(row.user_id), text(row.name, 100)]));
+      const visiblePeople = isAdmin
+        ? allPeople
+        : peopleViewer
+          ? allPeople.filter(row => actorScope.has(String(row.dept_id || '')))
+          : allPeople.filter(row => String(row.user_id) === String(profile.user_id));
+      const names = new Map<string, string>(visiblePeople.map(row => [String(row.user_id), text(row.name, 100)]));
       return reply(req, { ok: true, data: {
         documents: visible.map(row => ({
           ...row,
@@ -627,37 +688,54 @@ export async function handleAppApiRequest(req: Request) {
           steps: stepsByDocument.get(id(row.document_id)) || [],
           events: eventsByDocument.get(id(row.document_id)) || [],
         })),
-        departments: departmentResult.data || [],
-        people: peopleResult.data || [],
+        departments: rootDepartments,
+        people: visiblePeople.map(row => ({
+          ...row,
+          department: departmentPaths.pathForId(row.dept_id) || formatDepartment(row.department, departmentPaths.byName) || null,
+        })),
       } });
     }
 
     if (action === 'official_document_create') {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      const createActor = { ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> };
+      if (!officialDocumentManager(createActor, isSysadmin)) return reply(req, { ok: false, message: '只有公文管理人員可以建立公文' }, 403);
       const subject = text(body.subject, 300);
-      const documentNo = text(body.document_no, 100);
       if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
-      if (!documentNo) return reply(req, { ok: false, message: '公文編號不可空白' }, 400);
       const documentId = nextRequestRequestId();
-      const barcode = `OD-${documentId}`;
-      const payload = {
-        document_id: documentId,
-        document_no: documentNo,
-        subject,
-        originator_id: profile.user_id,
-        originator_dept_id: profile.dept_id || null,
-        status: 'draft',
-        barcode_value: barcode,
-      };
-      const created = await admin.from('official_documents').insert(payload).select('document_id,document_no,subject,status,barcode_value,created_at').single();
-      if (created.error) {
-        if (String(created.error.code) === '23505') return reply(req, { ok: false, message: '公文編號已存在，請勿重複建立' }, 409);
-        throw created.error;
+      const dateKey = taipeiDateKey();
+      let serialHint = 1;
+      let documentNo = '';
+      let barcode = '';
+      let createdData: Record<string, unknown> | null = null;
+      let lastCreateError: { code?: string; message?: string } | null = null;
+      for (let attemptNo = 0; attemptNo < 1000 && !createdData; attemptNo += 1) {
+        documentNo = await nextOfficialDocumentNo(admin, dateKey, serialHint);
+        barcode = documentNo;
+        const created = await admin.from('official_documents').insert({
+          document_id: documentId,
+          document_no: documentNo,
+          subject,
+          originator_id: profile.user_id,
+          originator_dept_id: profile.dept_id || null,
+          status: 'draft',
+          barcode_value: barcode,
+        }).select('document_id,document_no,subject,status,barcode_value,created_at').single();
+        if (!created.error && created.data) {
+          createdData = created.data as Record<string, unknown>;
+          break;
+        }
+        lastCreateError = created.error;
+        if (String(created.error?.code) !== '23505') throw created.error;
+        serialHint = Number(documentNo.slice(-3)) + 1;
       }
-      const actor = { ...profile, role: roleId } as OfficialDocumentActor;
-      await officialDocumentEvent(admin, actor, documentId, 'create', `${documentId}:create`, { to_status: 'draft', note: '建立公文' });
-      await officialDocumentEvent(admin, actor, documentId, 'barcode_generated', `${documentId}:barcode`, { to_status: 'draft', note: '建立公文查詢條碼', details: { barcode_value: barcode } });
-      return reply(req, { ok: true, data: created.data });
+      if (!createdData) {
+        if (lastCreateError) throw lastCreateError;
+        return reply(req, { ok: false, message: '今日公文編號已達 999 號，請聯絡系統管理員' }, 409);
+      }
+      await officialDocumentEvent(admin, createActor, documentId, 'create', `${documentId}:create`, { to_status: 'draft', note: '建立公文' });
+      await officialDocumentEvent(admin, createActor, documentId, 'barcode_generated', `${documentId}:barcode`, { to_status: 'draft', note: '建立公文查詢條碼', details: { barcode_value: barcode } });
+      return reply(req, { ok: true, data: createdData });
     }
 
     if (action === 'official_document_action') {
@@ -680,6 +758,12 @@ export async function handleAppApiRequest(req: Request) {
       const role = roleId;
       const actor = { ...profile, role } as OfficialDocumentActor;
       const manager = officialDocumentManager({ ...actor, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> }, isSysadmin);
+      const departmentsForScope = await admin.from('departments').select('dept_id,parent_id').eq('status', 'active').limit(1000);
+      if (departmentsForScope.error) throw departmentsForScope.error;
+      const actorScope = departmentScope((departmentsForScope.data || []) as Array<Record<string, unknown>>, profile.dept_id);
+      const documentInActorScope = isAdmin || actorScope.has(String(document.originator_dept_id || ''))
+        || steps.some(step => actorScope.has(String(step.unit_id || '')));
+      const managerCanOperate = manager && documentInActorScope;
       const inCurrentUnit = Boolean(currentStep && profile.dept_id && String(currentStep.unit_id) === String(profile.dept_id));
       const isOriginator = String(document.originator_id) === String(profile.user_id);
       const fail = (message: string, status = 409) => reply(req, { ok: false, message }, status);
@@ -696,7 +780,9 @@ export async function handleAppApiRequest(req: Request) {
         if (result.error) throw result.error;
         return result.data as Record<string, unknown> | null;
       };
-      const unitResult = targetUnitId ? await admin.from('departments').select('dept_id,name').eq('dept_id', targetUnitId).eq('status', 'active').maybeSingle() : { data: null, error: null };
+      const unitResult = targetUnitId
+        ? await admin.from('departments').select('dept_id,name,parent_id').eq('dept_id', targetUnitId).eq('status', 'active').is('parent_id', null).maybeSingle()
+        : { data: null, error: null };
       if (unitResult.error) throw unitResult.error;
       if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部室', 400);
       const unitName = text(unitResult.data?.name, 100);
@@ -709,7 +795,7 @@ export async function handleAppApiRequest(req: Request) {
       });
 
       if (documentAction === 'send_co_sign') {
-        if (!manager) return fail('只有單位公文管理人員可以送出會辦', 403);
+        if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出會辦', 403);
         if (!targetUnitId) return fail('請選擇下一個會辦部室', 400);
         if (!['draft', 'ready_for_next'].includes(String(document.status))) return fail('目前狀態不可送出會辦');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個流程節點尚未完成');
@@ -727,7 +813,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'send_approval') {
-        if (!manager) return fail('只有單位公文管理人員可以送出陳核', 403);
+        if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出陳核', 403);
         if (!targetUnitId) return fail('請選擇陳核部室', 400);
         if (String(document.status) !== 'ready_for_next' && !(String(document.status) === 'draft' && steps.length === 0)) return fail('所有會辦完成後才能送出陳核');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個會辦節點尚未完成');
@@ -807,10 +893,10 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'barcode_generate') {
-        if (!manager && !isOriginator) return fail('只有原申請人或公文管理人員可以產生條碼', 403);
+        if (!managerCanOperate && !isOriginator) return fail('只有原申請人或本單位公文管理人員可以產生條碼', 403);
         const currentBarcode = text(document.barcode_value, 200);
         if (currentBarcode) return reply(req, { ok: true, data: { status: document.status, barcode_value: currentBarcode, duplicate: true } });
-        const barcode = `OD-${documentId}`;
+        const barcode = text(document.document_no, 100);
         const updated = await admin.from('official_documents').update({ barcode_value: barcode, updated_at: new Date().toISOString() }).eq('document_id', documentId).is('barcode_value', null).select('barcode_value').maybeSingle();
         if (updated.error) throw updated.error;
         const event = await officialDocumentEvent(admin, actor, documentId, 'barcode_generated', idempotencyKey, { ...eventFields(String(document.status), String(document.status), null), details: { barcode_value: barcode } });
