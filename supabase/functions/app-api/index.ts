@@ -678,7 +678,7 @@ export async function handleAppApiRequest(req: Request) {
         userDb.from('case_status_log').select('*').eq('request_id', fullRequestId).order('created_at', { ascending: true }),
       ]);
       const warnings: string[] = [];
-      if (departmentResult.error) warnings.push(`單位資訊：${text(departmentResult.error.message, 300)}`);
+      if (departmentResult.error) warnings.push('單位資訊暫時無法載入');
       if (orderResult.error) warnings.push(`維修工單：${text(orderResult.error.message, 300)}`);
       if (attachmentsResult.error) warnings.push(`附件：${text(attachmentsResult.error.message, 300)}`);
       if (logsResult.error) warnings.push(`處理歷程：${text(logsResult.error.message, 300)}`);
