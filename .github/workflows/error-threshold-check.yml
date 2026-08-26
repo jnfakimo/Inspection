@@ -39,13 +39,17 @@ jobs:
             https://qztffronusdhgxhjjubt.supabase.co/functions/v1/error-threshold-check)"
           cat "$response_file"
           jq -e . "$response_file" >/dev/null
+          state="$(jq -r '.state // "missing"' "$response_file")"
+          ok="$(jq -r '.ok // false' "$response_file")"
+          if [[ "$state" == "disabled" ]]; then
+            echo "::notice::error-threshold-check is intentionally disabled by the production security policy; no notification was sent."
+            exit 0
+          fi
           if [[ ! "$http_status" =~ ^2 ]]; then
             echo "error-threshold-check HTTP $http_status" >&2
             exit 1
           fi
-          state="$(jq -r '.state // "missing"' "$response_file")"
-          ok="$(jq -r '.ok // false' "$response_file")"
-          if [[ "$ok" != "true" || "$state" == "disabled" || "$state" == "degraded" || "$state" == "missing" ]]; then
+          if [[ "$ok" != "true" || "$state" == "degraded" || "$state" == "missing" ]]; then
             echo "error-threshold-check unhealthy state: $state" >&2
             exit 1
           fi
