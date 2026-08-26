@@ -321,3 +321,11 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   live calling actions the deployed function did not have yet. Don't reintroduce a manual
   step; if a deploy must be rerun, use the workflow's `workflow_dispatch` input.
 - Don't open a PR unless asked.
+
+## Obsidian 開發紀錄
+
+- 本專案的 Obsidian vault 是 repository 內的 `Obsidian/`；主要文件為 `04-開發與部署.md`、`05-待辦清單.md`、`06-發布前驗收表.md`、`07-資料庫備份與復原流程.md` 與 `08-資安告警原因與修正報告.md`。
+- 每次完成程式、資料庫、資安或部署工作並取得驗證結果後，應在 `Obsidian/04-開發與部署.md` 追加一筆日期、變更摘要、驗證結果與 commit／workflow 證據；若待辦狀態有改變，同步更新 `Obsidian/05-待辦清單.md`。
+- 資安事件與告警原因另同步至 `Obsidian/08-資安告警原因與修正報告.md`；備份／復原流程另同步至 `Obsidian/07-資料庫備份與復原流程.md`。
+- Obsidian 只保存可公開於 repository 的開發紀錄，不得寫入 `SUPABASE_ACCESS_TOKEN`、service-role key、使用者密碼、Session、Cookie、私有 signed URL 或其他 Secret；必要時只記錄「已設定／已驗證」及遮蔽後的識別資訊。
+- 若本工作階段沒有 Obsidian connector／技能，仍以 repository 內 Markdown 檔案完成同步；不要因技能未載入而跳過紀錄，也不要把 Secret 寫入 vault。

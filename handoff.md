@@ -108,4 +108,4 @@ readiness **四個 workflow 全綠，過時警告 0**。
   介面風格切換改為全站右下角浮動圖示、移植讀取存取稽核、CI 由紅轉綠並升級 Actions、
   會議室預約改以時間管制、交接表格排版；並修掉四處「靜默失效」的缺陷
 · 新規範已寫進 AGENTS.md：圖資頁面的共同規範、介面風格切換、讀取存取稽核與資安告警
-· L3 Obsidian：未更新（AGENTS.md 未登記 vault 路徑）
+· L3 Obsidian：vault 已登記於 AGENTS.md 的 `Obsidian/`；完成程式／部署工作後同步 `04-開發與部署.md`，待辦狀態同步 `05-待辦清單.md`，不寫入任何 Secret。
