@@ -506,9 +506,11 @@ export async function handleAppApiRequest(req: Request) {
       save_floor_model: 'admin-api:write',
       move_structuremap_marker: 'admin-api:write',
       guardpatrol_checkin: 'patrol-checkin',
-      official_documents: 'official-documents:read',
-      official_document_create: 'official-documents:write',
-      official_document_action: 'official-documents:write',
+      // 沿用已部署的限流範圍；專用名稱需另行改 DB function，不能讓新功能
+      // 因未知 scope 被整體拒絕。寫入仍套用既有較嚴格的 admin-api:write 門檻。
+      official_documents: 'app-api',
+      official_document_create: 'admin-api:write',
+      official_document_action: 'admin-api:write',
       workorder_list: 'app-api',
       workorder_prepare_upload: 'app-api',
       workorder_options: 'app-api',
