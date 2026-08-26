@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * 0'  # 每週日午夜執行一次
 
