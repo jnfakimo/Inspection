@@ -211,6 +211,9 @@ export function MarkerBoardModule({ profile }: Props) {
       // 3D模型圖共用同一份預處理：一般版重畫為黑線，科技版保留青色但濾掉光暈。
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
+      // OpenSeadragon.destroy() 在圖像仍於背景解碼時可能留下舊 canvas；主題快速切換後，
+      // 殘留的透明畫布會蓋住新 viewer。重建前統一清空 host，確保永遠只有一套畫布。
+      hostRef.current.replaceChildren();
       const token = (name: string, fallback: string) =>
         getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
       viewer = OpenSeadragon({
