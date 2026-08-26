@@ -29,6 +29,7 @@ import {
 } from '@/lib/patrol-status';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
+import { preparePlanObjectUrl } from './floor-stack-3d';
 
 type Props = { profile: Profile };
 type MarkerKind = 'equipment' | 'space' | 'patrol' | 'repair' | 'note';
@@ -97,6 +98,10 @@ export function MarkerBoardModule({ profile }: Props) {
   const [showLabels, setShowLabels] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [zoomPct, setZoomPct] = useState(100);
+  const [viewerGeneration, setViewerGeneration] = useState(0);
+  const [theme, setTheme] = useState<'light' | 'tech'>(() =>
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'tech'
+      ? 'tech' : 'light');
 
   const [editor, setEditor] = useState<{
     id: string | null; x: number; y: number; floorId: string; kind: MarkerKind;
@@ -112,9 +117,19 @@ export function MarkerBoardModule({ profile }: Props) {
   const pendingLinkRef = useRef<PendingLink | null>(null);
   const detailIdRef = useRef<string | null>(null);
   const deepLinkRef = useRef<string | null>(null);
+  const curFloorRef = useRef(curFloor);
 
   useEffect(() => { placeModeRef.current = placeMode; }, [placeMode]);
   useEffect(() => { detailIdRef.current = detail?.marker.marker_id ?? null; }, [detail]);
+  useEffect(() => { curFloorRef.current = curFloor; }, [curFloor]);
+  useEffect(() => {
+    const syncTheme = () => setTheme(
+      document.documentElement.getAttribute('data-theme') === 'tech' ? 'tech' : 'light');
+    syncTheme();
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
 
   /* ──────────────── 資料 ──────────────── */
 
@@ -186,15 +201,43 @@ export function MarkerBoardModule({ profile }: Props) {
   /* ──────────────── OpenSeadragon ──────────────── */
 
   useEffect(() => {
-    if (!floors.length || !hostRef.current || viewerRef.current) return;
+    if (!floors.length || !hostRef.current) return;
     let disposed = false;
+    let viewer: any = null;
+    const preparedUrls: string[] = [];
+    floors.forEach(floor => { floor.index = null; });
     (async () => {
+      // 3D建模系統輸出的 PNG 將青色線條烘在檔案內。整合標記系統必須與平面模型圖、
+      // 3D模型圖共用同一份預處理：一般版重畫為黑線，科技版保留青色但濾掉光暈。
+      // 逐張處理可避免七個樓層的高解析畫布同時占用大量記憶體。
+      const preparedFloors: Array<{ floor: FloorSource; source: string }> = [];
+      for (let index = 0; index < floors.length; index += 1) {
+        if (disposed) break;
+        const floor = floors[index];
+        setProgress({
+          pct: Math.min(18, 8 + Math.round((index + 1) / floors.length * 10)),
+          msg: theme === 'light' ? '轉換一般版黑線圖…' : '整理科技版線條…',
+        });
+        const prepared = await preparePlanObjectUrl(floor.url, theme);
+        if (prepared) preparedUrls.push(prepared);
+        preparedFloors.push({ floor, source: prepared || floor.url });
+      }
+      if (disposed) {
+        preparedUrls.forEach(url => URL.revokeObjectURL(url));
+        return;
+      }
+
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
-      const viewer = OpenSeadragon({
+      const token = (name: string, fallback: string) =>
+        getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+      viewer = OpenSeadragon({
         element: hostRef.current, prefixUrl: '',
         showNavigationControl: false, showNavigator: true, navigatorId: 'markerboard-nav',
         navigatorAutoFade: false,
+        navigatorBackground: token('--bg', '#020b18'),
+        navigatorBorderColor: token('--line', '#173952'),
+        navigatorDisplayRegionColor: token('--cyan', '#00d4ff'),
         minZoomLevel: 0.2, maxZoomPixelRatio: 4, zoomPerScroll: 1.3,
         animationTime: 0.5, springStiffness: 7,
         panHorizontal: true, panVertical: true, constrainDuringPan: false,
@@ -210,12 +253,19 @@ export function MarkerBoardModule({ profile }: Props) {
         if (loaded < floors.length) return;
         setProgress({ pct: 100, msg: '完成' });
         window.setTimeout(() => setProgress(null), 420);
-        setCurFloor(current => current || floors[0].id);
+        const selectedFloor = curFloorRef.current || floors[0].id;
+        floors.forEach(floor => {
+          if (floor.index == null) return;
+          viewer.world.getItemAt(floor.index)?.setOpacity(floor.id === selectedFloor ? 1 : 0);
+        });
+        if (!curFloorRef.current) setCurFloor(selectedFloor);
+        // 主題切換會重建 viewer；即使樓層與標記資料都沒變，也要重新掛回圖釘覆蓋層。
+        setViewerGeneration(value => value + 1);
       };
       // 全部樓層載進同一個 world，之後只切換透明度。
-      floors.forEach(floor => {
+      preparedFloors.forEach(({ floor, source }) => {
         viewer.addTiledImage({
-          tileSource: { type: 'image', url: floor.url }, x: 0, y: 0, width: 1, opacity: 0,
+          tileSource: { type: 'image', url: source }, x: 0, y: 0, width: 1, opacity: 0,
           success: (event: any) => { floor.index = viewer.world.getIndexOfItem(event.item); done(); },
           error: () => done(),
         });
@@ -250,15 +300,17 @@ export function MarkerBoardModule({ profile }: Props) {
         }
       });
     })();
-    return () => { disposed = true; };
+    return () => {
+      disposed = true;
+      if (viewerRef.current === viewer) viewerRef.current = null;
+      try { viewer?.destroy(); } catch { /* viewer 可能仍在非同步建立中 */ }
+      overlaysRef.current.clear();
+      floors.forEach(floor => { floor.index = null; });
+      preparedUrls.forEach(url => URL.revokeObjectURL(url));
+    };
     // openCreate 於下方定義且不依賴變動狀態，刻意不列入相依。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [floors]);
-
-  useEffect(() => () => {
-    try { viewerRef.current?.destroy(); } catch { /* 忽略 */ }
-    viewerRef.current = null;
-  }, []);
+  }, [floors, theme]);
 
   // 切樓層：只改透明度，視角與縮放保持不變。
   useEffect(() => {
@@ -328,7 +380,7 @@ export function MarkerBoardModule({ profile }: Props) {
       });
     })();
     return () => { cancelled = true; };
-  }, [markers, curFloor, showLabels, markerColor]);
+  }, [markers, curFloor, showLabels, markerColor, viewerGeneration]);
 
   // 深連結 ?marker=：資料與圖磚都就緒後才跳。
   useEffect(() => {
