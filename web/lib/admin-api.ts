@@ -20,7 +20,9 @@ const isTransientNodeResponse = (response: Response) => (
 
 export async function invokeAdminApi<T = Record<string, unknown>>(action: string, payload: Record<string, unknown> = {}) {
   const client = getSupabase();
-  if (nodeAppApiUrl) {
+  // 後台清單／設定查詢直接走 Edge Function，避免 Render 冷啟動讓頁面先空等數秒。
+  // 管理寫入仍保留原本的 Node-first 與 Edge 備援流程。
+  if (nodeAppApiUrl && !READ_ACTION_LABELS[action]) {
     const { data: sessionData, error: sessionError } = await client.auth.getSession();
     const accessToken = sessionData.session?.access_token;
     if (sessionError || !accessToken) throw new Error('登入狀態無效，請重新登入');

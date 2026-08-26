@@ -45,7 +45,10 @@ export function getSupabase() {
 }
 
 export async function invokeAppApi<T>(action: string, payload: Record<string, unknown> = {}) {
-  if (nodeAppApiUrl) {
+  // 查詢直接走與資料庫同區的 Edge Function。Render 在低用量時會冷啟動，實測會先
+  // 等滿 3～5 秒才回覆或進入 Edge 備援，導致每一頁的 AuthGate 與模組資料都延後。
+  // 寫入仍沿用既有 Node-first 路徑，避免在尚未確認結果時跨兩個後端重送同一動作。
+  if (nodeAppApiUrl && !READ_ACTION_LABELS[action]) {
     const supabase = getSupabase();
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;

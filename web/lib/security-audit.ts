@@ -432,32 +432,17 @@ function installInteractionAudit() {
   });
 }
 
-/** 安裝一次 fetch 與 DOM 監聽器；SSR 時直接略過。 */
+/**
+ * 安裝一次 DOM 操作監聽器；SSR 時直接略過。
+ *
+ * REST／Storage 的 fetch 攔截由根版面的 access-audit.ts 單獨負責。這裡若再包一次
+ * window.fetch，同一筆資料讀取會建立兩筆稽核事件，既破壞告警門檻，也會讓進頁時
+ * 多送一整批 Edge Function 請求。nativeFetch 只保留給本檔的稽核佇列送信使用。
+ */
 export function installSecurityAudit() {
   if (installed || typeof window === 'undefined') return;
   installed = true;
   nativeFetch = window.fetch.bind(window);
-  const baseFetch = nativeFetch;
-  const auditedFetch: typeof window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const meta = readMeta(input, init);
-    if (meta?.suspicious) {
-      const denied = new Response(JSON.stringify({ message: '系統已阻擋可疑檔案路徑' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' },
-      });
-      recordRead(meta, denied);
-      return denied;
-    }
-    try {
-      const response = await baseFetch(input, init);
-      if (meta) recordRead(meta, response);
-      return response;
-    } catch (error) {
-      if (meta) recordRead(meta, null, error);
-      throw error;
-    }
-  };
-  window.fetch = auditedFetch;
   installInteractionAudit();
 }
 
