@@ -91,6 +91,7 @@ type DepartmentNode = {
   parent_id?: unknown;
   name?: unknown;
   level?: unknown;
+  code?: unknown;
 };
 
 function departmentKey(value: unknown) {
@@ -670,6 +671,7 @@ export async function handleAppApiRequest(req: Request) {
         ? new Set(rootDepartments.map(row => id(row.dept_id)).filter(Boolean))
         : new Set(Array.from(actorScope).map(deptId => id(departmentPaths.rootForId(deptId)?.dept_id)).filter(Boolean));
       const visibleRootDepartments = rootDepartments.filter(row => scopeRootIds.has(id(row.dept_id)));
+      const currentRootDepartment = departmentPaths.rootForId(profile.dept_id);
       const ids = allDocuments.map(row => id(row.document_id)).filter(Boolean);
       const steps: Array<Record<string, unknown>> = [];
       const events: Array<Record<string, unknown>> = [];
@@ -714,6 +716,13 @@ export async function handleAppApiRequest(req: Request) {
         })),
         departments: visibleRootDepartments,
         scope_root_departments: visibleRootDepartments,
+        current_root_department: currentRootDepartment ? {
+          dept_id: id(currentRootDepartment.dept_id),
+          parent_id: id(currentRootDepartment.parent_id) || null,
+          name: text(currentRootDepartment.name, 100),
+          code: text(currentRootDepartment.code, 100) || null,
+          level: Number(currentRootDepartment.level || 1),
+        } : null,
         people: visiblePeople.map(row => ({
           ...row,
           department: departmentPaths.pathForId(row.dept_id) || formatDepartment(row.department, departmentPaths.byName) || null,
