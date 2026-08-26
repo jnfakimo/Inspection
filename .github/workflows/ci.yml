@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 0 * * 0' # weekly run for dependency checks
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
