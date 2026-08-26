@@ -3,8 +3,10 @@ import { canonicalFloor } from "../_shared/floor.ts";
 
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, content-type, x-cron-secret"};
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"Content-Type":"application/json"}});
-type Rule={id:string;label:string;start:string;end:string;grace?:number;days?:number[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
+type Rule={id:string;label:string;start:string;end:string;shift_start?:string;shift_end?:string;grace?:number;days?:number[];only_incomplete?:boolean;include_points?:boolean;enabled?:boolean};
 type Shift={name:string;start_time:string;end_time:string;sort_order?:number};
+type WorkTime={start?:string;end?:string};
+type StaffConfig={templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>;workTimes:{templates:Record<string,WorkTime>;dates:Record<string,Record<string,WorkTime>>}};
 const mins=(s:string)=>{const [h,m]=(s||"00:00").split(":").map(Number);return h*60+m;};
 const normalizeShiftName=(name:string)=>String(name||"").trim().replace(/\s*巡邏\s*$/u,"");
 const localParts=(d:Date)=>{const p:Record<string,string>={};new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",weekday:"short",hourCycle:"h23"}).formatToParts(d).forEach(x=>p[x.type]=x.value);return p;};
@@ -87,13 +89,24 @@ Deno.serve(async req=>{
     const token=s.line_channel_token,groupId=s.line_group_id;
     if(lineEnabled&&(!token||!groupId))return reply({ok:false,msg:"LINE 尚未設定"},400);
     let configuredRules:Rule[]=[];try{configuredRules=JSON.parse(s.patrol_timeout_rules||"[]");}catch(_e){}
-    let staffAssignments:{templates:Record<string,string[]>;dates:Record<string,Record<string,string[]>>}={templates:{},dates:{}};
-    try{staffAssignments=JSON.parse(s.patrol_shift_staff||"{}");staffAssignments.templates||={};staffAssignments.dates||={};}catch(_e){}
+    let staffAssignments:StaffConfig={templates:{},dates:{},workTimes:{templates:{},dates:{}}};
+    try{
+      const parsed=JSON.parse(s.patrol_shift_staff||"{}");
+      staffAssignments={
+        templates:parsed?.templates||{},dates:parsed?.dates||{},
+        workTimes:{templates:parsed?.workTimes?.templates||{},dates:parsed?.workTimes?.dates||{}},
+      };
+    }catch(_e){}
     const now=new Date(),p=localParts(now),today=`${p.year}-${p.month}-${p.day}`;
     const yesterday=previousDate(today);
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
-    const {data:templates,error:templateError}=await db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").order("sort_order");
+    const [{data:templates,error:templateError},{data:dailyShifts,error:dailyShiftError}]=await Promise.all([
+      db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").neq("status","inactive").order("sort_order"),
+      db.from("patrol_shifts").select("shift_date,name,start_time,end_time").in("shift_date",[yesterday,today]),
+    ]);
     if(templateError)throw templateError;
+    if(dailyShiftError)throw dailyShiftError;
+    const dailyShiftByName=new Map((dailyShifts||[]).map((row:{shift_date:string;name:string})=>[`${row.shift_date}:${row.name}`,row]));
     const rules:Rule[]=(templates||[]).map((shift:Shift)=>{
       const configured=configuredRules.find(r=>normalizeShiftName(r.label)===normalizeShiftName(shift.name));
       return {
@@ -101,6 +114,8 @@ Deno.serve(async req=>{
         label:shift.name,
         start:(configured?.start||shift.start_time).slice(0,5),
         end:(configured?.end||shift.end_time).slice(0,5),
+        shift_start:shift.start_time.slice(0,5),
+        shift_end:shift.end_time.slice(0,5),
         grace:configured?.grace||0,
         days:configured?.days,
         enabled:configured?.enabled!==false,
@@ -115,8 +130,13 @@ Deno.serve(async req=>{
       // 從今天與昨天找出「最近一個已超過通報結束時間」的班別。
       // 這能正確處理跨夜班，並避免 force/手動測試把尚未到期的未來班別提前送出。
       const candidates=[yesterday,today].map(shiftDate=>{
-        const effectiveStart=rule.start.slice(0,5);
-        const effectiveEnd=rule.end.slice(0,5);
+        const daily=dailyShiftByName.get(`${shiftDate}:${rule.label}`) as {start_time?:string;end_time?:string}|undefined;
+        const templateWork=staffAssignments.workTimes.templates[rule.label]||{};
+        const dateWork=staffAssignments.workTimes.dates[shiftDate]?.[rule.label]||{};
+        // 排班頁的 workTimes 是通報時段唯一優先來源；每日班表的 start/end 是班別時段，
+        // 沒有另外設定通報時段時才作為相容性退回值。前端與逾時推播因此使用同一時窗。
+        const effectiveStart=String(dateWork.start||templateWork.start||daily?.start_time||rule.shift_start||rule.start||"00:00").slice(0,5);
+        const effectiveEnd=String(dateWork.end||templateWork.end||daily?.end_time||rule.shift_end||rule.end||"00:00").slice(0,5);
         const overnight=mins(effectiveEnd)<=mins(effectiveStart);
         const endDay=overnight?nextDate(shiftDate):shiftDate;
         const notifyAt=new Date(new Date(iso(endDay,effectiveEnd)).getTime()+grace*60000);
