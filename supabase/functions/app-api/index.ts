@@ -90,6 +90,7 @@ type DepartmentNode = {
   dept_id?: unknown;
   parent_id?: unknown;
   name?: unknown;
+  level?: unknown;
 };
 
 function departmentKey(value: unknown) {
@@ -124,6 +125,23 @@ function buildDepartmentPaths(rows: DepartmentNode[]) {
     if (path) pathCache.set(deptId, path);
     return path;
   };
+  const rootForId = (value: unknown) => {
+    const startId = id(value);
+    if (!startId) return null;
+    const visited = new Set<string>();
+    let currentId = startId;
+    let current: DepartmentNode | null = null;
+    let guard = 0;
+    while (currentId && guard++ < 20 && !visited.has(currentId)) {
+      visited.add(currentId);
+      current = byId.get(currentId) || null;
+      if (!current) break;
+      const parentId = id(current.parent_id);
+      if (!parentId) break;
+      currentId = parentId;
+    }
+    return current;
+  };
   const byName = new Map<string, string>();
   rows.forEach(row => {
     const name = text(row.name, 100);
@@ -131,7 +149,7 @@ function buildDepartmentPaths(rows: DepartmentNode[]) {
     const path = pathForId(row.dept_id) || name;
     byName.set(departmentKey(name), path);
   });
-  return { byName, pathForId };
+  return { byId, byName, pathForId, rootForId };
 }
 
 function formatDepartment(value: unknown, byName: Map<string, string>) {
@@ -648,6 +666,10 @@ export async function handleAppApiRequest(req: Request) {
       const actor = { ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> };
       const peopleViewer = officialDocumentPeopleViewer(actor, isSysadmin);
       const actorScope = departmentScope(allDepartments, profile.dept_id);
+      const scopeRootIds = isAdmin
+        ? new Set(rootDepartments.map(row => id(row.dept_id)).filter(Boolean))
+        : new Set(Array.from(actorScope).map(deptId => id(departmentPaths.rootForId(deptId)?.dept_id)).filter(Boolean));
+      const visibleRootDepartments = rootDepartments.filter(row => scopeRootIds.has(id(row.dept_id)));
       const ids = allDocuments.map(row => id(row.document_id)).filter(Boolean);
       const steps: Array<Record<string, unknown>> = [];
       const events: Array<Record<string, unknown>> = [];
@@ -685,13 +707,19 @@ export async function handleAppApiRequest(req: Request) {
         documents: visible.map(row => ({
           ...row,
           originator_name: names.get(String(row.originator_id)) || '',
+          originator_department: departmentPaths.pathForId(row.originator_dept_id) || null,
+          originator_root_department: text(departmentPaths.rootForId(row.originator_dept_id)?.name, 100) || null,
           steps: stepsByDocument.get(id(row.document_id)) || [],
           events: eventsByDocument.get(id(row.document_id)) || [],
         })),
-        departments: rootDepartments,
+        departments: visibleRootDepartments,
+        scope_root_departments: visibleRootDepartments,
         people: visiblePeople.map(row => ({
           ...row,
           department: departmentPaths.pathForId(row.dept_id) || formatDepartment(row.department, departmentPaths.byName) || null,
+          department_root: text(departmentPaths.rootForId(row.dept_id)?.name, 100) || null,
+          department_root_id: id(departmentPaths.rootForId(row.dept_id)?.dept_id) || null,
+          department_level: Number(departmentPaths.byId.get(id(row.dept_id))?.level || 0) || (id(departmentPaths.byId.get(id(row.dept_id))?.parent_id) ? 2 : 1),
         })),
       } });
     }

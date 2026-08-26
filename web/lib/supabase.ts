@@ -19,7 +19,12 @@ const READ_ACTION_LABELS: Record<string, string> = {
   dashboard: '讀取戰情儀表板資料',
   inspections: '讀取巡檢資料',
   equipment_map: '讀取設備地圖資料',
+  official_documents: '讀取公文傳送資料',
 };
+
+// 公文流程的寫入動作固定走 Edge Function，避免舊版 Node API 尚未包含
+// 自動取號／不可刪除時間軸時，前端先收到不支援或欄位錯誤。
+const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action']);
 
 const recordAppRead = (action: string) => {
   const label = READ_ACTION_LABELS[action];
@@ -48,7 +53,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
   // 查詢直接走與資料庫同區的 Edge Function。Render 在低用量時會冷啟動，實測會先
   // 等滿 3～5 秒才回覆或進入 Edge 備援，導致每一頁的 AuthGate 與模組資料都延後。
   // 寫入仍沿用既有 Node-first 路徑，避免在尚未確認結果時跨兩個後端重送同一動作。
-  if (nodeAppApiUrl && !READ_ACTION_LABELS[action]) {
+  if (nodeAppApiUrl && !READ_ACTION_LABELS[action] && !EDGE_ONLY_ACTIONS.has(action)) {
     const supabase = getSupabase();
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
