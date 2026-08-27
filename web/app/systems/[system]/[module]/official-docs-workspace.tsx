@@ -99,6 +99,7 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
   useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
   useEffect(() => {
     let active = true;
+    let stream: MediaStream | null = null;
     let controls: IScannerControls | null = null;
     const start = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -123,9 +124,19 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
         const reader = new BrowserMultiFormatOneDReader(hints, { delayBetweenScanAttempts: 180, delayBetweenScanSuccess: 1000 });
         const video = videoRef.current;
         if (!video) return;
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        if (!active) { stream.getTracks().forEach(track => track.stop()); return; }
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        try { await video.play(); } catch (error) { console.warn('[official-docs] camera preview autoplay was blocked', error); }
         setMessage('請允許相機權限，並將公文一維條碼置於掃描框內。');
-        controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        controls = await reader.decodeFromStream(
+          stream,
           video,
           (result, _error, scanControls) => {
             controlsRef.current = scanControls;
@@ -142,6 +153,7 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
         else controls.stop();
       } catch (error) {
         if (!active) return;
+        stream?.getTracks().forEach(track => track.stop());
         const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
         const fallback = name === 'NotAllowedError' || name === 'PermissionDeniedError'
           ? '相機權限被拒絕，請在瀏覽器網址列允許相機後重試。'
@@ -155,9 +167,9 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
       }
     };
     void start();
-    return () => { active = false; controlsRef.current?.stop(); controls?.stop(); controlsRef.current = null; };
+    return () => { active = false; controlsRef.current?.stop(); controls?.stop(); stream?.getTracks().forEach(track => track.stop()); controlsRef.current = null; };
   }, []);
-  return <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-label="掃描公文條碼"><section className="od-scanner-modal"><header><div><small>查詢工具／一維條碼</small><h2>掃描公文條碼</h2></div><button type="button" className="od-icon-button" onClick={onClose} aria-label="關閉">×</button></header><div className="od-scanner-preview"><video ref={videoRef} className="od-scanner-video" muted playsInline /><span className="od-scanner-guide" aria-hidden="true" /></div><p className="od-help">{message}</p><button type="button" className="secondary-btn" onClick={onClose}>關閉掃描</button></section></div>;
+  return <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-label="掃描公文條碼"><section className="od-scanner-modal"><header><div><small>查詢工具／一維條碼</small><h2>掃描公文條碼</h2></div><button type="button" className="od-icon-button" onClick={onClose} aria-label="關閉">×</button></header><div className="od-scanner-preview"><video ref={videoRef} className="od-scanner-video" muted autoPlay playsInline /><span className="od-scanner-guide" aria-hidden="true" /></div><p className="od-help">{message}</p><button type="button" className="secondary-btn" onClick={onClose}>關閉掃描</button></section></div>;
 }
 
 function QrModal({ document, onClose }: { document: Document; onClose: () => void }) {
