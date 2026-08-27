@@ -244,7 +244,7 @@ function RequestsModule({ module, profile }: Props) {
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
 
     {/* V1 四步驟流程 Banner */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+    <div className="vehicle-flow-grid" style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
       <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--cyan)' }}>
         <b style={{ color: 'var(--cyan)', fontSize: '0.85rem' }}>1. 申請人填單</b>
         <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>線上填寫用車日期、地點、人數與事由</div>
@@ -264,7 +264,7 @@ function RequestsModule({ module, profile }: Props) {
     </div>
 
     {/* V1 四大 KPI 統計卡 */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(130px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+    <div className="vehicle-kpi-grid" style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
       <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--amber)' }}>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--amber)', lineHeight: 1 }}>{kApprovalCount}</div>
         <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待主管核可</div>
