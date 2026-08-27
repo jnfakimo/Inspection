@@ -7,6 +7,13 @@ import { setSecurityAuditProfile } from '@/lib/security-audit';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import type { Profile } from '@/types/app';
 
+const AUTO_RETRY_LIMIT = 2;
+
+const isTransientAuthError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /安全限流服務暫時無法使用|Failed to fetch|NetworkError|network\s+error|timed out|timeout/i.test(message);
+};
+
 export function AuthGate({ children }: { children: (profile: Profile) => React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [message, setMessage] = useState('正在驗證登入狀態…');
@@ -14,6 +21,7 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
 
   useEffect(() => {
     let active = true;
+    let retryTimer: number | undefined;
     async function verify() {
       try {
         const { data } = await getSupabase().auth.getSession();
@@ -40,11 +48,24 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
         clearProfile();
         setErrorTrackerUser(null);
         setSecurityAuditProfile(null);
-        if (active) setMessage(error instanceof Error ? `${error.message}（請檢查網路後重試）` : '登入驗證失敗，請檢查網路後重試');
+        if (active && retry < AUTO_RETRY_LIMIT && isTransientAuthError(error)) {
+          const nextRetry = retry + 1;
+          setMessage(`連線服務暫時忙碌，正在重試（${nextRetry}/${AUTO_RETRY_LIMIT}）…`);
+          retryTimer = window.setTimeout(() => {
+            if (active) setRetry(nextRetry);
+          }, 500 * nextRetry);
+        } else if (active) {
+          setMessage(error instanceof Error ? `${error.message}（請檢查網路後重試）` : '登入驗證失敗，請檢查網路後重試');
+        }
       }
     }
     verify();
-    return () => { active = false; setErrorTrackerUser(null); setSecurityAuditProfile(null); };
+    return () => {
+      active = false;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      setErrorTrackerUser(null);
+      setSecurityAuditProfile(null);
+    };
   }, [retry]);
 
   if (!profile) return <main className="center-state"><div className="loader" /><p>{message}</p><button className="secondary-btn" onClick={() => { setMessage('正在驗證登入狀態…'); setRetry(count => count + 1); }}>重試</button></main>;

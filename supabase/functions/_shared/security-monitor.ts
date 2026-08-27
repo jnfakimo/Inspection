@@ -128,6 +128,68 @@ const isCompatibilityError = (error: any) => {
       .test(message);
 };
 
+// 限流 RPC 位於 Edge Function 與 PostgREST 之間；短暫的連線重設、資料庫
+// 鎖定或 gateway 逾時不代表請求已超過額度。只對可重試的基礎設施錯誤做
+// 極少次、短退避重試，最後仍回傳 error，避免限流服務失效時意外放行。
+const RATE_LIMIT_RETRY_DELAYS_MS = [100, 300] as const;
+const TRANSIENT_RATE_LIMIT_CODES = new Set([
+  "08000",
+  "08001",
+  "08003",
+  "08004",
+  "08006",
+  "08007",
+  "08P01",
+  "40001",
+  "40P01",
+  "55P03",
+  "57014",
+  "57P01",
+  "57P02",
+  "57P03",
+  "57P04",
+  "57P05",
+  "PGRST001",
+  "PGRST002",
+  "PGRST003",
+]);
+
+const isTransientRateLimitError = (error: any) => {
+  const code = clean(error?.code, 40);
+  const message = clean(error?.message, 500);
+  const status = Number(error?.status ?? error?.statusCode);
+  return TRANSIENT_RATE_LIMIT_CODES.has(code) ||
+    [408, 429, 500, 502, 503, 504].includes(status) ||
+    /fetch failed|failed to fetch|network|connection (?:reset|closed|refused|timed out)|timed out|timeout|temporarily unavailable|bad gateway|gateway timeout|service unavailable|upstream|deadlock|could not serialize|lock timeout|statement timeout|connection terminated/i
+      .test(message);
+};
+
+async function callRateLimit(
+  db: SecurityDb,
+  args: Record<string, unknown>,
+) {
+  let result: { data: any; error: any } = {
+    data: null,
+    error: { message: "限流服務連線失敗" },
+  };
+  for (let attempt = 0; attempt <= RATE_LIMIT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      result = await db.rpc("enforce_request_rate_limit", args);
+    } catch (error) {
+      // 某些 fetch／網路錯誤會直接 reject，而不是透過 Supabase 的 error 回傳。
+      result = { data: null, error };
+    }
+    if (!result.error || !isTransientRateLimitError(result.error) ||
+      attempt >= RATE_LIMIT_RETRY_DELAYS_MS.length) {
+      return result;
+    }
+    await new Promise((resolve) =>
+      setTimeout(resolve, RATE_LIMIT_RETRY_DELAYS_MS[attempt])
+    );
+  }
+  return result;
+}
+
 export async function enforceDurableRateLimit(
   db: SecurityDb,
   req: Request,
@@ -147,11 +209,11 @@ export async function enforceDurableRateLimit(
     p_request_id: requestId,
     p_actor_id: options.actorId || null,
   };
-  let result = await db.rpc("enforce_request_rate_limit", extendedArgs);
+  let result = await callRateLimit(db, extendedArgs);
   let durable = true;
   if (result.error && isCompatibilityError(result.error)) {
     durable = false;
-    result = await db.rpc("enforce_request_rate_limit", {
+    result = await callRateLimit(db, {
       p_subject: extendedArgs.p_subject,
       p_scope: extendedArgs.p_scope,
     });
