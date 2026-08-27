@@ -1,4 +1,6 @@
 -- 公文類別與承辦單位／人員；既有資料維持相容。
+begin;
+
 alter table public.official_documents
   add column if not exists document_type text not null default 'official_document';
 
@@ -19,3 +21,5 @@ create index if not exists official_documents_responsible_dept_idx
 
 create index if not exists official_documents_responsible_user_idx
   on public.official_documents(responsible_user_id, updated_at desc);
+
+commit;
