@@ -103,7 +103,7 @@ export function HandoverModules({ system, module, profile }: Props) {
 
 /* ──────────────────────────── 交接紀錄 ──────────────────────────── */
 
-function RecordsModule({ module, profile }: Props) {
+function RecordsModule({ system, module, profile }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
   const [departments, setDepartments] = useState<Row[]>([]);
