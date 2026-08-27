@@ -103,7 +103,7 @@
 .content:has(.vehicle-flow-grid) .admin-panel th,.content:has(.vehicle-flow-grid) .admin-panel td{padding:8px 7px}
 .content:has(.vehicle-flow-grid) .admin-pager{padding-top:10px}
 @media (min-width:801px){
-  .content:has(.vehicle-flow-grid) .responsive-table{max-height:max(180px,calc(100dvh - 433px));overflow:auto}
+  .content:has(.vehicle-flow-grid) .responsive-table{max-height:max(180px,calc(100dvh - 434px));overflow:auto}
   .content:has(.vehicle-flow-grid) .responsive-table thead{position:sticky;top:0;z-index:1;background:var(--surface)}
 }
 .admin-modal-backdrop:has(.vehicle-detail-modal){padding:8px}
