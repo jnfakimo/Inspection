@@ -93,7 +93,7 @@ function RequestsModule({ module, profile }: Props) {
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   
   const [tab, setTab] = useState<'mine' | 'driverToday' | 'todo' | 'all'>('mine');
-  const [query, setQuery] = useState(''), [statusFilter, setStatusFilter] = useState(''), [dateFilter, setDateFilter] = useState(''), [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState(''), [dateFilter, setDateFilter] = useState(''), [page, setPage] = useState(1);
   
   const [creating, setCreating] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
@@ -115,7 +115,7 @@ function RequestsModule({ module, profile }: Props) {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => setPage(1), [query, statusFilter, dateFilter, tab]);
+  useEffect(() => setPage(1), [statusFilter, dateFilter, tab]);
 
   const today = taipeiToday();
   const isDriver = useMemo(() => drivers.some(d => d.user_id === profile.user_id), [drivers, profile.user_id]);
@@ -144,13 +144,10 @@ function RequestsModule({ module, profile }: Props) {
   }, [tab, mineRows, driverTodayRows, todoRows, rows]);
 
   const filtered = useMemo(() => tabRows.filter(row => {
-    const q = query.trim().toLowerCase();
     const matchStatus = !statusFilter || row.status === statusFilter;
     const matchDate = !dateFilter || String(row.trip_date) === dateFilter;
-    const matchQuery = !q || [row.request_no, row.applicant_name, row.applicant_department, row.origin_location, row.destination_location, row.trip_purpose, row.plate_no, row.driver_name]
-      .some(v => String(v || '').toLowerCase().includes(q));
-    return matchStatus && matchDate && matchQuery;
-  }), [tabRows, query, statusFilter, dateFilter]);
+    return matchStatus && matchDate;
+  }), [tabRows, statusFilter, dateFilter]);
 
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -233,14 +230,13 @@ function RequestsModule({ module, profile }: Props) {
     {/* 工具列 */}
     <section className="panel admin-panel">
       <div className="admin-toolbar vehicle-request-toolbar" style={{ gap: '8px' }}>
-        <input style={{ minWidth: 0, flex: 1 }} value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋申請編號、申請人、地點、車號或駕駛…" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全部狀態</option>
           {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
         <LocalizedDateInput aria-label="用車日期（年/月/日）" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="用車日期" />
         <div className="vehicle-request-actions">
-          <button className="secondary-btn" onClick={() => { setQuery(''); setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
+          <button className="secondary-btn" onClick={() => { setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
           <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
