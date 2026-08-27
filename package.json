@@ -23,10 +23,11 @@
     "test:schema-contract": "node tools/schema-contract-check.mjs",
     "test:patrol-offline": "node tools/patrol-offline-consistency-check.mjs",
     "test:page-headings": "node --experimental-strip-types tools/system-page-heading-check.mjs",
+    "test:login-layout": "node tools/login-layout-check.mjs",
     "test:backup": "node tools/database-backup-consistency-check.mjs",
     "backup:db": "node tools/database-backup.mjs",
     "backup:verify": "node tools/database-backup-verify.mjs",
-    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:auth-consistency && npm run test:floor-consistency && npm run test:schema-contract && npm run test:patrol-offline && npm run test:page-headings && npm run test:backup"
+    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:auth-consistency && npm run test:floor-consistency && npm run test:schema-contract && npm run test:patrol-offline && npm run test:page-headings && npm run test:login-layout && npm run test:backup"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.2",

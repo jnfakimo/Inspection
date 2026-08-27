@@ -186,6 +186,20 @@
   }
 }
 
+/* 登入白色圖卡以原桌面尺寸的 80% 呈現；帳號申請表維持原尺寸。 */
+@media (min-width: 641px) {
+  .v1-login-page:has(> .v1-login-card:not(.account-apply-card)) {
+    height: 100svh;
+    min-height: 100svh;
+    max-height: 100svh;
+    overflow: hidden;
+  }
+
+  .v1-login-card:not(.account-apply-card) {
+    zoom: .8;
+  }
+}
+
 /* 帳號申請沿用登入品牌樣式，但需要足夠寬度呈現人員資料。 */
 .account-apply-page {
   justify-content: flex-start;
