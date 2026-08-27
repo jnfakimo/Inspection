@@ -116,14 +116,20 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 /* V2 維修六階段：沿用 V1 詳情視窗，僅補流程進度、完工表單與驗收狀態。 */
 .repair-workflow-steps{display:grid;grid-template-columns:repeat(6,minmax(90px,1fr));gap:0;margin:0 0 22px;padding:0;overflow-x:auto;list-style:none}.repair-workflow-steps li{position:relative;display:grid;justify-items:center;gap:7px;min-width:90px;color:var(--dim);text-align:center;font-size:11px}.repair-workflow-steps li:not(:last-child)::after{position:absolute;top:13px;left:calc(50% + 16px);right:calc(-50% + 16px);height:2px;background:var(--line);content:''}.repair-workflow-steps li span{position:relative;z-index:1;display:grid;width:28px;height:28px;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--panel);font:700 11px var(--head)}.repair-workflow-steps li b{font-weight:600;white-space:nowrap}.repair-workflow-steps li.done{color:var(--cyan)}.repair-workflow-steps li.done span{border-color:var(--cyan);background:rgba(0,212,255,.1)}.repair-workflow-steps li.done:not(:last-child)::after{background:var(--cyan)}.repair-workflow-steps li.current{color:var(--amber)}.repair-workflow-steps li.current span{border-color:var(--amber);background:rgba(255,179,0,.12);box-shadow:0 0 0 3px rgba(255,179,0,.08)}.dispatch-detail-form label.dispatch-check{display:flex;align-items:center;gap:8px;padding:8px 0;color:var(--text)}.dispatch-detail-form label.dispatch-check input{width:auto}.workflow-waiting,.workflow-finished{margin:0;padding:10px 12px;border-left:3px solid var(--amber);background:rgba(255,179,0,.08);color:var(--text);font-size:13px}.workflow-finished{border-left-color:var(--green);background:rgba(0,255,157,.08)}@media(max-width:700px){.repair-workflow-steps{grid-template-columns:repeat(6,100px);padding-bottom:8px}}
 
-/* V2 整合管理入口：統一導覽列大小，僅覆寫系統圖卡版型 */
+/* V2 整合管理入口：桌面圖卡縮為原版 88%，中尺寸維持兩欄，避免水平溢出。 */
 @media (min-width:761px){
-  body:has(.portal-intro) .system-grid{display:grid;grid-template-columns:repeat(4,300px);justify-content:center;gap:20px}
-  body:has(.portal-intro) .system-card{flex:none;width:100%;min-height:250px;padding:22px 18px;clip-path:none;border-radius:11px}
-  body:has(.portal-intro) .system-card img{width:66px;height:66px;margin-bottom:10px}
-  body:has(.portal-intro) .system-card h2{font-size:18px}
-  body:has(.portal-intro) .system-card p{font-size:12px;line-height:1.6}
-  body:has(.portal-intro) .system-card b{padding:5px 10px;font-size:11px}
+  body:has(.portal-intro) .system-grid{display:grid;justify-content:center;gap:18px}
+  body:has(.portal-intro) .system-card{flex:none;width:264px;height:220px;min-height:220px;padding:19px 16px;clip-path:none;border-radius:10px}
+  body:has(.portal-intro) .system-card img{width:58px;height:58px;margin-bottom:9px}
+  body:has(.portal-intro) .system-card h2{font-size:16px}
+  body:has(.portal-intro) .system-card p{font-size:11px;line-height:1.6}
+  body:has(.portal-intro) .system-card b{padding:4px 9px;font-size:10px}
+}
+@media (min-width:1200px){
+  body:has(.portal-intro) .system-grid{grid-template-columns:repeat(4,264px)}
+}
+@media (min-width:761px) and (max-width:1199px){
+  body:has(.portal-intro) .system-grid{grid-template-columns:repeat(2,264px)}
 }
 
 /* 使用者指定：維修流程提示文字桌面向右 170px，窄版恢復左對齊。 */
