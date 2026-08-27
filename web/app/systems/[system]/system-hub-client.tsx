@@ -81,7 +81,7 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     return <AppShell profile={profile} title={system.title}
       heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
       <div className="operations-portal-note">{system.title}流程 · 點選圖卡進入功能系統</div>
-      <section className={`operations-portal-grid ${system.key}-portal`}>{system.modules.map((module, index) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{`MODULE ${String(index + 1).padStart(2, '0')}`}</span><span className="operations-portal-status">● 系統連線</span></div><img src={system.icon} alt="" /><h2>{module.title}</h2><p>{module.description}</p><b>進入系統　→</b></Link>)}</section>
+      <section className={`operations-portal-grid ${system.key}-portal`}>{system.modules.map((module, index) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{`MODULE ${String(index + 1).padStart(2, '0')}`}</span><span className="operations-portal-status">● 系統連線</span></div><span className={`generated-module-icon generated-module-icon-${index}`} aria-hidden="true" /><h2>{module.title}</h2><p>{module.description}</p><b>進入系統　→</b></Link>)}</section>
     </AppShell>;
   }
   const cards = handover ? [
