@@ -186,7 +186,7 @@
   }
 }
 
-/* 登入白色圖卡以原桌面尺寸的 80% 呈現；帳號申請表維持原尺寸。 */
+/* 登入白色圖卡以共用 .login-card 的 430px 桌面尺寸做 80% 整體縮放；帳號申請表維持原尺寸。 */
 @media (min-width: 641px) {
   .v1-login-page:has(> .v1-login-card:not(.account-apply-card)) {
     height: 100svh;
