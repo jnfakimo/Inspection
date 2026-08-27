@@ -218,7 +218,7 @@ export function AppShell({ profile, title, children, heading }: {
       <section className="profile-modal">
         <header><div><small>個人設定</small><h2 id="personal-profile-title">個人資料設定</h2><p>查詢與維護本人的聯絡資料、登入安全及個人行事曆。</p></div><button type="button" aria-label="關閉" onClick={() => setProfileOpen(false)}>×</button></header>
         <div className="profile-modal-body">
-          <form className="profile-section" onSubmit={saveProfile}>
+          <form className="profile-section profile-section-basic" onSubmit={saveProfile}>
             <div className="profile-section-title"><span>01</span><div><b>基本資料</b><small>帳號、單位及權限由管理員維護</small></div></div>
             <div className="profile-form-grid">
               <label>登入帳號<input value={profileDetails.username || ''} readOnly /></label>
@@ -232,7 +232,7 @@ export function AppShell({ profile, title, children, heading }: {
             <div className="profile-actions"><button type="submit" className="primary-btn compact" disabled={profileBusy}>儲存個人資料</button></div>
           </form>
 
-          <section className="profile-section google-calendar-section">
+          <section className="profile-section profile-section-calendar google-calendar-section">
             <div className="profile-section-title"><span>02</span><div><b>Google 個人行事曆</b><small>只連結目前登入者自己的 Google 帳號</small></div></div>
             <div className={`google-connection-card${calendarStatus?.connected ? ' is-connected' : ''}`}>
               <div className="google-calendar-mark">G</div><div><b>{calendarStatus?.connected ? '已連結' : calendarStatus?.status === 'error' ? '需要重新連結' : '尚未連結'}</b><span>{calendarStatus?.connected ? calendarStatus.google_email : calendarStatus?.status === 'error' ? 'Google 授權已失效，請重新完成帳號授權' : '連結後可將本人會議室預約同步到個人行事曆'}</span>{calendarStatus?.last_sync_at && <small>最後同步：{Number.isNaN(new Date(calendarStatus.last_sync_at).getTime()) ? '—' : new Date(calendarStatus.last_sync_at).toLocaleString('zh-TW')}</small>}</div>
@@ -242,7 +242,7 @@ export function AppShell({ profile, title, children, heading }: {
             {calendarMessage && <p className="profile-message">{calendarMessage}</p>}
           </section>
 
-          <form className="profile-section" onSubmit={changePassword}>
+          <form className="profile-section profile-section-security" onSubmit={changePassword}>
             <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>至少 {PASSWORD_POLICY.minLength} 個字元，且符合複雜度要求</small></div></div>
             <div className="profile-form-grid"><label>新密碼<input type="password" name="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} required autoComplete="new-password" /></label></div>
             {passwordMessage && <p className="profile-message">{passwordMessage}</p>}
