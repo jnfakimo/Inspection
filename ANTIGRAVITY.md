@@ -11,3 +11,10 @@
 - **其他微調**: 更新 `theme.js` 中的 debounce 處理、統一品牌條、修正權限 guard、整理 XLSX 匯入程式碼。
 
 此檔案即為本次收工的專案紀錄，供日後追蹤與交接使用。
+
+## 2026-08-27 Obsidian 開發紀錄流程修正
+
+- 本專案的公開 Obsidian vault 是 repository 內的 `Obsidian/`，程式／資料庫／資安／部署工作完成並驗證後，必須追加 `Obsidian/04-開發與部署.md`；待辦變更才同步 `05-待辦清單.md`。
+- `antigravity-obsidian` 技能只負責連接／設定 Obsidian MCP，觸發詞為「連接 Obsidian」或「設定 Obsidian」，不會因一般「開工」或開發任務自動寫入紀錄。
+- 已在本機 Codex 使用者設定註冊 `mcpvault` 指向 `Obsidian/`；設定不進 repository，需重啟 Codex 後載入。MCP 不可用時仍以 repository Markdown 完成同步，不得跳過。
+- 本次已補回近期漏記的公開工作：台灣氣象圖示位置、報修清單縮放版型、報修單位一／二階顯示；未記錄任何 Secret、Session、Cookie 或私有網址。
