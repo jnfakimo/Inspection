@@ -87,6 +87,40 @@
 .vehicle-flow-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .vehicle-kpi-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .vehicle-flow-grid>div,.vehicle-kpi-grid>div{min-width:0}
+/* 派車申請桌面版在瀏覽器 100% 縮放時維持單一視窗高度；僅壓縮本頁卡片與明細彈窗。 */
+.content:has(.vehicle-flow-grid){padding-top:14px;padding-bottom:14px}
+.vehicle-flow-grid{gap:6px!important;margin-bottom:8px!important}
+.vehicle-flow-grid>div{padding:7px 9px!important;border-radius:6px!important}
+.vehicle-flow-grid>div b{font-size:.78rem!important;line-height:1.2}
+.vehicle-flow-grid>div>div{margin-top:1px!important;font-size:.66rem!important;line-height:1.3}
+.vehicle-kpi-grid{gap:6px!important;margin-bottom:8px!important}
+.vehicle-kpi-grid>div{padding:7px 9px!important;border-radius:6px!important}
+.vehicle-kpi-grid>div>div:first-child{font-size:1.25rem!important}
+.vehicle-kpi-grid>div>div:last-child{margin-top:2px!important;font-size:.66rem!important;line-height:1.2}
+.vehicle-request-tabs{margin-bottom:8px!important}
+.content:has(.vehicle-flow-grid) .admin-panel{padding:14px}
+.content:has(.vehicle-flow-grid) .admin-toolbar{margin-bottom:10px}
+.content:has(.vehicle-flow-grid) .admin-panel th,.content:has(.vehicle-flow-grid) .admin-panel td{padding:8px 7px}
+.content:has(.vehicle-flow-grid) .admin-pager{padding-top:10px}
+.admin-modal-backdrop:has(.vehicle-detail-modal){padding:8px}
+.vehicle-detail-modal{width:min(860px,100%);max-height:calc(100dvh - 16px)}
+.vehicle-detail-modal>header{padding:10px 14px}
+.vehicle-detail-modal>header h2{font-size:1.05rem}
+.vehicle-detail-modal>header button{font-size:1.65rem;line-height:1}
+.vehicle-detail-modal .detail-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:10px 14px}
+.vehicle-detail-modal .detail-grid>div{min-width:0;padding:6px 9px}
+.vehicle-detail-modal .detail-grid dt{font-size:.68rem}
+.vehicle-detail-modal .detail-grid dd{margin-top:2px;font-size:.84rem;line-height:1.3}
+.vehicle-detail-modal .detail-timeline{padding:0 14px 2px}
+.vehicle-detail-modal .detail-timeline h3{margin-bottom:5px;font-size:.85rem}
+.vehicle-detail-modal .detail-timeline ol{gap:5px}
+.vehicle-detail-modal .detail-timeline li{padding:6px 9px;font-size:.82rem;line-height:1.3}
+.vehicle-detail-modal .detail-timeline li p{margin-top:3px;font-size:.76rem}
+.vehicle-detail-modal .admin-form-grid{gap:6px;padding:7px 14px}
+.vehicle-detail-modal .admin-form-grid label{gap:3px;font-size:.76rem}
+.vehicle-detail-modal .admin-form-grid input,.vehicle-detail-modal .admin-form-grid select{min-height:34px;padding:6px 9px}
+.vehicle-detail-modal>footer{position:sticky;bottom:0;z-index:2;padding:8px 14px;background:color-mix(in srgb,var(--surface) 96%,transparent);backdrop-filter:blur(8px)}
+.vehicle-detail-modal>footer button{min-height:34px;padding:7px 11px}
 @media (max-width:1100px){
   .vehicle-request-toolbar{flex-wrap:wrap}
   .vehicle-request-toolbar>input{min-width:220px!important}
@@ -94,6 +128,7 @@
   .vehicle-request-toolbar .localized-date-input>input:first-child{padding-right:30px}
 }
 @media (max-width:800px){.vehicle-request-actions{flex-wrap:wrap;white-space:normal;width:100%}}
+@media (max-width:800px){.vehicle-detail-modal .detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:600px){
   .vehicle-request-tabs{gap:3px}
   .vehicle-request-tabs>button{padding:8px 3px;font-size:.72rem}
@@ -106,6 +141,13 @@
   .vehicle-kpi-grid>div{padding:9px 5px!important;border-left-width:2px!important}
   .vehicle-kpi-grid>div>div:first-child{font-size:1.3rem!important}
   .vehicle-kpi-grid>div>div:last-child{font-size:.62rem!important;line-height:1.25;text-align:center;overflow-wrap:anywhere}
+  .admin-modal-backdrop:has(.vehicle-detail-modal){padding:4px}
+  .vehicle-detail-modal{width:100%;max-height:calc(100dvh - 8px)}
+  .vehicle-detail-modal .detail-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}
+  .vehicle-detail-modal .detail-grid>div{padding:6px 7px}
+  .vehicle-detail-modal .detail-timeline{padding:0 8px 2px}
+  .vehicle-detail-modal .admin-form-grid{padding:7px 8px}
+  .vehicle-detail-modal>footer{padding:7px 8px;flex-wrap:wrap}
 }
 .vehicle-followup-banner{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px 12px;margin:0 0 14px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--amber) 36%,var(--line));border-left:4px solid var(--amber);border-radius:6px;background:color-mix(in srgb,var(--amber) 8%,var(--surface));color:var(--ink)}
 .vehicle-followup-banner>strong{color:var(--amber)}

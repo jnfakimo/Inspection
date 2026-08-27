@@ -684,7 +684,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
 
   const field = (label: string, value: unknown) => <div><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
 
-  return <AdminModal title={`派車申請｜${fmt(row.request_no)}`} onClose={onClose}>
+  return <AdminModal title={`派車申請｜${fmt(row.request_no)}`} className="vehicle-detail-modal" onClose={onClose}>
     {followup && <div className={`vehicle-followup-modal ${followup.level}`} role="alert">
       <strong>{followup.label}</strong><span>{followup.message}</span>
     </div>}
@@ -734,7 +734,12 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       {selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛上一趟行程尚未補齊里程，暫停派車；請先由司機完成回報。</p>}
     </div>}
     {canCancel && <div className="admin-form-grid">
-      <label className="wide">取消原因（取消時必填）<input value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="未出車、臨時取消或其他原因" /></label>
+      <label className="wide">取消原因（取消時必填）<select value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
+        <option value=""></option>
+        <option value="未出車">未出車</option>
+        <option value="臨時取消">臨時取消</option>
+        <option value="其他">其他</option>
+      </select></label>
     </div>}
 
     <footer>
@@ -750,7 +755,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       {row.status === 'assigned' && isDriver && row.driver_accepted_at &&
         <button className="primary-btn compact" onClick={onTrip}>填寫行車回報</button>}
       {canCancel &&
-        <button className="secondary-btn danger" disabled={busy} onClick={() => window.confirm('確定取消這筆派車申請？') && void onAct(row.request_id, 'cancel', { note: cancelReason }, '已取消申請')}>取消申請</button>}
+        <button className="secondary-btn danger" disabled={busy || !cancelReason} onClick={() => window.confirm('確定取消這筆派車申請？') && void onAct(row.request_id, 'cancel', { note: cancelReason }, '已取消申請')}>取消申請</button>}
     </footer>
   </AdminModal>;
 }
