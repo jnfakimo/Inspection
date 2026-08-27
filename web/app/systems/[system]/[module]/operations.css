@@ -48,3 +48,22 @@
 .operations-matrix th strong{display:block}
 .operations-matrix th small{display:block;margin-top:3px;color:var(--dim);font-size:11px;font-weight:400;white-space:nowrap}
 .operations-filter-row .operations-export{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
+
+/* 日期、篩選與匯出控制在寬版面合併為同一列；窄版面自動換行，避免水平溢出。 */
+.operations-datebar,
+.operations-filter-row{
+  display:inline-flex;
+  vertical-align:bottom;
+}
+.operations-datebar{margin-right:6px}
+@media (max-width:1100px){
+  .operations-datebar{
+    display:flex;
+    margin-right:0;
+  }
+  .operations-filter-row{
+    display:flex;
+    width:100%;
+    flex-wrap:wrap;
+  }
+}
