@@ -45,11 +45,11 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   const handover = system.key === 'handover';
   if (system.key === 'vehicle') {
     const vehicleCards = [
-      ['requests', '派車申請', '提出用車申請並追蹤多階段核可流程。', 'vehicle-dispatch-icon-v4.png', 'MODULE 01', '進入系統　→'],
-      ['vehicles', '公務車輛', '管理車號、狀態與目前里程資料。', 'vehicle-dispatch-icon-v4.png', 'MODULE 02', '管理車輛　→'],
-      ['drivers', '駕駛人員', '維護可指派駕駛與啟用狀態。', 'vehicle-dispatch-icon-v4.png', 'MODULE 03', '管理駕駛　→'],
-      ['managers', '派車管理員', '設定派車管理與授權人員。', 'vehicle-dispatch-icon-v4.png', 'MODULE 04', '管理權限　→'],
-      ['logs', '派車紀錄', '查詢狀態變更與行車歷程。', 'vehicle-dispatch-icon-v4.png', 'MODULE 05', '查看紀錄　→'],
+      ['requests', '派車申請', '提出用車申請並追蹤多階段核可流程。', 'vehicle-request-icon-ai.png', 'MODULE 01', '進入系統　→'],
+      ['vehicles', '公務車輛', '管理車號、狀態與目前里程資料。', 'vehicle-car-icon-ai.png', 'MODULE 02', '管理車輛　→'],
+      ['drivers', '駕駛人員', '維護可指派駕駛與啟用狀態。', 'vehicle-driver-icon-ai.png', 'MODULE 03', '管理駕駛　→'],
+      ['managers', '派車管理員', '設定派車管理與授權人員。', 'vehicle-manager-icon-ai.png', 'MODULE 04', '管理權限　→'],
+      ['logs', '派車紀錄', '查詢狀態變更與行車歷程。', 'vehicle-log-icon-ai.png', 'MODULE 05', '查看紀錄　→'],
     ] as const;
     return <AppShell profile={profile} title={system.title}
       heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
