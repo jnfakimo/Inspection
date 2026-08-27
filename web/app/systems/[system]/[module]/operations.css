@@ -44,7 +44,7 @@
 
 /* 打卡頁標題貼近內容；矩陣欄標同時列出班別與通報時段，避免只看到 08:00–16:00。 */
 .operations-page .operations-header{padding-top:6px;margin-top:-4px;margin-bottom:10px}
-.guardpatrol-checkins-page{padding-top:0}
+.content.v1-content.operations-page.guardpatrol-checkins-page{padding-top:0}
 .operations-matrix th strong{display:block}
 .operations-matrix th small{display:block;margin-top:3px;color:var(--dim);font-size:11px;font-weight:400;white-space:nowrap}
 .operations-filter-row .operations-export{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
