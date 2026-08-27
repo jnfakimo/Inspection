@@ -126,6 +126,16 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
   body:has(.portal-intro) .system-card b{padding:5px 10px;font-size:11px}
 }
 
+/* 使用者指定：維修流程提示文字桌面向右 170px，窄版恢復左對齊。 */
+.workorder-note{margin-left:170px}
+@media(max-width:900px){.workorder-note{margin-left:0}}
+
+/* 維修入口七張統計卡：桌面固定 190×90px，同列間距 10px。 */
+.workorder-summary{display:grid;grid-template-columns:repeat(7,190px);gap:10px;justify-content:center}
+.workorder-summary article{width:190px;height:90px;padding:12px}
+@media(max-width:900px){.workorder-summary{grid-template-columns:repeat(4,minmax(0,1fr));justify-content:stretch}.workorder-summary article{width:auto;height:auto}}
+@media(max-width:600px){.workorder-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 /* 列表設計規格：奇數列白色、偶數列淺藍（80% 淡化），所有列表每頁 10 筆。 */
 .responsive-table tbody tr:nth-child(odd),
 .admin-panel table tbody tr:nth-child(odd),
