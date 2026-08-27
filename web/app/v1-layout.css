@@ -138,6 +138,9 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 /* 報修案件白色內容卡縮小至桌面版 85% 寬度，窄版恢復滿寬避免溢出。 */
 .request-v1-table{width:85%;margin-left:auto;margin-right:auto}
 @media(max-width:900px){.request-v1-table{width:100%}}
+/* 派工頁白色報修案件內容卡同步縮小至桌面版 85% 寬度。 */
+.dispatch-v1-table{width:85%;margin-left:auto;margin-right:auto}
+@media(max-width:900px){.dispatch-v1-table{width:100%}}
 
 /* 列表設計規格：奇數列白色、偶數列淺藍（80% 淡化），所有列表每頁 10 筆。 */
 .responsive-table tbody tr:nth-child(odd),
