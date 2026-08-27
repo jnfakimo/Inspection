@@ -108,7 +108,7 @@ function RecordsModule({ module, profile }: Props) {
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增巡檢</button>} />
-    <section className="panel admin-panel">
+    <section className="panel admin-panel patrol-notifications-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋設備、資產碼、巡檢人員或異常說明" />
         <select value={status} onChange={e => setStatus(e.target.value)}>
