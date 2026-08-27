@@ -423,6 +423,45 @@ create trigger trg_guard_vehicle_dispatch_assignment_and_driver
   before update on vehicle_dispatch_requests
   for each row execute function guard_vehicle_dispatch_assignment_and_driver();
 
+-- 已出車但未補齊里程的行程，不得完成回報，也不得讓同一車輛再次派車。
+create or replace function guard_vehicle_dispatch_mileage()
+returns trigger
+language plpgsql
+security definer
+set search_path=public,pg_temp
+as $$
+declare
+  taipei_today date := (now() at time zone 'Asia/Taipei')::date;
+  taipei_time time := (now() at time zone 'Asia/Taipei')::time;
+begin
+  if new.status='cancelled' and nullif(btrim(coalesce(new.cancel_reason,'')),'') is null then
+    raise exception using errcode='23514',message='取消派車申請前，必須填寫取消原因';
+  end if;
+  if new.status='completed' and (new.odometer_start is null or new.odometer_end is null) then
+    raise exception using errcode='23514',message='完成行車回報前，必須填寫起始與回程里程';
+  end if;
+  if tg_op='UPDATE' then
+    if old.status='approved' and new.status='assigned' and new.vehicle_id is not null
+      and exists(
+        select 1 from vehicle_dispatch_requests prior
+        where prior.request_id<>old.request_id and prior.vehicle_id=new.vehicle_id
+          and prior.status in ('assigned','completed')
+          and (prior.odometer_start is null or prior.odometer_end is null)
+          and (prior.actual_departure_at is not null or
+            (prior.driver_accepted_at is not null and
+              (prior.trip_date<taipei_today or (prior.trip_date=taipei_today and prior.planned_return_time<=taipei_time))))
+      ) then
+      raise exception using errcode='23514',message='該車輛上一趟行程已出車但尚未填寫完整里程，暫停派車，請先完成司機回報';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_guard_vehicle_dispatch_mileage on vehicle_dispatch_requests;
+create trigger trg_guard_vehicle_dispatch_mileage
+  before insert or update of status,vehicle_id,odometer_start,odometer_end,actual_departure_at,driver_accepted_at,cancel_reason
+  on vehicle_dispatch_requests for each row execute function guard_vehicle_dispatch_mileage();
+
 -- 預計時段不得在過去；行車完成回報的實際時間不得晚於現在。
 create or replace function guard_vehicle_dispatch_time_window()
 returns trigger language plpgsql set search_path=public as $$

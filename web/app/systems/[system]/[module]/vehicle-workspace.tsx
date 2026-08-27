@@ -34,6 +34,12 @@ const STATUS_TONE: Record<string, string> = {
 const VEHICLE_STATUS_LABEL: Record<string, string> = { active: '可派用', maintenance: '維修中', inactive: '停用' };
 const VEHICLE_STATUS_TONE: Record<string, string> = { active: 'closed', maintenance: 'in-progress', inactive: 'cancelled' };
 
+type VehicleFollowup = {
+  level: 'warning' | 'critical';
+  label: string;
+  message: string;
+};
+
 function Pill({ value, labels, tones }: { value: unknown; labels: Record<string, string>; tones: Record<string, string> }) {
   const key = String(value || '');
   return <span className={`status-pill ${tones[key] || 'pending'}`}>{labels[key] || fmt(value)}</span>;
@@ -43,6 +49,11 @@ function taipeiToday() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
     .formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {} as Record<string, string>);
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+function taipeiCurrentTime() {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false })
+    .formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {} as Record<string, string>);
+  return `${parts.hour}:${parts.minute}`;
 }
 function timeText(value: unknown) { return value ? String(value).slice(0, 5) : '—'; }
 function localToIso(value: string) { return value ? new Date(value).toISOString() : null; }
@@ -58,6 +69,48 @@ function numberOrNull(value: string) {
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function missingNumber(value: unknown) {
+  return value === null || value === undefined || String(value).trim() === '' || !Number.isFinite(Number(value));
+}
+
+function tripPastDue(row: Row, today: string, nowTime: string) {
+  const tripDate = String(row.trip_date || '');
+  const returnTime = timeText(row.planned_return_time);
+  return tripDate < today || (tripDate === today && returnTime !== '—' && returnTime <= nowTime);
+}
+
+function vehicleFollowup(row: Row, today: string, nowTime: string): VehicleFollowup | null {
+  const status = String(row.status || '');
+  const hasMissingMileage = missingNumber(row.odometer_start) || missingNumber(row.odometer_end);
+  if (status === 'cancelled' && !String(row.cancel_reason || '').trim()) {
+    return { level: 'critical', label: '取消未填原因', message: '此派車申請已取消但沒有取消原因，請申請人或司機補登。' };
+  }
+  if (status === 'completed' && hasMissingMileage) {
+    return { level: 'critical', label: '里程未完成', message: '此行程已出車但未填完整里程，車輛暫停再派，請司機補填。' };
+  }
+  if (status !== 'assigned') return null;
+  if (row.actual_departure_at && hasMissingMileage) {
+    return { level: 'critical', label: '出車未填里程', message: '已記錄出車但尚未填寫起始／回程里程，請司機補填。' };
+  }
+  if (row.actual_departure_at && !row.actual_return_at) {
+    return { level: 'critical', label: '出車未回報', message: '已出車但尚未完成行車回報，請司機補填回程與里程。' };
+  }
+  if (!tripPastDue(row, today, nowTime)) return null;
+  if (!row.driver_accepted_at) {
+    return { level: 'warning', label: '逾期未接單', message: '用車日期已過且沒有使用紀錄，請司機或申請人填寫原因後取消。' };
+  }
+  return { level: 'critical', label: '已接單未回報', message: '司機已接單但沒有出車回報，請填寫取消原因或完成行車回報。' };
+}
+
+function blocksVehicleDispatch(row: Row, today: string, nowTime: string) {
+  if (!['assigned', 'completed'].includes(String(row.status || ''))) return false;
+  if (missingNumber(row.odometer_start) || missingNumber(row.odometer_end)) {
+    if (row.actual_departure_at) return true;
+    if (row.driver_accepted_at && tripPastDue(row, today, nowTime)) return true;
+  }
+  return false;
 }
 
 export function VehicleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
@@ -117,8 +170,27 @@ function RequestsModule({ module, profile }: Props) {
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [statusFilter, dateFilter, tab]);
 
+  // 逾期未回報由資料庫建立站內通知；畫面上的警示仍會即時顯示給司機與車輛管理人。
+  useEffect(() => {
+    if (!canManageFleet) return;
+    void getSupabase().rpc('notify_vehicle_dispatch_followups').then(({ error }) => {
+      if (error) console.warn('派車逾期通知建立失敗：', error.message);
+    });
+  }, [canManageFleet]);
+
   const today = taipeiToday();
+  const nowTime = taipeiCurrentTime();
   const isDriver = useMemo(() => drivers.some(d => d.user_id === profile.user_id), [drivers, profile.user_id]);
+  const followups = useMemo(() => rows
+    .map(row => ({ row, alert: vehicleFollowup(row, today, nowTime) }))
+    .filter((item): item is { row: Row; alert: VehicleFollowup } => Boolean(item.alert)), [rows, today, nowTime]);
+  const visibleFollowups = useMemo(() => canManageFleet
+    ? followups
+    : followups.filter(item => item.row.driver_id === profile.user_id || item.row.applicant_id === profile.user_id),
+  [canManageFleet, followups, profile.user_id]);
+  const blockedVehicleIds = useMemo(() => new Set(rows
+    .filter(row => blocksVehicleDispatch(row, today, nowTime) && row.vehicle_id)
+    .map(row => String(row.vehicle_id))), [rows, today, nowTime]);
 
   // KPI 統計數字
   const kApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_approval').length, [rows]);
@@ -211,6 +283,17 @@ function RequestsModule({ module, profile }: Props) {
       </div>
     </div>
 
+    {visibleFollowups.length > 0 && <div className="vehicle-followup-banner" role="alert">
+      <strong>{canManageFleet ? '派車回報警示' : '請完成派車回報'}</strong>
+      <span>{canManageFleet ? `目前有 ${visibleFollowups.length} 筆行程需要追蹤；紅色項目會鎖定該車輛再次派車。` : '請填寫取消原因，或完成出車、回程與里程回報。'}</span>
+      <div className="vehicle-followup-banner-list">
+        {visibleFollowups.slice(0, 4).map(({ row, alert }) => <span key={String(row.request_id)} className={`vehicle-followup-chip ${alert.level}`}>
+          {fmt(row.request_no)}｜{alert.label}
+        </span>)}
+        {visibleFollowups.length > 4 && <span className="vehicle-followup-more">另有 {visibleFollowups.length - 4} 筆</span>}
+      </div>
+    </div>}
+
     {/* V1 四大頁籤（帶計數） */}
     <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
       <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('mine')}>
@@ -245,9 +328,9 @@ function RequestsModule({ module, profile }: Props) {
 
       <div className="responsive-table"><table>
         <thead><tr><th>申請編號</th><th>狀態</th><th>用車日期／時間</th><th>起訖地點</th><th>申請人／單位</th><th>人數</th><th>車號／司機</th><th>里程</th><th>操作</th></tr></thead>
-        <tbody>{paged.map(row => <tr key={row.request_id}>
+        <tbody>{paged.map(row => { const alert = vehicleFollowup(row, today, nowTime); return <tr key={row.request_id} className={alert ? `vehicle-followup-row ${alert.level}` : undefined}>
           <td><strong>{fmt(row.request_no)}</strong><small>申請日 {fmt(row.application_date)}</small></td>
-          <td><Pill value={row.status} labels={STATUS_LABEL} tones={STATUS_TONE} /></td>
+          <td><Pill value={row.status} labels={STATUS_LABEL} tones={STATUS_TONE} />{alert && <span className={`vehicle-followup-flag ${alert.level}`} title={alert.message}>{alert.label}</span>}</td>
           <td>{fmt(row.trip_date)}<small>{timeText(row.planned_departure_time)}–{timeText(row.planned_return_time)}</small></td>
           <td>{fmt(row.origin_location)} → {fmt(row.destination_location)}</td>
           <td>{fmt(row.applicant_name)}<small>{fmt(row.applicant_department)}</small></td>
@@ -261,7 +344,7 @@ function RequestsModule({ module, profile }: Props) {
             {row.status === 'assigned' && row.driver_id === profile.user_id && row.driver_accepted_at &&
               <button className="warn" onClick={() => setTripFor(row)}>行車回報</button>}
           </div></td>
-        </tr>)}</tbody>
+        </tr>; })}</tbody>
       </table></div>
       {!busy && paged.length === 0 && <p className="empty">目前沒有符合條件的派車申請</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
@@ -272,6 +355,7 @@ function RequestsModule({ module, profile }: Props) {
 
     {detail && <DetailModal row={detail} logs={logs} busy={busy} profile={profile}
       vehicles={vehicles} drivers={drivers} canDispatch={canManageFleet || isAdmin}
+      blockedVehicleIds={blockedVehicleIds}
       canApprove={isAdmin || (isUnitSupervisor && detail.applicant_id !== profile.user_id)}
       onClose={() => setDetail(null)} onAct={act} onTrip={() => { setTripFor(detail); setDetail(null); }} />}
 
@@ -582,19 +666,28 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
   </AdminModal>;
 }
 
-function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch, canApprove, onClose, onAct, onTrip }: {
+function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehicleIds, canDispatch, canApprove, onClose, onAct, onTrip }: {
   row: Row; logs: Row[]; busy: boolean; profile: Profile; vehicles: Row[]; drivers: Row[]; canDispatch: boolean; canApprove: boolean;
+  blockedVehicleIds: Set<string>;
   onClose: () => void; onTrip: () => void;
   onAct: (requestId: string, action: string, extra?: { note?: string; vehicleId?: string; driverId?: string }, success?: string) => Promise<boolean>;
 }) {
   const [reason, setReason] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
   const isDriver = row.driver_id === profile.user_id;
+  const canCancel = !['completed', 'cancelled'].includes(String(row.status))
+    && (row.applicant_id === profile.user_id || row.driver_id === profile.user_id || canDispatch);
+  const followup = vehicleFollowup(row, taipeiToday(), taipeiCurrentTime());
+  const selectedVehicleBlocked = Boolean(vehicleId && blockedVehicleIds.has(vehicleId));
 
   const field = (label: string, value: unknown) => <div><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
 
   return <AdminModal title={`派車申請｜${fmt(row.request_no)}`} onClose={onClose}>
+    {followup && <div className={`vehicle-followup-modal ${followup.level}`} role="alert">
+      <strong>{followup.label}</strong><span>{followup.message}</span>
+    </div>}
     <dl className="detail-grid">
       {field('狀態', STATUS_LABEL[String(row.status)] || row.status)}
       {field('申請人', `${fmt(row.applicant_name)}（${fmt(row.applicant_department)}）`)}
@@ -631,16 +724,17 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch,
     {row.status === 'approved' && canDispatch && <div className="admin-form-grid">
       <label>指派車輛<select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
         <option value="">-- 請選擇 --</option>
-        {vehicles.filter(v => v.status === 'active').map(v => <option key={String(v.vehicle_id)} value={String(v.vehicle_id)}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）</option>)}
+        {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : ''}</option>; })}
       </select></label>
       <label>指派駕駛<select value={driverId} onChange={e => setDriverId(e.target.value)}>
         <option value="">-- 請選擇 --</option>
         {drivers.map(d => <option key={String(d.user_id)} value={String(d.user_id)}>{(d.users as Row)?.name || d.user_id}</option>)}
       </select></label>
       <label className="wide">派車備註<input value={reason} onChange={e => setReason(e.target.value)} /></label>
+      {selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛上一趟行程尚未補齊里程，暫停派車；請先由司機完成回報。</p>}
     </div>}
-    {['pending_approval', 'approved', 'assigned'].includes(String(row.status)) && row.status !== 'pending_approval' && <div className="admin-form-grid">
-      <label className="wide">取消原因（取消時必填）<input value={reason} onChange={e => setReason(e.target.value)} /></label>
+    {canCancel && <div className="admin-form-grid">
+      <label className="wide">取消原因（取消時必填）<input value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="未出車、臨時取消或其他原因" /></label>
     </div>}
 
     <footer>
@@ -650,13 +744,13 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, canDispatch,
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'approve', { note: reason }, '已核可申請')}>核可</button>
       </>}
       {row.status === 'approved' && canDispatch &&
-        <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}
+        <button className="primary-btn compact" disabled={busy || !vehicleId || !driverId || selectedVehicleBlocked} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}
       {row.status === 'assigned' && isDriver && !row.driver_accepted_at &&
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'accept', {}, '已接單')}>接單</button>}
       {row.status === 'assigned' && isDriver && row.driver_accepted_at &&
         <button className="primary-btn compact" onClick={onTrip}>填寫行車回報</button>}
-      {!['completed', 'cancelled'].includes(String(row.status)) && (row.applicant_id === profile.user_id || row.driver_id === profile.user_id || canDispatch) &&
-        <button className="secondary-btn danger" disabled={busy} onClick={() => window.confirm('確定取消這筆派車申請？') && void onAct(row.request_id, 'cancel', { note: reason }, '已取消申請')}>取消申請</button>}
+      {canCancel &&
+        <button className="secondary-btn danger" disabled={busy} onClick={() => window.confirm('確定取消這筆派車申請？') && void onAct(row.request_id, 'cancel', { note: cancelReason }, '已取消申請')}>取消申請</button>}
     </footer>
   </AdminModal>;
 }

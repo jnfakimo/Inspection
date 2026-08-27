@@ -9,7 +9,7 @@ import { AdminHeader, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, 
 const NOTICE_EVENT_LABELS: Record<string, string> = {
   new_repair: '新報修', dispatch: '已派工', return: '退件', overdue: '逾期提醒',
   complete: '完工', close: '結案', sign: '簽核', assignment: '任務指派',
-  reminder: '系統提醒', security_alert: '資安告警',
+  reminder: '系統提醒', security_alert: '資安告警', vehicle_dispatch_followup: '派車回報提醒',
 };
 
 export function NoticesAdmin({ profile, module }: AdminProps) {

@@ -84,6 +84,21 @@
 .vehicle-request-toolbar>input{min-width:0!important}
 @media (max-width:1100px){.vehicle-request-toolbar{flex-wrap:wrap}.vehicle-request-toolbar>input{min-width:220px!important}}
 @media (max-width:800px){.vehicle-request-actions{flex-wrap:wrap;white-space:normal;width:100%}}
+.vehicle-followup-banner{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:5px 12px;margin:0 0 14px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--amber) 36%,var(--line));border-left:4px solid var(--amber);border-radius:6px;background:color-mix(in srgb,var(--amber) 8%,var(--surface));color:var(--ink)}
+.vehicle-followup-banner>strong{color:var(--amber)}
+.vehicle-followup-banner>span{color:var(--muted);font-size:.82rem}
+.vehicle-followup-banner-list{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.vehicle-followup-chip,.vehicle-followup-flag{display:inline-flex;align-items:center;width:max-content;padding:3px 7px;border:1px solid color-mix(in srgb,var(--amber) 42%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--amber) 10%,var(--surface));color:var(--amber);font-size:.7rem;font-weight:700}
+.vehicle-followup-chip.critical,.vehicle-followup-flag.critical{border-color:color-mix(in srgb,var(--red) 45%,var(--line));background:color-mix(in srgb,var(--red) 9%,var(--surface));color:var(--red)}
+.vehicle-followup-more{color:var(--muted);font-size:.72rem;align-self:center}
+.vehicle-followup-row.warning>td{background:color-mix(in srgb,var(--amber) 7%,var(--surface))}
+.vehicle-followup-row.critical>td{background:color-mix(in srgb,var(--red) 7%,var(--surface))}
+.vehicle-followup-flag{display:flex;margin-top:5px}
+.vehicle-followup-modal{display:flex;gap:8px;align-items:flex-start;margin:0 20px 2px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--amber) 36%,var(--line));border-left:4px solid var(--amber);border-radius:5px;background:color-mix(in srgb,var(--amber) 8%,var(--surface));font-size:.82rem}
+.vehicle-followup-modal strong{color:var(--amber);white-space:nowrap}
+.vehicle-followup-modal.critical{border-color:color-mix(in srgb,var(--red) 38%,var(--line));border-left-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--surface))}
+.vehicle-followup-modal.critical strong{color:var(--red)}
+.admin-form-grid>.vehicle-followup-dispatch-block{grid-column:1/-1;margin:0;color:var(--red);font-size:.8rem}
 .handover-create-modal .detail-grid>div{border-left:3px solid var(--cyan)}
 .handover-create-modal .detail-grid dd{font-size:1.05rem;font-weight:700}
 .handover-records-panel{width:85%;margin-left:auto;margin-right:auto}
