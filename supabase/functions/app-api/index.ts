@@ -1656,13 +1656,16 @@ export async function handleAppApiRequest(req: Request) {
       if (rosterTable !== 'vehicle_dispatch_drivers' && rosterTable !== 'vehicle_dispatch_managers') return reply(req, { ok: false, message: '名單類型無效' }, 400);
       const targetUser = text(body.user_id, 80);
       if (!/^[0-9a-f-]{36}$/i.test(targetUser)) return reply(req, { ok: false, message: '人員識別碼無效' }, 400);
-      const active = body.active ? true : false;
-      const { data: before } = await userDb.from(rosterTable).select('user_id,active,assigned_by').eq('user_id', targetUser).maybeSingle();
+      const remove = body.remove === true;
+      const active = remove ? false : body.active === true;
+      const { data: before, error: readError } = await userDb.from(rosterTable).select('user_id,active,assigned_by').eq('user_id', targetUser).maybeSingle();
+      if (readError) throw readError;
+      if (remove && !before) return reply(req, { ok: false, message: '找不到指定的名單人員' }, 404);
       const payload: Record<string, unknown> = { user_id: targetUser, active, updated_at: new Date().toISOString() };
       if (!before) payload.assigned_by = profile.user_id;
       const { data, error } = await userDb.from(rosterTable).upsert(payload, { onConflict: 'user_id' }).select('user_id').single();
       if (error) throw error;
-      await writeAudit(userDb, profile.user_id, rosterTable, targetUser, before ? 'update' : 'insert', before || null, { active });
+      await writeAudit(userDb, profile.user_id, rosterTable, targetUser, before ? 'status_change' : 'insert', before || null, { active, removed: remove });
       return reply(req, { ok: true, data });
     }
 

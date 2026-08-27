@@ -850,6 +850,14 @@ function RosterModule({ module, profile }: Props) {
   const toggle = (row: Row) => run(
     () => invokeAppApi('vehicle_roster_update', { table, user_id: row.user_id, active: !row.active }),
     row.active ? `已停用該${roleWord}` : `已啟用該${roleWord}`);
+  const remove = (row: Row) => {
+    const user = (row.users as Row) || {};
+    const name = String(user.name || user.username || '此人員');
+    if (!window.confirm(`確定將「${name}」從${roleWord}名單移除？\n既有派車紀錄會保留，之後不再列入可指派名單；需要時仍可由管理者重新啟用。`)) return;
+    return run(
+      () => invokeAppApi('vehicle_roster_update', { table, user_id: row.user_id, active: false, remove: true }),
+      `已從${roleWord}名單移除`);
+  };
   const add = () => {
     if (!pick) { setNote('失敗：請先選擇人員'); return; }
     return run(() => invokeAppApi('vehicle_roster_update', { table, user_id: pick, active: true }), `已新增${roleWord}`);
@@ -878,6 +886,7 @@ function RosterModule({ module, profile }: Props) {
             <td>{fmtTime(row.updated_at || row.assigned_at)}</td>
             {isAdmin && <td><div className="admin-row-actions">
               <button className={row.active ? 'warn' : ''} onClick={() => void toggle(row)}>{row.active ? '停用' : '啟用'}</button>
+              {row.active && <button className="danger" onClick={() => void remove(row)}>刪除</button>}
             </div></td>}
           </tr>;
         })}</tbody>
