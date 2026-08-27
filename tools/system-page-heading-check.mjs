@@ -18,11 +18,17 @@ assert.match(component, /titleColor:\s*'var\(--cyan\)'/);
 assert.match(component, /logoSizePx:\s*42/);
 assert.match(component, /src=\{system\.icon\}/);
 assert.match(component, /data-system-page-heading="standard"/);
+assert.match(component, /title \|\| system\.title/);
+assert.match(component, /metaTitle \|\| module\.title/);
 
 const shell = readFileSync('web/components/AppShell.tsx', 'utf8');
-assert.match(shell, /<SystemPageHeader system=\{routeSystem\} module=\{routeModule\}/);
+assert.match(shell, /<SystemPageHeader system=\{headingSystem\} module=\{headingModule\}/);
 assert.match(shell, /admin-v2-content">\{pageHeading\}\{children\}/);
 assert.match(shell, /v1-content">\{pageHeading\}\{children\}/);
+
+const handover = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
+assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaTitle: system\.title \}\}/,
+  '交接紀錄首頁必須使用模組名稱作為大標題');
 
 const css = readFileSync('web/app/v1-layout.css', 'utf8');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);

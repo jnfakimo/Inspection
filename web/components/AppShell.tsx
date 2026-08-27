@@ -11,7 +11,7 @@ import type { Profile } from '@/types/app';
 import { allowedActions } from '@/lib/shared-actions';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile } from '@/lib/profile-cache';
-import { findModule, findSystem } from '@/lib/modules';
+import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
 
 
@@ -22,7 +22,12 @@ function taipeiClock() {
   }).format(new Date()).replace(',', '');
 }
 
-export function AppShell({ profile, title, children }: { profile: Profile; title: string; children: React.ReactNode }) {
+export function AppShell({ profile, title, children, heading }: {
+  profile: Profile;
+  title: string;
+  children: React.ReactNode;
+  heading?: { system: SystemDefinition; module: ModuleDefinition; title?: string; metaTitle?: string };
+}) {
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -39,7 +44,11 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   const systemsIndex = pathParts.indexOf('systems');
   const routeSystem = systemsIndex >= 0 ? findSystem(pathParts[systemsIndex + 1] || '') : undefined;
   const routeModule = routeSystem ? findModule(routeSystem.key, pathParts[systemsIndex + 2] || '') : undefined;
-  const pageHeading = routeSystem && routeModule ? <SystemPageHeader system={routeSystem} module={routeModule} /> : null;
+  const headingSystem = heading?.system || routeSystem;
+  const headingModule = heading?.module || routeModule;
+  const pageHeading = headingSystem && headingModule
+    ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} />
+    : null;
 
   useEffect(() => {
     // 主題屬性由 layout.tsx 的行內腳本在算繪前就設好，切換由全站的 ThemeToggle

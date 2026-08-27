@@ -159,7 +159,8 @@ function RecordsModule({ module, profile }: Props) {
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
-  return <AppShell profile={profile} title={module.title}>
+  return <AppShell profile={profile} title={module.title}
+    heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact handover-create-btn" onClick={() => setCreating(true)}>＋ 新增交接單</button>} />
     <section className="panel admin-panel handover-records-panel">

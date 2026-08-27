@@ -218,6 +218,9 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - 三個全螢幕圖資工具頁是版型例外：`structuremap/floor2d`、`structuremap/floor3d`、
   `guardpatrol/map3d`。它們不套 AppShell，使用 `data-system-page-heading="compact"` 的
   緊湊頂列標題，但仍必須顯示對應系統 Logo、主題色與模組名稱。
+- **交接紀錄首頁例外（2026-08-27 使用者指定）**：`/v2/systems/handover/` 直接呈現
+  `records` 模組，大標題使用「交接紀錄」，識別行顯示「SYS-04 · 電子交接簿」；距離、
+  字級、顏色與 Logo 尺寸仍完全沿用 `SystemPageHeader`，不可另寫一套樣式。
 - 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 9／49、
   正式 Logo、標題 token，以及 46 個一般頁首與 3 個全螢幕頁首的覆蓋關係。
 
