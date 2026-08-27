@@ -57,6 +57,19 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
       <section className="operations-portal-grid vehicle">{vehicleCards.map(([key, title, description, icon, code, action], index) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
     </AppShell>;
   }
+  if (system.key === 'meetingroom') {
+    const meetingCards = [
+      ['bookings', '會議室預約', '建立、查詢與管理會議室預約。', 'meeting-booking-icon-v1.png', 'MODULE 01', '進入系統　→'],
+      ['rooms', '會議室管理', '維護會議室資料與設備狀態。', 'meeting-room-master-icon-v1.png', 'MODULE 02', '管理會議室　→'],
+      ['changes', '異動申請', '審核預約取消與時間異動申請。', 'meeting-change-icon-v1.png', 'MODULE 03', '查看申請　→'],
+      ['notifications', '通知紀錄', '查詢預約通知與發送結果。', 'meeting-notification-icon-v1.png', 'MODULE 04', '查看通知　→'],
+    ] as const;
+    return <AppShell profile={profile} title={system.title}
+      heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
+      <div className="operations-portal-note">會議室管理流程 · 點選圖卡進入功能系統</div>
+      <section className="operations-portal-grid meetingroom">{meetingCards.map(([key, title, description, icon, code, action]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
+    </AppShell>;
+  }
   const cards = handover ? [
     ['records', '新增交接／交接記錄', '填寫班別、異常、待辦與備註，送出後由接班人接收。', 'handover-icon.png', 'HANDOVER 01'],
     ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 02'],
@@ -78,7 +91,7 @@ export function SystemHubClient({ system }: { system: SystemDefinition }) {
   function Hub({ profile }: { profile: Profile }) {
     const allowed = profile.allowed_systems.includes('*') || profile.allowed_systems.includes(system.key);
     if (system.key === 'workorder' && allowed) return <WorkorderHub profile={profile} />;
-    if ((system.key === 'handover' || system.key === 'guardpatrol' || system.key === 'vehicle') && allowed) return <OperationsHub system={system} profile={profile} />;
+    if ((system.key === 'handover' || system.key === 'guardpatrol' || system.key === 'vehicle' || system.key === 'meetingroom') && allowed) return <OperationsHub system={system} profile={profile} />;
     return <AppShell profile={profile} title={system.title}>{allowed ? <><section className={`module-hero ${system.key}-module-hero`}><div><span>{zhSystemCode(system.code)}</span><h2>{system.title}</h2><p>{system.description}</p></div><img src={system.icon} alt="" /></section><section className={`module-grid ${system.key}-module-grid`}>{system.modules.map((module: ModuleDefinition, index: number) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className={system.key === 'meetingroom' ? 'meetingroom-module-card' : undefined}>{system.key === 'meetingroom' && <img src={meetingroomModuleIcons[module.key]} alt="" aria-hidden="true" />}<span>{zhModuleCode(index)}</span><h3>{module.title}</h3><p>{module.description}</p><b>開啟子系統 →</b></Link>)}</section></> : <div className="notice danger">目前角色沒有此系統權限，請由管理員開放。</div>}</AppShell>;
   }
   return <AuthGate>{profile => <Hub profile={profile} />}</AuthGate>;
