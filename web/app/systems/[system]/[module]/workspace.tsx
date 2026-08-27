@@ -630,7 +630,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       </div>
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
       {data?.summary && (
-        <section className="mini-metrics">
+        <section className={`mini-metrics ${isRepairTableModule ? 'workorder-summary' : ''}`}>
           {/* 圖卡內容一律由後端的 repairRequestSummary 決定，前端不再自行插卡——
               先前這裡額外插了一張「急迫性案件」，維修系統入口沒有，兩頁因此對不起來。 */}
           {data.summary.map(item => (
