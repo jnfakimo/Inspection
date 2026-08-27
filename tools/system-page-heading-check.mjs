@@ -43,6 +43,10 @@ assert.match(operationsCss, /\.operations-portal-grid\.patrol \.operations-porta
   '駐衛警入口桌面圖卡必須固定為 269×200px');
 assert.match(operationsCss, /@media \(max-width:1100px\)[\s\S]*?\.operations-portal-grid\.patrol\{width:100%;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,
   '駐衛警入口必須隨瀏覽器縮放／視窗寬度恢復滿寬');
+assert.match(operationsCss, /\.operations-portal-grid\.handover\{grid-template-columns:repeat\(3,269px\);justify-content:center\}/,
+  '交接紀錄子系統桌面圖卡必須維持 269px 欄寬');
+assert.match(operationsCss, /\.operations-portal-grid\.handover \.operations-portal-card\{width:269px;height:200px;min-height:200px/,
+  '交接紀錄子系統桌面圖卡必須固定為 269×200px');
 
 const css = readFileSync('web/app/v1-layout.css', 'utf8');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);

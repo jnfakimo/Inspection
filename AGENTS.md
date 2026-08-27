@@ -233,6 +233,11 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 9／49、
   正式 Logo、標題 token，以及 46 個一般頁首與 3 個全螢幕頁首的覆蓋關係。
 
+- **49 個子系統圖卡（2026-08-27 使用者指定）**：一般 `.module-grid` 與交接／駐衛警入口
+  的子系統圖卡，桌面瀏覽器 100% 統一為 **269×200px**；標題沿用共用頁首規格（距頂列
+  22px、26px、淺藍 `rgb(2, 132, 199)`、Logo 左側 24px、標題左側 80px、Logo 42×42px）。
+  1100px 以下改兩欄、600px 以下改單欄，並恢復彈性寬度避免水平溢出。
+
 ## V2 登入頁版型規範（2026-08-27 訂）
 
 - `/v2/login/` 的白色登入圖卡在桌面以共用 `.login-card` 的 430px 基準做 **80%**
