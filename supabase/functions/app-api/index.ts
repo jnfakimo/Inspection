@@ -805,7 +805,7 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: false, message: '今日公文編號已達 9999 號，請聯絡系統管理員' }, 409);
       }
       await officialDocumentEvent(admin, createActor, documentId, 'create', `${documentId}:create`, { to_status: 'draft', note: '建立公文' });
-      await officialDocumentEvent(admin, createActor, documentId, 'barcode_generated', `${documentId}:barcode`, { to_status: 'draft', note: '建立公文查詢條碼', details: { barcode_value: barcode } });
+      await officialDocumentEvent(admin, createActor, documentId, 'barcode_generated', `${documentId}:barcode`, { to_status: 'draft', note: '建立公文文號', details: { barcode_value: barcode } });
       return reply(req, { ok: true, data: createdData });
     }
 
@@ -967,7 +967,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'barcode_generate') {
-        if (!managerCanOperate && !isOriginator) return fail('只有原申請人或本單位公文管理人員可以產生條碼', 403);
+        if (!managerCanOperate && !isOriginator) return fail('只有原申請人或本單位公文管理人員可以產生文號', 403);
         const currentBarcode = text(document.barcode_value, 200);
         if (currentBarcode) return reply(req, { ok: true, data: { status: document.status, barcode_value: currentBarcode, duplicate: true } });
         const barcode = text(document.document_no, 100);
