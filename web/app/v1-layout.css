@@ -49,11 +49,13 @@
 .maintenance-card{width:269px;height:200px;min-height:200px;padding:6px 18px 18px}
 .maintenance-card img{width:48px;height:48px;margin:2px 0 12px}
 /* 七張統計小卡以主圖卡 80% 比例收斂，桌面保持單列。 */
-.workorder-summary{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
-.workorder-summary article{height:80px;padding:12px}
-.workorder-summary strong{font-size:22px;margin-top:4px}
+.workorder-summary{display:grid;grid-template-columns:repeat(7,108px);gap:10px;justify-content:center}
+.workorder-summary article{width:108px;height:52px;padding:6px 8px}
+.workorder-summary span{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workorder-summary strong{font-size:17px;margin-top:1px}
 @media(max-width:900px){.maintenance-hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.maintenance-card{width:auto}}
-@media(max-width:760px){.workorder-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.workorder-summary article{height:auto}.maintenance-hub-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.workorder-summary{grid-template-columns:repeat(4,minmax(0,1fr));justify-content:stretch}.workorder-summary article{width:auto}}
+@media(max-width:600px){.workorder-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.workorder-summary article{height:auto}.maintenance-hub-grid{grid-template-columns:1fr}}
 .request-status-chips button[data-status="closed"].active,.request-status-chips button[data-status="closed"]:hover{border-color:var(--green);color:var(--green);background:rgba(0,255,157,.07)}
 .request-status-chips b{margin-left:4px;color:var(--text)}
 /* 報修清單在桌機版以固定欄寬填滿內容區，避免篩選欄位的最小寬度把整頁撐出水平捲軸。
