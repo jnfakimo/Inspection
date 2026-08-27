@@ -26,6 +26,7 @@ assert.match(shell, /v1-content">\{pageHeading\}\{children\}/);
 
 const css = readFileSync('web/app/v1-layout.css', 'utf8');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);
+assert.match(css, /\.content\.v1-content:has\(>\.system-page-heading\)\{padding-top:20px\}/);
 assert.match(css, /\.system-page-heading h1\{[^}]*color:var\(--cyan\)[^}]*font-size:26px/);
 assert.match(css, /\.system-page-heading>img\{[^}]*width:42px;height:42px/);
 
