@@ -95,31 +95,51 @@
   .operations-portal-grid.patrol .operations-portal-card{min-height:220px}
 }
 
-/* 日期、篩選與匯出控制在寬版面合併為同一列；窄版面自動換行，避免水平溢出。
-   901px 以上仍維持單列，讓一般筆電／平板橫向視窗不會被 1100px 斷點拆成兩列。 */
-.operations-datebar,
-.operations-filter-row{
-  display:inline-flex;
-  vertical-align:bottom;
+/* 日期、篩選與匯出控制共用同一個 Flex 工具列，寬版面一定維持單列；
+   窄版面才換行，避免兩個獨立列因總寬度不足而被瀏覽器拆開。 */
+.operations-tool-row{
+  display:flex;
+  align-items:flex-end;
+  flex-wrap:nowrap;
+  gap:6px;
+  width:100%;
+  min-width:0;
+  margin-bottom:14px;
 }
-.operations-datebar{margin-right:6px}
+.operations-tool-row .operations-datebar,
+.operations-tool-row .operations-filter-row{
+  display:contents;
+  margin:0;
+}
+.operations-tool-row .operations-datebar>button{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
+.operations-tool-row .operations-datebar .localized-date-input,
+.operations-tool-row .operations-filter-row .localized-date-input{
+  flex:0 1 104px;
+  width:104px;
+  min-width:0;
+}
+.operations-tool-row .operations-datebar .localized-date-input input,
+.operations-tool-row .operations-filter-row .localized-date-input input{
+  width:100%;
+  box-sizing:border-box;
+}
+.operations-tool-row .operations-filter-row>label{flex:0 1 104px;min-width:0;gap:3px}
+.operations-tool-row .operations-filter-row input,
+.operations-tool-row .operations-filter-row select,
+.operations-tool-row .operations-filter-row .request-filter-combobox{width:104px;max-width:100%;box-sizing:border-box}
+.operations-tool-row .operations-filter-row .operations-export{flex:0 1 auto;white-space:nowrap;padding:5px 9px;font:inherit}
 @media (max-width:1100px) and (min-width:901px){
   /* 控制項縮小但不換列，仍保留日期欄位與按鈕的可操作寬度。 */
-  .operations-datebar,.operations-filter-row{gap:4px;font-size:.74em}
-  .operations-datebar .localized-date-input,
-  .operations-filter-row .localized-date-input{width:92px}
-  .operations-filter-row input,.operations-filter-row select{width:92px}
-  .operations-datebar>button{padding:5px 6px}
-  .operations-filter-row .operations-export{padding:5px 6px}
+  .operations-tool-row{gap:4px}
+  .operations-tool-row .operations-datebar>button{padding:5px 6px}
+  .operations-tool-row .operations-datebar .localized-date-input,
+  .operations-tool-row .operations-filter-row .localized-date-input,
+  .operations-tool-row .operations-filter-row>label{flex-basis:92px;width:92px}
+  .operations-tool-row .operations-filter-row input,
+  .operations-tool-row .operations-filter-row select,
+  .operations-tool-row .operations-filter-row .request-filter-combobox{width:92px}
+  .operations-tool-row .operations-filter-row .operations-export{padding:5px 6px}
 }
 @media (max-width:900px){
-  .operations-datebar{
-    display:flex;
-    margin-right:0;
-  }
-  .operations-filter-row{
-    display:flex;
-    width:100%;
-    flex-wrap:wrap;
-  }
+  .operations-tool-row{flex-wrap:wrap}
 }
