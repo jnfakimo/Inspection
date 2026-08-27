@@ -43,6 +43,20 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   // 交接簿的系統入口直接顯示交接紀錄模組（system.modules[0] 即 records）。
   if (system.key === 'handover') return <HandoverModules system={system} module={system.modules[0]} profile={profile} />;
   const handover = system.key === 'handover';
+  if (system.key === 'vehicle') {
+    const vehicleCards = [
+      ['requests', '派車申請', '提出用車申請並追蹤多階段核可流程。', 'vehicle-dispatch-icon-v4.png', 'MODULE 01', '進入系統　→'],
+      ['vehicles', '公務車輛', '管理車號、狀態與目前里程資料。', 'vehicle-dispatch-icon-v4.png', 'MODULE 02', '管理車輛　→'],
+      ['drivers', '駕駛人員', '維護可指派駕駛與啟用狀態。', 'vehicle-dispatch-icon-v4.png', 'MODULE 03', '管理駕駛　→'],
+      ['managers', '派車管理員', '設定派車管理與授權人員。', 'vehicle-dispatch-icon-v4.png', 'MODULE 04', '管理權限　→'],
+      ['logs', '派車紀錄', '查詢狀態變更與行車歷程。', 'vehicle-dispatch-icon-v4.png', 'MODULE 05', '查看紀錄　→'],
+    ] as const;
+    return <AppShell profile={profile} title={system.title}
+      heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
+      <div className="operations-portal-note">公務車派車流程 · 點選圖卡進入功能系統</div>
+      <section className="operations-portal-grid vehicle">{vehicleCards.map(([key, title, description, icon, code, action], index) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
+    </AppShell>;
+  }
   const cards = handover ? [
     ['records', '新增交接／交接記錄', '填寫班別、異常、待辦與備註，送出後由接班人接收。', 'handover-icon.png', 'HANDOVER 01'],
     ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 02'],
