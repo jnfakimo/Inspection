@@ -400,8 +400,8 @@
 /* bottom 讓出全站介面風格切換鈕的位置（.theme-toggle，右下 16px、44px 高）。 */
 .f3-bottomright {
   position: fixed;
-  right: 14px;
-  bottom: 70px;
+  right: 72px;
+  bottom: 16px;
   z-index: 150;
   display: flex;
   align-items: flex-end;
