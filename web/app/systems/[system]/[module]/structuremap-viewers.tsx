@@ -86,7 +86,7 @@ function useFloorData() {
 
 /* ──────────────────────────── 2D 平面樓層圖 ──────────────────────────── */
 
-function Floor2DViewer({ module, profile }: Props) {
+function Floor2DViewer({ system, module, profile }: Props) {
   const { models, markers, busy, note, setNote, reload } = useFloorData();
   const [floor, setFloor] = useState('');
   // 類型篩選由單選下拉改為逐項核取，與 3D 模型圖的標記面板一致：現場常要「只看報修
@@ -393,9 +393,10 @@ function Floor2DViewer({ module, profile }: Props) {
       <div className="ld-m">讀取樓層模型與標記…</div>
     </div>}
 
-    <div className="f3-topbar">
+    <div className="f3-topbar" data-system-page-heading="compact" data-system-key={system.key} data-module-key={module.key}>
       <span className="tb-logo">臺北農產公司 第一果菜市場</span>
       <span className="tb-sep" />
+      <img className="tb-system-icon" src={system.icon} alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
       {/* 與 AppShell、3D 模型圖同一份定義（lib/shared-actions），依帳號可用的系統過濾。 */}
       <nav className="tb-nav" aria-label="共用系統導覽">

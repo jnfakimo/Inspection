@@ -5,7 +5,7 @@
 .mr-page{display:grid;gap:16px}
 
 .mr-page .mr-hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 20px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:6px;background:var(--panel)}
-.mr-page .mr-hero h1{margin:0;font-size:1.35rem}
+.mr-page .mr-hero-title{display:block;margin:0;font-size:1.35rem}
 .mr-page .mr-hero p{margin:6px 0 0;color:var(--dim);font-size:.82rem}
 .mr-page .mr-hero .spacer{flex:1}
 

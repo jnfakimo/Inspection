@@ -35,6 +35,7 @@
 .od-step-section,.od-layout .od-list-panel{--od-section-accent:var(--cyan);border-top-color:var(--od-section-accent);border-top-width:6px;box-shadow:0 -4px 14px color-mix(in srgb,var(--od-section-accent) 34%,transparent)}.od-layout .od-list-panel{--od-section-accent:var(--green)}.od-step-section-3{--od-section-accent:var(--amber)}
 @media (max-width:700px){.od-search-panel .od-section-title,.od-step-section-3 .od-section-title{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.od-search-panel .od-section-title>div,.od-step-section-3 .od-section-title>div{min-width:0}.od-search-panel .od-section-title h2,.od-step-section-3 .od-section-title h2{white-space:nowrap}.od-search-panel .od-section-title>small,.od-step-section-3 .od-section-title>small{max-width:none;text-align:left;line-height:1.55}}
 @media (min-width:701px){.od-header>div:first-child>p{white-space:nowrap;overflow:visible;max-width:none;font-size:clamp(11px,.88vw,13px)}}
+.od-header h2{margin:6px 0 8px;font-size:22px}
 
 /* 公文頁操作按鈕與摘要卡文案微調。 */
 .od-page .od-search-panel{border-top:6px solid var(--cyan);box-shadow:none}

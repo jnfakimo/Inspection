@@ -106,6 +106,7 @@
   font-size: 11px;
   white-space: nowrap;
 }
+.f3-topbar .tb-system-icon { width: 26px; height: 26px; object-fit: contain; flex: 0 0 auto; }
 
 .f3-topbar .tb-space { flex: 1 0 auto; }
 

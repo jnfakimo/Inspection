@@ -11,6 +11,8 @@ import type { Profile } from '@/types/app';
 import { allowedActions } from '@/lib/shared-actions';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile } from '@/lib/profile-cache';
+import { findModule, findSystem } from '@/lib/modules';
+import { SystemPageHeader } from '@/components/SystemPageHeader';
 
 
 function taipeiClock() {
@@ -33,6 +35,11 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const isAdminArea = pathname === '/systems/admin/' || pathname.startsWith('/systems/admin/') ||
     pathname === '/systems/structuremap/relations/' || pathname.startsWith('/systems/structuremap/relations/');
+  const pathParts = pathname.split('/').filter(Boolean);
+  const systemsIndex = pathParts.indexOf('systems');
+  const routeSystem = systemsIndex >= 0 ? findSystem(pathParts[systemsIndex + 1] || '') : undefined;
+  const routeModule = routeSystem ? findModule(routeSystem.key, pathParts[systemsIndex + 2] || '') : undefined;
+  const pageHeading = routeSystem && routeModule ? <SystemPageHeader system={routeSystem} module={routeModule} /> : null;
 
   useEffect(() => {
     // 主題屬性由 layout.tsx 的行內腳本在算繪前就設好，切換由全站的 ThemeToggle
@@ -190,9 +197,9 @@ export function AppShell({ profile, title, children }: { profile: Profile; title
           <img src="/Inspection/assets/system-icons/admin-icon.png" alt="" />
           後台選單
         </button>
-        <main className="content v1-content admin-v2-content">{children}</main>
+        <main className="content v1-content admin-v2-content">{pageHeading}{children}</main>
       </div>
-    </div> : <main className="content v1-content">{children}</main>}
+    </div> : <main className="content v1-content">{pageHeading}{children}</main>}
     {profileOpen && <div className="profile-modal-bg" role="dialog" aria-modal="true" aria-labelledby="personal-profile-title">
       <section className="profile-modal">
         <header><div><small>個人設定</small><h2 id="personal-profile-title">個人資料設定</h2><p>查詢與維護本人的聯絡資料、登入安全及個人行事曆。</p></div><button type="button" aria-label="關閉" onClick={() => setProfileOpen(false)}>×</button></header>

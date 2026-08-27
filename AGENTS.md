@@ -204,6 +204,23 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
     不是誤把 V2 頁面當成 V1 的 `floor3d.html`——**請勿再以「全螢幕工具頁不掛導覽」
     為由還原**。V1 的 `floor3d.html` 不在此例外內，維持不掛。
 
+## V2 系統子頁標題規範（2026-08-27 訂）
+
+- 9 大系統、49 個子系統的一般內容頁一律由 `AppShell` 自動插入
+  `components/SystemPageHeader.tsx`，不得在工作區再手寫另一個系統級 `<h1>`。
+- 標題頂端距共用頂列底部固定 **22px**；桌面版由 `.content.v1-content` 的 20px
+  上內距加標題元件 2px 上內距構成，手機版則為 14px + 8px。不要用負 margin 或頁面
+  專用覆蓋改變這個距離。
+- 系統標題固定 **26px**、`var(--cyan)`；Logo 固定 **42×42px**，來源必須是
+  `web/lib/modules.ts` 該系統的 `icon`，不可用 emoji、臨時圖示或子系統自行指定的替代圖。
+- 標題結構固定為：系統名稱、系統代碼／子系統名稱、子系統說明。子系統自己的功能區
+  標題只能使用 `<h2>` 以下，不得再與共用系統標題競爭。
+- 三個全螢幕圖資工具頁是版型例外：`structuremap/floor2d`、`structuremap/floor3d`、
+  `guardpatrol/map3d`。它們不套 AppShell，使用 `data-system-page-heading="compact"` 的
+  緊湊頂列標題，但仍必須顯示對應系統 Logo、主題色與模組名稱。
+- 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 9／49、
+  正式 Logo、標題 token，以及 46 個一般頁首與 3 個全螢幕頁首的覆蓋關係。
+
 ## 讀取存取稽核與資安告警（2026-08-21 訂）
 
 - **資安告警不是資料庫觸發器產生的**。`security_alerts` 由 `audit-event` edge function

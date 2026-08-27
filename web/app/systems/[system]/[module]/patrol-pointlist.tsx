@@ -189,7 +189,7 @@ export function PointListModule({ module, profile }: Props) {
     <div className="v1list-page pointlist-page">
       <nav className="v1list-local-nav" aria-label="巡邏點相關功能">
         <div className="v1list-nav-heading">
-          <h1>巡邏點清單</h1>
+          <h2>巡邏點清單</h2>
           <p>全樓層巡邏點標示彙總</p>
         </div>
         <div className="v1list-nav-links">

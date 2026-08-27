@@ -125,12 +125,12 @@ export function ModelHubModule({ module, profile }: Props) {
   return <AppShell profile={profile} title={module.title}>
     <div className="modelhub-page">
       <header className="modelhub-page-header">
-        <h1>
+        <h2>
           <span className="modelhub-section-icon" aria-hidden="true">
             <img src={`${ICON_BASE}/equipment-icon.png`} alt="" />
           </span>
           {module.title}
-        </h1>
+        </h2>
         <p>{module.description}</p>
       </header>
 

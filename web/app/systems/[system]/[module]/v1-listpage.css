@@ -44,7 +44,7 @@
   min-width: max-content;
 }
 
-.v1list-nav-heading h1 {
+.v1list-nav-heading h2 {
   margin: 0;
   color: var(--v1list-accent);
   font-family: var(--head);

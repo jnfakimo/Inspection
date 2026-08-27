@@ -238,7 +238,7 @@ function MeetingRoomPage({ module, profile }: Props) {
 
       <div className="mr-hero">
         <div>
-          <h1>會議室預約系統</h1>
+          <strong className="mr-hero-title">快速預約與週排程</strong>
           <p>週視圖排程總覽 · 送出即生效 · 系統自動防止同時段重複預約</p>
         </div>
         <div className="spacer" />

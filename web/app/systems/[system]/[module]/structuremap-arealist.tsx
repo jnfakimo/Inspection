@@ -447,7 +447,7 @@ export function AreaListModule({ module, profile }: Props) {
     <div className="v1list-page arealist-page">
       <nav className="v1list-local-nav" aria-label="設備圖臺相關功能">
         <div className="v1list-nav-heading">
-          <h1>區域位置表</h1>
+          <h2>區域位置表</h2>
           <p>各樓層平面空間名稱</p>
         </div>
         <div className="v1list-nav-links">

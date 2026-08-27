@@ -51,7 +51,7 @@
   box-shadow: 0 0 8px color-mix(in srgb, var(--cyan) 58%, transparent);
 }
 
-.modelhub-page-header h1 {
+.modelhub-page-header h2 {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -300,7 +300,7 @@
 }
 
 @media (max-width: 520px) {
-  .modelhub-page-header h1 { font-size: 1.3rem; }
+  .modelhub-page-header h2 { font-size: 1.3rem; }
   .modelhub-stats { grid-template-columns: 1fr; }
 }
 
