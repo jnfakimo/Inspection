@@ -159,6 +159,12 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 .vehicle-module-grid a:nth-child(5){border-top-color:var(--muted)}
 @media(max-width:900px){.vehicle-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.vehicle-module-grid a{width:auto;height:auto;min-height:200px}}
 @media(max-width:600px){.vehicle-module-grid{grid-template-columns:1fr}}
+/* 入口版型保險：設備／結構圖資／會議室／公文頁不再顯示舊大型圖塊。 */
+.meetingroom-module-hero,.equipment-module-hero,.structuremap-module-hero,.officialdocs-module-hero{display:none}
+.meetingroom-module-grid,.equipment-module-grid,.structuremap-module-grid,.officialdocs-module-grid{grid-template-columns:repeat(3,269px);justify-content:center;gap:14px}
+.meetingroom-module-grid a,.equipment-module-grid a,.structuremap-module-grid a,.officialdocs-module-grid a{width:269px;height:200px;min-height:200px;box-sizing:border-box}
+@media(max-width:900px){.meetingroom-module-grid,.equipment-module-grid,.structuremap-module-grid,.officialdocs-module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.meetingroom-module-grid a,.equipment-module-grid a,.structuremap-module-grid a,.officialdocs-module-grid a{width:auto;height:auto}}
+@media(max-width:600px){.meetingroom-module-grid,.equipment-module-grid,.structuremap-module-grid,.officialdocs-module-grid{grid-template-columns:1fr}}
 /* 報修單號欄固定單行顯示，1280px 寬度也不折行。 */
 .request-v1-table th:first-child,.request-v1-table td:first-child,.dispatch-v1-table th:first-child,.dispatch-v1-table td:first-child{white-space:nowrap;min-width:126px}
 
