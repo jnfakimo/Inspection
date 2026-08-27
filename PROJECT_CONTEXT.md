@@ -54,7 +54,7 @@
   紅色語意色。鍵盤焦點沿用全站 `:focus-visible` 規則。
 - 圖臺、地圖、表格分頁等專用控制可保留功能色與特殊布局，但應沿用共用幾何與停用／hover
   手感；新製作的相同按鈕一律優先使用上述三個語意 class，不再自行建立尺寸或顏色。
-- 實作集中於 `web/app/button-standard.css`，由 `web/app/globals.css` 載入，故 9 大系統的
+- 實作集中於 `web/app/button-standard.css`，由根版面 `web/app/layout.tsx` 最後載入，故 9 大系統的
   49 個子系統共用同一份規格，不需逐頁複製 CSS。
 
 ### V2 登入頁尺寸標準

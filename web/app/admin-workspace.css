@@ -48,32 +48,7 @@
 /* Theme surfaces: preserve the light theme while keeping the tech theme readable. */
 .admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{background:var(--surface);color:var(--ink)}
 .admin-modal,.admin-alert,.admin-notice-list article{background:var(--surface);color:var(--ink)}
-/* 後台主要操作按鈕統一使用淺藍色，讓設定、帳號與各管理模組維持一致的操作辨識。 */
-.admin-page-actions .primary-btn,
-.admin-panel .primary-btn,
-.admin-modal .primary-btn,
-.admin-layout-actions .primary-btn,
-.admin-page-actions .handover-create-btn,
-.admin-modal .handover-submit-btn{
-  background:#dbeafe;
-  border:1px solid #7dd3fc;
-  color:#075985;
-  min-height:40px;
-  padding:9px 16px;
-  border-radius:8px;
-  font-size:.85rem;
-  line-height:1.2;
-}
-.admin-page-actions .primary-btn:hover,
-.admin-panel .primary-btn:hover,
-.admin-modal .primary-btn:hover,
-.admin-layout-actions .primary-btn:hover,
-.admin-page-actions .handover-create-btn:hover,
-.admin-modal .handover-submit-btn:hover{
-  background:#bae6fd;
-  border-color:#38bdf8;
-  color:#075985;
-}
+/* 主要操作按鈕由全站 button-standard.css 統一；此檔只保留後台版面配置。 */
 .admin-form-grid input[readonly]{background:var(--surface-muted)}
 .audit-details div,.detail-grid>div,.detail-timeline li{background:var(--surface-soft)}
 .admin-alert .severity{background:var(--surface-soft);color:var(--muted)}

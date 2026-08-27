@@ -7,7 +7,9 @@ assert.equal(systems.length, 9, '按鈕規格稽核必須涵蓋 9 大系統');
 assert.equal(moduleCount, 49, '按鈕規格稽核必須涵蓋 49 個子系統');
 
 const globals = readFileSync('web/app/globals.css', 'utf8');
-assert.match(globals, /@import '\.\/button-standard\.css';/, '全站樣式必須載入共用按鈕規格');
+const layout = readFileSync('web/app/layout.tsx', 'utf8');
+assert.doesNotMatch(globals, /button-standard\.css/, '共用按鈕規格不可重複嵌入 globals.css');
+assert.match(layout, /import '\.\/button-standard\.css';/, '根版面必須最後載入共用按鈕規格');
 
 const css = readFileSync('web/app/button-standard.css', 'utf8');
 for (const className of ['.primary-btn', '.secondary-btn', '.danger-btn', '.compact']) {

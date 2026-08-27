@@ -141,7 +141,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   or deactivation actions; append `.compact` when a dense table or toolbar needs the smaller
   variant. The aliases `.btn`, `.btn-primary`, and `.btn-danger` are kept aligned for legacy
   module code. Geometry, hover, disabled, focus, and light／tech theme colors are centralized
-  in `web/app/button-standard.css` (loaded by `globals.css`); do not create a new one-off
+  in `web/app/button-standard.css` (loaded last by the root `layout.tsx`); do not create a new one-off
   button size or hardcoded text color for a matching action.
 - **Time inputs**: always use `@/components/TimeSelect` (a 30-minute-step `<select>`),
   never `<input type="time">`. The native field's `step` only constrains validation,
