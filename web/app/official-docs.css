@@ -17,3 +17,7 @@
 @media (max-width:1200px){.od-header{display:grid}.od-header-summary{min-width:0}.od-create-form{grid-template-columns:repeat(2,minmax(150px,1fr))}.od-subject-field{grid-column:1/-1}.od-create-submit{justify-self:start}}
 @media (max-width:700px){.od-header-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.od-header-stat{min-height:92px}.od-create-form{grid-template-columns:1fr}.od-subject-field{grid-column:auto}.od-create-submit{width:100%}}
 @media print{body *{visibility:hidden}.od-qr-modal,.od-qr-modal *{visibility:visible}.od-qr-modal{position:fixed;inset:0;width:100%;border:0;box-shadow:none}.od-qr-modal header,.od-qr-subject,.od-barcode-value,.od-modal-actions{display:none}.od-qr-modal .od-barcode-image{width:6cm;height:2cm;margin:0}}
+
+/* 2026-08-27 follow-up: compact cards, alternating list tint, and routing hint. */
+.od-header-summary{align-self:start;height:clamp(180px,22vw,262px)}.od-header-stat{height:100%;min-height:0}.od-document-list .od-document-item:nth-child(even){background:color-mix(in srgb,var(--cyan) 16%,var(--panel2))}.od-document-list .od-document-item:nth-child(even):hover,.od-document-list .od-document-item:nth-child(even).is-selected{background:color-mix(in srgb,var(--cyan) 24%,var(--panel2))}.od-action-hint{color:var(--amber);font-size:11px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--amber) 48%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--amber) 9%,var(--panel))}
+@media (max-width:700px){.od-header-summary{height:auto}.od-header-stat{height:auto;min-height:92px}}
