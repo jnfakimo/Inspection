@@ -31,4 +31,4 @@
 @media (max-width:1400px){.od-header{display:grid;grid-template-columns:minmax(0,1fr)}.od-header-summary{width:100%;min-width:0}}
 @media (max-width:700px){.od-header-summary{width:92%;justify-self:center}.od-header-stat{height:60px;min-height:60px;padding:4px 7px;gap:1px}.od-header-stat small{font-size:10px;line-height:1.15}.od-header-stat strong,.od-header-unit-stat strong{font-size:16px;line-height:1.1}}
 @media (min-width:701px){.od-header-scope{padding-left:34px;padding-right:34px}}
-@media (min-width:701px){.od-header-scope strong{white-space:nowrap;overflow:visible;overflow-wrap:normal;font-size:clamp(9px,1.2vw,12px);letter-spacing:-.01em}}
+@media (min-width:701px){.od-header-scope strong{white-space:nowrap;overflow:visible;overflow-wrap:normal;font-size:clamp(8px,1.2vw,12px);letter-spacing:-.01em}}
