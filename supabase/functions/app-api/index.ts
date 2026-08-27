@@ -286,6 +286,15 @@ type OfficialDocumentActor = {
 
 const OFFICIAL_MANAGER_ROLES = new Set(['sysadmin', 'admin', 'dispatcher', 'duty']);
 const OFFICIAL_PEOPLE_VIEWER_ROLES = new Set([...OFFICIAL_MANAGER_ROLES, 'unit_supervisor', 'mgmt_supervisor']);
+const OFFICIAL_APPROVAL_UNIT_CODES = new Set(['BOARD', 'GM', 'VGM', 'SECRE']);
+const OFFICIAL_APPROVAL_UNIT_NAMES = new Set(['董事長室', '總經理室', '副總經理', '副總經理室', '秘書室']);
+const officialDocumentUnitCapabilities = (unit: { name?: unknown; code?: unknown } | null | undefined) => {
+  const code = text(unit?.code, 40).toUpperCase();
+  const name = text(unit?.name, 100).replace(/\s+/g, '');
+  const isSecretary = code === 'SECRE' || name === '秘書室';
+  const canApprove = OFFICIAL_APPROVAL_UNIT_CODES.has(code) || OFFICIAL_APPROVAL_UNIT_NAMES.has(name);
+  return { canApprove, canCoSign: !canApprove || isSecretary };
+};
 const officialDocumentManager = (actor: OfficialDocumentActor, sysadmin: boolean) => {
   if (sysadmin || OFFICIAL_MANAGER_ROLES.has(String(actor.role || ''))) return true;
   const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
@@ -837,11 +846,12 @@ export async function handleAppApiRequest(req: Request) {
         return result.data as Record<string, unknown> | null;
       };
       const unitResult = targetUnitId
-        ? await admin.from('departments').select('dept_id,name,parent_id').eq('dept_id', targetUnitId).eq('status', 'active').is('parent_id', null).maybeSingle()
+        ? await admin.from('departments').select('dept_id,name,code,parent_id').eq('dept_id', targetUnitId).eq('status', 'active').is('parent_id', null).maybeSingle()
         : { data: null, error: null };
       if (unitResult.error) throw unitResult.error;
       if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部室', 400);
       const unitName = text(unitResult.data?.name, 100);
+      const unitCapability = officialDocumentUnitCapabilities(unitResult.data);
       const eventFields = (fromStatus: string | null, toStatus: string | null, stepId: string | null = currentStep ? String(currentStep.step_id) : null) => ({
         step_id: stepId,
         from_status: fromStatus,
@@ -853,6 +863,7 @@ export async function handleAppApiRequest(req: Request) {
       if (documentAction === 'send_co_sign') {
         if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出會辦', 403);
         if (!targetUnitId) return fail('請選擇下一個會辦部室', 400);
+        if (!unitCapability.canCoSign) return fail('董事長室、總經理室與副總經理室只能作為陳核單位；秘書室可會辦也可陳核', 400);
         if (!['draft', 'ready_for_next'].includes(String(document.status))) return fail('目前狀態不可送出會辦');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個流程節點尚未完成');
         const stepNo = steps.reduce((max, step) => Math.max(max, Number(step.step_no) || 0), 0) + 1;
@@ -871,6 +882,7 @@ export async function handleAppApiRequest(req: Request) {
       if (documentAction === 'send_approval') {
         if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出陳核', 403);
         if (!targetUnitId) return fail('請選擇陳核部室', 400);
+        if (!unitCapability.canApprove) return fail('陳核僅能送至董事長室、總經理室、副總經理室或秘書室', 400);
         if (String(document.status) !== 'ready_for_next' && !(String(document.status) === 'draft' && steps.length === 0)) return fail('所有會辦完成後才能送出陳核');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個會辦節點尚未完成');
         const stepNo = steps.reduce((max, step) => Math.max(max, Number(step.step_no) || 0), 0) + 1;

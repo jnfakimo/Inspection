@@ -37,9 +37,7 @@
 @media (min-width:701px){.od-header>div:first-child>p{white-space:nowrap;overflow:visible;max-width:none;font-size:clamp(11px,.88vw,13px)}}
 
 /* 公文頁操作按鈕與摘要卡文案微調。 */
-.od-search-panel{border-top:6px solid var(--cyan);box-shadow:none}
-.od-list-panel{border-top:6px solid var(--green);box-shadow:none}
-.od-create-panel{border-top:6px solid var(--amber);box-shadow:none}
+.od-step-section,.od-layout .od-list-panel{border-top-style:solid;box-shadow:none}
 .od-header-unit-stat small{font-size:0}
 .od-header-unit-stat small::after{content:'部門';font-size:14px;line-height:1.45}
 .od-route-actions .primary-btn{background:color-mix(in srgb,var(--cyan) 80%,transparent);border-color:color-mix(in srgb,var(--cyan) 80%,var(--line));color:#fff}

@@ -295,7 +295,7 @@ function RequestsModule({ module, profile }: Props) {
     </div>}
 
     {/* V1 四大頁籤（帶計數） */}
-    <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
+    <div className="vehicle-request-tabs" style={{ gap: '4px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
       <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('mine')}>
         我的申請 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,212,255,0.15)', fontSize: '0.68rem' }}>{mineRows.length}</span>
       </button>
