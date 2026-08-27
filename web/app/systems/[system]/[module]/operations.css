@@ -104,6 +104,13 @@
 .operations-portal-grid.officialdocs .operations-portal-card h2{margin-bottom:5px;font-size:18px}
 .operations-portal-grid.officialdocs .operations-portal-card p{margin-bottom:8px;font-size:12px;line-height:1.5}
 @media(max-width:600px){.operations-portal-grid.officialdocs{grid-template-columns:1fr}.operations-portal-grid.officialdocs .operations-portal-card{width:auto;height:auto;min-height:200px}}
+.operations-portal-grid.equipment-portal,.operations-portal-grid.structuremap-portal{grid-template-columns:repeat(3,269px);justify-content:center;gap:14px}
+.operations-portal-grid.equipment-portal .operations-portal-card,.operations-portal-grid.structuremap-portal .operations-portal-card{width:269px;height:200px;min-height:200px;box-sizing:border-box;padding:16px 18px}
+.operations-portal-grid.equipment-portal .operations-portal-card img,.operations-portal-grid.structuremap-portal .operations-portal-card img{width:42px;height:42px;margin-bottom:10px}
+.operations-portal-grid.equipment-portal .operations-portal-card h2,.operations-portal-grid.structuremap-portal .operations-portal-card h2{margin-bottom:5px;font-size:18px}
+.operations-portal-grid.equipment-portal .operations-portal-card p,.operations-portal-grid.structuremap-portal .operations-portal-card p{margin-bottom:8px;font-size:12px;line-height:1.5}
+@media(max-width:900px){.operations-portal-grid.equipment-portal,.operations-portal-grid.structuremap-portal{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-portal-grid.equipment-portal .operations-portal-card,.operations-portal-grid.structuremap-portal .operations-portal-card{width:auto;height:auto;min-height:200px}}
+@media(max-width:600px){.operations-portal-grid.equipment-portal,.operations-portal-grid.structuremap-portal{grid-template-columns:1fr}}
 .operations-portal-grid.patrol .operations-portal-card p{margin-bottom:14px;font-size:12px}
 .operations-portal-grid.patrol .operations-portal-card b{font-size:12px}
 /* 交接紀錄同樣納入 49 個子系統桌面圖卡規範。 */
