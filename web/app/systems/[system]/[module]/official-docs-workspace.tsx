@@ -96,12 +96,14 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
   const controlsRef = useRef<IScannerControls | null>(null);
   const onDetectedRef = useRef(onDetected);
   const [message, setMessage] = useState('正在啟動相機掃描…');
+  const [cameraAttempt, setCameraAttempt] = useState(0);
   useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
   useEffect(() => {
     let active = true;
     let stream: MediaStream | null = null;
     let controls: IScannerControls | null = null;
     const start = async () => {
+      setMessage(cameraAttempt ? '正在重新啟動相機掃描…' : '正在啟動相機掃描…');
       if (!navigator.mediaDevices?.getUserMedia) {
         setMessage('此瀏覽器不支援相機功能，請改用手動查詢。');
         return;
@@ -124,11 +126,19 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
         const reader = new BrowserMultiFormatOneDReader(hints, { delayBetweenScanAttempts: 180, delayBetweenScanSuccess: 1000 });
         const video = videoRef.current;
         if (!video) return;
-        stream = await navigator.mediaDevices.getUserMedia({
+        const cameraConstraints: MediaStreamConstraints = {
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
-        });
+        };
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(cameraConstraints);
+        } catch (error) {
+          const name = error && typeof error === 'object' && 'name' in error ? String(error.name) : '';
+          if (name !== 'OverconstrainedError' && name !== 'ConstraintNotSatisfiedError') throw error;
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        }
         if (!active) { stream.getTracks().forEach(track => track.stop()); return; }
+        video.setAttribute('webkit-playsinline', 'true');
         video.srcObject = stream;
         video.autoplay = true;
         video.muted = true;
@@ -168,8 +178,8 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
     };
     void start();
     return () => { active = false; controlsRef.current?.stop(); controls?.stop(); stream?.getTracks().forEach(track => track.stop()); controlsRef.current = null; };
-  }, []);
-  return <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-label="掃描公文條碼"><section className="od-scanner-modal"><header><div><small>查詢工具／一維條碼</small><h2>掃描公文條碼</h2></div><button type="button" className="od-icon-button" onClick={onClose} aria-label="關閉">×</button></header><div className="od-scanner-preview"><video ref={videoRef} className="od-scanner-video" muted autoPlay playsInline /><span className="od-scanner-guide" aria-hidden="true" /></div><p className="od-help">{message}</p><button type="button" className="secondary-btn" onClick={onClose}>關閉掃描</button></section></div>;
+  }, [cameraAttempt]);
+  return <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-label="掃描公文條碼"><section className="od-scanner-modal"><header><div><small>查詢工具／一維條碼</small><h2>掃描公文條碼</h2></div><button type="button" className="od-icon-button" onClick={onClose} aria-label="關閉">×</button></header><div className="od-scanner-preview" onClick={() => { const video = videoRef.current; if (video?.paused) void video.play().catch(error => console.warn('[official-docs] camera preview play was blocked', error)); }}><video ref={videoRef} className="od-scanner-video" muted autoPlay playsInline /><span className="od-scanner-guide" aria-hidden="true" /></div><p className="od-help">{message}</p><div className="od-modal-actions"><button type="button" className="secondary-btn" onClick={() => setCameraAttempt(value => value + 1)}>重新啟動相機</button><button type="button" className="secondary-btn" onClick={onClose}>關閉掃描</button></div></section></div>;
 }
 
 function QrModal({ document, onClose }: { document: Document; onClose: () => void }) {
