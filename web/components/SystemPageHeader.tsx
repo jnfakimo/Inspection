@@ -18,8 +18,10 @@ export function SystemPageHeader({ system, module, title, metaTitle, description
     <img src={system.icon} alt="" data-system-page-logo />
     <div>
       <h1>{title || system.title}</h1>
-      <span>{system.code} · {metaTitle || module.title}</span>
-      <p>{description || module.description}</p>
+      <div className="system-page-heading-meta">
+        <span>{system.code} · {metaTitle || module.title}</span>
+        <p>{description || module.description}</p>
+      </div>
     </div>
   </header>;
 }
