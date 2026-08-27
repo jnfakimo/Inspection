@@ -26,7 +26,7 @@ export function AppShell({ profile, title, children, heading }: {
   profile: Profile;
   title: string;
   children: React.ReactNode;
-  heading?: { system: SystemDefinition; module: ModuleDefinition; title?: string; metaTitle?: string };
+  heading?: { system: SystemDefinition; module: ModuleDefinition; title?: string; metaTitle?: string; description?: string };
 }) {
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
@@ -47,7 +47,7 @@ export function AppShell({ profile, title, children, heading }: {
   const headingSystem = heading?.system || routeSystem;
   const headingModule = heading?.module || routeModule;
   const pageHeading = headingSystem && headingModule
-    ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} />
+    ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} description={heading?.description} />
     : null;
 
   useEffect(() => {

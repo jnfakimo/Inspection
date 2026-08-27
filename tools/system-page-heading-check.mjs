@@ -20,6 +20,7 @@ assert.match(component, /src=\{system\.icon\}/);
 assert.match(component, /data-system-page-heading="standard"/);
 assert.match(component, /title \|\| system\.title/);
 assert.match(component, /metaTitle \|\| module\.title/);
+assert.match(component, /description \|\| module\.description/);
 
 const shell = readFileSync('web/components/AppShell.tsx', 'utf8');
 assert.match(shell, /<SystemPageHeader system=\{headingSystem\} module=\{headingModule\}/);
@@ -29,6 +30,15 @@ assert.match(shell, /v1-content">\{pageHeading\}\{children\}/);
 const handover = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
 assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaTitle: system\.title \}\}/,
   '交接紀錄首頁必須使用模組名稱作為大標題');
+
+const systemHub = readFileSync('web/app/systems/[system]/system-hub-client.tsx', 'utf8');
+assert.match(systemHub, /metaTitle: '系統入口', description: system\.description/,
+  '駐衛警系統入口必須使用共用標題與系統說明');
+const operationsCss = readFileSync('web/app/systems/[system]/[module]/operations.css', 'utf8');
+assert.match(operationsCss, /\.operations-portal-grid\.patrol\{[\s\S]*?width:80%/,
+  '駐衛警入口圖卡區必須維持桌面 80% 寬度');
+assert.match(operationsCss, /@media \(max-width:1100px\)[\s\S]*?\.operations-portal-grid\.patrol\{width:100%\}/,
+  '駐衛警入口必須隨瀏覽器縮放／視窗寬度恢復滿寬');
 
 const css = readFileSync('web/app/v1-layout.css', 'utf8');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);

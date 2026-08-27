@@ -213,6 +213,10 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   專用覆蓋改變這個距離。
 - 系統標題固定 **26px**、`var(--cyan)`；Logo 固定 **42×42px**，來源必須是
   `web/lib/modules.ts` 該系統的 `icon`，不可用 emoji、臨時圖示或子系統自行指定的替代圖。
+- 桌面內容區左右內距固定 **24px**，標題元件不得再加水平 padding；因此未觸發
+  `max-width` 置中時，Logo 左緣距視窗 24px，標題文字左緣為 **80px**（24 + 42 + 14px
+  gap）。手機內容區左右內距 14px，標題文字左緣為 70px。日後新增一般內容頁沿用
+  `.content.v1-content` 與 `SystemPageHeader`，不得以頁面專用 margin 改變此對齊。
 - 標題結構固定為：系統名稱、系統代碼／子系統名稱、子系統說明。子系統自己的功能區
   標題只能使用 `<h2>` 以下，不得再與共用系統標題競爭。
 - 三個全螢幕圖資工具頁是版型例外：`structuremap/floor2d`、`structuremap/floor3d`、
@@ -221,6 +225,10 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - **交接紀錄首頁例外（2026-08-27 使用者指定）**：`/v2/systems/handover/` 直接呈現
   `records` 模組，大標題使用「交接紀錄」，識別行顯示「SYS-04 · 電子交接簿」；距離、
   字級、顏色與 Logo 尺寸仍完全沿用 `SystemPageHeader`，不可另寫一套樣式。
+- **駐衛警系統入口（2026-08-27 使用者指定）**：`/v2/systems/guardpatrol/` 使用共用
+  標題，說明固定取系統定義「巡邏點、打卡、排班、逾時通知與立體巡檢。」；四張功能
+  圖卡在桌面縮為原設計的 **80%** 並置中。瀏覽器縮放造成可用 CSS 寬度改變時必須自動
+  響應：寬版 4 欄、1100px 以下 2 欄並恢復滿寬、600px 以下 1 欄，禁止水平溢出。
 - 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 9／49、
   正式 Logo、標題 token，以及 46 個一般頁首與 3 個全螢幕頁首的覆蓋關係。
 

@@ -49,6 +49,42 @@
 .operations-matrix th small{display:block;margin-top:3px;color:var(--dim);font-size:11px;font-weight:400;white-space:nowrap}
 .operations-filter-row .operations-export{flex:0 0 auto;white-space:nowrap;padding:5px 9px;font:inherit}
 
+/* 駐衛警系統入口：四張功能圖卡縮為原設計的 80%，桌面置中；窄版維持可讀尺寸。 */
+.operations-portal-grid.patrol{
+  width:80%;
+  margin-right:auto;
+  margin-left:auto;
+  gap:16px;
+}
+.operations-portal-grid.patrol .operations-portal-card{
+  min-height:192px;
+  padding:18px;
+}
+.operations-portal-grid.patrol .operations-portal-card-top{
+  min-height:19px;
+  margin-bottom:16px;
+}
+.operations-portal-grid.patrol .operations-portal-status{font-size:11px}
+.operations-portal-grid.patrol .operations-portal-card img{
+  width:51px;
+  height:51px;
+  margin-bottom:14px;
+}
+.operations-portal-grid.patrol .operations-portal-code{
+  top:10px;
+  right:11px;
+  font-size:10px;
+}
+.operations-portal-grid.patrol .operations-portal-card h2{margin-bottom:6px;font-size:16px}
+.operations-portal-grid.patrol .operations-portal-card p{margin-bottom:14px;font-size:12px}
+.operations-portal-grid.patrol .operations-portal-card b{font-size:12px}
+@media (max-width:1100px){
+  .operations-portal-grid.patrol{width:100%}
+}
+@media (max-width:600px){
+  .operations-portal-grid.patrol .operations-portal-card{min-height:220px}
+}
+
 /* 日期、篩選與匯出控制在寬版面合併為同一列；窄版面自動換行，避免水平溢出。 */
 .operations-datebar,
 .operations-filter-row{

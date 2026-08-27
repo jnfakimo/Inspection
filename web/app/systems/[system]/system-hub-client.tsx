@@ -53,7 +53,11 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     ['shifts', '巡檢排班系統', '管理每日巡檢班別、執勤人員與時段，維持排班資訊清楚且一致。', 'guardpatrol-schedule-icon.png', 'MODULE 03'],
     ['notifications', 'LINE推播紀錄', '查詢巡檢逾時推播的發送時間、完成狀況、排定人員與 LINE 回應。', 'guardpatrol-line-push-icon.png', 'MODULE 04'],
   ];
-  return <AppShell profile={profile} title={system.title}><section className="operations-portal-hero"><img src={system.icon} alt="" /><div><h1>{system.title}</h1><p>{system.description}</p></div></section><div className="operations-portal-note">{handover ? '電子交接流程 · 依班別完成交接與接收稽核' : '駐衛警巡檢流程 · 點選圖卡進入功能系統'}</div><section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? '▶ 進入交接' : key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section></AppShell>;
+  return <AppShell profile={profile} title={system.title}
+    heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
+    <div className="operations-portal-note">駐衛警巡檢流程 · 點選圖卡進入功能系統</div>
+    <section className="operations-portal-grid patrol">{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section>
+  </AppShell>;
 }
 
 export function SystemHubClient({ system }: { system: SystemDefinition }) {
