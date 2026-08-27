@@ -1,0 +1,11 @@
+/* Keep every profile section readable when the browser is at 100% zoom.
+   The modal body is a flex child with its own scrollbar; explicit max-content
+   rows prevent CSS Grid from shrinking the form cards to the title row. */
+.profile-modal-bg{overflow:auto}
+.profile-modal{min-height:0}
+.profile-modal-body{flex:1 1 auto;min-height:0;grid-auto-rows:max-content;align-content:start}
+.profile-section{min-height:max-content;overflow:visible}
+
+@media(max-width:600px){
+  .profile-modal-body{grid-auto-rows:max-content}
+}
