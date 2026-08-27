@@ -1,15 +1,13 @@
 /**
- * 全站共用的頂列動作組。
+ * 系統頁面中的內容層級切換清單。
  *
- * AGENTS.md 明訂：每個應用頁面都要用同一組六個動作、同一個順序、同一組圖示，
- * 且未經明確要求不得更動。抽成單一定義是為了讓「同一組」在結構上成立——
- * 先前只存在於 AppShell 內部，全螢幕工具頁（3D 模型圖、整合標記系統）因為不套
- * AppShell，就只能自己另寫一份導覽，兩邊必然逐漸走鐘。
+ * V2 一般內容頁頂列現在只顯示首頁、個人資料與登出；此清單保留給需要在
+ * 內容或工具區提供系統切換的舊頁面，不由 AppShell 的一般頂列直接渲染。
  */
 export type SharedAction = { href: string; label: string; icon: string; sysKey?: string };
 
 export const SHARED_ACTIONS: SharedAction[] = [
-  { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons/home-icon.svg' },
+  { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons/home-nav-icon.png' },
   { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons/admin-icon.png' },
   { href: '/systems/workorder/', label: '維修／派完工', icon: '/Inspection/assets/system-icons/maintenance-icon.png', sysKey: 'workorder' },
   { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', sysKey: 'guardpatrol' },

@@ -3,10 +3,8 @@
 // SYS-06 3D模型圖 = V1 `floor3d.html` 的移植。
 //
 // 與整合標記系統同樣是全螢幕工具頁，不套 AppShell（V1 自帶 topbar，面板與 HUD 都是
-// 絕對定位貼齊視窗邊緣，整層 shell 會把版面擠掉）。但頂列本身要掛上全站共用的六個
-// 動作——AGENTS.md 把 floor3d 列為不掛品牌列的工具頁，同一條也寫明「除非使用者明確
-// 要求」，2026-08-21 使用者已明確要求比照 3D建模系統。動作定義取自 lib/shared-actions，
-// 與 AppShell 共用同一份，兩邊才不會逐漸走鐘。
+// 絕對定位貼齊視窗邊緣，整層 shell 會把版面擠掉）。頂列只保留首頁與此工具必要的
+// 圖資操作連結；一般內容頁的個人資料／登出按鈕由 AppShell 提供。
 //
 // 3D 算繪沿用既有的 FloorStack3D，不另寫一套 Three.js——SYS-03 的立體巡檢雲臺用的
 // 是同一個元件，V1 的 floor3d.html 與 guardpatrol3d.html 正是因為各寫一份而分岔。
@@ -23,7 +21,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { FloorStack3D, type FloorStackApi, type StackMarker } from './floor-stack-3d';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
-import { allowedActions } from '@/lib/shared-actions';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
@@ -190,13 +187,9 @@ export function Floor3DBoardModule({ profile }: Props) {
       <span className="tb-sep" />
       <img className="tb-system-icon" src="/Inspection/assets/system-icons/settings-icon.png" alt="" data-system-page-logo />
       <span className="tb-title">3D 模型圖</span>
-      {/* 依帳號可用的系統過濾，與 AppShell 同一份定義、同一個順序。 */}
-      <nav className="tb-nav" aria-label="共用系統導覽">
-        {allowedActions(profile.allowed_systems).map(item =>
-          <a key={item.href} href={`/Inspection/v2${item.href}`}>
-            <img src={item.icon} alt="" /><span>{item.label}</span>
-          </a>)}
-      </nav>
+      <a className="tb-back tb-home" href="/Inspection/v2/systems/">
+        <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" /><span>首頁</span>
+      </a>
       <span className="tb-space" />
       <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
       <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor2d}>平面樓層圖</a>

@@ -127,44 +127,14 @@
   color: var(--f3-accent-text);
 }
 
-/* 共用的六個動作（lib/shared-actions）。樣式對齊 AppShell 的 .v1-actions，讓這頁的
-   頂列與其他頁面看起來是同一條；不直接沿用該 class，是因為它在 760px 以下會攤成
-   三欄格線，會把這頁固定 50px 的頂列撐破。 */
-.f3-topbar .tb-nav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 4px;
-}
-
-.f3-topbar .tb-nav a {
-  display: inline-flex;
-  align-items: center;
+.f3-topbar .tb-home {
   gap: 5px;
-  padding: 5px 9px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  color: var(--dim);
-  font-size: 11px;
-  text-decoration: none;
-  white-space: nowrap;
 }
 
-.f3-topbar .tb-nav a:hover {
-  border-color: var(--cyan);
-  color: var(--f3-accent-text);
-  background: color-mix(in srgb, var(--cyan) 7%, transparent);
-}
-
-.f3-topbar .tb-nav img {
+.f3-topbar .tb-home img {
   width: 15px;
   height: 15px;
   object-fit: contain;
-}
-
-/* 窄螢幕只留圖示，再窄就把品牌字樣收掉，優先保住導覽本身。 */
-@media (max-width: 1180px) {
-  .f3-topbar .tb-nav a span { display: none; }
 }
 
 @media (max-width: 720px) {

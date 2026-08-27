@@ -155,26 +155,15 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   do not create a second, page-specific user/status/clock format. The component must
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
-- **Shared header actions**: `system/theme.js` owns the global action group. Every
-  application page must use the same six actions in this order: 首頁 → 戰情儀表板 →
-  維修/派完工 → 駐衛警巡檢 → 電子交接簿 → 後台. Use `assets/system-icons/home-icon.svg` for 首頁,
-  `assets/system-icons/admin-icon.png` for 戰情儀表板 and 後台,
-  `assets/system-icons/maintenance-icon.png` for 維修/派完工, and
-  `assets/system-icons/handover-icon.png` for 電子交接簿. The 維修/派完工 action
-  must link to `https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs`.
-  Do not show a separate 完工回報 action. Do not use the `system/icons/nav-*`
-  set for these shared actions.
-  Do not add page-specific emoji or text-symbol versions. Page-specific actions
-  may remain immediately to the left.
-  This icon style, order, and shared-component implementation are locked; do not
-  change them unless the user explicitly requests that specific standard to change.
-  Never regenerate, redraw, edit, or replace the referenced PNG assets for this
-  shared header without an explicit user request.
-  Each action beyond 首頁/戰情儀表板 carries a `sysKey` (matching a `role_permissions`
-  `sys_*` row — see the RBAC section) so `installSharedHeaderActions` in theme.js can
-  hide it for roles without that system's access via `SystemAccess.allowedSystems()`;
-  sysadmin always sees every action. Adding a new sub-system's shared-nav shortcut
-  means adding one `defs` entry with its `sysKey` — no other page needs editing.
+- **Shared header actions**: V2 一般內容頁（共 9 大系統的 49 個子系統）頂列只保留三個
+  帳號／入口動作：首頁、個人資料、登出；移除戰情儀表板、維修／派完工、駐衛警巡檢、
+  電子交接簿與後台等跨系統按鈕，系統切換改由入口頁、系統頁與後台側欄承擔。
+  首頁使用 `assets/system-icons/home-nav-icon.png`，個人資料使用
+  `assets/system-icons/profile-nav-icon.png`，兩者為同一套生圖的藍／青色立體 ICON；
+  登出維持文字按鈕。不可再以 emoji 或文字符號建立另一套。三個全螢幕圖資工具頁
+  （3D 模型圖、平面／整合標記、立體巡檢雲臺）保留其必要的圖資工作連結，不加入
+  一般頁的跨系統導覽列。此為使用者明確指定的新頂列標準；若未來要變更，需再次取得
+  使用者明確要求。
 - **Shared brand bar** (added 2026-08-04, unified per owner request): the far-left
   of the header must read `■ TAIPEC-MKT-1 <頁面名稱> 臺北農產公司／第一果菜市場`. This is
   built automatically by `installBrandBar()`/`applyBrandNames()` in `theme.js` — do

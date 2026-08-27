@@ -23,7 +23,6 @@ import './structuremap-pin.css';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
-import { allowedActions } from '@/lib/shared-actions';
 import { canonicalFloor } from '@/lib/floor';
 import { floorOrder, floorTextureUrl, preparePlanObjectUrl } from './floor-stack-3d';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
@@ -398,13 +397,9 @@ function Floor2DViewer({ system, module, profile }: Props) {
       <span className="tb-sep" />
       <img className="tb-system-icon" src={system.icon} alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
-      {/* 與 AppShell、3D 模型圖同一份定義（lib/shared-actions），依帳號可用的系統過濾。 */}
-      <nav className="tb-nav" aria-label="共用系統導覽">
-        {allowedActions(profile.allowed_systems).map(item =>
-          <a key={item.href} href={`/Inspection/v2${item.href}`}>
-            <img src={item.icon} alt="" /><span>{item.label}</span>
-          </a>)}
-      </nav>
+      <a className="tb-back tb-home" href="/Inspection/v2/systems/">
+        <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" /><span>首頁</span>
+      </a>
       <span className="tb-space" />
       <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor3d}>3D模型圖</a>
       <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>

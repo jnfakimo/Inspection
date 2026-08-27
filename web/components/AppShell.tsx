@@ -8,7 +8,6 @@ import { ResponsiveTableLabels } from '@/components/ResponsiveTableLabels';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import type { Profile } from '@/types/app';
-import { allowedActions } from '@/lib/shared-actions';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile } from '@/lib/profile-cache';
 import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
@@ -118,7 +117,6 @@ export function AppShell({ profile, title, children, heading }: {
     };
   }, [adminMenuOpen]);
 
-  const actions = allowedActions(profile.allowed_systems);
   async function logout() {
     try { await getSupabase().auth.signOut({ scope: 'local' }); }
     catch (error) { console.warn('logout failed:', error); }
@@ -174,8 +172,11 @@ export function AppShell({ profile, title, children, heading }: {
     <ResponsiveTableLabels />
     <header className="v1-navbar">
       <div className="v1-brand"><b>■ TAIPEC-MKT-1</b><strong>{title}</strong><span>臺北農產公司／第一果菜市場</span></div>
-      <nav className="v1-actions" aria-label="共用系統導覽">
-        {actions.map(item => <Link key={item.href} href={item.href} className={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href)) ? 'is-current' : ''}><img src={item.icon} alt="" /><span>{item.label}</span></Link>)}
+      <nav className="v1-actions" aria-label="主要導覽">
+        <Link href="/systems/" className={pathname === '/systems/' ? 'is-current' : ''}>
+          <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" />
+          <span>首頁</span>
+        </Link>
       </nav>
       <div className="user-meta v1-meta">
         <span>{profileDetails.department || '未設定單位'}｜{profileDetails.name}</span>
@@ -183,8 +184,11 @@ export function AppShell({ profile, title, children, heading }: {
         <time>{clock}</time>
         {/* 介面風格切換改為全站右下角的浮動圖示（components/ThemeToggle.tsx），
             不再占用頂列，行動裝置上也不會被擠掉。 */}
-        <button onClick={openProfile}>個人資料</button>
-        <button onClick={logout}>登出</button>
+        <button className="v1-profile-action" onClick={openProfile}>
+          <img src="/Inspection/assets/system-icons/profile-nav-icon.png" alt="" />
+          <span>個人資料</span>
+        </button>
+        <button className="v1-logout-action" onClick={logout}>登出</button>
       </div>
     </header>
     {isAdminArea ? <div className="admin-v2-frame">

@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&family=Rajdhani:wght@500;600;700&display=swap');
 @import './modules.css';
 @import './v1-layout.css';
+@import './topbar.css';
 @import './login/login-responsive.css';
 @import './official-docs.css';
 :root{--surface:#071526;--surface-soft:#0a1d31;--surface-muted:#10283d}

@@ -21,7 +21,6 @@ import { getSupabase } from '@/lib/supabase';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import { errorMessage, type Row } from '@/components/admin/shared';
-import { allowedActions } from '@/lib/shared-actions';
 import { canonicalFloor } from '@/lib/floor';
 import { FloorStack3D, floorOrder, type FloorStackApi, type StackMarker } from './floor-stack-3d';
 import type { ModuleDefinition } from '@/lib/modules';
@@ -134,13 +133,9 @@ export function PatrolMap3DModule({ module, profile }: Props) {
       <span className="tb-sep" />
       <img className="tb-system-icon" src="/Inspection/assets/system-icons/guardpatrol-icon.png" alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
-      {/* 與 AppShell、模型圖同一份定義（lib/shared-actions），依帳號可用的系統過濾。 */}
-      <nav className="tb-nav" aria-label="共用系統導覽">
-        {allowedActions(profile.allowed_systems).map(item =>
-          <a key={item.href} href={`/Inspection/v2${item.href}`}>
-            <img src={item.icon} alt="" /><span>{item.label}</span>
-          </a>)}
-      </nav>
+      <a className="tb-back tb-home" href="/Inspection/v2/systems/">
+        <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" /><span>首頁</span>
+      </a>
       <span className="tb-space" />
       {/* 帶 ?kind=patrol：從駐衛警巡檢跳過去只看巡邏點，不摻雜設備、報修、空間等標記。 */}
       <a className="tb-back" href={`${STRUCTUREMAP_ROUTES.floor3d}?kind=patrol`}>3D模型圖</a>

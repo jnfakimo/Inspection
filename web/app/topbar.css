@@ -1,0 +1,11 @@
+/* V2 一般內容頁頂列：只保留首頁、個人資料與登出。 */
+.v1-actions img{width:18px;height:18px;object-fit:contain}
+.user-meta.v1-meta button{display:inline-flex;align-items:center;gap:5px;background:transparent;border-top:0;border-right:0;border-bottom:0;border-radius:0;padding-top:0;padding-right:0;padding-bottom:0;color:var(--dim);cursor:pointer}
+.user-meta.v1-meta button:hover{color:var(--cyan)}
+.user-meta.v1-meta .v1-profile-action img{width:18px;height:18px;object-fit:contain}
+.user-meta.v1-meta .v1-profile-action span{white-space:nowrap}
+@media(max-width:1380px){.v1-actions{order:3;width:auto;justify-content:flex-end}}
+@media(max-width:760px){
+  .v1-actions{display:flex;order:initial;width:auto}
+  .v1-actions a{justify-content:center;min-width:0;padding:6px 8px}
+}
