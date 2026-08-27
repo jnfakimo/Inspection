@@ -684,7 +684,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
 
   const field = (label: string, value: unknown) => <div><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
 
-  return <AdminModal title={`派車申請｜${fmt(row.request_no)}`} className="vehicle-detail-modal" onClose={onClose}>
+  return <AdminModal title={`派車申請｜${fmt(row.request_no)}`} className={`vehicle-detail-modal vehicle-status-${String(row.status)}`} onClose={onClose}>
     {followup && <div className={`vehicle-followup-modal ${followup.level}`} role="alert">
       <strong>{followup.label}</strong><span>{followup.message}</span>
     </div>}
