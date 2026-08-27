@@ -186,7 +186,10 @@ export function AppShell({ profile, title, children, heading }: {
           <img src="/Inspection/assets/system-icons/profile-nav-icon.png" alt="" />
           <span>個人資料</span>
         </button>
-        <button type="button" className="v1-logout-action" onClick={logout}>登出</button>
+        <button type="button" className="v1-logout-action" onClick={logout}>
+          <img src="/Inspection/assets/system-icons/logout-nav-icon.png" alt="" />
+          <span>登出</span>
+        </button>
       </nav>
     </header>
     {isAdminArea ? <div className="admin-v2-frame">

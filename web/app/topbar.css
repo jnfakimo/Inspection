@@ -4,6 +4,7 @@
 .v1-actions a:hover,.v1-actions a.is-current,.v1-actions button:hover{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,transparent)}
 .v1-actions img{width:18px;height:18px;object-fit:contain}
 .v1-actions .v1-profile-action span{white-space:nowrap}
+.v1-actions .v1-logout-action span{white-space:nowrap}
 @media(max-width:1380px){.v1-actions{order:3;width:auto;justify-content:flex-end}}
 @media(max-width:760px){
   .v1-actions{display:flex;order:initial;width:auto}
