@@ -454,7 +454,7 @@ function NotificationsModule({ module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
-    <section className="panel admin-panel">
+    <section className="panel admin-panel patrol-notifications-panel">
       <div className="admin-toolbar">
         <select value={period} onChange={e => setPeriod(e.target.value)}>
           <option value="7">最近 7 天</option><option value="30">最近 30 天</option>
