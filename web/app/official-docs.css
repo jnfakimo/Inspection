@@ -19,5 +19,9 @@
 @media print{body *{visibility:hidden}.od-qr-modal,.od-qr-modal *{visibility:visible}.od-qr-modal{position:fixed;inset:0;width:100%;border:0;box-shadow:none}.od-qr-modal header,.od-qr-subject,.od-barcode-value,.od-modal-actions{display:none}.od-qr-modal .od-barcode-image{width:6cm;height:2cm;margin:0}}
 
 /* 2026-08-27 follow-up: compact cards, alternating list tint, and routing hint. */
-.od-header-summary{align-self:start;height:clamp(180px,22vw,262px)}.od-header-stat{height:100%;min-height:0}.od-document-list .od-document-item:nth-child(even){background:color-mix(in srgb,var(--cyan) 16%,var(--panel2))}.od-document-list .od-document-item:nth-child(even):hover,.od-document-list .od-document-item:nth-child(even).is-selected{background:color-mix(in srgb,var(--cyan) 24%,var(--panel2))}.od-action-hint{color:var(--amber);font-size:11px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--amber) 48%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--amber) 9%,var(--panel))}
+.od-header-summary{align-self:start;height:auto}.od-header-stat{min-height:0}.od-document-list .od-document-item:nth-child(even){background:color-mix(in srgb,var(--cyan) 16%,var(--panel2))}.od-document-list .od-document-item:nth-child(even):hover,.od-document-list .od-document-item:nth-child(even).is-selected{background:color-mix(in srgb,var(--cyan) 24%,var(--panel2))}.od-action-hint{color:var(--amber);font-size:11px;padding:7px 9px;border:1px solid color-mix(in srgb,var(--amber) 48%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--amber) 9%,var(--panel))}
 @media (max-width:700px){.od-header-summary{height:auto}.od-header-stat{height:auto;min-height:92px}}
+
+/* 固定統計卡高度，避免父層內容或 viewport 高度把卡片拉長。 */
+.od-header{align-items:flex-start}.od-header-summary{align-self:flex-start;height:auto;align-items:start}.od-header-stat{height:160px;min-height:160px}
+@media (max-width:700px){.od-header-summary{height:auto;align-items:stretch}.od-header-stat{height:126px;min-height:126px}}
