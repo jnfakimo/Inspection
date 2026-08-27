@@ -329,3 +329,5 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - 資安事件與告警原因另同步至 `Obsidian/08-資安告警原因與修正報告.md`；備份／復原流程另同步至 `Obsidian/07-資料庫備份與復原流程.md`。
 - Obsidian 只保存可公開於 repository 的開發紀錄，不得寫入 `SUPABASE_ACCESS_TOKEN`、service-role key、使用者密碼、Session、Cookie、私有 signed URL 或其他 Secret；必要時只記錄「已設定／已驗證」及遮蔽後的識別資訊。
 - 若本工作階段沒有 Obsidian connector／技能，仍以 repository 內 Markdown 檔案完成同步；不要因技能未載入而跳過紀錄，也不要把 Secret 寫入 vault。
+- `antigravity-obsidian` 技能的用途是連接／設定 Obsidian MCP，觸發詞是「連接 Obsidian」或「設定 Obsidian」；它不是每次開工都會自動寫入紀錄的 hook。一般開發任務完成後，代理仍必須直接更新上述 Markdown 檔案。
+- MCP 註冊屬於本機 Codex 使用者設定，不放進公開 repository；本專案的公開同步來源固定是 `Obsidian/` 目錄。若 MCP 暫時不可用，直接以 Markdown 同步仍視為完成。
