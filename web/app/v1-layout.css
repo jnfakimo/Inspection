@@ -141,6 +141,8 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 /* 派工頁白色報修案件內容卡同步縮小至桌面版 85% 寬度。 */
 .dispatch-v1-table{width:85%;margin-left:auto;margin-right:auto}
 @media(max-width:900px){.dispatch-v1-table{width:100%}}
+/* 報修單號欄固定單行顯示，1280px 寬度也不折行。 */
+.request-v1-table th:first-child,.request-v1-table td:first-child,.dispatch-v1-table th:first-child,.dispatch-v1-table td:first-child{white-space:nowrap;min-width:126px}
 
 /* 列表設計規格：奇數列白色、偶數列淺藍（80% 淡化），所有列表每頁 10 筆。 */
 .responsive-table tbody tr:nth-child(odd),
