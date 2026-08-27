@@ -180,19 +180,25 @@ function taipeiDateKey(value = new Date()) {
   return `${get('year')}${get('month')}${get('day')}`;
 }
 
+function taipeiRocDateKey(value = new Date()) {
+  const gregorian = taipeiDateKey(value);
+  const rocYear = Number(gregorian.slice(0, 4)) - 1911;
+  return `${String(rocYear).padStart(3, '0')}${gregorian.slice(4)}`;
+}
+
 async function nextOfficialDocumentNo(db: SupabaseClient, dateKey: string, minimumSerial = 1) {
-  const prefix = text(dateKey, 8);
+  const prefix = text(dateKey, 7);
   const { data, error } = await db.from('official_documents')
     .select('document_no').like('document_no', `${prefix}%`).limit(2000);
   if (error) throw error;
   const highest = (data || []).reduce((max, row) => {
     const value = String(row.document_no || '');
-    if (!new RegExp(`^${prefix}\\d{3}$`).test(value)) return max;
-    return Math.max(max, Number(value.slice(-3)) || 0);
+    if (!new RegExp(`^${prefix}\\d{4}$`).test(value)) return max;
+    return Math.max(max, Number(value.slice(-4)) || 0);
   }, 0);
   const serial = Math.max(highest + 1, minimumSerial);
-  if (serial > 999) throw new Error('今日公文編號已達 999 號，請聯絡系統管理員');
-  return `${prefix}${String(serial).padStart(3, '0')}`;
+  if (serial > 9999) throw new Error('今日公文編號已達 9999 號，請聯絡系統管理員');
+  return `${prefix}${String(serial).padStart(4, '0')}`;
 }
 
 function extractClientIp(req: Request) {
@@ -652,7 +658,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
       const lookup = text(body.lookup, 200).toLocaleLowerCase();
       const [documentResult, departmentResult, peopleResult] = await Promise.all([
-        admin.from('official_documents').select('document_id,document_no,subject,originator_id,originator_dept_id,status,current_step_id,barcode_value,created_at,updated_at,closed_at').order('updated_at', { ascending: false }).limit(500),
+        admin.from('official_documents').select('document_id,document_no,document_type,subject,originator_id,originator_dept_id,responsible_dept_id,responsible_user_id,status,current_step_id,barcode_value,created_at,updated_at,closed_at').order('updated_at', { ascending: false }).limit(500),
         admin.from('departments').select('dept_id,parent_id,name,code,level').eq('status', 'active').order('sort_order').order('name').limit(500),
         admin.from('users').select('user_id,name,dept_id,role,rbac_role,department').eq('status', 'active').order('name').limit(1000),
       ]);
@@ -714,7 +720,7 @@ export async function handleAppApiRequest(req: Request) {
           steps: stepsByDocument.get(id(row.document_id)) || [],
           events: eventsByDocument.get(id(row.document_id)) || [],
         })),
-        departments: visibleRootDepartments,
+        departments: allDepartments.filter(row => isAdmin || actorScope.has(id(row.dept_id))),
         scope_root_departments: visibleRootDepartments,
         current_root_department: currentRootDepartment ? {
           dept_id: id(currentRootDepartment.dept_id),
@@ -739,8 +745,17 @@ export async function handleAppApiRequest(req: Request) {
       if (!officialDocumentManager(createActor, isSysadmin)) return reply(req, { ok: false, message: '只有公文管理人員可以建立公文' }, 403);
       const subject = text(body.subject, 300);
       if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
+      const documentType = text(body.document_type, 20) || 'official_document';
+      if (!['official_document', 'purchase_order', 'other'].includes(documentType)) return reply(req, { ok: false, message: '文件類別不正確' }, 400);
+      const responsibleDeptId = id(body.responsible_dept_id) || id(profile.dept_id);
+      const responsibleUserId = id(body.responsible_user_id) || id(profile.user_id);
+      const accessibleDepartments = departmentScope((await admin.from('departments').select('dept_id,parent_id').eq('status', 'active')).data || [], profile.dept_id);
+      if (!isAdmin && !accessibleDepartments.has(responsibleDeptId)) return reply(req, { ok: false, message: '只能選擇登入者第一階單位所屬的第二階單位' }, 403);
+      const responsiblePerson = await admin.from('users').select('user_id,dept_id,status').eq('user_id', responsibleUserId).eq('status', 'active').maybeSingle();
+      if (responsiblePerson.error) throw responsiblePerson.error;
+      if (!responsiblePerson.data || id(responsiblePerson.data.dept_id) !== responsibleDeptId) return reply(req, { ok: false, message: '承辦人員不屬於所選第二階單位' }, 400);
       const documentId = nextRequestRequestId();
-      const dateKey = taipeiDateKey();
+      const dateKey = taipeiRocDateKey();
       let serialHint = 1;
       let documentNo = '';
       let barcode = '';
@@ -752,9 +767,12 @@ export async function handleAppApiRequest(req: Request) {
         const created = await admin.from('official_documents').insert({
           document_id: documentId,
           document_no: documentNo,
+          document_type: documentType,
           subject,
           originator_id: profile.user_id,
           originator_dept_id: profile.dept_id || null,
+          responsible_dept_id: responsibleDeptId,
+          responsible_user_id: responsibleUserId,
           status: 'draft',
           barcode_value: barcode,
         }).select('document_id,document_no,subject,status,barcode_value,created_at').single();
@@ -764,11 +782,11 @@ export async function handleAppApiRequest(req: Request) {
         }
         lastCreateError = created.error;
         if (String(created.error?.code) !== '23505') throw created.error;
-        serialHint = Number(documentNo.slice(-3)) + 1;
+        serialHint = Number(documentNo.slice(-4)) + 1;
       }
       if (!createdData) {
         if (lastCreateError) throw lastCreateError;
-        return reply(req, { ok: false, message: '今日公文編號已達 999 號，請聯絡系統管理員' }, 409);
+        return reply(req, { ok: false, message: '今日公文編號已達 9999 號，請聯絡系統管理員' }, 409);
       }
       await officialDocumentEvent(admin, createActor, documentId, 'create', `${documentId}:create`, { to_status: 'draft', note: '建立公文' });
       await officialDocumentEvent(admin, createActor, documentId, 'barcode_generated', `${documentId}:barcode`, { to_status: 'draft', note: '建立公文查詢條碼', details: { barcode_value: barcode } });
