@@ -572,6 +572,7 @@ export async function handleAppApiRequest(req: Request) {
       save_official_vehicle: 'admin-api:write',
       vehicle_create_request: 'admin-api:write',
       vehicle_roster_update: 'admin-api:write',
+      vehicle_roster_remove_all: 'admin-api:write',
       patrol_shift_delete: 'admin-api:write',
       handover_save: 'admin-api:write',
       equipment_save: 'admin-api:write',
@@ -1667,6 +1668,25 @@ export async function handleAppApiRequest(req: Request) {
       if (error) throw error;
       await writeAudit(userDb, profile.user_id, rosterTable, targetUser, before ? 'status_change' : 'insert', before || null, { active, removed: remove });
       return reply(req, { ok: true, data });
+    }
+
+    if (action === 'vehicle_roster_remove_all') {
+      if (!can('vehicle') || !isAdmin) return reply(req, { ok: false, message: '只有管理者可以維護派車名單' }, 403);
+      const rosterTable = text(body.table, 60);
+      if (rosterTable !== 'vehicle_dispatch_drivers' && rosterTable !== 'vehicle_dispatch_managers') return reply(req, { ok: false, message: '名單類型無效' }, 400);
+      const { data: before, error: readError } = await userDb.from(rosterTable)
+        .select('user_id,active,assigned_by').eq('active', true);
+      if (readError) throw readError;
+      if (!before?.length) return reply(req, { ok: true, data: [], count: 0 });
+      const updatedAt = new Date().toISOString();
+      const { data, error } = await userDb.from(rosterTable).update({ active: false, updated_at: updatedAt })
+        .eq('active', true).select('user_id');
+      if (error) throw error;
+      await Promise.all((before as Array<Record<string, unknown>>).map(row => writeAudit(
+        userDb, profile.user_id, rosterTable, String(row.user_id), 'status_change', row,
+        { active: false, removed: true },
+      )));
+      return reply(req, { ok: true, data: data || [], count: data?.length || 0 });
     }
 
     if (action === 'patrol_shift_delete') {

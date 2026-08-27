@@ -827,6 +827,7 @@ function RosterModule({ module, profile }: Props) {
   const { isAdmin } = useFleetRole(profile);
   const [rows, setRows] = useState<Row[]>([]);
   const [page, setPage] = useState(1);
+  const [showInactive, setShowInactive] = useState(false);
   const [candidates, setCandidates] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState(''), [picking, setPicking] = useState(false), [pick, setPick] = useState('');
 
@@ -858,21 +859,32 @@ function RosterModule({ module, profile }: Props) {
       () => invokeAppApi('vehicle_roster_update', { table, user_id: row.user_id, active: false, remove: true }),
       `已從${roleWord}名單移除`);
   };
+  const removeAll = () => {
+    const activeCount = rows.filter(row => row.active).length;
+    if (!activeCount) { setNote(`目前沒有啟用中的${roleWord}`); return; }
+    if (!window.confirm(`確定將全部 ${activeCount} 名${roleWord}從名單移除？\n既有派車紀錄會保留，之後不再列入可指派名單；需要時仍可由管理者重新啟用。`)) return;
+    return run(
+      () => invokeAppApi('vehicle_roster_remove_all', { table }),
+      `已從${roleWord}名單移除 ${activeCount} 人`);
+  };
   const add = () => {
     if (!pick) { setNote('失敗：請先選擇人員'); return; }
     return run(() => invokeAppApi('vehicle_roster_update', { table, user_id: pick, active: true }), `已新增${roleWord}`);
   };
 
   const listed = new Set(rows.map(row => String(row.user_id)));
-  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleRows = showInactive ? rows : rows.filter(row => row.active);
+  const inactiveCount = rows.length - rows.filter(row => row.active).length;
+  const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+  const pageRows = visibleRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={isAdmin ? <button className="primary-btn compact" onClick={() => { setPick(''); setPicking(true); }}>＋ 新增{roleWord}</button> : undefined} />
+      action={isAdmin ? <><button className="primary-btn compact" onClick={() => { setPick(''); setPicking(true); }}>＋ 新增{roleWord}</button><button className="secondary-btn danger compact" disabled={busy || !rows.some(row => row.active)} onClick={() => void removeAll()}>全部刪除</button></> : undefined} />
     <section className="panel admin-panel">
       <div className="admin-toolbar"><span>啟用中 {rows.filter(r => r.active).length}／共 {rows.length} 人</span>
+        {inactiveCount > 0 && <button className="secondary-btn compact" onClick={() => { setShowInactive(value => !value); setPage(1); }}>{showInactive ? '隱藏已停用' : `顯示已停用（${inactiveCount}）`}</button>}
         {!isAdmin && <span className="inline-message">僅系統管理員可調整此名單</span>}</div>
       <div className="responsive-table"><table>
         <thead><tr><th>姓名</th><th>帳號</th><th>單位</th><th>狀態</th><th>設定時間</th>{isAdmin && <th>操作</th>}</tr></thead>
@@ -891,8 +903,8 @@ function RosterModule({ module, profile }: Props) {
           </tr>;
         })}</tbody>
       </table></div>
-      {!busy && rows.length === 0 && <p className="empty">尚未設定任何{roleWord}</p>}
-      {rows.length > 0 && <Pager page={page} total={rows.length} onPage={setPage} />}
+      {!busy && visibleRows.length === 0 && <p className="empty">{rows.length === 0 ? `尚未設定任何${roleWord}` : `目前沒有啟用中的${roleWord}；可按「顯示已停用」查看歷史名單`}</p>}
+      {visibleRows.length > 0 && <Pager page={page} total={visibleRows.length} onPage={setPage} />}
     </section>
 
     {picking && <AdminModal title={`新增${roleWord}`} onClose={() => setPicking(false)}>
