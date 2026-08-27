@@ -227,8 +227,9 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   字級、顏色與 Logo 尺寸仍完全沿用 `SystemPageHeader`，不可另寫一套樣式。
 - **駐衛警系統入口（2026-08-27 使用者指定）**：`/v2/systems/guardpatrol/` 使用共用
   標題，說明固定取系統定義「巡邏點、打卡、排班、逾時通知與立體巡檢。」；四張功能
-  圖卡在桌面縮為原設計的 **80%** 並置中。瀏覽器縮放造成可用 CSS 寬度改變時必須自動
-  響應：寬版 4 欄、1100px 以下 2 欄並恢復滿寬、600px 以下 1 欄，禁止水平溢出。
+  縮放時四張桌面功能圖卡固定為 **269px × 200px** 並置中。瀏覽器縮放造成可用 CSS
+  寬度改變時必須自動響應：寬版 4 欄、1100px 以下 2 欄並恢復滿寬、600px 以下 1 欄，
+  禁止水平溢出。
 - 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 9／49、
   正式 Logo、標題 token，以及 46 個一般頁首與 3 個全螢幕頁首的覆蓋關係。
 
