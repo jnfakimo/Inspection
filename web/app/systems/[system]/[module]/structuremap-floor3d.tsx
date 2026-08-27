@@ -227,7 +227,7 @@ export function Floor3DBoardModule({ profile }: Props) {
     <div className="f3-bottomright">
       <div className="f3-hint">左鍵拖曳：旋轉環繞　｜　右鍵拖曳：平移　｜　滾輪／雙指：縮放</div>
       <div className="f3-hud">
-        <div className="h-t">3D 模型圖</div>
+        <div className="h-t">3D 圖台</div>
         <div className="h-r">顯示樓層：<span>{shownFloorText}</span></div>
       </div>
     </div>
