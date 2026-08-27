@@ -136,6 +136,13 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   pages follow; never add one in a component. Before this, each side computed its own
   「top 3 statuses」 and the front end spliced in an extra card, so the two pages showed
   different cards from the same data — and the set silently changed as the data changed.
+- **Shared V2 button standard (9 systems／49 modules)**: use `.primary-btn` for the main
+  action, `.secondary-btn` for neutral or return actions, and `.danger-btn` for destructive
+  or deactivation actions; append `.compact` when a dense table or toolbar needs the smaller
+  variant. The aliases `.btn`, `.btn-primary`, and `.btn-danger` are kept aligned for legacy
+  module code. Geometry, hover, disabled, focus, and light／tech theme colors are centralized
+  in `web/app/button-standard.css` (loaded by `globals.css`); do not create a new one-off
+  button size or hardcoded text color for a matching action.
 - **Time inputs**: always use `@/components/TimeSelect` (a 30-minute-step `<select>`),
   never `<input type="time">`. The native field's `step` only constrains validation,
   so users can still type 08:17, and its rendering (上午/下午 vs 24-hour) is decided by

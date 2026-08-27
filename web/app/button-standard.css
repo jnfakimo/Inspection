@@ -1,0 +1,233 @@
+/* V2 九大系統／49 個子系統共用按鈕規格。
+   一般業務操作請使用 .primary-btn、.secondary-btn、.danger-btn；
+   .compact 是同一套規格的緊湊尺寸。特殊圖臺控制仍可保留自己的語意色，
+   但沿用下方的幾何、字級、焦點與停用狀態，讓所有頁面維持一致手感。 */
+.primary-btn,
+.secondary-btn,
+.danger-btn,
+.btn,
+.btn-primary,
+.btn-danger {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: 700 12px/1.25 var(--font);
+  letter-spacing: .01em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background .16s ease, border-color .16s ease, color .16s ease,
+    box-shadow .16s ease, transform .16s ease;
+}
+
+/* 主操作採用打卡按鈕的青色線框／淡色底；一般版與科技版都從主題變數取色。 */
+.primary-btn,
+.btn-primary {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--panel2));
+  color: var(--cyan);
+}
+
+.secondary-btn,
+.btn {
+  background: var(--panel2);
+  color: var(--text);
+}
+
+.danger-btn,
+.btn-danger {
+  border-color: var(--red);
+  background: color-mix(in srgb, var(--red) 10%, var(--panel2));
+  color: var(--red);
+}
+
+.primary-btn:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--cyan) 20%, var(--panel2));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cyan) 16%, transparent);
+  transform: translateY(-1px);
+}
+
+.secondary-btn:hover:not(:disabled),
+.btn:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel2));
+  color: var(--cyan);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--cyan) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.danger-btn:hover:not(:disabled),
+.btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--red) 16%, var(--panel2));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--red) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.primary-btn:active:not(:disabled),
+.secondary-btn:active:not(:disabled),
+.danger-btn:active:not(:disabled),
+.btn:active:not(:disabled),
+.btn-primary:active:not(:disabled),
+.btn-danger:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.danger-btn:disabled,
+.btn:disabled,
+.btn-primary:disabled,
+.btn-danger:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primary-btn.compact,
+.secondary-btn.compact,
+.danger-btn.compact,
+.btn.compact,
+.btn-primary.compact,
+.btn-danger.compact {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+/* 沒有使用語意 class 的共用控制列也沿用相同幾何規格。這些選擇器只統一尺寸，
+   各頁既有的功能色（例如圖臺的紫／綠／紅）仍由頁面樣式決定。 */
+.arealist-btn,
+.arealist-primary,
+.page-btn,
+.v1list-page .mini,
+.f3-panel .mini,
+.f3-floors .fbtn,
+.mb-btn,
+.mb-tools .tbtn,
+.f3-toggle,
+.modeler-button,
+.repair-add-button,
+.repair-submit-button,
+.dispatch-assign-button,
+.dispatch-cancel-button,
+.dispatch-step-button,
+.upload-btn,
+.item-add button,
+.admin-row-actions button,
+.link-btn,
+.operations-tabs button,
+.operations-panel-title button,
+.operations-add-row button,
+.operations-table button,
+.operations-datebar button,
+.operations-actions button,
+.operations-checkin-bar button,
+.operations-export {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font: 600 11px/1.25 var(--font);
+  letter-spacing: .01em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, color .16s ease,
+    box-shadow .16s ease, transform .16s ease;
+}
+
+.operations-tabs button:hover:not(:disabled),
+.operations-panel-title button:hover:not(:disabled),
+.operations-add-row button:hover:not(:disabled),
+.operations-table button:hover:not(:disabled),
+.operations-datebar button:hover:not(:disabled),
+.operations-actions button:hover:not(:disabled),
+.operations-checkin-bar button:hover:not(:disabled),
+.operations-export:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.operations-actions button.primary,
+.operations-checkin-bar button.primary {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 12%, var(--panel2));
+  color: var(--cyan);
+}
+
+.operations-export {
+  border: 1px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 9%, var(--panel2));
+  color: var(--violet);
+}
+
+.form-actions > button:not(.primary-btn):not(.secondary-btn):not(.danger-btn),
+.admin-pager button,
+.request-pagination button {
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel2);
+  color: var(--text);
+  font: 600 11px/1.25 var(--font);
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, color .16s ease,
+    box-shadow .16s ease, transform .16s ease;
+}
+
+.form-actions > button:not(.primary-btn):not(.secondary-btn):not(.danger-btn):hover:not(:disabled),
+.admin-pager button:hover:not(:disabled),
+.request-pagination button:hover:not(:disabled) {
+  border-color: var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 7%, var(--panel2));
+  color: var(--cyan);
+  transform: translateY(-1px);
+}
+
+.form-actions > button:disabled,
+.admin-pager button:disabled,
+.request-pagination button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 640px) {
+  .primary-btn,
+  .secondary-btn,
+  .danger-btn,
+  .btn,
+  .btn-primary,
+  .btn-danger {
+    min-height: 40px;
+  }
+
+  .primary-btn.compact,
+  .secondary-btn.compact,
+  .danger-btn.compact,
+  .btn.compact,
+  .btn-primary.compact,
+  .btn-danger.compact {
+    min-height: 36px;
+  }
+}
