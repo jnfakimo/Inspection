@@ -232,17 +232,19 @@ function RequestsModule({ module, profile }: Props) {
 
     {/* 工具列 */}
     <section className="panel admin-panel">
-      <div className="admin-toolbar" style={{ flexWrap: 'wrap', gap: '8px' }}>
-        <input style={{ minWidth: '220px', flex: 1 }} value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋申請編號、申請人、地點、車號或駕駛…" />
+      <div className="admin-toolbar vehicle-request-toolbar" style={{ gap: '8px' }}>
+        <input style={{ minWidth: 0, flex: 1 }} value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋申請編號、申請人、地點、車號或駕駛…" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全部狀態</option>
           {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
         <LocalizedDateInput aria-label="用車日期（年/月/日）" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="用車日期" />
-        <button className="secondary-btn" onClick={() => { setQuery(''); setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
-        {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
-        {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
-        <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
+        <div className="vehicle-request-actions">
+          <button className="secondary-btn" onClick={() => { setQuery(''); setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
+          {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
+          {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
+          <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
+        </div>
       </div>
 
       <div className="responsive-table"><table>

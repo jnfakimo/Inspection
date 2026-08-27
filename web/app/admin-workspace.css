@@ -78,6 +78,11 @@
 .audit-details div,.detail-grid>div,.detail-timeline li{background:var(--surface-soft)}
 .admin-alert .severity{background:var(--surface-soft);color:var(--muted)}
 .handover-create-modal>header{background:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 10%,var(--surface)),var(--surface) 72%);border-bottom-color:color-mix(in srgb,var(--cyan) 25%,var(--line))}
+.vehicle-request-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;flex-wrap:nowrap;white-space:nowrap}
+.vehicle-request-toolbar{flex-wrap:nowrap}
+.vehicle-request-toolbar>input{min-width:0!important}
+@media (max-width:1100px){.vehicle-request-toolbar{flex-wrap:wrap}.vehicle-request-toolbar>input{min-width:220px!important}}
+@media (max-width:800px){.vehicle-request-actions{flex-wrap:wrap;white-space:normal;width:100%}}
 .handover-create-modal .detail-grid>div{border-left:3px solid var(--cyan)}
 .handover-create-modal .detail-grid dd{font-size:1.05rem;font-weight:700}
 .handover-records-panel{width:85%;margin-left:auto;margin-right:auto}
