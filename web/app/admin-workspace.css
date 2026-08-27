@@ -102,6 +102,10 @@
 .content:has(.vehicle-flow-grid) .admin-toolbar{margin-bottom:10px}
 .content:has(.vehicle-flow-grid) .admin-panel th,.content:has(.vehicle-flow-grid) .admin-panel td{padding:8px 7px}
 .content:has(.vehicle-flow-grid) .admin-pager{padding-top:10px}
+@media (min-width:801px){
+  .content:has(.vehicle-flow-grid) .responsive-table{max-height:max(180px,calc(100dvh - 433px));overflow:auto}
+  .content:has(.vehicle-flow-grid) .responsive-table thead{position:sticky;top:0;z-index:1;background:var(--surface)}
+}
 .admin-modal-backdrop:has(.vehicle-detail-modal){padding:8px}
 .vehicle-detail-modal{width:min(860px,100%);max-height:calc(100dvh - 16px)}
 .vehicle-detail-modal>header{padding:10px 14px}
