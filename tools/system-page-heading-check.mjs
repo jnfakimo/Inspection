@@ -49,6 +49,12 @@ assert.match(operationsCss, /\.operations-portal-grid\.handover \.operations-por
   '交接紀錄子系統桌面圖卡必須固定為 269×200px');
 
 const css = readFileSync('web/app/v1-layout.css', 'utf8');
+assert.match(css, /\.maintenance-hub-grid\{grid-template-columns:repeat\(3,269px\);justify-content:center\}/,
+  '維修入口三張主圖卡必須以 269px 欄寬置中');
+assert.match(css, /\.maintenance-card\{width:269px;height:200px;min-height:200px/,
+  '維修入口三張主圖卡必須固定為 269×200px');
+assert.match(css, /\.workorder-summary\{display:grid;grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/,
+  '維修入口七張統計小卡必須維持單列比例版型');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);
 assert.match(css, /\.content\.v1-content:has\(>\.system-page-heading\)\{padding-top:20px\}/);
 assert.match(css, /\.system-page-heading h1\{[^}]*color:var\(--cyan\)[^}]*font-size:26px/);
