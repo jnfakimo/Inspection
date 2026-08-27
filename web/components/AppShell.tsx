@@ -172,24 +172,22 @@ export function AppShell({ profile, title, children, heading }: {
     <ResponsiveTableLabels />
     <header className="v1-navbar">
       <div className="v1-brand"><b>■ TAIPEC-MKT-1</b><strong>{title}</strong><span>臺北農產公司／第一果菜市場</span></div>
+      <div className="user-meta v1-meta">
+        <span>{profileDetails.department || '未設定單位'}｜{profileDetails.name}</span>
+        <i><em />系統連線中</i>
+        <time>{clock}</time>
+      </div>
       <nav className="v1-actions" aria-label="主要導覽">
         <Link href="/systems/" className={pathname === '/systems/' ? 'is-current' : ''}>
           <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" />
           <span>首頁</span>
         </Link>
-      </nav>
-      <div className="user-meta v1-meta">
-        <span>{profileDetails.department || '未設定單位'}｜{profileDetails.name}</span>
-        <i><em />系統連線中</i>
-        <time>{clock}</time>
-        {/* 介面風格切換改為全站右下角的浮動圖示（components/ThemeToggle.tsx），
-            不再占用頂列，行動裝置上也不會被擠掉。 */}
-        <button className="v1-profile-action" onClick={openProfile}>
+        <button type="button" className="v1-profile-action" onClick={openProfile}>
           <img src="/Inspection/assets/system-icons/profile-nav-icon.png" alt="" />
           <span>個人資料</span>
         </button>
-        <button className="v1-logout-action" onClick={logout}>登出</button>
-      </div>
+        <button type="button" className="v1-logout-action" onClick={logout}>登出</button>
+      </nav>
     </header>
     {isAdminArea ? <div className="admin-v2-frame">
       <AdminSidebar

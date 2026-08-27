@@ -1,11 +1,11 @@
 /* V2 一般內容頁頂列：只保留首頁、個人資料與登出。 */
+.v1-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.v1-actions a,.v1-actions button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;padding:5px 9px;border:1px solid var(--line);border-radius:3px;background:transparent;color:var(--dim);font:inherit;font-size:11px;text-decoration:none;white-space:nowrap;cursor:pointer}
+.v1-actions a:hover,.v1-actions a.is-current,.v1-actions button:hover{border-color:var(--cyan);color:var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,transparent)}
 .v1-actions img{width:18px;height:18px;object-fit:contain}
-.user-meta.v1-meta button{display:inline-flex;align-items:center;gap:5px;background:transparent;border-top:0;border-right:0;border-bottom:0;border-radius:0;padding-top:0;padding-right:0;padding-bottom:0;color:var(--dim);cursor:pointer}
-.user-meta.v1-meta button:hover{color:var(--cyan)}
-.user-meta.v1-meta .v1-profile-action img{width:18px;height:18px;object-fit:contain}
-.user-meta.v1-meta .v1-profile-action span{white-space:nowrap}
+.v1-actions .v1-profile-action span{white-space:nowrap}
 @media(max-width:1380px){.v1-actions{order:3;width:auto;justify-content:flex-end}}
 @media(max-width:760px){
   .v1-actions{display:flex;order:initial;width:auto}
-  .v1-actions a{justify-content:center;min-width:0;padding:6px 8px}
+  .v1-actions a,.v1-actions button{justify-content:center;min-width:0;padding:6px 8px}
 }
