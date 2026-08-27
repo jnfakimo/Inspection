@@ -12,7 +12,7 @@
 /* 2026-08-27 公文傳送視覺與條碼規格：此區置於檔尾覆蓋歷次尺寸修正。 */
 .od-header{align-items:stretch}.od-header-summary{grid-template-columns:repeat(4,minmax(128px,1fr));gap:10px;min-width:min(680px,100%)}.od-header-stat{min-height:112px;padding:14px 15px;align-content:center;border-radius:16px}.od-header-stat small{font-size:14px;line-height:1.45}.od-header-stat strong,.od-header-unit-stat strong{font-size:22px;line-height:1.35}.od-header-stat:nth-child(4){border-color:color-mix(in srgb,var(--red) 30%,var(--line));border-top-color:var(--red);background:linear-gradient(145deg,color-mix(in srgb,var(--red) 13%,var(--panel)),color-mix(in srgb,var(--red) 4%,var(--panel)))}.od-header-stat:nth-child(4) strong{color:var(--red)}
 .od-step-section{border-top:4px solid var(--cyan)}.od-layout .od-list-panel{border-top:4px solid var(--green)}.od-layout .od-list-panel .od-step-no{border-color:var(--green);color:var(--green)}.od-step-section-3{border-top-color:var(--amber)}.od-step-section-3 .od-step-no{border-color:var(--amber);color:var(--amber)}.od-scan-button{border-color:color-mix(in srgb,var(--cyan) 68%,var(--line));background:color-mix(in srgb,var(--cyan) 12%,var(--panel2));color:var(--cyan)}
-.od-create-form{grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;align-items:end}.od-create-form label{min-width:0}.od-create-form select,.od-create-form input{width:100%;min-height:42px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--text);padding:10px 12px}.od-subject-field{grid-column:1/-2}.od-create-submit{width:160px;justify-self:end}.od-people-panel{display:none!important}
+.od-create-form{grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;align-items:end}.od-create-form label{min-width:0}.od-create-form select,.od-create-form input{width:100%;min-height:42px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--text);padding:10px 12px}.od-subject-field{grid-column:1/-2}.od-create-submit{width:160px;justify-self:end}.od-people-panel{display:none!important}
 .od-barcode-image,.od-qr-modal .od-barcode-image{display:block;width:6cm;height:2cm;max-width:100%;object-fit:contain;margin:18px auto;image-rendering:pixelated}.od-barcode-value{font-size:14px;letter-spacing:2px}
 @media (max-width:1200px){.od-header{display:grid}.od-header-summary{min-width:0}.od-create-form{grid-template-columns:repeat(2,minmax(150px,1fr))}.od-subject-field{grid-column:1/-1}.od-create-submit{justify-self:start}}
 @media (max-width:700px){.od-header-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.od-header-stat{min-height:92px}.od-create-form{grid-template-columns:1fr}.od-subject-field{grid-column:auto}.od-create-submit{width:100%}}
@@ -37,9 +37,9 @@
 @media (min-width:701px){.od-header>div:first-child>p{white-space:nowrap;overflow:visible;max-width:none;font-size:clamp(11px,.88vw,13px)}}
 
 /* 公文頁操作按鈕與摘要卡文案微調。 */
-.od-search-panel{border-top:6px solid var(--cyan);box-shadow:none}
-.od-list-panel{border-top:6px solid var(--green);box-shadow:none}
-.od-create-panel{border-top:6px solid var(--amber);box-shadow:none}
+.od-page .od-search-panel{border-top:6px solid var(--cyan);box-shadow:none}
+.od-layout .od-list-panel{border-top:6px solid var(--green);box-shadow:none}
+.od-page .od-create-panel{border-top:6px solid var(--amber);box-shadow:none}
 .od-header-unit-stat small{font-size:0}
 .od-header-unit-stat small::after{content:'部門';font-size:14px;line-height:1.45}
 .od-route-actions .primary-btn{background:color-mix(in srgb,var(--cyan) 80%,transparent);border-color:color-mix(in srgb,var(--cyan) 80%,var(--line));color:#fff}

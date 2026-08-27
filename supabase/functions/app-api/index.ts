@@ -755,6 +755,10 @@ export async function handleAppApiRequest(req: Request) {
       if (!officialDocumentManager(createActor, isSysadmin)) return reply(req, { ok: false, message: '只有公文管理人員可以建立公文' }, 403);
       const subject = text(body.subject, 300);
       if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
+      const rawDocumentNo = String(body.document_no ?? '').trim();
+      if (rawDocumentNo.length > 100) return reply(req, { ok: false, message: '文號不可超過 100 個字元' }, 400);
+      if (/[\u0000-\u001f\u007f]/.test(rawDocumentNo)) return reply(req, { ok: false, message: '文號不可包含控制字元或換行' }, 400);
+      const requestedDocumentNo = rawDocumentNo;
       const documentType = text(body.document_type, 20) || 'official_document';
       if (!['official_document', 'purchase_order', 'other'].includes(documentType)) return reply(req, { ok: false, message: '文件類別不正確' }, 400);
       const responsibleDeptId = id(body.responsible_dept_id) || id(profile.dept_id);
@@ -767,12 +771,13 @@ export async function handleAppApiRequest(req: Request) {
       const documentId = nextRequestRequestId();
       const dateKey = taipeiRocDateKey();
       let serialHint = 1;
-      let documentNo = '';
+      let documentNo = requestedDocumentNo;
       let barcode = '';
       let createdData: Record<string, unknown> | null = null;
       let lastCreateError: { code?: string; message?: string } | null = null;
-      for (let attemptNo = 0; attemptNo < 1000 && !createdData; attemptNo += 1) {
-        documentNo = await nextOfficialDocumentNo(admin, dateKey, serialHint);
+      const maximumAttempts = requestedDocumentNo ? 1 : 1000;
+      for (let attemptNo = 0; attemptNo < maximumAttempts && !createdData; attemptNo += 1) {
+        if (!requestedDocumentNo) documentNo = await nextOfficialDocumentNo(admin, dateKey, serialHint);
         barcode = documentNo;
         const created = await admin.from('official_documents').insert({
           document_id: documentId,
@@ -792,6 +797,7 @@ export async function handleAppApiRequest(req: Request) {
         }
         lastCreateError = created.error;
         if (String(created.error?.code) !== '23505') throw created.error;
+        if (requestedDocumentNo) return reply(req, { ok: false, message: '此文號已存在，請確認後輸入其他文號' }, 409);
         serialHint = Number(documentNo.slice(-4)) + 1;
       }
       if (!createdData) {
