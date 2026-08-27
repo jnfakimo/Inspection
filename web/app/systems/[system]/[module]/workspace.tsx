@@ -641,7 +641,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
           ))}
         </section>
       )}
-      <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : isDispatchModule ? 'dispatch-v1-table' : ''}`}>
+      <section className={`panel table-panel ${isRequestModule ? 'request-v1-table' : (isDispatchModule || isOrdersModule) ? 'dispatch-v1-table' : ''}`}>
         <div className="panel-head"><h2>{data?.title || module.title}</h2><div className="table-tools"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋 報修單號／故障類型／單位…" /><span>{rows.length} 筆</span>{isRequestModule && <button className="repair-add-button" onClick={() => { setForm(emptyRepairForm()); setLocationPhoto(null); setEquipmentPhoto(null); setFormMessage(''); setShowCreate(true); }}>＋ 新增報修</button>}</div></div>
         {isRequestModule && <div className="request-status-chips">
           <button data-status="all" className={!statusFilter ? 'active' : ''} onClick={() => setStatusFilter('')}>全部 <b>{data?.rows.filter(row => row.status !== 'closed').length || 0}</b></button>
