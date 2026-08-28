@@ -35,6 +35,7 @@ function WorkorderHub({ profile }: { profile: Profile }) {
       <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/Inspection/assets/system-icons/repair-request-icon.png" alt="報修與維修" /><h3>報修 &amp; 維修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>
       <Link className="maintenance-card amber" href="/systems/workorder/dispatch/"><span className="maintenance-badge">MAIN-02</span><img src="/Inspection/assets/system-icons/under-repair-icon.png" alt="派工" /><h3>派工系統</h3><p>建立派工、承辦指派<br />工單處理進度追蹤</p><b>▶ 進入派工系統</b></Link>
       <Link className="maintenance-card green" href="/systems/workorder/orders/"><span className="maintenance-badge">MAIN-03</span><img src="/Inspection/assets/system-icons/repair-complete-icon.png" alt="維修完工回報" /><h3>維修完工回報</h3><p>填寫完工紀錄、照片回報<br />驗收及主管結案</p><b>▶ 進入完工回報</b></Link>
+      <Link className="maintenance-card cyan" href="/systems/workorder/repairmap3d/"><span className="maintenance-badge">MAIN-04</span><img src="/Inspection/assets/system-icons/settings-icon.png" alt="報修3D平面圖" /><h3>報修3D平面圖</h3><p>共用 3D 雲台圖資<br />查看報修點與空間位置</p><b>▶ 開啟圖面</b></Link>
     </section>
   </AppShell>;
 }

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
+import { AuthGate } from '@/components/AuthGate';
 
 type WorkspaceProps = {
   system: SystemDefinition;
@@ -49,6 +50,10 @@ const OfficialDocsWorkspace = dynamic<WorkspaceProps>(
   () => import('./official-docs-workspace').then((mod) => mod.OfficialDocsWorkspace),
   { ssr: false, loading: moduleLoading },
 );
+const RepairMap3DModule = dynamic<WorkspaceProps>(
+  () => import('./repair-map3d').then((mod) => mod.RepairMap3DModule),
+  { ssr: false, loading: moduleLoading },
+);
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'handover' || system.key === 'guardpatrol') {
@@ -65,6 +70,9 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   }
   if (system.key === 'workorder' && (module.key === 'attachments' || module.key === 'analytics')) {
     return <WorkorderExtras system={system} module={module} />;
+  }
+  if (system.key === 'workorder' && module.key === 'repairmap3d') {
+    return <AuthGate>{profile => <RepairMap3DModule system={system} module={module} profile={profile} />}</AuthGate>;
   }
   if (system.key === 'structuremap') {
     return <StructureMapModules system={system} module={module} />;

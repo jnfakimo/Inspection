@@ -35,10 +35,10 @@ import { StructuremapTopbarActions } from './structuremap-topbar-actions';
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
 const MARKER_KIND: Record<string, string> = {
-  equipment: '設備', patrol: '巡檢點', repair: '報修', note: '註記', other: '其他',
+  equipment: '設備', space: '空間', patrol: '巡檢點', repair: '報修點', note: '註記', other: '其他',
 };
 const KIND_COLOR: Record<string, string> = {
-  equipment: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
+  equipment: '#00d4ff', space: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
 };
 const CHECKED_COLOR = '#00ff9d';
 const UNCHECKED_COLOR = '#ff3b3b';
@@ -103,6 +103,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
   // 加巡檢點」，單選做不到。
   const [showMarkers, setShowMarkers] = useState(true);
   const patrolOnly = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kind') === 'patrol';
+  const repairOnly = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kind') === 'repair';
   const [date, setDate] = useState(() => new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
   }).format(new Date()));
@@ -113,7 +114,8 @@ function Floor2DViewer({ system, module, profile }: Props) {
     // 只認得的類型才套用，理由同 3D 模型圖：給了不存在的值會全部關掉變成空圖。
     const raw = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('kind');
     const only = raw && MARKER_KIND[raw] ? raw : null;
-    return Object.fromEntries(Object.keys(MARKER_KIND).map(kind => [kind, only ? kind === only : true]));
+    const repairKinds = new Set(['repair', 'space']);
+    return Object.fromEntries(Object.keys(MARKER_KIND).map(kind => [kind, repairOnly ? repairKinds.has(kind) : only ? kind === only : true]));
   });
   // 與 3D 模型圖同名同語意的開關：關閉時標籤只在滑過圖釘時浮現。
   const [showLabels, setShowLabels] = useState(false);
@@ -176,10 +178,10 @@ function Floor2DViewer({ system, module, profile }: Props) {
   const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
   const visible = useMemo(() => (showMarkers ? markers.filter(m =>
     String(m.floor_id) === floor && m.status !== 'inactive'
-      && (patrolOnly ? String(m.kind) === 'patrol' : visibleKinds[String(m.kind)] !== false))
+      && (patrolOnly ? String(m.kind) === 'patrol' : repairOnly ? (String(m.kind) === 'repair' || String(m.kind) === 'space') : visibleKinds[String(m.kind)] !== false))
     .map(m => patrolOnly && String(m.kind) === 'patrol'
       ? { ...m, color: isChecked(m) ? CHECKED_COLOR : UNCHECKED_COLOR } : m) : []),
-    [markers, floor, visibleKinds, showMarkers, patrolOnly, isChecked]);
+    [markers, floor, visibleKinds, showMarkers, patrolOnly, repairOnly, isChecked]);
   const patrolMarkers = useMemo(() => markers.filter(m => String(m.kind) === 'patrol' && m.status !== 'inactive'), [markers]);
   const done = patrolMarkers.filter(isChecked).length;
 
@@ -465,7 +467,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
       <img className="tb-system-icon" src={system.icon} alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
       <span className="tb-space" />
-      <StructuremapTopbarActions planeHref={`${STRUCTUREMAP_ROUTES.patrolMap3d}?kind=patrol`} label="切換3D圖" />
+      <StructuremapTopbarActions planeHref={repairOnly ? '/Inspection/v2/systems/workorder/repairmap3d/' : `${STRUCTUREMAP_ROUTES.patrolMap3d}?kind=patrol`} label="切換3D圖" />
     </div>
 
     {/* OSD 自己會在 host 裡增刪節點，所以空狀態訊息放在 host 外面、由 .f3-stage 承載。 */}
@@ -515,10 +517,10 @@ function Floor2DViewer({ system, module, profile }: Props) {
       </>}
       <label className="chk all">
         <input type="checkbox" checked={showMarkers}
-          onChange={event => setShowMarkers(event.target.checked)} />{patrolOnly ? '顯示巡檢點' : '所有標記'}
+        onChange={event => setShowMarkers(event.target.checked)} />{patrolOnly ? '顯示巡檢點' : repairOnly ? '顯示報修點與空間' : '所有標記'}
       </label>
       {/* 類型色以自訂屬性傳給 CSS，淺色主題才有機會把霓虹色壓深到可讀。 */}
-      {!patrolOnly && Object.entries(MARKER_KIND).map(([kind, label]) => <label key={kind} className="chk kind"
+      {!patrolOnly && !repairOnly && Object.entries(MARKER_KIND).map(([kind, label]) => <label key={kind} className="chk kind"
         style={{ '--kind-color': KIND_COLOR[kind] } as React.CSSProperties}>
         <input type="checkbox" disabled={!showMarkers} checked={visibleKinds[kind] !== false}
           onChange={event => setVisibleKinds(current => ({ ...current, [kind]: event.target.checked }))} />
@@ -535,7 +537,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
         <div className="chk kind legend" style={{ '--kind-color': UNCHECKED_COLOR } as React.CSSProperties}>
           <span className="legend-dot" />未打卡 {patrolMarkers.length - done}
         </div>
-      </> : <div className="f3-floors-count">本層 {visible.length} 個標記</div>}
+      </> : repairOnly ? <><div className="chk kind legend" style={{ '--kind-color': KIND_COLOR.repair } as React.CSSProperties}><span className="legend-dot" />報修點 {visible.filter(m => m.kind === 'repair').length}</div><div className="chk kind legend" style={{ '--kind-color': KIND_COLOR.space } as React.CSSProperties}><span className="legend-dot" />空間 {visible.filter(m => m.kind === 'space').length}</div></> : <div className="f3-floors-count">本層 {visible.length} 個標記</div>}
     </div>}
 
     {placePanelOpen && <div className="f3-panel">
