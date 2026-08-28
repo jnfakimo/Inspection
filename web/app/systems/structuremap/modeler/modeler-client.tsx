@@ -5,6 +5,7 @@ import { ChangeEvent, DragEvent, useCallback, useEffect, useRef, useState } from
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { canonicalFloor } from '@/lib/floor';
+import { preparePlanCanvas } from '@/lib/floorplan-render';
 import type { Profile } from '@/types/app';
 import './modeler.css';
 
@@ -38,6 +39,9 @@ type ParsedInfo = { fileName: string; groups: number; points: number; bbox: BBox
 
 const TEXTURE_LONG_SIDE = 2400;
 const MOBILE_TEXTURE_LONG_SIDE = 1024;
+// 桌機用的中間尺寸。原圖是 4096px，但畫面最大只用到視窗寬度，2048 已經綽綽有餘，
+// 下載與（萬一還要）逐像素處理的量都只剩四分之一。
+const DESKTOP_TEXTURE_LONG_SIDE = 2048;
 
 const FLOOR_OPTIONS = [
   ['B1', 'B1 地下一層'], ['1F', '1F 一樓'], ['2F', '2F 二樓'], ['3F', '3F 三樓'],
@@ -236,6 +240,61 @@ function makeMobileBlob(canvas: HTMLCanvasElement, maxSide: number) {
   });
 }
 
+/** 等比縮到指定長邊；已經夠小就回傳原 canvas（不做無謂的重繪）。 */
+function scaledCanvas(canvas: HTMLCanvasElement, maxSide: number): HTMLCanvasElement {
+  const scale = maxSide / Math.max(canvas.width, canvas.height);
+  if (scale >= 1) return canvas;
+  const target = document.createElement('canvas');
+  target.width = Math.max(1, Math.round(canvas.width * scale));
+  target.height = Math.max(1, Math.round(canvas.height * scale));
+  const context = target.getContext('2d');
+  if (!context) return canvas;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(canvas, 0, 0, target.width, target.height);
+  return target;
+}
+
+type PlanStorage = ReturnType<ReturnType<typeof getSupabase>['storage']['from']>;
+
+/**
+ * 產生並上傳衍生圖，讓檢視器不必在使用者的裝置上重做同樣的事。
+ *
+ * 檢視器原本的流程是「下載 4096px 原圖 → getImageData → 逐像素重畫 → toBlob」，
+ * 實測桌機 250～450ms、手機 3～6 倍，而且每次進場都重跑。改成上傳時就把成品備好，
+ * 檢視器只要挑對檔案直接開。
+ *
+ * light／tech 一律呼叫 preparePlanCanvas（與檢視器同一份實作），成品才會跟現行畫面一致。
+ * 任何一張失敗都只記 console 並回報，不影響主圖與 mobile 版的上傳。
+ */
+async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HTMLCanvasElement) {
+  const desktop = scaledCanvas(canvas, DESKTOP_TEXTURE_LONG_SIDE);
+  const mobile = scaledCanvas(canvas, MOBILE_TEXTURE_LONG_SIDE);
+  const variants: Array<[string, HTMLCanvasElement | null]> = [
+    [`desktop/${path}`, desktop],
+    [`light/${path}`, preparePlanCanvas(desktop, 'light')],
+    [`light/mobile/${path}`, preparePlanCanvas(mobile, 'light')],
+    [`tech/${path}`, preparePlanCanvas(desktop, 'tech')],
+    [`tech/mobile/${path}`, preparePlanCanvas(mobile, 'tech')],
+  ];
+  let done = 0;
+  let failed = 0;
+  for (const [target, image] of variants) {
+    if (!image) { failed += 1; console.warn(`derived plan skipped (prepare failed): ${target}`); continue; }
+    try {
+      const blob = await canvasBlob(image);   // 既有 helper，編碼失敗會 reject，由下面的 catch 接住
+      const result = await storage.upload(target, new File([blob], path, { type: 'image/png' }),
+        { upsert: true, contentType: 'image/png' });
+      if (result.error) throw result.error;
+      done += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn(`derived plan upload failed: ${target}`, error);
+    }
+  }
+  return { done, failed };
+}
+
 export function ModelerClient({ profile }: { profile: Profile }) {
   const [floorChoice, setFloorChoice] = useState('1F');
   const [customFloor, setCustomFloor] = useState('');
@@ -344,6 +403,12 @@ export function ModelerClient({ profile }: { profile: Profile }) {
         console.warn('mobile texture upload failed, viewers will fall back to the full-size image', error);
         mobileNote = '（手機版縮圖上傳失敗，手機將載入原圖）';
       }
+      // 衍生圖（桌機 2048px、淺色／科技版成品）。失敗不擋主圖：檢視器取不到成品就
+      // 退回原本「下載原圖再自己重畫」的流程，畫面一樣，只是慢一點。
+      const derived = await uploadDerivedPlans(storage, path, canvas);
+      const derivedNote = derived.failed
+        ? `，衍生圖 ${derived.done}/${derived.done + derived.failed} 張（失敗的樓層檢視器會自動退回原圖）`
+        : `，衍生圖 ${derived.done} 張`;
       const optionLabel = FLOOR_OPTIONS.find(option => option[0] === floorChoice)?.[1] || floor;
       
       await invokeAppApi('save_floor_model', {
@@ -354,7 +419,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       });
       
       if (floor === 'B1') setRefBBox(bbox);
-      setMessage({ text: `✓ 已更新 ${floor} 模型，平面圖與 3D 已同步${mobileNote}`, tone: 'ok' });
+      setMessage({ text: `✓ 已更新 ${floor} 模型，平面圖與 3D 已同步${mobileNote}${derivedNote}`, tone: 'ok' });
       await loadModels();
     } catch (error) {
       console.error('Save Model Error:', error);
