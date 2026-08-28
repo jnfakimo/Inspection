@@ -121,8 +121,25 @@
   .vehicle-request-toolbar .localized-date-input>button{display:block}
   .vehicle-request-toolbar .localized-date-input>input:first-child{padding-right:30px}
 }
-@media (max-width:800px){.vehicle-request-actions{flex-wrap:wrap;white-space:normal;width:100%}}
-@media (max-width:800px){.vehicle-detail-modal .detail-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* 清除篩選從 .vehicle-request-actions 移出來後就沒有那層的 nowrap 了；
+   桌面版寬度較窄時「清除篩選」會被拆成兩行，所以在這裡補回來。 */
+.vehicle-request-clear{white-space:nowrap}
+/* 派車申請手機版：第一列＝全部狀態／年月日／清除篩選，第二列＝派車報表／公務車主檔／新增派車申請。
+   桌面版仍是同一列，這裡只調整 800px 以下。六個控制項統一 36px 高、12px 字，兩列才會對齊；
+   選擇器要寫到兩層才蓋得過 button-standard.css 的 .primary-btn.compact。 */
+@media (max-width:800px){
+  .vehicle-request-toolbar>select,
+  .vehicle-request-toolbar>.vehicle-request-clear,
+  .vehicle-request-toolbar .localized-date-input>input:first-child,
+  .vehicle-request-toolbar .vehicle-request-actions>button{
+    min-height:36px;height:36px;padding:0 8px;font-size:12px;line-height:1.2}
+  .vehicle-request-toolbar>select{flex:1 1 0;min-width:0}
+  .vehicle-request-toolbar .localized-date-input{flex:1 1 0;min-width:0;width:auto}
+  .vehicle-request-toolbar .localized-date-input>input:first-child{min-width:0!important;width:100%;padding-right:26px}
+  .vehicle-request-toolbar>.vehicle-request-clear{flex:0 0 auto;white-space:nowrap}
+  .vehicle-request-actions{flex:1 0 100%;width:100%;flex-wrap:nowrap;gap:6px;white-space:normal}
+  .vehicle-request-toolbar .vehicle-request-actions>button{flex:1 1 0;min-width:0;white-space:nowrap}
+}
 @media (max-width:600px){
   .vehicle-request-tabs{gap:3px}
   .vehicle-request-tabs>button{padding:8px 3px;font-size:.72rem}

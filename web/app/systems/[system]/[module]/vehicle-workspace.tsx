@@ -318,8 +318,10 @@ function RequestsModule({ module, profile }: Props) {
           {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
         <LocalizedDateInput aria-label="用車日期（年/月/日）" value={dateFilter} onChange={e => setDateFilter(e.target.value)} title="用車日期" />
+        {/* 清除篩選跟著上面兩個篩選條件，不放進下面那組動作按鈕；桌面版順序不變，
+            手機版才能讓「篩選」與「動作」各自成為一列。 */}
+        <button className="secondary-btn vehicle-request-clear" onClick={() => { setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
         <div className="vehicle-request-actions">
-          <button className="secondary-btn" onClick={() => { setStatusFilter(''); setDateFilter(''); }}>清除篩選</button>
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
           <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
