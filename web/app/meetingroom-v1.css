@@ -262,8 +262,8 @@
 @media (max-width:520px){
   .booking-modal .booking-form-section:nth-of-type(3){grid-template-columns:repeat(2,minmax(0,1fr))}
   .booking-modal .booking-form-section:nth-of-type(3)>.row2{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .booking-modal .localized-date-input>input:first-child:focus{outline:0!important;box-shadow:none!important}
-  .booking-modal .localized-date-native{outline:0!important;border:0!important;box-shadow:none!important;color:transparent!important;-webkit-text-fill-color:transparent!important;caret-color:transparent!important}
+  .booking-modal .localized-date-input>input:first-child:focus{outline:0!important;border-color:color-mix(in srgb,var(--line) 88%,var(--dim))!important;box-shadow:none!important}
+  .booking-modal .localized-date-native{outline:0!important;border:0!important;box-shadow:none!important;background:transparent!important;color:transparent!important;-webkit-text-fill-color:transparent!important;caret-color:transparent!important}
   .mr-page .mr-hero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .mr-page .mr-hero>div:first-child{grid-column:1/-1}
   .mr-page .mr-hero>.spacer{display:none}
