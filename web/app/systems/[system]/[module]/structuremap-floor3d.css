@@ -254,6 +254,15 @@
   cursor: pointer;
 }
 
+/* 左側控制入口統一尺寸，較長的「巡檢點顯示」也能與「立體控制」整齊對齊。 */
+.f3-toggle.ctrl,
+.f3-toggle.marks {
+  width: 110px;
+  height: 34px;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
 .f3-toggle:hover { border-color: var(--cyan); }
 .f3-toggle.ctrl { left: 14px; top: 62px; }
 .f3-toggle.floors { right: 14px; top: 62px; }
