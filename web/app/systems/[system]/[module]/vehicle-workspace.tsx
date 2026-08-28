@@ -311,7 +311,7 @@ function RequestsModule({ module, profile }: Props) {
     </div>
 
     {/* 工具列 */}
-    <section className="panel admin-panel">
+    <section className="panel admin-panel vehicle-request-table-panel">
       <div className="admin-toolbar vehicle-request-toolbar" style={{ gap: '8px' }}>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全部狀態</option>
