@@ -16,6 +16,19 @@
 .od-barcode-image,.od-qr-modal .od-barcode-image{display:block;width:6cm;height:2cm;max-width:100%;object-fit:contain;margin:18px auto;image-rendering:pixelated}.od-barcode-value{font-size:14px;letter-spacing:2px}
 @media (max-width:1200px){.od-header{display:grid}.od-header-summary{min-width:0}.od-create-form{grid-template-columns:repeat(2,minmax(150px,1fr))}.od-subject-field{grid-column:1/-1}.od-create-submit{justify-self:start}}
 @media (max-width:700px){.od-header-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.od-header-stat{min-height:92px}.od-create-form{grid-template-columns:1fr}.od-subject-field{grid-column:auto}.od-create-submit{width:100%}}
+
+/* 公文傳送手機版：查詢動作與建立公文的四個分類欄位各自保持單列，
+   只在手機套用，桌面版維持原本寬版表單。 */
+@media (max-width:700px){
+  .od-search-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:stretch}
+  .od-search-input{grid-column:1/-1;min-width:0}
+  .od-search-row button{width:100%;min-width:0;padding:8px 4px;font-size:11px;white-space:nowrap}
+  .od-create-form{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+  .od-create-form>label:first-child,.od-subject-field{grid-column:1/-1}
+  .od-create-form label{font-size:11px}
+  .od-create-form select,.od-create-form input{padding:8px 5px;font-size:12px;min-width:0}
+  .od-create-submit{grid-column:1/-1;width:100%}
+}
 @media print{body *{visibility:hidden}.od-qr-modal,.od-qr-modal *{visibility:visible}.od-qr-modal{position:fixed;inset:0;width:100%;border:0;box-shadow:none}.od-qr-modal header,.od-qr-subject,.od-barcode-value,.od-modal-actions{display:none}.od-qr-modal .od-barcode-image{width:6cm;height:2cm;margin:0}}
 
 /* 2026-08-27 follow-up: compact cards, alternating list tint, and routing hint. */
