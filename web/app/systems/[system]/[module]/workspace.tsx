@@ -37,6 +37,9 @@ type RepairDetail = {
 const ORDER_COST_LABELS: Record<string, string> = { parts: '零件', labor: '工資', outsource: '委外', other: '其他' };
 const twd = (value: unknown) => Number(value || 0).toLocaleString('zh-TW', { maximumFractionDigits: 0 });
 
+// 完工回報的工時以「小時」為單位，一次跳一小時；上限 24 小時，跨日的案件請分次回報。
+const LABOR_HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => index + 1);
+
 const EMPTY_FILTER_VALUE = '__empty__';
 const REQUEST_COLUMNS = [
   { key: 'req_no', label: '報修單號' },
@@ -723,11 +726,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
               <div className="dispatch-detail-form-grid">
                 <label><span>故障原因（必填）</span><textarea value={completionForm.faultCause} onChange={event => setCompletionForm(current => ({ ...current, faultCause: event.target.value }))} /></label>
                 <label><span>處理方式（必填）</span><textarea value={completionForm.handleMethod} onChange={event => setCompletionForm(current => ({ ...current, handleMethod: event.target.value }))} /></label>
-                <label><span>更換零件</span><input value={completionForm.partsUsed} onChange={event => setCompletionForm(current => ({ ...current, partsUsed: event.target.value }))} /></label>
-                <label><span>使用材料</span><input value={completionForm.materials} onChange={event => setCompletionForm(current => ({ ...current, materials: event.target.value }))} /></label>
-                <label><span>工時（小時）</span><input type="number" min="0" step="0.5" value={completionForm.laborHours} onChange={event => setCompletionForm(current => ({ ...current, laborHours: event.target.value }))} /></label>
-                <label><span>零件費用（元）</span><input type="number" min="0" step="1" value={completionForm.partsCost} onChange={event => setCompletionForm(current => ({ ...current, partsCost: event.target.value }))} /></label>
-                <label><span>工資費用（元）</span><input type="number" min="0" step="1" value={completionForm.laborCost} onChange={event => setCompletionForm(current => ({ ...current, laborCost: event.target.value }))} /></label>
+                <label className="half"><span>更換零件</span><select value={completionForm.partsUsed} onChange={event => setCompletionForm(current => ({ ...current, partsUsed: event.target.value }))}><option value=""></option><option value="是">是</option><option value="否">否</option></select></label>
+                <label className="half"><span>使用材料</span><input value={completionForm.materials} onChange={event => setCompletionForm(current => ({ ...current, materials: event.target.value }))} /></label>
+                <label className="half"><span>工時（小時）</span><select value={completionForm.laborHours} onChange={event => setCompletionForm(current => ({ ...current, laborHours: event.target.value }))}><option value=""></option>{LABOR_HOUR_OPTIONS.map(hour => <option key={hour} value={hour}>{hour} 小時</option>)}</select></label>
+                <label className="half"><span>零件費用（元）</span><input type="number" min="0" step="1" value={completionForm.partsCost} onChange={event => setCompletionForm(current => ({ ...current, partsCost: event.target.value }))} /></label>
+                <label className="half"><span>工資費用（元）</span><input type="number" min="0" step="1" value={completionForm.laborCost} onChange={event => setCompletionForm(current => ({ ...current, laborCost: event.target.value }))} /></label>
                 <label><span>完工備註</span><input value={completionForm.note} onChange={event => setCompletionForm(current => ({ ...current, note: event.target.value }))} /></label>
               </div>
               <div className="dispatch-detail-form-actions"><button type="button" className="secondary-btn" onClick={() => setShowCompletionForm(false)}>取消</button><button type="submit" className="dispatch-assign-button" disabled={dispatchSaving}>{dispatchSaving ? '送出中…' : '送出完工'}</button></div>
