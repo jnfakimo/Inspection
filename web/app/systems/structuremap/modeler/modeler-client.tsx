@@ -6,6 +6,7 @@ import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { canonicalFloor } from '@/lib/floor';
 import { preparePlanCanvas } from '@/lib/floorplan-render';
+import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import type { Profile } from '@/types/app';
 import './modeler.css';
 
@@ -295,6 +296,26 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
   return { done, failed };
 }
 
+/** 把 Storage 上的原圖讀成 canvas，供補產生衍生圖使用。signed URL 允許跨網域讀取，
+ *  加上 crossOrigin='anonymous' 才不會讓 canvas 被污染而取不到像素。 */
+function loadImageCanvas(url: string): Promise<HTMLCanvasElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d');
+      if (!context) { reject(new Error('取不到 canvas 2d context')); return; }
+      context.drawImage(image, 0, 0);
+      resolve(canvas);
+    };
+    image.onerror = () => reject(new Error('原圖載入失敗'));
+    image.src = url;
+  });
+}
+
 export function ModelerClient({ profile }: { profile: Profile }) {
   const [floorChoice, setFloorChoice] = useState('1F');
   const [customFloor, setCustomFloor] = useState('');
@@ -305,6 +326,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
   const [refBBox, setRefBBox] = useState<BBox | null>(null);
   const [dragging, setDragging] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastBlobRef = useRef<Blob | null>(null);
@@ -373,6 +395,41 @@ export function ModelerClient({ profile }: { profile: Profile }) {
     setDragging(false);
     const file = event.dataTransfer.files?.[0];
     if (file) void handleFile(file);
+  }
+
+
+  /**
+   * 為既有樓層補產生衍生圖。步驟 1 只讓「之後上傳的樓層」自動有衍生圖，
+   * 這支是給已經在 Storage 裡的樓層補課用的——讀回原圖、在瀏覽器產生成品、傳回去，
+   * 不必重新上傳 DXF。全部成功之後這顆按鈕就不需要再按了（除非改了重畫演算法）。
+   */
+  async function backfillDerivedPlans() {
+    const paths = (savedModels || []).map(model => String(model.image_path || '')).filter(Boolean);
+    if (!paths.length) { setMessage({ text: '沒有可處理的樓層模型', tone: 'err' }); return; }
+    setBackfilling(true);
+    const storage = getSupabase().storage.from('floorplans');
+    let done = 0;
+    let failed = 0;
+    try {
+      for (const [index, path] of paths.entries()) {
+        setMessage({ text: `補產生衍生圖…（${index + 1}/${paths.length}）${path}`, tone: 'work' });
+        try {
+          const url = (await signFloorplanPaths([path])).get(path);
+          if (!url) throw new Error('無法取得原圖連結');
+          const result = await uploadDerivedPlans(storage, path, await loadImageCanvas(url));
+          done += result.done;
+          failed += result.failed;
+        } catch (error) {
+          failed += 5;   // 這一層的五張衍生圖都沒產生
+          console.warn(`backfill derived plans failed: ${path}`, error);
+        }
+      }
+      setMessage(failed
+        ? { text: `補產生完成：成功 ${done} 張、失敗 ${failed} 張（失敗原因見瀏覽器主控台；檢視器會自動退回原圖）`, tone: 'err' }
+        : { text: `✓ 補產生完成，共 ${done} 張衍生圖`, tone: 'ok' });
+    } finally {
+      setBackfilling(false);
+    }
   }
 
   async function saveModel() {
@@ -490,6 +547,20 @@ export function ModelerClient({ profile }: { profile: Profile }) {
               <span>{model.name || ''}</span><time>{formatDateTime(model.updated_at)}</time>
             </div>)}
           </div>
+
+          {/* 既有樓層是在「上傳時產生衍生圖」這個功能之前建立的，按一次補齊即可，
+              不必重新上傳 DXF。之後新上傳的樓層會自動附帶衍生圖。 */}
+          {!savedError && !!savedModels?.length && <>
+            <button className="modeler-button" disabled={backfilling || saving}
+              onClick={() => void backfillDerivedPlans()}>
+              {backfilling ? '補產生中…' : '⟳ 補產生衍生圖'}
+            </button>
+            <div className="modeler-hint">
+              ※ 為既有 {savedModels.length} 層產生桌機 2048px 與淺色／科技版成品圖，
+              讓檢視器不必每次進場都在你的裝置上重畫（實測可省 250～450ms／次）。
+              只需執行一次；之後新上傳的樓層會自動附帶。
+            </div>
+          </>}
 
           <div className="modeler-links">
             <Link href="/systems/structuremap/floor3d/">開啟 3D 立體模型</Link>
