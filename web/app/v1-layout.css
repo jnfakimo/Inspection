@@ -88,6 +88,10 @@
 
 /* 派車申請列表完整展開，避免「申請編號」清單被限制在內層捲軸。 */
 .vehicle-request-page .responsive-table{max-height:none!important;overflow:visible!important}
+
+/* 公務車主檔桌面版內容寬度 85%，手機版恢復滿寬。 */
+.vehicle-master-page{width:85%;margin-left:auto;margin-right:auto}
+@media(max-width:600px){.vehicle-master-page{width:100%}}
 .request-detail-modal h2{display:flex;align-items:center;gap:16px}
 .request-detail-modal h2>b{color:var(--cyan);font-family:var(--head);letter-spacing:.04em}
 .request-detail-body{padding-bottom:22px}

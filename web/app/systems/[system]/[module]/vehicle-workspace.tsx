@@ -876,6 +876,7 @@ function VehiclesModule({ module, profile }: Props) {
   };
 
   return <AppShell profile={profile} title={module.title}>
+    <div className="vehicle-master-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={canManageFleet ? <button className="primary-btn compact" onClick={() => setEditor({ status: 'active', seats: 5, current_odometer: 0 })}>＋ 新增車輛</button> : undefined} />
     <section className="panel admin-panel vehicle-master-panel">
@@ -898,6 +899,7 @@ function VehiclesModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">目前沒有車輛資料</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
+    </div>
 
     {editor && <AdminModal title={editor.vehicle_id ? `編輯車輛｜${fmt(editor.plate_no)}` : '新增車輛'} onClose={() => setEditor(null)}>
       <div className="admin-form-grid">
