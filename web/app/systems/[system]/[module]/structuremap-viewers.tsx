@@ -400,7 +400,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
       <img className="tb-system-icon" src={system.icon} alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
       <span className="tb-space" />
-      <StructuremapTopbarActions planeHref={`${STRUCTUREMAP_ROUTES.floor2d}?kind=patrol`} label="切換3D圖" />
+      <StructuremapTopbarActions planeHref={`${STRUCTUREMAP_ROUTES.floor3d}?kind=patrol`} label="切換3D圖" />
     </div>
 
     {/* OSD 自己會在 host 裡增刪節點，所以空狀態訊息放在 host 外面、由 .f3-stage 承載。 */}
