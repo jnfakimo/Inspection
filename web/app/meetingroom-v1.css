@@ -253,6 +253,27 @@
   .calendar-link-status{width:100%;order:3}.calendar-sync-option{align-items:stretch}
 }
 
+/* 手機預約彈窗第 03 段：兩個電話欄位、重複預約與 Google 行事曆各自並排。 */
+@media (max-width:700px){
+  .booking-modal .booking-form-section:nth-of-type(3){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .booking-modal .booking-form-section:nth-of-type(3)>.booking-section-head{grid-column:1/-1}
+  .booking-modal .booking-form-section:nth-of-type(3)>.row2{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+}
+@media (max-width:520px){
+  .booking-modal .booking-form-section:nth-of-type(3){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .booking-modal .booking-form-section:nth-of-type(3)>.row2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .booking-modal .localized-date-input>input:first-child:focus{outline:0!important;box-shadow:none!important}
+  .booking-modal .localized-date-native{outline:0!important;border:0!important;box-shadow:none!important;color:transparent!important;-webkit-text-fill-color:transparent!important;caret-color:transparent!important}
+  .mr-page .mr-hero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .mr-page .mr-hero>div:first-child{grid-column:1/-1}
+  .mr-page .mr-hero>.spacer{display:none}
+  .mr-page .mr-hero>.calendar-link-status,.mr-page .mr-hero>.btn{width:100%;min-width:0;font-size:.68rem}
+  .mr-page .mr-schedule-panel .mr-panel-head{display:grid;grid-template-columns:1fr;gap:8px}
+  .mr-page .mr-schedule-panel .week-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:4px;align-items:center}
+  .mr-page .mr-schedule-panel .week-nav .btn{min-width:0;padding:7px 5px;font-size:.78rem;white-space:nowrap}
+  .mr-page .mr-schedule-panel .week-label{min-width:0;font-size:.82rem;white-space:nowrap}
+}
+
 /* 會議室管理彈窗的送出按鈕列：桌面沿用原本的靠左排列（等同原本的行內 flex），
    手機版改為靠右，與各頁頁首按鈕的方向一致。 */
 .mr-form-actions{display:flex;gap:8px}
