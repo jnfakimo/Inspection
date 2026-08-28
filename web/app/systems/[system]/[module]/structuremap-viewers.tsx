@@ -21,6 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import './structuremap-pin.css';
 import { AuthGate } from '@/components/AuthGate';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { canonicalFloor } from '@/lib/floor';
@@ -39,6 +40,8 @@ const MARKER_KIND: Record<string, string> = {
 const KIND_COLOR: Record<string, string> = {
   equipment: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
 };
+const CHECKED_COLOR = '#00ff9d';
+const UNCHECKED_COLOR = '#ff3b3b';
 const textureUrl = floorTextureUrl;
 // 重畫後的樓層圖最多留 4 張（約 5MB；手機版縮圖只有十分之一），超過就釋放最舊的。
 const PLAN_CACHE_MAX = 4;
@@ -100,6 +103,10 @@ function Floor2DViewer({ system, module, profile }: Props) {
   // 加巡檢點」，單選做不到。
   const [showMarkers, setShowMarkers] = useState(true);
   const patrolOnly = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kind') === 'patrol';
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date()));
+  const [checkins, setCheckins] = useState<Row[]>([]);
   // ?kind=patrol：從駐衛警巡檢的立體巡檢雲臺跳過來時只看巡檢點。不另外複製一份
   // 頁面，也不改預設——直接進本頁仍是全部類型都顯示。
   const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(() => {
@@ -144,11 +151,36 @@ function Floor2DViewer({ system, module, profile }: Props) {
   // 不會執行，'open' 監聽根本沒註冊，圖面永遠是空的。
   const [viewerReady, setViewerReady] = useState(false);
 
+  useEffect(() => {
+    if (!patrolOnly) return;
+    let cancelled = false;
+    void getSupabase().from('checkin_logs').select('checkin_id,target_id,label,floor_id')
+      .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`)
+      .limit(5000).then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setNote(`失敗：${errorMessage(error, '打卡資料載入失敗')}`); return; }
+        setCheckins((data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
+      });
+    return () => { cancelled = true; };
+  }, [date, patrolOnly, setNote]);
+
+  const checkedIds = useMemo(() => {
+    const ids = new Set<string>();
+    checkins.forEach(row => { if (row.target_id) ids.add(String(row.target_id)); ids.add(`${row.floor_id}|${row.label}`); });
+    return ids;
+  }, [checkins]);
+  const isChecked = useCallback((marker: Row) =>
+    checkedIds.has(String(marker.marker_id)) || checkedIds.has(`${marker.floor_id}|${marker.label}`), [checkedIds]);
+
   useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
   const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
   const visible = useMemo(() => (showMarkers ? markers.filter(m =>
-    String(m.floor_id) === floor && visibleKinds[String(m.kind)] !== false) : []),
-    [markers, floor, visibleKinds, showMarkers]);
+    String(m.floor_id) === floor && m.status !== 'inactive' && visibleKinds[String(m.kind)] !== false)
+    .map(m => patrolOnly && String(m.kind) === 'patrol'
+      ? { ...m, color: isChecked(m) ? CHECKED_COLOR : UNCHECKED_COLOR } : m) : []),
+    [markers, floor, visibleKinds, showMarkers, patrolOnly, isChecked]);
+  const patrolMarkers = useMemo(() => markers.filter(m => String(m.kind) === 'patrol' && m.status !== 'inactive'), [markers]);
+  const done = patrolMarkers.filter(isChecked).length;
 
   // 建立／切換 OpenSeadragon。函式庫以動態 import 載入。
   useEffect(() => {
@@ -472,15 +504,20 @@ function Floor2DViewer({ system, module, profile }: Props) {
 
     {kindsOpen && <div className="f3-mkpanel">
       <div className="panel-head">
-        <span className="p-t">標記顯示</span>
+        <span className="p-t">{patrolOnly ? '巡檢點顯示' : '標記顯示'}</span>
         <button className="panel-close" onClick={() => setKindsOpen(false)}>隱藏</button>
       </div>
+      {patrolOnly && <>
+        <label htmlFor="f2-date">巡檢日期</label>
+        <LocalizedDateInput id="f2-date" aria-label="巡檢日期（年/月/日）"
+          value={date} onChange={event => setDate(event.target.value)} />
+      </>}
       <label className="chk all">
         <input type="checkbox" checked={showMarkers}
-          onChange={event => setShowMarkers(event.target.checked)} />{patrolOnly ? '巡檢點' : '所有標記'}
+          onChange={event => setShowMarkers(event.target.checked)} />{patrolOnly ? '顯示巡檢點' : '所有標記'}
       </label>
       {/* 類型色以自訂屬性傳給 CSS，淺色主題才有機會把霓虹色壓深到可讀。 */}
-      {Object.entries(MARKER_KIND).filter(([kind]) => !patrolOnly || kind === 'patrol').map(([kind, label]) => <label key={kind} className="chk kind"
+      {!patrolOnly && Object.entries(MARKER_KIND).map(([kind, label]) => <label key={kind} className="chk kind"
         style={{ '--kind-color': KIND_COLOR[kind] } as React.CSSProperties}>
         <input type="checkbox" disabled={!showMarkers} checked={visibleKinds[kind] !== false}
           onChange={event => setVisibleKinds(current => ({ ...current, [kind]: event.target.checked }))} />
@@ -490,7 +527,14 @@ function Floor2DViewer({ system, module, profile }: Props) {
         <input type="checkbox" disabled={!showMarkers} checked={showLabels}
           onChange={event => setShowLabels(event.target.checked)} />文字標籤
       </label>
-      <div className="f3-floors-count">本層 {visible.length} 個標記</div>
+      {patrolOnly ? <>
+        <div className="chk kind legend" style={{ '--kind-color': CHECKED_COLOR } as React.CSSProperties}>
+          <span className="legend-dot" />已打卡 {done}
+        </div>
+        <div className="chk kind legend" style={{ '--kind-color': UNCHECKED_COLOR } as React.CSSProperties}>
+          <span className="legend-dot" />未打卡 {patrolMarkers.length - done}
+        </div>
+      </> : <div className="f3-floors-count">本層 {visible.length} 個標記</div>}
     </div>}
 
     {placePanelOpen && <div className="f3-panel">
