@@ -4,7 +4,7 @@ import { clearProfile } from '@/lib/profile-cache';
 import { getSupabase } from '@/lib/supabase';
 
 /** 共用於 3D／平面全螢幕圖資頁的帳號與圖面導覽。 */
-export function StructuremapTopbarActions({ planeHref, label = '平面圖切換' }: { planeHref: string; label?: string }) {
+export function StructuremapTopbarActions({ planeHref, label = '切換平面圖' }: { planeHref: string; label?: string }) {
   async function logout() {
     try { await getSupabase().auth.signOut({ scope: 'local' }); }
     catch (error) { console.warn('logout failed:', error); }

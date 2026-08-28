@@ -189,7 +189,7 @@ export function Floor3DBoardModule({ profile }: Props) {
       <img className="tb-system-icon" src="/Inspection/assets/system-icons/settings-icon.png" alt="" data-system-page-logo />
       <span className="tb-title">3D 模型圖</span>
       <span className="tb-space" />
-      <StructuremapTopbarActions planeHref={STRUCTUREMAP_ROUTES.floor2d} />
+      <StructuremapTopbarActions planeHref={STRUCTUREMAP_ROUTES.floor2d} label="切換平面圖" />
     </div>
 
     <div className="f3-stage">
