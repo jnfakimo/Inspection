@@ -110,6 +110,24 @@
 
 .f3-topbar .tb-space { flex: 1 0 auto; }
 
+.f3-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.f3-topbar .tb-action {
+  gap: 5px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.f3-topbar .tb-tool-switch {
+  border-color: color-mix(in srgb, var(--cyan) 45%, var(--line));
+  color: var(--f3-accent-text);
+}
+
 .f3-topbar .tb-back {
   display: inline-flex;
   align-items: center;
@@ -140,6 +158,10 @@
 @media (max-width: 720px) {
   .f3-topbar .tb-logo,
   .f3-topbar .tb-sep { display: none; }
+  .f3-topbar { gap: 6px; padding: 0 8px; }
+  .f3-topbar-actions { gap: 4px; }
+  .f3-topbar .tb-action { padding: 4px 6px; font-size: 10px; }
+  .f3-topbar .tb-tool-switch { display: none; }
 }
 
 /* ── 3D 場景 ────────────────────────────────────────────────────────── */

@@ -29,6 +29,7 @@ import { signFloorplanPaths } from '@/lib/floorplan-storage';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import { StructuremapTopbarActions } from './structuremap-topbar-actions';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
@@ -397,13 +398,8 @@ function Floor2DViewer({ system, module, profile }: Props) {
       <span className="tb-sep" />
       <img className="tb-system-icon" src={system.icon} alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
-      <a className="tb-back tb-home" href="/Inspection/v2/systems/">
-        <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" /><span>首頁</span>
-      </a>
       <span className="tb-space" />
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor3d}>3D模型圖</a>
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.patrolMap3d}>立體巡檢雲臺</a>
+      <StructuremapTopbarActions planeHref={STRUCTUREMAP_ROUTES.floor3d} />
     </div>
 
     {/* OSD 自己會在 host 裡增刪節點，所以空狀態訊息放在 host 外面、由 .f3-stage 承載。 */}

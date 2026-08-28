@@ -84,6 +84,11 @@ export function AppShell({ profile, title, children, heading }: {
     const handleOpen = () => openProfile();
     window.addEventListener('open-personal-profile', handleOpen);
     const url = new URL(window.location.href);
+    if (url.searchParams.get('profile') === '1') {
+      openProfile();
+      url.searchParams.delete('profile');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
     const result = url.searchParams.get('google_calendar');
     if (result) {
       openProfile();
