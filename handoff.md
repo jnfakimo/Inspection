@@ -1,119 +1,114 @@
 # 交接檔 handoff
 
 > 這份只放「下次接手需要知道的事」。durable 的技術規範已寫進 `AGENTS.md`
-> （圖資頁面、介面風格切換、讀取存取稽核三節），這裡不重複。
+> （V2 手機版版型規範、樓層平面圖的圖檔與效能、系統子頁標題規範等節），
+> 完整脈絡與踩坑細節寫在 `Obsidian/04-開發與部署.md`，這裡不重複。
 
 ## ⏯️ 目前做到哪
 
-**2026-08-21：上午清掉 08-20 交接檔的四項待辦；下午到晚上把 V2 的圖資頁面收斂成
-同一套版面與同一批共用資產，並修好一批「看起來正常、其實沒作用」的缺陷。共 23 個
-commit。**
+**2026-08-28：一整天處理現場回報的「系統很慢」與手機版版型，並把圖資效能做了治本。
+本機 commit 89 筆（含其他 session）。**
 
-### 上午：四項待辦
+### 圖資效能（治本，四步完成）
 
-| 項目 | 結果 |
-|---|---|
-| 跑完工費用 migration | ✅ 查證後確認**早已套用**，交接檔過時 |
-| 驗證位置分析與費用累積 | ⏳ **仍待實機驗證** |
-| 認證信件改繁中 | 🔧 六封範本已進版控，**待貼主控台** |
-| `canonicalFloor` 無窮遞迴 | ✅ 已修（`ec59ab6`），V1 三頁受影響 |
+平面圖／3D 原本的流程是「下載 4096px 原圖 → `getImageData` → 逐像素重畫 → `toBlob`」，
+實測桌機 250～450ms、手機 3～6 倍，且每次切樓層都重跑。改為**上傳時就備好成品圖**：
 
-### 下午到晚上
+1. 建模系統 `saveModel()` 產生並上傳 `desktop/`、`light/`、`light/mobile/`、`tech/`、`tech/mobile/`
+2. 建模頁新增「⟳ 補產生衍生圖」，為既有樓層補課（不必重傳 DXF）
+3. 已執行，35 張衍生圖全部落地（`floorplans` 物件 13 → 48）
+4. **四個檢視器**（平面圖、3D 樓層圖、駐衛警立體雲台、整合標記圖臺）改為直接開成品圖
 
-- **圖資頁面全部收斂**。平面模型圖與立體巡檢雲臺都從「AppShell ＋ 後台面板」改為
-  全螢幕工具頁，與 3D 模型圖共用 `.f3-*` 外殼、共用圖釘（`structuremap-pin.css`）、
-  共用標籤防重疊規則。**規範已寫進 AGENTS.md**，含建模系統與三個檢視器的上下游關係。
-- **介面風格切換改為右下角浮動圖示**，掛在根版面，全站 71 頁自動涵蓋。
-- **移植讀取存取稽核到 V2**（`web/lib/access-audit.ts`）。資安告警靠前端呼叫
-  `audit-event` 產生，先前**只有 V1 在餵**，V1 退役後會直接歸零。
-- **CI 從紅轉綠**並升級 GitHub Actions（過時警告歸零）。
-- 會議室預約改以**時間**管制、交接紀錄表格排版、科技版線條粗細等現場回報。
+選圖規則收斂成 `web/lib/floorplan-storage.ts` 的 `signFloorPlanVariants()`，四頁共用。
 
-### 今天修掉的「靜默失效」
+### 其他效能
 
-這類缺陷全程出現四次，都是**畫面只是空的或看起來正常，沒有任何錯誤訊息**：
+- **系統圖示 13.6MB → 2.18MB**：24 個被引用的圖示以 1024～1254px 原尺寸進版控（單檔 1～1.5MB），
+  但最大顯示只有 88px。縮到 320px（Sprite 依格數換算）；入口頁圖示 2.63MB → 769KB。
 
-1. 平面模型圖的標記**從上線起一顆都沒畫出來過**——取 `window.OpenSeadragon`（UMD 在
-   打包環境不掛全域）每顆都丟 TypeError，被空 catch 吞掉。
-2. V1 三頁的 `canonicalFloor` 每次呼叫都 stack overflow，樓層比對從沒成功過。
-3. CI 紅了 **21 次沒人發現**，後端型別把關實質停擺 17 小時。
-4. 圖資頁切換主題後畫面停在舊主題（只在建場景時讀一次 `data-theme`）。
+### 功能修復
+
+- **公文條碼掃描**：iOS 上「有權限卻沒有影像」是 `decodeFromStream` 重複指派 `srcObject`；
+  另補「拍照辨識」（系統相機對焦後的靜態影像），使用者確認可用。
+- **日期欄位在 iOS 沒有日曆**：`showPicker()` 對不可見元素會丟例外。觸控裝置改為把原生
+  `<input type="date">` 變成覆蓋整個欄位的透明層。使用者實機確認可用，全站約 20 處受益。
+
+### 手機版版型
+
+- **49 個子系統頁首操作按鈕一律靠右**（一條全站規則，並刪掉先前六條分頁專用宣告）
+- 巡檢排班、巡邏打卡、逾時推播、派車申請、公務車主檔、駕駛人員、派車紀錄、會議室四頁、
+  完工回報等頁的欄位排列收斂
 
 ## 🚦 目前狀態
 
-本機與 `origin/main` 同步在 `5b303b1`，工作區乾淨。CI／Pages／CodeQL／Commercial
-readiness **四個 workflow 全綠，過時警告 0**。
+本機與 `origin/main` 同步在 `e030200`，工作區乾淨。`npm run typecheck:v2`、`build:v2`、
+完整 `npm test`、`security:audit`（錯誤 0／既有警告 4）全部通過。
 
-`tsc` 0 錯、`next build` 通過、`stylelint` 0 錯、`scan:pages` 通過、
-`security:audit` 錯誤 0／警告 4（與先前一致）。
+**工作區已改為 `C:\claude-code\Inspection`**，Google Drive 上那份已停用（見注意事項）。
 
 ## ➡️ 下一步
 
-1. **把認證信件範本貼進主控台（最優先，我做不到）**。主控台 → Authentication →
-   Emails，對照表在 `supabase/templates/README.md`。只做 Reset Password 也行。
-   貼完實際跑一次忘記密碼。
-2. **驗證費用與位置分析開始累積資料**（從 08-18 延到現在）。`cost_records` 仍是
-   **零筆** `note='完工回報自動產生'`。建報修 → 派工給自己 → 處理中 → 完工填費用。
-3. **實機驗收今天的 V2 改動**。三個圖資頁（版面、主題切換即時重繪、標籤不重疊）、
-   資安告警頁、會議室時間管制、交接表格。今天多數改動我只能驗到建置產物，
-   **需要登入的畫面都沒能實機驗證**。
-4. **決定 3D 模型圖的滑鼠鍵位要不要對齊 V1**（V1 左鍵平移／右鍵旋轉，V2 是
-   OrbitControls 預設的相反配置）。要一致應改 `mouseButtons`，不是改文案。
+1. **四個圖資頁實機驗收**：平面樓層圖、3D 模型圖、駐衛警立體雲台、整合標記圖臺。
+   看進場速度、圖面是否正常、切換一般版／科技版是否正確。3D 若某層空白，
+   代表那層成品圖有問題，可在建模頁重按「補產生衍生圖」。
+2. **P0 公文傳送流程跨角色端到端驗收**（`Obsidian/05-待辦清單.md` 唯一未結的 P0）：
+   程式與 migration 都已上線，缺登入後實際跑一輪。
+3. **追查「上傳回報成功但檔案沒落地」的根因**（見注意事項），目前只有防線沒有解答。
 
 ## ⚠️ 注意事項
 
 **這次新增的**
 
-- **不可以用 `window.OpenSeadragon`**。UMD 包裝在打包環境走 `module.exports`，
-  不會掛上全域。請用 import 進來的命名空間。
-- **不可以用空 catch 吞掉覆蓋層／算繪錯誤**。至少記 console，整批失敗要顯示在畫面。
-- **行內樣式優先權高於樣式表**。交接表格的對齊改不動就是因為欄位掛了
-  `style={{textAlign:'right'}}`；要統一調整就得先移除行內樣式。
-- **同特異度的 CSS 只靠順序取勝並不可靠**。實測 `.lab-off` 疊 `opacity:0` 在瀏覽器
-  裡沒生效；能用既有規則做到的效果就不要再疊一層互相打架的宣告。
-- **`next dev`（不是 build）會生成 `web/AGENTS.md` 與 `web/CLAUDE.md`**，已加入
-  `.gitignore`。專案的 agent 指示只有根目錄那一份。
-- **`npm run build:pages` 會把 `system/*.html` 全部改寫成 CRLF**，`git status` 冒出
-  三十幾個假變動。提交前用 `git diff --stat` 確認真正改了哪幾個檔。
-- **收工前看一眼 CI**。它紅了 21 次沒人發現；紅燈放著不管，真正的問題會躲在後面
-  （這次解除第一個錯誤後，下一步立刻也是紅的）。
+- **工作區改為 `C:\claude-code\Inspection`**。`G:\我的雲端硬碟\AI\Codex\北農巡檢系統` 已停用：
+  Drive 同步一天內弄壞 `.git` 兩次（生出重複檔 `refs/heads/main (1)` 讓 fetch 噴
+  `bad object`；`packed-refs.lock` 卡 0 bytes）。那份是 `blob:none` partial clone，
+  本機獨有的舊部署分支缺 blob 搬不過來，且掛著兩個 worktree，所以**保留不刪**，
+  根目錄放了 `讀我-此資料夾已停用.md`。
+- **上傳回報成功但檔案沒落地（根因未明）**。補產生衍生圖前兩次回報「35 張」，實際 0 張；
+  已排除專案接錯、RLS、桶限制、觸發器、Service Worker、部署未生效，並實測 Storage API
+  會正確拒絕無效身分。第三次成功前唯一差異是硬重整。**不要只看 `upload()` 的 error**——
+  現在的程式會要求 `data.path` 並在事後 `storage.list()` 實際數過才回報數字，這條防線要留著。
+- **不要用行內樣式排版**。`style={{...}}` 優先序高於任何選擇器，media query 蓋不過去。
+  今天被擋三次（`LocalizedDateInput` 的原生日期欄位、會議室彈窗按鈕列、巡檢排班外框）。
+- **手機版「明明空間夠卻換行」先查 `flex-basis`**，不是 `flex-wrap`：`flex:1 1 auto` 會取
+  內容寬度當基準，先佔滿一行把後面的項目擠下去。
+- **`display:contents` 的容器要先改回 `display:flex` 才能分列**（巡邏打卡工具列）。
+- **改版型後用建置產出的實際 CSS chunk 建靜態重現頁量測**，並**務必把基礎樣式 chunk 一起載入**
+  ——只載含新規則的那一個會量到錯誤結果，今天差點誤判規則沒生效。
+- **驗證線上部署用「本機建置的 chunk 檔名去線上對抓」**：V2 多數頁面的 CSS/JS 是動態載入，
+  只掃 HTML 裡的 `<link>`／`<script>` 會漏掉。
+- **圖示一律收在 320px 以內**再進版控（`npm test` 會擋下超過 200KB 的系統 Logo）。
+  不要用 256 色量化：實測 3D 光澤圖示在 88px 顯示時色差 RMS 達 5～17，看得見色帶。
 
 **沿用的**
 
 - **查正式庫用 `npx supabase db query --linked --project-ref qztffronusdhgxhjjubt "<SQL>"`**。
-  Supabase MCP 對正式專案仍是 permission denied。
-- **`supabase migration list` 與 `db push` 不可信**；**絕對不要跑 `supabase config push`**
-  （`config.toml` 沒有 `[auth]` 段，會蓋掉整份 auth 設定）。
+  Storage 也可用 `supabase storage ls ss:///floorplans/ --experimental`（但 `cp` 在此版本
+  不支援遠端↔本機，無法從命令列上傳）。
+- **`supabase migration list` 與 `db push` 不可信**；**絕對不要跑 `supabase config push`**。
 - **`users.department` 只是副本**，以 `dept_id` 為準。
 - **驗收剛推的修正前先 `Ctrl+Shift+R`**（GitHub Pages 的 CDN 會快取 HTML）。
-- **工作區在 `C:\claude-code\Inspection`**（完整 clone）；`G:\...\word-cloud` 是廢棄鏡像。
-- **`G:\我的雲端硬碟\AI\Codex\北農巡檢系統` 已於 2026-08-28 停用，不要在上面工作**。
-  `.git` 放在 Google Drive 上會被同步機制破壞：08-27～28 一天內出事兩次——Drive 生出重複檔
-  `refs/heads/main (1)` 讓 `git fetch` 噴 `bad object`，以及 `packed-refs.lock` 卡住 0 bytes
-  殘留鎖檔。那個 clone 另外還是 `blob:none` partial clone，`npm ci` 在 Drive 上也跑不起來。
-  本機獨有的舊部署分支（`codex/deploy-*`、`deploy/*`、`gh-pages`）因缺 blob 且 GitHub 上
-  也取不到而**搬不過來**，只留在原處；另有兩個 worktree 掛在它的 `.git` 上
-  （`北農巡檢系統-staging`、`C:\Users\jnfa\.codex\worktrees\6f38\北農巡檢系統`），
-  確認不需要之前不要刪除那個資料夾。
-- **多個 agent 並行推送**，推送前務必 `git fetch` 並 rebase。
+- **多個 agent 並行推送**，推送前務必 `git fetch` 並 rebase。今天撞到多次，
+  `Obsidian/04-開發與部署.md` 也發生過內容衝突（兩邊都往檔尾追加，解法是兩段都保留）。
 - **測試資料刪不掉**（41 張表有 `trg_prevent_removal`），名稱請註明「驗收測試（勿使用）」。
-- **plpgsql 建函式時不驗證欄位參照**，改完務必實際呼叫一次。
+- **收工前看一眼 CI**。
 
 **未處理、另行追蹤**
 
-- 整合標記系統的提示文案「雙擊：放大」對滑鼠不成立（OSD 預設 `dblClickToZoom=false`）。
-- `supabase/setup-cli@v1` 未升版（未被標過時，但它掛的是 edge function 自動部署，
-  要升應單獨一筆並實際觸發驗證）。
-- 會議室的「最後可預約刻度」目前寫死 23:30，未接會議室的開放時段設定。
-- 科技版線稿現在也要逐像素預處理（以前只有一般版做），若進場變慢可改為快取結果。
-- 08-19 五個班別的指派人員已永久遺失；巡檢與報修的歷史資料無法回填場域位置。
-- `exceljs@4.4.0` 帶進的 `uuid@8.3.2` 有 dependabot moderate 告警。
+- `tools/build-floorplan-variants.py` 是衍生圖的批次備援（需 service_role key），
+  主線走建模頁的按鈕，這支保留給 CI／批次重產。
+- 成品圖是「烘死」的：日後若改 `renderNeon` 或 `preparePlanCanvas` 的演算法，
+  要重按一次「補產生衍生圖」。
+- `RF.png` 在 Storage 沒有 `mobile/` 版本（選圖邏輯會自動退回原圖）。
+- 會議室的「最後可預約刻度」寫死 23:30；`exceljs` 帶進的 `uuid@8.3.2` 有 dependabot 告警。
 
 ## 🕐 最後更新
 
-2026-08-21 21:03 · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：待推
-· 本次：完成上午四項待辦；下午到晚上把 V2 三個圖資頁收斂成同一套版面與共用資產、
-  介面風格切換改為全站右下角浮動圖示、移植讀取存取稽核、CI 由紅轉綠並升級 Actions、
-  會議室預約改以時間管制、交接表格排版；並修掉四處「靜默失效」的缺陷
-· 新規範已寫進 AGENTS.md：圖資頁面的共同規範、介面風格切換、讀取存取稽核與資安告警
-· L3 Obsidian：vault 已登記於 AGENTS.md 的 `Obsidian/`；完成程式／部署工作後同步 `04-開發與部署.md`，待辦狀態同步 `05-待辦清單.md`，不寫入任何 Secret。
+2026-08-28 20:43 · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：待推
+· 本次：圖資效能治本（上傳時產生成品圖＋四個檢視器直接開，桌機省 250～450ms、
+  手機省 1～2.5 秒、3D 再乘 7 層）、系統圖示 13.6MB→2.18MB、公文掃描器與 iOS 日期日曆修復、
+  49 個子系統手機版頁首靠右、工作區搬離 Google Drive
+· 新規範已寫進 AGENTS.md：V2 手機版版型規範、樓層平面圖的圖檔與效能（含兩個已驗證無效的方向）
+· 新增 5 條 `npm test` 斷言：頁首靠右、禁止逐頁複製該宣告、系統 Logo 200KB 上限、
+  選圖邏輯必須留在共用檔案、短效連結（放寬為接受 `signFloorPlanVariants`）
+· L3 Obsidian：repo 內 `Obsidian/`，本日 11 筆紀錄已寫入 `04-開發與部署.md`
