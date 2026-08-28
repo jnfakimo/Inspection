@@ -981,7 +981,7 @@ function RosterModule({ module, profile }: Props) {
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={isAdmin ? <><button className="primary-btn compact" onClick={() => { setPick(''); setPicking(true); }}>＋ 新增{roleWord}</button><button className="secondary-btn danger compact" disabled={busy || !rows.some(row => row.active)} onClick={() => void removeAll()}>全部刪除</button></> : undefined} />
-    <section className="panel admin-panel">
+    <section className="panel admin-panel vehicle-people-panel">
       <div className="admin-toolbar"><span>啟用中 {rows.filter(r => r.active).length}／共 {rows.length} 人</span>
         {inactiveCount > 0 && <button className="secondary-btn compact" onClick={() => { setShowInactive(value => !value); setPage(1); }}>{showInactive ? '隱藏已停用' : `顯示已停用（${inactiveCount}）`}</button>}
         {!isAdmin && <span className="inline-message">僅系統管理員可調整此名單</span>}</div>
