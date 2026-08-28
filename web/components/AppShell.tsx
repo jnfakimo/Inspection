@@ -178,16 +178,20 @@ export function AppShell({ profile, title, children, heading }: {
         <time>{clock}</time>
       </div>
       <nav className="v1-actions" aria-label="主要導覽">
+        <button type="button" className="v1-back-action" onClick={() => window.history.back()}>
+          <span className="generated-nav-icon nav-back" aria-hidden="true" />
+          <span>上頁</span>
+        </button>
         <Link href="/systems/" className={pathname === '/systems/' ? 'is-current' : ''}>
-          <img src="/Inspection/assets/system-icons/home-nav-icon.png" alt="" />
+          <span className="generated-nav-icon nav-home" aria-hidden="true" />
           <span>首頁</span>
         </Link>
         <button type="button" className="v1-profile-action" onClick={openProfile}>
-          <img src="/Inspection/assets/system-icons/profile-nav-icon.png" alt="" />
+          <span className="generated-nav-icon nav-profile" aria-hidden="true" />
           <span>個人資料</span>
         </button>
         <button type="button" className="v1-logout-action" onClick={logout}>
-          <img src="/Inspection/assets/system-icons/logout-nav-icon.png" alt="" />
+          <span className="generated-nav-icon nav-logout" aria-hidden="true" />
           <span>登出</span>
         </button>
       </nav>
