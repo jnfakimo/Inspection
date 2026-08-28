@@ -62,6 +62,15 @@ assert.match(css, /\.content\.v1-content:has\(>\.system-page-heading\)\{padding-
 assert.match(css, /\.system-page-heading h1\{[^}]*color:var\(--cyan\)[^}]*font-size:26px/);
 assert.match(css, /\.system-page-heading>img\{[^}]*width:42px;height:42px/);
 
+// 手機版頁首操作按鈕一律靠右（2026-08-28 全站規範）。這條規則放在 admin-workspace.css
+// 的 800px 斷點，涵蓋所有使用 AdminHeader 的子系統；若被改回靠左或被逐頁規則取代，
+// 這裡會擋下來。
+const adminCss = readFileSync('web/app/admin-workspace.css', 'utf8');
+assert.match(adminCss, /@media \(max-width:800px\)\{[^@]*\.admin-page-actions>div:last-child\{width:100%;justify-content:flex-end\}/,
+  '手機版 AdminHeader 的操作按鈕必須靠右（.admin-page-actions>div:last-child）');
+assert.doesNotMatch(adminCss, /\.admin-page-actions:has\(/,
+  '頁首靠右已是全站規則，不要再為個別頁面加 :has() 的重複宣告');
+
 const compactPages = [
   ['structuremap/floor2d', 'web/app/systems/[system]/[module]/structuremap-viewers.tsx'],
   ['structuremap/floor3d', 'web/app/systems/[system]/[module]/structuremap-floor3d.tsx'],

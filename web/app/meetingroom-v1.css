@@ -238,7 +238,4 @@
 .mr-form-actions{display:flex;gap:8px}
 @media (max-width:800px){
   .mr-form-actions{justify-content:flex-end}
-  /* 會議室預約系統（SYS-08）各頁頁首的「重新載入」等按鈕一律靠右。
-     用系統代碼定位，四個子系統一次涵蓋，不必逐頁加標記 class。 */
-  .content:has(.system-page-heading[data-system-key="meetingroom"]) .admin-page-actions>div:last-child{width:100%;justify-content:flex-end}
 }

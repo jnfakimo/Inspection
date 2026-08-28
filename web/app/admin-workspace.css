@@ -40,7 +40,11 @@
 /* .plan-marker 與平面模型圖的操作說明／HUD 已於 2026-08-21 移到
    structuremap-floor3d.css——那頁改為全螢幕工具頁後不再相依這份後台樣式表。
    .plan-stage 保留：3D 的 FloorStack3D 仍以它當容器。 */
-@media (max-width:800px){.admin-panel{padding:14px}.admin-form-grid{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.detail-timeline li time{float:none;display:block;margin-top:4px}.admin-form-grid label.wide{grid-column:auto}.admin-pager,.admin-layout-actions{align-items:stretch;flex-direction:column}.layout-summary{grid-template-columns:1fr}.audit-details{grid-template-columns:1fr}.admin-page-actions{gap:12px}.admin-toolbar label{width:100%}.admin-toolbar label input{flex:1}.admin-notice-list article{flex-direction:column}.security-alert-summary{align-items:flex-start;flex-direction:column}.admin-alert dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* 全站規範（2026-08-28）：手機版（≤800px）AdminHeader 的操作按鈕一律靠右。
+   窄螢幕上頁首說明文字會換行到自己一列，按鈕若沿用桌面的靠左會黏在文字下方左側，
+   與各頁工具列的右側操作區不成一線。這條規則涵蓋所有使用 AdminHeader 的子系統，
+   新頁面不需要、也不應該再逐頁加同樣的宣告。 */
+@media (max-width:800px){.admin-panel{padding:14px}.admin-form-grid{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.detail-timeline li time{float:none;display:block;margin-top:4px}.admin-form-grid label.wide{grid-column:auto}.admin-pager,.admin-layout-actions{align-items:stretch;flex-direction:column}.layout-summary{grid-template-columns:1fr}.audit-details{grid-template-columns:1fr}.admin-page-actions{gap:12px}.admin-page-actions>div:last-child{width:100%;justify-content:flex-end}.admin-toolbar label{width:100%}.admin-toolbar label input{flex:1}.admin-notice-list article{flex-direction:column}.security-alert-summary{align-items:flex-start;flex-direction:column}.admin-alert dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:1100px){.security-alert-filters{grid-template-columns:repeat(4,minmax(0,1fr))}.security-alert-filters>input:first-child{grid-column:span 2}.security-alert-filters>.security-alert-date{width:auto}}
 @media (max-width:800px){.security-alert-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.security-alert-filters>input:first-child{grid-column:1/-1}.security-alert-filters>.security-alert-date{width:auto}.security-alert-filters>.security-alert-date .localized-date-input{width:100%;flex-basis:auto}}
 @media (max-width:520px){.admin-alert dl{grid-template-columns:1fr}.admin-alert header{align-items:flex-start;flex-direction:column}.admin-alert .alert-device,.audit-device,.audit-content{max-width:180px}}
@@ -124,7 +128,6 @@
 /* 公務車主檔手機版：頁首「＋新增車輛／重新載入」靠右；搜尋框與台數統計排成一列、
    統計靠右。桌面版不變，只在 800px 以下生效。 */
 @media (max-width:800px){
-  .admin-page-actions:has(+ .vehicle-master-panel)>div:last-child{width:100%;justify-content:flex-end}
   .vehicle-master-toolbar{flex-wrap:nowrap;gap:8px}
   /* 基礎規則是 min-width:min(420px,100%)，不解掉的話搜尋框會獨佔整列把統計擠下去。 */
   .vehicle-master-toolbar>input{flex:1 1 0;min-width:0;padding:0 8px;font-size:12px}
@@ -137,11 +140,6 @@
    桌面版仍是同一列，這裡只調整 800px 以下。六個控制項統一 36px 高、12px 字，兩列才會對齊；
    選擇器要寫到兩層才蓋得過 button-standard.css 的 .primary-btn.compact。 */
 @media (max-width:800px){
-  .admin-page-actions:has(+ .vehicle-flow-grid)>div:last-child{width:100%;justify-content:flex-end}
-  /* 駕駛人員／派車管理員名單：頁首三顆按鈕（新增／全部刪除／重新載入）靠右。 */
-  .admin-page-actions:has(+ .vehicle-people-panel)>div:last-child,
-  /* 派車紀錄：只有一顆「重新載入」，同樣靠右。 */
-  .admin-page-actions:has(+ .vehicle-logs-panel)>div:last-child{width:100%;justify-content:flex-end}
   .vehicle-request-toolbar>select,
   .vehicle-request-toolbar>.vehicle-request-clear,
   .vehicle-request-toolbar .localized-date-input>input:first-child,
@@ -224,7 +222,6 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
 .patrol-shift-shell{max-width:85%;margin:0 auto}
 @media (max-width:800px){
   .patrol-shift-shell{max-width:100%}
-  .admin-page-actions:has(+ .patrol-shift-shell)>div:last-child{width:100%;justify-content:flex-end}
   .patrol-shift-toolbar{gap:6px}
   .patrol-shift-toolbar>button{flex:0 0 auto;padding:7px 9px;font-size:12px;white-space:nowrap}
   /* flex-basis 必須夠小，否則日期欄位會先佔滿一整行，把「今天」擠到第二列。

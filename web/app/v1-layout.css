@@ -161,7 +161,6 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 @media(max-width:900px){.patrol-notifications-panel{width:100%}}
 /* 逾時推播手機版：頁首「重新載入」靠右，三個篩選等寬排成一列，統計文字另起一行。桌面版不變。 */
 @media(max-width:800px){
-  .admin-page-actions:has(+ .patrol-notifications-panel)>div:last-child{width:100%;justify-content:flex-end}
   .patrol-notifications-panel .admin-toolbar{gap:6px}
   .patrol-notifications-panel .admin-toolbar>select{flex:1 1 0;width:auto;min-width:0;padding:7px 6px;font-size:12px}
   .patrol-notifications-panel .admin-toolbar>span{flex:1 0 100%;font-size:12px}

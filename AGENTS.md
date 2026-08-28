@@ -236,6 +236,29 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - 維修／派工入口另有 7 張統計小卡，桌面維持單列並依主圖卡 80% 比例縮放；3 張流程
   主圖卡同樣固定為 269×200px，窄版依 900px／600px 斷點改為兩欄／單欄。
 
+## V2 手機版版型規範（2026-08-28 訂）
+
+- **頁首操作按鈕一律靠右**。`components/admin/shared.tsx` 的 `AdminHeader`（`.admin-page-actions`）
+  在 **≤800px** 時，右側按鈕組為 `width:100%; justify-content:flex-end`。規則寫在
+  `web/app/admin-workspace.css` 的 800px 斷點，**涵蓋所有使用 AdminHeader 的子系統**；
+  新頁面不需要、也不應該再逐頁加同樣的宣告（`tools/system-page-heading-check.mjs`
+  會擋下 `.admin-page-actions:has(...)` 這類重複的分頁規則）。
+  另一種頁首 `.operations-panel-title` 本身就是 `justify-content:space-between`，按鈕已在右側。
+- **不要用行內樣式排版**。`style={{...}}` 的優先序高於任何選擇器，media query 蓋不過去，
+  頁面就再也無法只調整手機版。2026-08-28 一天內就被擋住三次（`LocalizedDateInput` 的
+  原生日期欄位、會議室管理彈窗的按鈕列、巡檢排班的 `maxWidth:85%` 外框），全部改成 class。
+- **手機版排版靠 flex-basis，不是靠 flex-wrap**。控制項「明明空間夠卻換行」時，先查
+  `flex-basis`：`flex:1 1 auto` 會取內容寬度當基準，先佔滿一整行把後面的項目擠下去。
+  巡檢排班的日期欄位就是這樣（basis 190px → 收到 72px 才排得進同一列）。
+- **`display:contents` 的容器要先解掉才能分列**。`.operations-tool-row` 在寬版面用
+  `display:contents` 把日期列與篩選列攤平成同一列；手機版要分成上下兩列，必須先把子容器
+  改回 `display:flex`，否則所有控制項都是同一個 flex 容器的直接子項。
+- **手機版驗證方式**：本專案的 V2 頁面多半要登入才看得到內容，改版型後請用
+  `npm run build:v2` 產出的**實際 CSS chunk** 建立靜態重現頁，以 375px／320px／1280px
+  量測元素座標與 `document.scrollWidth`（確認無水平溢出），不要只靠目視。
+  重現頁務必把**基礎樣式 chunk 一起載入**——只載含新規則的那一個，會因為缺少
+  `display:flex` 之類的基礎宣告而量到錯誤結果。
+
 ## V2 登入頁版型規範（2026-08-27 訂）
 
 - `/v2/login/` 的白色登入圖卡在桌面以共用 `.login-card` 的 430px 基準做 **80%**
