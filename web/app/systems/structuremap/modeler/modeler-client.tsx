@@ -287,6 +287,9 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
       const result = await storage.upload(target, new File([blob], path, { type: 'image/png' }),
         { upsert: true, contentType: 'image/png' });
       if (result.error) throw result.error;
+      // 只有 error 是 null 不代表真的寫進去了：v2 的 upload 成功時一定會回傳 data.path。
+      // 沒有 path 卻沒有 error 就是「回報成功但其實沒寫入」，不能算成功。
+      if (!result.data?.path) throw new Error(`上傳未回傳路徑（回應：${JSON.stringify(result.data)}）`);
       done += 1;
     } catch (error) {
       failed += 1;
@@ -294,6 +297,22 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
     }
   }
   return { done, failed };
+}
+
+/** 直接列出衍生圖資料夾，回傳實際存在的檔案數——不相信上傳 API 的回報。 */
+async function countDerivedObjects(storage: PlanStorage) {
+  const folders = ['desktop', 'light', 'light/mobile', 'tech', 'tech/mobile'];
+  let total = 0;
+  for (const folder of folders) {
+    try {
+      const listed = await storage.list(folder, { limit: 100 });
+      if (listed.error) { console.warn(`list ${folder} failed`, listed.error); continue; }
+      total += (listed.data || []).filter(entry => entry.name?.endsWith('.png')).length;
+    } catch (error) {
+      console.warn(`list ${folder} threw`, error);
+    }
+  }
+  return total;
 }
 
 /** 把 Storage 上的原圖讀成 canvas，供補產生衍生圖使用。signed URL 允許跨網域讀取，
@@ -424,9 +443,14 @@ export function ModelerClient({ profile }: { profile: Profile }) {
           console.warn(`backfill derived plans failed: ${path}`, error);
         }
       }
-      setMessage(failed
-        ? { text: `補產生完成：成功 ${done} 張、失敗 ${failed} 張（失敗原因見瀏覽器主控台；檢視器會自動退回原圖）`, tone: 'err' }
-        : { text: `✓ 補產生完成，共 ${done} 張衍生圖`, tone: 'ok' });
+      // 上傳回報成功不等於檔案真的在儲存桶裡（2026-08-28 就遇過回報 35 張、實際 0 張）。
+      // 收工前直接把三個資料夾列出來數一次，訊息只講實際存在的數量。
+      const verified = await countDerivedObjects(storage);
+      const expected = paths.length * 5;
+      setMessage(verified >= expected && !failed
+        ? { text: `✓ 補產生完成，儲存桶實際有 ${verified} 張衍生圖`, tone: 'ok' }
+        : { text: `補產生結束：上傳回報成功 ${done} 張、失敗 ${failed} 張，`
+            + `但儲存桶實際只有 ${verified} 張（應為 ${expected}）。請開瀏覽器主控台看警告訊息。`, tone: 'err' });
     } finally {
       setBackfilling(false);
     }
