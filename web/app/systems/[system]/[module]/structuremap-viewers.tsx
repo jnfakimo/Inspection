@@ -64,14 +64,25 @@ function useFloorData() {
     if (m.error || k.error) setNote(`失敗：${errorMessage(m.error || k.error, '圖臺資料載入失敗')}`);
     const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
       .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    // 手機／觸控裝置改讀 floorplans 的 mobile/ 縮圖（1024px、約 255KB），
+    // 原圖是 4096px、1～2.3MB，下載慢之外還要多做 16 倍的逐像素預處理。
+    // V1 的 b1plan.html 早就這樣做了（`matchMedia('(max-width:768px),(pointer:coarse)')`），
+    // V2 一直沿用原圖是這次「顯示圖很慢」的主因之一。
+    // RF 在 Storage 沒有 mobile/ 版本，所以取不到時要退回原圖。
+    const wantsSmall = typeof window !== 'undefined'
+      && window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+    const basePaths = sorted.map(row => String(row.image_path || '')).filter(Boolean);
+    const wanted = wantsSmall ? [...basePaths.map(path => `mobile/${path}`), ...basePaths] : basePaths;
     let signed = new Map<string, string>();
     try {
-      signed = await signFloorplanPaths(sorted.map(row => String(row.image_path || '')), client);
+      signed = await signFloorplanPaths(wanted, client);
     } catch (error) {
       setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
     }
+    const pickUrl = (path: string) =>
+      (wantsSmall ? signed.get(`mobile/${path}`) : '') || signed.get(path) || '';
     const secured = sorted
-      .map(row => ({ ...row, image_url: signed.get(String(row.image_path || '')) || '' }))
+      .map(row => ({ ...row, image_url: pickUrl(String(row.image_path || '')) }))
       .filter(row => row.image_url);
     if (secured.length < sorted.length && sorted.length) {
       setNote('部分樓層圖連結無法產生，畫面僅呈現可授權的樓層。');
@@ -387,7 +398,8 @@ function Floor2DViewer({ system, module, profile }: Props) {
   const shownFloor = model ? String(model.name || model.floor_id) : '—';
   const noteIsError = note.startsWith('失敗');
 
-  return <div className="f3-root">
+  // 平面圖沒有 3D 的「控制」面板，左欄少一顆按鈕；標記面板要跟右邊的樓層面板同高。
+  return <div className="f3-root f3-no-ctrl">
     {busy && <div className="f3-loading">
       <div className="ld-t">載入樓層平面圖…</div>
       <div className="ld-bar"><div className="ld-fill" style={{ width: '70%' }} /></div>
