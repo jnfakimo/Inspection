@@ -175,7 +175,8 @@ function Floor2DViewer({ system, module, profile }: Props) {
   useEffect(() => { if (!floor && models.length) setFloor(String(models[0].floor_id)); }, [models, floor]);
   const model = useMemo(() => models.find(m => String(m.floor_id) === floor), [models, floor]);
   const visible = useMemo(() => (showMarkers ? markers.filter(m =>
-    String(m.floor_id) === floor && m.status !== 'inactive' && visibleKinds[String(m.kind)] !== false)
+    String(m.floor_id) === floor && m.status !== 'inactive'
+      && (patrolOnly ? String(m.kind) === 'patrol' : visibleKinds[String(m.kind)] !== false))
     .map(m => patrolOnly && String(m.kind) === 'patrol'
       ? { ...m, color: isChecked(m) ? CHECKED_COLOR : UNCHECKED_COLOR } : m) : []),
     [markers, floor, visibleKinds, showMarkers, patrolOnly, isChecked]);
