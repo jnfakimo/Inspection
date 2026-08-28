@@ -889,7 +889,11 @@ export async function handleAppApiRequest(req: Request) {
         if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出陳核', 403);
         if (!targetUnitId) return fail('請選擇陳核部室', 400);
         if (!unitCapability.canApprove) return fail('陳核僅能送至董事長室、總經理室、副總經理室或秘書室', 400);
-        if (String(document.status) !== 'ready_for_next' && !(String(document.status) === 'draft' && steps.length === 0)) return fail('所有會辦完成後才能送出陳核');
+        // 條件是「沒有還沒完成的會辦」，不是「完全沒有節點」：退回補正後狀態回到 draft，
+        // 但既有節點還留在時間軸上，用 steps.length === 0 會讓補正過的公文永遠送不出陳核
+        // （前端在 draft 仍會顯示可按的「送出陳核」，使用者會直接卡死）。
+        const pendingCoSign = steps.some(step => step.step_type === 'co_sign' && step.status !== 'completed');
+        if (String(document.status) !== 'ready_for_next' && !(String(document.status) === 'draft' && !pendingCoSign)) return fail('所有會辦完成後才能送出陳核');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個會辦節點尚未完成');
         const stepNo = steps.reduce((max, step) => Math.max(max, Number(step.step_no) || 0), 0) + 1;
         const createdStep = await admin.from('official_document_steps').insert({ document_id: documentId, step_no: stepNo, step_type: 'approval', unit_id: targetUnitId, unit_name: unitName, status: 'sent', sent_by: profile.user_id, sent_at: new Date().toISOString(), note }).select('step_id,step_no,status,unit_id,unit_name,sent_at').single();
