@@ -17,7 +17,7 @@ const SPACE_COLOR = '#00d4ff';
 const GAP_DEFAULT = 6;
 const GAP_PER_STEP = 1.6 / GAP_DEFAULT;
 
-export function RepairMap3DModule({ module }: { module: ModuleDefinition; profile: Profile; system?: SystemDefinition }) {
+export function RepairMap3DModule({ module, profile: _profile, system: _system }: { module: ModuleDefinition; profile: Profile; system: SystemDefinition }) {
   const [models, setModels] = useState<Row[]>([]), [markers, setMarkers] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [explode, setExplode] = useState(GAP_DEFAULT), [showMarkers, setShowMarkers] = useState(true), [showLabels, setShowLabels] = useState(false);
