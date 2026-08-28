@@ -240,6 +240,7 @@ function RequestsModule({ module, profile }: Props) {
   };
 
   return <AppShell profile={profile} title={module.title}>
+    <div className="vehicle-request-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
 
@@ -351,6 +352,7 @@ function RequestsModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">目前沒有符合條件的派車申請</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
+    </div>
 
     {creating && <CreateRequestModal profile={profile} onClose={() => setCreating(false)}
       onDone={async (message) => { setCreating(false); await load(); setNote(message); }} />}
