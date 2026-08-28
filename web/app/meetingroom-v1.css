@@ -2,7 +2,8 @@
    彈窗表單），僅把顏色改綁 V2 既有的 CSS 變數，讓亮色與科技版兩種主題都正常。
    全部收斂在 .mr-page 之下，避免與 V2 既有的 .panel／.field 等通用類別衝突。 */
 
-.mr-page{display:grid;gap:16px}
+.mr-page{display:grid;gap:16px;width:85%;margin-left:auto;margin-right:auto}
+.meetingroom-notifications-page{width:85%;margin-left:auto;margin-right:auto}
 
 .mr-page .mr-hero{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 20px;border:1px solid var(--line);border-left:3px solid var(--cyan);border-radius:6px;background:var(--panel)}
 .mr-page .mr-hero-title{display:block;margin:0;font-size:1.35rem}
@@ -112,7 +113,7 @@
 
 /* 週排程依 V1 圖塊比例縮至約 75%；手機仍保留完整寬度與橫向瀏覽。 */
 @media (min-width:761px){
-  .mr-page .mr-hero,.mr-page .mr-schedule-panel,.mr-page .mr-list-panel{width:75%;justify-self:center}
+  .mr-page .mr-hero,.mr-page .mr-schedule-panel,.mr-page .mr-list-panel{width:100%;justify-self:stretch}
   .mr-page .mr-schedule-panel .mr-panel-body{padding:11px 12px}
   .mr-page .mr-schedule-panel .roomgrid{min-width:0}
   .mr-page .mr-schedule-panel .roomgrid th{padding:6px 4px}
@@ -121,6 +122,10 @@
   .mr-page .mr-schedule-panel .bk-line{font-size:.992rem}
   .mr-page .mr-schedule-panel .bk-cancel-hint{font-size:.88rem}
   .mr-page .mr-schedule-panel .bk-action{font-size:.56rem;padding:2px 5px}
+}
+
+@media (max-width:800px){
+  .mr-page,.meetingroom-notifications-page{width:100%}
 }
 
 .mr-page .empty{padding:26px;color:var(--dim);text-align:center;font-size:.82rem}

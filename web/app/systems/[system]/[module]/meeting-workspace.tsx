@@ -661,8 +661,9 @@ function NotificationsModule({ module, profile }: Props) {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load} />
-    <section className="panel admin-panel">
+    <div className="meetingroom-notifications-page">
+      <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+      <section className="panel admin-panel">
       <div className="admin-toolbar">
         <select value={status} onChange={e => setStatus(e.target.value)}>
           <option value="">全部狀態</option>
@@ -686,6 +687,7 @@ function NotificationsModule({ module, profile }: Props) {
       </table></div>
       {!busy && paged.length === 0 && <p className="empty">目前沒有提醒紀錄</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
-    </section>
+      </section>
+    </div>
   </AppShell>;
 }
