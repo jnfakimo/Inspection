@@ -189,7 +189,8 @@
 .admin-form-grid>.vehicle-followup-dispatch-block{grid-column:1/-1;margin:0;color:var(--red);font-size:.8rem}
 .handover-create-modal .detail-grid>div{border-left:3px solid var(--cyan)}
 .handover-create-modal .detail-grid dd{font-size:1.05rem;font-weight:700}
-.handover-records-panel{width:85%;margin-left:auto;margin-right:auto}
+.handover-records-page{width:85%;margin-left:auto;margin-right:auto}
+.handover-records-page .handover-records-panel{width:100%;margin-left:0;margin-right:0}
 .handover-records-panel tbody tr:nth-child(odd){background:var(--list-row-odd)}
 .handover-records-panel tbody tr:nth-child(even){background:var(--list-row-even)}
 .handover-records-panel tbody tr:hover{background:color-mix(in srgb,var(--cyan) 10%,var(--surface))}
@@ -197,7 +198,7 @@
 .handover-submit-btn{background:#dbeafe;color:#075985;border:1px solid #7dd3fc}
 html[data-theme="tech"] .handover-create-btn,
 html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;border-color:#7dd3fc}
-@media (max-width:800px){.handover-records-panel{width:100%}}
+@media (max-width:800px){.handover-records-page{width:100%}.handover-records-page .handover-records-panel{width:100%}}
 @media (max-width:600px){
   .admin-modal-backdrop:has(.handover-create-modal){padding:8px}
   .handover-create-modal{width:100%;max-height:calc(100dvh - 16px);border-radius:10px}

@@ -161,9 +161,10 @@ function RecordsModule({ system, module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}
     heading={{ system, module, title: module.title, metaTitle: system.title }}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact handover-create-btn" onClick={() => setCreating(true)}>＋ 新增交接單</button>} />
-    <section className="panel admin-panel handover-records-panel">
+    <div className="handover-records-page">
+      <AdminHeader module={module} busy={busy} note={note} onReload={load}
+        action={<button className="primary-btn compact handover-create-btn" onClick={() => setCreating(true)}>＋ 新增交接單</button>} />
+      <section className="panel admin-panel handover-records-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋日期、班別、交接人、異常或待辦" />
         <select value={shift} onChange={e => setShift(e.target.value)}>
@@ -207,7 +208,8 @@ function RecordsModule({ system, module, profile }: Props) {
       </table></div>
       {!busy && paged.length === 0 && <p className="empty">目前沒有符合條件的交接紀錄</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
-    </section>
+      </section>
+    </div>
 
     {detail && <AdminModal title={`交接單｜${fmt(detail.shift_date)} ${shiftLabel(detail.shift_type)}`} onClose={() => setDetail(null)}>
       <dl className="detail-grid">
