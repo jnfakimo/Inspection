@@ -93,6 +93,9 @@
 .vehicle-master-page{width:100%}
 .vehicle-master-page .vehicle-master-panel{width:85%;margin-left:auto;margin-right:auto}
 @media(max-width:600px){.vehicle-master-page .vehicle-master-panel{width:100%}}
+.vehicle-people-page{width:100%}
+.vehicle-people-page .vehicle-people-panel{width:85%;margin-left:auto;margin-right:auto}
+@media(max-width:600px){.vehicle-people-page .vehicle-people-panel{width:100%}}
 .request-detail-modal h2{display:flex;align-items:center;gap:16px}
 .request-detail-modal h2>b{color:var(--cyan);font-family:var(--head);letter-spacing:.04em}
 .request-detail-body{padding-bottom:22px}

@@ -983,6 +983,7 @@ function RosterModule({ module, profile }: Props) {
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
   return <AppShell profile={profile} title={module.title}>
+    <div className="vehicle-people-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={isAdmin ? <><button className="primary-btn compact" onClick={() => { setPick(''); setPicking(true); }}>＋ 新增{roleWord}</button><button className="secondary-btn danger compact" disabled={busy || !rows.some(row => row.active)} onClick={() => void removeAll()}>全部刪除</button></> : undefined} />
     <section className="panel admin-panel vehicle-people-panel">
@@ -1009,6 +1010,7 @@ function RosterModule({ module, profile }: Props) {
       {!busy && visibleRows.length === 0 && <p className="empty">{rows.length === 0 ? `尚未設定任何${roleWord}` : `目前沒有啟用中的${roleWord}；可按「顯示已停用」查看歷史名單`}</p>}
       {visibleRows.length > 0 && <Pager page={page} total={visibleRows.length} onPage={setPage} />}
     </section>
+    </div>
 
     {picking && <AdminModal title={`新增${roleWord}`} onClose={() => setPicking(false)}>
       <div className="admin-form-grid">
