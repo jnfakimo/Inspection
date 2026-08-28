@@ -253,6 +253,13 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - **`display:contents` 的容器要先解掉才能分列**。`.operations-tool-row` 在寬版面用
   `display:contents` 把日期列與篩選列攤平成同一列；手機版要分成上下兩列，必須先把子容器
   改回 `display:flex`，否則所有控制項都是同一個 flex 容器的直接子項。
+- **圖示一律收在 320px 以內**。系統 Logo 最大顯示尺寸是入口圖卡的 88px，Sprite 依格數換算
+  （`equipment-structure-icons-ai.png` 4×4→512px、`topbar-nav-icons-ai.png` 2×2→256px）。
+  用 `draw` 技能產生的圖多半是 1024～1254px、單檔 1MB 以上，**進版控前務必縮圖**；
+  2026-08-28 就是因為沒縮，`/v2/systems/` 入口頁光圖示要載 2.6MB，全站 24 個圖示共 13.6MB。
+  `tools/system-page-heading-check.mjs` 會擋下超過 200KB 的系統 Logo。
+  縮圖用 Pillow 的 LANCZOS 重取樣即可；**不要用 256 色量化**——實測這批 3D 光澤圖示量化後
+  在 88px 顯示時色差 RMS 達 5～17（可見的色帶），省下的容量不值得。
 - **手機版驗證方式**：本專案的 V2 頁面多半要登入才看得到內容，改版型後請用
   `npm run build:v2` 產出的**實際 CSS chunk** 建立靜態重現頁，以 375px／320px／1280px
   量測元素座標與 `document.scrollWidth`（確認無水平溢出），不要只靠目視。

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
@@ -9,6 +9,11 @@ assert.equal(moduleCount, 49, '系統標題稽核必須涵蓋 49 個子系統');
 for (const system of systems) {
   const iconPath = `.${system.icon.replace('/Inspection', '')}`;
   assert.ok(existsSync(iconPath), `${system.key} 的正式 Logo 不存在：${iconPath}`);
+  // 系統 Logo 最大顯示尺寸是入口圖卡的 88px，來源一律收在 320px 以內（見 AGENTS.md）。
+  // 2026-08-28 曾有 1254px、1MB 以上的 PNG 直接上線，入口頁光圖示就要載 2.6MB。
+  const bytes = statSync(iconPath).size;
+  assert.ok(bytes <= 200 * 1024,
+    `${system.key} 的 Logo 過大（${Math.round(bytes / 1024)} KB）：系統圖示請縮到 320px 以內再進版控`);
 }
 
 const component = readFileSync('web/components/SystemPageHeader.tsx', 'utf8');
