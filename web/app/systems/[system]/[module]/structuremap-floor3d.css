@@ -418,6 +418,9 @@
   border: 1px solid var(--dim);
   border-radius: 2px;
   background: transparent;
+  /* 未選取的也給同樣半徑的光暈（只是收斂成中性灰），否則只有選取中的那顆帶
+     box-shadow，視覺占位比別人大一圈，整排看起來像沒對齊。 */
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dim) 45%, transparent);
 }
 
 .f3-floors .fbtn.on .dot {

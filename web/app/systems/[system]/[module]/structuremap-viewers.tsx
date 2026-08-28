@@ -40,6 +40,8 @@ const KIND_COLOR: Record<string, string> = {
   equipment: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
 };
 const textureUrl = floorTextureUrl;
+// 重畫後的樓層圖最多留 4 張（約 5MB；手機版縮圖只有十分之一），超過就釋放最舊的。
+const PLAN_CACHE_MAX = 4;
 
 export function StructureMapViewers({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   // floor3d 於 2026-08-19 改為 V1 floor3d.html 的全螢幕移植，元件在
@@ -133,7 +135,10 @@ function Floor2DViewer({ system, module, profile }: Props) {
   const osdRef = useRef<any>(null);
   const overlayRef = useRef<Map<string, HTMLElement>>(new Map());
   // 淺色主題重畫後的 blob 網址，換樓層與卸載時要釋放。
-  const planUrlRef = useRef<string | null>(null);
+  // 重畫後的 blob 依「樓層圖路徑＋主題」快取，切回看過的樓層就不必再跑一次
+  // 下載→getImageData→逐像素→toBlob（實測 4096px 圖約 250～450ms）。
+  // 放在 ref 而非模組層級：離開這頁時一起釋放，不會把 blob 留在記憶體裡。
+  const planCacheRef = useRef(new Map<string, string>());
   // 主題決定線稿要不要重畫成黑線，而那是在開圖當下決定的。必須跟著 data-theme
   // 變動重開，否則切換主題後圖面停在舊主題直到重新整理（與 FloorStack3D 同一個坑）。
   const [theme, setTheme] = useState(() =>
@@ -198,19 +203,34 @@ function Floor2DViewer({ system, module, profile }: Props) {
       // 兩種主題都要預處理，與 3D 模型圖共用同一份 preparePlanCanvas：
       // 淺色把線條重畫成黑線，科技版保留原色但濾掉光暈——光暈是 renderNeon 疊出來的，
       // 不濾掉會讓科技版的線看起來比一般版粗一截。
+      const mode = theme === 'light' ? 'light' : 'tech';
+      const cacheKey = `${String(model?.image_path || url)}|${mode}`;
+      const cache = planCacheRef.current;
       let source = url;
-      const prepared = await preparePlanObjectUrl(url, theme === 'light' ? 'light' : 'tech');
-      if (disposed) { if (prepared) URL.revokeObjectURL(prepared); return; }
-      if (prepared) source = prepared;
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        cache.delete(cacheKey);      // 重新插入＝更新使用順序，避免把正在顯示的那張淘汰掉
+        cache.set(cacheKey, cached);
+        source = cached;
+      } else {
+        const prepared = await preparePlanObjectUrl(url, mode);
+        if (disposed) { if (prepared) URL.revokeObjectURL(prepared); return; }
+        if (prepared) {
+          source = prepared;
+          cache.set(cacheKey, prepared);
+          while (cache.size > PLAN_CACHE_MAX) {
+            const oldest = cache.keys().next().value as string;
+            const evicted = cache.get(oldest);
+            cache.delete(oldest);
+            if (evicted && evicted !== source) URL.revokeObjectURL(evicted);
+          }
+        }
+      }
 
       overlayRef.current.clear();
       viewerRef.current.open({ type: 'image', url: source });
       setViewerReady(true);
 
-      // 換樓層時才釋放上一張，不在 cleanup 釋放——cleanup 跑在新圖開啟之前，
-      // 提早 revoke 會讓還沒解碼完的那張變成空白。
-      if (planUrlRef.current && planUrlRef.current !== source) URL.revokeObjectURL(planUrlRef.current);
-      planUrlRef.current = source.startsWith('blob:') ? source : null;
     })();
     return () => { disposed = true; };
   }, [model, theme]);
@@ -219,7 +239,8 @@ function Floor2DViewer({ system, module, profile }: Props) {
   useEffect(() => () => {
     try { viewerRef.current?.destroy(); } catch { /* 忽略 */ }
     viewerRef.current = null;
-    if (planUrlRef.current) { URL.revokeObjectURL(planUrlRef.current); planUrlRef.current = null; }
+    planCacheRef.current.forEach(objectUrl => URL.revokeObjectURL(objectUrl));
+    planCacheRef.current.clear();
   }, []);
 
   // 依 marker 清單重建覆蓋層。plan_markers 的 x／y 為 0–1 的相對座標。
