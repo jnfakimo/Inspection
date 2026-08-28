@@ -50,7 +50,7 @@ const OfficialDocsWorkspace = dynamic<WorkspaceProps>(
   () => import('./official-docs-workspace').then((mod) => mod.OfficialDocsWorkspace),
   { ssr: false, loading: moduleLoading },
 );
-const RepairMap3DModule = dynamic<WorkspaceProps>(
+const RepairMap3DModule = dynamic(
   () => import('./repair-map3d').then((mod) => mod.RepairMap3DModule),
   { ssr: false, loading: moduleLoading },
 );
