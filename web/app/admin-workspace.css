@@ -60,6 +60,9 @@
 .security-alert-filters{grid-template-columns:minmax(180px,2fr) repeat(4,minmax(0,1fr)) repeat(2,minmax(130px,1.1fr)) auto;min-width:0;width:100%;max-width:100%}
 .security-alert-filters>*{min-width:0}
 
+/* 稽核頁不提供水平捲軸：所有欄位已在桌面版固定比例內收斂。 */
+.responsive-table:has(.audit-log-table){overflow-x:hidden}
+
 /* 稽核紀錄桌面表格固定欄寬，避免 UUID／User-Agent 長字串撐出水平捲軸。 */
 @media (min-width:801px){
   .audit-log-table{width:100%;table-layout:fixed}
