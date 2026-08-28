@@ -321,9 +321,9 @@ function ShiftsModule({ module, profile }: Props) {
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => openEditor({ name: '', start_time: '', end_time: '', sort_order: shifts.length, assigned_user_ids: [] }, 'date')}>＋ 新增當日班別</button>} />
 
-    <div style={{ maxWidth: '85%', margin: '0 auto' }}>
+    <div className="patrol-shift-shell">
       <section className="panel admin-panel">
-        <div className="admin-toolbar">
+        <div className="admin-toolbar patrol-shift-toolbar">
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
           <span className="admin-toolbar-date"><LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></span>
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>

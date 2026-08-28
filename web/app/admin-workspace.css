@@ -186,3 +186,19 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
   .handover-create-modal>footer{position:sticky;bottom:0;z-index:2;padding:10px 16px;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(8px)}
   .handover-create-modal>footer button{min-height:44px}
 }
+
+/* 巡檢排班（SYS-03）：桌面版沿用原本的 85% 置中版面，以下手機版調整只在 800px 以下生效。
+   1. 頁首的「＋新增當日班別／重新載入」靠右對齊。
+   2. 前一天／日期／後一天／今天四個控制項壓成同一列，「值班日 …」說明另起一行。 */
+.patrol-shift-shell{max-width:85%;margin:0 auto}
+@media (max-width:800px){
+  .patrol-shift-shell{max-width:100%}
+  .admin-page-actions:has(+ .patrol-shift-shell)>div:last-child{width:100%;justify-content:flex-end}
+  .patrol-shift-toolbar{gap:6px}
+  .patrol-shift-toolbar>button{flex:0 0 auto;padding:7px 9px;font-size:12px;white-space:nowrap}
+  /* flex-basis 必須夠小，否則日期欄位會先佔滿一整行，把「今天」擠到第二列。
+     72px 是 320px 寬螢幕下四個控制項仍排得下的基準，實際寬度再由 flex-grow 撐開。 */
+  .patrol-shift-toolbar .admin-toolbar-date{flex:1 1 72px;width:auto;min-width:0}
+  .patrol-shift-toolbar .admin-toolbar-date input{width:100%;box-sizing:border-box;padding:7px 8px;font-size:12px}
+  .patrol-shift-toolbar>span:last-child{flex:1 0 100%;font-size:12px}
+}
