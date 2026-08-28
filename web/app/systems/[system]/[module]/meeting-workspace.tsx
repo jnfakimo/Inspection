@@ -677,7 +677,7 @@ function NotificationsModule({ module, profile }: Props) {
           const b = (row.meeting_bookings as Row) || {}, room = (b.meeting_rooms as Row) || {};
           return <tr key={String(row.notification_id)}>
             <td>{fmtTime(row.created_at)}</td>
-            <td><strong>{fmt(b.booking_no)}</strong><small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</small></td>
+            <td><strong>{fmt(b.booking_no)}</strong><small className="notification-booking-meta">{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</small></td>
             <td>{notificationTypeLabel(row.notification_type)}</td>
             <td>{notificationStatusLabel(row.status)}</td>
             <td>{fmtTime(row.sent_at)}</td>
