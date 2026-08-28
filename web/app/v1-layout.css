@@ -177,8 +177,9 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 .dispatch-v1-table{width:85%;margin-left:auto;margin-right:auto}
 @media(max-width:900px){.dispatch-v1-table{width:100%}}
 /* 駐衛警逾時推播白色內容卡桌面縮小至 85%，窄版恢復滿寬。 */
-.patrol-notifications-panel{width:85%;margin-left:auto;margin-right:auto}
-@media(max-width:900px){.patrol-notifications-panel{width:100%}}
+.patrol-notifications-page{width:85%;margin-left:auto;margin-right:auto}
+.patrol-notifications-page .patrol-notifications-panel{width:100%;margin-left:0;margin-right:0}
+@media(max-width:900px){.patrol-notifications-page{width:100%}.patrol-notifications-page .patrol-notifications-panel{width:100%}}
 /* 逾時推播手機版：頁首「重新載入」靠右，三個篩選等寬排成一列，統計文字另起一行。桌面版不變。 */
 @media(max-width:800px){
   .patrol-notifications-panel .admin-toolbar{gap:6px}

@@ -453,8 +453,9 @@ function NotificationsModule({ module, profile }: Props) {
   };
 
   return <AppShell profile={profile} title={module.title}>
-    <AdminHeader module={module} busy={busy} note={note} onReload={load} />
-    <section className="panel admin-panel patrol-notifications-panel">
+    <div className="patrol-notifications-page">
+      <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+      <section className="panel admin-panel patrol-notifications-panel">
       <div className="admin-toolbar">
         <select value={period} onChange={e => setPeriod(e.target.value)}>
           <option value="7">最近 7 天</option><option value="30">最近 30 天</option>
@@ -486,6 +487,7 @@ function NotificationsModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">查無符合條件的推播紀錄</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
       <p className="inline-message">推播紀錄的讀取權限限系統管理者（patrol_timeout_notifications 的 select 政策為 is_admin()）。</p>
-    </section>
+      </section>
+    </div>
   </AppShell>;
 }
