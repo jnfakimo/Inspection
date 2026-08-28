@@ -56,3 +56,4 @@ backup/
 restore-workspace/
 *.tar.gz.gpg
 inspection-backup-*
+.floorplan-build/
