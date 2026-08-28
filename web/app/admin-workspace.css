@@ -56,6 +56,10 @@
 .audit-log-table th:first-child,.audit-log-table td:first-child{white-space:nowrap}
 .audit-log-table .audit-content,.audit-log-table .audit-device{max-width:230px}
 
+/* 資安告警篩選列採可收縮欄寬，避免桌面版固定最小欄位造成水平溢出。 */
+.security-alert-filters{grid-template-columns:minmax(180px,2fr) repeat(4,minmax(0,1fr)) repeat(2,minmax(130px,1.1fr)) auto;min-width:0;width:100%;max-width:100%}
+.security-alert-filters>*{min-width:0}
+
 /* Theme surfaces: preserve the light theme while keeping the tech theme readable. */
 .admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{background:var(--surface);color:var(--ink)}
 .admin-modal,.admin-alert,.admin-notice-list article{background:var(--surface);color:var(--ink)}
