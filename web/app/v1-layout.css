@@ -143,7 +143,7 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 @media(max-width:900px){.workorder-summary{grid-template-columns:repeat(4,minmax(0,1fr));justify-content:stretch}.workorder-summary article{width:auto;height:auto}}
 @media(max-width:600px){.workorder-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* 維修／派工／完工手機版：7 張統計卡改為每列 4 張（4＋3），桌面版不變。 */
-@media(max-width:600px){.workorder-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.workorder-summary article{width:auto;height:63px;min-width:0;padding:6px 5px}.workorder-summary span{font-size:8px}.workorder-summary strong{font-size:16px}}
+@media(max-width:600px){.workorder-summary{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.workorder-summary article{width:auto;height:48px;min-width:0;padding:4px 5px}.workorder-summary span{font-size:8px}.workorder-summary strong{font-size:14px}}
 /* 報修案件白色內容卡縮小至桌面版 85% 寬度，窄版恢復滿寬避免溢出。 */
 .request-v1-table{width:85%;margin-left:auto;margin-right:auto}
 @media(max-width:900px){.request-v1-table{width:100%}}
