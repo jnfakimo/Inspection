@@ -108,6 +108,10 @@
 
 .mb-topbar .tb-space { flex: 1 0 auto; }
 
+.mb-topbar .f3-topbar-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+.mb-topbar .tb-action { gap:5px; cursor:pointer; font:inherit; }
+.mb-topbar .tb-tool-switch { border-color: color-mix(in srgb, var(--cyan) 45%, var(--line)); color: var(--mb-accent-text); }
+
 .mb-topbar .tb-back {
   display: inline-flex;
   align-items: center;
@@ -123,6 +127,13 @@
 .mb-topbar .tb-back:hover {
   border-color: var(--cyan);
   color: var(--mb-accent-text);
+}
+
+@media (max-width:720px) {
+  .mb-topbar { gap:6px; padding:0 8px; }
+  .mb-topbar .f3-topbar-actions { gap:4px; }
+  .mb-topbar .tb-action { padding:4px 6px; font-size:10px; }
+  .mb-topbar .tb-tool-switch { display:none; }
 }
 
 .mb-panel-toggle {

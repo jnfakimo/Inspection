@@ -31,6 +31,7 @@ import {
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 import { preparePlanObjectUrl } from './floor-stack-3d';
+import { StructuremapTopbarActions } from './structuremap-topbar-actions';
 
 type Props = { profile: Profile };
 type MarkerKind = 'equipment' | 'space' | 'patrol' | 'repair' | 'note';
@@ -616,10 +617,7 @@ export function MarkerBoardModule({ profile }: Props) {
       <span className="tb-sep" />
       <span className="tb-title">整合標記系統</span>
       <span className="tb-space" />
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.modeler}>3D建模系統</a>
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor2d}>平面樓層圖</a>
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.floor3d}>3D模型圖</a>
-      <a className="tb-back" href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
+      <StructuremapTopbarActions planeHref={STRUCTUREMAP_ROUTES.floor3d} label="切換3D圖" />
       <button className="mb-panel-toggle" onClick={() => setPanelOpen(open => !open)}>☰ 標記選單</button>
     </div>
 
