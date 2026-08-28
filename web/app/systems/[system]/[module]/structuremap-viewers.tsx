@@ -92,6 +92,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
   // 類型篩選由單選下拉改為逐項核取，與 3D 模型圖的標記面板一致：現場常要「只看報修
   // 加巡檢點」，單選做不到。
   const [showMarkers, setShowMarkers] = useState(true);
+  const patrolOnly = typeof location !== 'undefined' && new URLSearchParams(location.search).get('kind') === 'patrol';
   // ?kind=patrol：從駐衛警巡檢的立體巡檢雲臺跳過來時只看巡檢點。不另外複製一份
   // 頁面，也不改預設——直接進本頁仍是全部類型都顯示。
   const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(() => {
@@ -450,10 +451,10 @@ function Floor2DViewer({ system, module, profile }: Props) {
       </div>
       <label className="chk all">
         <input type="checkbox" checked={showMarkers}
-          onChange={event => setShowMarkers(event.target.checked)} />所有標記
+          onChange={event => setShowMarkers(event.target.checked)} />{patrolOnly ? '巡檢點' : '所有標記'}
       </label>
       {/* 類型色以自訂屬性傳給 CSS，淺色主題才有機會把霓虹色壓深到可讀。 */}
-      {Object.entries(MARKER_KIND).map(([kind, label]) => <label key={kind} className="chk kind"
+      {Object.entries(MARKER_KIND).filter(([kind]) => !patrolOnly || kind === 'patrol').map(([kind, label]) => <label key={kind} className="chk kind"
         style={{ '--kind-color': KIND_COLOR[kind] } as React.CSSProperties}>
         <input type="checkbox" disabled={!showMarkers} checked={visibleKinds[kind] !== false}
           onChange={event => setVisibleKinds(current => ({ ...current, [kind]: event.target.checked }))} />
