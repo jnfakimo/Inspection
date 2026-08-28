@@ -43,6 +43,12 @@ export function LocalizedDateInput({ value, onFocus, onBlur, onChange, ...props 
       } : undefined}
     />
     <button type="button" tabIndex={-1} aria-label="開啟日期選擇器" onClick={openPicker} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', border: 0, background: 'transparent', padding: 0, cursor: 'pointer' }}>▣</button>
-    <input ref={picker} type="date" value={value} min={props.min} max={props.max} tabIndex={-1} aria-hidden="true" onChange={onChange} style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
+    {/* 原生日期欄位：桌面維持 1x1 隱藏、只當 showPicker() 的載體；
+        觸控裝置改為覆蓋整個欄位的透明層，直接點就會叫出系統日曆——
+        iOS Safari 對「不可見元素」呼叫 showPicker() 會丟例外，
+        原本會落到手動輸入模式，使用者看到的就是「沒有萬年曆」。
+        樣式寫在 v1-layout.css 的 .localized-date-native，不用行內樣式，
+        否則 media query 蓋不過去。 */}
+    <input ref={picker} className="localized-date-native" type="date" value={value} min={props.min} max={props.max} tabIndex={-1} aria-hidden="true" onChange={onChange} />
   </span>;
 }
