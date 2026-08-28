@@ -393,7 +393,8 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 9px 16px;
+  /* 與右側面板標題的內容基準線一致，避免選項向內縮進。 */
+  padding: 9px 12px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: none;

@@ -110,11 +110,6 @@ function Floor2DViewer({ system, module, profile }: Props) {
   });
   // 與 3D 模型圖同名同語意的開關：關閉時標籤只在滑過圖釘時浮現。
   const [showLabels, setShowLabels] = useState(false);
-  // 同上：篩選由網址參數帶入，標記面板預設收合，必須主動說明。
-  const [kindNotice, setKindNotice] = useState(() => {
-    const only = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('kind');
-    return only && MARKER_KIND[only] ? `已套用篩選：只顯示「${MARKER_KIND[only]}」，其餘標記類型已隱藏` : '';
-  });
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
@@ -449,11 +444,6 @@ function Floor2DViewer({ system, module, profile }: Props) {
     </div>
 
     {note && <div className={`f3-error${noteIsError ? '' : ' ok'}`}>{note}</div>}
-
-    {kindNotice && !placing && <div className="f3-focus">
-      {kindNotice}
-      <button onClick={() => setKindNotice('')} aria-label="關閉">✕</button>
-    </div>}
 
     {placing && <div className="f3-focus">
       定位模式：點圖面上的位置，即可更新「{fmt(selected?.label)}」的座標
