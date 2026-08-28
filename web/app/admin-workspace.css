@@ -49,6 +49,13 @@
 @media (max-width:800px){.security-alert-filters{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.security-alert-filters>input:first-child{grid-column:1/-1}.security-alert-filters>.security-alert-date{width:auto}.security-alert-filters>.security-alert-date .localized-date-input{width:100%;flex-basis:auto}}
 @media (max-width:520px){.admin-alert dl{grid-template-columns:1fr}.admin-alert header{align-items:flex-start;flex-direction:column}.admin-alert .alert-device,.audit-device,.audit-content{max-width:180px}}
 
+/* 稽核表頭保持單列，欄位內容以省略號維持整潔。 */
+.audit-log-table{table-layout:auto}
+.audit-log-table thead th{white-space:nowrap;vertical-align:middle}
+.audit-log-table td{vertical-align:middle}
+.audit-log-table th:first-child,.audit-log-table td:first-child{white-space:nowrap}
+.audit-log-table .audit-content,.audit-log-table .audit-device{max-width:230px}
+
 /* Theme surfaces: preserve the light theme while keeping the tech theme readable. */
 .admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{background:var(--surface);color:var(--ink)}
 .admin-modal,.admin-alert,.admin-notice-list article{background:var(--surface);color:var(--ink)}
