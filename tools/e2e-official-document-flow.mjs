@@ -460,7 +460,9 @@ try {
   // 是停用帳號，先停用共同主管會讓其餘四個角色全部改不動。
   for (const userId of [...created.profiles].reverse()) {
     try {
-      await service(`/users?user_id=eq.${userId}`, { method: 'PATCH', prefer: 'return=minimal', body: { status: 'inactive' } });
+      // 一併清掉 supervisor_id：主管一旦先被停用，guard_user_supervisor_hierarchy
+      // 會擋下「直屬主管必須是啟用中的帳號」，剩下的角色就再也停用不掉。
+      await service(`/users?user_id=eq.${userId}`, { method: 'PATCH', prefer: 'return=minimal', body: { status: 'inactive', supervisor_id: null } });
     } catch (error) { console.warn(`停用測試帳號失敗 ${userId}：${String(error.message || error)}`); }
   }
   for (const authId of created.authUsers) {

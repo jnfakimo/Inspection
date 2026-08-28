@@ -284,17 +284,54 @@ async function objectExists(storage: PlanStorage, target: string) {
   }
 }
 
+/**
+ * 伺服器端追查用的請求識別碼。2026-08-28「上傳回報成功但檔案沒落地」事後不可重現，
+ * 當時沒有留下任何可以拿去向 Supabase 查伺服器紀錄的識別碼，追查只能停在客戶端。
+ * 這些 header 是唯一能把單一次請求對應到平台紀錄的線索，務必在當下就抓下來。
+ */
+const REQUEST_ID_HEADERS = ['x-request-id', 'sb-request-id', 'cf-ray'];
+
+function requestIds(response: Response) {
+  return REQUEST_ID_HEADERS
+    .map(name => [name, response.headers.get(name)] as const)
+    .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
+    .map(([name, value]) => `${name}=${value}`)
+    .join(' ');
+}
+
 /** 繞過 supabase-js，直接打 Storage REST API。用來判斷「回報成功卻沒落地」是不是 SDK 的問題。 */
 async function uploadViaRest(target: string, blob: Blob) {
   const session = (await getSupabase().auth.getSession()).data.session;
-  if (!session?.access_token) return { ok: false, detail: '沒有登入 session' };
+  if (!session?.access_token) return { ok: false, detail: '沒有登入 session', ids: '' };
   const response = await fetch(`${SUPABASE_URL}/storage/v1/object/floorplans/${target}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${session.access_token}`, 'x-upsert': 'true', 'Content-Type': 'image/png' },
     body: blob,
   });
-  const detail = `${response.status} ${(await response.text()).slice(0, 200)}`;
-  return { ok: response.ok, detail };
+  const ids = requestIds(response);
+  const detail = `${response.status} ${(await response.text()).slice(0, 200)}${ids ? ` [${ids}]` : ''}`;
+  return { ok: response.ok, detail, ids };
+}
+
+/**
+ * supabase-js 的 upload() 不會把回應 header 交出來，所以 SDK 路徑「回報成功卻沒落地」時
+ * 拿不到 request id。這支用原生 fetch 對同一個物件做一次 HEAD，換取同一個儲存節點的識別碼，
+ * 至少能把發生問題的時間點與節點釘住，供之後向 Supabase 查詢伺服器端紀錄。
+ */
+async function probeRequestIds(target: string) {
+  try {
+    const session = (await getSupabase().auth.getSession()).data.session;
+    if (!session?.access_token) return '';
+    const response = await fetch(`${SUPABASE_URL}/storage/v1/object/info/floorplans/${target}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    const ids = requestIds(response);
+    return ids ? `${response.status} [${ids}]` : String(response.status);
+  } catch (error) {
+    console.warn(`probe request ids failed: ${target}`, error);
+    return '';
+  }
 }
 
 async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HTMLCanvasElement) {
@@ -309,10 +346,12 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
   ];
   // 每張都走「上傳 → 立刻查證」；SDK 沒落地就改用原生 fetch 再試一次，
   // 兩種方式各自的成敗會分開統計，才知道問題出在 SDK 還是網路。
-  const stats = { sdk: 0, rest: 0, failed: 0 };
+  // forensics 收集「回報成功卻沒落地」當下的 request id，讓下次再發生時有東西可查。
+  const stats = { sdk: 0, rest: 0, failed: 0, forensics: [] as string[] };
   for (const [target, image] of variants) {
     if (!image) { stats.failed += 1; console.warn(`derived plan skipped (prepare failed): ${target}`); continue; }
     let blob: Blob | null = null;
+    let phantom = false;
     try {
       blob = await canvasBlob(image);   // 既有 helper，編碼失敗會 reject
       const result = await storage.upload(target, new File([blob], path, { type: 'image/png' }),
@@ -320,7 +359,12 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
       if (result.error) throw result.error;
       if (!result.data?.path) throw new Error(`上傳未回傳路徑（回應：${JSON.stringify(result.data)}）`);
       if (await objectExists(storage, target)) { stats.sdk += 1; continue; }
-      console.warn(`derived plan reported success but is missing: ${target}`, result.data);
+      // 這裡就是 2026-08-28 那個「回報成功、實際沒有檔案」的分支。
+      phantom = true;
+      const ids = await probeRequestIds(target);
+      const note = `${target}｜SDK 回報成功但列表查不到｜${new Date().toISOString()}｜${ids || '無 request id'}`;
+      stats.forensics.push(note);
+      console.warn(`derived plan reported success but is missing: ${note}`, result.data);
     } catch (error) {
       console.warn(`derived plan upload failed (sdk): ${target}`, error);
     }
@@ -328,6 +372,7 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
     try {
       const rest = await uploadViaRest(target, blob);
       console.warn(`derived plan retried via REST: ${target} → ${rest.detail}`);
+      if (phantom) stats.forensics.push(`${target}｜REST 重試｜${rest.detail}`);
       if (rest.ok && await objectExists(storage, target)) { stats.rest += 1; continue; }
     } catch (error) {
       console.warn(`derived plan retry threw: ${target}`, error);
@@ -468,6 +513,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
     let sdkDone = 0;
     let restDone = 0;
     let failed = 0;
+    const forensics: string[] = [];
     try {
       for (const [index, path] of paths.entries()) {
         setMessage({ text: `補產生衍生圖…（${index + 1}/${paths.length}）${path}`, tone: 'work' });
@@ -478,6 +524,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
           sdkDone += result.sdk;
           restDone += result.rest;
           failed += result.failed;
+          forensics.push(...result.forensics);
         } catch (error) {
           failed += 5;   // 這一層的五張衍生圖都沒產生
           console.warn(`backfill derived plans failed: ${path}`, error);
@@ -487,11 +534,17 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       // 收工前直接把三個資料夾列出來數一次，訊息只講實際存在的數量。
       const verified = await countDerivedObjects(storage);
       const expected = paths.length * 5;
+      // 「回報成功卻沒落地」再度發生時，request id 必須留在畫面上——只寫進主控台，
+      // 現場人員關掉分頁就沒了，事後向 Supabase 查伺服器紀錄會再次無從查起。
+      const forensicNote = forensics.length
+        ? `　⚠ 發生「回報成功卻沒落地」，請把以下識別碼一併回報：${forensics.join('；')}`
+        : '';
       setMessage(verified >= expected && !failed
         ? { text: `✓ 補產生完成，儲存桶實際有 ${verified} 張衍生圖`
-            + (restDone ? `（其中 ${restDone} 張是改用直接呼叫 API 才成功）` : ''), tone: 'ok' }
+            + (restDone ? `（其中 ${restDone} 張是改用直接呼叫 API 才成功）` : '') + forensicNote,
+            tone: forensics.length ? 'err' : 'ok' }
         : { text: `補產生結束：SDK 成功 ${sdkDone} 張、改用 API 成功 ${restDone} 張、仍失敗 ${failed} 張；`
-            + `儲存桶實際 ${verified} 張（應為 ${expected}）。詳細原因見主控台。`, tone: 'err' });
+            + `儲存桶實際 ${verified} 張（應為 ${expected}）。詳細原因見主控台。${forensicNote}`, tone: 'err' });
     } finally {
       setBackfilling(false);
     }
@@ -529,9 +582,12 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       // 退回原本「下載原圖再自己重畫」的流程，畫面一樣，只是慢一點。
       const derived = await uploadDerivedPlans(storage, path, canvas);
       const derivedOk = derived.sdk + derived.rest;
-      const derivedNote = derived.failed
+      const derivedNote = (derived.failed
         ? `，衍生圖 ${derivedOk}/${derivedOk + derived.failed} 張（失敗的樓層檢視器會自動退回原圖）`
-        : `，衍生圖 ${derivedOk} 張`;
+        : `，衍生圖 ${derivedOk} 張`)
+        + (derived.forensics.length
+          ? `　⚠ 發生「回報成功卻沒落地」，請回報識別碼：${derived.forensics.join('；')}`
+          : '');
       const optionLabel = FLOOR_OPTIONS.find(option => option[0] === floorChoice)?.[1] || floor;
       
       await invokeAppApi('save_floor_model', {

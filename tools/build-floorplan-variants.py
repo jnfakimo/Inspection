@@ -69,9 +69,19 @@ def api(url: str, key: str, path: str) -> str:
     return f'{url.rstrip("/")}/storage/v1/object/{path}'
 
 
+def auth(key: str) -> dict[str, str]:
+    """Storage 需要 apikey 才能解析出專案。
+
+    新版的 service_role 金鑰是 `sb_secret_…` 格式（不是 JWT），只送
+    Authorization 時 Storage 解析不到租戶，會回一個會誤導人的
+    400 `{"statusCode":"404","error":"Bucket not found"}`——看起來像儲存桶不存在，
+    其實是沒帶 apikey。兩個 header 都送，新舊格式的金鑰都能用。
+    """
+    return {'Authorization': f'Bearer {key}', 'apikey': key}
+
+
 def download(url: str, key: str, name: str) -> Image.Image:
-    res = requests.get(api(url, key, f'{BUCKET}/{name}'),
-                       headers={'Authorization': f'Bearer {key}'}, timeout=120)
+    res = requests.get(api(url, key, f'{BUCKET}/{name}'), headers=auth(key), timeout=120)
     res.raise_for_status()
     return Image.open(io.BytesIO(res.content)).convert('RGBA')
 
@@ -81,7 +91,7 @@ def upload(url: str, key: str, name: str, image: Image.Image) -> int:
     image.save(buf, 'PNG', optimize=True)
     body = buf.getvalue()
     res = requests.post(api(url, key, f'{BUCKET}/{name}'), data=body,
-                        headers={'Authorization': f'Bearer {key}',
+                        headers={**auth(key),
                                  'Content-Type': 'image/png',
                                  'x-upsert': 'true'}, timeout=300)
     res.raise_for_status()
