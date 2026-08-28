@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChangeEvent, DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { SUPABASE_URL } from '@/lib/config';
 import { canonicalFloor } from '@/lib/floor';
 import { preparePlanCanvas } from '@/lib/floorplan-render';
 import { signFloorplanPaths } from '@/lib/floorplan-storage';
@@ -268,6 +269,34 @@ type PlanStorage = ReturnType<ReturnType<typeof getSupabase>['storage']['from']>
  * light／tech 一律呼叫 preparePlanCanvas（與檢視器同一份實作），成品才會跟現行畫面一致。
  * 任何一張失敗都只記 console 並回報，不影響主圖與 mobile 版的上傳。
  */
+/** 上傳後立刻回頭確認檔案真的在儲存桶裡。upload() 回報成功不算數（2026-08-28 實例）。 */
+async function objectExists(storage: PlanStorage, target: string) {
+  const slash = target.lastIndexOf('/');
+  const folder = slash < 0 ? '' : target.slice(0, slash);
+  const file = target.slice(slash + 1);
+  try {
+    const listed = await storage.list(folder, { limit: 100, search: file });
+    if (listed.error) { console.warn(`verify list failed: ${target}`, listed.error); return false; }
+    return (listed.data || []).some(entry => entry.name === file);
+  } catch (error) {
+    console.warn(`verify list threw: ${target}`, error);
+    return false;
+  }
+}
+
+/** 繞過 supabase-js，直接打 Storage REST API。用來判斷「回報成功卻沒落地」是不是 SDK 的問題。 */
+async function uploadViaRest(target: string, blob: Blob) {
+  const session = (await getSupabase().auth.getSession()).data.session;
+  if (!session?.access_token) return { ok: false, detail: '沒有登入 session' };
+  const response = await fetch(`${SUPABASE_URL}/storage/v1/object/floorplans/${target}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'x-upsert': 'true', 'Content-Type': 'image/png' },
+    body: blob,
+  });
+  const detail = `${response.status} ${(await response.text()).slice(0, 200)}`;
+  return { ok: response.ok, detail };
+}
+
 async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HTMLCanvasElement) {
   const desktop = scaledCanvas(canvas, DESKTOP_TEXTURE_LONG_SIDE);
   const mobile = scaledCanvas(canvas, MOBILE_TEXTURE_LONG_SIDE);
@@ -278,25 +307,34 @@ async function uploadDerivedPlans(storage: PlanStorage, path: string, canvas: HT
     [`tech/${path}`, preparePlanCanvas(desktop, 'tech')],
     [`tech/mobile/${path}`, preparePlanCanvas(mobile, 'tech')],
   ];
-  let done = 0;
-  let failed = 0;
+  // 每張都走「上傳 → 立刻查證」；SDK 沒落地就改用原生 fetch 再試一次，
+  // 兩種方式各自的成敗會分開統計，才知道問題出在 SDK 還是網路。
+  const stats = { sdk: 0, rest: 0, failed: 0 };
   for (const [target, image] of variants) {
-    if (!image) { failed += 1; console.warn(`derived plan skipped (prepare failed): ${target}`); continue; }
+    if (!image) { stats.failed += 1; console.warn(`derived plan skipped (prepare failed): ${target}`); continue; }
+    let blob: Blob | null = null;
     try {
-      const blob = await canvasBlob(image);   // 既有 helper，編碼失敗會 reject，由下面的 catch 接住
+      blob = await canvasBlob(image);   // 既有 helper，編碼失敗會 reject
       const result = await storage.upload(target, new File([blob], path, { type: 'image/png' }),
         { upsert: true, contentType: 'image/png' });
       if (result.error) throw result.error;
-      // 只有 error 是 null 不代表真的寫進去了：v2 的 upload 成功時一定會回傳 data.path。
-      // 沒有 path 卻沒有 error 就是「回報成功但其實沒寫入」，不能算成功。
       if (!result.data?.path) throw new Error(`上傳未回傳路徑（回應：${JSON.stringify(result.data)}）`);
-      done += 1;
+      if (await objectExists(storage, target)) { stats.sdk += 1; continue; }
+      console.warn(`derived plan reported success but is missing: ${target}`, result.data);
     } catch (error) {
-      failed += 1;
-      console.warn(`derived plan upload failed: ${target}`, error);
+      console.warn(`derived plan upload failed (sdk): ${target}`, error);
     }
+    if (!blob) { stats.failed += 1; continue; }
+    try {
+      const rest = await uploadViaRest(target, blob);
+      console.warn(`derived plan retried via REST: ${target} → ${rest.detail}`);
+      if (rest.ok && await objectExists(storage, target)) { stats.rest += 1; continue; }
+    } catch (error) {
+      console.warn(`derived plan retry threw: ${target}`, error);
+    }
+    stats.failed += 1;
   }
-  return { done, failed };
+  return stats;
 }
 
 /** 直接列出衍生圖資料夾，回傳實際存在的檔案數——不相信上傳 API 的回報。 */
@@ -427,7 +465,8 @@ export function ModelerClient({ profile }: { profile: Profile }) {
     if (!paths.length) { setMessage({ text: '沒有可處理的樓層模型', tone: 'err' }); return; }
     setBackfilling(true);
     const storage = getSupabase().storage.from('floorplans');
-    let done = 0;
+    let sdkDone = 0;
+    let restDone = 0;
     let failed = 0;
     try {
       for (const [index, path] of paths.entries()) {
@@ -436,7 +475,8 @@ export function ModelerClient({ profile }: { profile: Profile }) {
           const url = (await signFloorplanPaths([path])).get(path);
           if (!url) throw new Error('無法取得原圖連結');
           const result = await uploadDerivedPlans(storage, path, await loadImageCanvas(url));
-          done += result.done;
+          sdkDone += result.sdk;
+          restDone += result.rest;
           failed += result.failed;
         } catch (error) {
           failed += 5;   // 這一層的五張衍生圖都沒產生
@@ -448,9 +488,10 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       const verified = await countDerivedObjects(storage);
       const expected = paths.length * 5;
       setMessage(verified >= expected && !failed
-        ? { text: `✓ 補產生完成，儲存桶實際有 ${verified} 張衍生圖`, tone: 'ok' }
-        : { text: `補產生結束：上傳回報成功 ${done} 張、失敗 ${failed} 張，`
-            + `但儲存桶實際只有 ${verified} 張（應為 ${expected}）。請開瀏覽器主控台看警告訊息。`, tone: 'err' });
+        ? { text: `✓ 補產生完成，儲存桶實際有 ${verified} 張衍生圖`
+            + (restDone ? `（其中 ${restDone} 張是改用直接呼叫 API 才成功）` : ''), tone: 'ok' }
+        : { text: `補產生結束：SDK 成功 ${sdkDone} 張、改用 API 成功 ${restDone} 張、仍失敗 ${failed} 張；`
+            + `儲存桶實際 ${verified} 張（應為 ${expected}）。詳細原因見主控台。`, tone: 'err' });
     } finally {
       setBackfilling(false);
     }
@@ -487,9 +528,10 @@ export function ModelerClient({ profile }: { profile: Profile }) {
       // 衍生圖（桌機 2048px、淺色／科技版成品）。失敗不擋主圖：檢視器取不到成品就
       // 退回原本「下載原圖再自己重畫」的流程，畫面一樣，只是慢一點。
       const derived = await uploadDerivedPlans(storage, path, canvas);
+      const derivedOk = derived.sdk + derived.rest;
       const derivedNote = derived.failed
-        ? `，衍生圖 ${derived.done}/${derived.done + derived.failed} 張（失敗的樓層檢視器會自動退回原圖）`
-        : `，衍生圖 ${derived.done} 張`;
+        ? `，衍生圖 ${derivedOk}/${derivedOk + derived.failed} 張（失敗的樓層檢視器會自動退回原圖）`
+        : `，衍生圖 ${derivedOk} 張`;
       const optionLabel = FLOOR_OPTIONS.find(option => option[0] === floorChoice)?.[1] || floor;
       
       await invokeAppApi('save_floor_model', {
