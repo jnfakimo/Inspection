@@ -1054,6 +1054,7 @@ function LogsModule({ module, profile }: Props) {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return <AppShell profile={profile} title={module.title}>
+    <div className="vehicle-logs-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
     <section className="panel admin-panel vehicle-logs-panel">
       <div className="admin-toolbar">
@@ -1077,5 +1078,6 @@ function LogsModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">目前沒有派車紀錄</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
+    </div>
   </AppShell>;
 }
