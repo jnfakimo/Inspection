@@ -90,9 +90,9 @@
 .vehicle-request-page .responsive-table{max-height:none!important;overflow:visible!important}
 
 /* 公務車主檔桌面版內容寬度 85%，手機版恢復滿寬。 */
-.vehicle-master-page{width:100%}
-.vehicle-master-page .vehicle-master-panel{width:85%;margin-left:auto;margin-right:auto}
-@media(max-width:600px){.vehicle-master-page .vehicle-master-panel{width:100%}}
+.vehicle-master-page{width:85%;margin-left:auto;margin-right:auto}
+.vehicle-master-page .vehicle-master-panel{width:100%}
+@media(max-width:600px){.vehicle-master-page{width:100%}.vehicle-master-page .vehicle-master-panel{width:100%}}
 .vehicle-people-page{width:100%}
 .vehicle-people-page .vehicle-people-panel{width:85%;margin-left:auto;margin-right:auto}
 @media(max-width:600px){.vehicle-people-page .vehicle-people-panel{width:100%}}
