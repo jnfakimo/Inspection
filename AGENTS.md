@@ -236,6 +236,23 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - 維修／派工入口另有 7 張統計小卡，桌面維持單列並依主圖卡 80% 比例縮放；3 張流程
   主圖卡同樣固定為 269×200px，窄版依 900px／600px 斷點改為兩欄／單欄。
 
+## 樓層平面圖的圖檔與效能（2026-08-28 訂）
+
+- `floorplans` 儲存桶的原圖是 **4096×4015（約 1～2.3MB）**，但畫面最大只用到視窗寬度。
+  客戶端目前會「下載原圖 → `getImageData` → 逐像素重畫 → `toBlob` 重新編碼 PNG」，
+  實測桌機 Chrome 這段 **250～450ms**，手機約 3～6 倍。
+- 已做的緩解：**手機／觸控裝置改讀 `mobile/`（1024px）**（比照 V1 `b1plan.html` 的
+  `matchMedia('(max-width:768px),(pointer:coarse)')`）；**重畫後的 blob 依「路徑＋主題」
+  LRU 快取 4 張**，切回看過的樓層不再重跑。
+- 治本作法：用 `tools/build-floorplan-variants.py` 在**上傳時**就產生
+  `light/`、`tech/`（已重畫完成）與 `desktop/`（2048px）、`mobile/`（1024px）四組衍生圖，
+  客戶端直接下載對應主題的成品，零像素處理。腳本的 `to_light()`／`to_tech()`
+  **必須與 `floor-stack-3d.tsx` 的 `preparePlanCanvas` 演算法一致**（light：alpha=0 略過、
+  luma>232 轉透明、其餘塗黑；tech：alpha<64 轉透明），改其中一邊就要同步改另一邊。
+- 兩個已驗證無效、不要再試的方向：`toBlob` 改 WebP **更慢**（PNG 116ms vs WebP 無損 293ms）；
+  canvas 開 `willReadFrequently:true` 的 `getImageData` 沒有比較快（106ms vs 90ms）。
+- `RF.png` 目前在儲存桶**沒有 `mobile/` 版本**，選圖邏輯取不到時必須退回原圖。
+
 ## V2 手機版版型規範（2026-08-28 訂）
 
 - **頁首操作按鈕一律靠右**。`components/admin/shared.tsx` 的 `AdminHeader`（`.admin-page-actions`）
