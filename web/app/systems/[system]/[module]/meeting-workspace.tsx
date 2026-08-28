@@ -496,7 +496,7 @@ function BookingModal({ rooms, init, myPhone, now, calendarStatus, onClose, onDo
                   {r.name}{r.capacity ? `（${r.capacity} 人）` : ''}{r.floor ? `｜${r.floor}` : ''}</option>)}
               </select></div>
             <div className="field"><label>日期（年/月/日）</label><LocalizedDateInput aria-label="預約日期（年/月/日）" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
-            <div className="field"><label>會議名稱</label><input type="text" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="例：管理部週會、面談會議" /></div>
+            <div className="field"><label>會議名稱</label><select value={purpose} onChange={e => setPurpose(e.target.value)}><option value="">-- 請選擇 --</option><option>主管會議</option><option>擴大主管會議</option><option>面試</option><option>管控會議</option><option>教育訓練</option><option>開／決標</option></select></div>
           </div>
         </section>
         <section className="booking-form-section">
