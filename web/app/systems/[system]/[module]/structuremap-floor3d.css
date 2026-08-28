@@ -404,6 +404,12 @@
   cursor: pointer;
 }
 
+/* 共用按鈕標準會將內容置中；樓層清單需沿面板內容基準線靠左排列。 */
+.f3-floors > .fbtn {
+  justify-content: flex-start;
+  padding: 9px 12px;
+}
+
 .f3-floors .fbtn:hover { background: color-mix(in srgb, var(--cyan) 8%, transparent); }
 .f3-floors .fbtn.on { color: var(--text); }
 
