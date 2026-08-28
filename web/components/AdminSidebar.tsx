@@ -29,7 +29,7 @@ const sidebarItems: SidebarItem[] = [
   },
   { href: '/systems/admin/users/', label: '帳號管理', icon: '/Inspection/assets/system-icons/account-icon.png', adminOnly: true },
   { href: '/systems/equipment/', label: '設備建置管理', icon: '/Inspection/assets/system-icons/equipment-icon.png', system: 'equipment' },
-  { href: '/systems/workorder/', label: '維修／派工／完工系統', icon: '/Inspection/assets/system-icons/maintenance-icon.png', system: 'workorder' },
+  { href: '/systems/workorder/', label: '報修／派工／完工系統', icon: '/Inspection/assets/system-icons/maintenance-icon.png', system: 'workorder' },
   { href: '/systems/guardpatrol/', label: '駐衛警巡檢系統', icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', system: 'guardpatrol' },
   { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons/handover-icon.png', system: 'handover' },
   { href: '/systems/structuremap/models/', label: '3D 雲臺建模', icon: '/Inspection/assets/system-icons/equipment-icon.png', system: 'structuremap' },

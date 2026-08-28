@@ -27,8 +27,8 @@ function WorkorderHub({ profile }: { profile: Profile }) {
     return () => { active = false; };
   }, []);
 
-  return <AppShell profile={profile} title="維修／派工／完工系統">
-    <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons/maintenance-icon.png" alt="" /> 維修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
+  return <AppShell profile={profile} title="報修／派工／完工系統">
+    <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons/maintenance-icon.png" alt="" /> 報修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
     {summary.length > 0 && <section className="mini-metrics workorder-summary">{summary.map(item => <article key={item.label} data-label={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
     <div className="workorder-note">■ 維修作業流程 ・ 點選圖卡進入功能系統</div>
     <section className="maintenance-hub-grid">
