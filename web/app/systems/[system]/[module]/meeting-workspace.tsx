@@ -617,7 +617,8 @@ function RoomAdminModal({ rooms, onClose, onSaved }: { rooms: Row[]; onClose: ()
             <option value="active">啟用</option><option value="inactive">停用</option></select></div>
         </div>
         <div className="field"><label>備註</label><input type="text" value={String(form.note || '')} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="選填" /></div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        {/* 用 class 而非行內樣式，手機版才有辦法用 media query 改成靠右。 */}
+        <div className="mr-form-actions">
           <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
             {editing ? '儲存變更' : <><span className="mr-add-icon" aria-hidden="true">＋</span> 新增會議室</>}
           </button>

@@ -232,3 +232,13 @@
   .booking-modal .mr-modal-foot .btn{min-height:48px;flex:1;touch-action:manipulation}
   .calendar-link-status{width:100%;order:3}.calendar-sync-option{align-items:stretch}
 }
+
+/* 會議室管理彈窗的送出按鈕列：桌面沿用原本的靠左排列（等同原本的行內 flex），
+   手機版改為靠右，與各頁頁首按鈕的方向一致。 */
+.mr-form-actions{display:flex;gap:8px}
+@media (max-width:800px){
+  .mr-form-actions{justify-content:flex-end}
+  /* 會議室預約系統（SYS-08）各頁頁首的「重新載入」等按鈕一律靠右。
+     用系統代碼定位，四個子系統一次涵蓋，不必逐頁加標記 class。 */
+  .content:has(.system-page-heading[data-system-key="meetingroom"]) .admin-page-actions>div:last-child{width:100%;justify-content:flex-end}
+}
