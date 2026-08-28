@@ -1049,7 +1049,7 @@ function LogsModule({ module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
-    <section className="panel admin-panel">
+    <section className="panel admin-panel vehicle-logs-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋動作、備註、操作人員或申請編號" />
         <span>共 {filtered.length} 筆</span>
