@@ -121,6 +121,15 @@
   .vehicle-request-toolbar .localized-date-input>button{display:block}
   .vehicle-request-toolbar .localized-date-input>input:first-child{padding-right:30px}
 }
+/* 公務車主檔手機版：頁首「＋新增車輛／重新載入」靠右；搜尋框與台數統計排成一列、
+   統計靠右。桌面版不變，只在 800px 以下生效。 */
+@media (max-width:800px){
+  .admin-page-actions:has(+ .vehicle-master-panel)>div:last-child{width:100%;justify-content:flex-end}
+  .vehicle-master-toolbar{flex-wrap:nowrap;gap:8px}
+  /* 基礎規則是 min-width:min(420px,100%)，不解掉的話搜尋框會獨佔整列把統計擠下去。 */
+  .vehicle-master-toolbar>input{flex:1 1 0;min-width:0;padding:0 8px;font-size:12px}
+  .vehicle-master-toolbar>span{flex:0 0 auto;white-space:nowrap;font-size:12px}
+}
 /* 清除篩選從 .vehicle-request-actions 移出來後就沒有那層的 nowrap 了；
    桌面版寬度較窄時「清除篩選」會被拆成兩行，所以在這裡補回來。 */
 .vehicle-request-clear{white-space:nowrap}

@@ -876,8 +876,8 @@ function VehiclesModule({ module, profile }: Props) {
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={canManageFleet ? <button className="primary-btn compact" onClick={() => setEditor({ status: 'active', seats: 5, current_odometer: 0 })}>＋ 新增車輛</button> : undefined} />
-    <section className="panel admin-panel">
-      <div className="admin-toolbar">
+    <section className="panel admin-panel vehicle-master-panel">
+      <div className="admin-toolbar vehicle-master-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋車號、車名、廠牌或型號" />
         <span>可派用 {rows.filter(r => r.status === 'active').length}／共 {rows.length} 台</span>
       </div>
