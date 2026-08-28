@@ -194,6 +194,4 @@
   /* 匯出起日／迄日與兩顆匯出按鈕在手機上隱藏，匯出請用電腦版。 */
   .operations-tool-row .operations-filter-row .export-date,
   .operations-tool-row .operations-filter-row .operations-export{display:none}
-  /* 當班即時統計只留班別與時段。 */
-  .operations-stat-row .stat-caption{display:none}
 }
