@@ -52,7 +52,18 @@ const projectReaders = [
 for (const relative of projectReaders) {
   const file = fs.readFileSync(path.join(root, relative), 'utf8');
   if (!file.includes("from('floor_models')")) throw new Error(`${relative} 未直接讀取 3D 建模專案`);
-  if (!file.includes('signFloorplanPaths')) throw new Error(`${relative} 未使用私有圖資的短效連結`);
+  // signFloorPlanVariants 是 signFloorplanPaths 的上層包裝（多簽 light/、tech/ 成品圖與尺寸變體），
+  // 底層一樣是短效 signed URL，兩者都算合格；直接組公開網址才是要擋的事。
+  if (!/signFloorplanPaths|signFloorPlanVariants/.test(file)) {
+    throw new Error(`${relative} 未使用私有圖資的短效連結`);
+  }
+}
+
+// 樓層圖的選圖規則（成品圖與尺寸）只能有一份：四個檢視器都必須走 web/lib/floorplan-storage.ts
+// 的 signFloorPlanVariants，不可以各自組 light/、tech/、mobile/ 的路徑字串。
+const variantHelper = fs.readFileSync(path.join(root, 'web/lib/floorplan-storage.ts'), 'utf8');
+for (const token of ['export async function signFloorPlanVariants', "`light/${sizeDir}${path}`", "`tech/${sizeDir}${path}`"]) {
+  if (!variantHelper.includes(token)) throw new Error(`floorplan-storage.ts 缺少成品圖選圖邏輯：${token}`);
 }
 
 const modeler = fs.readFileSync(path.join(root, 'web/app/systems/structuremap/modeler/modeler-client.tsx'), 'utf8');

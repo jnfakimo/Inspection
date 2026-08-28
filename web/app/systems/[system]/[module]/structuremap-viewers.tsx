@@ -25,7 +25,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { errorMessage, fmt, type Row } from '@/components/admin/shared';
 import { canonicalFloor } from '@/lib/floor';
 import { floorOrder, floorTextureUrl, preparePlanObjectUrl } from './floor-stack-3d';
-import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { signFloorPlanVariants, type FloorPlanUrls } from '@/lib/floorplan-storage';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -66,41 +66,18 @@ function useFloorData() {
     if (m.error || k.error) setNote(`失敗：${errorMessage(m.error || k.error, '圖臺資料載入失敗')}`);
     const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
       .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
-    // 手機／觸控裝置改讀 floorplans 的 mobile/ 縮圖（1024px、約 255KB），
-    // 原圖是 4096px、1～2.3MB，下載慢之外還要多做 16 倍的逐像素預處理。
-    // V1 的 b1plan.html 早就這樣做了（`matchMedia('(max-width:768px),(pointer:coarse)')`），
-    // V2 一直沿用原圖是這次「顯示圖很慢」的主因之一。
-    // RF 在 Storage 沒有 mobile/ 版本，所以取不到時要退回原圖。
-    const wantsSmall = typeof window !== 'undefined'
-      && window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
-    const basePaths = sorted.map(row => String(row.image_path || '')).filter(Boolean);
-    // 3D建模系統上傳時就把「已重畫好」的成品備在 light/ 與 tech/（見 uploadDerivedPlans）。
-    // 拿得到成品就直接開，省掉整段 getImageData → 逐像素 → toBlob；拿不到才退回原圖自己重畫。
-    // 兩種主題的連結一次簽好，切換介面風格時不必再跑一次簽章。
-    const sizeDir = wantsSmall ? 'mobile/' : '';
-    const wanted = basePaths.flatMap(path => [
-      `light/${sizeDir}${path}`,
-      `tech/${sizeDir}${path}`,
-      wantsSmall ? `mobile/${path}` : `desktop/${path}`,
-      path,
-    ]);
-    let signed = new Map<string, string>();
+    // 成品圖（light/、tech/）與尺寸選擇都交給 signFloorPlanVariants 統一處理，
+    // 3D 樓層圖、標記圖臺與雲台用同一支，選圖規則只有一份。
+    let variants = new Map<string, FloorPlanUrls>();
     try {
-      signed = await signFloorplanPaths(wanted, client);
+      variants = await signFloorPlanVariants(sorted.map(row => String(row.image_path || '')), client);
     } catch (error) {
       setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
     }
-    const pickRaw = (path: string) =>
-      signed.get(wantsSmall ? `mobile/${path}` : `desktop/${path}`) || signed.get(path) || '';
     const secured = sorted
       .map(row => {
-        const path = String(row.image_path || '');
-        return {
-          ...row,
-          image_url: pickRaw(path),
-          light_url: signed.get(`light/${sizeDir}${path}`) || '',
-          tech_url: signed.get(`tech/${sizeDir}${path}`) || '',
-        };
+        const urls = variants.get(String(row.image_path || ''));
+        return { ...row, image_url: urls?.raw || '', light_url: urls?.light || '', tech_url: urls?.tech || '' };
       })
       .filter(row => row.image_url || row.light_url || row.tech_url);
     if (secured.length < sorted.length && sorted.length) {

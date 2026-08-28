@@ -16,7 +16,9 @@ import { preparePlanCanvas } from '@/lib/floorplan-render';
 // 樓層排序沿用全站唯一的 web/lib/floor.ts；此處再匯出，既有匯入端不必改寫。
 export { floorOrder } from '@/lib/floor';
 
-export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; image_url?: string | null; level?: number | null };
+export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; image_url?: string | null;
+  /** 已重畫好的成品圖（3D建模系統上傳時產生）。有值就直接貼，不必再逐像素重畫。 */
+  light_url?: string | null; tech_url?: string | null; level?: number | null };
 export type StackMarker = { id: string; floor_id: string; x: number; y: number; color: string; kind?: string; label?: string };
 
 export const floorTextureUrl = (signedUrl: unknown) => signedUrl ? String(signedUrl) : '';
@@ -139,7 +141,10 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         mesh.position.y = y;
         scene.add(mesh);
 
-        const url = floorTextureUrl(row.image_url);
+        // 有成品圖就直接貼：省掉下載原圖後的 getImageData → 逐像素 → 重建貼圖，
+        // 7 層一起載入時這段的成本是乘以 7 的。拿不到成品才走原本的重畫流程。
+        const prerendered = String((isLight ? row.light_url : row.tech_url) || '');
+        const url = prerendered || floorTextureUrl(row.image_url);
         if (url) {
           loader.load(url, texture => {
             texture.colorSpace = THREE.SRGBColorSpace;
@@ -147,7 +152,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             // material.color 相乘——若圖檔是不透明白底，整片平面會變黑。
             // 改為逐像素重畫：近白視為背景轉全透明，其餘一律塗黑。
             // 這同時讓堆疊的樓層彼此看得穿，不再互相遮擋。
-            material.map = preparePlanTexture(THREE, texture, isLight ? 'light' : 'tech');
+            material.map = prerendered ? texture : preparePlanTexture(THREE, texture, isLight ? 'light' : 'tech');
             material.color.set(0xffffff);
             material.needsUpdate = true;
           }, undefined, () => { /* 貼圖載入失敗時保留底色，不中斷場景 */ });

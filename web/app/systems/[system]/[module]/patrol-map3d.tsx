@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
-import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { signFloorPlanVariants, type FloorPlanUrls } from '@/lib/floorplan-storage';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import { errorMessage, type Row } from '@/components/admin/shared';
 import { canonicalFloor } from '@/lib/floor';
@@ -74,15 +74,19 @@ export function PatrolMap3DModule({ module, profile }: Props) {
     if (m.error || p.error || c.error) setNote(`失敗：${errorMessage(m.error || p.error || c.error, '立體巡檢資料載入失敗')}`);
     const sourceRows = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
       .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
-    let signed = new Map<string, string>();
+    // 與平面圖共用同一支：拿得到 light/、tech/ 成品圖就直接貼，不必逐像素重畫。
+    let variants = new Map<string, FloorPlanUrls>();
     try {
-      signed = await signFloorplanPaths(sourceRows.map(row => String(row.image_path || '')), client);
+      variants = await signFloorPlanVariants(sourceRows.map(row => String(row.image_path || '')), client);
     } catch (error) {
       setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
     }
     const sorted = sourceRows
-      .map(row => ({ ...row, image_url: signed.get(String(row.image_path || '')) || '' }))
-      .filter(row => row.image_url);
+      .map(row => {
+        const urls = variants.get(String(row.image_path || ''));
+        return { ...row, image_url: urls?.raw || '', light_url: urls?.light || '', tech_url: urls?.tech || '' };
+      })
+      .filter(row => row.image_url || row.light_url || row.tech_url);
     setModels(sorted);
     setVisibleFloors(Object.fromEntries(sorted.map(row => [String(row.floor_id), true])));
     setPoints((p.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));

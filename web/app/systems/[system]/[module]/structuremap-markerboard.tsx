@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-markerboard.css';
 import './structuremap-pin.css';
 import { MARKET_ID } from '@/lib/config';
-import { signFloorplanPaths } from '@/lib/floorplan-storage';
+import { signFloorPlanVariants, type FloorPlanUrls } from '@/lib/floorplan-storage';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
 import { errorMessage } from '@/components/admin/shared';
@@ -43,7 +43,8 @@ type Marker = {
 type Equipment = { equipment_id: string; name: string; location: string | null };
 type Space = { space_id: string; floor: string; space_name: string };
 type Repair = { request_id: string; req_no: string | null; fault_type: string | null; fault_desc: string | null; status: string };
-type FloorSource = { id: string; label: string; url: string; index: number | null };
+// lightUrl／techUrl 是 3D建模系統上傳時就重畫好的成品圖，有值就直接開。
+type FloorSource = { id: string; label: string; url: string; lightUrl: string; techUrl: string; index: number | null };
 type PendingLink = { kind: MarkerKind; id: string; label: string };
 
 const KIND: Record<MarkerKind, { c: string; n: string }> = {
@@ -178,18 +179,23 @@ export function MarkerBoardModule({ profile }: Props) {
       if (error) console.warn('floor_models query failed', error);
       const sourceRows = (data || [])
         .filter(row => row.image_path)
-      let signed = new Map<string, string>();
+      // 與平面圖、3D 共用同一支：拿得到 light/、tech/ 成品圖就直接開，省掉逐像素重畫。
+      let variants = new Map<string, FloorPlanUrls>();
       try {
-        signed = await signFloorplanPaths(sourceRows.map(row => String(row.image_path)), getSupabase());
+        variants = await signFloorPlanVariants(sourceRows.map(row => String(row.image_path)), getSupabase());
       } catch (signError) {
         if (!disposed) setProgress({ pct: 100, msg: `樓層圖連結產生失敗：${errorMessage(signError, '請重新登入後再試')}` });
       }
       const list = sourceRows
-        .map(row => ({
-          id: canonicalFloor(row.floor_id), label: String(row.name || canonicalFloor(row.floor_id)),
-          url: signed.get(String(row.image_path)) || '', index: null as number | null,
-        }))
-        .filter(row => row.url)
+        .map(row => {
+          const urls = variants.get(String(row.image_path));
+          return {
+            id: canonicalFloor(row.floor_id), label: String(row.name || canonicalFloor(row.floor_id)),
+            url: urls?.raw || '', lightUrl: urls?.light || '', techUrl: urls?.tech || '',
+            index: null as number | null,
+          };
+        })
+        .filter(row => row.url || row.lightUrl || row.techUrl)
         .sort((a, b) => floorOrder(a.id) - floorOrder(b.id));
       if (disposed) return;
       setFloors(list);
@@ -279,13 +285,15 @@ export function MarkerBoardModule({ profile }: Props) {
             msg: theme === 'light' ? `轉換${floor.label}為黑線圖…` : `整理${floor.label}科技版線條…`,
           });
         }
-        const prepared = await preparePlanObjectUrl(floor.url, theme);
+        // 成品圖存在就直接用，不必下載原圖再逐像素重畫（也就不必產生／釋放 blob）。
+        const prerendered = theme === 'light' ? floor.lightUrl : floor.techUrl;
+        const prepared = prerendered ? null : await preparePlanObjectUrl(floor.url, theme);
         if (disposed) {
           if (prepared) URL.revokeObjectURL(prepared);
           return;
         }
         if (prepared) preparedUrls.push(prepared);
-        const source = prepared || floor.url;
+        const source = prerendered || prepared || floor.url;
         await new Promise<void>(resolve => viewer.addTiledImage({
           tileSource: { type: 'image', url: source }, x: 0, y: 0, width: 1, opacity: 0,
           success: (event: any) => {
