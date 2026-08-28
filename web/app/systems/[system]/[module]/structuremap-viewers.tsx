@@ -74,18 +74,35 @@ function useFloorData() {
     const wantsSmall = typeof window !== 'undefined'
       && window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
     const basePaths = sorted.map(row => String(row.image_path || '')).filter(Boolean);
-    const wanted = wantsSmall ? [...basePaths.map(path => `mobile/${path}`), ...basePaths] : basePaths;
+    // 3D建模系統上傳時就把「已重畫好」的成品備在 light/ 與 tech/（見 uploadDerivedPlans）。
+    // 拿得到成品就直接開，省掉整段 getImageData → 逐像素 → toBlob；拿不到才退回原圖自己重畫。
+    // 兩種主題的連結一次簽好，切換介面風格時不必再跑一次簽章。
+    const sizeDir = wantsSmall ? 'mobile/' : '';
+    const wanted = basePaths.flatMap(path => [
+      `light/${sizeDir}${path}`,
+      `tech/${sizeDir}${path}`,
+      wantsSmall ? `mobile/${path}` : `desktop/${path}`,
+      path,
+    ]);
     let signed = new Map<string, string>();
     try {
       signed = await signFloorplanPaths(wanted, client);
     } catch (error) {
       setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
     }
-    const pickUrl = (path: string) =>
-      (wantsSmall ? signed.get(`mobile/${path}`) : '') || signed.get(path) || '';
+    const pickRaw = (path: string) =>
+      signed.get(wantsSmall ? `mobile/${path}` : `desktop/${path}`) || signed.get(path) || '';
     const secured = sorted
-      .map(row => ({ ...row, image_url: pickUrl(String(row.image_path || '')) }))
-      .filter(row => row.image_url);
+      .map(row => {
+        const path = String(row.image_path || '');
+        return {
+          ...row,
+          image_url: pickRaw(path),
+          light_url: signed.get(`light/${sizeDir}${path}`) || '',
+          tech_url: signed.get(`tech/${sizeDir}${path}`) || '',
+        };
+      })
+      .filter(row => row.image_url || row.light_url || row.tech_url);
     if (secured.length < sorted.length && sorted.length) {
       setNote('部分樓層圖連結無法產生，畫面僅呈現可授權的樓層。');
     }
@@ -165,7 +182,9 @@ function Floor2DViewer({ system, module, profile }: Props) {
   useEffect(() => {
     let disposed = false;
     const url = textureUrl(model?.image_url);
-    if (!hostRef.current || !url) return;
+    // 只有成品圖、沒有原圖的樓層也要能開（例如原圖連結簽不出來但 light/ 還在）。
+    const anyUrl = url || String(model?.light_url || model?.tech_url || '');
+    if (!hostRef.current || !anyUrl) return;
     (async () => {
       const OpenSeadragon = (await import('openseadragon')).default;
       if (disposed || !hostRef.current) return;
@@ -204,6 +223,14 @@ function Floor2DViewer({ system, module, profile }: Props) {
       // 淺色把線條重畫成黑線，科技版保留原色但濾掉光暈——光暈是 renderNeon 疊出來的，
       // 不濾掉會讓科技版的線看起來比一般版粗一截。
       const mode = theme === 'light' ? 'light' : 'tech';
+      // 有成品圖就直接開：不必下載原圖、不必逐像素重畫、也不必進快取。
+      const prerendered = String((mode === 'light' ? model?.light_url : model?.tech_url) || '');
+      if (prerendered) {
+        overlayRef.current.clear();
+        viewerRef.current.open({ type: 'image', url: prerendered });
+        setViewerReady(true);
+        return;
+      }
       const cacheKey = `${String(model?.image_path || url)}|${mode}`;
       const cache = planCacheRef.current;
       let source = url;
