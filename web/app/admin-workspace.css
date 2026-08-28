@@ -137,6 +137,7 @@
    桌面版仍是同一列，這裡只調整 800px 以下。六個控制項統一 36px 高、12px 字，兩列才會對齊；
    選擇器要寫到兩層才蓋得過 button-standard.css 的 .primary-btn.compact。 */
 @media (max-width:800px){
+  .admin-page-actions:has(+ .vehicle-flow-grid)>div:last-child{width:100%;justify-content:flex-end}
   .vehicle-request-toolbar>select,
   .vehicle-request-toolbar>.vehicle-request-clear,
   .vehicle-request-toolbar .localized-date-input>input:first-child,
