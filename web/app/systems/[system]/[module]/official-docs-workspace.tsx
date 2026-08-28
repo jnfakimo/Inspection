@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { BrowserMultiFormatOneDReader, type IScannerControls } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { AppShell } from '@/components/AppShell';
@@ -100,6 +100,25 @@ function makeBarcode(textValue: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+// 即時掃描與拍照辨識共用同一組格式設定：公文條碼是 Code 39，其餘一維格式一併開著備用。
+function createOneDReader() {
+  const hints = new Map<DecodeHintType, unknown>([
+    [DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_93,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.ITF,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+    ]],
+    [DecodeHintType.TRY_HARDER, true],
+  ]);
+  return new BrowserMultiFormatOneDReader(hints, { delayBetweenScanAttempts: 180, delayBetweenScanSuccess: 1000 });
+}
+
 // 有相機權限不代表真的有影像：等到 video 送出第一張影格（videoWidth > 0）才算開啟成功。
 async function waitForFirstFrame(video: HTMLVideoElement, isActive: () => boolean, timeoutMs = 4000) {
   const deadline = Date.now() + timeoutMs;
@@ -120,6 +139,8 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [preferredDeviceId, setPreferredDeviceId] = useState('');
   const [activeDeviceId, setActiveDeviceId] = useState('');
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => { onDetectedRef.current = onDetected; }, [onDetected]);
   useEffect(() => {
     let active = true;
@@ -132,24 +153,12 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
         return;
       }
       try {
-        const hints = new Map<DecodeHintType, unknown>([
-          [DecodeHintType.POSSIBLE_FORMATS, [
-            BarcodeFormat.CODE_39,
-            BarcodeFormat.CODE_128,
-            BarcodeFormat.CODE_93,
-            BarcodeFormat.EAN_8,
-            BarcodeFormat.EAN_13,
-            BarcodeFormat.ITF,
-            BarcodeFormat.CODABAR,
-            BarcodeFormat.UPC_A,
-            BarcodeFormat.UPC_E,
-          ]],
-          [DecodeHintType.TRY_HARDER, true],
-        ]);
-        const reader = new BrowserMultiFormatOneDReader(hints, { delayBetweenScanAttempts: 180, delayBetweenScanSuccess: 1000 });
+        const reader = createOneDReader();
         const video = videoRef.current;
         if (!video) return;
-        const videoSettings = { width: { ideal: 1280 }, height: { ideal: 720 } };
+        // 公文條碼是印在紙上的 Code 39，解析度直接決定每根窄條有幾個像素。
+        // 1280 在手機上常常只夠勉強，改要 1920 讓細條不會糊在一起。
+        const videoSettings = { width: { ideal: 1920 }, height: { ideal: 1080 } };
         if (preferredDeviceId) {
           stream = await navigator.mediaDevices.getUserMedia({ video: { ...videoSettings, deviceId: { exact: preferredDeviceId } }, audio: false });
         } else {
@@ -175,6 +184,14 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
         if (active) {
           setCameraDevices(devices);
           setActiveDeviceId(stream.getVideoTracks()[0]?.getSettings().deviceId || '');
+        }
+        // 近距離拍紙本條碼最怕失焦。連續對焦不是每個瀏覽器都支援（Safari 目前就不支援），
+        // 支援的就開，不支援沿用系統預設對焦，兩種情況都不影響掃描。
+        try {
+          // focusMode 還沒進 TypeScript 的 MediaTrackConstraintSet，只能繞過型別。
+          await stream.getVideoTracks()[0]?.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as unknown as MediaTrackConstraints);
+        } catch (error) {
+          console.info('[official-docs] continuous focus is not supported on this device', error);
         }
         video.setAttribute('webkit-playsinline', 'true');
         video.srcObject = stream;
@@ -240,7 +257,29 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
     const next = cameraDevices[(currentIndex + 1 + cameraDevices.length) % cameraDevices.length];
     if (next?.deviceId) setPreferredDeviceId(next.deviceId);
   };
-  return <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-label="掃描公文文號"><section className="od-scanner-modal"><header><div><small>查詢工具／文號</small><h2>掃描公文文號</h2></div><button type="button" className="od-icon-button" onClick={onClose} aria-label="關閉">×</button></header><div className="od-scanner-preview" onClick={() => { const video = videoRef.current; if (video?.paused) void video.play().catch(error => console.warn('[official-docs] camera preview play was blocked', error)); }}><video ref={videoRef} className="od-scanner-video" muted autoPlay playsInline /><span className="od-scanner-guide" aria-hidden="true" /></div><p className="od-help">{message}</p><div className="od-modal-actions">{cameraDevices.length > 1 && <button type="button" className="secondary-btn" onClick={switchCamera}>切換鏡頭</button>}<button type="button" className="secondary-btn" onClick={() => setCameraAttempt(value => value + 1)}>重新啟動相機</button><button type="button" className="secondary-btn" onClick={onClose}>關閉掃描</button></div></section></div>;
+  // 即時影像受限於對焦與手震，紙本條碼常常掃不到；改拍一張照片交給系統相機，
+  // 拿到的是對焦完成的高解析靜態影像，辨識率比連續掃描高得多。
+  const decodePhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setPhotoBusy(true);
+    setMessage('正在辨識照片…');
+    const url = URL.createObjectURL(file);
+    try {
+      const result = await createOneDReader().decodeFromImageUrl(url);
+      const value = result.getText().trim();
+      if (value) { onDetectedRef.current(value); return; }
+      setMessage('照片裡沒有讀到條碼，請靠近一點讓條碼填滿畫面，再拍一次。');
+    } catch (error) {
+      console.warn('[official-docs] photo barcode decode failed', error);
+      setMessage('照片裡沒有讀到條碼，請靠近一點讓條碼填滿畫面、避開反光，再拍一次。');
+    } finally {
+      URL.revokeObjectURL(url);
+      setPhotoBusy(false);
+    }
+  };
+  return <div className="od-modal-backdrop" role="dialog" aria-modal="true" aria-label="掃描公文文號"><section className="od-scanner-modal"><header><div><small>查詢工具／文號</small><h2>掃描公文文號</h2></div><button type="button" className="od-icon-button" onClick={onClose} aria-label="關閉">×</button></header><div className="od-scanner-preview" onClick={() => { const video = videoRef.current; if (video?.paused) void video.play().catch(error => console.warn('[official-docs] camera preview play was blocked', error)); }}><video ref={videoRef} className="od-scanner-video" muted autoPlay playsInline /><span className="od-scanner-guide" aria-hidden="true" /></div><p className="od-help">{message}</p><div className="od-modal-actions"><input ref={photoInputRef} type="file" accept="image/*" capture="environment" hidden onChange={decodePhoto} /><button type="button" className="primary-btn" disabled={photoBusy} onClick={() => photoInputRef.current?.click()}>{photoBusy ? '辨識中…' : '拍照辨識'}</button>{cameraDevices.length > 1 && <button type="button" className="secondary-btn" onClick={switchCamera}>切換鏡頭</button>}<button type="button" className="secondary-btn" onClick={() => setCameraAttempt(value => value + 1)}>重新啟動相機</button><button type="button" className="secondary-btn" onClick={onClose}>關閉掃描</button></div></section></div>;
 }
 
 function QrModal({ document, onClose }: { document: Document; onClose: () => void }) {
