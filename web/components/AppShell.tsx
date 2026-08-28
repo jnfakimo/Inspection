@@ -240,7 +240,7 @@ export function AppShell({ profile, title, children, heading }: {
             <div className="profile-section-title"><span>02</span><div><b>Google 個人行事曆</b><small>只連結目前登入者自己的 Google 帳號</small></div></div>
             <div className={`google-connection-card${calendarStatus?.connected ? ' is-connected' : ''}`}>
               <div className="google-calendar-mark">G</div><div><b>{calendarStatus?.connected ? '已連結' : calendarStatus?.status === 'error' ? '需要重新連結' : '尚未連結'}</b><span>{calendarStatus?.connected ? calendarStatus.google_email : calendarStatus?.status === 'error' ? 'Google 授權已失效，請重新完成帳號授權' : '連結後可將本人會議室預約同步到個人行事曆'}</span>{calendarStatus?.last_sync_at && <small>最後同步：{Number.isNaN(new Date(calendarStatus.last_sync_at).getTime()) ? '—' : new Date(calendarStatus.last_sync_at).toLocaleString('zh-TW')}</small>}</div>
-              {calendarStatus?.connected ? <button type="button" onClick={disconnectGoogle} disabled={profileBusy}>解除連結</button> : <button type="button" className="primary-btn compact" onClick={connectGoogle} disabled={profileBusy}>連結 Google 帳號</button>}
+              {calendarStatus?.connected ? <button type="button" className="is-connected" onClick={disconnectGoogle} disabled={profileBusy}>解除連結</button> : <button type="button" className="primary-btn compact" onClick={connectGoogle} disabled={profileBusy}>連結 Google 帳號</button>}
             </div>
             <p className="google-policy-links">連結即表示您已閱讀並同意 <a href="/Inspection/v2/privacy/" target="_blank" rel="noreferrer">隱私權政策</a> 與 <a href="/Inspection/v2/terms/" target="_blank" rel="noreferrer">服務條款</a>。</p>
             {calendarMessage && <p className="profile-message">{calendarMessage}</p>}
