@@ -100,6 +100,17 @@ function makeBarcode(textValue: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+// 有相機權限不代表真的有影像：等到 video 送出第一張影格（videoWidth > 0）才算開啟成功。
+async function waitForFirstFrame(video: HTMLVideoElement, isActive: () => boolean, timeoutMs = 4000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isActive()) return false;
+    if (video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2 && !video.paused) return true;
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+  return false;
+}
+
 function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
@@ -172,8 +183,9 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
         video.playsInline = true;
         try { await video.play(); } catch (error) { console.warn('[official-docs] camera preview autoplay was blocked', error); }
         setMessage('請允許相機權限，並將公文文號置於掃描框內。');
-        controls = await reader.decodeFromStream(
-          stream,
+        // 串流交給 ZXing 前先自己掛上並播放，這裡改用 decodeFromVideoElement：
+        // decodeFromStream 會再指派一次同一個 srcObject，iOS 上重複指派會讓畫面停在載入中。
+        controls = await reader.decodeFromVideoElement(
           video,
           (result, _error, scanControls) => {
             controlsRef.current = scanControls;
@@ -186,8 +198,24 @@ function Scanner({ onDetected, onClose }: { onDetected: (value: string) => void;
           },
         );
         controlsRef.current = controls;
-        if (active) setMessage('鏡頭已開啟，請將公文文號置於掃描框內。');
-        else controls.stop();
+        if (!active) { controls.stop(); return; }
+        // 有權限不等於有畫面：iOS 主畫面捷徑與部分 App 內建瀏覽器會給出串流卻永遠不送影格。
+        // 一定要等到真的有影格（videoWidth > 0）才敢說「鏡頭已開啟」，否則就是讓畫面對使用者說謊。
+        const hasFrame = await waitForFirstFrame(video, () => active);
+        if (!active) { controls.stop(); return; }
+        if (hasFrame) { setMessage('鏡頭已開啟，請將公文文號置於掃描框內。'); return; }
+        const track = stream.getVideoTracks()[0];
+        console.warn('[official-docs] camera stream produced no video frame', {
+          readyState: video.readyState,
+          videoWidth: video.videoWidth,
+          videoHeight: video.videoHeight,
+          paused: video.paused,
+          trackReadyState: track?.readyState,
+          trackMuted: track?.muted,
+          standalone: typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        });
+        setMessage('相機已授權但沒有影像。若你是從主畫面捷徑或 App 內建瀏覽器（LINE／Facebook）開啟，請改用 Safari 或 Chrome 直接開啟本頁；也可以點畫面或按「重新啟動相機」再試一次。');
       } catch (error) {
         if (!active) return;
         stream?.getTracks().forEach(track => track.stop());
