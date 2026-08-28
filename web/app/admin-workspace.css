@@ -60,6 +60,21 @@
 .security-alert-filters{grid-template-columns:minmax(180px,2fr) repeat(4,minmax(0,1fr)) repeat(2,minmax(130px,1.1fr)) auto;min-width:0;width:100%;max-width:100%}
 .security-alert-filters>*{min-width:0}
 
+/* 稽核紀錄桌面表格固定欄寬，避免 UUID／User-Agent 長字串撐出水平捲軸。 */
+@media (min-width:801px){
+  .audit-log-table{width:100%;table-layout:fixed}
+  .audit-log-table th:nth-child(1),.audit-log-table td:nth-child(1){width:13%}
+  .audit-log-table th:nth-child(2),.audit-log-table td:nth-child(2){width:11%}
+  .audit-log-table th:nth-child(3),.audit-log-table td:nth-child(3){width:10%}
+  .audit-log-table th:nth-child(4),.audit-log-table td:nth-child(4){width:11%}
+  .audit-log-table th:nth-child(5),.audit-log-table td:nth-child(5){width:16%}
+  .audit-log-table th:nth-child(6),.audit-log-table td:nth-child(6){width:18%}
+  .audit-log-table th:nth-child(7),.audit-log-table td:nth-child(7){width:13%}
+  .audit-log-table th:nth-child(8),.audit-log-table td:nth-child(8){width:8%}
+  .audit-log-table td{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .audit-log-table td small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
 /* Theme surfaces: preserve the light theme while keeping the tech theme readable. */
 .admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{background:var(--surface);color:var(--ink)}
 .admin-modal,.admin-alert,.admin-notice-list article{background:var(--surface);color:var(--ink)}
