@@ -86,7 +86,15 @@ readiness **四個 workflow 全綠，過時警告 0**。
   （`config.toml` 沒有 `[auth]` 段，會蓋掉整份 auth 設定）。
 - **`users.department` 只是副本**，以 `dept_id` 為準。
 - **驗收剛推的修正前先 `Ctrl+Shift+R`**（GitHub Pages 的 CDN 會快取 HTML）。
-- **工作區在 `C:\claude-code\Inspection`**；`G:\...\word-cloud` 是廢棄鏡像。
+- **工作區在 `C:\claude-code\Inspection`**（完整 clone）；`G:\...\word-cloud` 是廢棄鏡像。
+- **`G:\我的雲端硬碟\AI\Codex\北農巡檢系統` 已於 2026-08-28 停用，不要在上面工作**。
+  `.git` 放在 Google Drive 上會被同步機制破壞：08-27～28 一天內出事兩次——Drive 生出重複檔
+  `refs/heads/main (1)` 讓 `git fetch` 噴 `bad object`，以及 `packed-refs.lock` 卡住 0 bytes
+  殘留鎖檔。那個 clone 另外還是 `blob:none` partial clone，`npm ci` 在 Drive 上也跑不起來。
+  本機獨有的舊部署分支（`codex/deploy-*`、`deploy/*`、`gh-pages`）因缺 blob 且 GitHub 上
+  也取不到而**搬不過來**，只留在原處；另有兩個 worktree 掛在它的 `.git` 上
+  （`北農巡檢系統-staging`、`C:\Users\jnfa\.codex\worktrees\6f38\北農巡檢系統`），
+  確認不需要之前不要刪除那個資料夾。
 - **多個 agent 並行推送**，推送前務必 `git fetch` 並 rebase。
 - **測試資料刪不掉**（41 張表有 `trg_prevent_removal`），名稱請註明「驗收測試（勿使用）」。
 - **plpgsql 建函式時不驗證欄位參照**，改完務必實際呼叫一次。
