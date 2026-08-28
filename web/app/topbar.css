@@ -5,12 +5,11 @@
 .v1-actions img{width:18px;height:18px;object-fit:contain}
 .generated-nav-icon{display:inline-block;width:20px;height:20px;background-image:url('/Inspection/assets/system-icons/topbar-nav-icons-ai.png');background-size:200% 200%;background-repeat:no-repeat}
 .nav-home{background-position:0 0}.nav-profile{background-position:100% 0}.nav-logout{background-position:0 100%}.nav-back{background-position:100% 100%}
-.v1-back-action{display:none}
+.v1-back-action{display:inline-flex}
 .v1-actions .v1-profile-action span{white-space:nowrap}
 .v1-actions .v1-logout-action span{white-space:nowrap}
 @media(max-width:1380px){.v1-actions{order:3;width:auto;justify-content:flex-end}}
 @media(max-width:760px){
   .v1-actions{display:flex;order:initial;width:auto}
   .v1-actions a,.v1-actions button{justify-content:center;min-width:0;padding:6px 8px}
-  .v1-back-action{display:inline-flex}
 }
