@@ -23,7 +23,7 @@
     grid-column: auto;
   }
 
-  .vehicle-request-form .vehicle-request-note {
+  .vehicle-request-form.admin-form-grid > label.vehicle-request-note {
     grid-column: 1 / -1;
   }
 
