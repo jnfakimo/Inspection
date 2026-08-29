@@ -296,3 +296,37 @@
 @media (max-width:800px){
   .mr-form-actions{justify-content:flex-end}
 }
+
+/* 會議系統手機版頁首：說明與「重新載入」同列，避免按鈕獨占一行留下過多空白。
+   僅套用會議預約／變更／提醒頁，其他使用 AdminHeader 的子系統維持共用版型。 */
+@media (max-width:760px){
+  .content.v1-content:has(.mr-page) .admin-page-actions,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions{
+    flex-direction:row;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:first-child,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:first-child{
+    min-width:0;
+    flex:1 1 auto;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:first-child p,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:first-child p{
+    margin:0;
+    line-height:1.45;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:last-child,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:last-child{
+    width:auto;
+    flex:0 0 auto;
+    justify-content:flex-end;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:last-child button,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:last-child button{
+    min-height:36px;
+    padding:7px 10px;
+    white-space:nowrap;
+  }
+}
