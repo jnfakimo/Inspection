@@ -595,7 +595,7 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
     </table></div>
 
     {editing && <AdminModal title={editing.vehicle_id ? '編輯車輛' : '新增車輛'} onClose={() => setEditing(null)}>
-      <div className="admin-form-grid">
+      <div className="admin-form-grid vehicle-master-edit-form">
         <label>車號（必填）<input value={String(editing.plate_no || '')} onChange={e => setEditing({ ...editing, plate_no: e.target.value })} /></label>
         <label>車名<input value={String(editing.vehicle_name || '')} onChange={e => setEditing({ ...editing, vehicle_name: e.target.value })} placeholder="例：公務 7 人座" /></label>
         <label>廠牌<input value={String(editing.brand || '')} onChange={e => setEditing({ ...editing, brand: e.target.value })} /></label>

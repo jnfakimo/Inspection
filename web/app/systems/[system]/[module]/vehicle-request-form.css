@@ -33,3 +33,35 @@
     min-height: 72px;
   }
 }
+
+/* 公務車主檔編輯彈窗：手機版依欄位群組排成三列；桌機維持共用表單網格。 */
+@media (max-width: 800px) {
+  .admin-form-grid.vehicle-master-edit-form {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px 8px;
+  }
+
+  .admin-form-grid.vehicle-master-edit-form > label {
+    min-width: 0;
+  }
+
+  .admin-form-grid.vehicle-master-edit-form > label:nth-child(-n + 4) {
+    grid-column: span 3;
+  }
+
+  .admin-form-grid.vehicle-master-edit-form > label:nth-child(n + 5):nth-child(-n + 7) {
+    grid-column: span 2;
+  }
+
+  .admin-form-grid.vehicle-master-edit-form > label.wide {
+    grid-column: 1 / -1;
+  }
+
+  .admin-form-grid.vehicle-master-edit-form > label > input,
+  .admin-form-grid.vehicle-master-edit-form > label > select,
+  .admin-form-grid.vehicle-master-edit-form > label > textarea {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
