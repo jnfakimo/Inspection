@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
+import './vehicle-request-form.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
@@ -623,7 +624,7 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
 function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: Profile; onClose: () => void; onDone: (message: string) => void }) {
   const [form, setForm] = useState({
     trip_date: taipeiToday(), planned_departure_time: '09:00', planned_return_time: '12:00',
-    origin_location: '第一果菜市場', destination_location: '', trip_purpose: '',
+    origin_location: '', destination_location: '', trip_purpose: '',
     passenger_count: '1', applicant_phone: '', applicant_note: '',
   });
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
@@ -651,16 +652,16 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
   };
 
   return <AdminModal title="新增派車申請" onClose={onClose}>
-    <div className="admin-form-grid">
+    <div className="admin-form-grid vehicle-request-form">
       <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
       <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
       <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
-      <label>出發地<input value={form.origin_location} onChange={e => set('origin_location', e.target.value)} /></label>
-      <label>目的地（必填）<input value={form.destination_location} onChange={e => set('destination_location', e.target.value)} placeholder="例：第二果菜市場" /></label>
+      <label>出發地<select value={form.origin_location} onChange={e => set('origin_location', e.target.value)}><option value=""></option><option value="第二市場">第二市場</option><option value="市場處">市場處</option></select></label>
+      <label>目的地（必填）<select value={form.destination_location} onChange={e => set('destination_location', e.target.value)}><option value=""></option><option value="第一市場">第一市場</option><option value="市場處">市場處</option></select></label>
       <label>聯絡電話<input value={form.applicant_phone} onChange={e => set('applicant_phone', e.target.value)} placeholder="分機或手機" /></label>
-      <label className="wide">用途（必填）<input value={form.trip_purpose} onChange={e => set('trip_purpose', e.target.value)} placeholder="例：會勘" /></label>
-      <label className="wide">備註<textarea rows={2} value={form.applicant_note} onChange={e => set('applicant_note', e.target.value)} /></label>
+      <label className="wide vehicle-request-purpose">用途（必填）<select value={form.trip_purpose} onChange={e => set('trip_purpose', e.target.value)}><option value=""></option><option value="會勘">會勘</option><option value="開會">開會</option><option value="考察">考察</option></select></label>
+      <label className="wide vehicle-request-note">備註<textarea rows={2} value={form.applicant_note} onChange={e => set('applicant_note', e.target.value)} /></label>
     </div>
     {message && <p className="inline-message danger">{message}</p>}
     <footer>
