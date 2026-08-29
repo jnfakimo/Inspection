@@ -625,8 +625,8 @@ export async function handleAdminApiRequest(req: Request) {
       let level = 1;
       if (parentId) {
         const { data: parent } = await admin.from('departments').select('level,parent_id,status').eq('dept_id', parentId).maybeSingle();
-        if (!parent || parent.status !== 'active' || Number(parent.level) !== 1 || parent.parent_id) return reply(req, { ok: false, message: '上層部門必須是啟用中的一級部門' }, 400);
-        if (deptId) { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId); if (count) return reply(req, { ok: false, message: '已有下層部門的一級部門不可再改為二級部門' }, 400); }
+        if (!parent || parent.status !== 'active' || Number(parent.level) !== 1 || parent.parent_id) return reply(req, { ok: false, message: '上層部門必須是啟用中的部／室' }, 400);
+        if (deptId) { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId); if (count) return reply(req, { ok: false, message: '已有課／組／隊的部／室不可再改為課／組／隊' }, 400); }
         level = 2;
       }
       const values: Record<string, unknown> = { parent_id: parentId, name, code, level, sort_order: sortOrder };
@@ -649,7 +649,7 @@ export async function handleAdminApiRequest(req: Request) {
       if (!deptId) return reply(req, { ok: false, message: '部門識別碼無效' }, 400);
       const { data: before } = await admin.from('departments').select('status').eq('dept_id', deptId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定部門' }, 404);
-      if (nextStatus === 'inactive') { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId).eq('status', 'active'); if (count) return reply(req, { ok: false, message: '請先停用所屬的二級部門，再停用此一級部門' }, 400); }
+      if (nextStatus === 'inactive') { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId).eq('status', 'active'); if (count) return reply(req, { ok: false, message: '請先停用所屬的課／組／隊，再停用此部／室' }, 400); }
       const { error } = await admin.from('departments').update({ status: nextStatus }).eq('dept_id', deptId);
       if (error) return reply(req, { ok: false, message: dbMessage(error, '部門狀態更新失敗') }, 400); await audit('departments', deptId, 'status_change', { before: before.status, after: nextStatus }); return reply(req, { ok: true });
     }

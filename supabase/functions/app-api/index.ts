@@ -764,10 +764,10 @@ export async function handleAppApiRequest(req: Request) {
       const responsibleDeptId = id(body.responsible_dept_id) || id(profile.dept_id);
       const responsibleUserId = id(body.responsible_user_id) || id(profile.user_id);
       const accessibleDepartments = departmentScope((await admin.from('departments').select('dept_id,parent_id').eq('status', 'active')).data || [], profile.dept_id);
-      if (!isAdmin && !accessibleDepartments.has(responsibleDeptId)) return reply(req, { ok: false, message: '只能選擇登入者第一階單位所屬的第二階單位' }, 403);
+      if (!isAdmin && !accessibleDepartments.has(responsibleDeptId)) return reply(req, { ok: false, message: '只能選擇登入者部／室所屬的課／組／隊' }, 403);
       const responsiblePerson = await admin.from('users').select('user_id,dept_id,status').eq('user_id', responsibleUserId).eq('status', 'active').maybeSingle();
       if (responsiblePerson.error) throw responsiblePerson.error;
-      if (!responsiblePerson.data || id(responsiblePerson.data.dept_id) !== responsibleDeptId) return reply(req, { ok: false, message: '承辦人員不屬於所選第二階單位' }, 400);
+      if (!responsiblePerson.data || id(responsiblePerson.data.dept_id) !== responsibleDeptId) return reply(req, { ok: false, message: '承辦人員不屬於所選課／組／隊' }, 400);
       const documentId = nextRequestRequestId();
       const dateKey = taipeiRocDateKey();
       let serialHint = 1;
@@ -855,7 +855,7 @@ export async function handleAppApiRequest(req: Request) {
         ? await admin.from('departments').select('dept_id,name,code,parent_id').eq('dept_id', targetUnitId).eq('status', 'active').is('parent_id', null).maybeSingle()
         : { data: null, error: null };
       if (unitResult.error) throw unitResult.error;
-      if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部室', 400);
+      if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部／室', 400);
       const unitName = text(unitResult.data?.name, 100);
       const unitCapability = officialDocumentUnitCapabilities(unitResult.data);
       const eventFields = (fromStatus: string | null, toStatus: string | null, stepId: string | null = currentStep ? String(currentStep.step_id) : null) => ({
@@ -868,7 +868,7 @@ export async function handleAppApiRequest(req: Request) {
 
       if (documentAction === 'send_co_sign') {
         if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出會辦', 403);
-        if (!targetUnitId) return fail('請選擇下一個會辦部室', 400);
+        if (!targetUnitId) return fail('請選擇下一個會辦部／室', 400);
         if (!unitCapability.canCoSign) return fail('董事長室、總經理室與副總經理室只能作為陳核單位；秘書室可會辦也可陳核', 400);
         if (!['draft', 'ready_for_next'].includes(String(document.status))) return fail('目前狀態不可送出會辦');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個流程節點尚未完成');
@@ -887,7 +887,7 @@ export async function handleAppApiRequest(req: Request) {
 
       if (documentAction === 'send_approval') {
         if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出陳核', 403);
-        if (!targetUnitId) return fail('請選擇陳核部室', 400);
+        if (!targetUnitId) return fail('請選擇陳核部／室', 400);
         if (!unitCapability.canApprove) return fail('陳核僅能送至董事長室、總經理室、副總經理室或秘書室', 400);
         // 條件是「沒有還沒完成的會辦」，不是「完全沒有節點」：退回補正後狀態回到 draft，
         // 但既有節點還留在時間軸上，用 steps.length === 0 會讓補正過的公文永遠送不出陳核
@@ -909,7 +909,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'receive') {
-        if (!currentStep || !inCurrentUnit) return fail('只有目前收文部室的人員可以收文', 403);
+        if (!currentStep || !inCurrentUnit) return fail('只有目前收文部／室的人員可以收文', 403);
         if (currentStep.status !== 'sent') return fail('這個流程節點已收文，請勿重複操作');
         const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
         if (!updatedStep) return fail('這筆公文已被其他人收文，請重新整理');
@@ -918,7 +918,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'co_sign_complete') {
-        if (!currentStep || currentStep.step_type !== 'co_sign' || !inCurrentUnit) return fail('只有目前會辦部室的人員可以完成會辦', 403);
+        if (!currentStep || currentStep.step_type !== 'co_sign' || !inCurrentUnit) return fail('只有目前會辦部／室的人員可以完成會辦', 403);
         if (currentStep.status !== 'received') return fail('完成會辦前請先收文');
         const updatedStep = await updateStep('received', { status: 'completed', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });
         if (!updatedStep) return fail('這個會辦節點已被完成，請重新整理');
@@ -930,7 +930,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'approval_receive') {
-        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部室的人員可以簽收', 403);
+        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部／室的人員可以簽收', 403);
         if (currentStep.status !== 'sent') return fail('這筆公文已簽收，請勿重複操作');
         const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
         if (!updatedStep) return fail('這筆公文已被其他人簽收，請重新整理');
@@ -939,7 +939,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'approve' || documentAction === 'return') {
-        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部室的人員可以核決', 403);
+        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部／室的人員可以核決', 403);
         if (currentStep.status !== 'received') return fail('核決前請先完成陳核簽收');
         const nextStatus = documentAction === 'approve' ? 'awaiting_originator' : 'returned';
         const updatedStep = await updateStep('received', { status: documentAction === 'approve' ? 'completed' : 'returned', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });

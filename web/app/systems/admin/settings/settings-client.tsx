@@ -570,11 +570,11 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       return;
     }
     if (parent?.parent_id) {
-      setNotice({ kind: 'error', text: '組織架構最多兩層，第二層部門不可再新增子部門。' });
+      setNotice({ kind: 'error', text: '組織架構最多兩層，課／組／隊不可再新增下層單位。' });
       return;
     }
     if (hasChildren && departmentEditor.parent_id) {
-      setNotice({ kind: 'error', text: '已有子部門的第一層部門不可改掛至其他部門。' });
+      setNotice({ kind: 'error', text: '已有課／組／隊的部／室不可改掛至其他部／室。' });
       return;
     }
     setBusy('department-save');
@@ -583,7 +583,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       departmentEditor.dept_id &&
       departments.some(item => item.parent_id === departmentEditor.dept_id && item.status === 'active')
     ) {
-      setNotice({ kind: 'error', text: '此部門仍有啟用中的子部門，請先停用子部門。' });
+      setNotice({ kind: 'error', text: '此部／室仍有啟用中的課／組／隊，請先停用課／組／隊。' });
       return;
     }
     try {
@@ -614,7 +614,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       nextStatus === 'inactive' &&
       departments.some(item => item.parent_id === department.dept_id && item.status === 'active')
     ) {
-      setNotice({ kind: 'error', text: '此部門仍有啟用中的子部門，請先停用子部門。' });
+      setNotice({ kind: 'error', text: '此部／室仍有啟用中的課／組／隊，請先停用課／組／隊。' });
       return;
     }
     if (!window.confirm(`確定${nextStatus === 'inactive' ? '停用' : '啟用'}「${department.name}」？`)) {
@@ -653,7 +653,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       <div className={styles.rowActions}>
         {!child && department.status === 'active' ? (
           <button type="button" onClick={() => openDepartmentEditor(undefined, department.dept_id)}>
-            新增子部門
+            新增課／組／隊
           </button>
         ) : null}
         <button type="button" onClick={() => openDepartmentEditor(department)}>編輯</button>
@@ -717,12 +717,12 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       <div className={styles.panelHeading}>
         <div>
           <h3>組織架構</h3>
-          <p>採兩層式樹狀管理；歷史資料使用軟停用，不刪除部門。</p>
+          <p>採部／室與課／組／隊兩層式樹狀管理；歷史資料使用軟停用，不刪除部門。</p>
         </div>
         <div className={styles.headingActions}>
           <span className={styles.codeBadge}>SYS-02</span>
           <button className={styles.primaryButton} type="button" onClick={() => openDepartmentEditor()}>
-            ＋ 新增第一層部門
+            ＋ 新增部／室
           </button>
         </div>
       </div>
@@ -734,7 +734,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
               .filter(item => item.parent_id === root.dept_id)
               .map(child => departmentRow(child, true))}
           </div>
-        )) : <div className={styles.emptyState}>目前沒有部門資料，請先新增第一層部門。</div>}
+        )) : <div className={styles.emptyState}>目前沒有部門資料，請先新增部／室。</div>}
         {orphanDepartments.length ? (
           <div className={styles.orphanGroup}>
             <strong>找不到上層部門的資料</strong>
@@ -1097,7 +1097,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
                   value={departmentEditor.parent_id}
                   onChange={event => setDepartmentEditor(current => current ? ({ ...current, parent_id: event.target.value }) : null)}
                 >
-                  <option value="">第一層部門</option>
+                  <option value="">部／室</option>
                   {roots
                     .filter(root => (
                       root.dept_id !== departmentEditor.dept_id &&

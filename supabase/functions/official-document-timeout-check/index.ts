@@ -84,7 +84,7 @@ Deno.serve(async req => {
         if (supervisors.has(role) && user.dept_id && scope.has(String(user.dept_id))) recipients.add(String(user.user_id));
       });
       const title = step.step_type === 'approval' ? '公文陳核逾期未核決' : '公文逾期未收文';
-      const bodyText = `${text(document.document_no, 100)}｜${text(document.subject, 300)}｜目前部室：${text(step.unit_name, 100)}｜應於 ${dueAt.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false })} 前處理`;
+      const bodyText = `${text(document.document_no, 100)}｜${text(document.subject, 300)}｜目前部／室：${text(step.unit_name, 100)}｜應於 ${dueAt.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false })} 前處理`;
       let recorded = 0;
       for (const recipientId of recipients) {
         const existing = await db.from('official_document_notifications').select('notification_id').eq('document_id', document.document_id).eq('step_id', step.step_id).eq('recipient_id', recipientId).eq('notification_type', 'overdue').maybeSingle();
