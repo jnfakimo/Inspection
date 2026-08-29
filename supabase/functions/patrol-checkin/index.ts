@@ -89,10 +89,6 @@ Deno.serve(async (req) => {
     if (sessionAge === null || sessionAge < -60 || sessionAge > 2 * 60 * 60) {
       return reply(req, { ok: false, code: "patrol_session_expired", message: "巡檢登入已超過兩小時，請重新登入後再簽到" }, 401);
     }
-    if (claims.aal !== "aal2") {
-      return reply(req, { ok: false, code: "mfa_required", message: "請先完成巡檢安全驗證後再簽到" }, 401);
-    }
-
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

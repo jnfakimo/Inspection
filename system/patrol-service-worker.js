@@ -1,6 +1,6 @@
 const CACHE='patrol-checkin-v11-password-session';
 const SHELL=[
-  './patrolcheckin.html','./patrolcheckin-app.js?v=20260829-nfc-session2','./theme.js?v=20260825-floor1',
+  './patrolcheckin.html','./patrolcheckin-app.js?v=20260829-nfc-session3','./theme.js?v=20260825-floor1',
   './light-mode-fix.css','./mobile-unified.css?v=20260717-1','./supabase-config.js?v=20260814-patrol-session1',
   './vendor/supabase-js-2.min.js'
 ];
