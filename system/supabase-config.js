@@ -13,16 +13,12 @@ window.SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 // 全站（V1/V2 共用）密碼政策。這只是前端提示；真正檢查由 app-api/admin-api
 // 的受信任後端再次執行，避免繞過畫面直接呼叫 Auth API。
 window.PasswordPolicy = window.PasswordPolicy || {
-  minLength: 12,
-  maxLength: 200,
-  requiredCharacterClasses: 3,
+  minLength: 8,
+  maxLength: 8,
   message: function (password) {
     password = String(password || '');
-    if (password.length < this.minLength) return '密碼至少需要 ' + this.minLength + ' 個字元';
-    if (password.length > this.maxLength) return '密碼不可超過 ' + this.maxLength + ' 個字元';
-    if (/\s/.test(password)) return '密碼不可包含空白字元';
-    var classes = [/[a-z]/.test(password), /[A-Z]/.test(password), /\d/.test(password), /[^A-Za-z0-9]/.test(password)].filter(Boolean).length;
-    return classes < this.requiredCharacterClasses ? '密碼需包含大寫、小寫、數字、特殊字元中的至少 3 類' : '';
+    if (password.length !== this.minLength) return '密碼必須是 ' + this.minLength + ' 位數字';
+    return /^\d{8}$/.test(password) ? '' : '密碼只能包含數字';
   }
 };
 

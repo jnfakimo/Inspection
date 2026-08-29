@@ -542,7 +542,7 @@
     document.head.appendChild(style);
     var modal=document.createElement('div');
     modal.id='sharedChangePwModal';
-    modal.innerHTML='<div class="spw-box"><h3>更改密碼</h3><label>新密碼（至少 12 個字元，需含至少 3 類字元）</label><input type="password" id="spwNew" minlength="12" maxlength="200" autocomplete="new-password" placeholder="至少 12 個字元"><label>確認新密碼</label><input type="password" id="spwNew2" minlength="12" maxlength="200" autocomplete="new-password" placeholder="再輸入一次"><div class="spw-msg" id="spwMsg"></div><div class="spw-actions"><button type="button" id="spwCancel">取消</button><button type="button" class="spw-primary" id="spwSubmit">確認更改</button></div></div>';
+    modal.innerHTML='<div class="spw-box"><h3>更改密碼</h3><label>新密碼（8 位數字）</label><input type="password" id="spwNew" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" autocomplete="new-password" placeholder="8 位數字"><label>確認新密碼</label><input type="password" id="spwNew2" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" autocomplete="new-password" placeholder="再輸入一次"><div class="spw-msg" id="spwMsg"></div><div class="spw-actions"><button type="button" id="spwCancel">取消</button><button type="button" class="spw-primary" id="spwSubmit">確認更改</button></div></div>';
     document.body.appendChild(modal);
     modal.addEventListener('click',function(e){ if(e.target===modal)closeChangePwModal(); });
     document.getElementById('spwCancel').addEventListener('click',closeChangePwModal);

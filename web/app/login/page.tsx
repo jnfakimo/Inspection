@@ -25,7 +25,7 @@ function friendlyError(raw: unknown, fallback: string) {
   if (/invalid.*email|email.*invalid/i.test(text)) return '電子郵件格式不正確';
   if (/user not found|no user/i.test(text)) return '查無此電子郵件對應的帳號';
   if (/expired|invalid.*token|session/i.test(text)) return '重設連結已失效，請重新申請';
-  if (/password.*(short|least|weak)/i.test(text)) return `密碼強度不足，請至少 ${PASSWORD_POLICY.minLength} 個字元並符合複雜度要求`;
+  if (/password.*(short|least|weak)/i.test(text)) return `密碼格式不符，請輸入 ${PASSWORD_POLICY.minLength} 位數字`;
   return text || fallback;
 }
 
@@ -151,9 +151,9 @@ export default function LoginPage() {
   if (view === 'reset') return <main className="v1-login-page">
     <div className="login-card v1-login-card">
       {brand}
-      <p className="v1-login-hint">設定新密碼（至少 {PASSWORD_POLICY.minLength} 個字元，需含至少 3 類字元）</p>
-      <label>新密碼<input type="password" value={password} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} autoComplete="new-password" onChange={e => setPassword(e.target.value)} placeholder="••••••••••••" /></label>
-      <label>再次輸入新密碼<input type="password" value={password2} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••••••" /></label>
+      <p className="v1-login-hint">設定新密碼（{PASSWORD_POLICY.minLength} 位數字）</p>
+      <label>新密碼<input type="password" value={password} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" autoComplete="new-password" onChange={e => setPassword(e.target.value)} placeholder="••••••••" /></label>
+      <label>再次輸入新密碼<input type="password" value={password2} minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" autoComplete="new-password" onChange={e => setPassword2(e.target.value)} placeholder="••••••••" /></label>
       {message && <p className="form-error">{message}</p>}
       {notice && <p className="inline-message">{notice}</p>}
       <button className="primary-btn" disabled={busy || !resetReady} onClick={() => void saveNewPassword()}>{busy ? '儲存中…' : resetReady ? '設定新密碼' : '驗證連結中…'}</button>

@@ -233,14 +233,14 @@ input:focus{border-color:#6366f1}
   <div class="card" style="max-width:380px">
     <div class="logo" style="font-size:1.8rem;margin-bottom:12px">🔑</div>
     <h1 style="font-size:1.2rem;margin-bottom:6px">設定新密碼</h1>
-    <div class="subtitle" style="margin-bottom:24px">請輸入您的新密碼（至少 12 個字元，需含至少 3 類字元）</div>
+    <div class="subtitle" style="margin-bottom:24px">請輸入您的新密碼（8 位數字）</div>
     <div class="field">
       <label for="resetPw">新密碼</label>
-      <input id="resetPw" type="password" minlength="12" maxlength="200" placeholder="••••••••••••" autocomplete="new-password">
+      <input id="resetPw" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="••••••••" autocomplete="new-password">
     </div>
     <div class="field">
       <label for="resetPw2">確認新密碼</label>
-      <input id="resetPw2" type="password" minlength="12" maxlength="200" placeholder="••••••••••••" autocomplete="new-password">
+      <input id="resetPw2" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="••••••••" autocomplete="new-password">
     </div>
     <button type="button" class="btn" id="resetSaveBtn">設定新密碼</button>
     <div class="err" id="resetErr"></div>

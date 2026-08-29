@@ -812,7 +812,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
           <div class="field field-name"><label>姓名</label><input id="u-name" type="text" placeholder="請輸入姓名" autocomplete="name"></div>
           <div class="field field-username"><label>登入帳號（英數字／底線）</label><input id="u-username" type="text" placeholder="例：tcfm_admin" autocomplete="off"></div>
           <div class="field field-email"><label>電子郵件（密碼找回用）</label><input id="u-email" type="email" placeholder="user@example.com" autocomplete="email"></div>
-          <div class="field field-pass"><label>初始密碼（至少 12 個字元，需含至少 3 類字元）</label><input id="u-pass" type="password" minlength="12" maxlength="200" placeholder="請輸入初始密碼" autocomplete="new-password"></div>
+          <div class="field field-pass"><label>初始密碼（8 位數字）</label><input id="u-pass" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="請輸入 8 位數字" autocomplete="new-password"></div>
           <div class="field field-phone"><label>聯絡電話</label><input id="u-phone" type="tel" placeholder="市話或手機號碼" autocomplete="tel"></div>
           <div class="field field-dept-l1"><label>第一層部門</label><select id="u-dept-l1" onchange="onAdminDeptL1Change()"><option value="">-- 選擇第一層 --</option></select></div>
           <div class="field field-dept-l2"><label>第二層部門（課）</label><select id="u-dept-l2" disabled><option value="">-- 無下級單位 --</option></select></div>
@@ -1525,8 +1525,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
             <p style="font-size:.75rem;color:var(--text-dim);margin-bottom:10px">若不需要變更密碼，請保持空白。填寫密碼則儲存時同步重設。</p>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div class="field">
-                <label>新密碼（至少 12 個字元，需含至少 3 類字元）</label>
-                <input id="edit-u-newpw" type="password" minlength="12" maxlength="200" placeholder="不變更請留空" autocomplete="new-password">
+                <label>新密碼（8 位數字）</label>
+                <input id="edit-u-newpw" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="不變更請留空" autocomplete="new-password">
               </div>
               <div class="field">
                 <label>確認新密碼</label>
@@ -1552,8 +1552,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
     <p id="resetPwTarget" style="font-size:.85rem;color:var(--text-dim);margin-bottom:16px"></p>
     <div class="form-grid">
       <div class="field" style="grid-column:1/-1">
-        <label>新密碼（至少 12 個字元，需含至少 3 類字元）</label>
-        <input id="reset-new-pw" type="password" minlength="12" maxlength="200" placeholder="輸入新密碼" autocomplete="new-password">
+        <label>新密碼（8 位數字）</label>
+        <input id="reset-new-pw" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="輸入 8 位數字" autocomplete="new-password">
       </div>
       <div class="field" style="grid-column:1/-1">
         <label>確認新密碼</label>
@@ -1620,8 +1620,8 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
   <div class="modal">
     <div class="modal-title"><span class="ic ic-inspection"></span> 更改密碼</div>
     <div class="form-grid">
-      <div class="field"><label>新密碼（至少 12 個字元，需含至少 3 類字元）</label><input id="new-pw" type="password" minlength="12" maxlength="200" placeholder="至少 12 個字元" autocomplete="new-password"></div>
-      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" minlength="12" maxlength="200" placeholder="再輸入一次" autocomplete="new-password"></div>
+      <div class="field"><label>新密碼（8 位數字）</label><input id="new-pw" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="8 位數字" autocomplete="new-password"></div>
+      <div class="field"><label>確認新密碼</label><input id="new-pw2" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="再輸入一次"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-sm" style="background:rgba(12,40,64,0.6);color:var(--text-dim);border:1px solid var(--border)" onclick="closeModal('changePwModal')">取消</button>
@@ -2532,7 +2532,7 @@ async function exportUsersXlsx() {
 // 統一標準：下載匯入範本（XLSX）
 async function downloadImportTemplate() {
   const head = ['姓名','帳號','Email','密碼','電話','角色','直屬主管帳號'];
-  const sample = ['王小明','tcfm_wang','wang@example.com','Password123!','0912345678','系統管理員','—'];
+  const sample = ['王小明','tcfm_wang','wang@example.com','12345678','0912345678','系統管理員','—'];
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('帳號匯入範本');
   ws.addRow(head); ws.addRow(sample);
@@ -2540,18 +2540,7 @@ async function downloadImportTemplate() {
 }
 
 function genTempPassword() {
-  // Math.random() 不是密碼學安全的亂數：V8 用的 xorshift128+ 可由少量輸出還原內部狀態，
-  // 批次匯入時前幾組臨時密碼足以推算後續每一組。改用 crypto.getRandomValues。
-  // 字集去掉 I/O/0/1，避免列印給同仁時誤認。長度取 32（2 的冪）不是湊巧：這樣才能用位元
-  // 遮罩取低 5 位，每個字元機率完全均等。改用 % 取模也算得出同樣結果，但那要靠 256 整除
-  // 32 才沒有偏差，意圖藏在算式裡，靜態分析一律當成有偏差的取樣。
-  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const mask = charset.length - 1;
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  let body = '';
-  for (const b of bytes) body += charset[b & mask];
-  // 'Tc!' 前綴讓密碼固定含大寫、小寫、符號三類，不必仰賴隨機結果去湊 PasswordPolicy。
-  return 'Tc!' + body;
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), b => String(b % 10)).join('');
 }
 
 function isRegisteredAuthUser(authData, authError) {
