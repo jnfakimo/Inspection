@@ -89,6 +89,9 @@ Deno.serve(async (req) => {
     if (sessionAge === null || sessionAge < -60 || sessionAge > 2 * 60 * 60) {
       return reply(req, { ok: false, code: "patrol_session_expired", message: "巡檢登入已超過兩小時，請重新登入後再簽到" }, 401);
     }
+    if (claims.aal !== "aal2") {
+      return reply(req, { ok: false, code: "mfa_required", message: "請先完成巡檢安全驗證後再簽到" }, 401);
+    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -128,8 +131,9 @@ Deno.serve(async (req) => {
     const targetType = cleanText(body.target_type, 20);
     const targetId = String(body.target_id || "");
     const requestedCheckinId = String(body.checkin_id || "");
+    const checkinSource = body.checkin_source === "nfc" ? "nfc" : "qr";
     if (!(["marker", "space"] as string[]).includes(targetType) || !isUuid(targetId)) {
-      return reply(req, { ok: false, code: "invalid_target", message: "巡檢 QR Code 資料格式不正確" }, 400);
+      return reply(req, { ok: false, code: "invalid_target", message: "巡檢掃描碼資料格式不正確" }, 400);
     }
     const checkinId = isUuid(requestedCheckinId) ? requestedCheckinId : crypto.randomUUID();
 
@@ -181,7 +185,7 @@ Deno.serve(async (req) => {
       verification_method: "password_session",
       source_ip: clientIp(req),
       user_agent: cleanText(req.headers.get("user-agent"), 1000) || null,
-      checkin_source: "qr"
+      checkin_source: checkinSource
     };
     const { data: inserted, error: insertError } = await admin.from("checkin_logs").insert(event).select("*").single();
     if (insertError) {

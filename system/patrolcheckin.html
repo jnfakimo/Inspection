@@ -24,6 +24,6 @@ if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then
 if('caches' in window){caches.keys().then(keys=>keys.filter(k=>/^patrol-checkin-/i.test(k)).forEach(k=>caches.delete(k))).catch(()=>{});}
 if(window.PatrolOffline?.sync){void window.PatrolOffline.sync();}
 </script>
-<script src="patrolcheckin-app.js?v=20260814-password-session1"></script>
+<script src="patrolcheckin-app.js?v=20260829-nfc-session2"></script>
 </body>
 </html>
