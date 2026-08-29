@@ -295,13 +295,6 @@ const officialDocumentUnitCapabilities = (unit: { name?: unknown; code?: unknown
   const canApprove = OFFICIAL_APPROVAL_UNIT_CODES.has(code) || OFFICIAL_APPROVAL_UNIT_NAMES.has(name);
   return { canApprove, canCoSign: !canApprove || isSecretary };
 };
-const officialDocumentManager = (actor: OfficialDocumentActor, sysadmin: boolean) => {
-  if (sysadmin || OFFICIAL_MANAGER_ROLES.has(String(actor.role || ''))) return true;
-  const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
-  return permissions.official_document_manager === true
-    || String(permissions.official_document_manager || '').toLowerCase() === 'true'
-    || permissions['officialdocs.manage'] === true;
-};
 const officialDocumentPeopleViewer = (actor: OfficialDocumentActor, sysadmin: boolean) => {
   if (sysadmin || OFFICIAL_PEOPLE_VIEWER_ROLES.has(String(actor.role || ''))) return true;
   const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
@@ -733,11 +726,18 @@ export async function handleAppApiRequest(req: Request) {
           currentDocumentStep && profile.dept_id
           && routingScope(currentDocumentStep.unit_id).has(String(profile.dept_id)),
         );
+        const originatorUnitForActor = Boolean(
+          row.status === 'awaiting_originator' && profile.dept_id && row.originator_dept_id
+          && id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id)
+          && id(departmentPaths.rootForId(profile.dept_id)?.dept_id)
+          && id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id)
+            === id(departmentPaths.rootForId(profile.dept_id)?.dept_id),
+        );
         const inUnitScope = peopleViewer && (isAdmin || actorScope.has(String(row.originator_dept_id || ''))
           || documentSteps.some(step => actorScope.has(String(step.unit_id || ''))));
         const ownDocument = String(row.originator_id || '') === String(profile.user_id);
         const textMatch = !lookup || [row.document_no, row.subject, row.barcode_value].some(value => String(value || '').toLocaleLowerCase().includes(lookup));
-        return textMatch && (isAdmin || incomingForActor || inUnitScope || ownDocument);
+        return textMatch && (isAdmin || incomingForActor || originatorUnitForActor || inUnitScope || ownDocument);
       });
       const visiblePeople = isAdmin
         ? allPeople
@@ -751,10 +751,13 @@ export async function handleAppApiRequest(req: Request) {
           originator_name: names.get(String(row.originator_id)) || '',
           originator_department: departmentPaths.pathForId(row.originator_dept_id) || null,
           originator_root_department: text(departmentPaths.rootForId(row.originator_dept_id)?.name, 100) || null,
+          originator_root_department_id: id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id) || null,
           steps: stepsByDocument.get(id(row.document_id)) || [],
           events: eventsByDocument.get(id(row.document_id)) || [],
         })),
-        departments: allDepartments.filter(row => isAdmin || actorScope.has(id(row.dept_id))),
+        // 路由下拉選單只需要第一階部／室；名稱可供所有 SYS-09 使用者選擇，
+        // 第二階單位仍只回傳目前帳號所屬範圍，避免人員資料跨單位曝光。
+        departments: allDepartments.filter(row => isAdmin || !id(row.parent_id) || actorScope.has(id(row.dept_id))),
         scope_root_departments: visibleRootDepartments,
         current_root_department: currentRootDepartment ? {
           dept_id: id(currentRootDepartment.dept_id),
@@ -775,8 +778,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'official_document_create') {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
-      const createActor = { ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> };
-      if (!officialDocumentManager(createActor, isSysadmin)) return reply(req, { ok: false, message: '只有公文管理人員可以建立公文' }, 403);
+      const createActor = { ...profile, role: roleId } as OfficialDocumentActor;
       const subject = text(body.subject, 300);
       if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
       const rawDocumentNo = String(body.document_no ?? '').trim();
@@ -852,15 +854,34 @@ export async function handleAppApiRequest(req: Request) {
       const currentStep = steps.find(step => String(step.step_id) === String(document.current_step_id)) || null;
       const role = roleId;
       const actor = { ...profile, role } as OfficialDocumentActor;
-      const manager = officialDocumentManager({ ...actor, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> }, isSysadmin);
       const departmentsForScope = await admin.from('departments').select('dept_id,parent_id').eq('status', 'active').limit(1000);
       if (departmentsForScope.error) throw departmentsForScope.error;
       const departmentRows = (departmentsForScope.data || []) as Array<Record<string, unknown>>;
-      const actorScope = departmentScope(departmentRows, profile.dept_id);
-      const documentInActorScope = isAdmin || actorScope.has(String(document.originator_dept_id || ''))
-        || steps.some(step => actorScope.has(String(step.unit_id || '')));
-      const managerCanOperate = manager && documentInActorScope;
+      const rootDepartmentId = (deptId: unknown) => {
+        let current = id(deptId);
+        const seen = new Set<string>();
+        while (current && !seen.has(current)) {
+          seen.add(current);
+          const row = departmentRows.find(item => id(item.dept_id) === current);
+          const parent = id(row?.parent_id);
+          if (!parent) return current;
+          current = parent;
+        }
+        return id(deptId);
+      };
+      const sameUnit = (unitId: unknown, memberId: unknown) => departmentContains(departmentRows, unitId, memberId)
+        || departmentContains(departmentRows, memberId, unitId);
+      const sameRootUnit = (unitId: unknown, memberId: unknown) => {
+        const left = rootDepartmentId(unitId);
+        const right = rootDepartmentId(memberId);
+        return Boolean(left && right && left === right);
+      };
+      // 流程所屬部／室及其子單位的人員都能接續已完成的節點；跨單位仍由這道檢查擋下。
+      const documentInActorScope = isAdmin || sameRootUnit(document.originator_dept_id, profile.dept_id)
+        || steps.some(step => sameUnit(step.unit_id, profile.dept_id));
+      const canOperateDocument = documentInActorScope;
       const inCurrentUnit = Boolean(currentStep && departmentContains(departmentRows, currentStep.unit_id, profile.dept_id));
+      const inOriginatorUnit = sameRootUnit(document.originator_dept_id, profile.dept_id);
       const isOriginator = String(document.originator_id) === String(profile.user_id);
       const fail = (message: string, status = 409) => reply(req, { ok: false, message }, status);
       const updateDocument = async (fromStatus: string | string[], patch: Record<string, unknown>) => {
@@ -897,9 +918,8 @@ export async function handleAppApiRequest(req: Request) {
         if (result.error) throw result.error;
         return (result.data || []) as Array<Record<string, unknown>>;
       };
-
       if (documentAction === 'send_co_sign') {
-        if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出會辦', 403);
+        if (!canOperateDocument) return fail('只有公文所屬部／室人員可以送出會辦', 403);
         if (!targetUnitId) return fail('請選擇下一個會辦部／室', 400);
         if (!unitCapability.canCoSign) return fail('董事長室、總經理室與副總經理室只能作為陳核單位；秘書室可會辦也可陳核', 400);
         if (!['draft', 'ready_for_next'].includes(String(document.status))) return fail('目前狀態不可送出會辦');
@@ -918,7 +938,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'send_approval') {
-        if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出陳核', 403);
+        if (!canOperateDocument) return fail('只有公文所屬部／室人員可以送出陳核', 403);
         if (!targetUnitId) return fail('請選擇陳核部／室', 400);
         if (!unitCapability.canApprove) return fail('陳核僅能送至董事長室、總經理室、副總經理室或秘書室', 400);
         // 條件是「沒有還沒完成的會辦」，不是「完全沒有節點」：退回補正後狀態回到 draft，
@@ -943,14 +963,31 @@ export async function handleAppApiRequest(req: Request) {
       if (documentAction === 'receive') {
         if (!currentStep || !inCurrentUnit) return fail('只有目前收文部／室的人員可以收文', 403);
         if (currentStep.status !== 'sent') return fail('這個流程節點已收文，請勿重複操作');
-        const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
+        const receivedAt = new Date().toISOString();
+        const autoComplete = currentStep.step_type === 'co_sign';
+        const updatedStep = await updateStep('sent', autoComplete
+          ? { status: 'completed', received_by: profile.user_id, received_at: receivedAt, completed_by: profile.user_id, completed_at: receivedAt }
+          : { status: 'received', received_by: profile.user_id, received_at: receivedAt });
         if (!updatedStep) return fail('這筆公文已被其他人收文，請重新整理');
+        if (autoComplete) {
+          const nextStatus = 'ready_for_next';
+          const updated = await updateDocument('awaiting_co_sign', { status: nextStatus, current_step_id: currentStep.step_id });
+          if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
+          const receiveEvent = await officialDocumentEvent(admin, actor, documentId, 'receive', idempotencyKey, eventFields('awaiting_co_sign', 'awaiting_co_sign'));
+          const completeEvent = await officialDocumentEvent(admin, actor, documentId, 'co_sign_complete', `${idempotencyKey}:complete`, eventFields('awaiting_co_sign', nextStatus));
+          return reply(req, { ok: true, data: { status: nextStatus, event_id: completeEvent.data?.event_id || receiveEvent.data?.event_id, auto_completed: true } });
+        }
         const event = await officialDocumentEvent(admin, actor, documentId, 'receive', idempotencyKey, eventFields(String(document.status), String(document.status)));
         return reply(req, { ok: true, data: { status: document.status, event_id: event.data?.event_id } });
       }
 
       if (documentAction === 'co_sign_complete') {
         if (!currentStep || currentStep.step_type !== 'co_sign' || !inCurrentUnit) return fail('只有目前會辦部／室的人員可以完成會辦', 403);
+        // 舊版畫面仍可能送出第二個完成動作；收文已自動完成時安全回傳目前狀態，
+        // 不再要求使用者再按一次按鈕，也不新增重複事件。
+        if (currentStep.status === 'completed' && String(document.status) === 'ready_for_next') {
+          return reply(req, { ok: true, data: { status: 'ready_for_next', already_completed: true } });
+        }
         if (currentStep.status !== 'received') return fail('完成會辦前請先收文');
         const updatedStep = await updateStep('received', { status: 'completed', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });
         if (!updatedStep) return fail('這個會辦節點已被完成，請重新整理');
@@ -979,8 +1016,13 @@ export async function handleAppApiRequest(req: Request) {
         const updated = await updateDocument('awaiting_approval', { status: nextStatus, current_step_id: currentStep.step_id });
         if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
         const event = await officialDocumentEvent(admin, actor, documentId, documentAction, idempotencyKey, eventFields('awaiting_approval', nextStatus));
-        const title = documentAction === 'approve' ? '公文已核決，請原申請人收訖' : '公文退回，請原申請人補正重送';
-        await officialDocumentNotification(admin, documentId, String(currentStep.step_id), String(document.originator_id), documentAction === 'approve' ? 'approved' : 'returned', title, `${document.document_no}｜${document.subject}${note ? `｜${note}` : ''}`);
+        const title = documentAction === 'approve' ? '公文已核決，請創文單位簽收' : '公文退回，請原申請人補正重送';
+        const recipients = documentAction === 'approve' && document.originator_dept_id
+          ? await activeUsersInUnit(rootDepartmentId(document.originator_dept_id))
+          : [{ user_id: document.originator_id }];
+        for (const recipient of recipients) {
+          await officialDocumentNotification(admin, documentId, String(currentStep.step_id), String(recipient.user_id), documentAction === 'approve' ? 'approved' : 'returned', title, `${document.document_no}｜${document.subject}${note ? `｜${note}` : ''}`);
+        }
         return reply(req, { ok: true, data: { status: nextStatus, event_id: event.data?.event_id } });
       }
 
@@ -994,7 +1036,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'originator_receive') {
-        if (!isOriginator) return fail('只有原申請人可以收訖公文', 403);
+        if (!isOriginator && !inOriginatorUnit) return fail('只有創文部／室人員可以簽收公文', 403);
         if (String(document.status) !== 'awaiting_originator') return fail('目前沒有待收訖的核決公文');
         const updated = await updateDocument('awaiting_originator', { status: 'closed', closed_at: new Date().toISOString() });
         if (!updated) return fail('這筆公文已完成收訖，請勿重複操作');
@@ -1003,7 +1045,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'barcode_generate') {
-        if (!managerCanOperate && !isOriginator) return fail('只有原申請人或本單位公文管理人員可以產生文號', 403);
+        if (!canOperateDocument && !isOriginator) return fail('只有公文所屬部／室人員可以產生文號', 403);
         const currentBarcode = text(document.barcode_value, 200);
         if (currentBarcode) return reply(req, { ok: true, data: { status: document.status, barcode_value: currentBarcode, duplicate: true } });
         const barcode = text(document.document_no, 100);
