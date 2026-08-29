@@ -252,6 +252,10 @@ img, canvas, video, svg { max-width: 100%; }
 }
 
 @media (max-width: 420px) {
+  /* theme.js adds a fixed two-row account bar to the standalone check-in page.
+     Reserve its height so the success icon and heading remain fully visible. */
+  body > #card.card { margin-top: 106px !important; }
+
   .navbar > a { flex-basis: 100% !important; }
   .navbar .nav-back { font-size: .78rem !important; }
   .content, .main, .main-content { padding-left: 10px !important; padding-right: 10px !important; }
