@@ -595,7 +595,7 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
     </table></div>
 
     {editing && <AdminModal title={editing.vehicle_id ? '編輯車輛' : '新增車輛'} onClose={() => setEditing(null)}>
-      <div className="admin-form-grid vehicle-master-edit-form">
+      <div className="admin-form-grid">
         <label>車號（必填）<input value={String(editing.plate_no || '')} onChange={e => setEditing({ ...editing, plate_no: e.target.value })} /></label>
         <label>車名<input value={String(editing.vehicle_name || '')} onChange={e => setEditing({ ...editing, vehicle_name: e.target.value })} placeholder="例：公務 7 人座" /></label>
         <label>廠牌<input value={String(editing.brand || '')} onChange={e => setEditing({ ...editing, brand: e.target.value })} /></label>
@@ -906,7 +906,7 @@ function VehiclesModule({ module, profile }: Props) {
     </div>
 
     {editor && <AdminModal title={editor.vehicle_id ? `編輯車輛｜${fmt(editor.plate_no)}` : '新增車輛'} onClose={() => setEditor(null)}>
-      <div className="admin-form-grid">
+      <div className="admin-form-grid vehicle-master-edit-form">
         <label>車號（必填）<input value={String(editor.plate_no || '')} onChange={e => setEditor({ ...editor, plate_no: e.target.value })} /></label>
         <label>車名<input value={String(editor.vehicle_name || '')} onChange={e => setEditor({ ...editor, vehicle_name: e.target.value })} placeholder="例：7人座車" /></label>
         <label>廠牌<input value={String(editor.brand || '')} onChange={e => setEditor({ ...editor, brand: e.target.value })} /></label>
