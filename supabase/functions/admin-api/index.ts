@@ -162,13 +162,26 @@ export async function handleAdminApiRequest(req: Request) {
       const { data } = await admin.from('departments').select('name').eq('dept_id', deptId).maybeSingle();
       return data?.name || null;
     };
+    const supervisorWithinUnitHierarchy = async (memberDeptId: string | null, supervisorDeptId: string | null) => {
+      const supervisorId = id(supervisorDeptId);
+      let currentId = id(memberDeptId);
+      const seen = new Set<string>();
+      if (!supervisorId || !currentId) return true;
+      while (currentId && !seen.has(currentId)) {
+        if (currentId === supervisorId) return true;
+        seen.add(currentId);
+        const { data } = await admin.from('departments').select('parent_id').eq('dept_id', currentId).eq('status', 'active').maybeSingle();
+        currentId = id(data?.parent_id);
+      }
+      return false;
+    };
     const roleExists = async (rbacRole: string) => {
       const { data } = await admin.from('roles').select('role_id').eq('role_id', rbacRole).maybeSingle();
       return Boolean(data);
     };
     const validateSupervisor = async (supervisorId: string | null, deptId: string | null, rbacRole: string, targetUserId = '') => {
       if (['unit_supervisor', 'sysadmin'].includes(rbacRole)) return { supervisorId: null, message: '' };
-      if (!supervisorId) return { supervisorId: null, message: '一般人員必須指定直屬課室主管' };
+      if (!supervisorId) return { supervisorId: null, message: '一般人員必須指定直屬主管' };
       if (supervisorId === targetUserId) return { supervisorId: null, message: '直屬主管不可設定為本人' };
       const { data: supervisor } = await admin.from('users')
         .select('user_id,dept_id,role,rbac_role,status')
@@ -177,8 +190,9 @@ export async function handleAdminApiRequest(req: Request) {
       if (!supervisor || !['unit_supervisor', 'sysadmin'].includes(String(supervisorRole || ''))) {
         return { supervisorId: null, message: '直屬主管必須是啟用中的單位主管或系統管理員' };
       }
-      if (supervisorRole !== 'sysadmin' && deptId && supervisor.dept_id !== deptId) {
-        return { supervisorId: null, message: '一般人員與直屬課室主管必須屬於同一單位' };
+      if (supervisorRole !== 'sysadmin' && deptId && supervisor.dept_id
+        && !(await supervisorWithinUnitHierarchy(deptId, supervisor.dept_id))) {
+        return { supervisorId: null, message: '直屬主管必須位於人員所屬單位或其上層部／室' };
       }
       return { supervisorId, message: '' };
     };
