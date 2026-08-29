@@ -37,7 +37,7 @@
     flex-wrap:wrap;
     align-items:flex-start;
     gap:10px;
-    margin-bottom:10px;
+    margin-bottom:8px;
   }
   .page-actions>div:first-child{
     min-width:0;
@@ -57,6 +57,7 @@
   .page-actions>.action-cluster{
     width:auto;
     justify-content:flex-end;
+    margin-left:auto;
   }
   .page-actions>div:last-child button,
   .page-actions>div:last-child a,

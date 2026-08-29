@@ -305,7 +305,7 @@
     flex-direction:row;
     align-items:flex-start;
     gap:10px;
-    margin-bottom:10px;
+    margin-bottom:8px;
   }
   .content.v1-content:has(.mr-page) .admin-page-actions>div:first-child,
   .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:first-child{
@@ -322,6 +322,7 @@
     width:auto;
     flex:0 0 auto;
     justify-content:flex-end;
+    margin-left:auto;
   }
   .content.v1-content:has(.mr-page) .admin-page-actions>div:last-child button,
   .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:last-child button{
