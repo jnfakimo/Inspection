@@ -230,12 +230,16 @@ export function AppShell({ profile, title, children, heading }: {
           <form className="profile-section profile-section-basic" onSubmit={saveProfile}>
             <div className="profile-section-title"><span>01</span><div><b>基本資料</b><small>帳號、單位及權限由管理員維護</small></div></div>
             <div className="profile-form-grid">
-              <label>登入帳號<input value={profileDetails.username || ''} readOnly /></label>
-              <label>電子郵件<input value={profileDetails.email || ''} readOnly /></label>
-              <label>姓名<input name="name" defaultValue={profileDetails.name} key={`name-${profileDetails.name}`} maxLength={100} required /></label>
-              <label>聯絡電話<input name="phone" defaultValue={profileDetails.phone || ''} key={`phone-${profileDetails.phone || ''}`} maxLength={40} inputMode="tel" /></label>
-              <label>所屬單位<input value={profileDetails.department || '未設定'} readOnly /></label>
-              <label>帳號角色<input value={profileDetails.rbac_role || profileDetails.role || '未設定'} readOnly /></label>
+              <div className="profile-basic-account-fields">
+                <label>登入帳號<input value={profileDetails.username || ''} readOnly /></label>
+                <label>電子郵件<input value={profileDetails.email || ''} readOnly /></label>
+              </div>
+              <div className="profile-basic-contact-fields">
+                <label>姓名<input name="name" defaultValue={profileDetails.name} key={`name-${profileDetails.name}`} maxLength={100} required /></label>
+                <label>聯絡電話<input name="phone" defaultValue={profileDetails.phone || ''} key={`phone-${profileDetails.phone || ''}`} maxLength={40} inputMode="tel" /></label>
+                <label>所屬單位<input value={profileDetails.department || '未設定'} readOnly /></label>
+                <label>帳號角色<input value={profileDetails.rbac_role || profileDetails.role || '未設定'} readOnly /></label>
+              </div>
             </div>
             {profileMessage && <p className="profile-message">{profileMessage}</p>}
             <div className="profile-actions"><button type="submit" className="primary-btn compact" disabled={profileBusy}>儲存個人資料</button></div>
