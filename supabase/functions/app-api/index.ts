@@ -396,7 +396,7 @@ const MODULE_SOURCES:Record<string,ModuleSource>={
   'workorder/orders':source('maintenance_orders','workorder','維修工單',[['created_at','建立時間'],['order_id','工單 ID'],['request_id','報修 ID'],['assignee_id','維修人員'],['start_time','開始'],['finish_time','完成'],['status','狀態'],['result_desc','處理結果']],'created_at'),
   'workorder/attachments':source('repair_attachments','workorder','維修附件',[['uploaded_at','上傳時間'],['request_id','報修 ID'],['order_id','工單 ID'],['file_name','檔名'],['file_path','儲存路徑'],['kind','類型']],'uploaded_at'),
   'workorder/analytics':source('repair_requests','workorder','維修分析資料',[['created_at','報修時間'],['req_no','案件編號'],['department','單位'],['fault_type','故障類型'],['urgency','急迫度'],['status','狀態']],'created_at'),
-  'guardpatrol/checkins':source('checkin_logs','guardpatrol','巡邏打卡',[['checkin_at','打卡時間'],['user_name','巡檢人員'],['floor_id','樓層'],['label','巡邏點'],['target_type','類型']],'checkin_at'),
+  'guardpatrol/checkins':source('checkin_logs','guardpatrol','巡邏打卡',[['checkin_at','打卡時間'],['user_name','巡檢人員'],['floor_id','樓層'],['label','巡邏點'],['target_type','類型'],['checkin_source','簽到方式']],'checkin_at'),
   'guardpatrol/points':source('plan_markers','guardpatrol','巡邏點清單',[['floor_id','樓層'],['label','巡邏點'],['kind','類型'],['note','巡檢說明'],['status','狀態'],['updated_at','更新時間']],'updated_at',['kind','patrol']),
   'guardpatrol/shifts':source('patrol_shifts','guardpatrol','巡檢排班',[['shift_date','日期'],['name','班別'],['start_time','開始'],['end_time','結束'],['assigned_user_ids','排定人員']],'shift_date'),
   'guardpatrol/notifications':source('patrol_timeout_notifications','guardpatrol','逾時推播',[['shift_date','日期'],['shift_name','班別'],['expected_count','應巡'],['checked_count','已巡'],['unchecked_count','未巡'],['status','狀態'],['sent_at','發送時間']],'shift_date'),

@@ -12,6 +12,7 @@ const valueLabels: Record<string, string> = {
   read: '已讀', unread: '未讀', published: '已發布', requested: '申請中', checked_in: '已報到',
   no_show: '未報到', released: '已釋出', available: '可使用', unavailable: '不可使用',
   red: '紅燈', green: '綠燈', patrol: '巡邏', manual: '手動', automatic: '自動',
+  qr: 'QR Code', nfc: 'NFC 感應', v2_dashboard: '系統操作', marker: '巡檢點', space: '巡檢區域',
   admin: '管理員', supervisor: '主管', maintenance: '維修人員', inspector: '巡檢人員',
   sysadmin: '系統管理員', unit_supervisor: '單位主管', technician: '維修人員', reporter: '一般人員',
   employee: '一般人員', manager: '管理員', driver: '駕駛', guard: '駐衛警',
