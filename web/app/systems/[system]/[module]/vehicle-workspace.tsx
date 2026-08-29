@@ -657,12 +657,15 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
       <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
       <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
-      <label>出發地<select value={form.origin_location} onChange={e => set('origin_location', e.target.value)}><option value=""></option><option value="第二市場">第二市場</option><option value="市場處">市場處</option></select></label>
-      <label>目的地（必填）<select value={form.destination_location} onChange={e => set('destination_location', e.target.value)}><option value=""></option><option value="第一市場">第一市場</option><option value="市場處">市場處</option></select></label>
+      <label>出發地<input list="vehicle-origin-options" value={form.origin_location} onChange={e => set('origin_location', e.target.value)} /></label>
+      <label>目的地（必填）<input list="vehicle-destination-options" value={form.destination_location} onChange={e => set('destination_location', e.target.value)} /></label>
       <label>聯絡電話<input value={form.applicant_phone} onChange={e => set('applicant_phone', e.target.value)} placeholder="分機或手機" /></label>
-      <label className="wide vehicle-request-purpose">用途（必填）<select value={form.trip_purpose} onChange={e => set('trip_purpose', e.target.value)}><option value=""></option><option value="會勘">會勘</option><option value="開會">開會</option><option value="考察">考察</option></select></label>
+      <label className="wide vehicle-request-purpose">用途（必填）<input list="vehicle-purpose-options" value={form.trip_purpose} onChange={e => set('trip_purpose', e.target.value)} /></label>
       <label className="wide vehicle-request-note">備註<textarea rows={2} value={form.applicant_note} onChange={e => set('applicant_note', e.target.value)} /></label>
     </div>
+    <datalist id="vehicle-origin-options"><option value="第二市場" /><option value="市場處" /></datalist>
+    <datalist id="vehicle-destination-options"><option value="第一市場" /><option value="市場處" /></datalist>
+    <datalist id="vehicle-purpose-options"><option value="會勘" /><option value="開會" /><option value="考察" /></datalist>
     {message && <p className="inline-message danger">{message}</p>}
     <footer>
       <button className="secondary-btn" onClick={onClose}>取消</button>

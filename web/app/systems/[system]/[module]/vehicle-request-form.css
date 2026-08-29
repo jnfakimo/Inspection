@@ -12,9 +12,11 @@
 
   .vehicle-request-form .localized-date-input,
   .vehicle-request-form input,
-  .vehicle-request-form select {
+  .vehicle-request-form select,
+  .vehicle-request-form textarea {
     min-width: 0;
     width: 100%;
+    box-sizing: border-box;
   }
 
   .vehicle-request-form .vehicle-request-purpose {
@@ -23,5 +25,11 @@
 
   .vehicle-request-form .vehicle-request-note {
     grid-column: 1 / -1;
+  }
+
+  /* 備註是手機版唯一的長文字填寫列，輸入框要跟著整列寬度延伸。 */
+  .vehicle-request-form .vehicle-request-note textarea {
+    display: block;
+    min-height: 72px;
   }
 }
