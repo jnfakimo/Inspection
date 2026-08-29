@@ -52,14 +52,20 @@ Deno.serve(async req => {
     if (usersResult.error) throw usersResult.error;
     const departments = (departmentsResult.data || []) as DeptRow[];
     const users = (usersResult.data || []) as UserRow[];
-    const byDept = new Map(departments.map(row => [String(row.dept_id), row]));
-    const ancestorIds = (deptId: string | null) => {
+    const departmentScope = (rootId: string | null) => {
       const result = new Set<string>();
-      let current = deptId || '';
-      let guard = 0;
-      while (current && guard++ < 30 && !result.has(current)) {
-        result.add(current);
-        current = byDept.get(current)?.parent_id || '';
+      const root = rootId || '';
+      if (!root) return result;
+      result.add(root);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        departments.forEach(department => {
+          if (department.parent_id && result.has(department.parent_id) && !result.has(department.dept_id)) {
+            result.add(department.dept_id);
+            changed = true;
+          }
+        });
       }
       return result;
     };
@@ -78,7 +84,8 @@ Deno.serve(async req => {
       if (Date.now() < dueAt.getTime()) continue;
       const recipients = new Set<string>();
       if (document.originator_id) recipients.add(String(document.originator_id));
-      const scope = ancestorIds(text(step.unit_id, 80));
+      // 流程節點記錄第一階部／室；逾時通知要涵蓋其下的課／組／隊主管。
+      const scope = departmentScope(text(step.unit_id, 80));
       users.forEach(user => {
         const role = String(user.rbac_role || user.role || '');
         if (supervisors.has(role) && user.dept_id && scope.has(String(user.dept_id))) recipients.add(String(user.user_id));

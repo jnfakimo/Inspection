@@ -116,6 +116,12 @@ const authAdmin = (path, options = {}) => request(`/auth/v1/admin${path}`, { ...
 const rest = (path, options = {}) => request(`/rest/v1${path}`, options);
 const service = (path, options = {}) => rest(path, { ...options, key: SERVICE_KEY, token: SERVICE_KEY });
 
+// 收文角色刻意放在業務部的子單位，驗證流程節點雖記錄根部門，
+// 子單位人員仍能看到通知並完成收文／會辦。
+const businessChildRows = await service('/departments?code=eq.BIZ-TRADE&select=dept_id,parent_id&limit=1');
+const businessChild = businessChildRows.find(row => String(row.parent_id || '') === DEPT.biz);
+const CO_SIGN_DEPT = String(businessChild?.dept_id || DEPT.biz);
+
 async function signIn(email, password) {
   const session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
   if (!session.access_token) throw new Error('P0 公文測試登入沒有取得 access token');
@@ -229,10 +235,10 @@ const manager = await createProfile({
   ...asStaff(DEPT.plan), permissions: { official_document_manager: true },
 });
 const responsible = await createProfile({ label: '承辦人員', emailLabel: 'staff', usernamePrefix: 'staff', ...asStaff(DEPT.planPromo) });
-const coSigner = await createProfile({ label: '會辦收發', emailLabel: 'cosign', usernamePrefix: 'cos', ...asStaff(DEPT.biz) });
+const coSigner = await createProfile({ label: '會辦收發', emailLabel: 'cosign', usernamePrefix: 'cos', ...asStaff(CO_SIGN_DEPT) });
 const approver = await createProfile({ label: '陳核核決', emailLabel: 'approver', usernamePrefix: 'apv', ...asStaff(DEPT.secretary) });
 const outsider = await createProfile({ label: '他部室人員', emailLabel: 'outsider', usernamePrefix: 'out', ...asStaff(DEPT.finance) });
-record('五個角色建立完成', '企劃部／企劃推廣課／業務部／秘書室／財務部各一人');
+record('五個角色建立完成', `企劃部／企劃推廣課／業務部${businessChild ? '（貿易課收文）' : ''}／秘書室／財務部各一人`);
 
 let exitCode = 0;
 try {
@@ -291,6 +297,8 @@ try {
   let state = await readDocument(documentId);
   assert(state.document.status === 'awaiting_co_sign', `送出會辦後狀態應為 awaiting_co_sign，實際 ${state.document.status}`);
   assert(state.steps.length === 1 && state.steps[0].step_type === 'co_sign', '應建立一個會辦節點');
+  const coSignNotifications = await service(`/official_document_notifications?document_id=eq.${documentId}&step_id=eq.${state.steps[0].step_id}&recipient_id=eq.${coSigner.profile.user_id}&select=notification_id&limit=1`);
+  assert(coSignNotifications.length === 1, '會辦通知應送達根部門下的子單位收文人員');
   record('公文管理人員送出會辦', `→ 業務部（狀態 ${state.document.status}）`);
 
   await expectDenied(outsider.token, {

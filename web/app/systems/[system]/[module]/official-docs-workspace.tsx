@@ -48,6 +48,25 @@ const fmtTime = (value: unknown) => {
   return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).format(date);
 };
 const text = (value: unknown) => String(value ?? '').trim();
+const departmentScope = (rows: Department[], rootId: unknown) => {
+  const root = text(rootId);
+  const scope = new Set<string>();
+  if (!root) return scope;
+  scope.add(root);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    rows.forEach(row => {
+      const deptId = text(row.dept_id);
+      const parentId = text(row.parent_id);
+      if (deptId && parentId && scope.has(parentId) && !scope.has(deptId)) {
+        scope.add(deptId);
+        changed = true;
+      }
+    });
+  }
+  return scope;
+};
 const managerRole = (profile: Profile) => {
   const role = String(profile.rbac_role || profile.role || '');
   const permissions = profile.permissions || {};
@@ -403,7 +422,14 @@ function OfficialDocsPage({ profile, system, module }: { profile: Profile; syste
   const onScanned = useCallback((value: string) => { setScanner(false); setLookup(value); void load(value); }, [load]);
   const currentStep = selected?.steps.find(step => step.step_id === selected.current_step_id) || null;
   const currentUnit = String(profile.dept_id || '');
-  const sameUnit = Boolean(currentStep && currentStep.unit_id === currentUnit);
+  // 流程節點記錄第一階部／室，但使用者可能掛在其下的課／組／隊；
+  // 合併目前可見的根單位與子單位資料後，沿部門樹判斷是否為收文範圍。
+  const visibleDepartmentRows = [
+    ...(data?.departments || []),
+    ...(data?.scope_root_departments || []),
+    ...(data?.current_root_department ? [data.current_root_department] : []),
+  ];
+  const sameUnit = Boolean(currentStep && currentUnit && departmentScope(visibleDepartmentRows, currentStep.unit_id).has(currentUnit));
   const latestEvent = selected?.events[selected.events.length - 1];
   const currentRootName = text(data?.current_root_department?.name) || '尚未設定';
   const coSignCount = (data?.documents || []).filter(document => document.status === 'awaiting_co_sign' || document.steps.some(step => step.step_type === 'co_sign' && step.status === 'sent')).length;
