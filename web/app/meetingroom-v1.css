@@ -290,12 +290,8 @@
   .meetingroom-notifications-page .notification-booking-meta{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 }
 
-/* 會議室管理彈窗的送出按鈕列：桌面沿用原本的靠左排列（等同原本的行內 flex），
-   手機版改為靠右，與各頁頁首按鈕的方向一致。 */
-.mr-form-actions{display:flex;gap:8px}
-@media (max-width:800px){
-  .mr-form-actions{justify-content:flex-end}
-}
+/* 會議室管理彈窗的送出按鈕列統一靠右，讓「新增會議室」與表單操作邏輯一致。 */
+.mr-form-actions{display:flex;justify-content:flex-end;gap:8px}
 
 /* 會議系統手機版頁首：說明與「重新載入」同列，避免按鈕獨占一行留下過多空白。
    僅套用會議預約／變更／提醒頁，其他使用 AdminHeader 的子系統維持共用版型。 */
