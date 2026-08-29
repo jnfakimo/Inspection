@@ -1530,7 +1530,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
               </div>
               <div class="field">
                 <label>確認新密碼</label>
-                <input id="edit-u-newpw2" type="password" placeholder="再輸一次" autocomplete="new-password">
+                <input id="edit-u-newpw2" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="再輸一次" autocomplete="new-password">
               </div>
             </div>
             <div id="editPwMsg" style="font-size:.76rem;min-height:1em;color:var(--text-dim)"></div>
@@ -1557,7 +1557,7 @@ html.maintenance-only #page-repairs{max-width:1500px;margin:0 auto}
       </div>
       <div class="field" style="grid-column:1/-1">
         <label>確認新密碼</label>
-        <input id="reset-new-pw2" type="password" placeholder="再次輸入新密碼" autocomplete="new-password">
+        <input id="reset-new-pw2" type="password" minlength="8" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" placeholder="再次輸入新密碼" autocomplete="new-password">
       </div>
     </div>
     <div id="resetPwMsg" style="font-size:.8rem;min-height:1.4em;margin:8px 0;padding:6px;border-radius:2px"></div>
