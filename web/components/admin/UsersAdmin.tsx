@@ -40,6 +40,15 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     }
     return current?.dept_id || '';
   }, [activeDepartments]);
+  const secretaryReportsToDeputy = useCallback((memberDeptId: unknown, supervisorDeptId: unknown) => {
+    const memberRootId = String(rootDepartmentId(memberDeptId) || ''), supervisorRootId = String(rootDepartmentId(supervisorDeptId) || '');
+    const memberRoot = activeDepartments.find(dept => String(dept.dept_id) === memberRootId);
+    const supervisorRoot = activeDepartments.find(dept => String(dept.dept_id) === supervisorRootId);
+    const rootName = (dept: Row | undefined) => String(dept?.name || '').replace(/\s+/g, '');
+    const rootCode = (dept: Row | undefined) => String(dept?.code || '').toUpperCase();
+    return (rootCode(memberRoot) === 'SECRE' || rootName(memberRoot) === '秘書室')
+      && (rootCode(supervisorRoot) === 'VGM' || ['副總經理', '副總經理室'].includes(rootName(supervisorRoot)));
+  }, [activeDepartments, rootDepartmentId]);
   const supervisorMatchesDepartment = useCallback((supervisorDeptId: unknown, memberDeptId: unknown) => {
     const supervisorId = String(supervisorDeptId || '');
     if (!memberDeptId) return true;
@@ -50,8 +59,8 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       seen.add(String(current.dept_id));
       current = activeDepartments.find(dept => String(dept.dept_id) === String(current?.parent_id || ''));
     }
-    return false;
-  }, [activeDepartments]);
+    return secretaryReportsToDeputy(memberDeptId, supervisorDeptId);
+  }, [activeDepartments, secretaryReportsToDeputy]);
   const rootDepartments = useMemo(() => activeDepartments.filter(dept => !dept.parent_id), [activeDepartments]);
   const supervisors = useMemo(() => users.filter(user => user.status === 'active' && ['unit_supervisor', 'sysadmin'].includes(userRole(user))), [users]);
   const pendingApplications = useMemo(() => applications.filter(application => application.status === 'pending'), [applications]);

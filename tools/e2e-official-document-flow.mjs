@@ -222,8 +222,8 @@ const record = (name, detail) => { stages.push({ name, detail }); console.log(` 
 
 console.log('■ 建立五個彼此分離的測試角色');
 // guard_user_supervisor_hierarchy 要求啟用中的一般人員必須掛直屬主管，且主管須同單位；
-// 系統管理員身分的主管不受同單位限制，公文流程本身完全不讀 supervisor_id，
-// 因此以一個測試用系統管理員當五個角色的共同直屬主管，不影響驗收語意。
+// 系統管理員身分的主管不受同單位限制；公文流程只在秘書室代收副總經理陳核時
+// 讀取 supervisor_id，因此以一個測試用系統管理員當五個角色的共同直屬主管，不影響驗收語意。
 const fixtureSupervisor = await createProfile({
   label: '固定裝置主管', emailLabel: 'sup', usernamePrefix: 'sup',
   rbacRole: 'sysadmin', role: 'admin',

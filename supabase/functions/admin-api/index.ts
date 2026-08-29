@@ -175,6 +175,26 @@ export async function handleAdminApiRequest(req: Request) {
       }
       return false;
     };
+    const secretaryReportsToDeputy = async (memberDeptId: string | null, supervisorDeptId: string | null) => {
+      const walkRoot = async (deptId: string | null) => {
+        let currentId = id(deptId);
+        const seen = new Set<string>();
+        let root: Record<string, unknown> | null = null;
+        while (currentId && !seen.has(currentId)) {
+          seen.add(currentId);
+          const { data } = await admin.from('departments').select('parent_id,code,name').eq('dept_id', currentId).eq('status', 'active').maybeSingle();
+          if (!data) break;
+          root = data as Record<string, unknown>;
+          currentId = id(data.parent_id);
+        }
+        return root;
+      };
+      const memberRoot = await walkRoot(memberDeptId), supervisorRoot = await walkRoot(supervisorDeptId);
+      const rootCode = (row: Record<string, unknown> | null) => clean(row?.code, 40).toUpperCase();
+      const rootName = (row: Record<string, unknown> | null) => clean(row?.name, 100).replace(/\s+/g, '');
+      return (rootCode(memberRoot) === 'SECRE' || rootName(memberRoot) === '秘書室')
+        && (rootCode(supervisorRoot) === 'VGM' || ['副總經理', '副總經理室'].includes(rootName(supervisorRoot)));
+    };
     const roleExists = async (rbacRole: string) => {
       const { data } = await admin.from('roles').select('role_id').eq('role_id', rbacRole).maybeSingle();
       return Boolean(data);
@@ -191,7 +211,8 @@ export async function handleAdminApiRequest(req: Request) {
         return { supervisorId: null, message: '直屬主管必須是啟用中的單位主管或系統管理員' };
       }
       if (supervisorRole !== 'sysadmin' && deptId && supervisor.dept_id
-        && !(await supervisorWithinUnitHierarchy(deptId, supervisor.dept_id))) {
+        && !(await supervisorWithinUnitHierarchy(deptId, supervisor.dept_id))
+        && !(await secretaryReportsToDeputy(deptId, supervisor.dept_id))) {
         return { supervisorId: null, message: '直屬主管必須位於人員所屬單位或其上層部／室' };
       }
       return { supervisorId, message: '' };

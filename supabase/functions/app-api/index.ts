@@ -282,12 +282,17 @@ type OfficialDocumentActor = {
   role: string;
   dept_id?: string | null;
   department?: string | null;
+  supervisor_id?: string | null;
 };
 
 const OFFICIAL_MANAGER_ROLES = new Set(['sysadmin', 'admin', 'dispatcher', 'duty']);
 const OFFICIAL_PEOPLE_VIEWER_ROLES = new Set([...OFFICIAL_MANAGER_ROLES, 'unit_supervisor', 'mgmt_supervisor']);
 const OFFICIAL_APPROVAL_UNIT_CODES = new Set(['BOARD', 'GM', 'VGM', 'SECRE']);
 const OFFICIAL_APPROVAL_UNIT_NAMES = new Set(['董事長室', '總經理室', '副總經理', '副總經理室', '秘書室']);
+const OFFICIAL_SECRETARY_UNIT_CODES = new Set(['SECRE']);
+const OFFICIAL_SECRETARY_UNIT_NAMES = new Set(['秘書室']);
+const OFFICIAL_DEPUTY_GM_UNIT_CODES = new Set(['VGM']);
+const OFFICIAL_DEPUTY_GM_UNIT_NAMES = new Set(['副總經理', '副總經理室']);
 const officialDocumentUnitCapabilities = (unit: { name?: unknown; code?: unknown } | null | undefined) => {
   const code = text(unit?.code, 40).toUpperCase();
   const name = text(unit?.name, 100).replace(/\s+/g, '');
@@ -327,6 +332,16 @@ function departmentScope(rows: Array<{ dept_id?: unknown; parent_id?: unknown }>
 function departmentContains(rows: Array<{ dept_id?: unknown; parent_id?: unknown }>, rootId: unknown, memberId: unknown) {
   const member = id(memberId);
   return Boolean(member && departmentScope(rows, rootId).has(member));
+}
+
+function departmentRole(value: { role?: unknown; rbac_role?: unknown } | null | undefined) {
+  return text(value?.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[String(value?.role || '')] || value?.role, 40);
+}
+
+function namedDepartment(unit: { code?: unknown; name?: unknown } | null | undefined, codes: Set<string>, names: Set<string>) {
+  const code = text(unit?.code, 40).toUpperCase();
+  const name = text(unit?.name, 100).replace(/\s+/g, '');
+  return Boolean((code && codes.has(code)) || (name && names.has(name)));
 }
 
 const officialDocumentEvent = async (
@@ -538,7 +553,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     const { data: profile, error: profileError } = await admin.from('users')
-      .select('user_id,username,email,name,phone,department,dept_id,role,rbac_role,status,permissions')
+      .select('user_id,username,email,name,phone,department,dept_id,role,rbac_role,supervisor_id,status,permissions')
       .eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
     // users.department 只是依 dept_id 從 departments 查出來後寫回的副本，兩者可能不同步。
@@ -670,7 +685,7 @@ export async function handleAppApiRequest(req: Request) {
       const [documentResult, departmentResult, peopleResult] = await Promise.all([
         admin.from('official_documents').select('document_id,document_no,document_type,subject,originator_id,originator_dept_id,responsible_dept_id,responsible_user_id,status,current_step_id,barcode_value,created_at,updated_at,closed_at').order('updated_at', { ascending: false }).limit(500),
         admin.from('departments').select('dept_id,parent_id,name,code,level').eq('status', 'active').order('sort_order').order('name').limit(500),
-        admin.from('users').select('user_id,name,dept_id,role,rbac_role,department').eq('status', 'active').order('name').limit(1000),
+        admin.from('users').select('user_id,name,dept_id,role,rbac_role,supervisor_id,department').eq('status', 'active').order('name').limit(1000),
       ]);
       if (documentResult.error) throw documentResult.error;
       if (departmentResult.error) throw departmentResult.error;
@@ -698,6 +713,18 @@ export async function handleAppApiRequest(req: Request) {
         routingScopeCache.set(key, scope);
         return scope;
       };
+      const rootUnit = (deptId: unknown) => departmentPaths.rootForId(deptId) as Record<string, unknown> | null;
+      const isSecretaryUnit = (deptId: unknown) => namedDepartment(rootUnit(deptId), OFFICIAL_SECRETARY_UNIT_CODES, OFFICIAL_SECRETARY_UNIT_NAMES);
+      const isDeputyGmUnit = (deptId: unknown) => namedDepartment(rootUnit(deptId), OFFICIAL_DEPUTY_GM_UNIT_CODES, OFFICIAL_DEPUTY_GM_UNIT_NAMES);
+      const actorSupervisor = allPeople.find(person => id(person.user_id) === id(profile.supervisor_id));
+      const delegatedApprovalForActor = (step: Record<string, unknown> | null | undefined) => Boolean(
+        step?.step_type === 'approval'
+        && isSecretaryUnit(profile.dept_id)
+        && isDeputyGmUnit(step.unit_id)
+        && actorSupervisor
+        && ['unit_supervisor', 'sysadmin'].includes(departmentRole(actorSupervisor))
+        && departmentContains(allDepartments, step.unit_id, actorSupervisor.dept_id),
+      );
       const ids = allDocuments.map(row => id(row.document_id)).filter(Boolean);
       const steps: Array<Record<string, unknown>> = [];
       const events: Array<Record<string, unknown>> = [];
@@ -725,7 +752,7 @@ export async function handleAppApiRequest(req: Request) {
         const incomingForActor = Boolean(
           currentDocumentStep && profile.dept_id
           && routingScope(currentDocumentStep.unit_id).has(String(profile.dept_id)),
-        );
+        ) || delegatedApprovalForActor(currentDocumentStep);
         const originatorUnitForActor = Boolean(
           row.status === 'awaiting_originator' && profile.dept_id && row.originator_dept_id
           && id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id)
@@ -766,6 +793,7 @@ export async function handleAppApiRequest(req: Request) {
           code: text(currentRootDepartment.code, 100) || null,
           level: Number(currentRootDepartment.level || 1),
         } : null,
+        actor_supervisor_dept_id: id(actorSupervisor?.dept_id) || null,
         people: visiblePeople.map(row => ({
           ...row,
           department: departmentPaths.pathForId(row.dept_id) || formatDepartment(row.department, departmentPaths.byName) || null,
@@ -854,7 +882,7 @@ export async function handleAppApiRequest(req: Request) {
       const currentStep = steps.find(step => String(step.step_id) === String(document.current_step_id)) || null;
       const role = roleId;
       const actor = { ...profile, role } as OfficialDocumentActor;
-      const departmentsForScope = await admin.from('departments').select('dept_id,parent_id').eq('status', 'active').limit(1000);
+      const departmentsForScope = await admin.from('departments').select('dept_id,parent_id,name,code').eq('status', 'active').limit(1000);
       if (departmentsForScope.error) throw departmentsForScope.error;
       const departmentRows = (departmentsForScope.data || []) as Array<Record<string, unknown>>;
       const rootDepartmentId = (deptId: unknown) => {
@@ -876,11 +904,40 @@ export async function handleAppApiRequest(req: Request) {
         const right = rootDepartmentId(memberId);
         return Boolean(left && right && left === right);
       };
+      const departmentAtRoot = (deptId: unknown) => {
+        let current = id(deptId);
+        const seen = new Set<string>();
+        let row: Record<string, unknown> | null = null;
+        while (current && !seen.has(current)) {
+          seen.add(current);
+          row = departmentRows.find(item => id(item.dept_id) === current) || null;
+          const parent = id(row?.parent_id);
+          if (!parent) return row;
+          current = parent;
+        }
+        return row;
+      };
+      const isSecretaryUnit = (deptId: unknown) => namedDepartment(departmentAtRoot(deptId), OFFICIAL_SECRETARY_UNIT_CODES, OFFICIAL_SECRETARY_UNIT_NAMES);
+      const isDeputyGmUnit = (deptId: unknown) => namedDepartment(departmentAtRoot(deptId), OFFICIAL_DEPUTY_GM_UNIT_CODES, OFFICIAL_DEPUTY_GM_UNIT_NAMES);
+      const supervisorResult = profile.supervisor_id
+        ? await admin.from('users').select('user_id,dept_id,role,rbac_role,status').eq('user_id', profile.supervisor_id).eq('status', 'active').maybeSingle()
+        : { data: null, error: null };
+      if (supervisorResult.error) throw supervisorResult.error;
+      const actorSupervisor = supervisorResult.data as Record<string, unknown> | null;
+      const delegatedApprovalReceiver = Boolean(
+        currentStep?.step_type === 'approval'
+        && isSecretaryUnit(profile.dept_id)
+        && isDeputyGmUnit(currentStep.unit_id)
+        && actorSupervisor
+        && ['unit_supervisor', 'sysadmin'].includes(departmentRole(actorSupervisor))
+        && departmentContains(departmentRows, currentStep.unit_id, actorSupervisor.dept_id),
+      );
       // 流程所屬部／室及其子單位的人員都能接續已完成的節點；跨單位仍由這道檢查擋下。
       const documentInActorScope = isAdmin || sameRootUnit(document.originator_dept_id, profile.dept_id)
         || steps.some(step => sameUnit(step.unit_id, profile.dept_id));
       const canOperateDocument = documentInActorScope;
       const inCurrentUnit = Boolean(currentStep && departmentContains(departmentRows, currentStep.unit_id, profile.dept_id));
+      const canReceiveCurrentStep = inCurrentUnit || delegatedApprovalReceiver;
       const inOriginatorUnit = sameRootUnit(document.originator_dept_id, profile.dept_id);
       const isOriginator = String(document.originator_id) === String(profile.user_id);
       const fail = (message: string, status = 409) => reply(req, { ok: false, message }, status);
@@ -911,12 +968,21 @@ export async function handleAppApiRequest(req: Request) {
         target_unit_id: targetUnitId || (currentStep ? currentStep.unit_id : null),
         note,
       });
-      const activeUsersInUnit = async (unitId: string) => {
+      const activeUsersForUnit = async (unitId: string, includeSecretaryDelegates = false) => {
         const recipientDeptIds = Array.from(departmentScope(departmentRows, unitId));
         if (!recipientDeptIds.length) return [] as Array<Record<string, unknown>>;
-        const result = await admin.from('users').select('user_id').in('dept_id', recipientDeptIds).eq('status', 'active').limit(500);
+        const result = await admin.from('users').select('user_id,dept_id,supervisor_id,role,rbac_role').eq('status', 'active').limit(1000);
         if (result.error) throw result.error;
-        return (result.data || []) as Array<Record<string, unknown>>;
+        const rows = (result.data || []) as Array<Record<string, unknown>>;
+        const targetSupervisorIds = new Set(rows
+          .filter(row => recipientDeptIds.includes(id(row.dept_id)) && ['unit_supervisor', 'sysadmin'].includes(departmentRole(row)))
+          .map(row => id(row.user_id)).filter(Boolean));
+        return rows.filter(row => recipientDeptIds.includes(id(row.dept_id)) || (
+          includeSecretaryDelegates
+          && isSecretaryUnit(row.dept_id)
+          && isDeputyGmUnit(unitId)
+          && targetSupervisorIds.has(id(row.supervisor_id))
+        )).map(row => ({ user_id: row.user_id }));
       };
       if (documentAction === 'send_co_sign') {
         if (!canOperateDocument) return fail('只有公文所屬部／室人員可以送出會辦', 403);
@@ -932,7 +998,7 @@ export async function handleAppApiRequest(req: Request) {
         if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
         const event = await officialDocumentEvent(admin, actor, documentId, 'send_co_sign', idempotencyKey, eventFields(String(document.status), nextStatus, String(createdStep.data.step_id)));
         const dueAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-        const recipients = await activeUsersInUnit(targetUnitId);
+        const recipients = await activeUsersForUnit(targetUnitId);
         for (const recipient of recipients) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文會辦待收文', `${document.document_no}｜${document.subject}`, dueAt);
         return reply(req, { ok: true, data: { status: nextStatus, step: createdStep.data, event_id: event.data?.event_id } });
       }
@@ -955,7 +1021,7 @@ export async function handleAppApiRequest(req: Request) {
         if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
         const event = await officialDocumentEvent(admin, actor, documentId, 'send_approval', idempotencyKey, eventFields(String(document.status), nextStatus, String(createdStep.data.step_id)));
         const dueAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-        const recipients = await activeUsersInUnit(targetUnitId);
+        const recipients = await activeUsersForUnit(targetUnitId, true);
         for (const recipient of recipients) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文陳核待收文', `${document.document_no}｜${document.subject}`, dueAt);
         return reply(req, { ok: true, data: { status: nextStatus, step: createdStep.data, event_id: event.data?.event_id } });
       }
@@ -999,7 +1065,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'approval_receive') {
-        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部／室的人員可以簽收', 403);
+        if (!currentStep || currentStep.step_type !== 'approval' || !canReceiveCurrentStep) return fail('只有目前陳核部／室或其指定收文人員可以簽收', 403);
         if (currentStep.status !== 'sent') return fail('這筆公文已簽收，請勿重複操作');
         const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
         if (!updatedStep) return fail('這筆公文已被其他人簽收，請重新整理');
@@ -1018,7 +1084,7 @@ export async function handleAppApiRequest(req: Request) {
         const event = await officialDocumentEvent(admin, actor, documentId, documentAction, idempotencyKey, eventFields('awaiting_approval', nextStatus));
         const title = documentAction === 'approve' ? '公文已核決，請創文單位簽收' : '公文退回，請原申請人補正重送';
         const recipients = documentAction === 'approve' && document.originator_dept_id
-          ? await activeUsersInUnit(rootDepartmentId(document.originator_dept_id))
+          ? await activeUsersForUnit(rootDepartmentId(document.originator_dept_id))
           : [{ user_id: document.originator_id }];
         for (const recipient of recipients) {
           await officialDocumentNotification(admin, documentId, String(currentStep.step_id), String(recipient.user_id), documentAction === 'approve' ? 'approved' : 'returned', title, `${document.document_no}｜${document.subject}${note ? `｜${note}` : ''}`);
