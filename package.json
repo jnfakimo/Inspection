@@ -28,10 +28,12 @@
     "test:profile-modal": "node tools/profile-modal-layout-check.mjs",
     "test:login-layout": "node tools/login-layout-check.mjs",
     "test:market-bar-guide": "node tools/market-bar-guide-check.mjs",
+    "test:market-movement": "node --experimental-strip-types --test web/lib/market-movement.test.ts",
+    "test:market-stock-signal": "node tools/market-stock-signal-check.mjs",
     "test:backup": "node tools/database-backup-consistency-check.mjs",
     "backup:db": "node tools/database-backup.mjs",
     "backup:verify": "node tools/database-backup-verify.mjs",
-    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:app-navigation && npm run test:auth-consistency && npm run test:floor-consistency && npm run test:schema-contract && npm run test:patrol-offline && npm run test:page-headings && npm run test:button-standard && npm run test:profile-modal && npm run test:login-layout && npm run test:market-bar-guide && npm run test:backup"
+    "test": "node --check tools/build-hardened-pages.mjs && npm run test:security-audit && npm run test:app-navigation && npm run test:auth-consistency && npm run test:floor-consistency && npm run test:schema-contract && npm run test:patrol-offline && npm run test:page-headings && npm run test:button-standard && npm run test:profile-modal && npm run test:login-layout && npm run test:market-bar-guide && npm run test:market-movement && npm run test:market-stock-signal && npm run test:backup"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.2",

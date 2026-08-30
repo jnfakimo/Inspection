@@ -12,11 +12,14 @@ import {
   PointElement,
   Tooltip,
   type ChartOptions,
+  type PointStyle,
 } from 'chart.js';
 import { Doughnut, Line, Pie } from 'react-chartjs-2';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
+import { MarketMovementBadge } from '@/components/MarketMovementBadge';
+import { marketMovementPresentation } from '@/lib/market-movement';
 import { invokeAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -291,10 +294,11 @@ function changePercent(currentValue: unknown, compareValue: unknown) {
   if (current === null || compare === null || compare === 0) return null;
   return (current - compare) / Math.abs(compare) * 100;
 }
-function signedPercentText(value: number | null) {
-  if (value === null) return '無比較基準';
-  if (Math.abs(value) < .05) return '持平 0.0%';
-  return `${value > 0 ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`;
+function signedNumberText(value: unknown, fraction = 0) {
+  const numeric = finiteNumber(value);
+  if (numeric === null) return '—';
+  const sign = numeric > 0 ? '+' : numeric < 0 ? '−' : '';
+  return `${sign}${numberText(Math.abs(numeric), fraction)}`;
 }
 function withAlpha(color: string, alpha: number) {
   const hex = color.match(/^#([0-9a-f]{6})$/i)?.[1];
@@ -348,6 +352,10 @@ function useResolvedPalette(paletteId: PaletteId, customColors: string[]) {
       dim: style?.getPropertyValue('--dim').trim() || '#64748b',
       grid: style?.getPropertyValue('--line').trim() || '#cbd5e1',
       panel: style?.getPropertyValue('--panel').trim() || '#ffffff',
+      current: colors[0],
+      comparison: colors[1 % colors.length],
+      rise: style?.getPropertyValue('--red').trim() || fallbacks['--red'],
+      fall: style?.getPropertyValue('--green').trim() || fallbacks['--green'],
     };
   }, [paletteId, customColors, themeRevision]);
 }
@@ -425,10 +433,36 @@ function MarketLineChart({ analysis, measure, field, chartType, paletteId, custo
   return <><div className={`market-line-chart${canDrill ? ' market-chart-drillable' : ''}`}><Line role="img" aria-label={`${field?.label || measure}${CHART_TYPE_LABELS[chartType]}，實線為本期、虛線為比較期${canDrill ? '，點選資料點可下鑽' : ''}`} data={data} options={options} /></div><details className="market-chart-summary"><summary>{canDrill ? '查看圖表數值與鍵盤下鑽' : '查看圖表數值'}</summary><div className="responsive-table"><table><thead><tr><th>分類</th><th>本期</th><th>比較期</th></tr></thead><tbody>{rows.map(row => <tr key={row.label}><td>{canDrill && row.drillValue ? <button type="button" className="market-table-drill-button" onClick={() => onDrill?.(row.drillValue)}>{row.label}<span>展開下一層</span></button> : row.label}</td><td>{numberText(row.current)}</td><td>{numberText(row.compare)}</td></tr>)}</tbody></table></div></details></>;
 }
 
+function MarketDifferenceSummary({ current, compare, difference, field }: { current: unknown; compare: unknown; difference?: unknown; field?: FieldDefinition }) {
+  const fraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0;
+  const currentNumber = finiteNumber(current), compareNumber = finiteNumber(compare);
+  const absoluteDifference = finiteNumber(difference) ?? (currentNumber !== null && compareNumber !== null ? currentNumber - compareNumber : null);
+  return <span className="market-stock-difference"><MarketMovementBadge value={changePercent(currentNumber, compareNumber)} /><small>絕對差異 {signedNumberText(absoluteDifference, fraction)}{field?.unit ? ` ${field.unit}` : ''}</small></span>;
+}
+
+function MarketAbsoluteMovementBadge({ value, unit }: { value: unknown; unit: string }) {
+  const numeric = finiteNumber(value);
+  const tone = numeric === null ? 'neutral' : numeric > 0 ? 'rise' : numeric < 0 ? 'fall' : 'steady';
+  const symbol = numeric === null ? '' : numeric > 0 ? '▲' : numeric < 0 ? '▼' : '—';
+  const label = numeric === null ? '無比較基準' : numeric > 0 ? '增加' : numeric < 0 ? '減少' : '持平';
+  const valueText = numeric === null || numeric === 0 ? '' : ` ${numberText(Math.abs(numeric))} ${unit}`;
+  return <span className={`market-movement-badge ${tone}`} aria-label={`${label}${valueText}`}>
+    {symbol && <span className="market-movement-glyph" aria-hidden="true">{symbol}</span>}
+    <span>{label}{valueText}</span>
+  </span>;
+}
+
 function MarketColorCards({ analysis, measure, field, paletteId, customColors, canDrill = false, onDrill }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[]; canDrill?: boolean; onDrill?: (value: string) => void }) {
   const palette = useResolvedPalette(paletteId, customColors);
   const drillDimension = analysis.dimensions.length === 1 ? analysis.dimensions[0] : '';
-  return <div className="market-result-cards">{analysis.rows.slice(0, 20).map((row, index) => { const value = drillDimension ? row.dimensions[drillDimension] || '' : ''; return <article className={canDrill && value ? 'market-result-card-drillable' : ''} key={index} style={{ '--market-card-accent': palette.colors[index % palette.colors.length] } as CSSProperties}>{canDrill && value ? <button type="button" onClick={() => onDrill?.(value)} aria-label={`下鑽查看${chartRowLabel(row)}`}><b>{chartRowLabel(row)}</b><strong>{numberText(row.values[measure])}<small>{field?.unit || ''}</small></strong><span>比較期 {numberText(row.compare_values[measure])}</span><small>變化 {row.changes[measure] === null ? '—' : numberText(row.changes[measure])}</small></button> : <><b>{chartRowLabel(row)}</b><strong>{numberText(row.values[measure])}<small>{field?.unit || ''}</small></strong><span>比較期 {numberText(row.compare_values[measure])}</span><small>變化 {row.changes[measure] === null ? '—' : numberText(row.changes[measure])}</small></>}</article>; })}</div>;
+  return <div className="market-result-cards">{analysis.rows.slice(0, 20).map((row, index) => {
+    const value = drillDimension ? row.dimensions[drillDimension] || '' : '';
+    const name = chartRowLabel(row), current = row.values[measure], compare = row.compare_values[measure], difference = row.changes[measure];
+    const movement = marketMovementPresentation(changePercent(current, compare));
+    const classes = [canDrill && value ? 'market-result-card-drillable' : '', `market-card-${movement.tone}`].filter(Boolean).join(' ');
+    const content = <><b>{name}</b><strong>{numberText(current)}<small>{field?.unit || ''}</small></strong><span>比較期 {numberText(compare)}</span><MarketDifferenceSummary current={current} compare={compare} difference={difference} field={field} /></>;
+    return <article className={classes} key={index} style={{ '--market-card-accent': palette.colors[index % palette.colors.length] } as CSSProperties}>{canDrill && value ? <button type="button" onClick={() => onDrill?.(value)} aria-label={`展開「${name}」下一層；本期 ${numberText(current)} ${field?.unit || ''}；比較期 ${numberText(compare)} ${field?.unit || ''}；${movement.ariaLabel}`}>{content}</button> : content}</article>;
+  })}</div>;
 }
 
 function MarketSimulation({ analysis, sources, measures, fieldMap, paletteId, customColors }: { analysis: Analysis; sources: Source[]; measures: string[]; fieldMap: Map<string, FieldDefinition>; paletteId: PaletteId; customColors: string[] }) {
@@ -479,7 +513,7 @@ function MarketSimulation({ analysis, sources, measures, fieldMap, paletteId, cu
   return <section className="panel market-simulation-panel">
     <header className="market-result-heading"><div><span className="market-kicker">情境模擬</span><h2>行情情境模擬</h2><p>以本期實際行情為基準調整指標，保存每次假設與結果，供後續追蹤比較。</p></div><span>百分比情境推估 v1</span></header>
     <div className="market-simulation-name"><label>情境名稱<input value={scenarioName} maxLength={120} onChange={event => setScenarioName(event.target.value)} /></label><p>此區為情境模擬，不代表統計預測；接入足夠歷史資料後可再升級預測模型。</p></div>
-    <div className="market-simulation-grid">{measures.map((measure, index) => { const field = fieldMap.get(measure); const base = finiteNumber(analysis.totals.values[measure]); const projected = projectedTotals[measure]; const adjustment = Number(adjustments[measure]) || 0; const fraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0; return <article key={measure} style={{ '--market-card-accent': palette.colors[index % palette.colors.length] } as CSSProperties}><div><b>{field?.label || measure}</b><span>基準 {numberText(base, fraction)} {field?.unit || ''}</span></div><label>調整幅度<input type="number" min="-100" max="500" step="1" value={adjustment} onChange={event => setAdjustments(current => ({ ...current, [measure]: Math.max(-100, Math.min(500, Number(event.target.value) || 0)) }))} /><small>%</small></label><strong>{numberText(projected, fraction)}<small>{field?.unit || ''}</small></strong><em>{adjustment === 0 ? '維持' : `${adjustment > 0 ? '▲' : '▼'} ${numberText(Math.abs(adjustment))}%`}</em></article>; })}</div>
+    <div className="market-simulation-grid">{measures.map((measure, index) => { const field = fieldMap.get(measure); const base = finiteNumber(analysis.totals.values[measure]); const projected = projectedTotals[measure]; const adjustment = Number(adjustments[measure]) || 0; const fraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0; const direction = adjustment > 0 ? 'rise' : adjustment < 0 ? 'fall' : 'steady'; const symbol = adjustment > 0 ? '▲' : adjustment < 0 ? '▼' : '—'; const label = adjustment > 0 ? '上調' : adjustment < 0 ? '下調' : '維持'; return <article className={`market-card-${direction}`} key={measure} style={{ '--market-card-accent': palette.colors[index % palette.colors.length] } as CSSProperties}><div><b>{field?.label || measure}</b><span>基準 {numberText(base, fraction)} {field?.unit || ''}</span></div><label>調整幅度<input type="number" min="-100" max="500" step="1" value={adjustment} onChange={event => setAdjustments(current => ({ ...current, [measure]: Math.max(-100, Math.min(500, Number(event.target.value) || 0)) }))} /><small>%</small></label><strong>{numberText(projected, fraction)}<small>{field?.unit || ''}</small></strong><em><span className={`market-movement-badge ${direction}`} aria-label={`${label} ${numberText(Math.abs(adjustment))}%`}><span className="market-movement-glyph" aria-hidden="true">{symbol}</span><span>{label} {numberText(Math.abs(adjustment))}%</span></span></em></article>; })}</div>
     <div className="market-simulation-actions"><span>保存後會記錄期間、假設、結果、建立者與時間，紀錄不可覆寫。</span><button type="button" className="primary-btn" disabled={busy || !scenarioName.trim()} onClick={() => void save()}>{busy ? '保存中…' : '保存模擬快照'}</button></div>
     {message && <p className="market-inline-message" role="status">{message}</p>}
     <div className="market-simulation-history"><header><h3>最近模擬紀錄</h3><button type="button" className="secondary-btn compact" onClick={() => void loadRuns()}>重新載入</button></header>{runs.length ? runs.slice(0, 8).map(run => <article key={run.simulation_id}><div><b>{run.name}</b><span>{sources.find(source => source.source_id === run.source_id)?.source_name || '市場行情資料'}　{periodText({ from: run.period_from, to: run.period_to })}</span></div><p>{assumptionSummary(run)}</p><time dateTime={run.created_at}>{dateTimeText(run.created_at)}</time></article>) : <p className="market-empty">尚未保存模擬紀錄。</p>}</div>
@@ -546,24 +580,67 @@ function MarketDailyTrend({ analysis, measure, field, paletteId, customColors }:
   const palette = useResolvedPalette(paletteId, customColors);
   const series = analysis.series || [];
   if (!series.length) return <MarketBars analysis={analysis} measure={measure} field={field} paletteId={paletteId} customColors={customColors} limit={8} />;
+  const fraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0;
+  const currentValues = series.map(point => finiteNumber(point.values[measure]));
+  const compareValues = series.map(point => finiteNumber(point.compare_values[measure]));
+  const movements = currentValues.map((current, index) => marketMovementPresentation(changePercent(current, compareValues[index])));
+  const pointStyles: PointStyle[] = movements.map(movement => movement.tone === 'rise' || movement.tone === 'fall' ? 'triangle' : movement.tone === 'steady' ? 'dash' : 'circle');
+  const pointRotations = movements.map(movement => movement.tone === 'fall' ? 180 : 0);
+  const pointColors = movements.map(movement => movement.tone === 'rise' ? palette.rise : movement.tone === 'fall' ? palette.fall : palette.dim);
+  const validCurrentIndices = currentValues.flatMap((value, index) => value === null ? [] : [index]);
+  const markerStep = Math.max(1, Math.ceil(validCurrentIndices.length / 45));
+  const visiblePointIndices = new Set(validCurrentIndices.filter((_index, position) => position === 0 || position === validCurrentIndices.length - 1 || position % markerStep === 0));
+  const pointRadii = series.map((_point, index) => visiblePointIndices.has(index) ? 4 : 0);
   const data = {
     labels: series.map(point => point.observed_on.slice(5).replace('-', '/')),
     datasets: [
-      { label: '本期每日行情', data: series.map(point => finiteNumber(point.values[measure])), borderColor: palette.colors[0], backgroundColor: withAlpha(palette.colors[0], .16), borderWidth: 2.5, pointRadius: series.length > 45 ? 0 : 2.5, tension: .3, fill: true, spanGaps: false },
-      { label: '比較期每日行情', data: series.map(point => finiteNumber(point.compare_values[measure])), borderColor: palette.colors[1 % palette.colors.length], backgroundColor: withAlpha(palette.colors[1 % palette.colors.length], .06), borderDash: [7, 5], borderWidth: 2, pointRadius: series.length > 45 ? 0 : 2.5, tension: .3, fill: false, spanGaps: false },
+      { label: '本期每日行情（實線）', data: currentValues, borderColor: palette.current, backgroundColor: withAlpha(palette.current, .12), borderWidth: 2.5, pointBackgroundColor: pointColors, pointBorderColor: palette.panel, pointBorderWidth: 1.5, pointStyle: pointStyles, pointRotation: pointRotations, pointRadius: pointRadii, pointHoverRadius: 6, pointHitRadius: 10, tension: .3, fill: true, spanGaps: false },
+      { label: '比較期每日行情（虛線）', data: compareValues, borderColor: palette.comparison, backgroundColor: withAlpha(palette.comparison, .06), borderDash: [7, 5], borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 10, pointStyle: 'circle' as const, tension: .3, fill: false, spanGaps: false },
     ],
   };
   const options: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { position: 'bottom', labels: { color: palette.text, usePointStyle: true, padding: 16 } } },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {
+        title: items => {
+          const point = series[items[0]?.dataIndex ?? -1];
+          return point ? [`本期 ${point.observed_on}`, `比較期 ${point.compare_observed_on || '無對應日期'}`] : '';
+        },
+        label: context => `${context.dataset.label}: ${numberText(context.parsed.y, fraction)}${field?.unit ? ` ${field.unit}` : ''}`,
+        afterBody: items => {
+          const index = items[0]?.dataIndex ?? -1;
+          const current = currentValues[index], compare = compareValues[index];
+          const movement = movements[index];
+          if (!movement || current === null || compare === null) return ['差異：無比較基準'];
+          return [`差異：${signedNumberText(current - compare, fraction)}${field?.unit ? ` ${field.unit}` : ''}`, `方向：${movement.ariaLabel}`];
+        },
+      } },
+    },
     scales: {
-      x: { ticks: { color: palette.dim, maxTicksLimit: 10, maxRotation: 0 }, grid: { color: withAlpha(palette.grid, .35) } },
-      y: { ticks: { color: palette.dim }, grid: { color: withAlpha(palette.grid, .55) }, title: { display: Boolean(field?.unit), text: field?.unit || '', color: palette.dim } },
+      x: { ticks: { color: palette.dim, maxTicksLimit: 10, maxRotation: 0 }, grid: { color: withAlpha(palette.grid, .35) }, title: { display: true, text: '本期日期', color: palette.dim } },
+      y: { ticks: { color: palette.dim }, grid: { color: withAlpha(palette.grid, .55) }, title: { display: true, text: `${field?.label || measure}${field?.unit ? `（${field.unit}）` : ''}`, color: palette.dim } },
     },
   };
-  return <div className="market-daily-trend"><Line role="img" aria-label={`${field?.label || measure}每日行情，本期實線、比較期虛線`} data={data} options={options} /></div>;
+  return <div className="market-stock-trend" style={{ '--market-current-color': palette.current, '--market-compare-color': palette.comparison } as CSSProperties}>
+    <div className="market-stock-legend" role="note">
+      <b>台股式差異標示</b>
+      <span data-series="current"><i aria-hidden="true" /> 本期（實線）</span>
+      <span data-series="comparison"><i aria-hidden="true" /> 比較期（虛線）</span>
+      <span data-direction="rise"><i aria-hidden="true">▲</i> 本期高於比較期</span>
+      <span data-direction="fall"><i aria-hidden="true">▼</i> 本期低於比較期</span>
+      <span data-direction="steady"><i aria-hidden="true">—</i> 持平</span>
+      <span data-direction="neutral"><i aria-hidden="true">●</i> 無比較基準</span>
+      <small>紅漲綠跌僅表示相對變化，並非漲停／跌停；實線為本期、虛線為比較期。</small>
+    </div>
+    <div className="market-daily-trend"><Line role="img" aria-label={`${field?.label || measure}每日行情趨勢；本期實線、比較期虛線；紅色向上三角形代表本期高於比較期，綠色向下三角形代表本期低於比較期`} data={data} options={options} /></div>
+    <details className="market-chart-summary market-trend-summary"><summary>查看每日行情、比較日期與漲跌差異</summary><div className="responsive-table"><table><thead><tr><th>本期日期</th><th>比較期日期</th><th>本期{field?.unit ? `（${field.unit}）` : ''}</th><th>比較期{field?.unit ? `（${field.unit}）` : ''}</th><th>絕對差異{field?.unit ? `（${field.unit}）` : ''}</th><th>漲跌幅</th></tr></thead><tbody>{series.map((point, index) => {
+      const current = currentValues[index], compare = compareValues[index], percent = changePercent(current, compare);
+      return <tr key={`${point.observed_on}-${index}`}><th scope="row">{point.observed_on}</th><td>{point.compare_observed_on || '—'}</td><td>{numberText(current, fraction)}</td><td>{numberText(compare, fraction)}</td><td>{current === null || compare === null ? '—' : signedNumberText(current - compare, fraction)}</td><td><MarketMovementBadge value={percent} /></td></tr>;
+    })}</tbody></table></div></details>
+  </div>;
 }
 
 function MarketShareSnapshot({ analysis, measure, field, paletteId, customColors, canDrill = false, onDrill }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[]; canDrill?: boolean; onDrill?: (value: string) => void }) {
@@ -611,7 +688,8 @@ function MarketComparisonStrip({ analysis, fieldMap, canDrill = false, onDrill }
   if (!rows.length) return null;
   return <section className="market-market-comparison" aria-label="市場別營運比較"><header><div><span className="market-kicker">市場別比較</span><h3>市場別營運比較</h3></div><span>成交額為推估值</span></header><div>{rows.map(row => {
     const quantityChange = changePercent(row.quantity, row.compareQuantity);
-    return <article className={canDrill ? 'market-market-drillable' : ''} key={row.market}>{canDrill && <button type="button" className="market-market-drill-button" aria-label={`下鑽查看${row.market}`} onClick={() => onDrill?.(row.market)} />}<div><b>{row.market}</b><span>占總成交量 {totalQuantity > 0 ? `${(row.quantity / totalQuantity * 100).toFixed(1)}%` : '—'}</span></div><dl><div><dt>{fieldMap.get('quantity')?.label || '成交量'}</dt><dd>{numberText(row.quantity)}<small>{fieldMap.get('quantity')?.unit || '公斤'}</small></dd></div>{analysis.measures.includes('total_value') && <div><dt>推估成交額</dt><dd>{numberText(row.value)}<small>{fieldMap.get('total_value')?.unit || '元'}</small></dd></div>}{analysis.measures.includes('average_price') && <div><dt>加權平均價</dt><dd>{numberText(row.averagePrice, 1)}<small>{fieldMap.get('average_price')?.unit || '元／公斤'}</small></dd></div>}</dl><p><span>相較比較期成交量</span><b className={quantityChange === null || Math.abs(quantityChange) < .05 ? 'steady' : quantityChange > 0 ? 'rise' : 'fall'}>{signedPercentText(quantityChange)}</b></p>{canDrill && <span className="market-drill-hint">展開下一層</span>}</article>;
+    const movement = marketMovementPresentation(quantityChange);
+    return <article className={[canDrill ? 'market-market-drillable' : '', `market-card-${movement.tone}`].filter(Boolean).join(' ')} key={row.market}>{canDrill && <button type="button" className="market-market-drill-button" aria-label={`下鑽查看${row.market}`} onClick={() => onDrill?.(row.market)} />}<div><b>{row.market}</b><span>占總成交量 {totalQuantity > 0 ? `${(row.quantity / totalQuantity * 100).toFixed(1)}%` : '—'}</span></div><dl><div><dt>{fieldMap.get('quantity')?.label || '成交量'}</dt><dd>{numberText(row.quantity)}<small>{fieldMap.get('quantity')?.unit || '公斤'}</small></dd></div>{analysis.measures.includes('total_value') && <div><dt>推估成交額</dt><dd>{numberText(row.value)}<small>{fieldMap.get('total_value')?.unit || '元'}</small></dd></div>}{analysis.measures.includes('average_price') && <div><dt>加權平均價</dt><dd>{numberText(row.averagePrice, 1)}<small>{fieldMap.get('average_price')?.unit || '元／公斤'}</small></dd></div>}</dl><p><span>相較比較期成交量</span><MarketMovementBadge value={quantityChange} /></p>{canDrill && <span className="market-drill-hint">展開下一層</span>}</article>;
   })}</div></section>;
 }
 
@@ -665,17 +743,21 @@ function MarketExecutiveDashboard({ analysis, measures, fieldMap, primaryMeasure
       <div className="market-command-status"><span className="ready"><i />分析結果已更新</span><time dateTime={generatedAt}>{dateTimeText(generatedAt)}</time></div>
     </header>
     <div className="market-context-strip"><span><b>資料來源</b>{analysis.source.source_name}</span><span><b>本期</b>{periodText(analysis.periods)}</span><span><b>比較期</b>{periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</span><span><b>資料截止</b>{latestDate}</span><span><b>分析資料</b>{numberText(analysis.counts.current)} 筆</span><span className={!groupsTruncated && !watchRows.length && comparableMovements.length ? 'stable' : 'watching'}><b>變動觀察</b>{contextStatus}</span></div>
+    <div className="market-stock-legend market-stock-legend-compact" role="note">
+      <b>台股式圖卡差異</b><span data-direction="rise"><i aria-hidden="true">▲</i> 上漲（紅）</span><span data-direction="fall"><i aria-hidden="true">▼</i> 下跌（綠）</span><span data-direction="steady"><i aria-hidden="true">—</i> 持平</span><small>皆為本期相較比較期；借用紅漲綠跌視覺，不代表漲停／跌停。</small>
+    </div>
     <section className="market-kpi-grid">{measures.map(measure => {
       const field = fieldMap.get(measure), current = analysis.totals.values[measure], compare = analysis.totals.compare_values[measure], percent = changePercent(current, compare);
       const fraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0;
-      return <article className="market-kpi-card" key={measure}><span>{field?.label || measure}</span><strong>{numberText(current, fraction)}<small>{field?.unit || ''}</small></strong><p><span>比較期 {numberText(compare, fraction)}</span><b className={percent === null || Math.abs(percent) < .05 ? 'steady' : percent > 0 ? 'rise' : 'fall'}>{signedPercentText(percent)}</b></p></article>;
-    })}<article className="market-kpi-card market-kpi-neutral"><span>有交易日數</span><strong>{numberText(activeDays)}<small>日</small></strong><p><span>比較期 {numberText(compareActiveDays)} 日</span><b className={activeDayChange === 0 ? 'steady' : activeDayChange > 0 ? 'rise' : 'fall'}>{activeDayChange === 0 ? '持平' : `${activeDayChange > 0 ? '▲' : '▼'} ${numberText(Math.abs(activeDayChange))} 日`}</b></p></article></section>
+      const movement = marketMovementPresentation(percent);
+      return <article className={`market-kpi-card market-card-${movement.tone}`} key={measure}><span>{field?.label || measure}</span><strong>{numberText(current, fraction)}<small>{field?.unit || ''}</small></strong><p><span>比較期 {numberText(compare, fraction)}</span><MarketMovementBadge value={percent} /></p></article>;
+    })}<article className={`market-kpi-card market-kpi-neutral market-card-${activeDayChange > 0 ? 'rise' : activeDayChange < 0 ? 'fall' : 'steady'}`}><span>有交易日數</span><strong>{numberText(activeDays)}<small>日</small></strong><p><span>比較期 {numberText(compareActiveDays)} 日</span><MarketAbsoluteMovementBadge value={activeDayChange} unit="日" /></p></article></section>
     <MarketComparisonStrip analysis={analysis} fieldMap={fieldMap} canDrill={marketCanDrill} onDrill={onDrill} />
     <div className="market-command-grid">
       <article className="market-command-card market-command-trend"><header><div><span className="market-kicker">每日趨勢比較</span><h3>{analysis.series?.length ? '每日行情走勢' : '主要分類比較'}</h3></div><span>{primaryField?.label || primaryMeasure}・{primaryField?.unit || '數值'}</span></header><MarketDailyTrend analysis={analysis} measure={primaryMeasure} field={primaryField} paletteId={paletteId} customColors={customColors} /></article>
-      <article className="market-command-card market-command-attention"><header><div><span className="market-kicker">變動觀察</span><h3>行情變動觀察</h3></div><span>{priceMovement ? priceReliabilityReady ? '門檻 ±10%・各期 ≥1,000 公斤' : '價格判讀需搭配成交量' : '門檻 ±10%'}</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>分類結果範圍過大</b>目前僅回傳 {numberText(returnedGroupCount)}／{numberText(totalGroupCount)} 組，請縮小期間或減少維度後再判讀。</p></div> : !priceReliabilityReady ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>請加入成交量指標</b>價格預警需確認本期與比較期交易量皆達 1,000 公斤，避免用微量交易誤判行情。</p></div> : watchRows.length ? <ol className="market-attention-list">{watchRows.map(row => <li className={canDrill && row.drillValue ? 'market-attention-drillable' : ''} key={`${row.state}-${row.label}`}>{canDrill && row.drillValue && <button type="button" className="market-attention-drill-button" aria-label={`下鑽查看${row.label}`} onClick={() => onDrill(row.drillValue)} />}<div><b title={row.label}>{row.label}</b><span>本期 {numberText(row.current)}・比較期 {numberText(row.compare)}</span></div><strong className={row.state === 'disappeared' || (row.percent !== null && row.percent < 0) ? 'fall' : 'rise'}>{row.percent === null ? movementStateLabel(row.state) : signedPercentText(row.percent)}</strong>{row.percent !== null && <progress className={row.percent > 0 ? 'rise' : 'fall'} max="100" value={Math.min(100, Math.abs(row.percent))} aria-label={`${row.label}變動幅度 ${Math.abs(row.percent).toFixed(1)}%`} />}</li>)}</ol> : comparableMovements.length ? <div className="market-steady-state"><span>✓</span><p><b>目前波動平穩</b>所選指標沒有分類項目超過 ±10%。</p></div> : <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>比較資料不足</b>{priceMovement ? '兩期成交量皆達 1,000 公斤的共同分類不足，暫不判定價格波動。' : '本期與比較期沒有可對照的共同分類，暫不判定波動。'}</p></div>}</article>
+      <article className="market-command-card market-command-attention"><header><div><span className="market-kicker">變動觀察</span><h3>行情變動觀察</h3></div><span>{priceMovement ? priceReliabilityReady ? '門檻 ±10%・各期 ≥1,000 公斤' : '價格判讀需搭配成交量' : '門檻 ±10%'}</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>分類結果範圍過大</b>目前僅回傳 {numberText(returnedGroupCount)}／{numberText(totalGroupCount)} 組，請縮小期間或減少維度後再判讀。</p></div> : !priceReliabilityReady ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>請加入成交量指標</b>價格預警需確認本期與比較期交易量皆達 1,000 公斤，避免用微量交易誤判行情。</p></div> : watchRows.length ? <ol className="market-attention-list">{watchRows.map(row => <li className={canDrill && row.drillValue ? 'market-attention-drillable' : ''} key={`${row.state}-${row.label}`}>{canDrill && row.drillValue && <button type="button" className="market-attention-drill-button" aria-label={`下鑽查看${row.label}`} onClick={() => onDrill(row.drillValue)} />}<div><b title={row.label}>{row.label}</b><span>本期 {numberText(row.current)}・比較期 {numberText(row.compare)}</span></div><strong className={row.percent === null ? 'neutral' : ''}>{row.percent === null ? movementStateLabel(row.state) : <MarketMovementBadge value={row.percent} />}</strong>{row.percent !== null && <progress className={marketMovementPresentation(row.percent).tone} max="100" value={Math.min(100, Math.abs(row.percent))} aria-label={`${row.label}${marketMovementPresentation(row.percent).ariaLabel}`} />}</li>)}</ol> : comparableMovements.length ? <div className="market-steady-state"><span>✓</span><p><b>目前波動平穩</b>所選指標沒有分類項目超過 ±10%。</p></div> : <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>比較資料不足</b>{priceMovement ? '兩期成交量皆達 1,000 公斤的共同分類不足，暫不判定價格波動。' : '本期與比較期沒有可對照的共同分類，暫不判定波動。'}</p></div>}</article>
       <article className="market-command-card market-command-share"><header><div><span className="market-kicker">本期結構</span><h3>本期分類占比</h3></div><span>{shareField?.label || shareMeasure}</span></header><MarketShareSnapshot analysis={analysis} measure={shareMeasure} field={shareField} paletteId={paletteId} customColors={customColors} canDrill={canDrill} onDrill={onDrill} /></article>
-      <article className="market-command-card market-command-insights"><header><div><span className="market-kicker">快速判讀</span><h3>快速判讀</h3></div><span>依目前篩選結果</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>暫停分類結論</b>分類結果尚未完整載入，主要分類與最大漲跌不會以部分資料推論。</p></div> : <><div className="market-insight-grid"><div className={canDrill && leader?.drillValue ? 'market-insight-drillable' : ''}>{canDrill && leader?.drillValue && <button type="button" aria-label={`下鑽查看${leader.label}`} onClick={() => onDrill(leader.drillValue)} />}<span>{primaryIsAdditive ? '本期主要分類' : '本期最高分類'}</span><strong>{leader?.label || '資料不足'}</strong><p>{leader ? primaryIsAdditive && positiveTotal > 0 ? `占本期 ${primaryField?.label || '指標'} ${(Number(leader.current) / positiveTotal * 100).toFixed(1)}%` : `${primaryField?.label || '本期值'} ${numberText(leader.current, primaryField?.aggregation === 'avg' || primaryField?.aggregation === 'weighted_avg' ? 1 : 0)} ${primaryField?.unit || ''}` : '尚無可判讀的資料'}</p></div><div className={canDrill && rising?.drillValue ? 'market-insight-drillable' : ''}>{canDrill && rising?.drillValue && <button type="button" aria-label={`下鑽查看${rising.label}`} onClick={() => onDrill(rising.drillValue)} />}<span>最大上升幅度</span><strong>{rising?.label || '無比較資料'}</strong><p className="rise">{rising ? signedPercentText(rising.percent) : '—'}</p></div><div className={canDrill && falling?.drillValue ? 'market-insight-drillable' : ''}>{canDrill && falling?.drillValue && <button type="button" aria-label={`下鑽查看${falling.label}`} onClick={() => onDrill(falling.drillValue)} />}<span>最大下降幅度</span><strong>{falling?.label || '無比較資料'}</strong><p className="fall">{falling ? signedPercentText(falling.percent) : '—'}</p></div></div><p className="market-insight-note">上升或下降僅代表數值方向，不代表營運好壞；請搭配交易量、價格與市場情境判讀。</p></>}</article>
+      <article className="market-command-card market-command-insights"><header><div><span className="market-kicker">快速判讀</span><h3>快速判讀</h3></div><span>依目前篩選結果</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>暫停分類結論</b>分類結果尚未完整載入，主要分類與最大漲跌不會以部分資料推論。</p></div> : <><div className="market-insight-grid"><div className={canDrill && leader?.drillValue ? 'market-insight-drillable' : ''}>{canDrill && leader?.drillValue && <button type="button" aria-label={`下鑽查看${leader.label}`} onClick={() => onDrill(leader.drillValue)} />}<span>{primaryIsAdditive ? '本期主要分類' : '本期最高分類'}</span><strong>{leader?.label || '資料不足'}</strong><p>{leader ? primaryIsAdditive && positiveTotal > 0 ? `占本期 ${primaryField?.label || '指標'} ${(Number(leader.current) / positiveTotal * 100).toFixed(1)}%` : `${primaryField?.label || '本期值'} ${numberText(leader.current, primaryField?.aggregation === 'avg' || primaryField?.aggregation === 'weighted_avg' ? 1 : 0)} ${primaryField?.unit || ''}` : '尚無可判讀的資料'}</p></div><div className={canDrill && rising?.drillValue ? 'market-insight-drillable market-card-rise' : 'market-card-rise'}>{canDrill && rising?.drillValue && <button type="button" aria-label={`下鑽查看${rising.label}`} onClick={() => onDrill(rising.drillValue)} />}<span>最大上升幅度</span><strong>{rising?.label || '無比較資料'}</strong><p>{rising ? <MarketMovementBadge value={rising.percent} /> : '—'}</p></div><div className={canDrill && falling?.drillValue ? 'market-insight-drillable market-card-fall' : 'market-card-fall'}>{canDrill && falling?.drillValue && <button type="button" aria-label={`下鑽查看${falling.label}`} onClick={() => onDrill(falling.drillValue)} />}<span>最大下降幅度</span><strong>{falling?.label || '無比較資料'}</strong><p>{falling ? <MarketMovementBadge value={falling.percent} /> : '—'}</p></div></div><p className="market-insight-note">上升或下降僅代表數值方向，不代表營運好壞；請搭配交易量、價格與市場情境判讀。</p></>}</article>
     </div>
   </section>;
 }
@@ -910,7 +992,7 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
     <MarketDrillToolbar enabled={effectiveDrillMode} hierarchy={drillHierarchy} path={drillPath} busy={busy} onToggle={toggleDrill} onBack={drillBack} onReset={drillReset} onDepth={drillToDepth} />
     {analysis && <>
       <MarketExecutiveDashboard analysis={analysis} measures={analysis.measures} fieldMap={analysisFieldMap} primaryMeasure={resultPrimaryMeasure} paletteId={paletteId} customColors={customColors} generatedAt={analysisGeneratedAt || new Date().toISOString()} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} marketCanDrill={effectiveDrillMode && activeDrillLevel?.key === 'market'} onDrill={drillToValue} />
-      <section className="panel market-result-panel"><header className="market-result-heading"><div><span className="market-kicker">分析結果</span><h2>{analysis.source.source_name}</h2><p>本期 {periodText(analysis.periods)}　｜　比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</p></div><span>{analysis.quality?.groups_truncated ? `共 ${numberText(analysis.quality.total_group_count)} 組，目前載入 ${numberText(analysis.quality.returned_group_count)} 組` : `${analysis.rows.length} 組比較結果`}</span></header>{analysis.quality?.groups_truncated ? <div className="market-result-incomplete" role="status"><b>分類結果超過顯示上限</b><p>為避免用部分資料產生排行、占比或漲跌結論，詳細分類圖表已暫停。請縮小日期範圍或減少分析維度後重新執行。</p></div> : <>{chartType === 'bar' && <MarketBars analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{(chartType === 'pie' || chartType === 'doughnut') && <MarketArcCharts analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{(chartType === 'line' || chartType === 'area') && <MarketLineChart analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{chartType === 'cards' && <MarketColorCards analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{chartType === 'table' && <div className="responsive-table market-result-table"><table><thead><tr>{analysis.dimensions.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}</th>)}{analysis.measures.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}（本期／比較）</th>)}<th>變化</th></tr></thead><tbody>{analysis.rows.map((row, index) => { const drillValue = analysis.dimensions.length === 1 ? row.dimensions[analysis.dimensions[0]] || '' : ''; return <tr key={index}>{analysis.dimensions.map(key => <td key={key}>{effectiveDrillMode && drillPath.length < drillHierarchy.length - 1 && key === analysis.dimensions[0] && drillValue ? <button type="button" className="market-table-drill-button" onClick={() => drillToValue(drillValue)}>{row.dimensions[key] || '未分類'}<span>展開下一層</span></button> : row.dimensions[key] || '未分類'}</td>)}{analysis.measures.map(key => <td key={key}>{numberText(row.values[key])} ／ {numberText(row.compare_values[key])}</td>)}<td>{numberText(row.changes[resultPrimaryMeasure])}</td></tr>; })}</tbody></table></div>}</>}</section>
+      <section className="panel market-result-panel"><header className="market-result-heading"><div><span className="market-kicker">分析結果</span><h2>{analysis.source.source_name}</h2><p>本期 {periodText(analysis.periods)}　｜　比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</p></div><span>{analysis.quality?.groups_truncated ? `共 ${numberText(analysis.quality.total_group_count)} 組，目前載入 ${numberText(analysis.quality.returned_group_count)} 組` : `${analysis.rows.length} 組比較結果`}</span></header>{analysis.quality?.groups_truncated ? <div className="market-result-incomplete" role="status"><b>分類結果超過顯示上限</b><p>為避免用部分資料產生排行、占比或漲跌結論，詳細分類圖表已暫停。請縮小日期範圍或減少分析維度後重新執行。</p></div> : <>{chartType === 'bar' && <MarketBars analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{(chartType === 'pie' || chartType === 'doughnut') && <MarketArcCharts analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{(chartType === 'line' || chartType === 'area') && <MarketLineChart analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{chartType === 'cards' && <MarketColorCards analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{chartType === 'table' && <div className="responsive-table market-result-table"><table><thead><tr>{analysis.dimensions.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}</th>)}{analysis.measures.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}（本期／比較）</th>)}<th>差異／漲跌幅</th></tr></thead><tbody>{analysis.rows.map((row, index) => { const drillValue = analysis.dimensions.length === 1 ? row.dimensions[analysis.dimensions[0]] || '' : ''; return <tr key={index}>{analysis.dimensions.map(key => <td key={key}>{effectiveDrillMode && drillPath.length < drillHierarchy.length - 1 && key === analysis.dimensions[0] && drillValue ? <button type="button" className="market-table-drill-button" onClick={() => drillToValue(drillValue)}>{row.dimensions[key] || '未分類'}<span>展開下一層</span></button> : row.dimensions[key] || '未分類'}</td>)}{analysis.measures.map(key => <td key={key}>{numberText(row.values[key])} ／ {numberText(row.compare_values[key])}</td>)}<td><MarketDifferenceSummary current={row.values[resultPrimaryMeasure]} compare={row.compare_values[resultPrimaryMeasure]} difference={row.changes[resultPrimaryMeasure]} field={resultPrimaryField} /></td></tr>; })}</tbody></table></div>}</>}</section>
       <MarketSimulation analysis={analysis} sources={decisionSources} measures={analysis.measures} fieldMap={analysisFieldMap} paletteId={paletteId} customColors={customColors} />
     </>}
     {!analysis && !busy && <div className="market-empty-panel panel">請選擇資料來源與比較期間，再執行分析。</div>}

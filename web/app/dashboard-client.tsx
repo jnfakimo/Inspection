@@ -27,6 +27,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
+import { MarketMovementBadge } from '@/components/MarketMovementBadge';
+import { marketMovementPresentation } from '@/lib/market-movement';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
@@ -97,6 +99,11 @@ const countBy = (rows: Row[], pick: (row: Row) => unknown): Array<[string, numbe
 };
 const average = (list: number[]) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
 const numberText = (value: unknown) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('zh-TW', { maximumFractionDigits: 1 });
+const signedNumberText = (value: unknown) => {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const numeric = Number(value), sign = numeric > 0 ? '+' : numeric < 0 ? '−' : '';
+  return `${sign}${numberText(Math.abs(numeric))}`;
+};
 
 function normalizeLayout(rows: Row[]): LayoutItem[] {
   const byKey: Record<string, Row> = {};
@@ -356,9 +363,9 @@ export function DashboardClient({ profile }: { profile: Profile }) {
           const definition = market?.fields?.find(item => item.key === key);
           const current = market?.totals?.values?.[key], compare = market?.totals?.compare_values?.[key];
           const percent = current == null || compare == null || Number(compare) === 0 ? null : (Number(current) - Number(compare)) / Math.abs(Number(compare)) * 100;
-          return { key, label: key === 'total_value' ? '推估成交額' : definition?.label || key, unit: definition?.unit || '', current, percent };
+          return { key, label: key === 'total_value' ? '推估成交額' : definition?.label || key, unit: definition?.unit || '', current, compare, difference: current == null || compare == null ? null : Number(current) - Number(compare), percent };
         });
-        return <div className="dash-market-snapshot"><div className="dash-market-meta"><span>{market?.source?.source_name || '尚未設定行情資料來源'}</span><small>{market?.periods ? `${market.periods.from}～${market.periods.to}　比　${market.periods.compare_from}～${market.periods.compare_to}　｜　資料截止 ${market.quality?.latest_observed_on || '—'}` : '可由市場營運分析系統設定'}</small></div>{market && <div className="dash-market-kpis">{kpis.map(kpi => <div key={kpi.key}><span>{kpi.label}</span><strong>{numberText(kpi.current)}<small>{kpi.unit}</small></strong><b className={kpi.percent == null ? '' : kpi.percent >= 0 ? 'up' : 'down'}>{kpi.percent == null ? '無比較基準' : `${kpi.percent >= 0 ? '▲' : '▼'} ${Math.abs(kpi.percent).toFixed(1)}%`}</b></div>)}</div>}{items.length ? <div className="dash-market-list">{items.map((item, index) => <div key={index}><b>{Object.values(item.dimensions || {}).join('／') || '全部'}</b><strong>{numberText(item.values?.[measure])}<small>{field?.unit || ''}</small></strong><span>{item.compare_values?.[measure] == null ? '無比較資料' : `比較 ${numberText(item.compare_values[measure])}`}</span></div>)}</div> : <p className="empty">尚無行情資料，請至「市場營運分析系統」確認正式來源與資料期間。</p>}</div>;
+        return <div className="dash-market-snapshot"><div className="dash-market-meta"><span>{market?.source?.source_name || '尚未設定行情資料來源'}</span><small>{market?.periods ? `${market.periods.from}～${market.periods.to}　比　${market.periods.compare_from}～${market.periods.compare_to}　｜　資料截止 ${market.quality?.latest_observed_on || '—'}` : '可由市場營運分析系統設定'}</small></div>{market && <><div className="dash-market-stock-legend" role="note"><b>台股式差異：</b><span className="rise"><i aria-hidden="true">▲</i> 上漲（紅）</span><span className="fall"><i aria-hidden="true">▼</i> 下跌（綠）</span><small>僅表示本期相較比較期，非漲停／跌停。</small></div><div className="dash-market-kpis">{kpis.map(kpi => { const movement = marketMovementPresentation(kpi.percent); return <div className={`market-card-${movement.tone}`} key={kpi.key}><span>{kpi.label}</span><strong>{numberText(kpi.current)}<small>{kpi.unit}</small></strong><MarketMovementBadge value={kpi.percent} /><small className="dash-market-compare">比較期 {numberText(kpi.compare)}・差異 {signedNumberText(kpi.difference)} {kpi.unit}</small></div>; })}</div></>}{items.length ? <div className="dash-market-list">{items.map((item, index) => <div key={index}><b>{Object.values(item.dimensions || {}).join('／') || '全部'}</b><strong>{numberText(item.values?.[measure])}<small>{field?.unit || ''}</small></strong><span>{item.compare_values?.[measure] == null ? '無比較資料' : `比較 ${numberText(item.compare_values[measure])}`}</span></div>)}</div> : <p className="empty">尚無行情資料，請至「市場營運分析系統」確認正式來源與資料期間。</p>}</div>;
       }
       default: return <p className="empty">未知的版面元件：{item.widget_key}</p>;
     }
