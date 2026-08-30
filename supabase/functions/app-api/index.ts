@@ -1246,10 +1246,14 @@ export async function handleAppApiRequest(req: Request) {
       const fieldMap = new Map(fields.map(field => [field.key, field]));
       const dimensionKeys = fields.filter(field => field.kind === 'dimension').map(field => field.key);
       const measureKeys = fields.filter(field => field.kind === 'measure').map(field => field.key);
-      const requestedDimensions: string[] = (Array.isArray(body.dimensions) ? body.dimensions : []).map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => dimensionKeys.includes(key)).slice(0, 4);
-      const requestedMeasures: string[] = (Array.isArray(body.measures) ? body.measures : []).map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => measureKeys.includes(key)).slice(0, 4);
-      const dimensions: string[] = requestedDimensions.length ? [...new Set(requestedDimensions)] : dimensionKeys.slice(0, 2);
-      const measures: string[] = requestedMeasures.length ? [...new Set(requestedMeasures)] : measureKeys.slice(0, 2);
+      const hasRequestedDimensions = Array.isArray(body.dimensions);
+      const hasRequestedMeasures = Array.isArray(body.measures);
+      const dimensionInput: unknown[] = Array.isArray(body.dimensions) ? body.dimensions : [];
+      const measureInput: unknown[] = Array.isArray(body.measures) ? body.measures : [];
+      const requestedDimensions: string[] = dimensionInput.map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => dimensionKeys.includes(key)).slice(0, 4);
+      const requestedMeasures: string[] = measureInput.map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => measureKeys.includes(key)).slice(0, 4);
+      const dimensions: string[] = hasRequestedDimensions ? [...new Set(requestedDimensions)] : dimensionKeys.slice(0, 2);
+      const measures: string[] = hasRequestedMeasures ? [...new Set(requestedMeasures)] : measureKeys.slice(0, 2);
       if (!measures.length) return reply(req, { ok: false, message: '資料來源至少需要一個可分析的數值欄位' }, 400);
       const nowISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
       const from = marketDateRange(body.from, nowISO);
@@ -1258,24 +1262,63 @@ export async function handleAppApiRequest(req: Request) {
       const compareTo = marketDateRange(body.compare_to, to);
       if (from > to || compareFrom > compareTo) return reply(req, { ok: false, message: '分析期間起訖日期不正確' }, 400);
       const rangeDays = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
-      if (rangeDays > 366) return reply(req, { ok: false, message: '單次分析期間最多 366 天' }, 400);
+      const compareRangeDays = Math.round((Date.parse(`${compareTo}T00:00:00Z`) - Date.parse(`${compareFrom}T00:00:00Z`)) / 86400000) + 1;
+      if (rangeDays > 366 || compareRangeDays > 366) return reply(req, { ok: false, message: '單次分析期間與比較期間最多 366 天' }, 400);
+      if (rangeDays !== compareRangeDays) return reply(req, { ok: false, message: '分析期間與比較期間必須使用相同天數' }, 400);
+      const MARKET_ANALYSIS_PAGE_SIZE = 1000;
+      const MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD = 50_000;
+      class MarketAnalysisRowLimitError extends Error {
+        constructor(readonly start: string, readonly end: string) {
+          super(`market analysis row limit exceeded for ${start} to ${end}`);
+          this.name = 'MarketAnalysisRowLimitError';
+        }
+      }
       const loadRange = async (start: string, end: string) => {
-        const result = await admin.from('market_data_points').select('observed_on,dimensions,measures').eq('source_id', source.source_id).gte('observed_on', start).lte('observed_on', end).order('observed_on').limit(5000);
-        if (result.error) throw result.error;
-        return (result.data || []) as Array<Record<string, unknown>>;
+        const rows: Array<Record<string, unknown>> = [];
+        // PostgREST 單次回傳有列數上限；逐頁讀完並多讀一列確認沒有超限，
+        // 避免以固定 limit 靜默截斷後仍回傳看似完整、實際少算的分析結果。
+        let offset = 0;
+        while (offset <= MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD) {
+          const pageEnd = Math.min(offset + MARKET_ANALYSIS_PAGE_SIZE - 1, MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD);
+          const result = await admin.from('market_data_points')
+            .select('point_id,observed_on,dimensions,measures')
+            .eq('source_id', source.source_id)
+            .gte('observed_on', start)
+            .lte('observed_on', end)
+            .order('observed_on')
+            .order('point_id')
+            .range(offset, pageEnd);
+          if (result.error) throw result.error;
+          const page = (result.data || []) as Array<Record<string, unknown>>;
+          if (!page.length) break;
+          rows.push(...page);
+          if (rows.length > MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD) throw new MarketAnalysisRowLimitError(start, end);
+          // 依實際收到的列數前進，避免 PostgREST 專案端若把單頁上限設得比
+          // MARKET_ANALYSIS_PAGE_SIZE 更小時，仍因固定 offset 跳過中間資料。
+          offset += page.length;
+        }
+        return rows;
       };
       let currentRows: Array<Record<string, unknown>>, compareRows: Array<Record<string, unknown>>;
       try {
         [currentRows, compareRows] = await Promise.all([loadRange(from, to), loadRange(compareFrom, compareTo)]);
       } catch (error) {
+        if (error instanceof MarketAnalysisRowLimitError) {
+          return reply(req, {
+            ok: false,
+            message: `分析期間 ${error.start} 至 ${error.end} 的行情資料超過每期 ${MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD.toLocaleString('en-US')} 筆上限；為避免少算，系統已停止分析。請縮短分析期間後再試。`,
+          }, 413);
+        }
         console.error('market analysis query failed:', error instanceof Error ? error.message : String(error));
         return reply(req, { ok: false, message: '市場行情分析資料讀取失敗' }, 500);
       }
       const current = aggregateMarketPoints(currentRows, dimensions, measures, fieldMap);
       const comparison = aggregateMarketPoints(compareRows, dimensions, measures, fieldMap);
-      const compareByKey = new Map(comparison.map(row => [JSON.stringify(dimensions.map(key => row.dimensions[key] || '未分類')), row]));
+      const marketGroupKey = (row: MarketAggregate) => JSON.stringify(dimensions.map(key => row.dimensions[key] || '未分類'));
+      const compareByKey = new Map(comparison.map(row => [marketGroupKey(row), row]));
+      const currentGroupKeys = new Set(current.map(marketGroupKey));
       const rows = current.map(row => {
-        const key = JSON.stringify(dimensions.map(name => row.dimensions[name] || '未分類'));
+        const key = marketGroupKey(row);
         const other = compareByKey.get(key);
         const values: Record<string, number | null> = {};
         const compareValues: Record<string, number | null> = {};
@@ -1290,17 +1333,75 @@ export async function handleAppApiRequest(req: Request) {
         return { dimensions: row.dimensions, values, compare_values: compareValues, changes, current_count: currentRows.length, compare_count: compareRows.length };
       });
       comparison.forEach(row => {
-        const key = JSON.stringify(dimensions.map(name => row.dimensions[name] || '未分類'));
-        if (rows.some(item => JSON.stringify(dimensions.map(name => item.dimensions[name] || '未分類')) === key)) return;
+        const key = marketGroupKey(row);
+        if (currentGroupKeys.has(key)) return;
         rows.push({ dimensions: row.dimensions, values: {}, compare_values: Object.fromEntries(measures.map(measure => [measure, row.values[measure] ?? null])), changes: {}, current_count: currentRows.length, compare_count: compareRows.length });
       });
+      const totalGroupCount = rows.length;
+      const returnedGroupCount = Math.min(totalGroupCount, 500);
+      const groupsTruncated = returnedGroupCount < totalGroupCount;
       const totalsCurrent = aggregateMarketPoints(currentRows, [], measures, fieldMap)[0]?.values || {};
       const totalsCompare = aggregateMarketPoints(compareRows, [], measures, fieldMap)[0]?.values || {};
+      const dailyValues = (inputRows: Array<Record<string, unknown>>) => {
+        const rowsByDate = new Map<string, Array<Record<string, unknown>>>();
+        inputRows.forEach(row => {
+          const observedOn = text(row.observed_on, 10);
+          if (!validISODate(observedOn)) return;
+          const dayRows = rowsByDate.get(observedOn) || [];
+          dayRows.push(row);
+          rowsByDate.set(observedOn, dayRows);
+        });
+        return new Map([...rowsByDate.entries()].map(([observedOn, dayRows]) => {
+          const values = aggregateMarketPoints(dayRows, [], measures, fieldMap)[0]?.values || {};
+          return [observedOn, Object.fromEntries(measures.map(measure => [
+            measure,
+            Number.isFinite(values[measure]) ? values[measure] : null,
+          ]))];
+        }));
+      };
+      const currentDaily = dailyValues(currentRows);
+      const compareDaily = dailyValues(compareRows);
+      const dateAtOffset = (start: string, offset: number) => {
+        const date = new Date(`${start}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + offset);
+        return date.toISOString().slice(0, 10);
+      };
+      // 圖表以「區間第 N 天」對齊，避免去年同期或前一期因實際日期不同而錯位。
+      // 沒有交易資料的日期仍保留在序列中並回傳 null，讓前端可如實呈現缺口。
+      const series = Array.from({ length: rangeDays }, (_, offset) => {
+        const observedOn = dateAtOffset(from, offset);
+        const candidateCompareOn = dateAtOffset(compareFrom, offset);
+        const compareObservedOn = candidateCompareOn <= compareTo ? candidateCompareOn : null;
+        return {
+          observed_on: observedOn,
+          compare_observed_on: compareObservedOn,
+          values: currentDaily.get(observedOn) || Object.fromEntries(measures.map(measure => [measure, null])),
+          compare_values: compareObservedOn
+            ? compareDaily.get(compareObservedOn) || Object.fromEntries(measures.map(measure => [measure, null]))
+            : Object.fromEntries(measures.map(measure => [measure, null])),
+        };
+      });
+      const latestObservedOn = currentRows
+        .map(row => text(row.observed_on, 10))
+        .filter(validISODate)
+        .sort()
+        .at(-1) || null;
       return reply(req, { ok: true, data: {
         source: { source_id: source.source_id, source_code: source.source_code, source_name: source.source_name },
         fields, dimensions, measures, periods: { from, to, compare_from: compareFrom, compare_to: compareTo },
         totals: { values: totalsCurrent, compare_values: totalsCompare, changes: Object.fromEntries(measures.map(measure => [measure, Number.isFinite(totalsCurrent[measure]) && Number.isFinite(totalsCompare[measure]) ? totalsCurrent[measure] - totalsCompare[measure] : null])) },
-        counts: { current: currentRows.length, compare: compareRows.length }, rows: rows.slice(0, 500),
+        counts: { current: currentRows.length, compare: compareRows.length },
+        quality: {
+          latest_observed_on: latestObservedOn,
+          current_loaded_count: currentRows.length,
+          compare_loaded_count: compareRows.length,
+          is_truncated: false,
+          total_group_count: totalGroupCount,
+          returned_group_count: returnedGroupCount,
+          groups_truncated: groupsTruncated,
+        },
+        series,
+        rows: rows.slice(0, returnedGroupCount),
       } });
     }
 
@@ -1363,7 +1464,10 @@ export async function handleAppApiRequest(req: Request) {
       if (!/^[a-z][a-z0-9_-]{1,59}$/.test(sourceCode) || !sourceName) return reply(req, { ok: false, message: '資料來源代碼與名稱不可空白，代碼需使用英文字母、數字、底線或連字號' }, 400);
       if (!['manual', 'csv', 'json', 'api'].includes(sourceType)) return reply(req, { ok: false, message: '資料來源類型不正確' }, 400);
       if (!fields.some(field => field.kind === 'dimension') || !fields.some(field => field.kind === 'measure')) return reply(req, { ok: false, message: '資料來源至少需要一個分類欄位與一個數值欄位' }, 400);
-      const payload = { source_code: sourceCode, source_name: sourceName, source_type: sourceType, endpoint_url: text(body.endpoint_url, 500) || null, field_definitions: fields, config: marketJsonObject(body.config), status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
+      const payload: Record<string, unknown> = { source_code: sourceCode, source_name: sourceName, source_type: sourceType, endpoint_url: text(body.endpoint_url, 500) || null, field_definitions: fields, status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
+      // 更新時若前端沒有送 config，保留資料庫中的既有設定；只有明確送出
+      // config 才覆寫。新增來源仍以空物件作為安全預設值。
+      if (!sourceId || Object.prototype.hasOwnProperty.call(body, 'config')) payload.config = marketJsonObject(body.config);
       const result = sourceId
         ? await admin.from('market_data_sources').update(payload).eq('source_id', sourceId).select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').maybeSingle()
         : await admin.from('market_data_sources').insert({ ...payload, created_by: profile.user_id }).select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').single();
@@ -1401,8 +1505,9 @@ export async function handleAppApiRequest(req: Request) {
       const fields = marketFieldDefinitions(sourceResult.data.field_definitions);
       const dimensions = fields.filter(field => field.kind === 'dimension');
       const measures = fields.filter(field => field.kind === 'measure');
-      const inputRows: unknown[] = Array.isArray(body.rows) ? body.rows.slice(0, 2000) : [];
+      const inputRows: unknown[] = Array.isArray(body.rows) ? body.rows : [];
       if (!inputRows.length) return reply(req, { ok: false, message: '沒有可匯入的資料列' }, 400);
+      if (inputRows.length > 2000) return reply(req, { ok: false, message: '單次最多匯入 2,000 筆行情資料；為避免漏匯，請將檔案分批後再試。' }, 413);
       let rows: Array<Record<string, unknown>>;
       try {
         rows = inputRows.map((item: unknown, index: number) => {

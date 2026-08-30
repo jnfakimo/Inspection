@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import {
   ArcElement,
   CategoryScale,
@@ -71,6 +71,21 @@ type Analysis = {
   periods: { from: string; to: string; compare_from: string; compare_to: string };
   totals: { values: Record<string, number | null>; compare_values: Record<string, number | null>; changes: Record<string, number | null> };
   counts: { current: number; compare: number };
+  quality?: {
+    latest_observed_on?: string | null;
+    current_loaded_count?: number;
+    compare_loaded_count?: number;
+    is_truncated?: boolean;
+    total_group_count?: number;
+    returned_group_count?: number;
+    groups_truncated?: boolean;
+  };
+  series?: Array<{
+    observed_on: string;
+    compare_observed_on?: string | null;
+    values: Record<string, number | null>;
+    compare_values: Record<string, number | null>;
+  }>;
   rows: AnalysisRow[];
 };
 type SimulationRun = {
@@ -102,6 +117,7 @@ const CHART_TYPE_LABELS: Record<ChartType, string> = {
   cards: '彩色數值卡',
 };
 const CHART_TYPE_OPTIONS = Object.entries(CHART_TYPE_LABELS) as Array<[ChartType, string]>;
+const CHART_TYPE_IDS = new Set<ChartType>(CHART_TYPE_OPTIONS.map(([value]) => value));
 const SOURCE_TYPE_LABELS: Record<string, string> = { csv: 'CSV 檔案', json: 'JSON 資料', api: '外部 API', manual: '手動輸入' };
 const DEFAULT_CUSTOM_COLORS = ['#0284c7', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
 const PALETTES: PaletteDefinition[] = [
@@ -223,8 +239,40 @@ function chartMeasureFrom(config: Record<string, unknown> | undefined, measures:
   const value = String(config?.chart_measure || '');
   return measures.includes(value) ? value : measures[0] || '';
 }
+function marketSourceSchemaKey(source?: Source) {
+  return source ? `${source.source_id}:${source.updated_at || ''}:${source.field_definitions.map(field => `${field.key}:${field.label}:${field.kind}:${field.unit || ''}:${field.aggregation || ''}:${field.required ? '1' : '0'}`).join('|')}` : '';
+}
+function validSelections(source: Source, requestedDimensions: string[] = [], requestedMeasures: string[] = []) {
+  const dimensionFields = source.field_definitions.filter(field => field.kind === 'dimension');
+  const measureFields = source.field_definitions.filter(field => field.kind === 'measure');
+  const dimensionKeys = new Set(dimensionFields.map(field => field.key));
+  const measureKeys = new Set(measureFields.map(field => field.key));
+  const requestedDimensionKeys = [...new Set(requestedDimensions)].slice(0, 4);
+  const requestedMeasureKeys = [...new Set(requestedMeasures)].slice(0, 4);
+  const validDimensions = requestedDimensionKeys.filter(key => dimensionKeys.has(key));
+  const validMeasures = requestedMeasureKeys.filter(key => measureKeys.has(key));
+  return {
+    dimensions: validDimensions.length ? validDimensions : dimensionFields.slice(0, 2).map(field => field.key),
+    measures: validMeasures.length ? validMeasures : measureFields.slice(0, 2).map(field => field.key),
+    validRequestedMeasures: validMeasures,
+    invalidCount: requestedDimensionKeys.length - validDimensions.length + requestedMeasureKeys.length - validMeasures.length,
+  };
+}
 function chartRowLabel(row: AnalysisRow) { return Object.values(row.dimensions).join('／') || '全部'; }
-function finiteNumber(value: unknown): number | null { return Number.isFinite(Number(value)) ? Number(value) : null; }
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+function changePercent(currentValue: unknown, compareValue: unknown) {
+  const current = finiteNumber(currentValue), compare = finiteNumber(compareValue);
+  if (current === null || compare === null || compare === 0) return null;
+  return (current - compare) / Math.abs(compare) * 100;
+}
+function signedPercentText(value: number | null) {
+  if (value === null) return '無比較基準';
+  if (Math.abs(value) < .05) return '持平 0.0%';
+  return `${value > 0 ? '▲' : '▼'} ${Math.abs(value).toFixed(1)}%`;
+}
 function withAlpha(color: string, alpha: number) {
   const hex = color.match(/^#([0-9a-f]{6})$/i)?.[1];
   if (hex) return `rgba(${Number.parseInt(hex.slice(0, 2), 16)}, ${Number.parseInt(hex.slice(2, 4), 16)}, ${Number.parseInt(hex.slice(4, 6), 16)}, ${alpha})`;
@@ -279,11 +327,14 @@ function PaletteStrip({ paletteId, customColors }: { paletteId: PaletteId; custo
 }
 
 type ChartRow = { label: string; current: number | null; compare: number | null };
-function chartRows(analysis: Analysis, measure: string, limit: number, positiveOnly = false): ChartRow[] {
+function chartRows(analysis: Analysis, measure: string, limit: number, positiveOnly = false, aggregateRemainder = false, sortBy: 'combined' | 'current' = 'combined'): ChartRow[] {
   const rows = analysis.rows.map(row => ({ label: chartRowLabel(row), current: finiteNumber(row.values[measure]), compare: finiteNumber(row.compare_values[measure]) }))
     .filter(row => positiveOnly ? Number(row.current) > 0 || Number(row.compare) > 0 : row.current !== null || row.compare !== null)
-    .sort((left, right) => Math.max(Math.abs(Number(right.current) || 0), Math.abs(Number(right.compare) || 0)) - Math.max(Math.abs(Number(left.current) || 0), Math.abs(Number(left.compare) || 0)));
+    .sort((left, right) => sortBy === 'current'
+      ? Math.abs(Number(right.current) || 0) - Math.abs(Number(left.current) || 0)
+      : Math.max(Math.abs(Number(right.current) || 0), Math.abs(Number(right.compare) || 0)) - Math.max(Math.abs(Number(left.current) || 0), Math.abs(Number(left.compare) || 0)));
   if (rows.length <= limit) return rows;
+  if (!aggregateRemainder) return rows.slice(0, limit);
   const visible = rows.slice(0, Math.max(1, limit - 1));
   const remainder = rows.slice(Math.max(1, limit - 1));
   visible.push({ label: `其他（${remainder.length} 類）`, current: remainder.reduce((sum, row) => sum + (Number(row.current) || 0), 0), compare: remainder.reduce((sum, row) => sum + (Number(row.compare) || 0), 0) });
@@ -292,7 +343,9 @@ function chartRows(analysis: Analysis, measure: string, limit: number, positiveO
 
 function MarketArcCharts({ analysis, measure, field, chartType, paletteId, customColors }: { analysis: Analysis; measure: string; field?: FieldDefinition; chartType: 'pie' | 'doughnut'; paletteId: PaletteId; customColors: string[] }) {
   const palette = useResolvedPalette(paletteId, customColors);
-  const rows = useMemo(() => chartRows(analysis, measure, 10, true), [analysis, measure]);
+  const rows = useMemo(() => chartRows(analysis, measure, 10, true, true), [analysis, measure]);
+  if (analysis.quality?.groups_truncated) return <p className="market-empty">分類結果超過顯示上限，請縮小期間或減少維度後再查看占比。</p>;
+  if (field?.aggregation !== 'sum') return <p className="market-empty">占比圖僅適用於交易量、交易金額等總和型指標，平均、最低或最高值不會合併為占比。</p>;
   if (!rows.length) return <p className="market-empty">圓餅圖只呈現大於 0 的數值，此期間沒有可繪製資料。</p>;
   const pieOptions: ChartOptions<'pie'> = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: palette.text, boxWidth: 13, padding: 12 } }, tooltip: { enabled: true } } };
   const doughnutOptions: ChartOptions<'doughnut'> = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: palette.text, boxWidth: 13, padding: 12 } }, tooltip: { enabled: true } } };
@@ -311,8 +364,8 @@ function MarketLineChart({ analysis, measure, field, chartType, paletteId, custo
   const rows = useMemo(() => chartRows(analysis, measure, 20), [analysis, measure]);
   if (!rows.length) return <p className="market-empty">此期間沒有可繪製的分類資料。</p>;
   const data = { labels: rows.map(row => row.label), datasets: [
-    { label: '本期', data: rows.map(row => row.current), borderColor: palette.colors[0], backgroundColor: withAlpha(palette.colors[0], .18), borderWidth: 2, pointRadius: 3, pointStyle: 'circle' as const, tension: .28, fill: chartType === 'area', spanGaps: true },
-    { label: '比較期', data: rows.map(row => row.compare), borderColor: palette.colors[1 % palette.colors.length], backgroundColor: withAlpha(palette.colors[1 % palette.colors.length], .1), borderDash: [7, 5], borderWidth: 2, pointRadius: 3, pointStyle: 'rectRot' as const, tension: .28, fill: chartType === 'area', spanGaps: true },
+    { label: '本期', data: rows.map(row => row.current), borderColor: palette.colors[0], backgroundColor: withAlpha(palette.colors[0], .18), borderWidth: 2, pointRadius: 3, pointStyle: 'circle' as const, tension: .28, fill: chartType === 'area', spanGaps: false },
+    { label: '比較期', data: rows.map(row => row.compare), borderColor: palette.colors[1 % palette.colors.length], backgroundColor: withAlpha(palette.colors[1 % palette.colors.length], .1), borderDash: [7, 5], borderWidth: 2, pointRadius: 3, pointStyle: 'rectRot' as const, tension: .28, fill: chartType === 'area', spanGaps: false },
   ] };
   const options: ChartOptions<'line'> = { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'bottom', labels: { color: palette.text, usePointStyle: true, padding: 18 } } }, scales: { x: { ticks: { color: palette.dim, maxRotation: 38, minRotation: 0 }, grid: { color: withAlpha(palette.grid, .45) } }, y: { ticks: { color: palette.dim }, grid: { color: withAlpha(palette.grid, .65) }, title: { display: Boolean(field?.unit), text: field?.unit || '', color: palette.dim } } } };
   return <div className="market-line-chart"><Line role="img" aria-label={`${field?.label || measure}${CHART_TYPE_LABELS[chartType]}，實線為本期、虛線為比較期`} data={data} options={options} /></div>;
@@ -374,14 +427,14 @@ function MarketSimulation({ analysis, sources, measures, fieldMap, paletteId, cu
   </section>;
 }
 
-function MarketBars({ analysis, measure, field, paletteId, customColors }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[] }) {
+function MarketBars({ analysis, measure, field, paletteId, customColors, limit = 20 }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[]; limit?: number }) {
   const palette = useResolvedPalette(paletteId, customColors);
-  const rows = analysis.rows.filter(row => Number.isFinite(Number(row.values[measure])) || Number.isFinite(Number(row.compare_values[measure]))).slice(0, 20);
-  const max = Math.max(1, ...rows.flatMap(row => [Number(row.values[measure]) || 0, Number(row.compare_values[measure]) || 0]));
+  const rows = chartRows(analysis, measure, limit);
+  const max = Math.max(1, ...rows.flatMap(row => [Number(row.current) || 0, Number(row.compare) || 0]));
   if (!rows.length) return <p className="market-empty">此期間沒有可繪製的資料。</p>;
   return <div className="market-bars" style={{ '--market-current-color': palette.colors[0], '--market-compare-color': palette.colors[1 % palette.colors.length] } as CSSProperties}>{rows.map((row, index) => {
-    const name = Object.values(row.dimensions).join('／') || '全部';
-    const current = Number(row.values[measure]) || 0, compare = Number(row.compare_values[measure]) || 0;
+    const name = row.label;
+    const current = Number(row.current) || 0, compare = Number(row.compare) || 0;
     return <div className="market-bar-row" key={`${name}-${index}`}>
       <div className="market-bar-label" title={name}>{name}</div>
       <div className="market-bar-pair" aria-label={`${name} 本期 ${numberText(current)}，比較期 ${numberText(compare)}`}>
@@ -390,6 +443,107 @@ function MarketBars({ analysis, measure, field, paletteId, customColors }: { ana
       <div className="market-bar-values"><b>{numberText(current)}</b><small>{numberText(compare)} {field?.unit || ''}</small></div>
     </div>;
   })}</div>;
+}
+
+function MarketDailyTrend({ analysis, measure, field, paletteId, customColors }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[] }) {
+  const palette = useResolvedPalette(paletteId, customColors);
+  const series = analysis.series || [];
+  if (!series.length) return <MarketBars analysis={analysis} measure={measure} field={field} paletteId={paletteId} customColors={customColors} limit={8} />;
+  const data = {
+    labels: series.map(point => point.observed_on.slice(5).replace('-', '/')),
+    datasets: [
+      { label: '本期每日行情', data: series.map(point => finiteNumber(point.values[measure])), borderColor: palette.colors[0], backgroundColor: withAlpha(palette.colors[0], .16), borderWidth: 2.5, pointRadius: series.length > 45 ? 0 : 2.5, tension: .3, fill: true, spanGaps: false },
+      { label: '比較期每日行情', data: series.map(point => finiteNumber(point.compare_values[measure])), borderColor: palette.colors[1 % palette.colors.length], backgroundColor: withAlpha(palette.colors[1 % palette.colors.length], .06), borderDash: [7, 5], borderWidth: 2, pointRadius: series.length > 45 ? 0 : 2.5, tension: .3, fill: false, spanGaps: false },
+    ],
+  };
+  const options: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom', labels: { color: palette.text, usePointStyle: true, padding: 16 } } },
+    scales: {
+      x: { ticks: { color: palette.dim, maxTicksLimit: 10, maxRotation: 0 }, grid: { color: withAlpha(palette.grid, .35) } },
+      y: { ticks: { color: palette.dim }, grid: { color: withAlpha(palette.grid, .55) }, title: { display: Boolean(field?.unit), text: field?.unit || '', color: palette.dim } },
+    },
+  };
+  return <div className="market-daily-trend"><Line role="img" aria-label={`${field?.label || measure}每日行情，本期實線、比較期虛線`} data={data} options={options} /></div>;
+}
+
+function MarketShareSnapshot({ analysis, measure, field, paletteId, customColors }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[] }) {
+  const palette = useResolvedPalette(paletteId, customColors);
+  const rows = useMemo(() => chartRows(analysis, measure, 7, true, true, 'current').filter(row => Number(row.current) > 0), [analysis, measure]);
+  const total = rows.reduce((sum, row) => sum + (Number(row.current) || 0), 0);
+  if (analysis.quality?.groups_truncated) return <p className="market-empty">分類結果超過顯示上限，為避免誤判占比，請先縮小期間或減少分析維度。</p>;
+  if (field?.aggregation !== 'sum') return <p className="market-empty">分類占比適用於交易量、交易金額等總和型指標；請在分析設定加入一項總和型指標。</p>;
+  if (!rows.length || total <= 0) return <p className="market-empty">本期沒有可計算占比的正值資料。</p>;
+  const data = { labels: rows.map(row => row.label), datasets: [{ data: rows.map(row => row.current), backgroundColor: rows.map((_, index) => palette.colors[index % palette.colors.length]), borderColor: palette.panel, borderWidth: 2 }] };
+  const options: ChartOptions<'doughnut'> = { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { display: false }, tooltip: { enabled: true } } };
+  return <div className="market-share-layout">
+    <div className="market-share-canvas"><Doughnut role="img" aria-label={`${field?.label || measure}本期分類占比`} data={data} options={options} /><div className="market-share-total"><span>本期合計</span><strong>{numberText(total)}</strong><small>{field?.unit || ''}</small></div></div>
+    <ol className="market-share-legend">{rows.slice(0, 5).map((row, index) => <li key={row.label}><i className="market-share-dot" style={{ '--market-card-accent': palette.colors[index % palette.colors.length] } as CSSProperties} /><span title={row.label}>{row.label}</span><b>{(Number(row.current) / total * 100).toFixed(1)}%</b></li>)}</ol>
+  </div>;
+}
+
+type MarketMovement = { label: string; current: number | null; compare: number | null; percent: number | null; state: 'comparable' | 'new' | 'disappeared' | 'zero-baseline' };
+function marketMovements(analysis: Analysis, measure: string): MarketMovement[] {
+  return analysis.rows.map((row): MarketMovement | null => {
+    const current = finiteNumber(row.values[measure]), compare = finiteNumber(row.compare_values[measure]);
+    if (current === null && compare === null) return null;
+    if (compare === null) return { label: chartRowLabel(row), current, compare, percent: null, state: 'new' as const };
+    if (current === null || (current === 0 && compare > 0)) return { label: chartRowLabel(row), current, compare, percent: null, state: 'disappeared' as const };
+    if (compare === 0 && current !== 0) return { label: chartRowLabel(row), current, compare, percent: null, state: 'zero-baseline' as const };
+    return { label: chartRowLabel(row), current, compare, percent: compare === 0 ? 0 : changePercent(current, compare), state: 'comparable' as const };
+  }).filter((row): row is MarketMovement => Boolean(row)).sort((left, right) => Math.abs(right.percent || 0) - Math.abs(left.percent || 0));
+}
+function movementStateLabel(state: MarketMovement['state']) {
+  return ({ new: '本期新增', disappeared: '本期消失', 'zero-baseline': '比較期為 0', comparable: '可比較' } as Record<MarketMovement['state'], string>)[state];
+}
+
+function MarketExecutiveDashboard({ analysis, measures, fieldMap, primaryMeasure, paletteId, customColors, generatedAt }: { analysis: Analysis; measures: string[]; fieldMap: Map<string, FieldDefinition>; primaryMeasure: string; paletteId: PaletteId; customColors: string[]; generatedAt: string }) {
+  const movements = useMemo(() => marketMovements(analysis, primaryMeasure), [analysis, primaryMeasure]);
+  const comparableMovements = movements.filter((row): row is MarketMovement & { percent: number } => row.state === 'comparable' && row.percent !== null);
+  const attentionRows = comparableMovements.filter(row => Math.abs(row.percent) >= 10);
+  const exceptionalRows = movements.filter(row => row.state !== 'comparable');
+  const watchRows = [...attentionRows, ...exceptionalRows].slice(0, 5);
+  const rising = comparableMovements.filter(row => row.percent > 0).sort((left, right) => right.percent - left.percent)[0];
+  const falling = comparableMovements.filter(row => row.percent < 0).sort((left, right) => left.percent - right.percent)[0];
+  const primaryField = fieldMap.get(primaryMeasure);
+  const shareMeasure = measures.find(measure => fieldMap.get(measure)?.aggregation === 'sum') || primaryMeasure;
+  const shareField = fieldMap.get(shareMeasure);
+  const primaryIsAdditive = primaryField?.aggregation === 'sum';
+  const groupsTruncated = Boolean(analysis.quality?.groups_truncated);
+  const totalGroupCount = analysis.quality?.total_group_count ?? analysis.rows.length;
+  const returnedGroupCount = analysis.quality?.returned_group_count ?? analysis.rows.length;
+  const positiveRows = chartRows(analysis, primaryMeasure, Math.max(1, analysis.rows.length), true).filter(row => Number(row.current) > 0);
+  const positiveTotal = positiveRows.reduce((sum, row) => sum + (Number(row.current) || 0), 0);
+  const leader = [...positiveRows].sort((left, right) => Number(right.current) - Number(left.current))[0];
+  const recordChange = analysis.counts.current - analysis.counts.compare;
+  const latestDate = analysis.quality ? analysis.quality.latest_observed_on || '本期無資料' : analysis.periods.to;
+  const contextStatus = groupsTruncated
+    ? `共 ${numberText(totalGroupCount)} 組，僅載入 ${numberText(returnedGroupCount)} 組`
+    : watchRows.length
+      ? `${attentionRows.length} 個大幅變動、${exceptionalRows.length} 個基準差異`
+      : comparableMovements.length
+        ? '未發現超過 10% 項目'
+        : '比較資料不足';
+  return <section className="panel market-command-center" aria-label="市場營運行情總覽">
+    <header className="market-command-header">
+      <div><span className="market-kicker">MARKET COMMAND VIEW</span><h2>市場營運行情總覽</h2><p>先掌握整體量價、占比與變動，再展開進階分析或情境模擬。</p></div>
+      <div className="market-command-status"><span className="ready"><i />分析結果已更新</span><time dateTime={generatedAt}>{dateTimeText(generatedAt)}</time></div>
+    </header>
+    <div className="market-context-strip"><span><b>資料來源</b>{analysis.source.source_name}</span><span><b>本期</b>{periodText(analysis.periods)}</span><span><b>比較期</b>{periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</span><span><b>資料截止</b>{latestDate}</span><span className={!groupsTruncated && !watchRows.length && comparableMovements.length ? 'stable' : 'watching'}><b>變動觀察</b>{contextStatus}</span></div>
+    <section className="market-kpi-grid">{measures.map(measure => {
+      const field = fieldMap.get(measure), current = analysis.totals.values[measure], compare = analysis.totals.compare_values[measure], percent = changePercent(current, compare);
+      const fraction = field?.aggregation === 'avg' ? 1 : 0;
+      return <article className="market-kpi-card" key={measure}><span>{field?.label || measure}</span><strong>{numberText(current, fraction)}<small>{field?.unit || ''}</small></strong><p><span>比較期 {numberText(compare, fraction)}</span><b className={percent === null || Math.abs(percent) < .05 ? 'steady' : percent > 0 ? 'rise' : 'fall'}>{signedPercentText(percent)}</b></p></article>;
+    })}<article className="market-kpi-card market-kpi-neutral"><span>行情資料筆數</span><strong>{numberText(analysis.counts.current)}<small>筆</small></strong><p><span>比較期 {numberText(analysis.counts.compare)} 筆</span><b className={recordChange === 0 ? 'steady' : recordChange > 0 ? 'rise' : 'fall'}>{recordChange === 0 ? '持平' : `${recordChange > 0 ? '▲' : '▼'} ${numberText(Math.abs(recordChange))} 筆`}</b></p></article></section>
+    <div className="market-command-grid">
+      <article className="market-command-card market-command-trend"><header><div><span className="market-kicker">DAILY COMPARISON</span><h3>{analysis.series?.length ? '每日行情走勢' : '主要分類比較'}</h3></div><span>{primaryField?.label || primaryMeasure}・{primaryField?.unit || '數值'}</span></header><MarketDailyTrend analysis={analysis} measure={primaryMeasure} field={primaryField} paletteId={paletteId} customColors={customColors} /></article>
+      <article className="market-command-card market-command-attention"><header><div><span className="market-kicker">WATCH LIST</span><h3>行情變動觀察</h3></div><span>門檻 ±10%</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>分類結果範圍過大</b>目前僅回傳 {numberText(returnedGroupCount)}／{numberText(totalGroupCount)} 組，請縮小期間或減少維度後再判讀。</p></div> : watchRows.length ? <ol className="market-attention-list">{watchRows.map(row => <li key={`${row.state}-${row.label}`}><div><b title={row.label}>{row.label}</b><span>本期 {numberText(row.current)}・比較期 {numberText(row.compare)}</span></div><strong className={row.state === 'disappeared' || (row.percent !== null && row.percent < 0) ? 'fall' : 'rise'}>{row.percent === null ? movementStateLabel(row.state) : signedPercentText(row.percent)}</strong>{row.percent !== null && <progress className={row.percent > 0 ? 'rise' : 'fall'} max="100" value={Math.min(100, Math.abs(row.percent))} aria-label={`${row.label}變動幅度 ${Math.abs(row.percent).toFixed(1)}%`} />}</li>)}</ol> : comparableMovements.length ? <div className="market-steady-state"><span>✓</span><p><b>目前波動平穩</b>所選指標沒有分類項目超過 ±10%。</p></div> : <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>比較資料不足</b>本期與比較期沒有可對照的共同分類，暫不判定波動。</p></div>}</article>
+      <article className="market-command-card market-command-share"><header><div><span className="market-kicker">CURRENT SHARE</span><h3>本期分類占比</h3></div><span>{shareField?.label || shareMeasure}</span></header><MarketShareSnapshot analysis={analysis} measure={shareMeasure} field={shareField} paletteId={paletteId} customColors={customColors} /></article>
+      <article className="market-command-card market-command-insights"><header><div><span className="market-kicker">QUICK INSIGHTS</span><h3>快速判讀</h3></div><span>依目前篩選結果</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>暫停分類結論</b>分類結果尚未完整載入，主要分類與最大漲跌不會以部分資料推論。</p></div> : <><div className="market-insight-grid"><div><span>{primaryIsAdditive ? '本期主要分類' : '本期最高分類'}</span><strong>{leader?.label || '資料不足'}</strong><p>{leader ? primaryIsAdditive && positiveTotal > 0 ? `占本期 ${primaryField?.label || '指標'} ${(Number(leader.current) / positiveTotal * 100).toFixed(1)}%` : `${primaryField?.label || '本期值'} ${numberText(leader.current, primaryField?.aggregation === 'avg' ? 1 : 0)} ${primaryField?.unit || ''}` : '尚無可判讀的資料'}</p></div><div><span>最大上升幅度</span><strong>{rising?.label || '無比較資料'}</strong><p className="rise">{rising ? signedPercentText(rising.percent) : '—'}</p></div><div><span>最大下降幅度</span><strong>{falling?.label || '無比較資料'}</strong><p className="fall">{falling ? signedPercentText(falling.percent) : '—'}</p></div></div><p className="market-insight-note">上升或下降僅代表數值方向，不代表營運好壞；請搭配交易量、價格與市場情境判讀。</p></>}</article>
+    </div>
+  </section>;
 }
 
 function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Source[]; templates: Template[]; reloadCatalog: () => Promise<void> }) {
@@ -406,76 +560,121 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   const [paletteId, setPaletteId] = useState<PaletteId>('market');
   const [customColors, setCustomColors] = useState(DEFAULT_CUSTOM_COLORS);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [analysisGeneratedAt, setAnalysisGeneratedAt] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const source = sources.find(item => item.source_id === sourceId) || sources[0];
+  const [configuredSchemaKey, setConfiguredSchemaKey] = useState('');
+  const requestEpochRef = useRef(0);
+  const source = sources.find(item => item.source_id === sourceId);
+  const sourceSchemaKey = useMemo(() => marketSourceSchemaKey(source), [source]);
   const dimensionFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'dimension'), [source]);
   const measureFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'measure'), [source]);
   const fieldMap = useMemo(() => new Map((source?.field_definitions || []).map(field => [field.key, field])), [source]);
+  const invalidateAnalysis = useCallback(() => { requestEpochRef.current += 1; setAnalysis(null); setBusy(false); }, []);
 
   useEffect(() => {
-    if (!source) return;
-    setSourceId(current => current || source.source_id);
-    setDimensions(current => current.length ? current.filter(key => dimensionFields.some(field => field.key === key)) : dimensionFields.slice(0, 2).map(field => field.key));
-    setMeasures(current => current.length ? current.filter(key => measureFields.some(field => field.key === key)) : measureFields.slice(0, 2).map(field => field.key));
-  }, [source, dimensionFields, measureFields]);
-  useEffect(() => { setChartMeasure(current => measures.includes(current) ? current : measures[0] || measureFields[0]?.key || ''); }, [measures, measureFields]);
-
-  const applyCompare = (mode: 'previous' | 'next' | 'same' | 'custom') => {
-    setCompareMode(mode);
-    if (mode === 'previous' || mode === 'next') {
-      const offset = mode === 'previous' ? -rangeLength(from, to) : rangeLength(from, to);
-      setCompareFrom(addDays(from, offset)); setCompareTo(addDays(to, offset));
-    } else if (mode === 'same') {
-      setCompareFrom(addYears(from, -1)); setCompareTo(addYears(to, -1));
+    if (!sourceId) {
+      if (sources[0]) { setSourceId(sources[0].source_id); setConfiguredSchemaKey(''); }
+      return;
     }
+    if (!source) {
+      invalidateAnalysis(); setSourceId(sources[0]?.source_id || ''); setConfiguredSchemaKey('');
+      return;
+    }
+    if (!sourceSchemaKey || configuredSchemaKey === sourceSchemaKey) return;
+    invalidateAnalysis();
+    const next = validSelections(source, dimensions, measures);
+    setDimensions(next.dimensions); setMeasures(next.measures);
+    setChartMeasure(current => next.measures.includes(current) ? current : next.measures[0] || '');
+    setConfiguredSchemaKey(sourceSchemaKey);
+  }, [sourceId, sources, source, sourceSchemaKey, configuredSchemaKey, dimensions, measures, invalidateAnalysis]);
+  useEffect(() => { setChartMeasure(current => measures.includes(current) ? current : measures[0] || measureFields[0]?.key || ''); }, [measures, measureFields]);
+  useEffect(() => { requestEpochRef.current += 1; setBusy(false); }, [sourceId, from, to, compareFrom, compareTo, dimensions, measures]);
+
+  const selectSource = (nextSourceId: string) => {
+    invalidateAnalysis(); setSourceId(nextSourceId); setConfiguredSchemaKey(''); setFiltersOpen(true);
   };
+
+  const applyCompare = (mode: 'previous' | 'next' | 'same' | 'custom') => { setCompareMode(mode); if (mode !== 'custom') invalidateAnalysis(); };
+  useEffect(() => {
+    if (compareMode === 'previous' || compareMode === 'next') {
+      const offset = compareMode === 'previous' ? -rangeLength(from, to) : rangeLength(from, to);
+      setCompareFrom(addDays(from, offset)); setCompareTo(addDays(to, offset));
+    } else if (compareMode === 'same') {
+      const samePeriodFrom = addYears(from, -1);
+      setCompareFrom(samePeriodFrom); setCompareTo(addDays(samePeriodFrom, rangeLength(from, to) - 1));
+    }
+  }, [from, to, compareMode]);
+  const analysisRangeLength = rangeLength(from, to);
+  const compareRangeLength = rangeLength(compareFrom, compareTo);
+  const rangesValid = Boolean(from && to && compareFrom && compareTo && from <= to && compareFrom <= compareTo && analysisRangeLength <= 366 && compareRangeLength === analysisRangeLength);
+  const compareDatesReady = rangesValid && (compareMode === 'custom' || (compareMode === 'same'
+    ? compareFrom === addYears(from, -1) && compareTo === addDays(addYears(from, -1), analysisRangeLength - 1)
+    : compareFrom === addDays(from, compareMode === 'previous' ? -analysisRangeLength : analysisRangeLength)
+      && compareTo === addDays(to, compareMode === 'previous' ? -analysisRangeLength : analysisRangeLength)));
+  const sourceFieldsReady = Boolean(source && configuredSchemaKey === sourceSchemaKey && dimensions.length && measures.length
+    && dimensions.every(key => fieldMap.get(key)?.kind === 'dimension')
+    && measures.every(key => fieldMap.get(key)?.kind === 'measure'));
   const load = useCallback(async () => {
-    if (!source?.source_id) return;
+    if (!source?.source_id || !sourceFieldsReady || !compareDatesReady) { setMessage('請確認資料來源、分析欄位，以及本期與比較期使用相同天數（最多 366 天）。'); return; }
+    const requestEpoch = ++requestEpochRef.current;
     setBusy(true); setMessage('');
     try {
       const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from, to, compare_from: compareFrom, compare_to: compareTo, dimensions, measures });
-      setAnalysis(result);
-    } catch (error) { setMessage(error instanceof Error ? error.message : '行情分析載入失敗'); }
-    finally { setBusy(false); }
-  }, [source?.source_id, from, to, compareFrom, compareTo, dimensions, measures]);
-  useEffect(() => { if (source?.source_id && !analysis && dimensions.length && measures.length) void load(); }, [source?.source_id, analysis, dimensions.length, measures.length, load]);
+      if (requestEpoch !== requestEpochRef.current) return;
+      setAnalysis(result); setAnalysisGeneratedAt(new Date().toISOString()); setFiltersOpen(false);
+    } catch (error) { if (requestEpoch === requestEpochRef.current) setMessage(error instanceof Error ? error.message : '行情分析載入失敗'); }
+    finally { if (requestEpoch === requestEpochRef.current) setBusy(false); }
+  }, [source?.source_id, sourceFieldsReady, compareDatesReady, from, to, compareFrom, compareTo, dimensions, measures]);
+  useEffect(() => { if (source?.source_id && !analysis && sourceFieldsReady && compareDatesReady) void load(); }, [source?.source_id, analysis, sourceFieldsReady, compareDatesReady, load]);
 
   const applyTemplate = (template: Template) => {
-    if (template.source_id && sources.some(sourceItem => sourceItem.source_id === template.source_id)) setSourceId(template.source_id);
-    setAnalysis(null);
-    setDimensions(template.dimensions || []); setMeasures(template.measures || []); setChartType(template.chart_type || 'bar');
-    setChartMeasure(chartMeasureFrom(template.default_config, template.measures || []));
+    const targetSource = template.source_id ? sources.find(sourceItem => sourceItem.source_id === template.source_id) : source;
+    if (!targetSource) { setMessage('模板資料來源已停用或不存在，請先修正模板設定。'); return; }
+    const next = validSelections(targetSource, template.dimensions || [], template.measures || []);
+    if (!next.validRequestedMeasures.length) { setMessage(`模板「${template.template_name}」沒有可套用至目前資料來源的分析指標。`); return; }
+    invalidateAnalysis();
+    setSourceId(targetSource.source_id); setConfiguredSchemaKey(marketSourceSchemaKey(targetSource));
+    setDimensions(next.dimensions); setMeasures(next.measures); setChartType(CHART_TYPE_IDS.has(template.chart_type) ? template.chart_type : 'bar');
+    setChartMeasure(chartMeasureFrom(template.default_config, next.measures));
     setPaletteId(paletteIdFrom(template.default_config));
     setCustomColors(normalizeCustomColors(template.default_config?.custom_colors));
     const compare = String(template.default_config?.compare || 'previous');
     if (['previous', 'next', 'same'].includes(compare)) applyCompare(compare as 'previous' | 'next' | 'same');
-    setMessage(`已套用模板「${template.template_name}」，正在依新設定更新結果。`);
+    setMessage(`已套用模板「${template.template_name}」${next.invalidCount ? `，已忽略 ${next.invalidCount} 個不相容欄位` : ''}，正在依新設定更新結果。`);
   };
   const primaryMeasure = measures.includes(chartMeasure) ? chartMeasure : measures[0] || measureFields[0]?.key || '';
   const primaryField = fieldMap.get(primaryMeasure);
+  const analysisFieldMap = useMemo(() => new Map((analysis?.fields || []).map(field => [field.key, field])), [analysis]);
+  const resultPrimaryMeasure = analysis?.measures.includes(primaryMeasure) ? primaryMeasure : analysis?.measures[0] || primaryMeasure;
+  const resultPrimaryField = analysisFieldMap.get(resultPrimaryMeasure) || primaryField;
   const demoTemplate = templates.find(template => template.template_code === 'market-demo-produce-share');
 
   return <div className="market-analysis-workspace">
     <section className="market-control-panel panel">
-      <div className="market-section-heading"><div><span className="market-kicker">ANALYSIS WORKBENCH</span><h2>交易行情比較</h2><p>用同一套來源設定切換品項、市場、日期與指標；新增品項只要匯入資料，不必修改畫面。</p></div><div className="market-template-quick"><label>快速套用模板<select value="" onChange={event => { const template = templates.find(item => item.template_id === event.target.value); if (template) applyTemplate(template); }}><option value="">選擇分析模板</option>{templates.map(template => <option key={template.template_id} value={template.template_id}>{template.template_name}</option>)}</select></label>{demoTemplate && <button type="button" className="secondary-btn compact" onClick={() => applyTemplate(demoTemplate)}>載入非正式示範行情</button>}</div></div>
-      <div className="market-control-grid">
-        <label>資料來源<select value={source?.source_id || ''} onChange={event => { setSourceId(event.target.value); setAnalysis(null); }}><option value="">請選擇資料來源</option>{sources.map(item => <option key={item.source_id} value={item.source_id}>{item.source_name}</option>)}</select></label>
-        <div className="market-period-group"><span>分析期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="分析起始日期" value={from} onChange={event => { setFrom(event.target.value); setAnalysis(null); }} /><span>至</span><LocalizedDateInput aria-label="分析結束日期" value={to} onChange={event => { setTo(event.target.value); setAnalysis(null); }} /></div></div>
-        <div className="market-period-group"><span>比較期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="比較起始日期" value={compareFrom} onChange={event => { setCompareMode('custom'); setCompareFrom(event.target.value); setAnalysis(null); }} /><span>至</span><LocalizedDateInput aria-label="比較結束日期" value={compareTo} onChange={event => { setCompareMode('custom'); setCompareTo(event.target.value); setAnalysis(null); }} /></div></div>
+      <div className="market-section-heading"><div><span className="market-kicker">ANALYSIS WORKBENCH</span><h2>交易行情比較</h2><p>首頁先呈現營運結論；需要更換資料來源、期間、指標或色卡時再展開設定。</p></div><div className="market-filter-actions"><div className="market-template-quick"><label>快速套用模板<select value="" onChange={event => { const template = templates.find(item => item.template_id === event.target.value); if (template) applyTemplate(template); }}><option value="">選擇分析模板</option>{templates.map(template => <option key={template.template_id} value={template.template_id}>{template.template_name}</option>)}</select></label>{demoTemplate && <button type="button" className="secondary-btn compact" onClick={() => applyTemplate(demoTemplate)}>載入非正式示範行情</button>}</div><button type="button" className="secondary-btn compact market-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>{filtersOpen ? '收合分析設定' : '調整分析條件'}</button></div></div>
+      {!filtersOpen && analysis && <div className="market-filter-summary"><span>{analysis.source.source_name}</span><span>本期 {periodText(analysis.periods)}</span><span>比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</span><span>{analysis.measures.map(key => analysisFieldMap.get(key)?.label || key).join('、')}</span></div>}
+      {filtersOpen && <div className="market-control-body">
+        <div className="market-control-grid">
+          <label>資料來源<select value={sourceId} onChange={event => selectSource(event.target.value)}><option value="">請選擇資料來源</option>{sources.map(item => <option key={item.source_id} value={item.source_id}>{item.source_name}</option>)}</select></label>
+          <div className="market-period-group"><span>分析期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="分析起始日期" value={from} onChange={event => { invalidateAnalysis(); setFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="分析結束日期" value={to} onChange={event => { invalidateAnalysis(); setTo(event.target.value); }} /></div></div>
+          <div className="market-period-group"><span>比較期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="比較起始日期" value={compareFrom} onChange={event => { invalidateAnalysis(); setCompareMode('custom'); setCompareFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="比較結束日期" value={compareTo} onChange={event => { invalidateAnalysis(); setCompareMode('custom'); setCompareTo(event.target.value); }} /></div></div>
+        </div>
+        <div className="market-compare-actions"><span>快速比較：</span><button type="button" className={compareMode === 'previous' ? 'active' : ''} onClick={() => applyCompare('previous')}>前一段期間</button><button type="button" className={compareMode === 'next' ? 'active' : ''} onClick={() => applyCompare('next')}>後一段期間</button><button type="button" className={compareMode === 'same' ? 'active' : ''} onClick={() => applyCompare('same')}>去年同期</button><button type="button" className={compareMode === 'custom' ? 'active' : ''} onClick={() => setCompareMode('custom')}>自訂</button></div>
+        <div className="market-selector-grid"><fieldset><legend>分析維度（最多 4 個）</legend><div className="market-check-list">{dimensionFields.map(field => <label key={field.key}><input type="checkbox" checked={dimensions.includes(field.key)} disabled={!dimensions.includes(field.key) && dimensions.length >= 4} onChange={event => { invalidateAnalysis(); setDimensions(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key)); }} />{field.label}</label>)}</div></fieldset><fieldset><legend>分析指標（最多 4 個）</legend><div className="market-check-list">{measureFields.map(field => <label key={field.key}><input type="checkbox" checked={measures.includes(field.key)} disabled={!measures.includes(field.key) && measures.length >= 4} onChange={event => { invalidateAnalysis(); setMeasures(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key)); }} />{field.label}{field.unit ? `（${field.unit}）` : ''}</label>)}</div></fieldset></div>
+        <div className="market-chart-settings"><label>詳細圖表類型<select value={chartType} onChange={event => setChartType(event.target.value as ChartType)}>{CHART_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>主要判讀指標<select value={primaryMeasure} onChange={event => setChartMeasure(event.target.value)}>{measures.map(measure => <option key={measure} value={measure}>{fieldMap.get(measure)?.label || measure}</option>)}</select></label></div>
+        <PalettePicker value={paletteId} customColors={customColors} onChange={setPaletteId} onCustomColorsChange={setCustomColors} />
+        <div className="market-control-footer"><span>本期：{periodText({ from, to })}　比較：{periodText({ from: compareFrom, to: compareTo })}{!compareDatesReady ? '　（兩個期間須為相同天數，且最多 366 天）' : ''}</span><button type="button" className="primary-btn" disabled={busy || !sourceFieldsReady || !compareDatesReady} onClick={() => void load()}>{busy ? '分析中…' : '執行分析'}</button></div>
       </div>
-      <div className="market-compare-actions"><span>快速比較：</span><button type="button" className={compareMode === 'previous' ? 'active' : ''} onClick={() => applyCompare('previous')}>前一段期間</button><button type="button" className={compareMode === 'next' ? 'active' : ''} onClick={() => applyCompare('next')}>後一段期間</button><button type="button" className={compareMode === 'same' ? 'active' : ''} onClick={() => applyCompare('same')}>去年同期</button><button type="button" className={compareMode === 'custom' ? 'active' : ''} onClick={() => setCompareMode('custom')}>自訂</button></div>
-      <div className="market-selector-grid"><fieldset><legend>分析維度（最多 4 個）</legend><div className="market-check-list">{dimensionFields.map(field => <label key={field.key}><input type="checkbox" checked={dimensions.includes(field.key)} disabled={!dimensions.includes(field.key) && dimensions.length >= 4} onChange={event => setDimensions(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key))} />{field.label}</label>)}</div></fieldset><fieldset><legend>分析指標（最多 4 個）</legend><div className="market-check-list">{measureFields.map(field => <label key={field.key}><input type="checkbox" checked={measures.includes(field.key)} disabled={!measures.includes(field.key) && measures.length >= 4} onChange={event => setMeasures(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key))} />{field.label}{field.unit ? `（${field.unit}）` : ''}</label>)}</div></fieldset></div>
-      <div className="market-chart-settings"><label>圖表類型<select value={chartType} onChange={event => setChartType(event.target.value as ChartType)}>{CHART_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>圖表指標<select value={primaryMeasure} onChange={event => setChartMeasure(event.target.value)}>{measures.map(measure => <option key={measure} value={measure}>{fieldMap.get(measure)?.label || measure}</option>)}</select></label></div>
-      <PalettePicker value={paletteId} customColors={customColors} onChange={setPaletteId} onCustomColorsChange={setCustomColors} />
-      <div className="market-control-footer"><span>本期：{periodText({ from, to })}　比較：{periodText({ from: compareFrom, to: compareTo })}</span><button type="button" className="primary-btn" disabled={busy || !source} onClick={() => void load()}>{busy ? '分析中…' : '執行分析'}</button></div>
+      }
       {source?.source_code === 'market_demo' && <p className="market-demo-notice">目前使用非正式示範行情，僅供體驗圖表、色卡與情境模擬，不得作為實際交易決策。</p>}
       {message && <p className="market-inline-message" role="status">{message}</p>}
     </section>
     {analysis && <>
-      <section className="market-kpi-grid">{measures.map(measure => { const field = fieldMap.get(measure); const current = analysis.totals.values[measure], compare = analysis.totals.compare_values[measure], change = analysis.totals.changes[measure]; const percent = current !== null && compare !== null && compare !== 0 ? (Number(change) / Number(compare) * 100) : null; return <article className="market-kpi-card" key={measure}><span>{field?.label || measure}</span><strong>{numberText(current, field?.aggregation === 'avg' ? 1 : 0)}<small>{field?.unit || ''}</small></strong><p>比較期 {numberText(compare, field?.aggregation === 'avg' ? 1 : 0)}　<span className={Number(change) >= 0 ? 'up' : 'down'}>{change === null ? '—' : `${Number(change) >= 0 ? '▲' : '▼'} ${numberText(Math.abs(Number(change)), field?.aggregation === 'avg' ? 1 : 0)}${percent === null ? '' : `（${Math.abs(percent).toFixed(1)}%）`}`}</span></p></article>; })}<article className="market-kpi-card market-kpi-neutral"><span>資料筆數</span><strong>{numberText(analysis.counts.current)}<small>筆</small></strong><p>比較期 {numberText(analysis.counts.compare)} 筆</p></article></section>
-      <section className="panel market-result-panel"><header className="market-result-heading"><div><span className="market-kicker">RESULT</span><h2>{analysis.source.source_name}</h2><p>本期 {periodText(analysis.periods)}　｜　比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</p></div><span>{analysis.rows.length} 組比較結果</span></header>{chartType === 'bar' && <MarketBars analysis={analysis} measure={primaryMeasure} field={primaryField} paletteId={paletteId} customColors={customColors} />}{(chartType === 'pie' || chartType === 'doughnut') && <MarketArcCharts analysis={analysis} measure={primaryMeasure} field={primaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} />}{(chartType === 'line' || chartType === 'area') && <MarketLineChart analysis={analysis} measure={primaryMeasure} field={primaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} />}{chartType === 'cards' && <MarketColorCards analysis={analysis} measure={primaryMeasure} field={primaryField} paletteId={paletteId} customColors={customColors} />}{chartType === 'table' && <div className="responsive-table market-result-table"><table><thead><tr>{dimensions.map(key => <th key={key}>{fieldMap.get(key)?.label || key}</th>)}{measures.map(key => <th key={key}>{fieldMap.get(key)?.label || key}（本期／比較）</th>)}<th>變化</th></tr></thead><tbody>{analysis.rows.map((row, index) => <tr key={index}>{dimensions.map(key => <td key={key}>{row.dimensions[key] || '未分類'}</td>)}{measures.map(key => <td key={key}>{numberText(row.values[key])} ／ {numberText(row.compare_values[key])}</td>)}<td>{numberText(row.changes[primaryMeasure])}</td></tr>)}</tbody></table></div>}</section>
-      <MarketSimulation analysis={analysis} sources={sources} measures={measures} fieldMap={fieldMap} paletteId={paletteId} customColors={customColors} />
+      <MarketExecutiveDashboard analysis={analysis} measures={analysis.measures} fieldMap={analysisFieldMap} primaryMeasure={resultPrimaryMeasure} paletteId={paletteId} customColors={customColors} generatedAt={analysisGeneratedAt || new Date().toISOString()} />
+      <section className="panel market-result-panel"><header className="market-result-heading"><div><span className="market-kicker">RESULT</span><h2>{analysis.source.source_name}</h2><p>本期 {periodText(analysis.periods)}　｜　比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</p></div><span>{analysis.quality?.groups_truncated ? `共 ${numberText(analysis.quality.total_group_count)} 組，目前載入 ${numberText(analysis.quality.returned_group_count)} 組` : `${analysis.rows.length} 組比較結果`}</span></header>{analysis.quality?.groups_truncated ? <div className="market-result-incomplete" role="status"><b>分類結果超過顯示上限</b><p>為避免用部分資料產生排行、占比或漲跌結論，詳細分類圖表已暫停。請縮小日期範圍或減少分析維度後重新執行。</p></div> : <>{chartType === 'bar' && <MarketBars analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} />}{(chartType === 'pie' || chartType === 'doughnut') && <MarketArcCharts analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} />}{(chartType === 'line' || chartType === 'area') && <MarketLineChart analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} />}{chartType === 'cards' && <MarketColorCards analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} />}{chartType === 'table' && <div className="responsive-table market-result-table"><table><thead><tr>{analysis.dimensions.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}</th>)}{analysis.measures.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}（本期／比較）</th>)}<th>變化</th></tr></thead><tbody>{analysis.rows.map((row, index) => <tr key={index}>{analysis.dimensions.map(key => <td key={key}>{row.dimensions[key] || '未分類'}</td>)}{analysis.measures.map(key => <td key={key}>{numberText(row.values[key])} ／ {numberText(row.compare_values[key])}</td>)}<td>{numberText(row.changes[resultPrimaryMeasure])}</td></tr>)}</tbody></table></div>}</>}</section>
+      <MarketSimulation analysis={analysis} sources={sources} measures={analysis.measures} fieldMap={analysisFieldMap} paletteId={paletteId} customColors={customColors} />
     </>}
     {!analysis && !busy && <div className="market-empty-panel panel">請選擇資料來源與比較期間，再執行分析。</div>}
   </div>;
@@ -532,6 +731,7 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
 }
 
 function TemplatesWorkspace({ sources, templates, onSaved }: { sources: Source[]; templates: Template[]; onSaved: () => Promise<void> }) {
+  const [templateId, setTemplateId] = useState('');
   const [templateCode, setTemplateCode] = useState('market_compare_custom');
   const [templateName, setTemplateName] = useState('自訂行情比較');
   const [description, setDescription] = useState('');
@@ -549,7 +749,7 @@ function TemplatesWorkspace({ sources, templates, onSaved }: { sources: Source[]
   const fields = source?.field_definitions || [];
   useEffect(() => { setChartMeasure(current => measures.includes(current) ? current : measures[0] || ''); }, [measures]);
   const chooseTemplate = (template: Template) => {
-    setTemplateCode(template.template_code); setTemplateName(template.template_name); setDescription(template.description || ''); setSourceId(template.source_id || '');
+    setTemplateId(template.template_id); setTemplateCode(template.template_code); setTemplateName(template.template_name); setDescription(template.description || ''); setSourceId(template.source_id || '');
     setDimensions(template.dimensions || []); setMeasures(template.measures || []); setChartType(template.chart_type); setChartMeasure(chartMeasureFrom(template.default_config, template.measures || []));
     setCompare(String(template.default_config?.compare || 'previous')); setPaletteId(paletteIdFrom(template.default_config)); setCustomColors(normalizeCustomColors(template.default_config?.custom_colors));
     setMessage(`已載入「${template.template_name}」設定。`);
@@ -557,11 +757,11 @@ function TemplatesWorkspace({ sources, templates, onSaved }: { sources: Source[]
   const save = async () => {
     setBusy(true); setMessage('');
     try {
-      await invokeAppApi('market_template_save', {
-        template_code: templateCode, template_name: templateName, description, source_id: source?.source_id || undefined, dimensions, measures, chart_type: chartType,
+      const saved = await invokeAppApi<Template>('market_template_save', {
+        template_id: templateId || undefined, template_code: templateCode, template_name: templateName, description, source_id: source?.source_id || undefined, dimensions, measures, chart_type: chartType,
         default_config: { compare, limit: 20, chart_measure: chartMeasure || measures[0] || '', palette_id: paletteId, custom_colors: paletteId === 'custom' ? normalizeCustomColors(customColors) : undefined },
       });
-      setMessage('分析模板已儲存。'); await onSaved();
+      setTemplateId(saved.template_id); setMessage(templateId ? '分析模板已更新。' : '分析模板已建立。'); await onSaved();
     } catch (error) { setMessage(error instanceof Error ? error.message : '分析模板儲存失敗'); }
     finally { setBusy(false); }
   };
