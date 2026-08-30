@@ -272,6 +272,8 @@ type MarketFieldDefinition = {
   aggregation?: 'sum' | 'avg' | 'weighted_avg' | 'min' | 'max';
   weight_key?: string;
   required?: boolean;
+  hidden?: boolean;
+  filterable?: boolean;
 };
 
 function marketFieldDefinitions(value: unknown): MarketFieldDefinition[] {
@@ -288,6 +290,8 @@ function marketFieldDefinitions(value: unknown): MarketFieldDefinition[] {
       unit: text(row.unit, 40) || undefined, aggregation,
       weight_key: aggregation === 'weighted_avg' && /^[a-z][a-z0-9_-]{0,59}$/.test(weightKey) ? weightKey : undefined,
       required: row.required === true,
+      hidden: typeof row.hidden === 'boolean' ? row.hidden : undefined,
+      filterable: typeof row.filterable === 'boolean' ? row.filterable : undefined,
     };
   }).filter(field => /^[a-z][a-z0-9_-]{0,59}$/.test(field.key));
 }
@@ -1280,10 +1284,27 @@ export async function handleAppApiRequest(req: Request) {
       const sourceId = id(body.source_id);
       const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions,config').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
       if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
-      const dimensions = marketFieldDefinitions(sourceResult.data.field_definitions).filter(field => field.kind === 'dimension').slice(0, 8);
+      const allDimensions = marketFieldDefinitions(sourceResult.data.field_definitions)
+        .filter(field => field.kind === 'dimension' && field.hidden !== true && field.filterable !== false);
+      const dimensions = allDimensions.slice(0, 8);
+      const dimensionKeys = new Set(allDimensions.map(field => field.key));
+      const rawFilters = marketJsonObject(body.filters);
+      const catalogFilters = Object.fromEntries(Object.entries(rawFilters)
+        .filter(([key, value]) => dimensionKeys.has(key) && typeof value === 'string')
+        .map(([key, value]) => [key, text(value, 200)] as const)
+        .filter(([, value]) => Boolean(value))
+        .slice(0, 8));
       const results = await Promise.all(dimensions.map(async field => {
-        const result = await admin.rpc('market_dimension_values', { p_source_id: sourceId, p_dimension: field.key, p_limit: 500 });
-        return { field, result };
+        const filters = Object.fromEntries(Object.entries(catalogFilters).filter(([key]) => key !== field.key));
+        const filteredResult = await admin.rpc('market_dimension_values_filtered', {
+          p_source_id: sourceId, p_dimension: field.key, p_filters: filters, p_limit: 500,
+        });
+        if (!filteredResult.error) return { field, result: filteredResult };
+        const missingFilteredRpc = ['PGRST202', '42883'].includes(String(filteredResult.error.code || ''))
+          || /market_dimension_values_filtered.*(?:not find|not found|does not exist)/i.test(String(filteredResult.error.message || ''));
+        if (!missingFilteredRpc) return { field, result: filteredResult };
+        const fallbackResult = await admin.rpc('market_dimension_values', { p_source_id: sourceId, p_dimension: field.key, p_limit: 500 });
+        return { field, result: fallbackResult };
       }));
       const failed = results.find(item => item.result.error);
       if (failed) {
@@ -1429,7 +1450,7 @@ export async function handleAppApiRequest(req: Request) {
       const totalsCompare = aggregateMarketPoints(compareRows, [], measures, fieldMap)[0]?.values || {};
       // 市場摘要必須以完整期間資料重新彙總，不能從最多 500 組的畫面明細回推，
       // 否則品項／品種維度很多時會顯示看似正式、實際少算的市場占比。
-      const marketSummary = dimensions.includes('market') && dimensionKeys.includes('market')
+      const marketSummary = dimensionKeys.includes('market')
         ? (() => {
           const currentByMarket = aggregateMarketPoints(currentRows, ['market'], measures, fieldMap);
           const compareByMarket = new Map(aggregateMarketPoints(compareRows, ['market'], measures, fieldMap)
@@ -1511,9 +1532,14 @@ export async function handleAppApiRequest(req: Request) {
     if (action === 'market_simulation_list') {
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const sourceResult = await admin.from('market_data_sources').select('source_id,source_code,config').eq('status', 'active');
+      if (sourceResult.error) return reply(req, { ok: false, message: '市場行情來源暫時無法讀取' }, 503);
+      const decisionSourceIds = (sourceResult.data || []).filter(source => source.source_code !== 'market_demo'
+        && marketJsonObject(source.config).is_demo !== true).map(source => String(source.source_id));
+      if (!decisionSourceIds.length) return reply(req, { ok: true, data: [] });
       let query = admin.from('market_simulation_runs')
         .select('simulation_id,name,source_id,period_from,period_to,base_totals,assumptions,projected_totals,created_by,created_at,status')
-        .order('created_at', { ascending: false }).limit(50);
+        .in('source_id', decisionSourceIds).order('created_at', { ascending: false }).limit(50);
       if (!canManageMarket) query = query.eq('created_by', profile.user_id);
       const result = await query;
       if (result.error) {
@@ -1563,7 +1589,7 @@ export async function handleAppApiRequest(req: Request) {
       const sourceCode = text(body.source_code, 60).toLowerCase();
       const sourceName = text(body.source_name, 120);
       const sourceType = text(body.source_type, 20) || 'manual';
-      const fields = marketFieldDefinitions(body.field_definitions);
+      let fields = marketFieldDefinitions(body.field_definitions);
       if (!/^[a-z][a-z0-9_-]{1,59}$/.test(sourceCode) || !sourceName) return reply(req, { ok: false, message: '資料來源代碼與名稱不可空白，代碼需使用英文字母、數字、底線或連字號' }, 400);
       if (!['manual', 'csv', 'json', 'api'].includes(sourceType)) return reply(req, { ok: false, message: '資料來源類型不正確' }, 400);
       if (!fields.some(field => field.kind === 'dimension') || !fields.some(field => field.kind === 'measure')) return reply(req, { ok: false, message: '資料來源至少需要一個分類欄位與一個數值欄位' }, 400);
@@ -1573,6 +1599,19 @@ export async function handleAppApiRequest(req: Request) {
       const invalidWeightedField = fields.find(field => field.aggregation === 'weighted_avg'
         && (!field.weight_key || field.weight_key === field.key || !measureKeys.has(field.weight_key)));
       if (invalidWeightedField) return reply(req, { ok: false, message: `「${invalidWeightedField.label}」使用加權平均時，必須指定另一個已定義的數值欄位作為權重` }, 400);
+      if (sourceId) {
+        const currentSource = await admin.from('market_data_sources').select('field_definitions').eq('source_id', sourceId).maybeSingle();
+        if (currentSource.error || !currentSource.data) return reply(req, { ok: false, message: '找不到要更新的市場行情資料來源' }, 404);
+        const currentFields = new Map(marketFieldDefinitions(currentSource.data.field_definitions).map(field => [field.key, field]));
+        fields = fields.map(field => {
+          const current = currentFields.get(field.key);
+          return {
+            ...field,
+            hidden: field.hidden ?? current?.hidden,
+            filterable: field.filterable ?? current?.filterable,
+          };
+        });
+      }
       const payload: Record<string, unknown> = { source_code: sourceCode, source_name: sourceName, source_type: sourceType, endpoint_url: text(body.endpoint_url, 500) || null, field_definitions: fields, status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
       // 更新時若前端沒有送 config，保留資料庫中的既有設定；只有明確送出
       // config 才覆寫。新增來源仍以空物件作為安全預設值。
@@ -1596,6 +1635,15 @@ export async function handleAppApiRequest(req: Request) {
       const chartType = ['bar', 'pie', 'doughnut', 'line', 'area', 'table', 'cards'].includes(text(body.chart_type, 20)) ? text(body.chart_type, 20) : 'bar';
       if (!/^[a-z][a-z0-9_-]{1,59}$/.test(templateCode) || !templateName || !measures.length) return reply(req, { ok: false, message: '模板代碼、名稱與至少一個分析指標為必填' }, 400);
       const sourceId = id(body.source_id) || null;
+      if (sourceId) {
+        const sourceResult = await admin.from('market_data_sources').select('field_definitions').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+        if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到模板使用的市場行情資料來源' }, 404);
+        const sourceFields = marketFieldDefinitions(sourceResult.data.field_definitions);
+        const visibleDimensionKeys = new Set(sourceFields.filter(field => field.kind === 'dimension' && field.hidden !== true).map(field => field.key));
+        const sourceMeasureKeys = new Set(sourceFields.filter(field => field.kind === 'measure').map(field => field.key));
+        if (dimensions.some(key => !visibleDimensionKeys.has(key))) return reply(req, { ok: false, message: '模板包含不存在或不可顯示的分析維度，請重新選擇' }, 400);
+        if (measures.some(key => !sourceMeasureKeys.has(key))) return reply(req, { ok: false, message: '模板包含不存在的分析指標，請重新選擇' }, 400);
+      }
       const payload = { template_code: templateCode, template_name: templateName, description: text(body.description, 500) || null, source_id: sourceId, dimensions, measures, chart_type: chartType, default_config: marketJsonObject(body.default_config), status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
       const result = templateId
         ? await admin.from('market_analysis_templates').update(payload).eq('template_id', templateId).select('template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status,updated_at').maybeSingle()

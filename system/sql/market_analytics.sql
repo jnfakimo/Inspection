@@ -167,6 +167,82 @@ $$;
 revoke all on function market_dimension_values(uuid,text,integer) from public;
 grant execute on function market_dimension_values(uuid,text,integer) to authenticated,service_role;
 
+create or replace function market_dimension_values_filtered(
+  p_source_id uuid,
+  p_dimension text,
+  p_filters jsonb default '{}'::jsonb,
+  p_limit integer default 500
+) returns table(value text, point_count bigint)
+language sql stable security invoker set search_path=public,pg_temp as $$
+  with filter_input as (
+    select p_filters is null or jsonb_typeof(p_filters)='object' as is_valid
+  ),
+  raw_filters as (
+    select entry.key,entry.value
+    from filter_input input
+    cross join lateral jsonb_each(
+      case when input.is_valid then coalesce(p_filters,'{}'::jsonb) else '{}'::jsonb end
+    ) as entry(key,value)
+  ),
+  valid_filters as (
+    select raw.key,raw.value
+    from raw_filters raw
+    where raw.key ~ '^[a-z][a-z0-9_-]{0,59}$'
+      and jsonb_typeof(raw.value)='string'
+      and length(raw.value #>> '{}') between 1 and 200
+      and exists (
+        select 1
+        from market_data_sources source
+        cross join lateral jsonb_array_elements(
+          case when jsonb_typeof(source.field_definitions)='array'
+            then source.field_definitions else '[]'::jsonb end
+        ) as definition(field)
+        where source.source_id=p_source_id
+          and definition.field->>'key'=raw.key
+          and definition.field->>'kind'='dimension'
+          and coalesce(definition.field->>'hidden','false')<>'true'
+          and coalesce(definition.field->>'filterable','true')<>'false'
+      )
+  ),
+  filter_state as (
+    select
+      input.is_valid,
+      (select count(*) from raw_filters) as input_count,
+      (select count(*) from valid_filters) as valid_count,
+      coalesce((select jsonb_object_agg(valid.key,valid.value) from valid_filters valid),'{}'::jsonb) as filters
+    from filter_input input
+  )
+  select points.dimensions->>p_dimension as value,count(*)::bigint as point_count
+  from market_data_points points
+  cross join filter_state state
+  where points.source_id=p_source_id
+    and p_dimension ~ '^[a-z][a-z0-9_-]{0,59}$'
+    and state.is_valid
+    and state.input_count=state.valid_count
+    and state.input_count<=8
+    and exists (
+      select 1
+      from market_data_sources source
+      cross join lateral jsonb_array_elements(
+        case when jsonb_typeof(source.field_definitions)='array'
+          then source.field_definitions else '[]'::jsonb end
+      ) as definition(field)
+      where source.source_id=p_source_id
+        and definition.field->>'key'=p_dimension
+        and definition.field->>'kind'='dimension'
+        and coalesce(definition.field->>'hidden','false')<>'true'
+        and coalesce(definition.field->>'filterable','true')<>'false'
+    )
+    and points.dimensions ? p_dimension
+    and coalesce(points.dimensions->>p_dimension,'')<>''
+    and points.dimensions @> state.filters
+  group by points.dimensions->>p_dimension
+  order by count(*) desc,points.dimensions->>p_dimension
+  limit least(greatest(coalesce(p_limit,500),1),500)
+$$;
+revoke all on function market_dimension_values_filtered(uuid,text,jsonb,integer) from public;
+grant execute on function market_dimension_values_filtered(uuid,text,jsonb,integer) to authenticated,service_role;
+
 create or replace function market_source_date_ranges()
 returns table(source_id uuid,first_observed_on date,latest_observed_on date,previous_observed_on date)
 language sql stable security invoker set search_path=public,pg_temp as $$

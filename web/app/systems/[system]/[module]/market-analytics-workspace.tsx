@@ -35,6 +35,8 @@ type FieldDefinition = {
   aggregation?: 'sum' | 'avg' | 'weighted_avg' | 'min' | 'max';
   weight_key?: string;
   required?: boolean;
+  hidden?: boolean;
+  filterable?: boolean;
 };
 type Source = {
   source_id: string;
@@ -259,10 +261,10 @@ function chartMeasureFrom(config: Record<string, unknown> | undefined, measures:
   return measures.includes(value) ? value : measures[0] || '';
 }
 function marketSourceSchemaKey(source?: Source) {
-  return source ? `${source.source_id}:${source.updated_at || ''}:${source.field_definitions.map(field => `${field.key}:${field.label}:${field.kind}:${field.unit || ''}:${field.aggregation || ''}:${field.weight_key || ''}:${field.required ? '1' : '0'}`).join('|')}` : '';
+  return source ? `${source.source_id}:${source.updated_at || ''}:${source.field_definitions.map(field => `${field.key}:${field.label}:${field.kind}:${field.unit || ''}:${field.aggregation || ''}:${field.weight_key || ''}:${field.required ? '1' : '0'}:${field.hidden ? '1' : '0'}:${field.filterable === false ? '0' : '1'}`).join('|')}` : '';
 }
 function validSelections(source: Source, requestedDimensions: string[] = [], requestedMeasures: string[] = []) {
-  const dimensionFields = source.field_definitions.filter(field => field.kind === 'dimension');
+  const dimensionFields = source.field_definitions.filter(field => field.kind === 'dimension' && field.hidden !== true);
   const measureFields = source.field_definitions.filter(field => field.kind === 'measure');
   const dimensionKeys = new Set(dimensionFields.map(field => field.key));
   const measureKeys = new Set(measureFields.map(field => field.key));
@@ -301,8 +303,17 @@ function withAlpha(color: string, alpha: number) {
   return rgb ? `rgba(${rgb[1]}, ${rgb[2]}, ${rgb[3]}, ${alpha})` : color;
 }
 
-function marketDrillHierarchy(fields: FieldDefinition[]): MarketDrillLevel[] {
-  const dimensions = fields.filter(field => field.kind === 'dimension');
+function configuredFieldKeys(configured: unknown) {
+  return Array.isArray(configured) ? [...new Set(configured.map(String).map(value => value.trim()).filter(Boolean))] : [];
+}
+
+function marketDrillHierarchy(fields: FieldDefinition[], configured?: unknown): MarketDrillLevel[] {
+  const dimensions = fields.filter(field => field.kind === 'dimension' && field.hidden !== true);
+  const configuredLevels = configuredFieldKeys(configured).flatMap(key => {
+    const field = dimensions.find(candidate => candidate.key === key);
+    return field ? [{ key: field.key, label: field.label }] : [];
+  });
+  if (configuredLevels.length >= 2) return configuredLevels;
   const definitions: Array<{ keys: string[]; labels: RegExp }> = [
     { keys: ['market', 'market_name', 'marketplace', 'venue'], labels: /市場|場別/u },
     { keys: ['category', 'item_category', 'product_category', 'commodity_category'], labels: /品類|商品分類|類別/u },
@@ -427,12 +438,16 @@ function MarketSimulation({ analysis, sources, measures, fieldMap, paletteId, cu
   const [runs, setRuns] = useState<SimulationRun[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const allowedSourceIds = useMemo(() => new Set(sources.map(source => source.source_id)), [sources]);
   useEffect(() => { setAdjustments(current => Object.fromEntries(measures.map(measure => [measure, Number(current[measure]) || 0]))); }, [measures]);
   useEffect(() => { setScenarioName(`${analysis.source.source_name} ${periodText(analysis.periods)} 情境`); }, [analysis.source.source_name, analysis.periods.from, analysis.periods.to]);
   const loadRuns = useCallback(async () => {
-    try { setRuns(await invokeAppApi<SimulationRun[]>('market_simulation_list')); }
+    try {
+      const result = await invokeAppApi<SimulationRun[]>('market_simulation_list');
+      setRuns(result.filter(run => allowedSourceIds.has(run.source_id)));
+    }
     catch (error) { setMessage(error instanceof Error ? error.message : '模擬紀錄載入失敗'); }
-  }, []);
+  }, [allowedSourceIds]);
   useEffect(() => { void loadRuns(); }, [loadRuns]);
   const projectedTotals = useMemo(() => Object.fromEntries(measures.map(measure => {
     const base = finiteNumber(analysis.totals.values[measure]);
@@ -568,13 +583,13 @@ function MarketDrillToolbar({ enabled, hierarchy, path, busy, onToggle, onBack, 
   const currentLevel = hierarchy[Math.min(path.length, hierarchy.length - 1)];
   const atLeaf = path.length >= hierarchy.length - 1;
   return <section className="market-drill-toolbar" aria-label="市場行情下鑽工具列" aria-busy={busy}>
-    <div className="market-drill-mode"><button type="button" className={enabled ? 'active' : ''} aria-pressed={enabled} onClick={onToggle}><span aria-hidden="true">↧</span> 下鑽模式：{enabled ? '已開啟' : '已關閉'}</button><p>{enabled ? atLeaf ? `目前聚焦單一${currentLevel.label}層級，可向上鑽取後重新選擇` : `點選${currentLevel.label}資料即可展開下一層` : '開啟後可依市場、品類、品項逐層查看'}</p></div>
+    <div className="market-drill-mode"><button type="button" className={enabled ? 'active' : ''} aria-pressed={enabled} onClick={onToggle}><span aria-hidden="true">↧</span> 下鑽模式：{enabled ? '已開啟' : '已關閉'}</button><p>{enabled ? atLeaf ? `目前聚焦單一${currentLevel.label}層級，可向上鑽取後重新選擇` : `點選${currentLevel.label}資料即可展開下一層` : `開啟後可依${hierarchy.map(level => level.label).join('、')}逐層查看`}</p></div>
     {enabled && <><nav aria-label="目前下鑽路徑"><ol><li><button type="button" onClick={() => onDepth(0)} disabled={!path.length}>整體行情</button></li>{path.map((step, index) => <li key={`${step.key}-${index}`}><span aria-hidden="true">›</span><button type="button" onClick={() => onDepth(index + 1)} disabled={index === path.length - 1}>{step.value}</button></li>)}<li><span aria-hidden="true">›</span><strong aria-current="page">查看{currentLevel.label}</strong></li></ol></nav><div className="market-drill-actions"><button type="button" className="secondary-btn compact" disabled={!path.length || busy} onClick={onBack}>向上鑽取</button><button type="button" className="secondary-btn compact" disabled={!path.length || busy} onClick={onReset}>清除下鑽</button></div></>}
     {busy && enabled && <span className="market-drill-loading" role="status">正在更新下鑽資料…</span>}
   </section>;
 }
 
-function MarketExecutiveDashboard({ analysis, measures, fieldMap, primaryMeasure, paletteId, customColors, generatedAt, canDrill = false, onDrill }: { analysis: Analysis; measures: string[]; fieldMap: Map<string, FieldDefinition>; primaryMeasure: string; paletteId: PaletteId; customColors: string[]; generatedAt: string; canDrill?: boolean; onDrill: (value: string) => void }) {
+function MarketExecutiveDashboard({ analysis, measures, fieldMap, primaryMeasure, paletteId, customColors, generatedAt, canDrill = false, marketCanDrill = false, onDrill }: { analysis: Analysis; measures: string[]; fieldMap: Map<string, FieldDefinition>; primaryMeasure: string; paletteId: PaletteId; customColors: string[]; generatedAt: string; canDrill?: boolean; marketCanDrill?: boolean; onDrill: (value: string) => void }) {
   const movements = useMemo(() => marketMovements(analysis, primaryMeasure), [analysis, primaryMeasure]);
   const primaryField = fieldMap.get(primaryMeasure);
   const priceMovement = primaryMeasure.includes('price') || primaryField?.unit === '元／公斤';
@@ -618,7 +633,7 @@ function MarketExecutiveDashboard({ analysis, measures, fieldMap, primaryMeasure
       const fraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0;
       return <article className="market-kpi-card" key={measure}><span>{field?.label || measure}</span><strong>{numberText(current, fraction)}<small>{field?.unit || ''}</small></strong><p><span>比較期 {numberText(compare, fraction)}</span><b className={percent === null || Math.abs(percent) < .05 ? 'steady' : percent > 0 ? 'rise' : 'fall'}>{signedPercentText(percent)}</b></p></article>;
     })}<article className="market-kpi-card market-kpi-neutral"><span>有交易日數</span><strong>{numberText(activeDays)}<small>日</small></strong><p><span>比較期 {numberText(compareActiveDays)} 日</span><b className={activeDayChange === 0 ? 'steady' : activeDayChange > 0 ? 'rise' : 'fall'}>{activeDayChange === 0 ? '持平' : `${activeDayChange > 0 ? '▲' : '▼'} ${numberText(Math.abs(activeDayChange))} 日`}</b></p></article></section>
-    <MarketComparisonStrip analysis={analysis} fieldMap={fieldMap} canDrill={canDrill} onDrill={onDrill} />
+    <MarketComparisonStrip analysis={analysis} fieldMap={fieldMap} canDrill={marketCanDrill} onDrill={onDrill} />
     <div className="market-command-grid">
       <article className="market-command-card market-command-trend"><header><div><span className="market-kicker">每日趨勢比較</span><h3>{analysis.series?.length ? '每日行情走勢' : '主要分類比較'}</h3></div><span>{primaryField?.label || primaryMeasure}・{primaryField?.unit || '數值'}</span></header><MarketDailyTrend analysis={analysis} measure={primaryMeasure} field={primaryField} paletteId={paletteId} customColors={customColors} /></article>
       <article className="market-command-card market-command-attention"><header><div><span className="market-kicker">變動觀察</span><h3>行情變動觀察</h3></div><span>{priceMovement ? priceReliabilityReady ? '門檻 ±10%・各期 ≥1,000 公斤' : '價格判讀需搭配成交量' : '門檻 ±10%'}</span></header>{groupsTruncated ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>分類結果範圍過大</b>目前僅回傳 {numberText(returnedGroupCount)}／{numberText(totalGroupCount)} 組，請縮小期間或減少維度後再判讀。</p></div> : !priceReliabilityReady ? <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>請加入成交量指標</b>價格預警需確認本期與比較期交易量皆達 1,000 公斤，避免用微量交易誤判行情。</p></div> : watchRows.length ? <ol className="market-attention-list">{watchRows.map(row => <li className={canDrill && row.drillValue ? 'market-attention-drillable' : ''} key={`${row.state}-${row.label}`}>{canDrill && row.drillValue && <button type="button" className="market-attention-drill-button" aria-label={`下鑽查看${row.label}`} onClick={() => onDrill(row.drillValue)} />}<div><b title={row.label}>{row.label}</b><span>本期 {numberText(row.current)}・比較期 {numberText(row.compare)}</span></div><strong className={row.state === 'disappeared' || (row.percent !== null && row.percent < 0) ? 'fall' : 'rise'}>{row.percent === null ? movementStateLabel(row.state) : signedPercentText(row.percent)}</strong>{row.percent !== null && <progress className={row.percent > 0 ? 'rise' : 'fall'} max="100" value={Math.min(100, Math.abs(row.percent))} aria-label={`${row.label}變動幅度 ${Math.abs(row.percent).toFixed(1)}%`} />}</li>)}</ol> : comparableMovements.length ? <div className="market-steady-state"><span>✓</span><p><b>目前波動平穩</b>所選指標沒有分類項目超過 ±10%。</p></div> : <div className="market-steady-state market-incomplete-state"><span>!</span><p><b>比較資料不足</b>{priceMovement ? '兩期成交量皆達 1,000 公斤的共同分類不足，暫不判定價格波動。' : '本期與比較期沒有可對照的共同分類，暫不判定波動。'}</p></div>}</article>
@@ -647,6 +662,7 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   const [drillPath, setDrillPath] = useState<MarketDrillStep[]>([]);
   const [dimensionOptions, setDimensionOptions] = useState<Record<string, Array<{ value: string; count: number }>>>({});
   const [dimensionCatalogMessage, setDimensionCatalogMessage] = useState('');
+  const [dimensionCatalogLoading, setDimensionCatalogLoading] = useState(false);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [analysisGeneratedAt, setAnalysisGeneratedAt] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -654,18 +670,37 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   const [message, setMessage] = useState('');
   const [configuredSchemaKey, setConfiguredSchemaKey] = useState('');
   const requestEpochRef = useRef(0);
-  const source = sources.find(item => item.source_id === sourceId);
+  const decisionSources = useMemo(() => sources.filter(item => item.source_code !== 'market_demo' && item.config?.is_demo !== true), [sources]);
+  const decisionSourceIds = useMemo(() => new Set(decisionSources.map(item => item.source_id)), [decisionSources]);
+  const decisionTemplates = useMemo(() => templates.filter(template => template.template_code !== 'market-demo-produce-share'
+    && template.default_config?.is_demo !== true
+    && (!template.source_id || decisionSourceIds.has(template.source_id))), [templates, decisionSourceIds]);
+  const source = decisionSources.find(item => item.source_id === sourceId);
   const sourceSchemaKey = useMemo(() => marketSourceSchemaKey(source), [source]);
-  const dimensionFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'dimension'), [source]);
+  const dimensionFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'dimension' && field.hidden !== true), [source]);
+  const filterFields = useMemo(() => {
+    const available = dimensionFields.filter(field => field.filterable !== false);
+    const configured = configuredFieldKeys(source?.config?.filter_hierarchy ?? source?.config?.filter_dimensions);
+    const ordered = configured.flatMap(key => {
+      const field = available.find(candidate => candidate.key === key);
+      return field ? [field] : [];
+    });
+    const used = new Set(ordered.map(field => field.key));
+    return [...ordered, ...available.filter(field => !used.has(field.key))];
+  }, [dimensionFields, source]);
   const measureFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'measure'), [source]);
   const fieldMap = useMemo(() => new Map((source?.field_definitions || []).map(field => [field.key, field])), [source]);
-  const drillHierarchy = useMemo(() => marketDrillHierarchy(source?.field_definitions || []), [source]);
+  const drillHierarchy = useMemo(() => marketDrillHierarchy(source?.field_definitions || [], source?.config?.drill_hierarchy), [source]);
   const effectiveDrillMode = drillMode && drillHierarchy.length >= 2;
   const activeDrillLevel = effectiveDrillMode ? drillHierarchy[Math.min(drillPath.length, drillHierarchy.length - 1)] : undefined;
   const analysisDimensions = useMemo(() => activeDrillLevel ? [activeDrillLevel.key] : dimensions, [activeDrillLevel, dimensions]);
   const analysisFilters = useMemo(() => effectiveDrillMode
     ? { ...filters, ...Object.fromEntries(drillPath.map(step => [step.key, step.value])) }
     : filters, [effectiveDrillMode, filters, drillPath]);
+  const catalogFilters = useMemo(() => Object.fromEntries(filterFields.flatMap(field => {
+    const value = String(filterDrafts[field.key] || '').trim();
+    return value ? [[field.key, value]] : [];
+  })), [filterDrafts, filterFields]);
   const invalidateAnalysis = useCallback(() => { requestEpochRef.current += 1; setAnalysis(null); setBusy(false); }, []);
   const configureSourceDates = useCallback((nextSource: Source) => {
     const nextFrom = configuredDate(nextSource.config?.default_from);
@@ -682,12 +717,12 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
 
   useEffect(() => {
     if (!sourceId) {
-      const preferred = sources.find(item => item.config?.is_default === true) || sources[0];
+      const preferred = decisionSources.find(item => item.config?.is_default === true) || decisionSources[0];
       if (preferred) { setSourceId(preferred.source_id); setConfiguredSchemaKey(''); configureSourceDates(preferred); }
       return;
     }
     if (!source) {
-      invalidateAnalysis(); setSourceId(sources[0]?.source_id || ''); setConfiguredSchemaKey('');
+      invalidateAnalysis(); setSourceId(decisionSources[0]?.source_id || ''); setConfiguredSchemaKey('');
       return;
     }
     if (!sourceSchemaKey || configuredSchemaKey === sourceSchemaKey) return;
@@ -696,21 +731,35 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
     setDimensions(next.dimensions); setMeasures(next.measures);
     setChartMeasure(current => next.measures.includes(current) ? current : next.measures[0] || '');
     setConfiguredSchemaKey(sourceSchemaKey);
-  }, [sourceId, sources, source, sourceSchemaKey, configuredSchemaKey, dimensions, measures, invalidateAnalysis, configureSourceDates]);
+  }, [sourceId, decisionSources, source, sourceSchemaKey, configuredSchemaKey, dimensions, measures, invalidateAnalysis, configureSourceDates]);
   useEffect(() => { setChartMeasure(current => measures.includes(current) ? current : measures[0] || measureFields[0]?.key || ''); }, [measures, measureFields]);
   useEffect(() => { requestEpochRef.current += 1; setBusy(false); }, [sourceId, from, to, compareFrom, compareTo, dimensions, measures, filters, drillMode, drillPath]);
+  useEffect(() => { setDimensionOptions({}); }, [source?.source_id]);
   useEffect(() => {
     let active = true;
-    setDimensionOptions({}); setDimensionCatalogMessage('');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setDimensionCatalogMessage(''); setDimensionCatalogLoading(Boolean(source?.source_id));
     if (!source?.source_id) return () => { active = false; };
-    void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id })
-      .then(result => { if (active) setDimensionOptions(result.options || {}); })
-      .catch(error => { if (active) setDimensionCatalogMessage(error instanceof Error ? error.message : '篩選選項載入失敗，仍可直接輸入文字。'); });
-    return () => { active = false; };
-  }, [source?.source_id]);
+    timer = setTimeout(() => {
+      void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters })
+        .then(result => { if (active) setDimensionOptions(result.options || {}); })
+        .catch(error => { if (active) setDimensionCatalogMessage(error instanceof Error ? error.message : '篩選選項載入失敗，請重新整理設定後再試。'); })
+        .finally(() => { if (active) setDimensionCatalogLoading(false); });
+    }, 150);
+    return () => { active = false; if (timer) clearTimeout(timer); };
+  }, [source?.source_id, catalogFilters]);
+
+  const updateFilterDraft = useCallback((key: string, value: string) => {
+    setFilterDrafts(current => {
+      const next = { ...current, [key]: value };
+      const index = filterFields.findIndex(field => field.key === key);
+      if (index >= 0) filterFields.slice(index + 1).forEach(field => { delete next[field.key]; });
+      return next;
+    });
+  }, [filterFields]);
 
   const selectSource = (nextSourceId: string) => {
-    const nextSource = sources.find(item => item.source_id === nextSourceId);
+    const nextSource = decisionSources.find(item => item.source_id === nextSourceId);
     invalidateAnalysis(); setSourceId(nextSourceId); setConfiguredSchemaKey(''); setFilters({}); setFilterDrafts({}); setDrillPath([]); setFiltersOpen(true);
     if (nextSource) configureSourceDates(nextSource);
   };
@@ -751,7 +800,7 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   useEffect(() => { if (source?.source_id && !analysis && sourceFieldsReady && compareDatesReady && analysisFiltersReady) void load(); }, [source?.source_id, analysis, sourceFieldsReady, compareDatesReady, analysisFiltersReady, load]);
 
   const applyTemplate = (template: Template) => {
-    const targetSource = template.source_id ? sources.find(sourceItem => sourceItem.source_id === template.source_id) : source;
+    const targetSource = template.source_id ? decisionSources.find(sourceItem => sourceItem.source_id === template.source_id) : source;
     if (!targetSource) { setMessage('模板資料來源已停用或不存在，請先修正模板設定。'); return; }
     const next = validSelections(targetSource, template.dimensions || [], template.measures || []);
     if (!next.validRequestedMeasures.length) { setMessage(`模板「${template.template_name}」沒有可套用至目前資料來源的分析指標。`); return; }
@@ -773,7 +822,6 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   const analysisFieldMap = useMemo(() => new Map((analysis?.fields || []).map(field => [field.key, field])), [analysis]);
   const resultPrimaryMeasure = analysis?.measures.includes(primaryMeasure) ? primaryMeasure : analysis?.measures[0] || primaryMeasure;
   const resultPrimaryField = analysisFieldMap.get(resultPrimaryMeasure) || primaryField;
-  const demoTemplate = templates.find(template => template.template_code === 'market-demo-produce-share');
   const replaceDrillPath = useCallback((nextPath: MarketDrillStep[]) => {
     invalidateAnalysis();
     setDrillPath(nextPath);
@@ -803,31 +851,30 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
 
   return <div className="market-analysis-workspace">
     <section className="market-control-panel panel">
-      <div className="market-section-heading"><div><span className="market-kicker">分析工作台</span><h2>交易行情比較</h2><p>首頁先呈現營運結論；需要更換資料來源、期間、指標或色卡時再展開設定。</p></div><div className="market-filter-actions"><div className="market-template-quick"><label>快速套用模板<select value="" onChange={event => { const template = templates.find(item => item.template_id === event.target.value); if (template) applyTemplate(template); }}><option value="">選擇分析模板</option>{templates.map(template => <option key={template.template_id} value={template.template_id}>{template.template_name}</option>)}</select></label>{demoTemplate && <button type="button" className="secondary-btn compact" onClick={() => applyTemplate(demoTemplate)}>載入非正式示範行情</button>}</div><button type="button" className="secondary-btn compact market-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>{filtersOpen ? '收合分析設定' : '調整分析條件'}</button></div></div>
+      <div className="market-section-heading"><div><span className="market-kicker">分析工作台</span><h2>交易行情比較</h2><p>首頁先呈現營運結論；需要更換資料來源、期間、指標或色卡時再展開設定。</p></div><div className="market-filter-actions"><div className="market-template-quick"><label>快速套用模板<select value="" onChange={event => { const template = decisionTemplates.find(item => item.template_id === event.target.value); if (template) applyTemplate(template); }}><option value="">選擇分析模板</option>{decisionTemplates.map(template => <option key={template.template_id} value={template.template_id}>{template.template_name}</option>)}</select></label></div><button type="button" className="secondary-btn compact market-filter-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>{filtersOpen ? '收合分析設定' : '調整分析條件'}</button></div></div>
       {!filtersOpen && analysis && <div className="market-filter-summary"><span>{analysis.source.source_name}</span><span>本期 {periodText(analysis.periods)}</span><span>比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</span>{Object.entries(analysis.filters || {}).map(([key, value]) => <span key={key}>{analysisFieldMap.get(key)?.label || key}：{value}</span>)}<span>{analysis.measures.map(key => analysisFieldMap.get(key)?.label || key).join('、')}</span></div>}
       {filtersOpen && <div className="market-control-body">
         <div className="market-control-grid">
-          <label>資料來源<select value={sourceId} onChange={event => selectSource(event.target.value)}><option value="">請選擇資料來源</option>{sources.map(item => <option key={item.source_id} value={item.source_id}>{item.source_name}</option>)}</select></label>
+          <label>資料來源<select value={sourceId} onChange={event => selectSource(event.target.value)}><option value="">請選擇資料來源</option>{decisionSources.map(item => <option key={item.source_id} value={item.source_id}>{item.source_name}</option>)}</select></label>
           <div className="market-period-group"><span>分析期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="分析起始日期" value={from} onChange={event => { invalidateAnalysis(); setFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="分析結束日期" value={to} onChange={event => { invalidateAnalysis(); setTo(event.target.value); }} /></div></div>
           <div className="market-period-group"><span>比較期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="比較起始日期" value={compareFrom} onChange={event => { invalidateAnalysis(); setCompareMode('custom'); setCompareFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="比較結束日期" value={compareTo} onChange={event => { invalidateAnalysis(); setCompareMode('custom'); setCompareTo(event.target.value); }} /></div></div>
         </div>
         <div className="market-compare-actions"><span>快速比較：</span><button type="button" className={compareMode === 'previous' ? 'active' : ''} onClick={() => applyCompare('previous')}>前一段期間</button><button type="button" className={compareMode === 'next' ? 'active' : ''} onClick={() => applyCompare('next')}>後一段期間</button><button type="button" className={compareMode === 'same' ? 'active' : ''} onClick={() => applyCompare('same')}>去年同期</button><button type="button" className={compareMode === 'custom' ? 'active' : ''} onClick={() => setCompareMode('custom')}>自訂</button></div>
         <div className="market-selector-grid"><fieldset><legend>分析維度（最多 4 個）</legend><div className="market-check-list">{dimensionFields.map(field => <label key={field.key}><input type="checkbox" checked={dimensions.includes(field.key)} disabled={!dimensions.includes(field.key) && dimensions.length >= 4} onChange={event => { invalidateAnalysis(); setDimensions(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key)); }} />{field.label}</label>)}</div></fieldset><fieldset><legend>分析指標（最多 4 個）</legend><div className="market-check-list">{measureFields.map(field => <label key={field.key}><input type="checkbox" checked={measures.includes(field.key)} disabled={!measures.includes(field.key) && measures.length >= 4} onChange={event => { invalidateAnalysis(); setMeasures(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key)); }} />{field.label}{field.unit ? `（${field.unit}）` : ''}</label>)}</div></fieldset></div>
-        <section className="market-value-filters"><header><div><b>資料內容篩選</b><span>可從選項挑選，也可直接輸入來源中的市場、品類或品項；空白代表全部。</span></div><div className="market-value-filter-actions">{Object.values(filterDrafts).some(Boolean) && <button type="button" className="secondary-btn compact" onClick={() => { invalidateAnalysis(); setFilterDrafts({}); setFilters({}); setDrillPath([]); }}>清除篩選</button>}<button type="button" className="primary-btn compact" onClick={() => { invalidateAnalysis(); setFilters(Object.fromEntries(Object.entries(filterDrafts).map(([key, value]) => [key, value.trim()]).filter(([, value]) => Boolean(value)))); setDrillPath([]); }}>套用篩選</button></div></header><div>{dimensionFields.map(field => { const listId = `market-filter-${source?.source_id || 'source'}-${field.key}`; return <label key={field.key}>{field.label}<input list={listId} value={filterDrafts[field.key] || ''} onChange={event => setFilterDrafts(current => ({ ...current, [field.key]: event.target.value }))} placeholder={`全部${field.label}`} /><datalist id={listId}>{(dimensionOptions[field.key] || []).map(option => <option key={option.value} value={option.value}>{option.value}（{numberText(option.count)} 筆）</option>)}</datalist></label>; })}</div>{dimensionCatalogMessage && <small>{dimensionCatalogMessage}</small>}</section>
+        <section className="market-value-filters"><header><div><b>資料內容篩選</b><span>請依「市場 → 蔬果大類 → 品項分類」選擇；下層選項會跟著上層連動，空白代表全部。</span></div><div className="market-value-filter-actions">{Object.values(filterDrafts).some(Boolean) && <button type="button" className="secondary-btn compact" onClick={() => { invalidateAnalysis(); setFilterDrafts({}); setFilters({}); setDrillPath([]); }}>清除篩選</button>}<button type="button" className="primary-btn compact" onClick={() => { invalidateAnalysis(); setFilters(Object.fromEntries(Object.entries(filterDrafts).map(([key, value]) => [key, value.trim()]).filter(([, value]) => Boolean(value)))); setDrillPath([]); }}>套用篩選</button></div></header><div>{filterFields.map(field => { const options = dimensionOptions[field.key] || []; return <label key={field.key}>{field.label}<select value={filterDrafts[field.key] || ''} disabled={dimensionCatalogLoading || Boolean(dimensionCatalogMessage) || !options.length} onChange={event => updateFilterDraft(field.key, event.target.value)}><option value="">{dimensionCatalogLoading && !options.length ? `載入${field.label}中…` : !options.length ? `目前沒有${field.label}資料` : `全部${field.label}`}</option>{options.map(option => <option key={option.value} value={option.value}>{option.value}（{numberText(option.count)} 筆）</option>)}</select></label>; })}</div>{dimensionCatalogMessage && <small>{dimensionCatalogMessage}</small>}</section>
         <div className="market-chart-settings"><label>詳細圖表類型<select value={chartType} onChange={event => setChartType(event.target.value as ChartType)}>{CHART_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>主要判讀指標<select value={primaryMeasure} onChange={event => setChartMeasure(event.target.value)}>{measures.map(measure => <option key={measure} value={measure}>{fieldMap.get(measure)?.label || measure}</option>)}</select></label></div>
         <PalettePicker value={paletteId} customColors={customColors} onChange={setPaletteId} onCustomColorsChange={setCustomColors} />
         <div className="market-control-footer"><span>本期：{periodText({ from, to })}　比較：{periodText({ from: compareFrom, to: compareTo })}{!compareDatesReady ? '　（兩個期間須為相同天數，且最多 366 天）' : ''}</span><button type="button" className="primary-btn" disabled={busy || !sourceFieldsReady || !compareDatesReady || !analysisFiltersReady} onClick={() => void load()}>{busy ? '分析中…' : '執行分析'}</button></div>
       </div>
       }
-      {source?.source_code === 'market_demo' && <p className="market-demo-notice">目前使用非正式示範行情，僅供體驗圖表、色卡與情境模擬，不得作為實際交易決策。</p>}
       {source?.config?.is_actual === true && <p className="market-actual-notice"><b>實際資料範圍：</b>{String(source.config.data_scope || '第一市場、第二市場')}；{String(source.config.value_note || '交易金額為平均價乘以成交量的推估值。')}{source.config.data_quality_note ? `　資料品質：${String(source.config.data_quality_note)}` : ''}</p>}
       {message && <p className="market-inline-message" role="status">{message}</p>}
     </section>
     <MarketDrillToolbar enabled={effectiveDrillMode} hierarchy={drillHierarchy} path={drillPath} busy={busy} onToggle={toggleDrill} onBack={drillBack} onReset={drillReset} onDepth={drillToDepth} />
     {analysis && <>
-      <MarketExecutiveDashboard analysis={analysis} measures={analysis.measures} fieldMap={analysisFieldMap} primaryMeasure={resultPrimaryMeasure} paletteId={paletteId} customColors={customColors} generatedAt={analysisGeneratedAt || new Date().toISOString()} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />
+      <MarketExecutiveDashboard analysis={analysis} measures={analysis.measures} fieldMap={analysisFieldMap} primaryMeasure={resultPrimaryMeasure} paletteId={paletteId} customColors={customColors} generatedAt={analysisGeneratedAt || new Date().toISOString()} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} marketCanDrill={effectiveDrillMode && activeDrillLevel?.key === 'market'} onDrill={drillToValue} />
       <section className="panel market-result-panel"><header className="market-result-heading"><div><span className="market-kicker">分析結果</span><h2>{analysis.source.source_name}</h2><p>本期 {periodText(analysis.periods)}　｜　比較期 {periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to })}</p></div><span>{analysis.quality?.groups_truncated ? `共 ${numberText(analysis.quality.total_group_count)} 組，目前載入 ${numberText(analysis.quality.returned_group_count)} 組` : `${analysis.rows.length} 組比較結果`}</span></header>{analysis.quality?.groups_truncated ? <div className="market-result-incomplete" role="status"><b>分類結果超過顯示上限</b><p>為避免用部分資料產生排行、占比或漲跌結論，詳細分類圖表已暫停。請縮小日期範圍或減少分析維度後重新執行。</p></div> : <>{chartType === 'bar' && <MarketBars analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{(chartType === 'pie' || chartType === 'doughnut') && <MarketArcCharts analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{(chartType === 'line' || chartType === 'area') && <MarketLineChart analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} chartType={chartType} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{chartType === 'cards' && <MarketColorCards analysis={analysis} measure={resultPrimaryMeasure} field={resultPrimaryField} paletteId={paletteId} customColors={customColors} canDrill={effectiveDrillMode && drillPath.length < drillHierarchy.length - 1} onDrill={drillToValue} />}{chartType === 'table' && <div className="responsive-table market-result-table"><table><thead><tr>{analysis.dimensions.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}</th>)}{analysis.measures.map(key => <th key={key}>{analysisFieldMap.get(key)?.label || key}（本期／比較）</th>)}<th>變化</th></tr></thead><tbody>{analysis.rows.map((row, index) => { const drillValue = analysis.dimensions.length === 1 ? row.dimensions[analysis.dimensions[0]] || '' : ''; return <tr key={index}>{analysis.dimensions.map(key => <td key={key}>{effectiveDrillMode && drillPath.length < drillHierarchy.length - 1 && key === analysis.dimensions[0] && drillValue ? <button type="button" className="market-table-drill-button" onClick={() => drillToValue(drillValue)}>{row.dimensions[key] || '未分類'}<span>展開下一層</span></button> : row.dimensions[key] || '未分類'}</td>)}{analysis.measures.map(key => <td key={key}>{numberText(row.values[key])} ／ {numberText(row.compare_values[key])}</td>)}<td>{numberText(row.changes[resultPrimaryMeasure])}</td></tr>; })}</tbody></table></div>}</>}</section>
-      <MarketSimulation analysis={analysis} sources={sources} measures={analysis.measures} fieldMap={analysisFieldMap} paletteId={paletteId} customColors={customColors} />
+      <MarketSimulation analysis={analysis} sources={decisionSources} measures={analysis.measures} fieldMap={analysisFieldMap} paletteId={paletteId} customColors={customColors} />
     </>}
     {!analysis && !busy && <div className="market-empty-panel panel">請選擇資料來源與比較期間，再執行分析。</div>}
   </div>;
@@ -918,10 +965,13 @@ function TemplatesWorkspace({ sources, templates, onSaved }: { sources: Source[]
   const [message, setMessage] = useState('');
   const source = sources.find(item => item.source_id === sourceId) || sources[0];
   const fields = source?.field_definitions || [];
+  const visibleDimensionFields = fields.filter(field => field.kind === 'dimension' && field.hidden !== true);
   useEffect(() => { setChartMeasure(current => measures.includes(current) ? current : measures[0] || ''); }, [measures]);
   const chooseTemplate = (template: Template) => {
+    const targetSource = sources.find(item => item.source_id === template.source_id) || source;
+    const visibleDimensionKeys = new Set((targetSource?.field_definitions || []).filter(field => field.kind === 'dimension' && field.hidden !== true).map(field => field.key));
     setTemplateId(template.template_id); setTemplateCode(template.template_code); setTemplateName(template.template_name); setDescription(template.description || ''); setSourceId(template.source_id || '');
-    setDimensions(template.dimensions || []); setMeasures(template.measures || []); setChartType(template.chart_type); setChartMeasure(chartMeasureFrom(template.default_config, template.measures || []));
+    setDimensions((template.dimensions || []).filter(key => visibleDimensionKeys.has(key))); setMeasures(template.measures || []); setChartType(template.chart_type); setChartMeasure(chartMeasureFrom(template.default_config, template.measures || []));
     setCompare(String(template.default_config?.compare || 'previous')); setPaletteId(paletteIdFrom(template.default_config)); setCustomColors(normalizeCustomColors(template.default_config?.custom_colors));
     setMessage(`已載入「${template.template_name}」設定。`);
   };
@@ -929,7 +979,7 @@ function TemplatesWorkspace({ sources, templates, onSaved }: { sources: Source[]
     setBusy(true); setMessage('');
     try {
       const saved = await invokeAppApi<Template>('market_template_save', {
-        template_id: templateId || undefined, template_code: templateCode, template_name: templateName, description, source_id: source?.source_id || undefined, dimensions, measures, chart_type: chartType,
+        template_id: templateId || undefined, template_code: templateCode, template_name: templateName, description, source_id: source?.source_id || undefined, dimensions: dimensions.filter(key => visibleDimensionFields.some(field => field.key === key)), measures, chart_type: chartType,
         default_config: { compare, limit: 20, chart_measure: chartMeasure || measures[0] || '', palette_id: paletteId, custom_colors: paletteId === 'custom' ? normalizeCustomColors(customColors) : undefined },
       });
       setTemplateId(saved.template_id); setMessage(templateId ? '分析模板已更新。' : '分析模板已建立。'); await onSaved();
@@ -941,7 +991,7 @@ function TemplatesWorkspace({ sources, templates, onSaved }: { sources: Source[]
       <header className="market-result-heading"><div><span className="market-kicker">模板設計</span><h2>分析模板設計</h2><p>把常用的品項、市場、指標、圖表與色卡保存起來，之後一鍵套用。</p></div><label>載入既有模板<select value="" onChange={event => { const template = templates.find(item => item.template_id === event.target.value); if (template) chooseTemplate(template); }}><option value="">選擇模板</option>{templates.map(template => <option key={template.template_id} value={template.template_id}>{template.template_name}</option>)}</select></label></header>
       <div className="market-form-grid"><label>模板代碼<input value={templateCode} onChange={event => setTemplateCode(event.target.value)} /></label><label>模板名稱<input value={templateName} onChange={event => setTemplateName(event.target.value)} /></label><label>資料來源<select value={source?.source_id || ''} onChange={event => setSourceId(event.target.value)}><option value="">選擇來源</option>{sources.map(item => <option key={item.source_id} value={item.source_id}>{item.source_name}</option>)}</select></label><label>比較預設<select value={compare} onChange={event => setCompare(event.target.value)}><option value="previous">前一段期間</option><option value="next">後一段期間</option><option value="same">去年同期</option><option value="custom">自訂</option></select></label></div>
       <label className="market-template-description">模板說明<textarea rows={2} value={description} onChange={event => setDescription(event.target.value)} placeholder="說明此模板適合的分析情境" /></label>
-      <div className="market-selector-grid"><fieldset><legend>預設分析維度</legend><div className="market-check-list">{fields.filter(field => field.kind === 'dimension').map(field => <label key={field.key}><input type="checkbox" checked={dimensions.includes(field.key)} onChange={event => setDimensions(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key))} />{field.label}</label>)}</div></fieldset><fieldset><legend>預設分析指標</legend><div className="market-check-list">{fields.filter(field => field.kind === 'measure').map(field => <label key={field.key}><input type="checkbox" checked={measures.includes(field.key)} onChange={event => setMeasures(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key))} />{field.label}</label>)}</div></fieldset></div>
+      <div className="market-selector-grid"><fieldset><legend>預設分析維度</legend><div className="market-check-list">{visibleDimensionFields.map(field => <label key={field.key}><input type="checkbox" checked={dimensions.includes(field.key)} onChange={event => setDimensions(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key))} />{field.label}</label>)}</div></fieldset><fieldset><legend>預設分析指標</legend><div className="market-check-list">{fields.filter(field => field.kind === 'measure').map(field => <label key={field.key}><input type="checkbox" checked={measures.includes(field.key)} onChange={event => setMeasures(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key))} />{field.label}</label>)}</div></fieldset></div>
       <div className="market-chart-settings"><label>預設圖表<select value={chartType} onChange={event => setChartType(event.target.value as ChartType)}>{CHART_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>預設圖表指標<select value={chartMeasure || measures[0] || ''} onChange={event => setChartMeasure(event.target.value)}>{measures.map(measure => <option key={measure} value={measure}>{fields.find(field => field.key === measure)?.label || measure}</option>)}</select></label></div>
       <PalettePicker value={paletteId} customColors={customColors} onChange={setPaletteId} onCustomColorsChange={setCustomColors} />
       <div className="market-form-actions"><span>模板會同步保存圖表、指標、比較方式與色卡。</span><button type="button" className="primary-btn" disabled={busy || !measures.length} onClick={() => void save()}>{busy ? '儲存中…' : '儲存分析模板'}</button></div>
