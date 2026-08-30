@@ -1359,7 +1359,8 @@ export async function handleAppApiRequest(req: Request) {
       const requestSnapshot = {
         request_id: requestId,
         req_no: reqNo,
-        source: 'app-api',
+        // V2 表單是直接通報；沿用 repair_requests 既有合法來源值。
+        source: 'direct',
         reporter: text(requestPayload.reporter, 100) || profile.name,
         phone: text(requestPayload.phone, 40) || null,
         department: text(requestPayload.department, 100) || text(profile.department, 100) || null,
@@ -1453,7 +1454,8 @@ export async function handleAppApiRequest(req: Request) {
       const requestRow = {
         request_id: requestId,
         req_no: reqNo,
-        source: 'app-api',
+        // V2 表單是直接通報；沿用 repair_requests 既有合法來源值。
+        source: 'direct',
         reporter: text(requestData.reporter, 100) || profile.name,
         phone: text(requestData.phone, 40) || null,
         department: text(requestData.department, 100) || text(profile.department, 100) || null,
