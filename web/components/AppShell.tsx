@@ -12,6 +12,7 @@ import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile } from '@/lib/profile-cache';
 import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
+import { resolveAppBackHref } from '@/lib/app-navigation';
 
 
 function taipeiClock() {
@@ -45,6 +46,7 @@ export function AppShell({ profile, title, children, heading }: {
   const routeModule = routeSystem ? findModule(routeSystem.key, pathParts[systemsIndex + 2] || '') : undefined;
   const headingSystem = heading?.system || routeSystem;
   const headingModule = heading?.module || routeModule;
+  const backHref = resolveAppBackHref(pathname);
   const pageHeading = headingSystem && headingModule
     ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} description={heading?.description} />
     : null;
@@ -183,10 +185,10 @@ export function AppShell({ profile, title, children, heading }: {
         <time>{clock}</time>
       </div>
       <nav className="v1-actions" aria-label="主要導覽">
-        <button type="button" className="v1-back-action" onClick={() => window.history.back()}>
+        <Link href={backHref} className="v1-back-action">
           <span className="generated-nav-icon nav-back" aria-hidden="true" />
           <span>上頁</span>
-        </button>
+        </Link>
         <Link href="/systems/" className={pathname === '/systems/' ? 'is-current' : ''}>
           <span className="generated-nav-icon nav-home" aria-hidden="true" />
           <span>首頁</span>
