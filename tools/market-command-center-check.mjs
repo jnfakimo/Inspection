@@ -26,6 +26,8 @@ assert.match(command, /setCategory\(''\); setItem\(''\)/,
   '切換市場或蔬果大類時必須清除不再相容的品項');
 assert.match(command, /XLSX|K 線|累積占比|收盤高於開盤/,
   '戰情儀表板必須提供初學者可讀的 K 線與統計圖例');
+assert.match(command, /行情方向圖例[\s\S]*?▲[\s\S]*?上漲（紅）[\s\S]*?▼[\s\S]*?下跌（綠）/,
+  '戰情儀表板必須明示紅色上漲三角形與綠色下跌三角形');
 assert.match(workspace, /parseXlsxFile[\s\S]*?workbook\.worksheets\[0\][\s\S]*?accept=.*xlsx/,
   '資料介接中心必須可讀取 XLSX 第一個工作表');
 assert.match(workspace, /IMPORT_HEADER_ALIASES[\s\S]*?品名代號[\s\S]*?平均價[\s\S]*?inferImportHeader/,

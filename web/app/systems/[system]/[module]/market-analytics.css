@@ -73,7 +73,10 @@
 @media(max-width:430px){.market-stock-legend{display:grid;grid-template-columns:1fr 1fr}.market-stock-legend>b,.market-stock-legend>small{grid-column:1/-1}.market-stock-trend .market-daily-trend{height:250px}.market-result-cards{grid-template-columns:1fr}.market-result-card-drillable>button{min-height:44px}}
 
 /* 獨立市場戰情儀表板：日／週／月／季／年切換、圖形切換與 Power BI 式下鑽。 */
-.market-command-page{display:grid;gap:14px;min-width:0}
+.market-command-page{--market-rise-color:var(--red);--market-fall-color:var(--green);--market-rise-readable:color-mix(in srgb,var(--market-rise-color) 72%,var(--text));--market-fall-readable:color-mix(in srgb,var(--market-fall-color) 68%,var(--text));display:grid;gap:14px;min-width:0}
+.market-command-page .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
+.market-command-page .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
+.market-command-direction-legend{margin:0}
 .market-command-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;border-top:3px solid var(--cyan)}
 .market-command-hero h2{margin:5px 0 4px;font-size:24px}
 .market-command-hero p{max-width:760px;margin:0;color:var(--dim);font-size:12px;line-height:1.7}
