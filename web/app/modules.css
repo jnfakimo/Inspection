@@ -24,12 +24,12 @@
 .module-hero{background:linear-gradient(120deg,color-mix(in srgb,var(--icon-sky) 12%,transparent),var(--panel))}
 .module-hero span{color:var(--icon-sky-text)}
 
-/* 49 個子系統共用桌面圖卡尺寸；窄版由斷點恢復彈性寬度。 */
+/* 53 個子系統共用桌面圖卡尺寸；窄版由斷點恢復彈性寬度。 */
 .module-grid{grid-template-columns:repeat(3,269px);justify-content:center}
 .module-grid a{width:269px;height:200px;min-height:200px}
 @media(max-width:1100px){.module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.module-grid a{width:auto}}
 
-/* 49 個子系統共用的手機頁首操作列：說明與操作按鈕優先同列靠上，
+/* 53 個子系統共用的手機頁首操作列：說明與操作按鈕優先同列靠上，
    空間不足時以 flex-wrap 自動換行，避免按鈕壓住文字或造成水平溢出。 */
 @media(max-width:760px){
   .page-actions{

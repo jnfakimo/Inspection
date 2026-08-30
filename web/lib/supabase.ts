@@ -20,11 +20,13 @@ const READ_ACTION_LABELS: Record<string, string> = {
   inspections: '讀取巡檢資料',
   equipment_map: '讀取設備地圖資料',
   official_documents: '讀取公文傳送資料',
+  market_catalog: '讀取市場分析設定',
+  market_analysis: '讀取交易行情分析',
 };
 
 // 公文流程的寫入動作固定走 Edge Function，避免舊版 Node API 尚未包含
 // 自動取號／不可刪除時間軸時，前端先收到不支援或欄位錯誤。
-const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action']);
+const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action', 'market_source_save', 'market_template_save', 'market_import_rows']);
 
 const recordAppRead = (action: string) => {
   const label = READ_ACTION_LABELS[action];

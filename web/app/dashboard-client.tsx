@@ -27,7 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
 import { WeatherWidget } from './weather-widget';
@@ -42,6 +42,13 @@ type LayoutItem = {
   widget_key: string; title: string; x: number; y: number; width: number; height: number;
   min_width: number; min_height: number; visible: boolean; refresh_seconds: number; sort_order: number;
 };
+type MarketSnapshot = {
+  source?: { source_name?: string };
+  rows?: Array<{ dimensions?: Record<string, string>; values?: Record<string, number | null>; compare_values?: Record<string, number | null> }>;
+  measures?: string[];
+  fields?: Array<{ key: string; label: string; kind: string; unit?: string }>;
+  periods?: { from: string; to: string; compare_from: string; compare_to: string };
+};
 
 // 與 V1 dashboard-layout.js 的 CATALOG 一字不差，兩邊的預設版面才會一致。
 const CATALOG = [
@@ -55,6 +62,7 @@ const CATALOG = [
   { key: 'rank_fault', title: '故障類型分析', x: 6, y: 13, w: 6, h: 4, minW: 3, minH: 3 },
   { key: 'trend', title: '各月份報修趨勢', x: 0, y: 17, w: 12, h: 5, minW: 4, minH: 4 },
   { key: 'weather_taiwan', title: '臺灣即時氣象', x: 0, y: 22, w: 12, h: 7, minW: 6, minH: 5 },
+  { key: 'market_snapshot', title: '市場交易行情摘要', x: 0, y: 29, w: 12, h: 5, minW: 4, minH: 4 },
 ] as const;
 
 const DONE_ORDER = ['completed', 'closed'];
@@ -86,6 +94,7 @@ const countBy = (rows: Row[], pick: (row: Row) => unknown): Array<[string, numbe
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 };
 const average = (list: number[]) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
+const numberText = (value: unknown) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('zh-TW', { maximumFractionDigits: 1 });
 
 function normalizeLayout(rows: Row[]): LayoutItem[] {
   const byKey: Record<string, Row> = {};
@@ -121,6 +130,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   const [requests, setRequests] = useState<Row[]>([]);
   const [orders, setOrders] = useState<Row[]>([]);
   const [trend, setTrend] = useState<Array<{ label: string; value: number }>>([]);
+  const [market, setMarket] = useState<MarketSnapshot | null>(null);
   const [patrol, setPatrol] = useState({ points: 0, done: 0, shift: '', floors: [] as Array<[string, number]> });
   const [range, setRange] = useState<'today' | 'month' | 'year'>('month');
   const [from, setFrom] = useState(() => { const now = new Date(); return ymd(new Date(now.getFullYear(), now.getMonth(), 1)); });
@@ -157,8 +167,11 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const trendStart = `${now.getFullYear() - (now.getMonth() < 11 ? 1 : 0)}-${pad(((now.getMonth() + 1) % 12) + 1)}-01`;
     const trendEnd = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     const day = today();
+    const marketDays = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1);
+    const marketCompareFrom = ymd(new Date(Date.parse(`${from}T00:00:00Z`) - marketDays * 86400000));
+    const marketCompareTo = ymd(new Date(Date.parse(`${to}T00:00:00Z`) - marketDays * 86400000));
 
-    const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult] = await Promise.all([
+    const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult, marketResult] = await Promise.all([
       client.from('repair_requests')
         .select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,hidden,equipment(name,category)')
         .gte('created_at', rangeStart).lte('created_at', rangeEnd).limit(5000),
@@ -170,6 +183,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(5000),
       getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
       getPatrolShiftsForDate(client, day),
+      invokeAppApi<MarketSnapshot>('market_analysis', { from, to, compare_from: marketCompareFrom, compare_to: marketCompareTo }).catch(() => null),
     ]);
 
     if (requestResult.error || orderResult.error) {
@@ -187,6 +201,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     if (notices.length) setError(notices.join('；'));
     setRequests((requestResult.data || []).filter(row => !row.hidden));
     setOrders((orderResult.data || []).filter(row => !row.hidden));
+    setMarket(marketResult);
 
     // 12 個月趨勢：RPC 失敗時以 0 補滿，畫面仍成立但不會假造數字。
     const counts: Record<string, number> = {};
@@ -327,6 +342,12 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         return <div style={{ position: 'relative', height: '100%', minHeight: '200px' }}><Line data={data} options={options} /></div>;
       }
       case 'weather_taiwan': return <WeatherWidget />;
+      case 'market_snapshot': {
+        const measure = market?.measures?.[0] || '';
+        const field = market?.fields?.find(item => item.key === measure);
+        const items = (market?.rows || []).slice(0, 8);
+        return <div className="dash-market-snapshot"><div className="dash-market-meta"><span>{market?.source?.source_name || '尚未設定行情資料來源'}</span><small>{market?.periods ? `${market.periods.from}～${market.periods.to}　比　${market.periods.compare_from}～${market.periods.compare_to}` : '可由市場營運分析系統設定'}</small></div>{items.length ? <div className="dash-market-list">{items.map((item, index) => <div key={index}><b>{Object.values(item.dimensions || {}).join('／') || '全部'}</b><strong>{numberText(item.values?.[measure])}<small>{field?.unit || ''}</small></strong><span>{item.compare_values?.[measure] == null ? '無比較資料' : `比較 ${numberText(item.compare_values[measure])}`}</span></div>)}</div> : <p className="empty">尚無行情資料，請至「市場營運分析系統」匯入資料。</p>}</div>;
+      }
       default: return <p className="empty">未知的版面元件：{item.widget_key}</p>;
     }
   };

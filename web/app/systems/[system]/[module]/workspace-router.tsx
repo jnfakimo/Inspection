@@ -54,6 +54,10 @@ const RepairMap3DModule = dynamic(
   () => import('./repair-map3d').then((mod) => mod.RepairMap3DModule),
   { ssr: false, loading: moduleLoading },
 );
+const MarketAnalyticsWorkspace = dynamic<WorkspaceProps>(
+  () => import('./market-analytics-workspace').then((mod) => mod.MarketAnalyticsWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'handover' || system.key === 'guardpatrol') {
@@ -79,6 +83,9 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   }
   if (system.key === 'officialdocs') {
     return <OfficialDocsWorkspace system={system} module={module} />;
+  }
+  if (system.key === 'marketanalytics') {
+    return <MarketAnalyticsWorkspace system={system} module={module} />;
   }
   return <ModuleWorkspace system={system} module={module} />;
 }

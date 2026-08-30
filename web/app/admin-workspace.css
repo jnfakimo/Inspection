@@ -261,7 +261,7 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
 .patrol-shift-shell .responsive-table td{grid-template-columns:minmax(64px,26%) 1fr}
 }
 
-/* 49 個子系統的 AdminHeader 手機版共用操作列：說明與重新載入／其他按鈕
+/* 53 個子系統的 AdminHeader 手機版共用操作列：說明與重新載入／其他按鈕
    同列靠上；總寬不足時換行，並縮短按鈕列下方留白。 */
 @media (max-width:800px){
   .page-actions.admin-page-actions{
