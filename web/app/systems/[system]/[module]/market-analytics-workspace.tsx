@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import {
   ArcElement,
   CategoryScale,
@@ -487,22 +487,59 @@ function MarketSimulation({ analysis, sources, measures, fieldMap, paletteId, cu
 }
 
 function MarketBars({ analysis, measure, field, paletteId, customColors, limit = 20, canDrill = false, onDrill }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[]; limit?: number; canDrill?: boolean; onDrill?: (value: string) => void }) {
+  const guideId = useId();
   const palette = useResolvedPalette(paletteId, customColors);
   const rows = chartRows(analysis, measure, limit);
   const max = Math.max(1, ...rows.flatMap(row => [Number(row.current) || 0, Number(row.compare) || 0]));
   if (!rows.length) return <p className="market-empty">此期間沒有可繪製的資料。</p>;
-  return <div className="market-bars" style={{ '--market-current-color': palette.colors[0], '--market-compare-color': palette.colors[1 % palette.colors.length] } as CSSProperties}>{rows.map((row, index) => {
-    const name = row.label;
-    const current = Number(row.current) || 0, compare = Number(row.compare) || 0;
-    return <div className={`market-bar-row${canDrill && row.drillValue ? ' market-bar-drillable' : ''}`} key={`${name}-${index}`}>
-      {canDrill && row.drillValue && <button type="button" className="market-bar-drill-button" aria-label={`下鑽查看${name}`} onClick={() => onDrill?.(row.drillValue)} />}
-      <div className="market-bar-label" title={name}>{name}</div>
-      <div className="market-bar-pair" aria-label={`${name} 本期 ${numberText(current)}，比較期 ${numberText(compare)}`}>
-        <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true"><rect className="market-bar-current" x="0" y="0" width={Math.max(0, current / max * 100)} height="5" rx="2" /><rect className="market-bar-compare" x="0" y="7" width={Math.max(0, compare / max * 100)} height="5" rx="2" /></svg>
+  const dimensionLabel = analysis.dimensions.map(key => analysis.fields.find(item => item.key === key)?.label || key).join('／') || '分類項目';
+  const measureLabel = field?.label || measure;
+  const unitLabel = field?.unit || '無單位';
+  const unitHeading = field?.unit ? `（${field.unit}）` : '';
+  const valueFraction = field?.aggregation === 'avg' || field?.aggregation === 'weighted_avg' ? 1 : 0;
+  const currentPeriod = periodText(analysis.periods);
+  const comparePeriod = periodText({ from: analysis.periods.compare_from, to: analysis.periods.compare_to });
+  const rowSummary = analysis.rows.length > rows.length
+    ? `顯示前 ${rows.length} 組，共 ${analysis.rows.length} 組；依兩期較大值由高到低排序。`
+    : `共 ${rows.length} 組；依兩期較大值由高到低排序。`;
+  const scaleTicks = [0, .25, .5, .75, 1];
+  return <figure className="market-bar-chart" aria-labelledby={guideId} style={{ '--market-current-color': palette.colors[0], '--market-compare-color': palette.colors[1 % palette.colors.length] } as CSSProperties}>
+    <figcaption className="market-bar-guide">
+      <h3 id={guideId}>如何閱讀這張比較圖</h3>
+      <div className="market-bar-legend" aria-label="圖例">
+        <div><i className="market-bar-legend-current" aria-hidden="true" /><span><b>本期（上方長條）</b><small>{currentPeriod}</small></span></div>
+        <div><i className="market-bar-legend-compare" aria-hidden="true" /><span><b>比較期（下方長條）</b><small>{comparePeriod}</small></span></div>
       </div>
-      <div className="market-bar-values"><b>{numberText(current)}</b><small>{numberText(compare)} {field?.unit || ''}</small></div>
-    </div>;
-  })}</div>;
+      <dl className="market-bar-axis-help">
+        <div><dt>X 軸（橫向）</dt><dd>{measureLabel}（{unitLabel}）；長條越長，代表數值越高。</dd></div>
+        <div><dt>Y 軸（縱向）</dt><dd>{dimensionLabel}；每一列代表一個比較項目。</dd></div>
+      </dl>
+      <p className="market-bar-reading"><b>讀圖方式：</b>同一列先比較上、下兩條的長度，再看右側「本期／比較期」精確數字。兩種顏色代表比較期間，不代表第一／第二市場；市場範圍以上方篩選條件為準。長條以全圖最大值同比例縮放；{rowSummary}{canDrill ? ' 點選任一列或按 Enter，可展開下一層分類。' : ''}</p>
+    </figcaption>
+    <div className="market-bar-axis" aria-label={`Y 軸為${dimensionLabel}，X 軸為${measureLabel}，單位${unitLabel}`}>
+      <b>Y 軸 · {dimensionLabel}</b>
+      <div className="market-bar-axis-main"><strong>X 軸 · {measureLabel}（{unitLabel}）</strong><div className="market-bar-scale" aria-hidden="true">{scaleTicks.map((tick, index) => <span className={index % 2 ? 'minor' : ''} key={tick}>{numberText(max * tick, valueFraction)}</span>)}</div></div>
+      <b>右側 · 精確值</b>
+    </div>
+    <div className="market-bars">{rows.map((row, index) => {
+      const name = row.label;
+      const current = Number(row.current) || 0, compare = Number(row.compare) || 0;
+      const spokenUnit = field?.unit ? ` ${field.unit}` : '';
+      const currentText = row.current === null ? '—' : numberText(row.current, valueFraction);
+      const compareText = row.compare === null ? '—' : numberText(row.compare, valueFraction);
+      const currentSpoken = row.current === null ? '無資料' : `${currentText}${spokenUnit}`;
+      const compareSpoken = row.compare === null ? '無資料' : `${compareText}${spokenUnit}`;
+      return <div className={`market-bar-row${canDrill && row.drillValue ? ' market-bar-drillable' : ''}`} role="group" aria-label={`${name}，本期 ${currentSpoken}，比較期 ${compareSpoken}`} key={`${name}-${index}`}>
+        {canDrill && row.drillValue && <button type="button" className="market-bar-drill-button" aria-label={`展開「${name}」的下一層分類`} onClick={() => onDrill?.(row.drillValue)} />}
+        <div className="market-bar-label" title={name}>{name}</div>
+        <div className="market-bar-pair" aria-hidden="true">
+          <svg viewBox="0 0 100 12" preserveAspectRatio="none"><rect className="market-bar-current" x="0" y="0" width={Math.max(0, current / max * 100)} height="5" rx="2" /><rect className="market-bar-compare" x="0" y="7" width={Math.max(0, compare / max * 100)} height="5" rx="2" /></svg>
+        </div>
+        <div className="market-bar-values"><span className="current"><em>本期</em><b>{currentText}<small>{row.current === null ? '無資料' : field?.unit || ''}</small></b></span><span className="compare"><em>比較期</em><b>{compareText}<small>{row.compare === null ? '無資料' : field?.unit || ''}</small></b></span></div>
+      </div>;
+    })}</div>
+    <details className="market-chart-summary market-bar-summary"><summary>查看圖中 {rows.length} 組完整數值{canDrill ? '與鍵盤下鑽' : ''}</summary><div className="responsive-table"><table><thead><tr><th>{dimensionLabel}</th><th>本期{unitHeading}</th><th>比較期{unitHeading}</th></tr></thead><tbody>{rows.map(row => <tr key={row.label}><th scope="row">{canDrill && row.drillValue ? <button type="button" className="market-table-drill-button" onClick={() => onDrill?.(row.drillValue)}>{row.label}<span>展開下一層</span></button> : row.label}</th><td>{row.current === null ? '—' : numberText(row.current, valueFraction)}</td><td>{row.compare === null ? '—' : numberText(row.compare, valueFraction)}</td></tr>)}</tbody></table></div></details>
+  </figure>;
 }
 
 function MarketDailyTrend({ analysis, measure, field, paletteId, customColors }: { analysis: Analysis; measure: string; field?: FieldDefinition; paletteId: PaletteId; customColors: string[] }) {
