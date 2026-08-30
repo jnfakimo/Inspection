@@ -121,6 +121,7 @@ type PaletteDefinition = {
 };
 type MarketDrillLevel = { key: string; label: string };
 type MarketDrillStep = MarketDrillLevel & { value: string };
+type AnalysisPeriodPreset = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
 
 const CHART_TYPE_LABELS: Record<ChartType, string> = {
   bar: '比較長條',
@@ -168,6 +169,29 @@ function addYears(value: string, amount: number) {
   if (Number.isNaN(date.getTime())) return value;
   date.setUTCFullYear(date.getUTCFullYear() + amount);
   return date.toISOString().slice(0, 10);
+}
+function periodBounds(anchor: string, preset: Exclude<AnalysisPeriodPreset, 'custom'>) {
+  const parsed = new Date(`${anchor}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return { from: anchor, to: anchor };
+  if (preset === 'day') return { from: anchor, to: anchor };
+  const year = parsed.getUTCFullYear();
+  const month = parsed.getUTCMonth();
+  if (preset === 'week') {
+    const mondayOffset = (parsed.getUTCDay() + 6) % 7;
+    const from = new Date(parsed);
+    from.setUTCDate(from.getUTCDate() - mondayOffset);
+    const to = new Date(from);
+    to.setUTCDate(to.getUTCDate() + 6);
+    return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  }
+  if (preset === 'month') {
+    return { from: `${year}-${String(month + 1).padStart(2, '0')}-01`, to: new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10) };
+  }
+  if (preset === 'quarter') {
+    const firstMonth = Math.floor(month / 3) * 3;
+    return { from: `${year}-${String(firstMonth + 1).padStart(2, '0')}-01`, to: new Date(Date.UTC(year, firstMonth + 3, 0)).toISOString().slice(0, 10) };
+  }
+  return { from: `${year}-01-01`, to: `${year}-12-31` };
 }
 function rangeLength(from: string, to: string) {
   return Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1);
@@ -221,6 +245,25 @@ function parseCsv(text: string) {
     } else cell += character;
   }
   if (cell || row.length) { row.push(cell.trim()); if (row.some(Boolean)) rows.push(row); }
+  const headers = (rows.shift() || []).map((header, index) => header || `欄位${index + 1}`);
+  return { headers, rows: rows.map(values => headers.map((_, index) => values[index] || '')) };
+}
+async function parseXlsxFile(file: File) {
+  const { Workbook } = await import('exceljs');
+  const workbook = new Workbook();
+  await workbook.xlsx.load(await file.arrayBuffer());
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) return { headers: [] as string[], rows: [] as string[][] };
+  const rows: string[][] = [];
+  worksheet.eachRow({ includeEmpty: false }, row => {
+    const values = Array.from({ length: worksheet.columnCount }, (_, index) => {
+      const value = row.getCell(index + 1).value;
+      if (value instanceof Date) return value.toISOString().slice(0, 10);
+      if (value && typeof value === 'object' && 'text' in value) return String((value as { text?: unknown }).text || '');
+      return value === null || value === undefined ? '' : String(value);
+    });
+    if (values.some(Boolean)) rows.push(values);
+  });
   const headers = (rows.shift() || []).map((header, index) => header || `欄位${index + 1}`);
   return { headers, rows: rows.map(values => headers.map((_, index) => values[index] || '')) };
 }
@@ -764,7 +807,8 @@ function MarketExecutiveDashboard({ analysis, measures, fieldMap, primaryMeasure
 
 function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Source[]; templates: Template[]; reloadCatalog: () => Promise<void> }) {
   const [sourceId, setSourceId] = useState('');
-    const [from, setFrom] = useState(TODAY);
+  const [periodPreset, setPeriodPreset] = useState<AnalysisPeriodPreset>('day');
+  const [from, setFrom] = useState(TODAY);
   const [to, setTo] = useState(TODAY);
   const [compareFrom, setCompareFrom] = useState(addDays(TODAY, -1));
   const [compareTo, setCompareTo] = useState(addDays(TODAY, -1));
@@ -883,6 +927,15 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
     if (nextSource) configureSourceDates(nextSource);
   };
 
+  const applyPeriodPreset = useCallback((preset: Exclude<AnalysisPeriodPreset, 'custom'>) => {
+    const next = periodBounds(to || TODAY, preset);
+    invalidateAnalysis();
+    setPeriodPreset(preset);
+    setFrom(next.from);
+    setTo(next.to);
+    setCompareMode('previous');
+  }, [invalidateAnalysis, to]);
+
   const applyCompare = (mode: 'previous' | 'next' | 'same' | 'custom') => { setCompareMode(mode); if (mode !== 'custom') invalidateAnalysis(); };
   useEffect(() => {
     if (compareMode === 'previous' || compareMode === 'next') {
@@ -975,8 +1028,13 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
       {filtersOpen && <div className="market-control-body">
         <div className="market-control-grid">
           <label>資料來源<select value={sourceId} onChange={event => selectSource(event.target.value)}><option value="">請選擇資料來源</option>{decisionSources.map(item => <option key={item.source_id} value={item.source_id}>{item.source_name}</option>)}</select></label>
-          <div className="market-period-group"><span>分析期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="分析起始日期" value={from} onChange={event => { invalidateAnalysis(); setFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="分析結束日期" value={to} onChange={event => { invalidateAnalysis(); setTo(event.target.value); }} /></div></div>
+          <div className="market-period-group"><span>分析期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="分析起始日期" value={from} onChange={event => { invalidateAnalysis(); setPeriodPreset('custom'); setFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="分析結束日期" value={to} onChange={event => { invalidateAnalysis(); setPeriodPreset('custom'); setTo(event.target.value); }} /></div></div>
           <div className="market-period-group"><span>比較期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="比較起始日期" value={compareFrom} onChange={event => { invalidateAnalysis(); setCompareMode('custom'); setCompareFrom(event.target.value); }} /><span>至</span><LocalizedDateInput aria-label="比較結束日期" value={compareTo} onChange={event => { invalidateAnalysis(); setCompareMode('custom'); setCompareTo(event.target.value); }} /></div></div>
+        </div>
+        <div className="market-period-presets" role="group" aria-label="快速分析期間">
+          <span>快速切換：</span>
+          {([['day', '日'], ['week', '週'], ['month', '月'], ['quarter', '季'], ['year', '年']] as Array<[Exclude<AnalysisPeriodPreset, 'custom'>, string]>).map(([value, label]) => <button type="button" key={value} className={periodPreset === value ? 'active' : ''} aria-pressed={periodPreset === value} onClick={() => applyPeriodPreset(value)}>{label}</button>)}
+          {periodPreset === 'custom' && <span className="market-period-custom-label">自訂</span>}
         </div>
         <div className="market-compare-actions"><span>快速比較：</span><button type="button" className={compareMode === 'previous' ? 'active' : ''} onClick={() => applyCompare('previous')}>前一段期間</button><button type="button" className={compareMode === 'next' ? 'active' : ''} onClick={() => applyCompare('next')}>後一段期間</button><button type="button" className={compareMode === 'same' ? 'active' : ''} onClick={() => applyCompare('same')}>去年同期</button><button type="button" className={compareMode === 'custom' ? 'active' : ''} onClick={() => setCompareMode('custom')}>自訂</button></div>
         <div className="market-selector-grid"><fieldset><legend>分析維度（最多 4 個）</legend><div className="market-check-list">{dimensionFields.map(field => <label key={field.key}><input type="checkbox" checked={dimensions.includes(field.key)} disabled={!dimensions.includes(field.key) && dimensions.length >= 4} onChange={event => { invalidateAnalysis(); setDimensions(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key)); }} />{field.label}</label>)}</div></fieldset><fieldset><legend>分析指標（最多 4 個）</legend><div className="market-check-list">{measureFields.map(field => <label key={field.key}><input type="checkbox" checked={measures.includes(field.key)} disabled={!measures.includes(field.key) && measures.length >= 4} onChange={event => { invalidateAnalysis(); setMeasures(current => event.target.checked ? [...current, field.key] : current.filter(key => key !== field.key)); }} />{field.label}{field.unit ? `（${field.unit}）` : ''}</label>)}</div></fieldset></div>
@@ -1025,12 +1083,16 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
   };
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
-    const parsed = file.name.toLowerCase().endsWith('.json') ? parseJsonRows(await file.text()) : parseCsv(await file.text()); setHeaders(parsed.headers); setCsvRows(parsed.rows);
-    const next: Record<string, string> = {};
-    const dateHeader = parsed.headers.find(header => /日期|date|day/i.test(header)) || parsed.headers[0] || '';
-    next.observed_on = dateHeader;
-    fields.forEach(field => { next[field.key] = parsed.headers.find(header => header.toLowerCase() === field.key || header === field.label) || ''; });
-    setMapping(next); setMessage(`已讀取 ${parsed.rows.length} 筆 CSV，請確認欄位對應後匯入。`);
+    try {
+      const lowerName = file.name.toLowerCase();
+      const parsed = lowerName.endsWith('.json') ? parseJsonRows(await file.text()) : lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlsm') ? await parseXlsxFile(file) : parseCsv(await file.text());
+      setHeaders(parsed.headers); setCsvRows(parsed.rows);
+      const next: Record<string, string> = {};
+      const dateHeader = parsed.headers.find(header => /日期|date|day/i.test(header)) || parsed.headers[0] || '';
+      next.observed_on = dateHeader;
+      fields.forEach(field => { next[field.key] = parsed.headers.find(header => header.toLowerCase() === field.key || header === field.label) || ''; });
+      setMapping(next); setMessage(`已讀取 ${parsed.rows.length.toLocaleString('zh-TW')} 筆 ${lowerName.endsWith('.json') ? 'JSON' : lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlsm') ? 'XLSX' : 'CSV'}，請確認欄位對應後匯入。`);
+    } catch (error) { setMessage(error instanceof Error ? `檔案讀取失敗：${error.message}` : '檔案讀取失敗，請確認格式。'); }
   };
   const importCsv = async () => {
     if (!selectedSource?.source_id || !csvRows.length) return;
@@ -1063,7 +1125,7 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
   };
   return <div className="market-sources-workspace">
       <section className="panel market-source-editor"><header className="market-result-heading"><div><span className="market-kicker">資料介接</span><h2>資料來源與欄位定義</h2><p>每個來源可以有自己的分類欄位與數值欄位，欄位以設定驅動，不綁定特定菜名。</p></div></header><div className="market-source-layout"><div className="market-source-list"><div className="market-source-list-head"><b>已建立來源</b><button type="button" className="secondary-btn compact" onClick={() => { setSelectedId(''); setSourceCode('market_daily_custom'); setSourceName('自訂交易行情'); setSourceType('csv'); setEndpointUrl(''); setFieldText(fieldLines(DEFAULT_FIELDS)); }}>＋ 新增來源</button></div>{sources.map(source => <button type="button" className={`market-source-item${selectedSource?.source_id === source.source_id ? ' active' : ''}`} key={source.source_id} onClick={() => openSource(source)}><b>{source.source_name}</b><span>{SOURCE_TYPE_LABELS[source.source_type] || source.source_type} ・ {source.field_definitions.length} 個欄位</span></button>)}</div><div className="market-source-form"><div className="market-form-grid"><label>介接代碼<input value={sourceCode} onChange={event => setSourceCode(event.target.value)} placeholder="例如 market_daily" /></label><label>來源名稱<input value={sourceName} onChange={event => setSourceName(event.target.value)} placeholder="例如 每日交易行情" /></label><label>來源類型<select value={sourceType} onChange={event => setSourceType(event.target.value)}><option value="csv">CSV 檔案</option><option value="json">JSON 資料</option><option value="api">外部 API</option><option value="manual">手動輸入</option></select></label><label>外部網址（選填）<input value={endpointUrl} onChange={event => setEndpointUrl(event.target.value)} placeholder="https://…" /></label></div><label className="market-field-definition">欄位定義（每行：代碼｜顯示名稱｜分類／數值｜單位｜彙總方式｜權重欄位｜是否必填）<textarea value={fieldText} onChange={event => setFieldText(event.target.value)} rows={9} /><small>例如：item｜品項｜分類｜｜｜｜必填　　或　average_price｜平均價｜數值｜元／公斤｜加權平均｜quantity</small></label><div className="market-field-preview"><b>目前辨識 {fields.length} 個欄位</b>{fields.map(field => <span key={field.key} className={field.kind}>{field.label}{field.unit ? `・${field.unit}` : ''}{field.required ? '・必填' : ''}</span>)}</div><div className="market-form-actions"><button type="button" className="primary-btn" disabled={busy || fields.length < 2} onClick={() => void saveSource()}>{busy ? '儲存中…' : '儲存資料來源'}</button></div></div></div>{message && <p className="market-inline-message" role="status">{message}</p>}</section>
-    <section className="panel market-import-panel"><header className="market-result-heading"><div><span className="market-kicker">資料匯入</span><h2>匯入 CSV／JSON 行情資料</h2><p>先選取上方資料來源，再上傳檔案；系統會保留原始資料摘要並依欄位定義轉換。JSON 可使用陣列或 <code>{'{ data: [...] }'}</code> 格式。</p></div></header><div className="market-import-toolbar"><label className="market-file-input">選擇 CSV／JSON 檔案<input type="file" accept=".csv,.json,text/csv,application/json" onChange={event => void handleFile(event)} /></label>{selectedSource && <span>目前來源：<b>{selectedSource.source_name}</b></span>}</div>{headers.length > 0 && <div className="market-mapping"><h3>欄位對應</h3><div className="market-mapping-grid"><label>交易日期<select value={mapping.observed_on || ''} onChange={event => setMapping(current => ({ ...current, observed_on: event.target.value }))}><option value="">請選擇</option>{headers.map(header => <option key={header} value={header}>{header}</option>)}</select></label>{(selectedSource?.field_definitions || fields).map(field => <label key={field.key}>{field.label}<select value={mapping[field.key] || ''} onChange={event => setMapping(current => ({ ...current, [field.key]: event.target.value }))}><option value="">不匯入</option>{headers.map(header => <option key={header} value={header}>{header}</option>)}</select></label>)}</div><div className="market-import-actions"><span>預覽 {csvRows.length} 筆資料</span><button type="button" className="primary-btn" disabled={busy || !selectedSource} onClick={() => void importCsv()}>{busy ? '匯入中…' : '確認匯入'}</button></div></div>}{message && <p className="market-inline-message" role="status">{message}</p>}</section>
+    <section className="panel market-import-panel"><header className="market-result-heading"><div><span className="market-kicker">資料匯入</span><h2>匯入 CSV／JSON／XLSX 行情資料</h2><p>先選取上方資料來源，再上傳檔案；系統會保留原始資料摘要並依欄位定義轉換。JSON 可使用陣列或 <code>{'{ data: [...] }'}</code> 格式，XLSX 讀取第一個工作表。</p></div></header><div className="market-import-toolbar"><label className="market-file-input">選擇 CSV／JSON／XLSX 檔案<input type="file" accept=".csv,.json,.xlsx,.xlsm,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={event => void handleFile(event)} /></label>{selectedSource && <span>目前來源：<b>{selectedSource.source_name}</b></span>}</div>{headers.length > 0 && <div className="market-mapping"><h3>欄位對應</h3><div className="market-mapping-grid"><label>交易日期<select value={mapping.observed_on || ''} onChange={event => setMapping(current => ({ ...current, observed_on: event.target.value }))}><option value="">請選擇</option>{headers.map(header => <option key={header} value={header}>{header}</option>)}</select></label>{(selectedSource?.field_definitions || fields).map(field => <label key={field.key}>{field.label}<select value={mapping[field.key] || ''} onChange={event => setMapping(current => ({ ...current, [field.key]: event.target.value }))}><option value="">不匯入</option>{headers.map(header => <option key={header} value={header}>{header}</option>)}</select></label>)}</div><div className="market-import-actions"><span>預覽 {csvRows.length.toLocaleString('zh-TW')} 筆資料</span><button type="button" className="primary-btn" disabled={busy || !selectedSource} onClick={() => void importCsv()}>{busy ? '匯入中…' : '確認匯入'}</button></div></div>}{message && <p className="market-inline-message" role="status">{message}</p>}</section>
   </div>;
 }
 
