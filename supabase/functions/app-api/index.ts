@@ -293,6 +293,12 @@ function marketJsonObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
+function marketSimulationJsonObject(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const object = value as Record<string, unknown>;
+  return JSON.stringify(object).length <= 100_000 ? object : null;
+}
+
 function marketPermissionEnabled(value: unknown) {
   return value === true || (typeof value === 'string' && value.toLowerCase() === 'true');
 }
@@ -702,6 +708,8 @@ export async function handleAppApiRequest(req: Request) {
       workorder_workflow: 'admin-api:write',
       market_catalog: 'app-api',
       market_analysis: 'app-api',
+      market_simulation_list: 'app-api',
+      market_simulation_save: 'admin-api:write',
       market_source_save: 'admin-api:write',
       market_template_save: 'admin-api:write',
       market_import_rows: 'admin-api:write',
@@ -1296,6 +1304,54 @@ export async function handleAppApiRequest(req: Request) {
       } });
     }
 
+    if (action === 'market_simulation_list') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      let query = admin.from('market_simulation_runs')
+        .select('simulation_id,name,source_id,period_from,period_to,base_totals,assumptions,projected_totals,created_by,created_at,status')
+        .order('created_at', { ascending: false }).limit(50);
+      if (!canManageMarket) query = query.eq('created_by', profile.user_id);
+      const result = await query;
+      if (result.error) {
+        console.error('market simulation list failed:', result.error.message);
+        return reply(req, { ok: false, message: '市場模擬紀錄尚未完成設定，請先套用市場模擬資料庫腳本' }, 503);
+      }
+      return reply(req, { ok: true, data: result.data || [] });
+    }
+
+    if (action === 'market_simulation_save') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const name = text(body.name, 120);
+      const sourceId = id(body.source_id);
+      const periodFrom = text(body.period_from, 10);
+      const periodTo = text(body.period_to, 10);
+      if (!name) return reply(req, { ok: false, message: '請輸入模擬情境名稱' }, 400);
+      if (!sourceId) return reply(req, { ok: false, message: '請選擇有效的市場行情資料來源' }, 400);
+      if (!validISODate(periodFrom) || !validISODate(periodTo) || periodFrom > periodTo) {
+        return reply(req, { ok: false, message: '模擬期間起訖日期不正確，請使用 YYYY-MM-DD' }, 400);
+      }
+      const rangeDays = Math.round((Date.parse(`${periodTo}T00:00:00Z`) - Date.parse(`${periodFrom}T00:00:00Z`)) / 86400000) + 1;
+      if (rangeDays > 366) return reply(req, { ok: false, message: '單次模擬期間最多 366 天' }, 400);
+      const baseTotals = marketSimulationJsonObject(body.base_totals);
+      const assumptions = marketSimulationJsonObject(body.assumptions);
+      const projectedTotals = marketSimulationJsonObject(body.projected_totals);
+      if (!baseTotals || !assumptions || !projectedTotals) {
+        return reply(req, { ok: false, message: '基準合計、模擬假設與推估合計必須是有效的資料物件，且單項不得超過 100 KB' }, 400);
+      }
+      const sourceResult = await admin.from('market_data_sources').select('source_id').eq('source_id', sourceId).maybeSingle();
+      if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到指定的市場行情資料來源' }, 404);
+      const status = body.status === 'draft' ? 'draft' : 'completed';
+      const result = await admin.from('market_simulation_runs').insert({
+        name, source_id: sourceId, period_from: periodFrom, period_to: periodTo,
+        base_totals: baseTotals, assumptions, projected_totals: projectedTotals,
+        created_by: profile.user_id, status,
+      }).select('simulation_id,name,source_id,period_from,period_to,base_totals,assumptions,projected_totals,created_by,created_at,status').single();
+      if (result.error || !result.data) return reply(req, { ok: false, message: dbMessage(result.error, '市場模擬紀錄儲存失敗') }, 400);
+      await writeAudit(admin, profile.user_id, 'market_simulation_runs', String(result.data.simulation_id), 'insert', null, result.data);
+      return reply(req, { ok: true, data: result.data });
+    }
+
     if (action === 'market_source_save') {
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以修改資料來源' }, 403);
@@ -1324,7 +1380,7 @@ export async function handleAppApiRequest(req: Request) {
       const templateName = text(body.template_name, 120);
       const dimensions: string[] = Array.isArray(body.dimensions) ? body.dimensions.map((value: unknown) => text(value, 60).toLowerCase()).filter((value: string) => Boolean(value)).slice(0, 8) : [];
       const measures: string[] = Array.isArray(body.measures) ? body.measures.map((value: unknown) => text(value, 60).toLowerCase()).filter((value: string) => Boolean(value)).slice(0, 8) : [];
-      const chartType = ['bar', 'table', 'cards'].includes(text(body.chart_type, 20)) ? text(body.chart_type, 20) : 'bar';
+      const chartType = ['bar', 'pie', 'doughnut', 'line', 'area', 'table', 'cards'].includes(text(body.chart_type, 20)) ? text(body.chart_type, 20) : 'bar';
       if (!/^[a-z][a-z0-9_-]{1,59}$/.test(templateCode) || !templateName || !measures.length) return reply(req, { ok: false, message: '模板代碼、名稱與至少一個分析指標為必填' }, 400);
       const sourceId = id(body.source_id) || null;
       const payload = { template_code: templateCode, template_name: templateName, description: text(body.description, 500) || null, source_id: sourceId, dimensions, measures, chart_type: chartType, default_config: marketJsonObject(body.default_config), status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };

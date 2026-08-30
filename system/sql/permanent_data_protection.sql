@@ -78,7 +78,7 @@ begin
     'equipment_monitor_points','equipment_monitor_events',
     'official_vehicles','vehicle_dispatch_managers','vehicle_dispatch_drivers','vehicle_dispatch_requests','vehicle_dispatch_logs','vehicle_dispatch_attachments',
     'meeting_rooms','meeting_bookings','meeting_booking_change_requests',
-    'market_data_sources','market_data_points','market_analysis_templates'
+    'market_data_sources','market_data_points','market_analysis_templates','market_simulation_runs'
   ] loop
     if to_regclass('public.' || table_name) is not null then
       execute format('drop trigger if exists trg_prevent_removal on public.%I', table_name);
