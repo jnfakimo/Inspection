@@ -205,6 +205,32 @@ function dateText(value: unknown) {
   const match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   return match ? `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}` : raw;
 }
+const IMPORT_HEADER_ALIASES: Record<string, string[]> = {
+  observed_on: ['交易日期', '日期(西元)', '日期（西元）', '日期', 'date', 'day'],
+  market: ['市場', '市場別', '市場名稱'],
+  category: ['果菜類別', '蔬果大類', '蔬果類別', '品類', '類別'],
+  item: ['品名', '品項', '品名名稱', '品項名稱'],
+  item_key: ['品名代號', '品項代號', '品名編號', '品項編號', '代號'],
+  quantity: ['成交量(公斤)', '成交量（公斤）', '成交量', '交易量', '數量'],
+  average_price: ['平均價(元/公斤)', '平均價（元／公斤）', '平均價', '加權平均價'],
+  high_price: ['上價', '最高上價', '最高價'],
+  middle_price: ['中價', '成交量加權中價', '中間價'],
+  low_price: ['下價', '最低下價', '最低價'],
+  total_value: ['成交金額', '交易金額', '推估成交額', '成交額'],
+};
+function normalizedHeader(value: unknown) {
+  return String(value || '').toLowerCase().replace(/[\s_()（）/／.,:：-]+/g, '');
+}
+function inferImportHeader(key: string, label: string, headers: string[]) {
+  const candidates = [key, label, ...(IMPORT_HEADER_ALIASES[key] || [])].filter(Boolean);
+  const normalizedCandidates = candidates.map(normalizedHeader).filter(Boolean);
+  for (const candidate of normalizedCandidates) {
+    const exact = headers.find(header => normalizedHeader(header) === candidate);
+    if (exact) return exact;
+  }
+  const aliases = (IMPORT_HEADER_ALIASES[key] || []).map(normalizedHeader).filter(candidate => candidate.length >= 2);
+  return headers.find(header => aliases.some(alias => normalizedHeader(header).includes(alias))) || '';
+}
 function configuredDate(value: unknown) {
   const normalized = dateText(value);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return '';
@@ -1066,6 +1092,7 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
   const [selectedId, setSelectedId] = useState('');
   const [headers, setHeaders] = useState<string[]>([]);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
+  const [importFileName, setImportFileName] = useState('');
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -1088,9 +1115,10 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
       const parsed = lowerName.endsWith('.json') ? parseJsonRows(await file.text()) : lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlsm') ? await parseXlsxFile(file) : parseCsv(await file.text());
       setHeaders(parsed.headers); setCsvRows(parsed.rows);
       const next: Record<string, string> = {};
-      const dateHeader = parsed.headers.find(header => /日期|date|day/i.test(header)) || parsed.headers[0] || '';
+      setImportFileName(file.name);
+      const dateHeader = inferImportHeader('observed_on', '交易日期', parsed.headers) || parsed.headers[0] || '';
       next.observed_on = dateHeader;
-      fields.forEach(field => { next[field.key] = parsed.headers.find(header => header.toLowerCase() === field.key || header === field.label) || ''; });
+      fields.forEach(field => { next[field.key] = inferImportHeader(field.key, field.label, parsed.headers); });
       setMapping(next); setMessage(`已讀取 ${parsed.rows.length.toLocaleString('zh-TW')} 筆 ${lowerName.endsWith('.json') ? 'JSON' : lowerName.endsWith('.xlsx') || lowerName.endsWith('.xlsm') ? 'XLSX' : 'CSV'}，請確認欄位對應後匯入。`);
     } catch (error) { setMessage(error instanceof Error ? `檔案讀取失敗：${error.message}` : '檔案讀取失敗，請確認格式。'); }
   };
@@ -1099,7 +1127,20 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
     setBusy(true); setMessage(''); let processed = 0;
     try {
       const fieldList = selectedSource.field_definitions || fields;
-      const rows = csvRows.map(values => { const value = (header: string) => header ? values[headers.indexOf(header)] || '' : ''; return { observed_on: dateText(value(mapping.observed_on)), dimensions: Object.fromEntries(fieldList.filter(field => field.kind === 'dimension').map(field => [field.key, value(mapping[field.key])])), measures: Object.fromEntries(fieldList.filter(field => field.kind === 'measure').map(field => [field.key, value(mapping[field.key])])), metadata: { import_file: 'csv' } }; });
+      const rows = csvRows.map(values => {
+        const value = (header: string) => header ? values[headers.indexOf(header)] || '' : '';
+        const dimensions = Object.fromEntries(fieldList.filter(field => field.kind === 'dimension').map(field => [field.key, value(mapping[field.key])]));
+        const measures = Object.fromEntries(fieldList.filter(field => field.kind === 'measure').map(field => [field.key, value(mapping[field.key])]));
+        // The historical market files do not carry a total-value column. Derive
+        // the same estimated amount used by the actual source when both inputs
+        // are available, while preserving an explicitly mapped value.
+        if (!measures.total_value && measures.average_price && measures.quantity) {
+          const averagePrice = Number(String(measures.average_price).replace(/,/g, ''));
+          const quantity = Number(String(measures.quantity).replace(/,/g, ''));
+          if (Number.isFinite(averagePrice) && Number.isFinite(quantity)) measures.total_value = String(averagePrice * quantity);
+        }
+        return { observed_on: dateText(value(mapping.observed_on)), dimensions, measures, metadata: { import_file: importFileName || 'uploaded' } };
+      });
       const dimensionKeys = new Set(fieldList.filter(field => field.kind === 'dimension').map(field => field.key));
       const configuredNaturalKeys = Array.isArray(selectedSource.config?.natural_key_fields)
         ? selectedSource.config.natural_key_fields.map(value => String(value)).filter(key => dimensionKeys.has(key))
@@ -1119,7 +1160,7 @@ function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source
         const result = await invokeAppApi<{ imported: number; inserted: number; updated: number }>('market_import_rows', { source_id: selectedSource.source_id, rows: batch });
         processed += result.imported; inserted += result.inserted; updated += result.updated;
       }
-      setMessage(`匯入完成，共處理 ${numberText(processed)} 筆（新增 ${numberText(inserted)}、更新 ${numberText(updated)}）。`); setCsvRows([]); setHeaders([]); await reloadCatalog();
+      setMessage(`匯入完成，共處理 ${numberText(processed)} 筆（新增 ${numberText(inserted)}、更新 ${numberText(updated)}）。`); setCsvRows([]); setHeaders([]); setImportFileName(''); await reloadCatalog();
     } catch (error) { setMessage(`${error instanceof Error ? error.message : '行情資料匯入失敗'}${processed ? `；已完成 ${numberText(processed)} 筆，可用同一檔案安全重試。` : ''}`); }
     finally { setBusy(false); }
   };

@@ -20,10 +20,18 @@ assert.match(command, /下鑽路徑[\s\S]*?onSelect[\s\S]*?chooseDrill/,
   '戰情儀表板必須保留 Power BI 式逐層下鑽路徑與操作');
 assert.match(command, /market_dimension_catalog[\s\S]*?datalist id="market-command-market-options"[\s\S]*?datalist id="market-command-category-options"/,
   '市場與蔬果分類選項必須從資料來源目錄動態載入，並保留可輸入篩選');
+assert.match(command, /const catalogFilters = useMemo[\s\S]*?next\.market[\s\S]*?next\.category[\s\S]*?filters: catalogFilters/,
+  '品項目錄必須依目前市場與蔬果大類連動查詢');
+assert.match(command, /setCategory\(''\); setItem\(''\)/,
+  '切換市場或蔬果大類時必須清除不再相容的品項');
 assert.match(command, /XLSX|K 線|累積占比|收盤高於開盤/,
   '戰情儀表板必須提供初學者可讀的 K 線與統計圖例');
 assert.match(workspace, /parseXlsxFile[\s\S]*?workbook\.worksheets\[0\][\s\S]*?accept=.*xlsx/,
   '資料介接中心必須可讀取 XLSX 第一個工作表');
+assert.match(workspace, /IMPORT_HEADER_ALIASES[\s\S]*?品名代號[\s\S]*?平均價[\s\S]*?inferImportHeader/,
+  '行情匯入必須能辨識北農歷史檔的中文欄位名稱');
+assert.match(workspace, /total_value[\s\S]*?average_price[\s\S]*?quantity[\s\S]*?averagePrice \* quantity/,
+  '行情匯入缺少成交金額欄位時必須可推估交易金額');
 assert.match(workspace, /匯入 CSV／JSON／XLSX 行情資料/,
   '資料介接中心的介接說明必須明示支援 XLSX');
 assert.match(css, /market-command-page[\s\S]*?market-command-chart-switch[\s\S]*?market-kline/,

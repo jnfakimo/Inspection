@@ -209,6 +209,15 @@ function CommandCenter({ system, module, profile }: { system: SystemDefinition; 
   const range = useMemo(() => dateRange(anchor, periodMode), [anchor, periodMode]);
   const drillFilters = useMemo(() => Object.fromEntries(drillPath.map(step => [step.key, step.value])), [drillPath]);
   const manualFilters = useMemo(() => Object.fromEntries([['market', market], ['category', category], ['item', item].filter(Boolean)].filter(([, value]) => value)), [market, category, item]);
+  // The item catalog must follow the selected market and produce category.
+  // Keep this filter set separate from the analysis filters so the datalist can
+  // refresh immediately without waiting for an analysis request.
+  const catalogFilters = useMemo<Record<string, string>>(() => {
+    const next: Record<string, string> = {};
+    if (market.trim()) next.market = market.trim();
+    if (category.trim()) next.category = category.trim();
+    return next;
+  }, [market, category]);
   const filters = useMemo(() => ({ ...manualFilters, ...drillFilters }), [manualFilters, drillFilters]);
   const dimensions = useMemo(() => {
     const dimensionKeys = new Set((source?.field_definitions || []).filter(field => field.kind === 'dimension').map(field => field.key));
@@ -251,12 +260,13 @@ function CommandCenter({ system, module, profile }: { system: SystemDefinition; 
   useEffect(() => { void loadCatalog(); }, [loadCatalog]);
   useEffect(() => {
     let active = true;
-    if (!source?.source_id) { setDimensionOptions({}); return () => { active = false; }; }
-    void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: {} })
+    setDimensionOptions({});
+    if (!source?.source_id) return () => { active = false; };
+    void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters })
       .then(result => { if (active) setDimensionOptions(result.options || {}); })
       .catch(() => { if (active) setDimensionOptions({}); });
     return () => { active = false; };
-  }, [source?.source_id]);
+  }, [catalogFilters, source?.source_id]);
   useEffect(() => { if (source?.source_id && measures.length && !analysis) void loadAnalysis(); }, [analysis, loadAnalysis, measures.length, source?.source_id]);
 
   const choosePeriod = (next: PeriodMode) => { setPeriodMode(next); setDrillPath([]); setAnalysis(null); };
@@ -290,9 +300,9 @@ function CommandCenter({ system, module, profile }: { system: SystemDefinition; 
       <div className="market-command-status"><span className={analysis ? 'ready' : 'loading'}><i />{analysis ? '資料已更新' : busy ? '分析中…' : '等待分析'}</span>{updatedAt && <time dateTime={updatedAt}>{updatedAt.slice(0, 16).replace('T', ' ')}</time>}</div>
     </section>
     <section className="panel market-command-controls">
-      <div className="market-command-control-row"><label>資料來源<select value={sourceId} onChange={event => { setSourceId(event.target.value); setAnalysis(null); setDrillPath([]); }}><option value="">選擇資料來源</option>{sources.map(itemOption => <option key={itemOption.source_id} value={itemOption.source_id}>{itemOption.source_name}</option>)}</select></label><label>基準日期<LocalizedDateInput aria-label="戰情基準日期（年/月/日）" value={anchor} onChange={event => { setAnchor(event.target.value); setAnalysis(null); }} /></label><label>判讀指標<select value={activeMeasure} onChange={event => { setMeasure(event.target.value); setAnalysis(null); }}>{measures.map(field => <option key={field.key} value={field.key}>{field.label}{field.unit ? `（${field.unit}）` : ''}</option>)}</select></label><button type="button" className="primary-btn" disabled={busy || !sourceId} onClick={() => void loadAnalysis()}>{busy ? '分析中…' : '更新戰情'}</button></div>
+      <div className="market-command-control-row"><label>資料來源<select value={sourceId} onChange={event => { setSourceId(event.target.value); setMarket(''); setCategory(''); setItem(''); setAnalysis(null); setDrillPath([]); }}><option value="">選擇資料來源</option>{sources.map(itemOption => <option key={itemOption.source_id} value={itemOption.source_id}>{itemOption.source_name}</option>)}</select></label><label>基準日期<LocalizedDateInput aria-label="戰情基準日期（年/月/日）" value={anchor} onChange={event => { setAnchor(event.target.value); setAnalysis(null); }} /></label><label>判讀指標<select value={activeMeasure} onChange={event => { setMeasure(event.target.value); setAnalysis(null); }}>{measures.map(field => <option key={field.key} value={field.key}>{field.label}{field.unit ? `（${field.unit}）` : ''}</option>)}</select></label><button type="button" className="primary-btn" disabled={busy || !sourceId} onClick={() => void loadAnalysis()}>{busy ? '分析中…' : '更新戰情'}</button></div>
       <div className="market-period-presets market-command-periods" role="group" aria-label="行情期間切換"><span>行情期間：</span>{(Object.entries(MODE_LABELS) as Array<[PeriodMode, string]>).map(([mode, label]) => <button type="button" key={mode} className={periodMode === mode ? 'active' : ''} aria-pressed={periodMode === mode} onClick={() => choosePeriod(mode)}>{label}</button>)}<small>{periodText(range.from, range.to)}　比較前一段同日數期間</small></div>
-      <div className="market-command-slicers"><label>市場（可輸入）<input list="market-command-market-options" value={market} onChange={event => { setMarket(event.target.value); setDrillPath([]); setAnalysis(null); }} placeholder="全部市場" /><datalist id="market-command-market-options">{sourceMarkets.map(value => <option key={value} value={value} />)}</datalist></label><label>蔬果大類（可輸入）<input list="market-command-category-options" value={category} onChange={event => { setCategory(event.target.value); setDrillPath([]); setAnalysis(null); }} placeholder="全部蔬果" /><datalist id="market-command-category-options">{sourceCategories.map(value => <option key={value} value={value} />)}</datalist></label><label className="market-command-item-filter">品項（可輸入）<input list="market-command-item-options" value={item} onChange={event => { setItem(event.target.value); setAnalysis(null); }} placeholder="例如 高麗菜、菠菜、山蘇" /><datalist id="market-command-item-options">{sourceItems.map(value => <option key={value} value={value} />)}</datalist></label></div>
+      <div className="market-command-slicers"><label>市場（可輸入）<input list="market-command-market-options" value={market} onChange={event => { setMarket(event.target.value); setCategory(''); setItem(''); setDrillPath([]); setAnalysis(null); }} placeholder="全部市場" /><datalist id="market-command-market-options">{sourceMarkets.map(value => <option key={value} value={value} />)}</datalist></label><label>蔬果大類（可輸入）<input list="market-command-category-options" value={category} onChange={event => { setCategory(event.target.value); setItem(''); setDrillPath([]); setAnalysis(null); }} placeholder="全部蔬果" /><datalist id="market-command-category-options">{sourceCategories.map(value => <option key={value} value={value} />)}</datalist></label><label className="market-command-item-filter">品項（可輸入）<input list="market-command-item-options" value={item} onChange={event => { setItem(event.target.value); setAnalysis(null); }} placeholder="例如 高麗菜、菠菜、山蘇" /><datalist id="market-command-item-options">{sourceItems.map(value => <option key={value} value={value} />)}</datalist><small className="market-command-filter-hint">品項會依市場與蔬果大類連動篩選</small></label></div>
     </section>
     {error && <p className="market-inline-message" role="alert">{error}</p>}
     {analysis && <>
