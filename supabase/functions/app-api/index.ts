@@ -269,7 +269,8 @@ type MarketFieldDefinition = {
   label: string;
   kind: 'dimension' | 'measure';
   unit?: string;
-  aggregation?: 'sum' | 'avg' | 'min' | 'max';
+  aggregation?: 'sum' | 'avg' | 'weighted_avg' | 'min' | 'max';
+  weight_key?: string;
   required?: boolean;
 };
 
@@ -279,11 +280,13 @@ function marketFieldDefinitions(value: unknown): MarketFieldDefinition[] {
     const row = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
     const key = text(row.key, 60).toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/^_+|_+$/g, '');
     const kind: MarketFieldDefinition['kind'] = row.kind === 'measure' ? 'measure' : 'dimension';
-    const aggregation = ['sum', 'avg', 'min', 'max'].includes(String(row.aggregation))
+    const aggregation = ['sum', 'avg', 'weighted_avg', 'min', 'max'].includes(String(row.aggregation))
       ? String(row.aggregation) as MarketFieldDefinition['aggregation'] : kind === 'measure' ? 'sum' : undefined;
+    const weightKey = text(row.weight_key, 60).toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/^_+|_+$/g, '');
     return {
       key, label: text(row.label, 100) || key, kind,
       unit: text(row.unit, 40) || undefined, aggregation,
+      weight_key: aggregation === 'weighted_avg' && /^[a-z][a-z0-9_-]{0,59}$/.test(weightKey) ? weightKey : undefined,
       required: row.required === true,
     };
   }).filter(field => /^[a-z][a-z0-9_-]{0,59}$/.test(field.key));
@@ -309,7 +312,19 @@ function marketNumeric(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-type MarketAggregate = { dimensions: Record<string, string>; values: Record<string, number>; counts: Record<string, number> };
+async function marketImportExternalKey(sourceId: string, observedOn: string, dimensions: Record<string, string>, naturalKeyFields: string[]) {
+  const payload = [sourceId, observedOn, ...naturalKeyFields.map(key => `${key}=${dimensions[key] || ''}`)].join('\u001f');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+  return `market-import:${[...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('')}`;
+}
+
+type MarketAggregate = {
+  dimensions: Record<string, string>;
+  values: Record<string, number>;
+  counts: Record<string, number>;
+  weightedSums: Record<string, number>;
+  weights: Record<string, number>;
+};
 
 function aggregateMarketPoints(rows: Array<Record<string, unknown>>, dimensions: string[], measures: string[], definitions: Map<string, MarketFieldDefinition>) {
   const grouped = new Map<string, MarketAggregate>();
@@ -319,7 +334,10 @@ function aggregateMarketPoints(rows: Array<Record<string, unknown>>, dimensions:
     const groupKey = JSON.stringify(values);
     let aggregate = grouped.get(groupKey);
     if (!aggregate) {
-      aggregate = { dimensions: Object.fromEntries(dimensions.map((key, index) => [key, values[index]])), values: {}, counts: {} };
+      aggregate = {
+        dimensions: Object.fromEntries(dimensions.map((key, index) => [key, values[index]])),
+        values: {}, counts: {}, weightedSums: {}, weights: {},
+      };
       grouped.set(groupKey, aggregate);
     }
     const rawMeasures = marketJsonObject(row.measures);
@@ -331,6 +349,12 @@ function aggregateMarketPoints(rows: Array<Record<string, unknown>>, dimensions:
       const prior = aggregate!.values[key];
       if (aggregation === 'min') aggregate!.values[key] = prior === undefined ? number : Math.min(prior, number);
       else if (aggregation === 'max') aggregate!.values[key] = prior === undefined ? number : Math.max(prior, number);
+      else if (aggregation === 'weighted_avg') {
+        const weight = definition?.weight_key ? marketNumeric(rawMeasures[definition.weight_key]) : null;
+        if (weight === null || weight <= 0) return;
+        aggregate!.weightedSums[key] = (aggregate!.weightedSums[key] || 0) + number * weight;
+        aggregate!.weights[key] = (aggregate!.weights[key] || 0) + weight;
+      }
       else {
         aggregate!.values[key] = (prior || 0) + number;
         aggregate!.counts[key] = (aggregate!.counts[key] || 0) + 1;
@@ -341,6 +365,8 @@ function aggregateMarketPoints(rows: Array<Record<string, unknown>>, dimensions:
     measures.forEach(key => {
       if (definitions.get(key)?.aggregation === 'avg' && aggregate.counts[key]) {
         aggregate.values[key] /= aggregate.counts[key];
+      } else if (definitions.get(key)?.aggregation === 'weighted_avg' && aggregate.weights[key]) {
+        aggregate.values[key] = aggregate.weightedSums[key] / aggregate.weights[key];
       }
     });
   });
@@ -707,6 +733,7 @@ export async function handleAppApiRequest(req: Request) {
       workorder_create_request: 'admin-api:write',
       workorder_workflow: 'admin-api:write',
       market_catalog: 'app-api',
+      market_dimension_catalog: 'app-api',
       market_analysis: 'app-api',
       market_simulation_list: 'app-api',
       market_simulation_save: 'admin-api:write',
@@ -1222,24 +1249,73 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'market_catalog') {
       if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
-      const [sourceResult, templateResult] = await Promise.all([
+      const [sourceResult, templateResult, rangeResult] = await Promise.all([
         admin.from('market_data_sources').select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').eq('status', 'active').order('source_name').limit(200),
         admin.from('market_analysis_templates').select('template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status,updated_at').eq('status', 'active').order('template_name').limit(200),
+        admin.rpc('market_source_date_ranges'),
       ]);
-      if (sourceResult.error || templateResult.error) {
-        console.error('market catalog query failed:', sourceResult.error?.message || templateResult.error?.message);
+      if (sourceResult.error || templateResult.error || rangeResult.error) {
+        console.error('market catalog query failed:', sourceResult.error?.message || templateResult.error?.message || rangeResult.error?.message);
         return reply(req, { ok: false, message: '市場行情資料尚未完成設定，請先套用市場分析資料庫腳本' }, 503);
       }
-      return reply(req, { ok: true, data: { sources: sourceResult.data || [], templates: templateResult.data || [] } });
+      const rangeRows = (rangeResult.data || []) as Array<Record<string, unknown>>;
+      const ranges = new Map<string, Record<string, unknown>>(rangeRows.map(row => [String(row.source_id), row]));
+      const sources = (sourceResult.data || []).map((row: Record<string, unknown>) => {
+        const range = ranges.get(String(row.source_id));
+        if (!range?.latest_observed_on) return row;
+        const latest = text(range.latest_observed_on, 10);
+        const previous = text(range.previous_observed_on, 10);
+        return { ...row, config: {
+          ...marketJsonObject(row.config),
+          period_from: text(range.first_observed_on, 10), period_to: latest, latest_observed_on: latest,
+          default_from: latest, default_to: latest,
+          ...(previous ? { default_compare_from: previous, default_compare_to: previous } : {}),
+        } };
+      });
+      return reply(req, { ok: true, data: { sources, templates: templateResult.data || [] } });
+    }
+
+    if (action === 'market_dimension_catalog') {
+      if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const sourceId = id(body.source_id);
+      const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions,config').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+      if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
+      const dimensions = marketFieldDefinitions(sourceResult.data.field_definitions).filter(field => field.kind === 'dimension').slice(0, 8);
+      const results = await Promise.all(dimensions.map(async field => {
+        const result = await admin.rpc('market_dimension_values', { p_source_id: sourceId, p_dimension: field.key, p_limit: 500 });
+        return { field, result };
+      }));
+      const failed = results.find(item => item.result.error);
+      if (failed) {
+        console.error('market dimension catalog failed:', failed.result.error?.message);
+        return reply(req, { ok: false, message: '市場行情篩選選項尚未完成設定，仍可直接輸入篩選文字' }, 503);
+      }
+      return reply(req, { ok: true, data: { options: Object.fromEntries(results.map(item => [
+        item.field.key,
+        (item.result.data || []).map((row: Record<string, unknown>) => ({ value: text(row.value, 200), count: Number(row.point_count) || 0 })).filter((row: { value: string }) => row.value),
+      ])) } });
     }
 
     if (action === 'market_analysis') {
       if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
       const sourceId = id(body.source_id);
-      const sourceQuery = sourceId
-        ? admin.from('market_data_sources').select('source_id,source_code,source_name,field_definitions').eq('source_id', sourceId).eq('status', 'active').maybeSingle()
-        : admin.from('market_data_sources').select('source_id,source_code,source_name,field_definitions').eq('status', 'active').order('source_name').limit(1).maybeSingle();
-      const sourceResult = await sourceQuery;
+      let sourceResult;
+      if (sourceId) {
+        sourceResult = await admin.from('market_data_sources')
+          .select('source_id,source_code,source_name,field_definitions')
+          .eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+      } else {
+        // 未指定來源的中央戰情摘要只使用明確標記的預設來源，避免名稱排序剛好
+        // 取到示範資料；舊環境尚未設定預設來源時才退回第一個啟用來源。
+        const preferred = await admin.from('market_data_sources')
+          .select('source_id,source_code,source_name,field_definitions')
+          .eq('status', 'active').contains('config', { is_default: true }).order('source_name').limit(1).maybeSingle();
+        sourceResult = preferred.data || preferred.error
+          ? preferred
+          : await admin.from('market_data_sources')
+            .select('source_id,source_code,source_name,field_definitions')
+            .eq('status', 'active').order('source_name').limit(1).maybeSingle();
+      }
       if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
       const source = sourceResult.data as Record<string, unknown>;
       const fields = marketFieldDefinitions(source.field_definitions);
@@ -1254,6 +1330,10 @@ export async function handleAppApiRequest(req: Request) {
       const requestedMeasures: string[] = measureInput.map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => measureKeys.includes(key)).slice(0, 4);
       const dimensions: string[] = hasRequestedDimensions ? [...new Set(requestedDimensions)] : dimensionKeys.slice(0, 2);
       const measures: string[] = hasRequestedMeasures ? [...new Set(requestedMeasures)] : measureKeys.slice(0, 2);
+      const rawFilters = marketJsonObject(body.filters);
+      const filterEntries = dimensionKeys.map(key => [key, text(rawFilters[key], 200)] as const).filter(([, value]) => Boolean(value));
+      if (filterEntries.length > 4) return reply(req, { ok: false, message: '單次最多套用 4 個資料內容篩選，請移除較次要的篩選條件' }, 400);
+      const filters = Object.fromEntries(filterEntries);
       if (!measures.length) return reply(req, { ok: false, message: '資料來源至少需要一個可分析的數值欄位' }, 400);
       const nowISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
       const from = marketDateRange(body.from, nowISO);
@@ -1280,11 +1360,13 @@ export async function handleAppApiRequest(req: Request) {
         let offset = 0;
         while (offset <= MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD) {
           const pageEnd = Math.min(offset + MARKET_ANALYSIS_PAGE_SIZE - 1, MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD);
-          const result = await admin.from('market_data_points')
+          let query = admin.from('market_data_points')
             .select('point_id,observed_on,dimensions,measures')
             .eq('source_id', source.source_id)
             .gte('observed_on', start)
-            .lte('observed_on', end)
+            .lte('observed_on', end);
+          if (Object.keys(filters).length) query = query.contains('dimensions', filters);
+          const result = await query
             .order('observed_on')
             .order('point_id')
             .range(offset, pageEnd);
@@ -1337,11 +1419,32 @@ export async function handleAppApiRequest(req: Request) {
         if (currentGroupKeys.has(key)) return;
         rows.push({ dimensions: row.dimensions, values: {}, compare_values: Object.fromEntries(measures.map(measure => [measure, row.values[measure] ?? null])), changes: {}, current_count: currentRows.length, compare_count: compareRows.length });
       });
+      const rankMeasure = measures[0];
+      rows.sort((left, right) => Math.max(Math.abs(Number(right.values[rankMeasure]) || 0), Math.abs(Number(right.compare_values[rankMeasure]) || 0))
+        - Math.max(Math.abs(Number(left.values[rankMeasure]) || 0), Math.abs(Number(left.compare_values[rankMeasure]) || 0)));
       const totalGroupCount = rows.length;
       const returnedGroupCount = Math.min(totalGroupCount, 500);
       const groupsTruncated = returnedGroupCount < totalGroupCount;
       const totalsCurrent = aggregateMarketPoints(currentRows, [], measures, fieldMap)[0]?.values || {};
       const totalsCompare = aggregateMarketPoints(compareRows, [], measures, fieldMap)[0]?.values || {};
+      // 市場摘要必須以完整期間資料重新彙總，不能從最多 500 組的畫面明細回推，
+      // 否則品項／品種維度很多時會顯示看似正式、實際少算的市場占比。
+      const marketSummary = dimensions.includes('market') && dimensionKeys.includes('market')
+        ? (() => {
+          const currentByMarket = aggregateMarketPoints(currentRows, ['market'], measures, fieldMap);
+          const compareByMarket = new Map(aggregateMarketPoints(compareRows, ['market'], measures, fieldMap)
+            .map(row => [row.dimensions.market || '未分類市場', row.values]));
+          const currentMarkets = new Set(currentByMarket.map(row => row.dimensions.market || '未分類市場'));
+          const result = currentByMarket.map(row => {
+            const market = row.dimensions.market || '未分類市場';
+            return { market, values: row.values, compare_values: compareByMarket.get(market) || {} };
+          });
+          compareByMarket.forEach((values, market) => {
+            if (!currentMarkets.has(market)) result.push({ market, values: {}, compare_values: values });
+          });
+          return result;
+        })()
+        : [];
       const dailyValues = (inputRows: Array<Record<string, unknown>>) => {
         const rowsByDate = new Map<string, Array<Record<string, unknown>>>();
         inputRows.forEach(row => {
@@ -1387,7 +1490,7 @@ export async function handleAppApiRequest(req: Request) {
         .sort()
         .at(-1) || null;
       return reply(req, { ok: true, data: {
-        source: { source_id: source.source_id, source_code: source.source_code, source_name: source.source_name },
+        source: { source_id: source.source_id, source_code: source.source_code, source_name: source.source_name }, filters,
         fields, dimensions, measures, periods: { from, to, compare_from: compareFrom, compare_to: compareTo },
         totals: { values: totalsCurrent, compare_values: totalsCompare, changes: Object.fromEntries(measures.map(measure => [measure, Number.isFinite(totalsCurrent[measure]) && Number.isFinite(totalsCompare[measure]) ? totalsCurrent[measure] - totalsCompare[measure] : null])) },
         counts: { current: currentRows.length, compare: compareRows.length },
@@ -1400,7 +1503,7 @@ export async function handleAppApiRequest(req: Request) {
           returned_group_count: returnedGroupCount,
           groups_truncated: groupsTruncated,
         },
-        series,
+        series, market_summary: marketSummary,
         rows: rows.slice(0, returnedGroupCount),
       } });
     }
@@ -1464,6 +1567,12 @@ export async function handleAppApiRequest(req: Request) {
       if (!/^[a-z][a-z0-9_-]{1,59}$/.test(sourceCode) || !sourceName) return reply(req, { ok: false, message: '資料來源代碼與名稱不可空白，代碼需使用英文字母、數字、底線或連字號' }, 400);
       if (!['manual', 'csv', 'json', 'api'].includes(sourceType)) return reply(req, { ok: false, message: '資料來源類型不正確' }, 400);
       if (!fields.some(field => field.kind === 'dimension') || !fields.some(field => field.kind === 'measure')) return reply(req, { ok: false, message: '資料來源至少需要一個分類欄位與一個數值欄位' }, 400);
+      const fieldKeys = fields.map(field => field.key);
+      if (new Set(fieldKeys).size !== fieldKeys.length) return reply(req, { ok: false, message: '欄位代碼不可重複，請合併或重新命名重複欄位' }, 400);
+      const measureKeys = new Set(fields.filter(field => field.kind === 'measure').map(field => field.key));
+      const invalidWeightedField = fields.find(field => field.aggregation === 'weighted_avg'
+        && (!field.weight_key || field.weight_key === field.key || !measureKeys.has(field.weight_key)));
+      if (invalidWeightedField) return reply(req, { ok: false, message: `「${invalidWeightedField.label}」使用加權平均時，必須指定另一個已定義的數值欄位作為權重` }, 400);
       const payload: Record<string, unknown> = { source_code: sourceCode, source_name: sourceName, source_type: sourceType, endpoint_url: text(body.endpoint_url, 500) || null, field_definitions: fields, status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
       // 更新時若前端沒有送 config，保留資料庫中的既有設定；只有明確送出
       // config 才覆寫。新增來源仍以空物件作為安全預設值。
@@ -1500,17 +1609,23 @@ export async function handleAppApiRequest(req: Request) {
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以匯入行情資料' }, 403);
       const sourceId = id(body.source_id);
-      const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+      const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions,config').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
       if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可匯入的資料來源' }, 404);
       const fields = marketFieldDefinitions(sourceResult.data.field_definitions);
       const dimensions = fields.filter(field => field.kind === 'dimension');
       const measures = fields.filter(field => field.kind === 'measure');
+      const dimensionKeys = new Set(dimensions.map(field => field.key));
+      const sourceConfig = marketJsonObject((sourceResult.data as unknown as Record<string, unknown>).config);
+      const configuredNaturalKeys = Array.isArray(sourceConfig.natural_key_fields)
+        ? (sourceConfig.natural_key_fields as unknown[]).map(value => text(value, 60)).filter(key => dimensionKeys.has(key))
+        : [];
+      const naturalKeyFields = configuredNaturalKeys.length ? [...new Set(configuredNaturalKeys)] : dimensions.map(field => field.key);
       const inputRows: unknown[] = Array.isArray(body.rows) ? body.rows : [];
       if (!inputRows.length) return reply(req, { ok: false, message: '沒有可匯入的資料列' }, 400);
       if (inputRows.length > 2000) return reply(req, { ok: false, message: '單次最多匯入 2,000 筆行情資料；為避免漏匯，請將檔案分批後再試。' }, 413);
       let rows: Array<Record<string, unknown>>;
       try {
-        rows = inputRows.map((item: unknown, index: number) => {
+        rows = await Promise.all(inputRows.map(async (item: unknown, index: number) => {
           const row = marketJsonObject(item);
           const observedOn = text(row.observed_on, 10);
           if (!validISODate(observedOn)) throw new Error(`第 ${index + 1} 列日期格式不正確`);
@@ -1520,11 +1635,23 @@ export async function handleAppApiRequest(req: Request) {
           measures.forEach(field => { const value = marketNumeric(rawMeasures[field.key]); if (value !== null) normalizedMeasures[field.key] = value; });
           const requiredMissing = dimensions.filter(field => field.required && !normalizedDimensions[field.key]);
           if (requiredMissing.length) throw new Error(`第 ${index + 1} 列缺少${requiredMissing.map(field => field.label).join('、')}`);
-          return { source_id: sourceId, observed_on: observedOn, dimensions: normalizedDimensions, measures: normalizedMeasures, metadata: marketJsonObject(row.metadata), external_key: text(row.external_key, 200) || null, imported_by: profile.user_id };
+          const externalKey = text(row.external_key, 200) || await marketImportExternalKey(sourceId, observedOn, normalizedDimensions, naturalKeyFields);
+          return { observed_on: observedOn, dimensions: normalizedDimensions, measures: normalizedMeasures, metadata: marketJsonObject(row.metadata), external_key: externalKey };
+        }));
+        const keyRows = new Map<string, number>();
+        rows.forEach((row, index) => {
+          const key = String(row.external_key);
+          const previousIndex = keyRows.get(key);
+          if (previousIndex !== undefined) throw new Error(`同一批第 ${previousIndex + 1} 列與第 ${index + 1} 列的日期及分類欄位重複；請先合併該筆行情後再匯入。`);
+          keyRows.set(key, index);
         });
-        const result = await admin.from('market_data_points').insert(rows).select('point_id');
+        const result = await admin.rpc('market_import_data_points', { p_source_id: sourceId, p_rows: rows, p_imported_by: profile.user_id });
         if (result.error) return reply(req, { ok: false, message: dbMessage(result.error, '行情資料匯入失敗') }, 400);
-        return reply(req, { ok: true, data: { imported: result.data?.length || rows.length } });
+        const counts = Array.isArray(result.data) ? result.data[0] as Record<string, unknown> | undefined : undefined;
+        const inserted = Number(counts?.inserted_count) || 0;
+        const updated = Number(counts?.updated_count) || 0;
+        await writeAudit(admin, profile.user_id, 'market_data_points', sourceId, 'insert', null, { inserted, updated, row_count: rows.length });
+        return reply(req, { ok: true, data: { imported: inserted + updated, inserted, updated } });
       } catch (error) {
         return reply(req, { ok: false, message: error instanceof Error ? error.message : '行情資料格式不正確' }, 400);
       }

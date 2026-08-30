@@ -101,6 +101,8 @@ create index if not exists idx_market_points_source_date
   on market_data_points(source_id, observed_on desc);
 create index if not exists idx_market_points_date
   on market_data_points(observed_on desc);
+create index if not exists idx_market_points_dimensions_gin
+  on market_data_points using gin (dimensions jsonb_path_ops);
 create unique index if not exists uq_market_points_external_key
   on market_data_points(source_id, external_key)
   where external_key is not null and external_key <> '';
@@ -145,6 +147,76 @@ revoke all on function market_analytics_has_access() from public;
 revoke all on function market_analytics_can_manage() from public;
 grant execute on function market_analytics_has_access() to authenticated;
 grant execute on function market_analytics_can_manage() to authenticated;
+
+create or replace function market_dimension_values(
+  p_source_id uuid,
+  p_dimension text,
+  p_limit integer default 500
+) returns table(value text, point_count bigint)
+language sql stable security invoker set search_path=public,pg_temp as $$
+  select p.dimensions->>p_dimension as value, count(*)::bigint as point_count
+  from market_data_points p
+  where p.source_id=p_source_id
+    and p_dimension ~ '^[a-z][a-z0-9_-]{0,59}$'
+    and p.dimensions ? p_dimension
+    and coalesce(p.dimensions->>p_dimension,'')<>''
+  group by p.dimensions->>p_dimension
+  order by count(*) desc, p.dimensions->>p_dimension
+  limit least(greatest(coalesce(p_limit,500),1),500)
+$$;
+revoke all on function market_dimension_values(uuid,text,integer) from public;
+grant execute on function market_dimension_values(uuid,text,integer) to authenticated,service_role;
+
+create or replace function market_source_date_ranges()
+returns table(source_id uuid,first_observed_on date,latest_observed_on date,previous_observed_on date)
+language sql stable security invoker set search_path=public,pg_temp as $$
+  with source_days as (
+    select distinct p.source_id,p.observed_on from market_data_points p
+  )
+  select d.source_id,min(d.observed_on),max(d.observed_on),(array_agg(d.observed_on order by d.observed_on desc))[2]
+  from source_days d
+  group by d.source_id
+$$;
+revoke all on function market_source_date_ranges() from public;
+grant execute on function market_source_date_ranges() to service_role;
+
+create or replace function market_import_data_points(
+  p_source_id uuid,
+  p_rows jsonb,
+  p_imported_by uuid
+) returns table(inserted_count bigint,updated_count bigint)
+language sql volatile security definer set search_path=public,pg_temp as $$
+  with incoming_rows as (
+    select
+      (row_data->>'observed_on')::date as observed_on,
+      coalesce(row_data->'dimensions','{}'::jsonb) as dimensions,
+      coalesce(row_data->'measures','{}'::jsonb) as measures,
+      coalesce(row_data->'metadata','{}'::jsonb) as metadata,
+      row_data->>'external_key' as external_key,
+      ordinal
+    from jsonb_array_elements(coalesce(p_rows,'[]'::jsonb)) with ordinality as rows(row_data,ordinal)
+    where coalesce(row_data->>'external_key','')<>''
+  ), incoming as (
+    select distinct on (external_key)
+      observed_on,dimensions,measures,metadata,external_key
+    from incoming_rows
+    order by external_key,ordinal desc
+  ), upserted as (
+    insert into market_data_points(source_id,observed_on,dimensions,measures,metadata,external_key,imported_by)
+    select p_source_id,i.observed_on,i.dimensions,i.measures,i.metadata,i.external_key,p_imported_by
+    from incoming i
+    on conflict (source_id,external_key) where external_key is not null and external_key<>'' do update set
+      observed_on=excluded.observed_on,
+      dimensions=excluded.dimensions,
+      measures=coalesce(market_data_points.measures,'{}'::jsonb) || excluded.measures,
+      metadata=coalesce(market_data_points.metadata,'{}'::jsonb) || excluded.metadata,
+      imported_by=excluded.imported_by
+    returning (xmax=0) as inserted
+  )
+  select count(*) filter(where inserted),count(*) filter(where not inserted) from upserted
+$$;
+revoke all on function market_import_data_points(uuid,jsonb,uuid) from public,anon,authenticated;
+grant execute on function market_import_data_points(uuid,jsonb,uuid) to service_role;
 
 alter table market_data_sources enable row level security;
 alter table market_data_points enable row level security;
@@ -221,11 +293,11 @@ values (
     {"key":"item","label":"品項","kind":"dimension","required":true},
     {"key":"market","label":"市場","kind":"dimension"},
     {"key":"unit","label":"交易單位","kind":"dimension"},
-    {"key":"quantity","label":"交易量","kind":"measure","unit":"公斤"},
-    {"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤"},
-    {"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤"},
-    {"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤"},
-    {"key":"total_value","label":"交易金額","kind":"measure","unit":"元"}
+    {"key":"quantity","label":"交易量","kind":"measure","unit":"公斤","aggregation":"sum"},
+    {"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤","aggregation":"weighted_avg","weight_key":"quantity"},
+    {"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤","aggregation":"min"},
+    {"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤","aggregation":"max"},
+    {"key":"total_value","label":"交易金額","kind":"measure","unit":"元","aggregation":"sum"}
   ]'::jsonb,
   'active'
 )
@@ -257,11 +329,11 @@ values (
     {"key":"item","label":"品項","kind":"dimension","required":true},
     {"key":"market","label":"市場","kind":"dimension"},
     {"key":"unit","label":"交易單位","kind":"dimension"},
-    {"key":"quantity","label":"交易量","kind":"measure","unit":"公斤"},
-    {"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤"},
-    {"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤"},
-    {"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤"},
-    {"key":"total_value","label":"交易金額","kind":"measure","unit":"元"}
+    {"key":"quantity","label":"交易量","kind":"measure","unit":"公斤","aggregation":"sum"},
+    {"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤","aggregation":"weighted_avg","weight_key":"quantity"},
+    {"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤","aggregation":"min"},
+    {"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤","aggregation":"max"},
+    {"key":"total_value","label":"交易金額","kind":"measure","unit":"元","aggregation":"sum"}
   ]'::jsonb,
   '{"is_demo":true,"data_classification":"非正式示範資料"}'::jsonb,
   'active'

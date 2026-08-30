@@ -48,6 +48,8 @@ type MarketSnapshot = {
   measures?: string[];
   fields?: Array<{ key: string; label: string; kind: string; unit?: string }>;
   periods?: { from: string; to: string; compare_from: string; compare_to: string };
+  totals?: { values?: Record<string, number | null>; compare_values?: Record<string, number | null> };
+  quality?: { latest_observed_on?: string | null };
 };
 
 // 與 V1 dashboard-layout.js 的 CATALOG 一字不差，兩邊的預設版面才會一致。
@@ -183,7 +185,10 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(5000),
       getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
       getPatrolShiftsForDate(client, day),
-      invokeAppApi<MarketSnapshot>('market_analysis', { from, to, compare_from: marketCompareFrom, compare_to: marketCompareTo }).catch(() => null),
+      invokeAppApi<MarketSnapshot>('market_analysis', {
+        from, to, compare_from: marketCompareFrom, compare_to: marketCompareTo,
+        dimensions: ['market', 'category'], measures: ['quantity', 'total_value', 'average_price'],
+      }).then(data => ({ data, error: '' })).catch(error => ({ data: null, error: error instanceof Error ? error.message : '市場交易行情載入失敗' })),
     ]);
 
     if (requestResult.error || orderResult.error) {
@@ -198,10 +203,11 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const patrolFailure = markerResult.error || checkinResult.error;
     if (patrolFailure) notices.push(`當班巡檢資料載入失敗：${patrolFailure.message || '請稍後再試'}`);
     if (trendResult.error) notices.push(`月趨勢統計載入失敗（repair_monthly_counts）：${trendResult.error.message || '請稍後再試'}`);
+    if (marketResult.error) notices.push(`市場交易行情載入失敗：${marketResult.error}`);
     if (notices.length) setError(notices.join('；'));
     setRequests((requestResult.data || []).filter(row => !row.hidden));
     setOrders((orderResult.data || []).filter(row => !row.hidden));
-    setMarket(marketResult);
+    setMarket(marketResult.data);
 
     // 12 個月趨勢：RPC 失敗時以 0 補滿，畫面仍成立但不會假造數字。
     const counts: Record<string, number> = {};
@@ -343,10 +349,16 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       }
       case 'weather_taiwan': return <WeatherWidget />;
       case 'market_snapshot': {
-        const measure = market?.measures?.[0] || '';
+        const measure = market?.measures?.includes('quantity') ? 'quantity' : market?.measures?.[0] || '';
         const field = market?.fields?.find(item => item.key === measure);
         const items = (market?.rows || []).slice(0, 8);
-        return <div className="dash-market-snapshot"><div className="dash-market-meta"><span>{market?.source?.source_name || '尚未設定行情資料來源'}</span><small>{market?.periods ? `${market.periods.from}～${market.periods.to}　比　${market.periods.compare_from}～${market.periods.compare_to}` : '可由市場營運分析系統設定'}</small></div>{items.length ? <div className="dash-market-list">{items.map((item, index) => <div key={index}><b>{Object.values(item.dimensions || {}).join('／') || '全部'}</b><strong>{numberText(item.values?.[measure])}<small>{field?.unit || ''}</small></strong><span>{item.compare_values?.[measure] == null ? '無比較資料' : `比較 ${numberText(item.compare_values[measure])}`}</span></div>)}</div> : <p className="empty">尚無行情資料，請至「市場營運分析系統」匯入資料。</p>}</div>;
+        const kpis = ['quantity', 'total_value', 'average_price'].map(key => {
+          const definition = market?.fields?.find(item => item.key === key);
+          const current = market?.totals?.values?.[key], compare = market?.totals?.compare_values?.[key];
+          const percent = current == null || compare == null || Number(compare) === 0 ? null : (Number(current) - Number(compare)) / Math.abs(Number(compare)) * 100;
+          return { key, label: key === 'total_value' ? '推估成交額' : definition?.label || key, unit: definition?.unit || '', current, percent };
+        });
+        return <div className="dash-market-snapshot"><div className="dash-market-meta"><span>{market?.source?.source_name || '尚未設定行情資料來源'}</span><small>{market?.periods ? `${market.periods.from}～${market.periods.to}　比　${market.periods.compare_from}～${market.periods.compare_to}　｜　資料截止 ${market.quality?.latest_observed_on || '—'}` : '可由市場營運分析系統設定'}</small></div>{market && <div className="dash-market-kpis">{kpis.map(kpi => <div key={kpi.key}><span>{kpi.label}</span><strong>{numberText(kpi.current)}<small>{kpi.unit}</small></strong><b className={kpi.percent == null ? '' : kpi.percent >= 0 ? 'up' : 'down'}>{kpi.percent == null ? '無比較基準' : `${kpi.percent >= 0 ? '▲' : '▼'} ${Math.abs(kpi.percent).toFixed(1)}%`}</b></div>)}</div>}{items.length ? <div className="dash-market-list">{items.map((item, index) => <div key={index}><b>{Object.values(item.dimensions || {}).join('／') || '全部'}</b><strong>{numberText(item.values?.[measure])}<small>{field?.unit || ''}</small></strong><span>{item.compare_values?.[measure] == null ? '無比較資料' : `比較 ${numberText(item.compare_values[measure])}`}</span></div>)}</div> : <p className="empty">尚無行情資料，請至「市場營運分析系統」確認正式來源與資料期間。</p>}</div>;
       }
       default: return <p className="empty">未知的版面元件：{item.widget_key}</p>;
     }

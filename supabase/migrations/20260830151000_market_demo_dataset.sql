@@ -13,11 +13,11 @@ values (
     {"key":"item","label":"品項","kind":"dimension","required":true},
     {"key":"market","label":"市場","kind":"dimension"},
     {"key":"unit","label":"交易單位","kind":"dimension"},
-    {"key":"quantity","label":"交易量","kind":"measure","unit":"公斤"},
-    {"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤"},
-    {"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤"},
-    {"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤"},
-    {"key":"total_value","label":"交易金額","kind":"measure","unit":"元"}
+    {"key":"quantity","label":"交易量","kind":"measure","unit":"公斤","aggregation":"sum"},
+    {"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤","aggregation":"weighted_avg","weight_key":"quantity"},
+    {"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤","aggregation":"min"},
+    {"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤","aggregation":"max"},
+    {"key":"total_value","label":"交易金額","kind":"measure","unit":"元","aggregation":"sum"}
   ]'::jsonb,
   '{"is_demo":true,"data_classification":"非正式示範資料"}'::jsonb,
   'active'

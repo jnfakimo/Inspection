@@ -37,7 +37,7 @@ create table if not exists public.market_analysis_templates (
   source_id uuid references public.market_data_sources(source_id),
   dimensions jsonb not null default '[]'::jsonb,
   measures jsonb not null default '[]'::jsonb,
-  chart_type text not null default 'bar' check (chart_type in ('bar','table','cards')),
+  chart_type text not null default 'bar' check (chart_type in ('bar','pie','doughnut','line','area','table','cards')),
   default_config jsonb not null default '{}'::jsonb,
   status text not null default 'active' check (status in ('active','inactive')),
   created_by uuid references public.users(user_id),
@@ -53,6 +53,12 @@ alter table public.market_data_points add column if not exists metadata jsonb no
 alter table public.market_data_points add column if not exists external_key text;
 alter table public.market_analysis_templates add column if not exists default_config jsonb not null default '{}'::jsonb;
 alter table public.market_analysis_templates add column if not exists updated_at timestamptz not null default now();
+
+alter table public.market_analysis_templates
+  drop constraint if exists market_analysis_templates_chart_type_check;
+alter table public.market_analysis_templates
+  add constraint market_analysis_templates_chart_type_check
+  check (chart_type in ('bar','pie','doughnut','line','area','table','cards'));
 
 create index if not exists idx_market_points_source_date on public.market_data_points(source_id, observed_on desc);
 create index if not exists idx_market_points_date on public.market_data_points(observed_on desc);
@@ -92,7 +98,7 @@ create policy market_templates_manage on public.market_analysis_templates for al
 
 insert into public.market_data_sources(source_id,source_code,source_name,source_type,field_definitions,status)
 values ('55555555-5555-4555-8555-555555555555','market_daily','每日交易行情','csv',
-  '[{"key":"item","label":"品項","kind":"dimension","required":true},{"key":"market","label":"市場","kind":"dimension"},{"key":"unit","label":"交易單位","kind":"dimension"},{"key":"quantity","label":"交易量","kind":"measure","unit":"公斤"},{"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤"},{"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤"},{"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤"},{"key":"total_value","label":"交易金額","kind":"measure","unit":"元"}]'::jsonb,'active')
+  '[{"key":"item","label":"品項","kind":"dimension","required":true},{"key":"market","label":"市場","kind":"dimension"},{"key":"unit","label":"交易單位","kind":"dimension"},{"key":"quantity","label":"交易量","kind":"measure","unit":"公斤","aggregation":"sum"},{"key":"average_price","label":"平均價","kind":"measure","unit":"元／公斤","aggregation":"weighted_avg","weight_key":"quantity"},{"key":"min_price","label":"最低價","kind":"measure","unit":"元／公斤","aggregation":"min"},{"key":"max_price","label":"最高價","kind":"measure","unit":"元／公斤","aggregation":"max"},{"key":"total_value","label":"交易金額","kind":"measure","unit":"元","aggregation":"sum"}]'::jsonb,'active')
 on conflict (source_code) do nothing;
 insert into public.market_analysis_templates(template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status)
 values ('66666666-6666-4666-8666-666666666666','leaf-market-compare','葉菜交易行情比較','比較指定期間與前一日／後一日／同期的交易量與平均價。',(select source_id from public.market_data_sources where source_code='market_daily'),'["item","market"]'::jsonb,'["quantity","average_price"]'::jsonb,'bar','{"compare":"previous","limit":20}'::jsonb,'active')
