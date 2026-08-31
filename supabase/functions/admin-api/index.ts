@@ -54,7 +54,19 @@ function dbMessage(error: { code?: string; message?: string } | null, fallback: 
   const code = String(error?.code || '');
   if (code === '23505') return '資料已存在，請勿重複提交';
   if (code === '23503') return '關聯資料不存在，請先確認相關資料';
-  if (code === '23514') return '資料不符合系統規則';
+  if (code === '23514') {
+    // 帳號階層觸發器會回傳已翻譯的業務訊息；保留它，讓管理員知道
+    // 是哪一位主管或哪一項指派不符合，而不是只看到無法處理的通用錯誤。
+    const message = clean(error?.message, 300);
+    const knownRule = [
+      '主管及系統管理員不可設定直屬主管', '啟用中的一般人員必須指定直屬主管',
+      '啟用中的一般人員必須指定直屬課室主管', '直屬主管必須是啟用中的帳號',
+      '直屬主管必須具備單位主管或系統管理員角色', '直屬主管必須具備課室主管或系統管理員角色',
+      '直屬主管必須位於人員所屬單位或其上層部／室', '直屬主管必須與人員屬於同一單位',
+      '這位主管底下還有',
+    ].find(prefix => message.includes(prefix));
+    return knownRule ? message : '資料不符合系統規則';
+  }
   if (code === '22P02') return '數值或格式不正確';
   if (code === '23502') return '缺少必填欄位';
   const message = clean(error?.message, 300);
@@ -579,9 +591,28 @@ export async function handleAdminApiRequest(req: Request) {
       const userId = id(body.user_id), nextStatus = status(body.status);
       if (!userId) return reply(req, { ok: false, message: '使用者識別碼無效' }, 400);
       if (userId === profile.user_id && nextStatus === 'inactive') return reply(req, { ok: false, message: '不可停用目前登入的管理員帳號' }, 400);
-      const { data: before } = await admin.from('users').select('user_id,name,status,auth_id').eq('user_id', userId).maybeSingle();
+      const { data: before } = await admin.from('users').select('user_id,name,status,auth_id,dept_id,supervisor_id,role,rbac_role').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
-      const { error } = await admin.from('users').update({ status: nextStatus }).eq('user_id', userId);
+      // 啟用前先用同一套主管規則檢查，避免只顯示資料庫約束錯誤；主管／系統
+      // 管理員若留有歷史 supervisor_id，啟用時一併清除，維持帳號階層一致。
+      const targetRole = String(before.rbac_role || (before.role === 'admin' ? 'sysadmin' : before.role === 'supervisor' ? 'unit_supervisor' : before.role === 'maintenance' ? 'technician' : before.role === 'inspector' ? 'reporter' : before.role) || 'reporter');
+      if (nextStatus === 'active') {
+        const supervisorValidation = await validateSupervisor(id(before.supervisor_id) || null, id(before.dept_id) || null, targetRole, userId);
+        if (supervisorValidation.message) return reply(req, { ok: false, message: `帳號啟用失敗：${supervisorValidation.message}` }, 400);
+      }
+      // 任何仍掛著這位帳號的啟用人員都會失去可用主管；先要求改派，
+      // 即使資料庫尚未套用主管異動觸發器也不會產生孤兒指派。
+      if (nextStatus === 'inactive') {
+        const { data: dependents, error: dependentError } = await admin.from('users')
+          .select('name').eq('supervisor_id', userId).eq('status', 'active').order('name').limit(200);
+        if (dependentError) return reply(req, { ok: false, message: '帳號狀態檢查失敗，請重新整理後再試' }, 400);
+        if ((dependents || []).length > 0) {
+          const names = (dependents || []).map(row => String(row.name || '')).filter(Boolean).join('、');
+          return reply(req, { ok: false, message: `無法停用：此帳號仍是 ${dependents?.length || 0} 位啟用人員的直屬主管（${names.slice(0, 200)}），請先改派其他主管` }, 409);
+        }
+      }
+      const changes = { status: nextStatus, ...(nextStatus === 'active' && ['unit_supervisor', 'sysadmin'].includes(targetRole) ? { supervisor_id: null } : {}) };
+      const { error } = await admin.from('users').update(changes).eq('user_id', userId);
       if (error) return reply(req, { ok: false, message: dbMessage(error, '帳號狀態更新失敗') }, 400);
       // 同步停用/啟用 Supabase Auth，確保離職/停用帳號無法再登入或延續既有 session。
       if (before.auth_id) {
@@ -647,9 +678,21 @@ export async function handleAdminApiRequest(req: Request) {
       const userId = id(body.user_id), rbacRole = clean(body.rbac_role, 40);
       if (!userId || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '使用者或角色設定無效' }, 400);
       if (userId === profile.user_id) return reply(req, { ok: false, message: '不可變更目前登入管理員自己的角色' }, 400);
-      const { data: before } = await admin.from('users').select('rbac_role,role').eq('user_id', userId).maybeSingle();
+      const { data: before } = await admin.from('users').select('user_id,rbac_role,role,dept_id,supervisor_id,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
-      const changes = { rbac_role: rbacRole, role: LEGACY_ROLE[rbacRole] ?? 'inspector', permissions: {} };
+      // 「使用者角色指派」也必須和帳號管理共用主管規則。升為主管時清除舊
+      // supervisor_id；改為一般角色時保留既有主管，若已無效則明確提示改到
+      // 帳號管理重新指派，避免角色頁把人員留在無法啟用的狀態。
+      const requestedSupervisorId = ['unit_supervisor', 'sysadmin'].includes(rbacRole)
+        ? null
+        : id(body.supervisor_id) || id(before.supervisor_id) || null;
+      let normalizedSupervisorId = requestedSupervisorId;
+      if (before.status === 'active' || requestedSupervisorId) {
+        const supervisorValidation = await validateSupervisor(requestedSupervisorId, id(before.dept_id) || null, rbacRole, userId);
+        if (supervisorValidation.message) return reply(req, { ok: false, message: `使用者角色更新失敗：${supervisorValidation.message}；請到帳號管理指定所屬單位與直屬主管` }, 400);
+        normalizedSupervisorId = supervisorValidation.supervisorId;
+      }
+      const changes = { rbac_role: rbacRole, role: LEGACY_ROLE[rbacRole] ?? 'inspector', supervisor_id: normalizedSupervisorId, permissions: {} };
       const { error } = await admin.from('users').update(changes).eq('user_id', userId);
       if (error) return reply(req, { ok: false, message: `使用者角色更新失敗：${error.message}` }, 400);
       await audit('users', userId, 'update', { before, after: changes });
