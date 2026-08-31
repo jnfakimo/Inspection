@@ -152,6 +152,9 @@
 
 /* 同期比較子系統：年度 YoY 長條圖、價格分布箱型圖與交易熱力圖，沿用既有 market- 前綴與雙主題色階。 */
 .market-comparison-page{--market-rise-color:var(--red);--market-fall-color:var(--green);--market-rise-readable:color-mix(in srgb,var(--market-rise-color) 72%,var(--text));--market-fall-readable:color-mix(in srgb,var(--market-fall-color) 68%,var(--text));display:grid;gap:16px;min-width:0}
+.market-comparison-page .market-control-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:1000px){.market-comparison-page .market-control-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.market-comparison-page .market-control-grid{grid-template-columns:1fr}}
 .market-comparison-page .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
 .market-comparison-page .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
 .market-comparison-top-items{grid-column:span 2}
