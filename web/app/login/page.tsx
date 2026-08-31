@@ -15,13 +15,30 @@ import Link from 'next/link';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
+import { invokeUsernameLogin } from '@/lib/username-login';
 import type { Profile } from '@/types/app';
+
+const LOGIN_SESSION_TIMEOUT_MS = 15_000;
+
+async function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs = LOGIN_SESSION_TIMEOUT_MS): Promise<T> {
+  let timeoutId: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
 function friendlyError(raw: unknown, fallback: string) {
   const text = raw instanceof Error ? raw.message : String(raw || '');
   if (/rate limit|too many requests|for security purposes/i.test(text)) return '操作過於頻繁，請稍後再試';
-  if (/failed to fetch|network|load failed/i.test(text)) return '網路連線失敗，請確認連線後再試';
+  if (/failed to fetch|failed to send|network|load failed|abort|timeout|timed out/i.test(text)) return '網路連線逾時，請確認連線後再試';
   if (/invalid.*email|email.*invalid/i.test(text)) return '電子郵件格式不正確';
   if (/user not found|no user/i.test(text)) return '查無此電子郵件對應的帳號';
   if (/expired|invalid.*token|session/i.test(text)) return '重設連結已失效，請重新申請';
@@ -50,10 +67,13 @@ export default function LoginPage() {
   async function loadCaptcha() {
     setCaptcha(null);
     try {
-      const { data, error } = await getSupabase().functions.invoke('username-login', { body: { action: 'captcha' } });
-      if (error || !data?.challenge_id) return setMessage('驗證碼載入失敗，請確認網路後重新整理');
+      const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string }>(
+        { action: 'captcha' },
+        '驗證碼服務暫時無法連線，請稍後重試',
+      );
+      if (!data?.challenge_id || !data.image) return setMessage('驗證碼載入失敗，請確認網路後重新整理');
       setCaptcha({ id: data.challenge_id, image: data.image });
-    } catch { setMessage('驗證碼服務暫時無法連線，請稍後重試'); }
+    } catch (error) { setMessage(friendlyError(error, '驗證碼服務暫時無法連線，請稍後重試')); }
   }
 
   useEffect(() => {
@@ -92,25 +112,28 @@ export default function LoginPage() {
     event.preventDefault(); setBusy(true); setMessage('');
     const form = new FormData(event.currentTarget);
     try {
-      const { data, error } = await getSupabase().functions.invoke('username-login', { body: {
+      const data = await invokeUsernameLogin<{ access_token?: string; refresh_token?: string; message?: string }>({
         identifier: String(form.get('identifier') || '').trim(), password: String(form.get('password') || ''),
         captcha_id: captcha?.id, captcha_answer: String(form.get('captcha') || '').trim(),
-      }});
-      if (error || !data?.access_token) { setMessage(data?.message || '帳號、密碼或驗證碼錯誤'); setBusy(false); await loadCaptcha(); return; }
-      const result = await getSupabase().auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
+      }, '登入服務暫時無法連線，請稍後重試');
+      if (!data?.access_token || !data.refresh_token) { setMessage(data?.message || '帳號、密碼或驗證碼錯誤'); setBusy(false); void loadCaptcha(); return; }
+      const result = await withTimeout(
+        getSupabase().auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token }),
+        '登入狀態建立逾時，請重新登入',
+      );
       if (result.error) { setMessage('登入狀態建立失敗，請重新登入'); setBusy(false); return; }
       try {
         const profile = await invokeAppApi<Profile>('profile');
         saveProfile(profile);
       } catch (profileError) {
         clearProfile();
-        await getSupabase().auth.signOut({ scope: 'local' }).catch(() => {});
+        await withTimeout(getSupabase().auth.signOut({ scope: 'local' }), '登出逾時', 3_000).catch(() => {});
         setMessage(friendlyError(profileError, '找不到啟用中的系統帳號，請聯絡管理員'));
         setBusy(false);
         return;
       }
       location.replace(nextPath());
-    } catch { setMessage('登入服務暫時無法連線，請稍後重試'); setBusy(false); }
+    } catch (error) { setMessage(friendlyError(error, '登入服務暫時無法連線，請稍後重試')); setBusy(false); void loadCaptcha(); }
   }
 
   async function sendResetLink() {

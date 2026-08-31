@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
+import { invokeUsernameLogin } from '@/lib/username-login';
 
 type Department = {
   dept_id: string;
@@ -38,8 +39,11 @@ export default function AccountApplyPage() {
   async function loadCaptcha() {
     setCaptcha(null);
     try {
-      const { data, error } = await getSupabase().functions.invoke('username-login', { body: { action: 'captcha' } });
-      if (error || !data?.challenge_id) throw new Error(data?.message || '驗證碼載入失敗');
+      const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string; message?: string }>(
+        { action: 'captcha' },
+        '驗證碼服務暫時無法連線，請稍後重試',
+      );
+      if (!data?.challenge_id || !data.image) throw new Error(data?.message || '驗證碼載入失敗');
       setCaptcha({ id: data.challenge_id, image: data.image });
     } catch (error) { setMessage(friendlyError(error)); }
   }
@@ -67,7 +71,7 @@ export default function AccountApplyPage() {
       setMessage('請重新選擇所屬課／組／隊'); setBusy(false); return;
     }
     try {
-      const { data, error } = await getSupabase().functions.invoke('username-login', { body: {
+      const data = await invokeUsernameLogin<{ ok?: boolean; message?: string }>({
         action: 'account_application',
         name: String(form.get('name') || '').trim(),
         username: String(form.get('username') || '').trim(),
@@ -77,8 +81,8 @@ export default function AccountApplyPage() {
         reason: String(form.get('reason') || '').trim(),
         captcha_id: captcha?.id,
         captcha_answer: String(form.get('captcha') || '').trim(),
-      }});
-      if (error || !data?.ok) throw new Error(data?.message || '帳號申請送出失敗');
+      }, '帳號申請服務暫時無法連線，請稍後重試');
+      if (!data?.ok) throw new Error(data?.message || '帳號申請送出失敗');
       setDone(true); setMessage(data.message || '帳號申請已送出，請等待系統管理員審核');
     } catch (error) {
       setMessage(friendlyError(error)); setBusy(false); await loadCaptcha();

@@ -10,6 +10,7 @@ const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/,
 // Render 的免費／低用量服務可能需要冷啟動；不能讓前端無限等待。
 // 逾時後沿用既有的 Supabase Edge Function 備援，讓畫面可繼續工作。
 const NODE_API_TIMEOUT_MS = 5000;
+const EDGE_API_TIMEOUT_MS = 15_000;
 const READ_ACTION_LABELS: Record<string, string> = {
   profile: '讀取個人帳號資料',
   module_data: '讀取系統模組資料',
@@ -106,6 +107,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
 
   const { data, error } = await getSupabase().functions.invoke('app-api', {
     body: { action, ...payload },
+    timeout: EDGE_API_TIMEOUT_MS,
   });
   if (error) {
     console.error('Edge Function Error:', error);
@@ -116,7 +118,8 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
         if (errData?.message) msg = errData.message;
       } catch { /* ignore */ }
     }
-    throw new Error(`Edge Function 失敗: ${msg}`);
+    if (/abort|timeout|timed out|failed to send/i.test(msg)) msg = '系統服務回應逾時，請稍後再試';
+    throw new Error(`系統服務失敗：${msg}`);
   }
   if (!data?.ok) {
     reportIfInfrastructureError(data?.message, { action, via: 'edge-function' });
