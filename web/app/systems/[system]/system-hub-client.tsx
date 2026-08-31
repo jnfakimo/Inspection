@@ -6,6 +6,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import { zhModuleCode, zhSystemCode, zhValue } from '@/lib/zh-tw';
+import { useFleetRole } from '@/lib/fleet-role';
 import type { Profile } from '@/types/app';
 import { HandoverModules } from './[module]/handover-workspace';
 import { invokeAppApi } from '@/lib/supabase';
@@ -40,24 +41,37 @@ function WorkorderHub({ profile }: { profile: Profile }) {
   </AppShell>;
 }
 
+/**
+ * SYS-07 公務車派車的系統入口。
+ *
+ * 圖卡的顯示條件與模組內實際能做的事一致（判斷共用 `@/lib/fleet-role`）：
+ * 一般使用人只需要「派車申請」與「派車紀錄」，其餘三張是維護用的，
+ * 顯示給沒有權限的人只會讓他們點進去發現什麼都不能做。
+ *   公務車輛      canManageFleet（系統管理員或派車管理員）
+ *   駕駛人員      isAdmin（RosterModule 只允許系統管理員調整名單）
+ *   派車管理員    isAdmin（同上）
+ */
+function VehicleHub({ system, profile }: { system: SystemDefinition; profile: Profile }) {
+  const { isAdmin, canManageFleet } = useFleetRole(profile);
+  const vehicleCards = [
+    ['requests', '派車申請', '提出用車申請並追蹤多階段核可流程。', 'vehicle-request-icon-ai.png', 'MODULE 01', '進入系統　→', true],
+    ['vehicles', '公務車輛', '管理車號、狀態與目前里程資料。', 'vehicle-car-icon-ai.png', 'MODULE 02', '管理車輛　→', canManageFleet],
+    ['drivers', '駕駛人員', '維護可指派駕駛與啟用狀態。', 'vehicle-driver-icon-ai.png', 'MODULE 03', '管理駕駛　→', isAdmin],
+    ['managers', '派車管理員', '設定派車管理與授權人員。', 'vehicle-manager-icon-ai.png', 'MODULE 04', '管理權限　→', isAdmin],
+    ['logs', '派車紀錄', '查詢狀態變更與行車歷程。', 'vehicle-log-icon-ai.png', 'MODULE 05', '查看紀錄　→', true],
+  ] as const;
+  return <AppShell profile={profile} title={system.title}
+    heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
+    <div className="operations-portal-note">公務車派車流程 · 點選圖卡進入功能系統</div>
+    <section className="operations-portal-grid vehicle">{vehicleCards.filter(([, , , , , , visible]) => visible).map(([key, title, description, icon, code, action]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
+  </AppShell>;
+}
+
 function OperationsHub({ system, profile }: { system: SystemDefinition; profile: Profile }) {
   // 交接簿的系統入口直接顯示交接紀錄模組（system.modules[0] 即 records）。
   if (system.key === 'handover') return <HandoverModules system={system} module={system.modules[0]} profile={profile} />;
   const handover = system.key === 'handover';
-  if (system.key === 'vehicle') {
-    const vehicleCards = [
-      ['requests', '派車申請', '提出用車申請並追蹤多階段核可流程。', 'vehicle-request-icon-ai.png', 'MODULE 01', '進入系統　→'],
-      ['vehicles', '公務車輛', '管理車號、狀態與目前里程資料。', 'vehicle-car-icon-ai.png', 'MODULE 02', '管理車輛　→'],
-      ['drivers', '駕駛人員', '維護可指派駕駛與啟用狀態。', 'vehicle-driver-icon-ai.png', 'MODULE 03', '管理駕駛　→'],
-      ['managers', '派車管理員', '設定派車管理與授權人員。', 'vehicle-manager-icon-ai.png', 'MODULE 04', '管理權限　→'],
-      ['logs', '派車紀錄', '查詢狀態變更與行車歷程。', 'vehicle-log-icon-ai.png', 'MODULE 05', '查看紀錄　→'],
-    ] as const;
-    return <AppShell profile={profile} title={system.title}
-      heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
-      <div className="operations-portal-note">公務車派車流程 · 點選圖卡進入功能系統</div>
-      <section className="operations-portal-grid vehicle">{vehicleCards.map(([key, title, description, icon, code, action], index) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
-    </AppShell>;
-  }
+  if (system.key === 'vehicle') return <VehicleHub system={system} profile={profile} />;
   if (system.key === 'meetingroom') {
     const meetingCards = [
       ['bookings', '會議室預約', '建立、查詢與管理會議室預約。', 'meeting-booking-icon-v1.png', 'MODULE 01', '進入系統　→'],

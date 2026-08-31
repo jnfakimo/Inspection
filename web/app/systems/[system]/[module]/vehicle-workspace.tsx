@@ -19,6 +19,7 @@ import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, 
 import { TimeSelect } from '@/components/TimeSelect';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { escHtml } from '@/lib/html-escape';
+import { useFleetRole } from '@/lib/fleet-role';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -193,28 +194,35 @@ function blocksVehicleDispatch(row: Row, today: string, nowTime: string) {
   return false;
 }
 
+/**
+ * 三個維護用模組不開放給一般使用人。系統入口已不顯示這三張圖卡，
+ * 但直接輸入網址仍會進來，所以這裡用同一份判斷（`@/lib/fleet-role`）再擋一次。
+ * 這是介面層的防線，資料層仍以 Supabase RLS 為準。
+ */
+function VehicleModuleGate({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
+  const { isAdmin, canManageFleet } = useFleetRole(profile);
+  const allowed = module.key === 'vehicles' ? canManageFleet : isAdmin;
+  if (!allowed) {
+    return <AppShell profile={profile} title={module.title}>
+      <div className="notice danger">目前角色沒有此子系統權限，請由管理員開放。</div>
+    </AppShell>;
+  }
+  return module.key === 'vehicles'
+    ? <VehiclesModule system={system} module={module} profile={profile} />
+    : <RosterModule system={system} module={module} profile={profile} />;
+}
+
 export function VehicleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   return <AuthGate>{profile => {
     if (module.key === 'requests') return <RequestsModule system={system} module={module} profile={profile} />;
-    if (module.key === 'vehicles') return <VehiclesModule system={system} module={module} profile={profile} />;
-    if (module.key === 'drivers' || module.key === 'managers') return <RosterModule system={system} module={module} profile={profile} />;
+    if (module.key === 'vehicles' || module.key === 'drivers' || module.key === 'managers') {
+      return <VehicleModuleGate system={system} module={module} profile={profile} />;
+    }
     return <LogsModule system={system} module={module} profile={profile} />;
   }}</AuthGate>;
 }
 
-function useFleetRole(profile: Profile) {
-  const [isManager, setIsManager] = useState(false);
-  const role = String(profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[profile.role] || profile.role || '');
-  const isAdmin = role === 'sysadmin' || role === 'admin';
-  const isUnitSupervisor = role === 'unit_supervisor';
-  useEffect(() => {
-    let active = true;
-    getSupabase().from('vehicle_dispatch_managers').select('user_id,active').eq('user_id', profile.user_id).eq('active', true).maybeSingle()
-      .then(({ data }) => { if (active) setIsManager(Boolean(data)); });
-    return () => { active = false; };
-  }, [profile.user_id]);
-  return { isAdmin, isUnitSupervisor, isManager, canManageFleet: isAdmin || isManager };
-}
+// useFleetRole 已移到 @/lib/fleet-role，與系統入口圖卡的顯示條件共用同一份判斷。
 
 /* ──────────────────────────── 派車申請 (100% V1 視覺對齊) ──────────────────────────── */
 
