@@ -12,6 +12,7 @@ export const systems:SystemDefinition[]=[
  {key:'meetingroom',code:'SYS-08',title:'會議室預約系統',description:'會議室、預約、變更申請與提醒。',icon:'/Inspection/assets/system-icons/meeting-room-icon-v3.png',tone:'green',modules:[m('bookings','會議預約','預約、報到與使用狀態。','meetingroom.html'),m('changes','變更申請','改期與取消申請。','meetingroom.html#changes'),m('notifications','預約提醒','到期提醒與通知結果。','meetingroom.html#notifications'),m('rooms','會議室主檔','會議室容量、位置與啟用狀態。','meetingroom.html#rooms')]},
  {key:'officialdocs',code:'SYS-09',title:'公文傳送系統',description:'公文送出、依序會辦、陳核、核決與原申請人收訖紀錄。',icon:'/Inspection/assets/system-icons/handover-icon.png',tone:'cyan',modules:[m('routing','公文傳送','以部／室為單位傳送、收文、簽收與核決。','official-document-routing')]},
  {key:'marketanalytics',code:'SYS-10',title:'市場營運分析系統',description:'交易行情彙整、同期比較、可配置指標與戰情摘要。',icon:'/Inspection/assets/system-icons/market-analytics-icon.svg',tone:'green',modules:[m('command-center','市場戰情儀表板','以日、週、月、季、年切換行情，支援圖表切換與逐層下鑽。'),m('overview','行情分析工作台','以品項、市場與日期區間自由切換，分析交易量與價格。'),m('sources','資料介接中心','管理資料來源、欄位定義並匯入 CSV／JSON／XLSX 行情資料。'),m('templates','分析模板','保存常用維度、指標、比較期間與圖表設定。')]},
+ {key:'dashboard',code:'SYS-11',title:'戰情儀表板',description:'設備、巡檢、異常與報修的即時彙總，版面由後台的戰情版面設定。',icon:'/Inspection/assets/system-icons/command-dashboard-icon.svg',tone:'violet',modules:[]},
 ];
 export function findSystem(key:string){return systems.find(system=>system.key===key)}
 export function findModule(systemKey:string,moduleKey:string){return findSystem(systemKey)?.modules.find(module=>module.key===moduleKey)}

@@ -162,7 +162,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   do not create a second, page-specific user/status/clock format. The component must
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
-- **Shared header actions**: V2 一般內容頁（共 10 大系統的 53 個子系統）頂列只保留三個
+- **Shared header actions**: V2 一般內容頁（共 11 大系統的 53 個子系統）頂列只保留三個
   帳號／入口動作：首頁、個人資料、登出；移除戰情儀表板、維修／派完工、駐衛警巡檢、
   電子交接簿與後台等跨系統按鈕，系統切換改由入口頁、系統頁與後台側欄承擔。
   首頁使用 `assets/system-icons/home-nav-icon.png`，個人資料使用
@@ -202,7 +202,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 
 ## V2 系統子頁標題規範（2026-08-27 訂）
 
-- 10 大系統、53 個子系統的一般內容頁一律由 `AppShell` 自動插入
+- 11 大系統、53 個子系統的一般內容頁一律由 `AppShell` 自動插入
   `components/SystemPageHeader.tsx`，不得在工作區再手寫另一個系統級 `<h1>`。
 - 標題頂端距共用頂列底部固定 **22px**；桌面版由 `.content.v1-content` 的 20px
   上內距加標題元件 2px 上內距構成，手機版則為 14px + 8px。不要用負 margin 或頁面

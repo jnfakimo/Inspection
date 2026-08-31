@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
-assert.equal(systems.length, 10, '系統標題稽核必須涵蓋 10 大系統');
+assert.equal(systems.length, 11, '系統標題稽核必須涵蓋 11 大系統');
 assert.equal(moduleCount, 54, '系統標題稽核必須涵蓋 54 個子系統');
 
 for (const system of systems) {
