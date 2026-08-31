@@ -4,6 +4,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 COPY backend/node-api ./backend/node-api
 COPY supabase/functions/app-api ./supabase/functions/app-api
+COPY supabase/functions/admin-api ./supabase/functions/admin-api
+COPY supabase/functions/_shared ./supabase/functions/_shared
 RUN npm run build:api && npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
@@ -16,4 +18,3 @@ COPY --from=build --chown=nodeapi:nodeapi /app/backend/node-api/dist ./backend/n
 USER nodeapi
 EXPOSE 8787
 CMD ["node", "backend/node-api/dist/server.mjs"]
-

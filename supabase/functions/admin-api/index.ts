@@ -23,6 +23,9 @@ const SUPABASE_URL = requiredEnvironment('SUPABASE_URL');
 const SERVICE_ROLE_KEY = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
 const ANON_KEY = requiredEnvironment('SUPABASE_ANON_KEY');
 const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_supervisor', 'sysadmin']);
+// Node.js 與 Edge Function 共用同一支處理器；前端會先檢查此版本，
+// 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
+const ADMIN_CONTRACT_VERSION = 2;
 const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'marketanalytics_manage']);
 const SAFE_SETTING_KEYS = new Set([
   'org_name', 'site_name', 'shifts', 'line_group_id', 'line_notify_anomaly', 'line_notify_repair',
@@ -139,7 +142,7 @@ export async function handleAdminApiRequest(req: Request) {
     const roleId = profile.rbac_role || (profile.role === 'admin' ? 'sysadmin' : profile.role);
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = clean(body.action, 50);
-    if (action !== 'admin_get_settings') {
+    if (!['admin_get_settings', 'admin_get_contract'].includes(action)) {
       const writeRate = await enforceDurableRateLimit(admin, req, {
         subject: authData.user.id,
         scope: 'admin-api:write',
@@ -230,6 +233,10 @@ export async function handleAdminApiRequest(req: Request) {
       }
       return { supervisorId, message: '' };
     };
+
+    if (action === 'admin_get_contract') {
+      return reply(req, { ok: true, data: { contract_version: ADMIN_CONTRACT_VERSION } });
+    }
 
     if (action === 'admin_get_settings') {
       const keys = [...SAFE_SETTING_KEYS, 'line_channel_token'];
@@ -560,7 +567,7 @@ export async function handleAdminApiRequest(req: Request) {
       if (createError || !created.user) return reply(req, { ok: false, message: `Auth 帳號建立失敗：${createError?.message || '未知錯誤'}` }, 400);
       const profileData = { auth_id: created.user.id, name, username, email, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, permissions: {}, status: 'active', created_by: profile.user_id };
       const { data, error } = await admin.from('users').insert(profileData).select('user_id').single();
-      if (error) { await admin.auth.admin.deleteUser(created.user.id); return reply(req, { ok: false, message: `人員主檔建立失敗：${error.message}` }, 400); }
+      if (error) { await admin.auth.admin.deleteUser(created.user.id); return reply(req, { ok: false, message: `人員主檔建立失敗：${dbMessage(error, '資料格式不符合規則')}` }, 400); }
       await audit('users', data.user_id, 'insert', { name, username, email, dept_id: deptId, rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, status: 'active' });
       return reply(req, { ok: true, data });
     }
