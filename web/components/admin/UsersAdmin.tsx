@@ -26,6 +26,11 @@ function importKey(value: unknown) {
   return importText(value).replace(/[／]/g, '/').replace(/\s+/g, '').toLowerCase();
 }
 
+function accountKey(value: unknown) {
+  const text = importText(value).toLowerCase();
+  return /^\d+$/.test(text) ? text.replace(/^0+(?=\d)/, '') : text;
+}
+
 function temporaryPassword() {
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     return Array.from(crypto.getRandomValues(new Uint8Array(PASSWORD_POLICY.minLength)), value => String(value % 10)).join('');
@@ -239,26 +244,37 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       if (!sheet) throw new Error('找不到工作表');
       const matrix: string[][] = [];
       sheet.eachRow({ includeEmpty: true }, row => { const values = Array.isArray(row.values) ? row.values.slice(1) : []; matrix.push(values.map(importText)); });
-      const headerIndex = matrix.findIndex(row => { const labels = row.map(importKey); return labels.includes('姓名') && (labels.includes('登入帳號') || labels.includes('帳號')) && (labels.includes('電子郵件') || labels.includes('email')); });
+      const headerIndex = matrix.findIndex((row, rowIndex) => {
+        const labels = row.map(importKey);
+        const emailHeader = labels.includes('電子郵件') || labels.includes('email');
+        const inferredEmail = row.some((label, column) => !label && matrix.slice(rowIndex + 1).some(data => /^[^@\s]+@[^@\s]+$/.test(importText(data[column]))));
+        return labels.includes('姓名') && (labels.includes('登入帳號') || labels.includes('帳號')) && (emailHeader || inferredEmail);
+      });
       if (headerIndex < 0) throw new Error('格式錯誤：找不到姓名、登入帳號與電子郵件欄位');
       const headers = matrix[headerIndex].map(importKey);
       const findHeader = (...names: string[]) => names.map(importKey).map(name => headers.indexOf(name)).find(index => index >= 0) ?? -1;
-      const nameIndex = findHeader('姓名'); const usernameIndex = findHeader('登入帳號', '帳號'); const emailIndex = findHeader('電子郵件', 'Email');
+      const nameIndex = findHeader('姓名'); const usernameIndex = findHeader('登入帳號', '帳號');
+      let emailIndex = findHeader('電子郵件', 'Email');
+      if (emailIndex < 0) emailIndex = matrix[headerIndex].findIndex((label, column) => !importKey(label) && matrix.slice(headerIndex + 1).some(row => /^[^@\s]+@[^@\s]+$/.test(importText(row[column]))));
       const phoneIndex = findHeader('聯絡電話', '電話'); const rootIndex = findHeader('部／室', '部/室', '第一層部門'); const childIndex = findHeader('課／組／隊', '課/組/隊', '第二層部門');
       const roleIndex = findHeader('系統角色', '角色'); const supervisorIndex = findHeader('直屬主管帳號', '主管帳號', '直屬主管'); const passwordIndex = findHeader('初始密碼', '密碼');
       const roleMap = new Map<string, string>();
       roles.forEach(role => { roleMap.set(importKey(role.role_id), String(role.role_id)); roleMap.set(importKey(role.name), String(role.role_id)); });
       Object.entries(IMPORT_ROLE_ALIASES).forEach(([label, id]) => roleMap.set(importKey(label), id));
-      const existingUsernames = new Set(users.map(user => String(user.username || '').toLowerCase()));
+      const existingUsernames = new Set(users.map(user => accountKey(user.username)));
       const existingEmails = new Set(users.map(user => String(user.email || '').toLowerCase()));
       let success = 0; let skipped = 0; let failed = 0;
       const generated: TemporaryPassword[] = [];
       for (let index = headerIndex + 1; index < matrix.length; index += 1) {
         const row = matrix[index]; if (!row.some(Boolean)) continue;
         const rowNumber = index + 1; const value = (column: number) => column >= 0 ? importText(row[column]) : '';
-        const name = value(nameIndex); const username = value(usernameIndex); const email = value(emailIndex).toLowerCase();
+        const name = value(nameIndex); const email = value(emailIndex).toLowerCase();
+        const emailAccount = email.split('@')[0] || '';
+        const rawUsername = value(usernameIndex);
+        // 舊檔案若把帳號欄當成數字，Excel 會吃掉前導 0；Email 通常仍保留完整帳號，優先用它還原。
+        const username = /^\d+$/.test(rawUsername) && /^\d+$/.test(emailAccount) && emailAccount.length > rawUsername.length ? emailAccount : rawUsername;
         if (!name || !username || !email) { details.push(`第 ${rowNumber} 列：缺少姓名、登入帳號或電子郵件，已跳過`); failed += 1; continue; }
-        if (existingUsernames.has(username.toLowerCase()) || existingEmails.has(email)) { details.push(`第 ${rowNumber} 列「${username}」：帳號或電子郵件已存在，已跳過`); skipped += 1; continue; }
+        if (existingUsernames.has(accountKey(username)) || existingEmails.has(email)) { details.push(`第 ${rowNumber} 列「${username}」：帳號或電子郵件已存在，已跳過`); skipped += 1; continue; }
         const rootRaw = value(rootIndex); const childRaw = value(childIndex); const root = rootDepartments.find(dept => importKey(dept.name) === importKey(rootRaw));
         if (rootRaw && !root) { details.push(`第 ${rowNumber} 列「${username}」：找不到部／室「${rootRaw}」`); failed += 1; continue; }
         if (childRaw && !root) { details.push(`第 ${rowNumber} 列「${username}」：請先填寫部／室再指定課／組／隊`); failed += 1; continue; }
@@ -268,14 +284,16 @@ export function UsersAdmin({ profile, module }: AdminProps) {
         const roleRaw = value(roleIndex); const selectedRole = roleMap.get(importKey(roleRaw || '一般報修人員'));
         if (!selectedRole || !roles.some(role => String(role.role_id) === selectedRole)) { details.push(`第 ${rowNumber} 列「${username}」：系統角色「${roleRaw}」無法辨識或已停用`); failed += 1; continue; }
         const supervisorRaw = value(supervisorIndex);
-        const supervisor = supervisorRaw ? supervisors.find(user => String(user.username || '').toLowerCase() === supervisorRaw.toLowerCase() || importKey(user.name) === importKey(supervisorRaw)) : undefined;
+        const supervisor = supervisorRaw ? supervisors.find(user => accountKey(user.username) === accountKey(supervisorRaw) || importKey(user.name) === importKey(supervisorRaw)) : undefined;
         if (!['unit_supervisor', 'sysadmin'].includes(selectedRole) && (!supervisor || !supervisorMatchesDepartment(supervisor.dept_id, deptId))) { details.push(`第 ${rowNumber} 列「${username}」：請填寫所屬單位可管理的直屬主管帳號`); failed += 1; continue; }
-        const password = value(passwordIndex) || temporaryPassword(); const passwordError = passwordPolicyMessage(password);
+        const passwordCell = value(passwordIndex);
+        const generatedPassword = !passwordCell || passwordCell === '000000000';
+        const password = generatedPassword ? temporaryPassword() : passwordCell; const passwordError = passwordPolicyMessage(password);
         if (passwordError) { details.push(`第 ${rowNumber} 列「${username}」：${passwordError}`); failed += 1; continue; }
         try {
           await invokeAdminApi('admin_create_user', { action: 'admin_create_user', name, username, email, phone: value(phoneIndex), dept_id: deptId, rbac_role: selectedRole, supervisor_id: supervisor?.user_id || null, password });
-          existingUsernames.add(username.toLowerCase()); existingEmails.add(email); success += 1;
-          if (!value(passwordIndex)) generated.push({ name, username, password });
+          existingUsernames.add(accountKey(username)); existingEmails.add(email); success += 1;
+          if (generatedPassword) generated.push({ name, username, password });
         } catch (error) { details.push(`第 ${rowNumber} 列「${username}」：${errorMessage(error)}`); failed += 1; }
       }
       if (success > 0) await load();
