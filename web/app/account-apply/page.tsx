@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase';
 
 type Department = {
@@ -21,8 +21,19 @@ function friendlyError(error: unknown) {
 
 export default function AccountApplyPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [rootDepartmentId, setRootDepartmentId] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
   const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [done, setDone] = useState(false);
+
+  const rootDepartments = useMemo(() => {
+    const ids = new Set(departments.map(department => department.dept_id));
+    return departments.filter(department => !department.parent_id || !ids.has(department.parent_id));
+  }, [departments]);
+  const childDepartments = useMemo(
+    () => departments.filter(department => department.parent_id === rootDepartmentId),
+    [departments, rootDepartmentId],
+  );
 
   async function loadCaptcha() {
     setCaptcha(null);
@@ -47,6 +58,14 @@ export default function AccountApplyPage() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setMessage('');
     const form = new FormData(event.currentTarget);
+    const belongsToRoot = departmentId === rootDepartmentId
+      || childDepartments.some(department => department.dept_id === departmentId);
+    if (!rootDepartmentId) {
+      setMessage('請選擇所屬部／室'); setBusy(false); return;
+    }
+    if (!departmentId || !belongsToRoot) {
+      setMessage('請重新選擇所屬課／組／隊'); setBusy(false); return;
+    }
     try {
       const { data, error } = await getSupabase().functions.invoke('username-login', { body: {
         action: 'account_application',
@@ -54,7 +73,7 @@ export default function AccountApplyPage() {
         username: String(form.get('username') || '').trim(),
         email: String(form.get('email') || '').trim(),
         phone: String(form.get('phone') || '').trim(),
-        dept_id: String(form.get('dept_id') || ''),
+        dept_id: departmentId,
         reason: String(form.get('reason') || '').trim(),
         captcha_id: captcha?.id,
         captcha_answer: String(form.get('captcha') || '').trim(),
@@ -82,9 +101,23 @@ export default function AccountApplyPage() {
           <label>登入帳號（必填）<input name="username" required minLength={3} maxLength={64} pattern="[A-Za-z0-9._-]+" autoComplete="username" placeholder="限英數字、句點、底線或連字號" /></label>
           <label>電子郵件（必填）<input name="email" type="email" required maxLength={200} autoComplete="email" /></label>
           <label>聯絡電話<input name="phone" maxLength={50} autoComplete="tel" /></label>
-          <label className="wide">所屬單位（必填）<select name="dept_id" required defaultValue="">
-            <option value="" disabled>-- 請選擇所屬課室 --</option>
-            {departments.map(department => <option key={department.dept_id} value={department.dept_id}>{department.name}</option>)}
+          <label>部／室（必填）<select required value={rootDepartmentId} onChange={event => {
+            const nextRootId = event.target.value;
+            setRootDepartmentId(nextRootId);
+            setDepartmentId(nextRootId);
+            setMessage('');
+          }}>
+            <option value="" disabled>-- 請選擇部／室 --</option>
+            {rootDepartments.map(department => <option key={department.dept_id} value={department.dept_id}>{department.name}</option>)}
+          </select></label>
+          <label>課／組／隊<select name="dept_id" required disabled={!rootDepartmentId} value={departmentId} onChange={event => {
+            setDepartmentId(event.target.value);
+            setMessage('');
+          }}>
+            {!rootDepartmentId
+              ? <option value="">-- 請先選擇部／室 --</option>
+              : <option value={rootDepartmentId}>整個部／室（未指定課／組／隊）</option>}
+            {childDepartments.map(department => <option key={department.dept_id} value={department.dept_id}>{department.name}</option>)}
           </select></label>
           <label className="wide">申請說明<textarea name="reason" rows={3} maxLength={1000} placeholder="請簡述工作職掌或需要使用的系統" /></label>
           <label className="wide">安全驗證碼（六位數字）
