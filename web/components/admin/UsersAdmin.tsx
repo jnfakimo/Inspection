@@ -329,7 +329,10 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       }
       if (pendingRows.length > 0) {
         try {
-          const result = await invokeAdminApi<BatchCreateResult>('admin_create_users_batch', { action: 'admin_create_users_batch', rows: pendingRows });
+          const response = await invokeAdminApi<BatchCreateResult & { data?: BatchCreateResult }>('admin_create_users_batch', { action: 'admin_create_users_batch', rows: pendingRows });
+          // Edge Function 與 Node API 都會回傳 { ok, data, message }；統一取出 data，
+          // 避免批次結果在不同部署路徑下被當成 0 筆。
+          const result = response?.data && typeof response.data === 'object' ? response.data : response;
           success += Number(result?.success || 0); skipped += Number(result?.skipped || 0); failed += Number(result?.failed || 0);
           if (Array.isArray(result?.details)) details.push(...result.details);
           const created = new Set((result?.created_usernames || []).map(accountKey));
