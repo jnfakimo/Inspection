@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
-import { AdminHeader, AdminModal, type AdminAction, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, ROLE_LABELS, type Row, StatusPill, userRole } from './shared';
+import { AdminHeader, AdminModal, type AdminAction, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, roleLabel, type Row, StatusPill, userRole } from './shared';
 
 const ACCOUNT_EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const IMPORT_ROLE_ALIASES: Record<string, string> = {
@@ -146,8 +146,8 @@ export function UsersAdmin({ profile, module }: AdminProps) {
   const pendingApplications = useMemo(() => applications.filter(application => application.status === 'pending'), [applications]);
   const filtered = useMemo(() => users.filter(user => {
     const q = query.trim().toLowerCase();
-    return (!status || user.status === status) && (!q || [user.name, user.username, user.email, user.phone, user.department, deptName(user.dept_id), ROLE_LABELS[userRole(user)], supervisorName(user.supervisor_id)].some(value => String(value || '').toLowerCase().includes(q)));
-  }), [users, query, status, deptName, supervisorName]);
+    return (!status || user.status === status) && (!q || [user.name, user.username, user.email, user.phone, user.department, deptName(user.dept_id), roleLabel(userRole(user), roles), supervisorName(user.supervisor_id)].some(value => String(value || '').toLowerCase().includes(q)));
+  }), [users, roles, query, status, deptName, supervisorName]);
   useEffect(() => setPage(1), [query, status]);
   const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const userPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -213,7 +213,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       sorted.forEach((user, index) => {
         const [root, child] = departmentParts(user.dept_id);
         sheet.addRow({ seq: index + 1, name: user.name || '', username: user.username || '', email: user.email || '', phone: user.phone || '', root, child,
-          role: ROLE_LABELS[userRole(user)] || userRole(user), supervisor: ['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id),
+          role: roleLabel(userRole(user), roles), supervisor: ['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id),
           status: user.status === 'active' ? '啟用' : '停用', createdAt: fmtTime(user.created_at) });
       });
       sheet.views = [{ state: 'frozen', ySplit: 1 }];
@@ -229,7 +229,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       summary.addRows([
         ['臺北農產公司｜帳號統計摘要'], ['產製時間', fmtTime(new Date())], [], ['帳號總數', sorted.length, '啟用帳號', activeCount, '停用帳號', sorted.length - activeCount],
         [], ['角色分布', '人數'],
-        ...Object.entries(sorted.reduce<Record<string, number>>((counts, user) => { const label = ROLE_LABELS[userRole(user)] || userRole(user); counts[label] = (counts[label] || 0) + 1; return counts; }, {})).sort((a, b) => b[1] - a[1]).map(([label, count]) => [label, count]),
+        ...Object.entries(sorted.reduce<Record<string, number>>((counts, user) => { const label = roleLabel(userRole(user), roles); counts[label] = (counts[label] || 0) + 1; return counts; }, {})).sort((a, b) => b[1] - a[1]).map(([label, count]) => [label, count]),
       ]);
       summary.mergeCells('A1:F1'); summary.getCell('A1').font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } }; summary.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF17365D' } };
       summary.getRow(6).font = { bold: true, color: { argb: 'FFFFFFFF' } }; summary.getRow(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B6B8A' } }; summary.columns = [{ width: 24 }, { width: 14 }, { width: 16 }, { width: 14 }, { width: 16 }, { width: 14 }];
@@ -249,7 +249,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       const child = root ? activeDepartments.find(dept => String(dept.parent_id || '') === String(root.dept_id)) : undefined;
       const supervisor = supervisors[0];
       sheet.addRow(['姓名', '登入帳號', '電子郵件', '聯絡電話', '部／室', '課／組／隊', '系統角色', '直屬主管帳號', '初始密碼']);
-      sheet.addRow(['請修改範例', 'example_user', 'example@example.com', '', root?.name || '', child?.name || '', '一般報修人員', supervisor?.username || '', '']);
+      sheet.addRow(['請修改範例', 'example_user', 'example@example.com', '', root?.name || '', child?.name || '', roleLabel('reporter', roles), supervisor?.username || '', '']);
       sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }; sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B6B8A' } }; sheet.getRow(1).alignment = { horizontal: 'center' };
       sheet.addRow([]); sheet.addRow(['說明：姓名、登入帳號、電子郵件為必填；初始密碼留白時由系統產生 8 位數字臨時密碼。匯入帳號不會匯出密碼。']);
       sheet.mergeCells('A4:I4'); sheet.getRow(4).font = { color: { argb: 'FF64748B' }, italic: true }; sheet.getRow(4).alignment = { wrapText: true };
@@ -377,7 +377,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       </tr>)}</tbody></table></div>
     </section>}
     <section className="panel admin-panel"><div className="admin-toolbar"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋姓名、帳號、電子郵件、單位或角色"/><select value={status} onChange={event => setStatus(event.target.value)}><option value="">全部狀態</option><option value="active">啟用</option><option value="inactive">停用</option></select><span>啟用 {users.filter(user => user.status === 'active').length}／停用 {users.filter(user => user.status === 'inactive').length}</span></div>
-      <div className="responsive-table"><table><thead><tr><th>姓名</th><th>登入帳號</th><th>單位</th><th>角色</th><th>直屬主管</th><th>狀態</th><th>建立時間</th><th>操作</th></tr></thead><tbody>{rows.map(user => <tr key={user.user_id}><td><strong>{user.name}</strong><small>{user.email || '—'}</small></td><td>{user.username || '—'}</td><td>{deptName(user.dept_id) !== '—' ? deptName(user.dept_id) : user.department || '—'}</td><td>{ROLE_LABELS[userRole(user)] || userRole(user)}</td><td>{['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id)}</td><td><StatusPill value={user.status}/></td><td>{fmtTime(user.created_at)}</td><td><div className="admin-row-actions"><button onClick={() => openEditor({ ...user, rbac_role: userRole(user) })}>編輯</button><button onClick={() => setPasswordUser(user)}>重設密碼</button>{user.user_id !== profile.user_id && <button className={user.status === 'active' ? 'warn' : ''} onClick={() => window.confirm(`確定${user.status === 'active' ? '停用' : '啟用'}「${user.name}」？`) && void run({ action: 'admin_toggle_user', user_id: user.user_id, status: user.status === 'active' ? 'inactive' : 'active' }, user.status === 'active' ? '帳號已停用' : '帳號已啟用')}>{user.status === 'active' ? '停用' : '啟用'}</button>}{user.status === 'inactive' && !String(user.username || '').startsWith('deidentified-') && <button className="danger" onClick={() => window.confirm(`確定將「${user.name}」個資去識別化？此操作無法復原。`) && void run({ action: 'admin_deidentify_user', user_id: user.user_id }, '個資已去識別化')}>去識別化</button>}</div></td></tr>)}</tbody></table></div>
+      <div className="responsive-table"><table><thead><tr><th>姓名</th><th>登入帳號</th><th>單位</th><th>角色</th><th>直屬主管</th><th>狀態</th><th>建立時間</th><th>操作</th></tr></thead><tbody>{rows.map(user => <tr key={user.user_id}><td><strong>{user.name}</strong><small>{user.email || '—'}</small></td><td>{user.username || '—'}</td><td>{deptName(user.dept_id) !== '—' ? deptName(user.dept_id) : user.department || '—'}</td><td>{roleLabel(userRole(user), roles)}</td><td>{['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id)}</td><td><StatusPill value={user.status}/></td><td>{fmtTime(user.created_at)}</td><td><div className="admin-row-actions"><button onClick={() => openEditor({ ...user, rbac_role: userRole(user) })}>編輯</button><button onClick={() => setPasswordUser(user)}>重設密碼</button>{user.user_id !== profile.user_id && <button className={user.status === 'active' ? 'warn' : ''} onClick={() => window.confirm(`確定${user.status === 'active' ? '停用' : '啟用'}「${user.name}」？`) && void run({ action: 'admin_toggle_user', user_id: user.user_id, status: user.status === 'active' ? 'inactive' : 'active' }, user.status === 'active' ? '帳號已停用' : '帳號已啟用')}>{user.status === 'active' ? '停用' : '啟用'}</button>}{user.status === 'inactive' && !String(user.username || '').startsWith('deidentified-') && <button className="danger" onClick={() => window.confirm(`確定將「${user.name}」個資去識別化？此操作無法復原。`) && void run({ action: 'admin_deidentify_user', user_id: user.user_id }, '個資已去識別化')}>去識別化</button>}</div></td></tr>)}</tbody></table></div>
       {!busy && rows.length === 0 && <p className="empty">查無符合條件的人員</p>}<Pager page={page} total={filtered.length} onPage={setPage}/>
     </section>
     {editor && (() => {

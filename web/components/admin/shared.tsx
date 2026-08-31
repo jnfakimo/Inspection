@@ -9,9 +9,15 @@ export type AdminProps = { profile: Profile; module: ModuleDefinition };
 export type AdminAction = { action: string; [key: string]: unknown };
 export const PAGE_SIZE = 10;
 export const ROLE_LABELS: Record<string, string> = {
-  reporter: '一般報修人員', duty: '值班人員', dispatcher: '派工管理員', technician: '維修技術人員',
+  // 角色名稱以 roles.name 為準；這裡只作為資料載入失敗或舊資料的備援。
+  reporter: '一般使用者', duty: '值班人員', dispatcher: '派工管理員', technician: '維修技術人員',
   unit_supervisor: '單位主管', mgmt_supervisor: '管理部主管（已停用）', sysadmin: '系統管理員',
 };
+export function roleLabel(value: unknown, roles?: ReadonlyArray<Row>) {
+  const roleId = String(value || '');
+  const configuredName = roles?.find(role => String(role.role_id) === roleId)?.name;
+  return String(configuredName || ROLE_LABELS[roleId] || roleId || '—');
+}
 export const PERMISSIONS = [
   ['create', '新增'], ['update', '修改'], ['delete', '刪除'], ['read', '查詢'], ['dispatch', '派工'],
   ['close', '結案'], ['sign', '簽核'], ['export', '匯出'], ['admin', '後台管理'], ['marketanalytics_manage', '市場分析資料管理'],
