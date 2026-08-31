@@ -28,10 +28,14 @@ assert.match(
 for (const action of ['market_catalog', 'market_dimension_catalog', 'market_analysis']) {
   assert.match(
     dashboard,
-    new RegExp(`invokeAppApi(?:<[^;]+?>)?\\s*\\(\\s*['"]${action}['"]`),
+    new RegExp(`invoke(?:Cached)?AppApi(?:<[^;]+?>)?\\s*\\(\\s*['"]${action}['"]`),
     `互動儀表板必須透過 ${action} 讀取正式行情資料`,
   );
 }
+
+assert.match(dashboard, /invokeCachedAppApi/, '互動儀表板必須共用市場行情短效快取');
+assert.match(dashboard, /requestSerial\.current\s*\+=\s*1/, '切換分析條件時必須立即使舊請求失效');
+assert.match(dashboard, /loadAnalysis\(\s*true\s*\)/, '使用者按更新分析時必須強制重新取得行情');
 
 for (const period of ['日', '週', '月', '季', '年']) {
   assert.match(dashboard, new RegExp(`['"]${period}['"]`), `互動儀表板缺少「${period}」期間切換`);

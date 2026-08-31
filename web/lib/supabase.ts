@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { reportIfInfrastructureError } from './error-tracker';
 import { emitSecurityDataRead } from './security-audit-sink';
+import { cachedRequest, clearRequestCache, requestCacheKey } from './request-cache';
 
 let client: SupabaseClient | null = null;
 const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
@@ -29,10 +30,26 @@ const READ_ACTION_LABELS: Record<string, string> = {
 // 公文流程的寫入動作固定走 Edge Function，避免舊版 Node API 尚未包含
 // 自動取號／不可刪除時間軸時，前端先收到不支援或欄位錯誤。
 const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action', 'market_source_save', 'market_template_save', 'market_import_rows']);
+const CACHEABLE_MARKET_ACTIONS = new Set([
+  'market_catalog',
+  'market_dimension_catalog',
+  'market_analysis',
+  'dashboard_market_rotation',
+]);
+const MARKET_CACHE_INVALIDATING_ACTIONS = new Set([
+  'market_source_save',
+  'market_template_save',
+  'market_import_rows',
+]);
 
 const recordAppRead = (action: string) => {
   const label = READ_ACTION_LABELS[action];
   if (label) emitSecurityDataRead(label);
+};
+
+const recordAppSuccess = (action: string) => {
+  if (MARKET_CACHE_INVALIDATING_ACTIONS.has(action)) clearRequestCache();
+  recordAppRead(action);
 };
 
 const isTransientNodeResponse = (response: Response) => (
@@ -97,7 +114,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
         }
         console.warn(`Node.js API 尚未支援 ${action}，改由 Supabase Edge Function 處理`);
       } else {
-        recordAppRead(action);
+        recordAppSuccess(action);
         return result.data as T;
       }
     }
@@ -126,6 +143,23 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
     reportIfInfrastructureError(data?.message, { action, via: 'edge-function' });
     throw new Error(data?.message || '系統服務回傳失敗');
   }
-  recordAppRead(action);
+  recordAppSuccess(action);
   return data.data as T;
+}
+
+/**
+ * 市場行情讀取專用的使用者隔離短效快取。其他動作仍直接走 invokeAppApi，
+ * 寫入成功時會清空快取；force 可讓使用者主動重新載入最新資料。
+ */
+export async function invokeCachedAppApi<T>(
+  action: string,
+  payload: Record<string, unknown> = {},
+  options: { ttlMs: number; force?: boolean },
+) {
+  if (!CACHEABLE_MARKET_ACTIONS.has(action)) return invokeAppApi<T>(action, payload);
+  const { data, error } = await getSupabase().auth.getSession();
+  const userId = data.session?.user.id;
+  if (error || !userId) return invokeAppApi<T>(action, payload);
+  const key = requestCacheKey(userId, action, payload);
+  return cachedRequest(key, () => invokeAppApi<T>(action, payload), options);
 }

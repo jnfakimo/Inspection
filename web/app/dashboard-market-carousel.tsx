@@ -5,7 +5,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement
 import { Line } from 'react-chartjs-2';
 import { MarketMovementBadge } from '@/components/MarketMovementBadge';
 import { marketMovementPresentation } from '@/lib/market-movement';
-import { invokeAppApi } from '@/lib/supabase';
+import { invokeCachedAppApi } from '@/lib/supabase';
 import './dashboard-market-prices.css';
 import './dashboard-market-carousel.css';
 
@@ -74,7 +74,9 @@ type Slide = {
 };
 
 const DEFAULT_STEP_SECONDS = 3.5;
-const DEFAULT_REFRESH_SECONDS = 60;
+const DEFAULT_REFRESH_SECONDS = 300;
+const MINIMUM_REFRESH_SECONDS = 300;
+const FEED_CACHE_TTL_MS = 4 * 60 * 1000;
 
 const numberText = (value: unknown, digits = 1) => (
   value == null || !Number.isFinite(Number(value))
@@ -135,12 +137,16 @@ export function DashboardMarketCarousel() {
   const [colors, setColors] = useState(chartColors);
   const loadingRef = useRef(false);
 
-  const loadCards = useCallback(async () => {
+  const loadCards = useCallback(async (force = false) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setError('');
     try {
-      const nextFeed = await invokeAppApi<CardsFeed>('dashboard_market_rotation', { view: 'cards' });
+      const nextFeed = await invokeCachedAppApi<CardsFeed>(
+        'dashboard_market_rotation',
+        { view: 'cards' },
+        { ttlMs: FEED_CACHE_TTL_MS, force },
+      );
       const nextSlides = feedToSlides(nextFeed);
       setFeed(nextFeed);
       setSlides(nextSlides);
@@ -159,10 +165,18 @@ export function DashboardMarketCarousel() {
     void loadCards();
   }, [loadCards]);
 
-  const refreshSeconds = Math.round(boundedNumber(feed?.refresh_seconds, DEFAULT_REFRESH_SECONDS, 15, 86400));
+  const configuredRefreshSeconds = Math.round(boundedNumber(feed?.refresh_seconds, DEFAULT_REFRESH_SECONDS, 15, 86400));
+  const refreshSeconds = Math.max(MINIMUM_REFRESH_SECONDS, configuredRefreshSeconds);
   useEffect(() => {
-    const timer = window.setInterval(() => void loadCards(), refreshSeconds * 1000);
-    return () => window.clearInterval(timer);
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void loadCards();
+    };
+    const timer = window.setInterval(refreshWhenVisible, refreshSeconds * 1000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [loadCards, refreshSeconds]);
 
   useEffect(() => {
@@ -181,6 +195,7 @@ export function DashboardMarketCarousel() {
   useEffect(() => {
     if (!activeSlide || !slides.length) return;
     const timer = window.setInterval(() => {
+      if (document.hidden) return;
       setFocusIndex(index => {
         if (activeSlide.cards.length && index + 1 < activeSlide.cards.length) return index + 1;
         setPageIndex(page => (page + 1) % slides.length);
@@ -250,7 +265,7 @@ export function DashboardMarketCarousel() {
       <div className="market-carousel-live">
         <i aria-hidden="true" />
         <b>自動播放中</b>
-        <span>每 {refreshSeconds} 秒檢查新資料{updatedAt ? '・' + updatedAt : ''}</span>
+        <span>每 {Math.round(refreshSeconds / 60)} 分鐘檢查新資料{updatedAt ? '・' + updatedAt : ''}</span>
       </div>
     </div>
 

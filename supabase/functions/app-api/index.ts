@@ -324,58 +324,8 @@ async function marketImportExternalKey(sourceId: string, observedOn: string, dim
 
 type MarketAggregate = {
   dimensions: Record<string, string>;
-  values: Record<string, number>;
-  counts: Record<string, number>;
-  weightedSums: Record<string, number>;
-  weights: Record<string, number>;
+  values: Record<string, number | null>;
 };
-
-function aggregateMarketPoints(rows: Array<Record<string, unknown>>, dimensions: string[], measures: string[], definitions: Map<string, MarketFieldDefinition>) {
-  const grouped = new Map<string, MarketAggregate>();
-  rows.forEach(row => {
-    const rawDimensions = marketJsonObject(row.dimensions);
-    const values = dimensions.map(key => text(rawDimensions[key], 160) || '未分類');
-    const groupKey = JSON.stringify(values);
-    let aggregate = grouped.get(groupKey);
-    if (!aggregate) {
-      aggregate = {
-        dimensions: Object.fromEntries(dimensions.map((key, index) => [key, values[index]])),
-        values: {}, counts: {}, weightedSums: {}, weights: {},
-      };
-      grouped.set(groupKey, aggregate);
-    }
-    const rawMeasures = marketJsonObject(row.measures);
-    measures.forEach(key => {
-      const number = marketNumeric(rawMeasures[key]);
-      if (number === null) return;
-      const definition = definitions.get(key);
-      const aggregation = definition?.aggregation || 'sum';
-      const prior = aggregate!.values[key];
-      if (aggregation === 'min') aggregate!.values[key] = prior === undefined ? number : Math.min(prior, number);
-      else if (aggregation === 'max') aggregate!.values[key] = prior === undefined ? number : Math.max(prior, number);
-      else if (aggregation === 'weighted_avg') {
-        const weight = definition?.weight_key ? marketNumeric(rawMeasures[definition.weight_key]) : null;
-        if (weight === null || weight <= 0) return;
-        aggregate!.weightedSums[key] = (aggregate!.weightedSums[key] || 0) + number * weight;
-        aggregate!.weights[key] = (aggregate!.weights[key] || 0) + weight;
-      }
-      else {
-        aggregate!.values[key] = (prior || 0) + number;
-        aggregate!.counts[key] = (aggregate!.counts[key] || 0) + 1;
-      }
-    });
-  });
-  grouped.forEach(aggregate => {
-    measures.forEach(key => {
-      if (definitions.get(key)?.aggregation === 'avg' && aggregate.counts[key]) {
-        aggregate.values[key] /= aggregate.counts[key];
-      } else if (definitions.get(key)?.aggregation === 'weighted_avg' && aggregate.weights[key]) {
-        aggregate.values[key] = aggregate.weightedSums[key] / aggregate.weights[key];
-      }
-    });
-  });
-  return [...grouped.values()];
-}
 
 function marketDateRange(value: unknown, fallback: string) {
   const candidate = text(value, 10);
@@ -1379,44 +1329,78 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: false, message: '市場行情尚未建立最新與前一交易日的比較資料' }, 503);
       }
 
-      const loadPoints = async (from: string, to: string) => {
-        const pageSize = 1000;
-        const maximumRows = 50_000;
-        const rows: Array<Record<string, unknown>> = [];
-        let offset = 0;
-        while (rows.length <= maximumRows) {
-          const requestedRows = Math.min(pageSize, maximumRows + 1 - rows.length);
-          const result = await admin.from('market_data_points')
-            .select('point_id,observed_on,dimensions,measures').eq('source_id', sourceId)
-            .gte('observed_on', from).lte('observed_on', to)
-            .order('observed_on').order('point_id').range(offset, offset + requestedRows - 1);
-          if (result.error) throw result.error;
-          const page = (result.data || []) as Array<Record<string, unknown>>;
-          rows.push(...page);
-          if (rows.length > maximumRows) throw new Error('dashboard market row limit exceeded');
-          if (page.length < requestedRows) return rows;
-          offset += page.length;
-        }
-        return rows;
-      };
-
       const requestedMarket = text(body.market, 20);
       const requestedCategory = text(body.category, 20);
       const requestedItem = text(body.item, 160);
-      const queryFrom = dashboardMarketShiftDate(latestDate, -13);
-      let loadedRows: Array<Record<string, unknown>>;
-      try {
-        loadedRows = await loadPoints(queryFrom, latestDate);
-      } catch (loadError) {
-        console.error('dashboard market points failed:', loadError instanceof Error ? loadError.message : String(loadError));
-        return reply(req, { ok: false, message: '市場行情資料量過大或暫時無法讀取，請稍後再試' }, 503);
+      const currentFrom = dashboardMarketShiftDate(latestDate, -6);
+      const compareFrom = dashboardMarketShiftDate(latestDate, -13);
+      const compareTo = dashboardMarketShiftDate(latestDate, -7);
+      const rollupResult = await admin.rpc('market_analysis_rollup', {
+        p_source_id: sourceId,
+        p_from: currentFrom,
+        p_to: latestDate,
+        p_compare_from: compareFrom,
+        p_compare_to: compareTo,
+        p_dimensions: ['market', 'category', 'item'],
+        p_measures: measures,
+        p_filters: {},
+        p_include_group_daily: true,
+      });
+      if (rollupResult.error) {
+        const missingRollup = ['PGRST202', '42883'].includes(String(rollupResult.error.code || ''))
+          || /market_analysis_rollup.*(?:not find|not found|does not exist)/i.test(String(rollupResult.error.message || ''));
+        console.error('dashboard market rollup failed:', rollupResult.error.message);
+        return reply(req, {
+          ok: false,
+          message: missingRollup
+            ? '市場行情彙總功能尚未完成設定，請先套用資料庫效能更新'
+            : '市場行情彙總資料暫時無法讀取，請稍後再試',
+        }, 503);
       }
-      const currentRows = loadedRows.filter(row => text(row.observed_on, 10) === latestDate);
-      const previousRows = loadedRows.filter(row => text(row.observed_on, 10) === previousDate);
-      const currentAggregates = aggregateMarketPoints(currentRows, ['market', 'category', 'item'], measures, fieldMap)
-        .filter(row => row.dimensions.item && row.dimensions.item !== '未分類');
-      const previousAggregates = aggregateMarketPoints(previousRows, ['market', 'category', 'item'], measures, fieldMap);
-      const aggregateKey = (row: MarketAggregate) => `${row.dimensions.market}::${row.dimensions.category}::${row.dimensions.item}`;
+
+      const rollup = marketJsonObject(rollupResult.data);
+      const rollupRows = (key: string) => (
+        Array.isArray(rollup[key])
+          ? (rollup[key] as unknown[]).filter(item => item && typeof item === 'object')
+            .map(item => item as Record<string, unknown>)
+          : []
+      );
+      const rollupValues = (value: unknown) => {
+        const raw = marketJsonObject(value);
+        return Object.fromEntries(measures.map(measure => [measure, marketNumeric(raw[measure])]));
+      };
+      const dailyAggregates = [
+        ...rollupRows('current_group_daily'),
+        ...rollupRows('compare_group_daily'),
+      ].flatMap(row => {
+        const observedOn = text(row.observed_on, 10);
+        const rowDimensions = marketJsonObject(row.dimensions);
+        if (!validISODate(observedOn)) return [];
+        return [{
+          observed_on: observedOn,
+          dimensions: {
+            market: text(rowDimensions.market, 20) || '未分類',
+            category: text(rowDimensions.category, 20) || '未分類',
+            item: text(rowDimensions.item, 160) || '未分類',
+          },
+          values: rollupValues(row.values),
+        }];
+      });
+      const aggregateKey = (row: MarketAggregate) => [
+        row.dimensions.market,
+        row.dimensions.category,
+        row.dimensions.item,
+      ].join('::');
+      const dailyAggregateKey = (observedOn: string, market: string, category: string, item: string) => (
+        [observedOn, market, category, item].join('::')
+      );
+      const dailyByKey = new Map(dailyAggregates.map(row => [
+        dailyAggregateKey(row.observed_on, row.dimensions.market, row.dimensions.category, row.dimensions.item),
+        row,
+      ]));
+      const currentAggregates = dailyAggregates
+        .filter(row => row.observed_on === latestDate && row.dimensions.item !== '未分類');
+      const previousAggregates = dailyAggregates.filter(row => row.observed_on === previousDate);
       const previousByKey = new Map(previousAggregates.map(row => [aggregateKey(row), row]));
       const configuredItems = rotation.items.filter(item => item.enabled);
 
@@ -1465,21 +1449,12 @@ export async function handleAppApiRequest(req: Request) {
         source_code: text(source.source_code, 60),
         source_name: text(source.source_name, 120),
       };
-      const currentFrom = dashboardMarketShiftDate(latestDate, -6);
-      const compareFrom = dashboardMarketShiftDate(latestDate, -13);
-      const compareTo = dashboardMarketShiftDate(latestDate, -7);
       const trendFor = (market: string, category: string, item: string) => {
-        const itemRows = loadedRows.filter(row => {
-          const rowDimensions = marketJsonObject(row.dimensions);
-          return text(rowDimensions.market, 20) === market
-            && text(rowDimensions.category, 20) === category
-            && text(rowDimensions.item, 160) === item;
-        });
         const series = Array.from({ length: 7 }, (_, index) => {
           const observedOn = dashboardMarketShiftDate(currentFrom, index);
           const compareObservedOn = dashboardMarketShiftDate(compareFrom, index);
-          const current = aggregateMarketPoints(itemRows.filter(row => text(row.observed_on, 10) === observedOn), [], measures, fieldMap)[0]?.values || {};
-          const comparison = aggregateMarketPoints(itemRows.filter(row => text(row.observed_on, 10) === compareObservedOn), [], measures, fieldMap)[0]?.values || {};
+          const current = dailyByKey.get(dailyAggregateKey(observedOn, market, category, item))?.values || {};
+          const comparison = dailyByKey.get(dailyAggregateKey(compareObservedOn, market, category, item))?.values || {};
           return { observed_on: observedOn, compare_observed_on: compareObservedOn, values: current, compare_values: comparison };
         });
         return { periods: { from: currentFrom, to: latestDate, compare_from: compareFrom, compare_to: compareTo }, series };
@@ -1604,7 +1579,6 @@ export async function handleAppApiRequest(req: Request) {
       if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
       const source = sourceResult.data as Record<string, unknown>;
       const fields = marketFieldDefinitions(source.field_definitions);
-      const fieldMap = new Map(fields.map(field => [field.key, field]));
       const dimensionKeys = fields.filter(field => field.kind === 'dimension').map(field => field.key);
       const measureKeys = fields.filter(field => field.kind === 'measure').map(field => field.key);
       const hasRequestedDimensions = Array.isArray(body.dimensions);
@@ -1630,57 +1604,58 @@ export async function handleAppApiRequest(req: Request) {
       const compareRangeDays = Math.round((Date.parse(`${compareTo}T00:00:00Z`) - Date.parse(`${compareFrom}T00:00:00Z`)) / 86400000) + 1;
       if (rangeDays > 366 || compareRangeDays > 366) return reply(req, { ok: false, message: '單次分析期間與比較期間最多 366 天' }, 400);
       if (rangeDays !== compareRangeDays) return reply(req, { ok: false, message: '分析期間與比較期間必須使用相同天數' }, 400);
-      const MARKET_ANALYSIS_PAGE_SIZE = 1000;
-      const MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD = 50_000;
-      class MarketAnalysisRowLimitError extends Error {
-        constructor(readonly start: string, readonly end: string) {
-          super(`market analysis row limit exceeded for ${start} to ${end}`);
-          this.name = 'MarketAnalysisRowLimitError';
-        }
+      const rollupResult = await admin.rpc('market_analysis_rollup', {
+        p_source_id: source.source_id,
+        p_from: from,
+        p_to: to,
+        p_compare_from: compareFrom,
+        p_compare_to: compareTo,
+        p_dimensions: dimensions,
+        p_measures: measures,
+        p_filters: filters,
+        p_include_group_daily: false,
+      });
+      if (rollupResult.error) {
+        const missingRollup = ['PGRST202', '42883'].includes(String(rollupResult.error.code || ''))
+          || /market_analysis_rollup.*(?:not find|not found|does not exist)/i.test(String(rollupResult.error.message || ''));
+        console.error('market analysis rollup failed:', rollupResult.error.message);
+        return reply(req, {
+          ok: false,
+          message: missingRollup
+            ? '市場行情彙總功能尚未完成設定，請先套用資料庫效能更新'
+            : '市場行情分析資料彙總失敗，請稍後再試',
+        }, 503);
       }
-      const loadRange = async (start: string, end: string) => {
-        const rows: Array<Record<string, unknown>> = [];
-        // PostgREST 單次回傳有列數上限；逐頁讀完並多讀一列確認沒有超限，
-        // 避免以固定 limit 靜默截斷後仍回傳看似完整、實際少算的分析結果。
-        let offset = 0;
-        while (offset <= MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD) {
-          const pageEnd = Math.min(offset + MARKET_ANALYSIS_PAGE_SIZE - 1, MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD);
-          let query = admin.from('market_data_points')
-            .select('point_id,observed_on,dimensions,measures')
-            .eq('source_id', source.source_id)
-            .gte('observed_on', start)
-            .lte('observed_on', end);
-          if (Object.keys(filters).length) query = query.contains('dimensions', filters);
-          const result = await query
-            .order('observed_on')
-            .order('point_id')
-            .range(offset, pageEnd);
-          if (result.error) throw result.error;
-          const page = (result.data || []) as Array<Record<string, unknown>>;
-          if (!page.length) break;
-          rows.push(...page);
-          if (rows.length > MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD) throw new MarketAnalysisRowLimitError(start, end);
-          // 依實際收到的列數前進，避免 PostgREST 專案端若把單頁上限設得比
-          // MARKET_ANALYSIS_PAGE_SIZE 更小時，仍因固定 offset 跳過中間資料。
-          offset += page.length;
-        }
-        return rows;
+
+      const rollup = marketJsonObject(rollupResult.data);
+      const rollupArray = (key: string) => (
+        Array.isArray(rollup[key])
+          ? (rollup[key] as unknown[]).filter(item => item && typeof item === 'object')
+            .map(item => item as Record<string, unknown>)
+          : []
+      );
+      const rollupValues = (value: unknown, includeNulls = true) => {
+        const raw = marketJsonObject(value);
+        return Object.fromEntries(measures.flatMap(measure => {
+          const numeric = marketNumeric(raw[measure]);
+          return includeNulls || numeric !== null ? [[measure, numeric] as const] : [];
+        }));
       };
-      let currentRows: Array<Record<string, unknown>>, compareRows: Array<Record<string, unknown>>;
-      try {
-        [currentRows, compareRows] = await Promise.all([loadRange(from, to), loadRange(compareFrom, compareTo)]);
-      } catch (error) {
-        if (error instanceof MarketAnalysisRowLimitError) {
-          return reply(req, {
-            ok: false,
-            message: `分析期間 ${error.start} 至 ${error.end} 的行情資料超過每期 ${MARKET_ANALYSIS_MAX_POINTS_PER_PERIOD.toLocaleString('en-US')} 筆上限；為避免少算，系統已停止分析。請縮短分析期間後再試。`,
-          }, 413);
-        }
-        console.error('market analysis query failed:', error instanceof Error ? error.message : String(error));
-        return reply(req, { ok: false, message: '市場行情分析資料讀取失敗' }, 500);
-      }
-      const current = aggregateMarketPoints(currentRows, dimensions, measures, fieldMap);
-      const comparison = aggregateMarketPoints(compareRows, dimensions, measures, fieldMap);
+      const rollupDimensions = (value: unknown) => {
+        const raw = marketJsonObject(value);
+        return Object.fromEntries(dimensions.map(key => [key, text(raw[key], 160) || '未分類']));
+      };
+      const counts = marketJsonObject(rollup.counts);
+      const currentCount = Math.max(0, Math.round(Number(counts.current) || 0));
+      const compareCount = Math.max(0, Math.round(Number(counts.compare) || 0));
+      const current = rollupArray('current_groups').map(row => ({
+        dimensions: rollupDimensions(row.dimensions),
+        values: rollupValues(row.values),
+      }));
+      const comparison = rollupArray('compare_groups').map(row => ({
+        dimensions: rollupDimensions(row.dimensions),
+        values: rollupValues(row.values),
+      }));
       const marketGroupKey = (row: MarketAggregate) => JSON.stringify(dimensions.map(key => row.dimensions[key] || '未分類'));
       const compareByKey = new Map(comparison.map(row => [marketGroupKey(row), row]));
       const currentGroupKeys = new Set(current.map(marketGroupKey));
@@ -1693,16 +1668,23 @@ export async function handleAppApiRequest(req: Request) {
         measures.forEach(measure => {
           const currentValue = row.values[measure] ?? null;
           const compareValue = other?.values[measure] ?? null;
-          values[measure] = Number.isFinite(currentValue) ? currentValue : null;
-          compareValues[measure] = Number.isFinite(compareValue) ? compareValue : null;
-          changes[measure] = typeof currentValue === 'number' && Number.isFinite(currentValue) && typeof compareValue === 'number' && Number.isFinite(compareValue) ? currentValue - compareValue : null;
+          values[measure] = currentValue;
+          compareValues[measure] = compareValue;
+          changes[measure] = currentValue !== null && compareValue !== null ? currentValue - compareValue : null;
         });
-        return { dimensions: row.dimensions, values, compare_values: compareValues, changes, current_count: currentRows.length, compare_count: compareRows.length };
+        return { dimensions: row.dimensions, values, compare_values: compareValues, changes, current_count: currentCount, compare_count: compareCount };
       });
       comparison.forEach(row => {
         const key = marketGroupKey(row);
         if (currentGroupKeys.has(key)) return;
-        rows.push({ dimensions: row.dimensions, values: {}, compare_values: Object.fromEntries(measures.map(measure => [measure, row.values[measure] ?? null])), changes: {}, current_count: currentRows.length, compare_count: compareRows.length });
+        rows.push({
+          dimensions: row.dimensions,
+          values: {},
+          compare_values: rollupValues(row.values),
+          changes: {},
+          current_count: currentCount,
+          compare_count: compareCount,
+        });
       });
       const rankMeasure = measures[0];
       rows.sort((left, right) => Math.max(Math.abs(Number(right.values[rankMeasure]) || 0), Math.abs(Number(right.compare_values[rankMeasure]) || 0))
@@ -1710,79 +1692,76 @@ export async function handleAppApiRequest(req: Request) {
       const totalGroupCount = rows.length;
       const returnedGroupCount = Math.min(totalGroupCount, 500);
       const groupsTruncated = returnedGroupCount < totalGroupCount;
-      const totalsCurrent = aggregateMarketPoints(currentRows, [], measures, fieldMap)[0]?.values || {};
-      const totalsCompare = aggregateMarketPoints(compareRows, [], measures, fieldMap)[0]?.values || {};
-      // 市場摘要必須以完整期間資料重新彙總，不能從最多 500 組的畫面明細回推，
-      // 否則品項／品種維度很多時會顯示看似正式、實際少算的市場占比。
+      const totalsCurrent = rollupValues(rollup.current_totals, false);
+      const totalsCompare = rollupValues(rollup.compare_totals, false);
+
       const marketSummary = dimensionKeys.includes('market')
         ? (() => {
-          const currentByMarket = aggregateMarketPoints(currentRows, ['market'], measures, fieldMap);
-          const compareByMarket = new Map(aggregateMarketPoints(compareRows, ['market'], measures, fieldMap)
-            .map(row => [row.dimensions.market || '未分類市場', row.values]));
-          const currentMarkets = new Set(currentByMarket.map(row => row.dimensions.market || '未分類市場'));
-          const result = currentByMarket.map(row => {
-            const market = row.dimensions.market || '未分類市場';
-            return { market, values: row.values, compare_values: compareByMarket.get(market) || {} };
-          });
+          const currentByMarket = rollupArray('current_market').map(row => ({
+            market: text(row.market, 160) || '未分類市場',
+            values: rollupValues(row.values, false),
+          }));
+          const compareByMarket = new Map(rollupArray('compare_market').map(row => [
+            text(row.market, 160) || '未分類市場',
+            rollupValues(row.values, false),
+          ]));
+          const currentMarkets = new Set(currentByMarket.map(row => row.market));
+          const result = currentByMarket.map(row => ({
+            market: row.market,
+            values: row.values,
+            compare_values: compareByMarket.get(row.market) || {},
+          }));
           compareByMarket.forEach((values, market) => {
             if (!currentMarkets.has(market)) result.push({ market, values: {}, compare_values: values });
           });
           return result;
         })()
         : [];
-      const dailyValues = (inputRows: Array<Record<string, unknown>>) => {
-        const rowsByDate = new Map<string, Array<Record<string, unknown>>>();
-        inputRows.forEach(row => {
+
+      const dailyValues = (key: string) => new Map<string, Record<string, number | null>>(
+        rollupArray(key).flatMap(row => {
           const observedOn = text(row.observed_on, 10);
-          if (!validISODate(observedOn)) return;
-          const dayRows = rowsByDate.get(observedOn) || [];
-          dayRows.push(row);
-          rowsByDate.set(observedOn, dayRows);
-        });
-        return new Map([...rowsByDate.entries()].map(([observedOn, dayRows]) => {
-          const values = aggregateMarketPoints(dayRows, [], measures, fieldMap)[0]?.values || {};
-          return [observedOn, Object.fromEntries(measures.map(measure => [
-            measure,
-            Number.isFinite(values[measure]) ? values[measure] : null,
-          ]))];
-        }));
-      };
-      const currentDaily = dailyValues(currentRows);
-      const compareDaily = dailyValues(compareRows);
-      const dateAtOffset = (start: string, offset: number) => {
-        const date = new Date(`${start}T00:00:00Z`);
-        date.setUTCDate(date.getUTCDate() + offset);
-        return date.toISOString().slice(0, 10);
-      };
-      // 圖表以「區間第 N 天」對齊，避免去年同期或前一期因實際日期不同而錯位。
-      // 沒有交易資料的日期仍保留在序列中並回傳 null，讓前端可如實呈現缺口。
+          return validISODate(observedOn) ? [[observedOn, rollupValues(row.values)] as const] : [];
+        }),
+      );
+      const currentDaily = dailyValues('current_daily');
+      const compareDaily = dailyValues('compare_daily');
+      const emptyValues = () => Object.fromEntries(measures.map(measure => [measure, null]));
+      // 圖表以「區間第 N 天」對齊；沒有交易資料的日期保留 null，不補成 0。
       const series = Array.from({ length: rangeDays }, (_, offset) => {
-        const observedOn = dateAtOffset(from, offset);
-        const candidateCompareOn = dateAtOffset(compareFrom, offset);
+        const observedOn = dashboardMarketShiftDate(from, offset);
+        const candidateCompareOn = dashboardMarketShiftDate(compareFrom, offset);
         const compareObservedOn = candidateCompareOn <= compareTo ? candidateCompareOn : null;
         return {
           observed_on: observedOn,
           compare_observed_on: compareObservedOn,
-          values: currentDaily.get(observedOn) || Object.fromEntries(measures.map(measure => [measure, null])),
-          compare_values: compareObservedOn
-            ? compareDaily.get(compareObservedOn) || Object.fromEntries(measures.map(measure => [measure, null]))
-            : Object.fromEntries(measures.map(measure => [measure, null])),
+          values: currentDaily.get(observedOn) || emptyValues(),
+          compare_values: compareObservedOn ? compareDaily.get(compareObservedOn) || emptyValues() : emptyValues(),
         };
       });
-      const latestObservedOn = currentRows
-        .map(row => text(row.observed_on, 10))
-        .filter(validISODate)
-        .sort()
-        .at(-1) || null;
+      const latestCandidate = text(rollup.latest_observed_on, 10);
+      const latestObservedOn = validISODate(latestCandidate) ? latestCandidate : null;
+      const totalsChanges = Object.fromEntries(measures.map(measure => {
+        const currentValue = totalsCurrent[measure];
+        const compareValue = totalsCompare[measure];
+        return [
+          measure,
+          currentValue !== null && currentValue !== undefined
+            && compareValue !== null && compareValue !== undefined
+            && Number.isFinite(currentValue) && Number.isFinite(compareValue)
+            ? currentValue - compareValue
+            : null,
+        ];
+      }));
       return reply(req, { ok: true, data: {
         source: { source_id: source.source_id, source_code: source.source_code, source_name: source.source_name }, filters,
         fields, dimensions, measures, periods: { from, to, compare_from: compareFrom, compare_to: compareTo },
-        totals: { values: totalsCurrent, compare_values: totalsCompare, changes: Object.fromEntries(measures.map(measure => [measure, Number.isFinite(totalsCurrent[measure]) && Number.isFinite(totalsCompare[measure]) ? totalsCurrent[measure] - totalsCompare[measure] : null])) },
-        counts: { current: currentRows.length, compare: compareRows.length },
+        totals: { values: totalsCurrent, compare_values: totalsCompare, changes: totalsChanges },
+        counts: { current: currentCount, compare: compareCount },
         quality: {
           latest_observed_on: latestObservedOn,
-          current_loaded_count: currentRows.length,
-          compare_loaded_count: compareRows.length,
+          current_loaded_count: currentCount,
+          compare_loaded_count: compareCount,
           is_truncated: false,
           total_group_count: totalGroupCount,
           returned_group_count: returnedGroupCount,

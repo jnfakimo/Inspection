@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   DASHBOARD_CATEGORIES,
@@ -44,4 +45,12 @@ test('重複設定採用最後一筆，停用後重新加入可以恢復輪播',
     { market: '第一市場', category: '水果', item: '香蕉', enabled: true, sort_order: 20 },
   ] } });
   assert.deepEqual(dashboardRotationItemsForGroup(config, '第一市場', '水果').map(item => item.item), ['香蕉']);
+});
+
+test('首頁戰情輪播最低五分鐘更新且背景頁籤暫停', () => {
+  const component = readFileSync('web/app/dashboard-market-carousel.tsx', 'utf8');
+  assert.match(component, /MINIMUM_REFRESH_SECONDS\s*=\s*300/);
+  assert.match(component, /invokeCachedAppApi/);
+  assert.match(component, /document\.hidden/);
+  assert.match(component, /visibilitychange/);
 });

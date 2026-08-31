@@ -22,7 +22,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { MarketMovementBadge } from '@/components/MarketMovementBadge';
 import { marketMovementPresentation } from '@/lib/market-movement';
-import { invokeAppApi } from '@/lib/supabase';
+import { invokeAppApi, invokeCachedAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './market-analytics.css';
@@ -932,7 +932,7 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
     setDimensionCatalogMessage(''); setDimensionCatalogLoading(Boolean(source?.source_id));
     if (!source?.source_id) return () => { active = false; };
     timer = setTimeout(() => {
-      void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters })
+      void invokeCachedAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters }, { ttlMs: 2 * 60 * 1000 })
         .then(result => { if (active) setDimensionOptions(result.options || {}); })
         .catch(error => { if (active) setDimensionCatalogMessage(error instanceof Error ? error.message : '篩選選項載入失敗，請重新整理設定後再試。'); })
         .finally(() => { if (active) setDimensionCatalogLoading(false); });
@@ -985,13 +985,13 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   const sourceFieldsReady = Boolean(source && configuredSchemaKey === sourceSchemaKey && analysisDimensions.length && measures.length
     && analysisDimensions.every(key => fieldMap.get(key)?.kind === 'dimension')
     && measures.every(key => fieldMap.get(key)?.kind === 'measure'));
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     if (!analysisFiltersReady) { setMessage('目前篩選與下鑽條件合計超過 4 個，請先移除較次要的資料內容篩選。'); return; }
     if (!source?.source_id || !sourceFieldsReady || !compareDatesReady) { setMessage('請確認資料來源、分析欄位，以及本期與比較期使用相同天數（最多 366 天）。'); return; }
     const requestEpoch = ++requestEpochRef.current;
     setBusy(true); setMessage('');
     try {
-      const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from, to, compare_from: compareFrom, compare_to: compareTo, dimensions: analysisDimensions, measures, filters: analysisFilters });
+      const result = await invokeCachedAppApi<Analysis>('market_analysis', { source_id: source.source_id, from, to, compare_from: compareFrom, compare_to: compareTo, dimensions: analysisDimensions, measures, filters: analysisFilters }, { ttlMs: 60 * 1000, force });
       if (requestEpoch !== requestEpochRef.current) return;
       setAnalysis(result); setAnalysisGeneratedAt(new Date().toISOString()); setFiltersOpen(false);
     } catch (error) { if (requestEpoch === requestEpochRef.current) setMessage(error instanceof Error ? error.message : '行情分析載入失敗'); }
@@ -1069,7 +1069,7 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
         <section className="market-value-filters"><header><div><b>資料內容篩選</b><span>請依「市場 → 蔬果大類 → 品項分類」選擇；下層選項會跟著上層連動，空白代表全部。</span></div><div className="market-value-filter-actions">{Object.values(filterDrafts).some(Boolean) && <button type="button" className="secondary-btn compact" onClick={() => { invalidateAnalysis(); setFilterDrafts({}); setFilters({}); setDrillPath([]); }}>清除篩選</button>}<button type="button" className="primary-btn compact" onClick={() => { invalidateAnalysis(); setFilters(Object.fromEntries(Object.entries(filterDrafts).map(([key, value]) => [key, value.trim()]).filter(([, value]) => Boolean(value)))); setDrillPath([]); }}>套用篩選</button></div></header><div>{filterFields.map(field => { const options = dimensionOptions[field.key] || []; return <label key={field.key}>{field.label}<select value={filterDrafts[field.key] || ''} disabled={dimensionCatalogLoading || Boolean(dimensionCatalogMessage) || !options.length} onChange={event => updateFilterDraft(field.key, event.target.value)}><option value="">{dimensionCatalogLoading && !options.length ? `載入${field.label}中…` : !options.length ? `目前沒有${field.label}資料` : `全部${field.label}`}</option>{options.map(option => <option key={option.value} value={option.value}>{option.value}（{numberText(option.count)} 筆）</option>)}</select></label>; })}</div>{dimensionCatalogMessage && <small>{dimensionCatalogMessage}</small>}</section>
         <div className="market-chart-settings"><label>詳細圖表類型<select value={chartType} onChange={event => setChartType(event.target.value as ChartType)}>{CHART_TYPE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>主要判讀指標<select value={primaryMeasure} onChange={event => setChartMeasure(event.target.value)}>{measures.map(measure => <option key={measure} value={measure}>{fieldMap.get(measure)?.label || measure}</option>)}</select></label></div>
         <PalettePicker value={paletteId} customColors={customColors} onChange={setPaletteId} onCustomColorsChange={setCustomColors} />
-        <div className="market-control-footer"><span>本期：{periodText({ from, to })}　比較：{periodText({ from: compareFrom, to: compareTo })}{!compareDatesReady ? '　（兩個期間須為相同天數，且最多 366 天）' : ''}</span><button type="button" className="primary-btn" disabled={busy || !sourceFieldsReady || !compareDatesReady || !analysisFiltersReady} onClick={() => void load()}>{busy ? '分析中…' : '執行分析'}</button></div>
+        <div className="market-control-footer"><span>本期：{periodText({ from, to })}　比較：{periodText({ from: compareFrom, to: compareTo })}{!compareDatesReady ? '　（兩個期間須為相同天數，且最多 366 天）' : ''}</span><button type="button" className="primary-btn" disabled={busy || !sourceFieldsReady || !compareDatesReady || !analysisFiltersReady} onClick={() => void load(true)}>{busy ? '分析中…' : '執行分析'}</button></div>
       </div>
       }
       {source?.config?.is_actual === true && <p className="market-actual-notice"><b>實際資料範圍：</b>{String(source.config.data_scope || '第一市場、第二市場')}；{String(source.config.value_note || '交易金額為平均價乘以成交量的推估值。')}{source.config.data_quality_note ? `　資料品質：${String(source.config.data_quality_note)}` : ''}</p>}
@@ -1181,7 +1181,7 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
     let active = true;
     setDimensionOptions({}); setCatalogLoaded(false);
     if (!source?.source_id) return () => { active = false; };
-    void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters })
+    void invokeCachedAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters }, { ttlMs: 2 * 60 * 1000 })
       .then(result => { if (active) setDimensionOptions(result.options || {}); })
       .catch(() => { if (active) setDimensionOptions({}); })
       .finally(() => { if (active) setCatalogLoaded(true); });
@@ -1197,7 +1197,7 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
       const summaryMeasures = [...priority.filter(key => available.includes(key)), ...available.filter(key => !priority.includes(key))].slice(0, 4);
       if (!summaryMeasures.length) throw new Error('資料來源沒有可用的分析指標');
       const { compareFrom, compareTo } = comparisonRange(range.from, range.to, compareMode);
-      const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: range.from, to: range.to, compare_from: compareFrom, compare_to: compareTo, dimensions: hasItemDimension ? ['item'] : [], measures: summaryMeasures, filters: manualFilters });
+      const result = await invokeCachedAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: range.from, to: range.to, compare_from: compareFrom, compare_to: compareTo, dimensions: hasItemDimension ? ['item'] : [], measures: summaryMeasures, filters: manualFilters }, { ttlMs: 60 * 1000 });
       setSummary(result);
     } catch (error) { setSummaryError(error instanceof Error ? error.message : '同期比較摘要載入失敗'); }
     finally { setSummaryBusy(false); }
@@ -1225,7 +1225,7 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
       if (!measureKey) throw new Error('資料來源沒有可用的交易量指標');
       const results = await Promise.all(months.map(async monthRange => {
         const { compareFrom, compareTo } = comparisonRange(monthRange.from, monthRange.to, 'same');
-        const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: monthRange.from, to: monthRange.to, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: manualFilters });
+        const result = await invokeCachedAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: monthRange.from, to: monthRange.to, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: manualFilters }, { ttlMs: 60 * 1000 });
         return { ...monthRange, current: finiteNumber(result.totals.values[measureKey]), previous: finiteNumber(result.totals.compare_values[measureKey]) };
       }));
       setYoyField(fieldMap.get(measureKey)); setYoyData(results);
@@ -1243,7 +1243,7 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
       if (!measureKey) throw new Error('資料來源沒有可用的價格指標');
       const { compareFrom, compareTo } = comparisonRange(range.from, range.to, compareMode);
       const results = await Promise.all(categories.map(async categoryValue => {
-        const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: range.from, to: range.to, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: { ...manualFilters, category: categoryValue } });
+        const result = await invokeCachedAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: range.from, to: range.to, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: { ...manualFilters, category: categoryValue } }, { ttlMs: 60 * 1000 });
         const values = (result.series || []).map(point => finiteNumber(point.values[measureKey])).filter((value): value is number => value !== null).sort((a, b) => a - b);
         if (!values.length) return { category: categoryValue, count: 0, min: 0, q1: 0, median: 0, q3: 0, max: 0 };
         return { category: categoryValue, count: values.length, min: values[0], q1: quantile(values, .25), median: quantile(values, .5), q3: quantile(values, .75), max: values[values.length - 1] };
@@ -1262,7 +1262,7 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
       const heatTo = anchor;
       const heatFrom = addDays(heatTo, -83);
       const { compareFrom, compareTo } = comparisonRange(heatFrom, heatTo, 'previous');
-      const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: heatFrom, to: heatTo, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: manualFilters });
+      const result = await invokeCachedAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: heatFrom, to: heatTo, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: manualFilters }, { ttlMs: 60 * 1000 });
       setHeatField(fieldMap.get(measureKey)); setHeatSeries(result.series || []); setHeatRange({ from: heatFrom, to: heatTo });
     } catch (error) { setHeatError(error instanceof Error ? error.message : '交易熱力圖載入失敗'); }
     finally { setHeatBusy(false); }
@@ -1566,10 +1566,10 @@ export function MarketAnalyticsWorkspace({ system, module }: { system: SystemDef
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const loadCatalog = useCallback(async () => { setLoading(true); setError(''); try { const result = await invokeAppApi<{ sources: Source[]; templates: Template[] }>('market_catalog'); setSources(result.sources || []); setTemplates(result.templates || []); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : '市場分析設定載入失敗'); } finally { setLoading(false); } }, []);
+    const loadCatalog = useCallback(async (force = false) => { setLoading(true); setError(''); try { const result = await invokeCachedAppApi<{ sources: Source[]; templates: Template[] }>('market_catalog', {}, { ttlMs: 5 * 60 * 1000, force }); setSources(result.sources || []); setTemplates(result.templates || []); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : '市場分析設定載入失敗'); } finally { setLoading(false); } }, []);
     useEffect(() => { void loadCatalog(); }, [loadCatalog]);
     const page = module.key === 'sources' ? <SourcesWorkspace sources={sources} onSaved={loadCatalog} reloadCatalog={loadCatalog} /> : module.key === 'templates' ? <TemplatesWorkspace sources={sources} templates={templates} onSaved={loadCatalog} /> : module.key === 'comparison' ? <ComparisonWorkspace sources={sources} /> : <AnalysisWorkspace sources={sources} templates={templates} reloadCatalog={loadCatalog} />;
-    return <AppShell profile={profile} title={system.title}><div className="page-actions"><div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div><div className="action-cluster"><button type="button" className="secondary-btn" disabled={loading} onClick={() => void loadCatalog()}>{loading ? '載入中…' : '重新載入設定'}</button></div></div>{loading && !sources.length ? <div className="market-empty-panel panel">正在載入市場分析設定…</div> : page}</AppShell>;
+    return <AppShell profile={profile} title={system.title}><div className="page-actions"><div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div><div className="action-cluster"><button type="button" className="secondary-btn" disabled={loading} onClick={() => void loadCatalog(true)}>{loading ? '載入中…' : '重新載入設定'}</button></div></div>{loading && !sources.length ? <div className="market-empty-panel panel">正在載入市場分析設定…</div> : page}</AppShell>;
   }
   return <AuthGate>{profile => <Workspace profile={profile} />}</AuthGate>;
 }

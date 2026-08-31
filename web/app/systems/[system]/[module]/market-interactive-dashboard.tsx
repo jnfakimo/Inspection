@@ -20,7 +20,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { MarketMovementBadge } from '@/components/MarketMovementBadge';
-import { invokeAppApi } from '@/lib/supabase';
+import { invokeCachedAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import './market-interactive-dashboard.css';
 
@@ -290,7 +290,11 @@ function InteractiveDashboard({
   const loadCatalog = useCallback(async () => {
     setError('');
     try {
-      const result = await invokeAppApi<{ sources: Source[] }>('market_catalog');
+      const result = await invokeCachedAppApi<{ sources: Source[] }>(
+        'market_catalog',
+        {},
+        { ttlMs: 5 * 60 * 1000 },
+      );
       const nextSources = (result.sources || []).filter(
         candidate => candidate.source_code !== 'market_demo' && candidate.config?.is_demo !== true,
       );
@@ -312,22 +316,26 @@ function InteractiveDashboard({
     }
   }, []);
 
-  const loadAnalysis = useCallback(async () => {
+  const loadAnalysis = useCallback(async (force = false) => {
     if (!sourceId || !currentDimension || !requestedMeasures.length) return;
     const serial = ++requestSerial.current;
     setBusy(true);
     setError('');
     try {
-      const result = await invokeAppApi<Analysis>('market_analysis', {
-        source_id: sourceId,
-        from: range.from,
-        to: range.to,
-        compare_from: compareRange.from,
-        compare_to: compareRange.to,
-        dimensions: [currentDimension],
-        measures: requestedMeasures,
-        filters,
-      });
+      const result = await invokeCachedAppApi<Analysis>(
+        'market_analysis',
+        {
+          source_id: sourceId,
+          from: range.from,
+          to: range.to,
+          compare_from: compareRange.from,
+          compare_to: compareRange.to,
+          dimensions: [currentDimension],
+          measures: requestedMeasures,
+          filters,
+        },
+        { ttlMs: 60 * 1000, force },
+      );
       if (serial !== requestSerial.current) return;
       setAnalysis(result);
       setUpdatedAt(new Date().toLocaleString('zh-TW', {
@@ -351,6 +359,10 @@ function InteractiveDashboard({
 
   useEffect(() => { void loadCatalog(); }, [loadCatalog]);
   useEffect(() => {
+    requestSerial.current += 1;
+    setBusy(false);
+  }, [compareRange.from, compareRange.to, currentDimension, filters, range.from, range.to, requestedMeasures, sourceId]);
+  useEffect(() => {
     if (!measures.length) return;
     setMetric(current => measures.some(field => field.key === current)
       ? current
@@ -363,10 +375,14 @@ function InteractiveDashboard({
       const linkedFilters: Record<string, string> = {};
       if (market.trim()) linkedFilters.market = market.trim();
       if (category.trim()) linkedFilters.category = category.trim();
-      void invokeAppApi<{ options: DimensionCatalog }>('market_dimension_catalog', {
-        source_id: sourceId,
-        filters: linkedFilters,
-      }).then(result => {
+      void invokeCachedAppApi<{ options: DimensionCatalog }>(
+        'market_dimension_catalog',
+        {
+          source_id: sourceId,
+          filters: linkedFilters,
+        },
+        { ttlMs: 2 * 60 * 1000 },
+      ).then(result => {
         if (active) setDimensionOptions(result.options || {});
       }).catch(() => {
         if (active) setDimensionOptions({});
@@ -649,7 +665,7 @@ function InteractiveDashboard({
             {measures.map(field => <option key={field.key} value={field.key}>{field.label}{fieldUnit(field)}</option>)}
           </select>
         </label>
-        <button type="button" className="primary-btn" disabled={busy || !sourceId} onClick={() => void loadAnalysis()}>
+        <button type="button" className="primary-btn" disabled={busy || !sourceId} onClick={() => void loadAnalysis(true)}>
           {busy ? '分析中…' : '更新分析'}
         </button>
       </div>
