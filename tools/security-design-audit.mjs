@@ -44,8 +44,8 @@ if (fs.existsSync(modulesFile)) {
   const moduleCount = (registry.match(/\bm\(/g) || []).length;
   console.log(`V2 模組盤點：${systemCount} 大系統、${moduleCount} 個子系統`);
   // SYS-11 戰情儀表板沒有子系統：入口圖卡直接連到 /，因此系統數 +1、子系統數不變。
-  if (systemCount !== 11 || moduleCount !== 55) {
-    findings.push({ severity: 'error', file: 'web/lib/modules.ts', rule: '系統拓撲數量', message: 'V2 必須維持 11 大系統、55 個子系統，請同步更新專案設計與權限盤點。' });
+  if (systemCount !== 11 || moduleCount !== 56) {
+    findings.push({ severity: 'error', file: 'web/lib/modules.ts', rule: '系統拓撲數量', message: 'V2 必須維持 11 大系統、56 個子系統，請同步更新專案設計與權限盤點。' });
   }
 }
 for (const file of walk(path.join(root, 'web'))) {

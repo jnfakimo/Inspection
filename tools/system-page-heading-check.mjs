@@ -4,7 +4,7 @@ import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
 assert.equal(systems.length, 11, '系統標題稽核必須涵蓋 11 大系統');
-assert.equal(moduleCount, 55, '系統標題稽核必須涵蓋 55 個子系統');
+assert.equal(moduleCount, 56, '系統標題稽核必須涵蓋 56 個子系統');
 
 for (const system of systems) {
   const iconPath = `.${system.icon.replace('/Inspection', '')}`;
@@ -77,6 +77,7 @@ assert.doesNotMatch(adminCss, /\.admin-page-actions:has\(/,
   '頁首靠右已是全站規則，不要再為個別頁面加 :has() 的重複宣告');
 
 const compactPages = [
+  ['workorder/repairmap3d', 'web/app/systems/[system]/[module]/repair-map3d.tsx'],
   ['structuremap/floor2d', 'web/app/systems/[system]/[module]/structuremap-viewers.tsx'],
   ['structuremap/floor3d', 'web/app/systems/[system]/[module]/structuremap-floor3d.tsx'],
   ['guardpatrol/map3d', 'web/app/systems/[system]/[module]/patrol-map3d.tsx'],
@@ -87,4 +88,4 @@ for (const [route, file] of compactPages) {
   assert.match(source, /data-system-page-logo/, `${route} 缺少對應系統 Logo`);
 }
 
-console.log(`系統頁標題一致性檢查通過：${systems.length} 大系統、${moduleCount} 個子系統；51 個標準頁首、3 個全螢幕緊湊頁首。`);
+console.log(`系統頁標題一致性檢查通過：${systems.length} 大系統、${moduleCount} 個子系統；52 個標準頁首、4 個全螢幕緊湊頁首。`);

@@ -62,6 +62,10 @@ const MarketCommandCenterWorkspace = dynamic<WorkspaceProps>(
   () => import('./market-command-center').then((mod) => mod.MarketCommandCenterWorkspace),
   { ssr: false, loading: moduleLoading },
 );
+const MarketInteractiveDashboardWorkspace = dynamic<WorkspaceProps>(
+  () => import('./market-interactive-dashboard').then((mod) => mod.MarketInteractiveDashboardWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'handover' || system.key === 'guardpatrol') {
@@ -91,6 +95,9 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'marketanalytics') {
     if (module.key === 'command-center') {
       return <MarketCommandCenterWorkspace system={system} module={module} />;
+    }
+    if (module.key === 'interactive-dashboard') {
+      return <MarketInteractiveDashboardWorkspace system={system} module={module} />;
     }
     return <MarketAnalyticsWorkspace system={system} module={module} />;
   }

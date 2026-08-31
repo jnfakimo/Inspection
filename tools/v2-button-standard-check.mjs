@@ -4,7 +4,7 @@ import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
 assert.equal(systems.length, 11, '按鈕規格稽核必須涵蓋 11 大系統');
-assert.equal(moduleCount, 55, '按鈕規格稽核必須涵蓋 55 個子系統');
+assert.equal(moduleCount, 56, '按鈕規格稽核必須涵蓋 56 個子系統');
 
 const globals = readFileSync('web/app/globals.css', 'utf8');
 const layout = readFileSync('web/app/layout.tsx', 'utf8');

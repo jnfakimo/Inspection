@@ -5,6 +5,7 @@ import { resolveAppBackHref } from './app-navigation.ts';
 
 test('市場行情分析的上頁固定回到市場分析系統入口', () => {
   assert.equal(resolveAppBackHref('/systems/marketanalytics/overview/'), '/systems/marketanalytics/');
+  assert.equal(resolveAppBackHref('/systems/marketanalytics/interactive-dashboard/'), '/systems/marketanalytics/');
   assert.equal(
     resolveAppBackHref('/Inspection/v2/systems/marketanalytics/overview/?v=2ec94674b'),
     '/systems/marketanalytics/',
