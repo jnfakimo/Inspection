@@ -1,0 +1,45 @@
+.dashboard-market-prices{--market-rise-color:var(--red);--market-fall-color:var(--green);--market-rise-readable:color-mix(in srgb,var(--red) 72%,var(--text));--market-fall-readable:color-mix(in srgb,var(--green) 68%,var(--text));display:grid;gap:14px}
+.market-price-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.market-price-heading h3,.market-week-heading h3{margin:0;color:var(--text);font:750 20px var(--head)}
+.market-price-heading p{margin:4px 0 0;color:var(--dim);font-size:11px}
+.market-price-links{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.market-price-links a{text-decoration:none}
+.market-price-controls{display:flex;flex-wrap:wrap;align-items:end;gap:10px}
+.market-choice,.market-metric-choice{display:flex;flex-wrap:wrap;gap:6px}
+.market-choice button,.market-metric-choice button{border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--dim);padding:7px 12px;cursor:pointer;font:650 12px var(--font)}
+.market-choice button:hover,.market-choice button:focus-visible,.market-metric-choice button:hover,.market-metric-choice button:focus-visible{border-color:var(--cyan);color:var(--text);outline:none}
+.market-choice button.active,.market-metric-choice button.active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 11%,var(--panel2));color:var(--text)}
+.market-item-search{display:grid;gap:4px;min-width:220px;flex:1 1 260px;color:var(--dim);font-size:10px}
+.market-item-search input{width:100%;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--text);padding:9px 11px;font:500 13px var(--font)}
+.market-item-search input:focus{border-color:var(--cyan);outline:2px solid color-mix(in srgb,var(--cyan) 20%,transparent);outline-offset:1px}
+.market-result-count{margin-left:auto;color:var(--dim);font-size:11px;white-space:nowrap}
+.vegetable-price-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.vegetable-price-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:5px 8px;min-width:0;padding:12px;border:1px solid var(--line);border-top:3px solid var(--dim);border-radius:8px;background:var(--panel2);color:var(--text);text-align:left;cursor:pointer;box-shadow:none}
+.vegetable-price-card:hover,.vegetable-price-card:focus-visible{border-color:var(--cyan);transform:translateY(-1px);outline:none}
+.vegetable-price-card.selected{outline:2px solid color-mix(in srgb,var(--cyan) 55%,transparent);outline-offset:1px}
+.vegetable-price-card.market-card-rise{border-top-color:var(--red);background:color-mix(in srgb,var(--red) 6%,var(--panel2))}
+.vegetable-price-card.market-card-fall{border-top-color:var(--green);background:color-mix(in srgb,var(--green) 6%,var(--panel2))}
+.vegetable-card-top{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.vegetable-card-top b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.vegetable-card-top small{flex:0 0 auto;border-radius:999px;background:color-mix(in srgb,var(--cyan) 9%,var(--panel));color:var(--dim);padding:2px 6px;font-size:9px}
+.vegetable-price-card>strong{min-width:0;color:var(--text);font:800 23px var(--head);white-space:nowrap}
+.vegetable-price-card>strong small{margin-left:4px;color:var(--dim);font:500 9px var(--font)}
+.vegetable-card-previous,.vegetable-card-volume,.vegetable-card-range{grid-column:1/-1;color:var(--dim);font-size:10px;line-height:1.35}
+.vegetable-card-range{padding-top:4px;border-top:1px solid var(--line)}
+.dashboard-market-prices .market-movement-badge{display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;color:var(--text);font-size:10px;font-weight:750;white-space:nowrap}
+.dashboard-market-prices .market-movement-glyph{font-size:12px;line-height:1}
+.dashboard-market-prices .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
+.dashboard-market-prices .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
+.dashboard-market-prices .market-movement-badge.steady,.dashboard-market-prices .market-movement-badge.neutral{color:var(--dim)}
+.market-show-more{justify-self:center}
+.market-week-analysis{display:grid;gap:10px;border:1px solid var(--line);border-radius:9px;background:color-mix(in srgb,var(--cyan) 3%,var(--panel2));padding:14px}
+.market-week-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.market-week-heading>div:first-child>span{display:block;margin-bottom:3px;color:var(--cyan);font-size:10px;font-weight:750;letter-spacing:.06em}
+.market-week-heading h3 small{margin-left:4px;color:var(--dim);font:500 11px var(--font)}
+.market-axis-guide,.market-week-period{margin:0;color:var(--dim);font-size:10px;line-height:1.55}
+.market-axis-guide{border-left:3px solid var(--cyan);padding:7px 10px;background:var(--panel2)}
+.market-axis-guide b{color:var(--text)}
+.market-week-chart{position:relative;min-height:280px}
+@media(max-width:1100px){.vegetable-price-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.market-price-heading,.market-week-heading{display:grid}.market-price-links{justify-content:flex-start}.vegetable-price-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.market-result-count{margin-left:0}.market-week-chart{min-height:250px}}
+@media(max-width:430px){.vegetable-price-grid{grid-template-columns:1fr}.market-price-links a{flex:1 1 auto}.market-item-search{flex-basis:100%;min-width:0}.market-result-count{width:100%}.market-week-chart{min-height:230px}}

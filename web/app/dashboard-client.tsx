@@ -33,6 +33,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
 import { WeatherWidget } from './weather-widget';
+import { DashboardMarketCarousel } from './dashboard-market-carousel';
 import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
@@ -394,7 +395,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         <section className="dash-widget" key={item.widget_key}
           style={{ gridColumn: `span ${item.width}`, minHeight: item.height * 56 }}>
           <header><h2>{item.title}</h2><span>{item.widget_key}</span></header>
-          {widget(item)}
+          {item.widget_key === 'market_snapshot' ? <DashboardMarketCarousel /> : widget(item)}
         </section>)}
     </div>
   </AppShell>;
