@@ -63,7 +63,8 @@ function dbMessage(error: { code?: string; message?: string } | null, fallback: 
       '啟用中的一般人員必須指定直屬課室主管', '直屬主管必須是啟用中的帳號',
       '直屬主管必須具備單位主管或系統管理員角色', '直屬主管必須具備課室主管或系統管理員角色',
       '直屬主管必須位於人員所屬單位或其上層部／室', '直屬主管必須與人員屬於同一單位',
-      '這位主管底下還有',
+      '這位主管底下還有', '此人原有', '接任主管不可設定為原主管本人',
+      '接任主管必須是另一位啟用中的單位主管或系統管理員', '接任主管無法管理全部原直屬人員',
     ].find(prefix => message.includes(prefix));
     return knownRule ? message : '資料不符合系統規則';
   }
@@ -565,7 +566,7 @@ export async function handleAdminApiRequest(req: Request) {
     }
 
     if (action === 'admin_update_user') {
-      const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
+      const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null, replacementSupervisorId = id(body.replacement_supervisor_id) || null;
       if (!userId || !name || !/^[A-Za-z0-9._-]{3,64}$/.test(username) || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '人員資料或角色設定無效' }, 400);
       const { data: before } = await admin.from('users').select('user_id,auth_id,name,username,phone,dept_id,department,role,rbac_role,supervisor_id,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
@@ -575,16 +576,23 @@ export async function handleAdminApiRequest(req: Request) {
       // 更新前檢查 username 是否與其他使用者重複（排除自己），避免重名帳號。
       const { count: usernameCount } = await admin.from('users').select('*', { count: 'exact', head: true }).eq('username', username).neq('user_id', userId);
       if (Number(usernameCount || 0) > 0) return reply(req, { ok: false, message: '登入帳號已存在' }, 409);
-      // 更新姓名/電話不應清除個人權限覆寫（permissions 欄位保留原值）。
+      // 單位、課室及角色輪調必須與原直屬人員改派同一交易完成；若任一步不合法，
+      // PostgreSQL 會整筆回滾，避免只改到一半。個人 permissions 覆寫維持原值。
       const changes = { name, username, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId };
-      const { error } = await admin.from('users').update(changes).eq('user_id', userId);
+      const { data: rotation, error } = await admin.rpc('admin_rotate_user_assignment', {
+        p_user_id: userId, p_name: name, p_username: username, p_phone: phone,
+        p_dept_id: deptId, p_department: changes.department, p_role: changes.role,
+        p_rbac_role: rbacRole, p_supervisor_id: supervisorValidation.supervisorId,
+        p_replacement_supervisor_id: replacementSupervisorId,
+      });
       if (error) return reply(req, { ok: false, message: dbMessage(error, '人員資料更新失敗') }, 400);
       if (before.auth_id) {
         const { error: authError } = await admin.auth.admin.updateUserById(before.auth_id, { user_metadata: { name, username } });
         if (authError) console.warn('admin auth metadata sync failed:', authError.message);
       }
-      await audit('users', userId, 'update', { before, after: changes });
-      return reply(req, { ok: true });
+      const reassignedCount = Number((rotation as Record<string, unknown> | null)?.reassigned_count || 0);
+      await audit('users', userId, 'update', { before, after: changes, replacement_supervisor_id: replacementSupervisorId, reassigned_count: reassignedCount });
+      return reply(req, { ok: true, message: reassignedCount > 0 ? `人員資料已更新，並同步改派 ${reassignedCount} 位原直屬人員` : '人員資料已更新' });
     }
 
     if (action === 'admin_toggle_user') {
@@ -680,6 +688,15 @@ export async function handleAdminApiRequest(req: Request) {
       if (userId === profile.user_id) return reply(req, { ok: false, message: '不可變更目前登入管理員自己的角色' }, 400);
       const { data: before } = await admin.from('users').select('user_id,rbac_role,role,dept_id,supervisor_id,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
+      if (!['unit_supervisor', 'sysadmin'].includes(rbacRole)) {
+        const { data: directReports, error: directReportError } = await admin.from('users')
+          .select('name').eq('supervisor_id', userId).eq('status', 'active').order('name').limit(200);
+        if (directReportError) return reply(req, { ok: false, message: '人員主管關係檢查失敗，請重新整理後再試' }, 400);
+        if ((directReports || []).length > 0) {
+          const names = (directReports || []).map(row => String(row.name || '')).filter(Boolean).join('、');
+          return reply(req, { ok: false, message: `此帳號仍有 ${directReports?.length || 0} 位直屬人員（${names.slice(0, 200)}）；請到帳號管理調整角色並選擇接任主管` }, 409);
+        }
+      }
       // 「使用者角色指派」也必須和帳號管理共用主管規則。升為主管時清除舊
       // supervisor_id；改為一般角色時保留既有主管，若已無效則明確提示改到
       // 帳號管理重新指派，避免角色頁把人員留在無法啟用的狀態。
