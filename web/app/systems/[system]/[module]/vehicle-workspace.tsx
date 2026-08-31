@@ -194,6 +194,30 @@ function blocksVehicleDispatch(row: Row, today: string, nowTime: string) {
   return false;
 }
 
+/** 排除約束 vehicle_dispatch_no_time_overlap 納入計算的狀態，兩邊必須一致。 */
+const VEHICLE_OCCUPYING_STATUSES = ['pending_approval', 'approved', 'assigned', 'completed'];
+
+/**
+ * 同一台車在重疊時段只能有一張派車單（資料庫的排除約束
+ * vehicle_dispatch_no_time_overlap 才是最終依據）。這裡先在畫面上算一次，
+ * 讓已被佔用的車輛在下拉選單就是停用狀態，而不是讓派車管理員按下去才被退回。
+ * 只看得到自己有權限讀到的申請單，所以可能少偵測、但不會誤判成不可用。
+ */
+function overlapsTripWindow(candidate: Row, target: Row) {
+  if (String(candidate.request_id) === String(target.request_id)) return false;
+  if (!VEHICLE_OCCUPYING_STATUSES.includes(String(candidate.status || ''))) return false;
+  const span = (row: Row) => {
+    const date = String(row.trip_date || '');
+    const from = String(row.planned_departure_time || '');
+    const to = String(row.planned_return_time || '');
+    return date && from && to ? { from: `${date} ${from}`, to: `${date} ${to}` } : null;
+  };
+  const a = span(candidate);
+  const b = span(target);
+  if (!a || !b) return false;
+  return a.from < b.to && b.from < a.to;   // 半開區間 [from, to)，與資料庫的 '[)' 一致
+}
+
 /**
  * 三個維護用模組不開放給一般使用人。系統入口已不顯示這三張圖卡，
  * 但直接輸入網址仍會進來，所以這裡用同一份判斷（`@/lib/fleet-role`）再擋一次。
@@ -279,6 +303,10 @@ function RequestsModule({ module, profile }: Props) {
   const blockedVehicleIds = useMemo(() => new Set(rows
     .filter(row => blocksVehicleDispatch(row, today, nowTime) && row.vehicle_id)
     .map(row => String(row.vehicle_id))), [rows, today, nowTime]);
+  // 與目前這張單的用車時段重疊、已被其他派車單佔用的車輛。
+  const occupiedVehicleIds = useMemo(() => new Set(detail
+    ? rows.filter(row => row.vehicle_id && overlapsTripWindow(row, detail)).map(row => String(row.vehicle_id))
+    : []), [rows, detail]);
 
   // KPI 統計數字
   const kApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_approval').length, [rows]);
@@ -447,7 +475,7 @@ function RequestsModule({ module, profile }: Props) {
 
     {detail && <DetailModal row={detail} logs={logs} busy={busy} profile={profile}
       vehicles={vehicles} drivers={drivers} canDispatch={canManageFleet || isAdmin}
-      blockedVehicleIds={blockedVehicleIds}
+      blockedVehicleIds={blockedVehicleIds} occupiedVehicleIds={occupiedVehicleIds}
       canApprove={isAdmin || (isUnitSupervisor && detail.applicant_id !== profile.user_id)}
       onClose={() => setDetail(null)} onAct={act} onTrip={() => { setTripFor(detail); setDetail(null); }} />}
 
@@ -758,9 +786,9 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
   </AdminModal>;
 }
 
-function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehicleIds, canDispatch, canApprove, onClose, onAct, onTrip }: {
+function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehicleIds, occupiedVehicleIds, canDispatch, canApprove, onClose, onAct, onTrip }: {
   row: Row; logs: Row[]; busy: boolean; profile: Profile; vehicles: Row[]; drivers: Row[]; canDispatch: boolean; canApprove: boolean;
-  blockedVehicleIds: Set<string>;
+  blockedVehicleIds: Set<string>; occupiedVehicleIds: Set<string>;
   onClose: () => void; onTrip: () => void;
   onAct: (requestId: string, action: string, extra?: { note?: string; vehicleId?: string; driverId?: string }, success?: string) => Promise<boolean>;
 }) {
@@ -773,6 +801,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
     && (row.applicant_id === profile.user_id || row.driver_id === profile.user_id || canDispatch);
   const followup = vehicleFollowup(row, taipeiToday(), taipeiCurrentTime());
   const selectedVehicleBlocked = Boolean(vehicleId && blockedVehicleIds.has(vehicleId));
+  const selectedVehicleOccupied = Boolean(vehicleId && occupiedVehicleIds.has(vehicleId));
 
   const field = (label: string, value: unknown) => <div><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
 
@@ -816,7 +845,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
     {row.status === 'approved' && canDispatch && <div className="admin-form-grid">
       <label>指派車輛<select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
         <option value="">-- 請選擇 --</option>
-        {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : ''}</option>; })}
+        {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); const occupied = occupiedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked || occupied}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : occupied ? '（該時段已被派用）' : ''}</option>; })}
       </select></label>
       <label>指派駕駛<select value={driverId} onChange={e => setDriverId(e.target.value)}>
         <option value="">-- 請選擇 --</option>
@@ -824,6 +853,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       </select></label>
       <label className="wide">派車備註<input value={reason} onChange={e => setReason(e.target.value)} /></label>
       {selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛上一趟行程尚未補齊里程，暫停派車；請先由司機完成回報。</p>}
+      {selectedVehicleOccupied && !selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛在本申請的用車時段已被其他派車單使用，請改派其他車輛或調整用車時段。</p>}
     </div>}
     {canCancel && <div className="admin-form-grid">
       <label className="wide">取消原因（取消時必填）<select value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
@@ -841,7 +871,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'approve', { note: reason }, '已核可申請')}>核可</button>
       </>}
       {row.status === 'approved' && canDispatch &&
-        <button className="primary-btn compact" disabled={busy || !vehicleId || !driverId || selectedVehicleBlocked} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}
+        <button className="primary-btn compact" disabled={busy || !vehicleId || !driverId || selectedVehicleBlocked || selectedVehicleOccupied} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}
       {row.status === 'assigned' && isDriver && !row.driver_accepted_at &&
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'accept', {}, '已接單')}>接單</button>}
       {row.status === 'assigned' && isDriver && row.driver_accepted_at &&

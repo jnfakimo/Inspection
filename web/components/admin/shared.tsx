@@ -29,6 +29,9 @@ export function errorMessage(error: unknown, fallback = '操作失敗，請稍�
   const message = raw.replace(/^\s*(?:Edge Function|Function)\s*(?:失敗|錯誤|failed|error)\s*[:：-]?\s*/i, '').trim();
   if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(message)) return '目前帳號沒有執行此操作的權限';
   if (/duplicate|unique/i.test(message)) return '資料已存在，請勿重複建立';
+  // 排除約束（同一資源的時段重疊）不屬於 unique，先前會一路掉到最後的通用備援
+  // 「操作失敗，請稍後再試」，讓使用者誤以為是暫時性故障而重試。
+  if (/exclusion constraint|23P01/i.test(message)) return '所選時段與現有安排重疊，請改選其他時段或資源';
   if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(message)) return '網路連線失敗，請確認連線後再試';
   if (/jwt.*expired|token.*expired|invalid.*jwt|invalid.*token|auth session missing|refresh.*token/i.test(message)) return '登入已過期，請重新登入';
   if (/not authenticated|unauthorized|尚未登入|未登入|登入狀態無效/i.test(message)) return '無法確認登入狀態，請重新登入';
