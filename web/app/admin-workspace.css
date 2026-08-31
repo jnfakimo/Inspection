@@ -291,3 +291,22 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
     white-space:nowrap;
   }
 }
+
+/* 帳號管理：批次匯入／匯出與建立表單錯誤訊息。錯誤留在彈窗內，避免被頁首提示列遮住。 */
+.users-batch-panel{display:grid;gap:10px}
+.users-batch-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.users-batch-toolbar h2{margin:0;font-size:1rem;color:var(--ink)}
+.users-batch-toolbar p,.users-batch-hint{margin:4px 0 0;color:var(--muted);font-size:.8rem;line-height:1.5}
+.users-batch-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.users-import-input{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;clip-path:inset(50%)}
+.users-batch-message{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.users-batch-details{display:grid;gap:4px;margin:0;padding:10px 14px 10px 30px;border:1px solid color-mix(in srgb,var(--amber) 30%,var(--line));border-radius:5px;background:color-mix(in srgb,var(--amber) 5%,var(--surface));color:var(--muted);font-size:.78rem;line-height:1.5}
+.users-temp-passwords{display:grid;gap:7px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--cyan) 28%,var(--line));border-left:3px solid var(--cyan);border-radius:5px;background:color-mix(in srgb,var(--cyan) 5%,var(--surface))}
+.users-temp-passwords strong{color:var(--cyan)}
+.users-temp-passwords>span{color:var(--muted);font-size:.78rem;line-height:1.5}
+.users-temp-passwords>div{display:flex;gap:7px;flex-wrap:wrap}
+.users-editor-error{margin:0 20px 16px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
+@media (max-width:800px){
+  .users-batch-toolbar{align-items:stretch;flex-direction:column;gap:10px}
+  .users-batch-actions{justify-content:flex-end}
+}
