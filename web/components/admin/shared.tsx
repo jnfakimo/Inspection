@@ -24,17 +24,24 @@ export const SYSTEM_PERMISSIONS = [
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
   const raw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error) ? String((error as Record<string, unknown>).message) : String(error || '');
-  if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(raw)) return '目前帳號沒有執行此操作的權限';
-  if (/duplicate|unique/i.test(raw)) return '資料已存在，請勿重複建立';
-  if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(raw)) return '網路連線失敗，請確認連線後再試';
-  if (/jwt.*expired|token.*expired|invalid.*jwt|invalid.*token|auth session missing|refresh.*token/i.test(raw)) return '登入已過期，請重新登入';
-  if (/not authenticated|unauthorized|尚未登入|未登入|登入狀態無效/i.test(raw)) return '無法確認登入狀態，請重新登入';
-  if (/timeout|timed out|gateway timeout/i.test(raw)) return '系統回應逾時，請稍後再試';
-  if (/rate limit|too many requests|security purposes.*seconds/i.test(raw)) return '操作過於頻繁，請稍後再試';
-  if (/foreign key|violates.*reference/i.test(raw)) return '關聯資料不完整，無法完成操作';
-  if (/not-null|null value|required|cannot be blank/i.test(raw)) return '請完整填寫必填欄位';
-  if (/check constraint|invalid input|invalid format|malformed/i.test(raw)) return '輸入資料格式不正確';
-  return raw || fallback;
+  // Edge Function 的錯誤外層標籤不應直接顯示給使用者；保留真正的業務訊息，
+  // 讓「預計出發時間已過」等繁中訊息能正常呈現。
+  const message = raw.replace(/^\s*(?:Edge Function|Function)\s*(?:失敗|錯誤|failed|error)\s*[:：-]?\s*/i, '').trim();
+  if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(message)) return '目前帳號沒有執行此操作的權限';
+  if (/duplicate|unique/i.test(message)) return '資料已存在，請勿重複建立';
+  if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(message)) return '網路連線失敗，請確認連線後再試';
+  if (/jwt.*expired|token.*expired|invalid.*jwt|invalid.*token|auth session missing|refresh.*token/i.test(message)) return '登入已過期，請重新登入';
+  if (/not authenticated|unauthorized|尚未登入|未登入|登入狀態無效/i.test(message)) return '無法確認登入狀態，請重新登入';
+  if (/timeout|timed out|gateway timeout/i.test(message)) return '系統回應逾時，請稍後再試';
+  if (/rate limit|too many requests|security purposes.*seconds/i.test(message)) return '操作過於頻繁，請稍後再試';
+  if (/foreign key|violates.*reference/i.test(message)) return '關聯資料不完整，無法完成操作';
+  if (/not-null|null value|required|cannot be blank/i.test(message)) return '請完整填寫必填欄位';
+  if (/check constraint|invalid input|invalid format|malformed|syntax.*type/i.test(message)) return '輸入資料格式不正確';
+  if (/not found|does not exist|no rows/i.test(message)) return '找不到相關資料，請重新整理後再試';
+  if (/edge function|internal server error|server error|unexpected error|unknown error/i.test(message)) return '系統服務暫時無法完成，請稍後再試';
+  // 未對應的純英文平台錯誤不要直接露出；資料內容若已有繁中則保留業務訊息。
+  if (message && !/[\u3400-\u9fff]/.test(message) && /^[\x20-\x7e\s]+$/.test(message)) return fallback;
+  return message || fallback;
 }
 export function fmt(value: unknown) {
   if (value == null || value === '') return '—';

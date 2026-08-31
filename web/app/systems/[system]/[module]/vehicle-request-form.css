@@ -1,4 +1,20 @@
 /* 派車申請表在桌面維持共用雙欄版型；手機將指定欄位成對排列。 */
+.vehicle-combobox,
+.vehicle-combobox-control {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.vehicle-combobox-control > input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vehicle-combobox-toggle {
+  display: none;
+}
+
 @media (max-width: 800px) {
   .vehicle-request-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -31,6 +47,80 @@
   .vehicle-request-form .vehicle-request-note textarea {
     display: block;
     min-height: 72px;
+  }
+
+  /* iOS 會把 datalist 選項放在鍵盤上方，手機改用欄位內的展開按鈕與清單，
+     選項會緊貼對應輸入框，不會和另一欄混在一起。 */
+  .vehicle-combobox.is-mobile .vehicle-combobox-control > input {
+    padding-right: 40px;
+  }
+
+  .vehicle-combobox-toggle {
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    color: var(--muted);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .vehicle-combobox-toggle:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+
+  .vehicle-combobox-menu {
+    position: absolute;
+    z-index: 30;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    display: grid;
+    gap: 3px;
+    max-height: 190px;
+    overflow-y: auto;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 16%, transparent);
+  }
+
+  .vehicle-combobox-menu button {
+    min-height: 38px;
+    padding: 7px 10px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: var(--surface-soft);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .vehicle-combobox-menu button:hover,
+  .vehicle-combobox-menu button:focus-visible,
+  .vehicle-combobox-menu button.is-selected {
+    border-color: var(--blue);
+    background: color-mix(in srgb, var(--blue) 10%, var(--surface-soft));
+    color: var(--blue);
+    outline: none;
+  }
+
+  .vehicle-combobox-empty {
+    padding: 9px 10px;
+    color: var(--muted);
+    font-size: .82rem;
   }
 }
 

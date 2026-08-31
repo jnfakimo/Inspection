@@ -7,7 +7,7 @@
 //   vehicle_request_action  —— 核可／退回／派車／接單／取消（security definer，內含 RLS 等價檢查）
 //   complete_vehicle_trip   —— 司機行車回報（單一交易內更新申請單、車輛里程與流程歷程）
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
 import './vehicle-request-form.css';
@@ -70,6 +70,85 @@ function numberOrNull(value: string) {
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+const VEHICLE_ORIGIN_OPTIONS = ['第二市場', '市場處'];
+const VEHICLE_DESTINATION_OPTIONS = ['第一市場', '市場處'];
+const VEHICLE_PURPOSE_OPTIONS = ['會勘', '開會', '考察'];
+
+/**
+ * 可輸入文字／數字、也可從常用選項挑選的派車欄位。
+ * 桌面維持原生 datalist；手機改成欄位內的展開按鈕與 listbox，避免 iOS 把選項
+ * 放到鍵盤上方，使用者能清楚看到選項屬於哪一個輸入框。
+ */
+function VehicleCombobox({
+  id, value, options, onChange, placeholder = '可輸入文字或數字',
+}: {
+  id: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const [mobile, setMobile] = useState(false);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const listId = `${id}-options`;
+  const visibleOptions = options.filter(option => !value.trim() || option.includes(value.trim()));
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 800px), (pointer: coarse)');
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeWhenOutside = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeWhenOutside);
+    return () => document.removeEventListener('pointerdown', closeWhenOutside);
+  }, [open]);
+
+  return <div ref={containerRef} className={`vehicle-combobox${mobile ? ' is-mobile' : ''}`}>
+    <div className="vehicle-combobox-control">
+      <input
+        id={id}
+        list={mobile ? undefined : listId}
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        role={mobile ? 'combobox' : undefined}
+        aria-autocomplete={mobile ? 'list' : undefined}
+        aria-expanded={mobile ? open : undefined}
+        aria-controls={mobile ? `${id}-menu` : undefined}
+        onFocus={() => { if (mobile) setOpen(true); }}
+        onChange={event => { onChange(event.target.value); if (mobile) setOpen(true); }}
+      />
+      {mobile && <button
+        type="button"
+        className="vehicle-combobox-toggle"
+        aria-label={open ? '收合選項' : '展開選項'}
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+      >⌄</button>}
+    </div>
+    <datalist id={listId}>{options.map(option => <option key={option} value={option} />)}</datalist>
+    {mobile && open && <div id={`${id}-menu`} className="vehicle-combobox-menu" role="listbox">
+      {visibleOptions.map(option => <button
+        type="button"
+        role="option"
+        aria-selected={value === option}
+        className={value === option ? 'is-selected' : ''}
+        key={option}
+        onClick={() => { onChange(option); setOpen(false); }}
+      >{option}</button>)}
+      {!visibleOptions.length && <span className="vehicle-combobox-empty">可保留自訂文字或數字</span>}
+    </div>}
+  </div>;
 }
 
 function missingNumber(value: unknown) {
@@ -572,7 +651,7 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
     try {
       await invokeAppApi('save_official_vehicle', editing.vehicle_id ? { vehicle_id: String(editing.vehicle_id), ...payload } : payload);
       setEditing(null); await load();
-    } catch (error) { alert(`失敗：${error instanceof Error ? error.message : String(error)}`); }
+    } catch (error) { alert(`失敗：${errorMessage(error)}`); }
     setBusy(false);
   };
 
@@ -646,7 +725,7 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
       });
       onDone('派車申請已送出，待單位主管核可');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorMessage(error));
       setBusy(false); return;
     }
   };
@@ -657,15 +736,12 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
       <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
       <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
-      <label>出發地<input list="vehicle-origin-options" value={form.origin_location} onChange={e => set('origin_location', e.target.value)} /></label>
-      <label>目的地（必填）<input list="vehicle-destination-options" value={form.destination_location} onChange={e => set('destination_location', e.target.value)} /></label>
+      <label>出發地<VehicleCombobox id="vehicle-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
+      <label>目的地（必填）<VehicleCombobox id="vehicle-destination" value={form.destination_location} options={VEHICLE_DESTINATION_OPTIONS} onChange={value => set('destination_location', value)} /></label>
       <label>聯絡電話<input value={form.applicant_phone} onChange={e => set('applicant_phone', e.target.value)} placeholder="分機或手機" /></label>
-      <label className="wide vehicle-request-purpose">用途（必填）<input list="vehicle-purpose-options" value={form.trip_purpose} onChange={e => set('trip_purpose', e.target.value)} /></label>
+      <label className="wide vehicle-request-purpose">用途（必填）<VehicleCombobox id="vehicle-purpose" value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} onChange={value => set('trip_purpose', value)} /></label>
       <label className="wide vehicle-request-note">備註<textarea rows={2} value={form.applicant_note} onChange={e => set('applicant_note', e.target.value)} /></label>
     </div>
-    <datalist id="vehicle-origin-options"><option value="第二市場" /><option value="市場處" /></datalist>
-    <datalist id="vehicle-destination-options"><option value="第一市場" /><option value="市場處" /></datalist>
-    <datalist id="vehicle-purpose-options"><option value="會勘" /><option value="開會" /><option value="考察" /></datalist>
     {message && <p className="inline-message danger">{message}</p>}
     <footer>
       <button className="secondary-btn" onClick={onClose}>取消</button>
