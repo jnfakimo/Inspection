@@ -52,6 +52,24 @@ async function downloadWorkbook(workbook: any, filename: string) {
 }
 
 type TemporaryPassword = { name: string; username: string; password: string };
+type BatchCreateRow = {
+  row_number: number;
+  name: string;
+  username: string;
+  email: string;
+  phone: string;
+  dept_id: string | null;
+  rbac_role: string;
+  supervisor_id: string | null;
+  password: string;
+};
+type BatchCreateResult = {
+  success: number;
+  skipped: number;
+  failed: number;
+  details: string[];
+  created_usernames: string[];
+};
 
 export function UsersAdmin({ profile, module }: AdminProps) {
   const [users, setUsers] = useState<Row[]>([]), [roles, setRoles] = useState<Row[]>([]), [departments, setDepartments] = useState<Row[]>([]), [applications, setApplications] = useState<Row[]>([]);
@@ -112,6 +130,19 @@ export function UsersAdmin({ profile, module }: AdminProps) {
   }, [activeDepartments, secretaryReportsToDeputy]);
   const rootDepartments = useMemo(() => activeDepartments.filter(dept => !dept.parent_id), [activeDepartments]);
   const supervisors = useMemo(() => users.filter(user => user.status === 'active' && ['unit_supervisor', 'sysadmin'].includes(userRole(user))), [users]);
+  const supervisorOptions = useCallback((memberDeptId: unknown, currentSupervisorId = '') => {
+    const eligible = supervisors.filter(supervisor => {
+      // 尚未選擇部／室時，不列出任意部門主管，避免誤把跨單位人員指定為直屬主管；
+      // 系統管理員仍可跨單位協助處理例外帳號。
+      if (userRole(supervisor) === 'sysadmin') return true;
+      return Boolean(memberDeptId) && supervisorMatchesDepartment(supervisor.dept_id, memberDeptId);
+    });
+    if (currentSupervisorId && !eligible.some(supervisor => String(supervisor.user_id) === currentSupervisorId)) {
+      const current = supervisors.find(supervisor => String(supervisor.user_id) === currentSupervisorId);
+      if (current) return [...eligible, current];
+    }
+    return eligible;
+  }, [supervisors, supervisorMatchesDepartment]);
   const pendingApplications = useMemo(() => applications.filter(application => application.status === 'pending'), [applications]);
   const filtered = useMemo(() => users.filter(user => {
     const q = query.trim().toLowerCase();
@@ -264,6 +295,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       const existingUsernames = new Set(users.map(user => accountKey(user.username)));
       const existingEmails = new Set(users.map(user => String(user.email || '').toLowerCase()));
       let success = 0; let skipped = 0; let failed = 0;
+      const pendingRows: BatchCreateRow[] = [];
       const generated: TemporaryPassword[] = [];
       for (let index = headerIndex + 1; index < matrix.length; index += 1) {
         const row = matrix[index]; if (!row.some(Boolean)) continue;
@@ -290,14 +322,27 @@ export function UsersAdmin({ profile, module }: AdminProps) {
         const generatedPassword = !passwordCell || passwordCell === '000000000';
         const password = generatedPassword ? temporaryPassword() : passwordCell; const passwordError = passwordPolicyMessage(password);
         if (passwordError) { details.push(`第 ${rowNumber} 列「${username}」：${passwordError}`); failed += 1; continue; }
+        pendingRows.push({ row_number: rowNumber, name, username, email, phone: value(phoneIndex), dept_id: deptId,
+          rbac_role: selectedRole, supervisor_id: supervisor?.user_id || null, password });
+        existingUsernames.add(accountKey(username)); existingEmails.add(email);
+        if (generatedPassword) generated.push({ name, username, password });
+      }
+      if (pendingRows.length > 0) {
         try {
-          await invokeAdminApi('admin_create_user', { action: 'admin_create_user', name, username, email, phone: value(phoneIndex), dept_id: deptId, rbac_role: selectedRole, supervisor_id: supervisor?.user_id || null, password });
-          existingUsernames.add(accountKey(username)); existingEmails.add(email); success += 1;
-          if (generatedPassword) generated.push({ name, username, password });
-        } catch (error) { details.push(`第 ${rowNumber} 列「${username}」：${errorMessage(error)}`); failed += 1; }
+          const result = await invokeAdminApi<BatchCreateResult>('admin_create_users_batch', { action: 'admin_create_users_batch', rows: pendingRows });
+          success += Number(result?.success || 0); skipped += Number(result?.skipped || 0); failed += Number(result?.failed || 0);
+          if (Array.isArray(result?.details)) details.push(...result.details);
+          const created = new Set((result?.created_usernames || []).map(accountKey));
+          setTemporaryPasswords(generated.filter(entry => created.has(accountKey(entry.username))));
+        } catch (error) {
+          const message = errorMessage(error, '批次建立帳號失敗');
+          pendingRows.forEach(row => details.push(`第 ${row.row_number} 列「${row.username}」：${message}`));
+          failed += pendingRows.length;
+          setTemporaryPasswords([]);
+        }
       }
       if (success > 0) await load();
-      setTemporaryPasswords(generated);
+      if (pendingRows.length === 0) setTemporaryPasswords([]);
       setBatchMessage(`匯入完成：成功 ${success} 筆、略過 ${skipped} 筆、失敗 ${failed} 筆`);
       setBatchDetails(details.slice(0, 80));
     } catch (error) { setBatchMessage(`匯入失敗：${errorMessage(error, '無法讀取匯入檔案')}`); setBatchDetails([]); }
@@ -335,9 +380,9 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     {editor && (() => {
       const selectedRootId = String(editor.department_root_id || rootDepartmentId(editor.dept_id));
       const childDepartments = activeDepartments.filter(dept => String(dept.parent_id || '') === selectedRootId);
-      return <AdminModal title={editor.user_id ? '編輯人員帳號' : '新增人員帳號'} onClose={closeEditor}><div className="admin-form-grid"><label>姓名（必填）<input value={editor.name || ''} onChange={event => setEditor({ ...editor, name: event.target.value })}/></label><label>登入帳號（必填）<input value={editor.username || ''} onChange={event => setEditor({ ...editor, username: event.target.value })}/></label><label>電子郵件（{editor.user_id ? '唯讀' : '必填'}）<input type="email" readOnly={Boolean(editor.user_id)} value={editor.email || ''} onChange={event => setEditor({ ...editor, email: event.target.value })}/></label><label>聯絡電話<input value={editor.phone || ''} onChange={event => setEditor({ ...editor, phone: event.target.value })}/></label><label>部／室<select value={selectedRootId} onChange={event => setEditor({ ...editor, department_root_id: event.target.value, dept_id: event.target.value || null, supervisor_id: '' })}><option value="">-- 未指定 --</option>{rootDepartments.map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select></label><label>課／組／隊<select value={editor.dept_id || ''} disabled={!selectedRootId} onChange={event => setEditor({ ...editor, dept_id: event.target.value || null, supervisor_id: '' })}><option value={selectedRootId}>整個部／室（未指定課／組）</option>{childDepartments.map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select>{selectedRootId && childDepartments.length === 0 && <small>此部／室目前沒有可選的課／組／隊。</small>}</label><label>系統角色<select value={editor.rbac_role || 'reporter'} disabled={editor.user_id === profile.user_id} onChange={event => setEditor({ ...editor, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : editor.supervisor_id })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select>{editor.user_id === profile.user_id && <small>為避免中斷管理權限，不可變更自己的角色</small>}</label>{!['unit_supervisor', 'sysadmin'].includes(String(editor.rbac_role || 'reporter')) && <label className="wide">直屬主管（必填）<select value={editor.supervisor_id || ''} onChange={event => setEditor({ ...editor, supervisor_id: event.target.value })}><option value="">-- 請選擇 --</option>{supervisors.filter(supervisor => userRole(supervisor) === 'sysadmin' || supervisorMatchesDepartment(supervisor.dept_id, editor.dept_id)).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select></label>}{!editor.user_id && <label className="wide">初始密碼（{PASSWORD_POLICY.minLength} 位數字）<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={editor.password || ''} onChange={event => setEditor({ ...editor, password: event.target.value })}/></label>}</div>{editorError && <p className="inline-message danger users-editor-error" role="alert" aria-live="assertive">{editorError}</p>}<footer><button className="secondary-btn" onClick={closeEditor}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => void saveUser()}>{busy ? '儲存中…' : '儲存'}</button></footer></AdminModal>;
+      return <AdminModal title={editor.user_id ? '編輯人員帳號' : '新增人員帳號'} onClose={closeEditor}><div className="admin-form-grid"><label>姓名（必填）<input value={editor.name || ''} onChange={event => setEditor({ ...editor, name: event.target.value })}/></label><label>登入帳號（必填）<input value={editor.username || ''} onChange={event => setEditor({ ...editor, username: event.target.value })}/></label><label>電子郵件（{editor.user_id ? '唯讀' : '必填'}）<input type="email" readOnly={Boolean(editor.user_id)} value={editor.email || ''} onChange={event => setEditor({ ...editor, email: event.target.value })}/></label><label>聯絡電話<input value={editor.phone || ''} onChange={event => setEditor({ ...editor, phone: event.target.value })}/></label><label>部／室<select value={selectedRootId} onChange={event => setEditor({ ...editor, department_root_id: event.target.value, dept_id: event.target.value || null, supervisor_id: '' })}><option value="">-- 未指定 --</option>{rootDepartments.map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select></label><label>課／組／隊<select value={editor.dept_id || ''} disabled={!selectedRootId} onChange={event => setEditor({ ...editor, dept_id: event.target.value || null, supervisor_id: '' })}><option value={selectedRootId}>整個部／室（未指定課／組）</option>{childDepartments.map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select>{selectedRootId && childDepartments.length === 0 && <small>此部／室目前沒有可選的課／組／隊。</small>}</label><label>系統角色<select value={editor.rbac_role || 'reporter'} disabled={editor.user_id === profile.user_id} onChange={event => setEditor({ ...editor, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : editor.supervisor_id })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select>{editor.user_id === profile.user_id && <small>為避免中斷管理權限，不可變更自己的角色</small>}</label>{!['unit_supervisor', 'sysadmin'].includes(String(editor.rbac_role || 'reporter')) && <label className="wide">直屬主管（必填）<select value={editor.supervisor_id || ''} onChange={event => setEditor({ ...editor, supervisor_id: event.target.value })}><option value="">{editor.dept_id ? '-- 請選擇 --' : '-- 請先選擇部／室 --'}</option>{supervisorOptions(editor.dept_id, String(editor.supervisor_id || '')).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select>{!editor.dept_id && <small>請先選擇部／室，才會顯示該單位可管理的主管。</small>}</label>}{!editor.user_id && <label className="wide">初始密碼（{PASSWORD_POLICY.minLength} 位數字）<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={editor.password || ''} onChange={event => setEditor({ ...editor, password: event.target.value })}/></label>}</div>{editorError && <p className="inline-message danger users-editor-error" role="alert" aria-live="assertive">{editorError}</p>}<footer><button className="secondary-btn" onClick={closeEditor}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => void saveUser()}>{busy ? '儲存中…' : '儲存'}</button></footer></AdminModal>;
     })()}
-    {applicationReview && <AdminModal title={`審核帳號申請｜${applicationReview.name}`} onClose={() => setApplicationReview(null)}><dl className="detail-grid"><div><dt>登入帳號</dt><dd>{applicationReview.username}</dd></div><div><dt>電子郵件</dt><dd>{applicationReview.email}</dd></div><div><dt>所屬單位</dt><dd>{deptName(applicationReview.dept_id)}</dd></div><div><dt>聯絡電話</dt><dd>{applicationReview.phone || '—'}</dd></div><div><dt>申請說明</dt><dd>{applicationReview.reason || '—'}</dd></div></dl><div className="admin-form-grid"><label>系統角色（管理員核定）<select value={applicationReview.rbac_role} onChange={event => setApplicationReview({ ...applicationReview, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : applicationReview.supervisor_id })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select></label>{!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && <label>直屬主管（必填）<select value={applicationReview.supervisor_id || ''} onChange={event => setApplicationReview({ ...applicationReview, supervisor_id: event.target.value })}><option value="">-- 請選擇 --</option>{supervisors.filter(supervisor => userRole(supervisor) === 'sysadmin' || supervisorMatchesDepartment(supervisor.dept_id, applicationReview.dept_id)).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select></label>}<label className="wide">審核備註（退回時必填）<textarea rows={3} value={applicationReview.decision_note || ''} onChange={event => setApplicationReview({ ...applicationReview, decision_note: event.target.value })}/></label></div><footer><button className="secondary-btn" onClick={() => setApplicationReview(null)}>取消</button><button className="secondary-btn danger" disabled={busy} onClick={() => void run({ action: 'admin_reject_account_application', application_id: applicationReview.application_id, decision_note: applicationReview.decision_note || '' }, '帳號申請已退回')}>退回</button><button className="primary-btn compact" disabled={busy || (!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && !applicationReview.supervisor_id)} onClick={() => void run({ action: 'admin_approve_account_application', application_id: applicationReview.application_id, rbac_role: applicationReview.rbac_role, supervisor_id: applicationReview.supervisor_id || null, decision_note: applicationReview.decision_note || '' }, '帳號已核准')}>核准並寄啟用連結</button></footer></AdminModal>}
+    {applicationReview && <AdminModal title={`審核帳號申請｜${applicationReview.name}`} onClose={() => setApplicationReview(null)}><dl className="detail-grid"><div><dt>登入帳號</dt><dd>{applicationReview.username}</dd></div><div><dt>電子郵件</dt><dd>{applicationReview.email}</dd></div><div><dt>所屬單位</dt><dd>{deptName(applicationReview.dept_id)}</dd></div><div><dt>聯絡電話</dt><dd>{applicationReview.phone || '—'}</dd></div><div><dt>申請說明</dt><dd>{applicationReview.reason || '—'}</dd></div></dl><div className="admin-form-grid"><label>系統角色（管理員核定）<select value={applicationReview.rbac_role} onChange={event => setApplicationReview({ ...applicationReview, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : applicationReview.supervisor_id })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select></label>{!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && <label>直屬主管（必填）<select value={applicationReview.supervisor_id || ''} onChange={event => setApplicationReview({ ...applicationReview, supervisor_id: event.target.value })}><option value="">{applicationReview.dept_id ? '-- 請選擇 --' : '-- 請先確認所屬單位 --'}</option>{supervisorOptions(applicationReview.dept_id, String(applicationReview.supervisor_id || '')).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select>{!applicationReview.dept_id && <small>此申請尚未指定所屬單位，請先補齊單位後再核准。</small>}</label>}<label className="wide">審核備註（退回時必填）<textarea rows={3} value={applicationReview.decision_note || ''} onChange={event => setApplicationReview({ ...applicationReview, decision_note: event.target.value })}/></label></div><footer><button className="secondary-btn" onClick={() => setApplicationReview(null)}>取消</button><button className="secondary-btn danger" disabled={busy} onClick={() => void run({ action: 'admin_reject_account_application', application_id: applicationReview.application_id, decision_note: applicationReview.decision_note || '' }, '帳號申請已退回')}>退回</button><button className="primary-btn compact" disabled={busy || (!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && !applicationReview.supervisor_id)} onClick={() => void run({ action: 'admin_approve_account_application', application_id: applicationReview.application_id, rbac_role: applicationReview.rbac_role, supervisor_id: applicationReview.supervisor_id || null, decision_note: applicationReview.decision_note || '' }, '帳號已核准')}>核准並寄啟用連結</button></footer></AdminModal>}
     {passwordUser && <AdminModal title={`重設密碼｜${passwordUser.name}`} onClose={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}><div className="admin-form-grid"><label className="wide">新密碼（{PASSWORD_POLICY.minLength} 位數字）<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={password} onChange={event => setPassword(event.target.value)}/></label><label className="wide">再次輸入新密碼<input type="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" value={password2} onChange={event => setPassword2(event.target.value)}/></label></div><footer><button className="secondary-btn" onClick={() => { setPasswordUser(null); setPassword(''); setPassword2(''); }}>取消</button><button className="primary-btn compact" disabled={busy} onClick={() => { const passwordError = passwordPolicyMessage(password); if (passwordError) { setNote(`失敗：${passwordError}`); return; } if (password !== password2) { setNote('失敗：兩次密碼不一致'); return; } void run({ action: 'admin_reset_password', user_id: passwordUser.user_id, password }, '密碼已重設'); }}>確認重設</button></footer></AdminModal>}
   </AppShell>;
 }

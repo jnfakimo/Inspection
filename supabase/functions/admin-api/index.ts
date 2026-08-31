@@ -485,6 +485,53 @@ export async function handleAdminApiRequest(req: Request) {
       return reply(req, { ok: true, message: '帳號申請已退回' });
     }
 
+    if (action === 'admin_create_users_batch') {
+      const source = Array.isArray(body.rows) ? body.rows : [];
+      if (!source.length) return reply(req, { ok: false, message: '沒有可匯入的人員資料' }, 400);
+      if (source.length > 200) return reply(req, { ok: false, message: '單次最多匯入 200 筆人員資料' }, 400);
+      const { data: existing, error: existingError } = await admin.from('users').select('username,email').limit(5000);
+      if (existingError) return reply(req, { ok: false, message: dbMessage(existingError, '人員資料載入失敗') }, 400);
+      const existingUsernames = new Set((existing || []).map(row => clean(row.username, 64).toLowerCase()));
+      const existingEmails = new Set((existing || []).map(row => clean(row.email, 200).toLowerCase()));
+      const details: string[] = [], createdUsernames: string[] = [];
+      let success = 0, skipped = 0, failed = 0;
+      const addFailure = (rowNumber: number, username: string, message: string) => {
+        details.push(`第 ${rowNumber} 列「${username || '未命名'}」：${message}`);
+        failed += 1;
+      };
+      for (const [index, raw] of source.entries()) {
+        const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+        const rowNumber = Number.isInteger(Number(row.row_number)) && Number(row.row_number) > 0 ? Number(row.row_number) : index + 2;
+        const name = clean(row.name, 100), username = clean(row.username, 64), email = clean(row.email, 200).toLowerCase();
+        const phone = clean(row.phone, 50), deptId = id(row.dept_id) || null, rbacRole = clean(row.rbac_role, 40);
+        const supervisorId = id(row.supervisor_id) || null, password = String(row.password || '');
+        if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) { addFailure(rowNumber, username, '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號'); continue; }
+        if (!/^\S+@\S+\.\S+$/.test(email) || /[(),]/.test(email)) { addFailure(rowNumber, username, '電子郵件格式不正確'); continue; }
+        if (existingUsernames.has(username.toLowerCase()) || existingEmails.has(email)) { details.push(`第 ${rowNumber} 列「${username}」：帳號或電子郵件已存在，已跳過`); skipped += 1; continue; }
+        const passwordError = passwordPolicyMessage(password);
+        if (passwordError) { addFailure(rowNumber, username, `初始${passwordError}`); continue; }
+        if (!ROLES.has(rbacRole) && !(await roleExists(rbacRole))) { addFailure(rowNumber, username, '系統角色設定無效'); continue; }
+        const supervisorValidation = await validateSupervisor(supervisorId, deptId, rbacRole);
+        if (supervisorValidation.message) { addFailure(rowNumber, username, supervisorValidation.message); continue; }
+        const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name, username } });
+        if (createError || !created.user) { addFailure(rowNumber, username, '登入帳號建立失敗，請確認電子郵件未被使用'); continue; }
+        const profileData = {
+          auth_id: created.user.id, name, username, email, phone: phone || null, dept_id: deptId,
+          department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector',
+          rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, permissions: {}, status: 'active', created_by: profile.user_id,
+        };
+        const { data: createdProfile, error: profileError } = await admin.from('users').insert(profileData).select('user_id').single();
+        if (profileError || !createdProfile) {
+          await admin.auth.admin.deleteUser(created.user.id);
+          addFailure(rowNumber, username, `人員主檔建立失敗：${dbMessage(profileError, '資料格式不符合規則')}`);
+          continue;
+        }
+        await audit('users', createdProfile.user_id, 'insert', { name, username, email, dept_id: deptId, rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, status: 'active', source: 'batch-import' });
+        existingUsernames.add(username.toLowerCase()); existingEmails.add(email); createdUsernames.push(username); success += 1;
+      }
+      return reply(req, { ok: true, data: { success, skipped, failed, details: details.slice(0, 200), created_usernames: createdUsernames }, message: `匯入完成：成功 ${success} 筆、略過 ${skipped} 筆、失敗 ${failed} 筆` });
+    }
+
     if (action === 'admin_create_user') {
       const name = clean(body.name, 100), username = clean(body.username, 64), email = clean(body.email, 200).toLowerCase(), phone = clean(body.phone, 50), password = String(body.password || ''), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
       if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) return reply(req, { ok: false, message: '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號' }, 400);
