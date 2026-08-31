@@ -27,9 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
-import { MarketMovementBadge } from '@/components/MarketMovementBadge';
-import { marketMovementPresentation } from '@/lib/market-movement';
-import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
 import { WeatherWidget } from './weather-widget';
@@ -44,15 +42,6 @@ type Row = Record<string, any>;
 type LayoutItem = {
   widget_key: string; title: string; x: number; y: number; width: number; height: number;
   min_width: number; min_height: number; visible: boolean; refresh_seconds: number; sort_order: number;
-};
-type MarketSnapshot = {
-  source?: { source_name?: string };
-  rows?: Array<{ dimensions?: Record<string, string>; values?: Record<string, number | null>; compare_values?: Record<string, number | null> }>;
-  measures?: string[];
-  fields?: Array<{ key: string; label: string; kind: string; unit?: string }>;
-  periods?: { from: string; to: string; compare_from: string; compare_to: string };
-  totals?: { values?: Record<string, number | null>; compare_values?: Record<string, number | null> };
-  quality?: { latest_observed_on?: string | null };
 };
 
 // 與 V1 dashboard-layout.js 的 CATALOG 一字不差，兩邊的預設版面才會一致。
@@ -99,12 +88,6 @@ const countBy = (rows: Row[], pick: (row: Row) => unknown): Array<[string, numbe
   return Object.entries(map).sort((a, b) => b[1] - a[1]);
 };
 const average = (list: number[]) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
-const numberText = (value: unknown) => value == null || !Number.isFinite(Number(value)) ? '—' : Number(value).toLocaleString('zh-TW', { maximumFractionDigits: 1 });
-const signedNumberText = (value: unknown) => {
-  if (value == null || !Number.isFinite(Number(value))) return '—';
-  const numeric = Number(value), sign = numeric > 0 ? '+' : numeric < 0 ? '−' : '';
-  return `${sign}${numberText(Math.abs(numeric))}`;
-};
 
 function normalizeLayout(rows: Row[]): LayoutItem[] {
   const byKey: Record<string, Row> = {};
@@ -140,7 +123,6 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   const [requests, setRequests] = useState<Row[]>([]);
   const [orders, setOrders] = useState<Row[]>([]);
   const [trend, setTrend] = useState<Array<{ label: string; value: number }>>([]);
-  const [market, setMarket] = useState<MarketSnapshot | null>(null);
   const [patrol, setPatrol] = useState({ points: 0, done: 0, shift: '', floors: [] as Array<[string, number]> });
   const [range, setRange] = useState<'today' | 'month' | 'year'>('month');
   const [from, setFrom] = useState(() => { const now = new Date(); return ymd(new Date(now.getFullYear(), now.getMonth(), 1)); });
@@ -177,11 +159,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const trendStart = `${now.getFullYear() - (now.getMonth() < 11 ? 1 : 0)}-${pad(((now.getMonth() + 1) % 12) + 1)}-01`;
     const trendEnd = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     const day = today();
-    const marketDays = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1);
-    const marketCompareFrom = ymd(new Date(Date.parse(`${from}T00:00:00Z`) - marketDays * 86400000));
-    const marketCompareTo = ymd(new Date(Date.parse(`${to}T00:00:00Z`) - marketDays * 86400000));
-
-    const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult, marketResult] = await Promise.all([
+    const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult] = await Promise.all([
       client.from('repair_requests')
         .select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,hidden,equipment(name,category)')
         .gte('created_at', rangeStart).lte('created_at', rangeEnd).limit(5000),
@@ -193,10 +171,6 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(5000),
       getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
       getPatrolShiftsForDate(client, day),
-      invokeAppApi<MarketSnapshot>('market_analysis', {
-        from, to, compare_from: marketCompareFrom, compare_to: marketCompareTo,
-        dimensions: ['market', 'category'], measures: ['quantity', 'total_value', 'average_price'],
-      }).then(data => ({ data, error: '' })).catch(error => ({ data: null, error: error instanceof Error ? error.message : '市場交易行情載入失敗' })),
     ]);
 
     if (requestResult.error || orderResult.error) {
@@ -211,11 +185,9 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const patrolFailure = markerResult.error || checkinResult.error;
     if (patrolFailure) notices.push(`當班巡檢資料載入失敗：${patrolFailure.message || '請稍後再試'}`);
     if (trendResult.error) notices.push(`月趨勢統計載入失敗（repair_monthly_counts）：${trendResult.error.message || '請稍後再試'}`);
-    if (marketResult.error) notices.push(`市場交易行情載入失敗：${marketResult.error}`);
     if (notices.length) setError(notices.join('；'));
     setRequests((requestResult.data || []).filter(row => !row.hidden));
     setOrders((orderResult.data || []).filter(row => !row.hidden));
-    setMarket(marketResult.data);
 
     // 12 個月趨勢：RPC 失敗時以 0 補滿，畫面仍成立但不會假造數字。
     const counts: Record<string, number> = {};
@@ -356,18 +328,15 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         return <div style={{ position: 'relative', height: '100%', minHeight: '200px' }}><Line data={data} options={options} /></div>;
       }
       case 'weather_taiwan': return <WeatherWidget />;
-      case 'market_snapshot': {
-        const measure = market?.measures?.includes('quantity') ? 'quantity' : market?.measures?.[0] || '';
-        const field = market?.fields?.find(item => item.key === measure);
-        const items = (market?.rows || []).slice(0, 8);
-        const kpis = ['quantity', 'total_value', 'average_price'].map(key => {
-          const definition = market?.fields?.find(item => item.key === key);
-          const current = market?.totals?.values?.[key], compare = market?.totals?.compare_values?.[key];
-          const percent = current == null || compare == null || Number(compare) === 0 ? null : (Number(current) - Number(compare)) / Math.abs(Number(compare)) * 100;
-          return { key, label: key === 'total_value' ? '推估成交額' : definition?.label || key, unit: definition?.unit || '', current, compare, difference: current == null || compare == null ? null : Number(current) - Number(compare), percent };
-        });
-        return <div className="dash-market-snapshot"><div className="dash-market-meta"><span>{market?.source?.source_name || '尚未設定行情資料來源'}</span><small>{market?.periods ? `${market.periods.from}～${market.periods.to}　比　${market.periods.compare_from}～${market.periods.compare_to}　｜　資料截止 ${market.quality?.latest_observed_on || '—'}` : '可由市場營運分析系統設定'}</small></div>{market && <><div className="dash-market-stock-legend" role="note"><b>台股式差異：</b><span className="rise"><i aria-hidden="true">▲</i> 上漲（紅）</span><span className="fall"><i aria-hidden="true">▼</i> 下跌（綠）</span><small>僅表示本期相較比較期，非漲停／跌停。</small></div><div className="dash-market-kpis">{kpis.map(kpi => { const movement = marketMovementPresentation(kpi.percent); return <div className={`market-card-${movement.tone}`} key={kpi.key}><span>{kpi.label}</span><strong>{numberText(kpi.current)}<small>{kpi.unit}</small></strong><MarketMovementBadge value={kpi.percent} /><small className="dash-market-compare">比較期 {numberText(kpi.compare)}・差異 {signedNumberText(kpi.difference)} {kpi.unit}</small></div>; })}</div></>}{items.length ? <div className="dash-market-list">{items.map((item, index) => <div key={index}><b>{Object.values(item.dimensions || {}).join('／') || '全部'}</b><strong>{numberText(item.values?.[measure])}<small>{field?.unit || ''}</small></strong><span>{item.compare_values?.[measure] == null ? '無比較資料' : `比較 ${numberText(item.compare_values[measure])}`}</span></div>)}</div> : <p className="empty">尚無行情資料，請至「市場營運分析系統」確認正式來源與資料期間。</p>}</div>;
-      }
+      case 'market_snapshot': return <>
+        <div className="dash-market-stock-legend" aria-label="行情方向圖例">
+          <b>行情方向</b>
+          <span className="rise"><i aria-hidden="true">▲</i> 上漲（紅）</span>
+          <span className="fall"><i aria-hidden="true">▼</i> 下跌（綠）</span>
+          <small>與前一交易日相比，紅漲綠跌僅表示價格方向，非漲停／跌停。</small>
+        </div>
+        <DashboardMarketCarousel />
+      </>;
       default: return <p className="empty">未知的版面元件：{item.widget_key}</p>;
     }
   };
@@ -395,7 +364,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         <section className="dash-widget" key={item.widget_key}
           style={{ gridColumn: `span ${item.width}`, minHeight: item.height * 56 }}>
           <header><h2>{item.title}</h2><span>{item.widget_key}</span></header>
-          {item.widget_key === 'market_snapshot' ? <DashboardMarketCarousel /> : widget(item)}
+          {widget(item)}
         </section>)}
     </div>
   </AppShell>;

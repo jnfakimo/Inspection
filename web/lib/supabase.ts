@@ -23,6 +23,7 @@ const READ_ACTION_LABELS: Record<string, string> = {
   official_documents: '讀取公文傳送資料',
   market_catalog: '讀取市場分析設定',
   market_analysis: '讀取交易行情分析',
+  dashboard_market_rotation: '讀取戰情蔬果行情輪播',
 };
 
 // 公文流程的寫入動作固定走 Edge Function，避免舊版 Node API 尚未包含

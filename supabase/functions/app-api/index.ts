@@ -382,6 +382,68 @@ function marketDateRange(value: unknown, fallback: string) {
   return validISODate(candidate) ? candidate : fallback;
 }
 
+const DASHBOARD_MARKETS = ['第一市場', '第二市場'] as const;
+const DASHBOARD_CATEGORIES = ['蔬菜', '水果'] as const;
+type DashboardMarket = typeof DASHBOARD_MARKETS[number];
+type DashboardCategory = typeof DASHBOARD_CATEGORIES[number];
+type DashboardRotationItem = {
+  market: DashboardMarket;
+  category: DashboardCategory;
+  item: string;
+  enabled: boolean;
+  sortOrder: number;
+};
+type DashboardMarketRotation = {
+  sourceId: string;
+  autoStepSeconds: number;
+  cardsPerGroup: number;
+  items: DashboardRotationItem[];
+};
+
+function dashboardMarketRotationConfig(value: unknown): DashboardMarketRotation {
+  const root = marketJsonObject(value);
+  const raw = marketJsonObject(root.market_rotation);
+  const marketSet = new Set<string>(DASHBOARD_MARKETS);
+  const categorySet = new Set<string>(DASHBOARD_CATEGORIES);
+  const seen = new Map<string, number>();
+  const items: DashboardRotationItem[] = [];
+  (Array.isArray(raw.items) ? raw.items : []).forEach((entry, index) => {
+    const row = marketJsonObject(entry);
+    const market = text(row.market, 20);
+    const category = text(row.category, 20);
+    const item = text(row.item, 160);
+    if (!marketSet.has(market) || !categorySet.has(category) || !item) return;
+    const key = `${market}::${category}::${item}`;
+    const parsedOrder = Number(row.sort_order);
+    const normalizedItem: DashboardRotationItem = {
+      market: market as DashboardMarket,
+      category: category as DashboardCategory,
+      item,
+      enabled: row.enabled !== false,
+      sortOrder: Number.isFinite(parsedOrder) ? Math.max(0, Math.min(9999, Math.round(parsedOrder))) : (index + 1) * 10,
+    };
+    const existingIndex = seen.get(key);
+    if (existingIndex !== undefined) { items[existingIndex] = normalizedItem; return; }
+    if (items.length >= 96) return;
+    seen.set(key, items.length);
+    items.push(normalizedItem);
+  });
+  const autoStepSeconds = Number(raw.auto_step_seconds);
+  const cardsPerGroup = Number(raw.cards_per_group);
+  return {
+    sourceId: id(raw.source_id),
+    autoStepSeconds: Number.isFinite(autoStepSeconds) ? Math.max(2, Math.min(30, autoStepSeconds)) : 3.5,
+    cardsPerGroup: Number.isFinite(cardsPerGroup) ? Math.max(4, Math.min(24, Math.round(cardsPerGroup))) : 12,
+    items: items.sort((left, right) => left.sortOrder - right.sortOrder),
+  };
+}
+
+function dashboardMarketShiftDate(value: string, offset: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
 async function writeAudit(
   db: AuditClient, operatorId: string, table: string, recordId: string,
   auditAction: 'insert' | 'update' | 'status_change', before: unknown, after: unknown,
@@ -739,6 +801,7 @@ export async function handleAppApiRequest(req: Request) {
       market_catalog: 'app-api',
       market_dimension_catalog: 'app-api',
       market_analysis: 'app-api',
+      dashboard_market_rotation: 'app-api:dashboard',
       market_simulation_list: 'app-api',
       market_simulation_save: 'admin-api:write',
       market_source_save: 'admin-api:write',
@@ -1249,6 +1312,207 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       return fail('公文流程動作無效', 400);
+    }
+
+    if (action === 'dashboard_market_rotation') {
+      if (!can('dashboard') && !can('marketanalytics')) {
+        return reply(req, { ok: false, message: '目前角色沒有戰情儀表板或市場營運分析系統權限' }, 403);
+      }
+      const view = text(body.view, 20) === 'trend' ? 'trend' : 'cards';
+      let widgetConfig: Record<string, unknown> = {};
+      let refreshSeconds = 60;
+      const layoutResult = await admin.from('dashboard_layouts')
+        .select('published_version_id').eq('layout_code', 'operations_main').eq('status', 'active').maybeSingle();
+      if (layoutResult.error) console.warn('dashboard market layout lookup failed:', layoutResult.error.message);
+      if (layoutResult.data?.published_version_id) {
+        const widgetResult = await admin.from('dashboard_layout_items')
+          .select('config,refresh_seconds').eq('version_id', layoutResult.data.published_version_id)
+          .eq('widget_key', 'market_snapshot').maybeSingle();
+        if (widgetResult.error) console.warn('dashboard market widget lookup failed:', widgetResult.error.message);
+        if (widgetResult.data) {
+          widgetConfig = marketJsonObject(widgetResult.data.config);
+          const parsedRefresh = Number(widgetResult.data.refresh_seconds);
+          if (Number.isFinite(parsedRefresh)) refreshSeconds = Math.max(15, Math.min(86400, Math.round(parsedRefresh)));
+        }
+      }
+      const rotation = dashboardMarketRotationConfig(widgetConfig);
+
+      const sourceResult = await admin.from('market_data_sources')
+        .select('source_id,source_code,source_name,field_definitions,config')
+        .eq('status', 'active').order('source_name').limit(200);
+      if (sourceResult.error) {
+        console.error('dashboard market source lookup failed:', sourceResult.error.message);
+        return reply(req, { ok: false, message: '市場行情資料來源暫時無法讀取' }, 503);
+      }
+      const sourceCandidates = (sourceResult.data || []) as Array<Record<string, unknown>>;
+      const isDecisionSource = (row: Record<string, unknown>) => (
+        text(row.source_code, 60) !== 'market_demo' && marketJsonObject(row.config).is_demo !== true
+      );
+      const source = sourceCandidates.find(row => rotation.sourceId && text(row.source_id, 80) === rotation.sourceId && isDecisionSource(row))
+        || sourceCandidates.find(row => {
+          const config = marketJsonObject(row.config);
+          return isDecisionSource(row) && config.is_default === true && config.is_actual === true;
+        })
+        || sourceCandidates.find(row => isDecisionSource(row) && marketJsonObject(row.config).is_actual === true)
+        || sourceCandidates.find(isDecisionSource);
+      if (!source) return reply(req, { ok: false, message: '尚未設定可供戰情儀表板使用的正式市場行情資料來源' }, 503);
+
+      const sourceId = id(source.source_id);
+      const fields = marketFieldDefinitions(source.field_definitions);
+      const fieldMap = new Map(fields.map(field => [field.key, field]));
+      const dimensions = new Set(fields.filter(field => field.kind === 'dimension').map(field => field.key));
+      const measures = ['quantity', 'average_price', 'high_price', 'low_price'].filter(key => fieldMap.get(key)?.kind === 'measure');
+      if (!['market', 'category', 'item'].every(key => dimensions.has(key)) || !measures.includes('quantity') || !measures.includes('average_price')) {
+        return reply(req, { ok: false, message: '正式行情資料缺少市場、大類、品項、成交量或平均價欄位' }, 503);
+      }
+
+      const rangeResult = await admin.rpc('market_source_date_ranges');
+      if (rangeResult.error) {
+        console.error('dashboard market date range failed:', rangeResult.error.message);
+        return reply(req, { ok: false, message: '市場行情交易日期暫時無法讀取' }, 503);
+      }
+      const range = ((rangeResult.data || []) as Array<Record<string, unknown>>)
+        .find(row => text(row.source_id, 80) === sourceId);
+      const latestDate = text(range?.latest_observed_on, 10);
+      const previousDate = text(range?.previous_observed_on, 10);
+      if (!validISODate(latestDate) || !validISODate(previousDate)) {
+        return reply(req, { ok: false, message: '市場行情尚未建立最新與前一交易日的比較資料' }, 503);
+      }
+
+      const loadPoints = async (from: string, to: string) => {
+        const pageSize = 1000;
+        const maximumRows = 50_000;
+        const rows: Array<Record<string, unknown>> = [];
+        let offset = 0;
+        while (rows.length <= maximumRows) {
+          const requestedRows = Math.min(pageSize, maximumRows + 1 - rows.length);
+          const result = await admin.from('market_data_points')
+            .select('point_id,observed_on,dimensions,measures').eq('source_id', sourceId)
+            .gte('observed_on', from).lte('observed_on', to)
+            .order('observed_on').order('point_id').range(offset, offset + requestedRows - 1);
+          if (result.error) throw result.error;
+          const page = (result.data || []) as Array<Record<string, unknown>>;
+          rows.push(...page);
+          if (rows.length > maximumRows) throw new Error('dashboard market row limit exceeded');
+          if (page.length < requestedRows) return rows;
+          offset += page.length;
+        }
+        return rows;
+      };
+
+      const requestedMarket = text(body.market, 20);
+      const requestedCategory = text(body.category, 20);
+      const requestedItem = text(body.item, 160);
+      const queryFrom = dashboardMarketShiftDate(latestDate, -13);
+      let loadedRows: Array<Record<string, unknown>>;
+      try {
+        loadedRows = await loadPoints(queryFrom, latestDate);
+      } catch (loadError) {
+        console.error('dashboard market points failed:', loadError instanceof Error ? loadError.message : String(loadError));
+        return reply(req, { ok: false, message: '市場行情資料量過大或暫時無法讀取，請稍後再試' }, 503);
+      }
+      const currentRows = loadedRows.filter(row => text(row.observed_on, 10) === latestDate);
+      const previousRows = loadedRows.filter(row => text(row.observed_on, 10) === previousDate);
+      const currentAggregates = aggregateMarketPoints(currentRows, ['market', 'category', 'item'], measures, fieldMap)
+        .filter(row => row.dimensions.item && row.dimensions.item !== '未分類');
+      const previousAggregates = aggregateMarketPoints(previousRows, ['market', 'category', 'item'], measures, fieldMap);
+      const aggregateKey = (row: MarketAggregate) => `${row.dimensions.market}::${row.dimensions.category}::${row.dimensions.item}`;
+      const previousByKey = new Map(previousAggregates.map(row => [aggregateKey(row), row]));
+      const configuredItems = rotation.items.filter(item => item.enabled);
+
+      const groups = DASHBOARD_MARKETS.flatMap(market => DASHBOARD_CATEGORIES.map(category => {
+        const inGroup = currentAggregates.filter(row => row.dimensions.market === market && row.dimensions.category === category)
+          .sort((left, right) => (right.values.quantity || 0) - (left.values.quantity || 0));
+        const currentByItem = new Map(inGroup.map(row => [row.dimensions.item, row]));
+        const pinned = configuredItems.filter(item => item.market === market && item.category === category)
+          .slice(0, rotation.cardsPerGroup);
+        const availablePinned: Array<{ item: string; current?: MarketAggregate; configured: boolean }> = [];
+        const unavailablePinned: Array<{ item: string; current?: MarketAggregate; configured: boolean }> = [];
+        pinned.forEach(item => {
+          const current = currentByItem.get(item.item);
+          const comparison = previousByKey.get(`${market}::${category}::${item.item}`);
+          (current || comparison ? availablePinned : unavailablePinned).push({ item: item.item, current, configured: true });
+        });
+        const selected = [...availablePinned];
+        const seen = new Set(pinned.map(item => item.item));
+        for (const row of inGroup) {
+          if (selected.length >= rotation.cardsPerGroup) break;
+          if (seen.has(row.dimensions.item)) continue;
+          seen.add(row.dimensions.item);
+          selected.push({ item: row.dimensions.item, current: row, configured: false });
+        }
+        for (const missing of unavailablePinned) {
+          if (selected.length >= rotation.cardsPerGroup) break;
+          selected.push(missing);
+        }
+        const cards = selected.map(selection => {
+          const key = `${market}::${category}::${selection.item}`;
+          const comparison = previousByKey.get(key);
+          return {
+            key, market, category, item: selection.item, configured: selection.configured,
+            price: marketNumeric(selection.current?.values.average_price),
+            previous_price: marketNumeric(comparison?.values.average_price),
+            quantity: marketNumeric(selection.current?.values.quantity),
+            high_price: marketNumeric(selection.current?.values.high_price),
+            low_price: marketNumeric(selection.current?.values.low_price),
+          };
+        });
+        return { key: `${market}::${category}`, market, category, cards };
+      }));
+
+      const sourceSummary = {
+        source_id: sourceId,
+        source_code: text(source.source_code, 60),
+        source_name: text(source.source_name, 120),
+      };
+      const currentFrom = dashboardMarketShiftDate(latestDate, -6);
+      const compareFrom = dashboardMarketShiftDate(latestDate, -13);
+      const compareTo = dashboardMarketShiftDate(latestDate, -7);
+      const trendFor = (market: string, category: string, item: string) => {
+        const itemRows = loadedRows.filter(row => {
+          const rowDimensions = marketJsonObject(row.dimensions);
+          return text(rowDimensions.market, 20) === market
+            && text(rowDimensions.category, 20) === category
+            && text(rowDimensions.item, 160) === item;
+        });
+        const series = Array.from({ length: 7 }, (_, index) => {
+          const observedOn = dashboardMarketShiftDate(currentFrom, index);
+          const compareObservedOn = dashboardMarketShiftDate(compareFrom, index);
+          const current = aggregateMarketPoints(itemRows.filter(row => text(row.observed_on, 10) === observedOn), [], measures, fieldMap)[0]?.values || {};
+          const comparison = aggregateMarketPoints(itemRows.filter(row => text(row.observed_on, 10) === compareObservedOn), [], measures, fieldMap)[0]?.values || {};
+          return { observed_on: observedOn, compare_observed_on: compareObservedOn, values: current, compare_values: comparison };
+        });
+        return { periods: { from: currentFrom, to: latestDate, compare_from: compareFrom, compare_to: compareTo }, series };
+      };
+      if (view === 'cards') {
+        return reply(req, { ok: true, data: {
+          source: sourceSummary,
+          latest_date: latestDate,
+          previous_date: previousDate,
+          auto_step_seconds: rotation.autoStepSeconds,
+          refresh_seconds: refreshSeconds,
+          cards_per_slide: 4,
+          cards_per_group: rotation.cardsPerGroup,
+          groups: groups.map(group => ({
+            ...group,
+            cards: group.cards.map(card => ({ ...card, trend: trendFor(card.market, card.category, card.item) })),
+          })),
+        } });
+      }
+
+      if (!(DASHBOARD_MARKETS as readonly string[]).includes(requestedMarket)
+        || !(DASHBOARD_CATEGORIES as readonly string[]).includes(requestedCategory)
+        || !requestedItem) {
+        return reply(req, { ok: false, message: '單品趨勢的市場、大類或品項不正確' }, 400);
+      }
+      const selectedGroup = groups.find(group => group.market === requestedMarket && group.category === requestedCategory);
+      if (!selectedGroup?.cards.some(card => card.item === requestedItem)) {
+        return reply(req, { ok: false, message: '此品項不在目前發布的戰情輪播清單中' }, 403);
+      }
+      return reply(req, { ok: true, data: {
+        source: sourceSummary,
+        ...trendFor(requestedMarket, requestedCategory, requestedItem),
+      } });
     }
 
     if (action === 'market_catalog') {
