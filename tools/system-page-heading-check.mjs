@@ -29,8 +29,13 @@ assert.match(component, /description \|\| module\.description/);
 
 const shell = readFileSync('web/components/AppShell.tsx', 'utf8');
 assert.match(shell, /<SystemPageHeader system=\{headingSystem\} module=\{headingModule\}/);
-assert.match(shell, /admin-v2-content">\{pageHeading\}\{children\}/);
-assert.match(shell, /v1-content">\{pageHeading\}\{children\}/);
+// 共用頁首必須緊接在內容之前，兩個 <main> 出口都要維持這個順序。
+// 手機版未開放的系統會把整頁換成說明（blockedOnMobile），因此允許外層有條件包裹，
+// 但 {pageHeading}{children} 這組順序本身不可以被拆開或省略。
+assert.equal((shell.match(/\{pageHeading\}\{children\}/g) || []).length, 2,
+  '兩個內容出口都必須保留「共用頁首在前、內容在後」');
+assert.match(shell, /admin-v2-content">[\s\S]{0,120}?\{pageHeading\}\{children\}/);
+assert.match(shell, /v1-content">[\s\S]{0,120}?\{pageHeading\}\{children\}/);
 
 const handover = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
 assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaTitle: system\.title \}\}/,
