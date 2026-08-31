@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import {
   ArcElement,
+  BarController,
+  BarElement,
   CategoryScale,
   Chart as ChartJS,
   Filler,
@@ -14,7 +16,7 @@ import {
   type ChartOptions,
   type PointStyle,
 } from 'chart.js';
-import { Doughnut, Line, Pie } from 'react-chartjs-2';
+import { Bar, Doughnut, Line, Pie } from 'react-chartjs-2';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
@@ -25,7 +27,7 @@ import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './market-analytics.css';
 
-ChartJS.register(ArcElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);
+ChartJS.register(ArcElement, BarController, BarElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);
 
 type ChartType = 'bar' | 'pie' | 'doughnut' | 'line' | 'area' | 'table' | 'cards';
 type PaletteId = 'market' | 'produce' | 'cool' | 'warm' | 'accessible' | 'custom';
@@ -1083,6 +1085,341 @@ function AnalysisWorkspace({ sources, templates, reloadCatalog }: { sources: Sou
   </div>;
 }
 
+type ComparisonPeriodMode = 'day' | 'week' | 'month' | 'quarter' | 'year' | 'custom';
+type ComparisonCompareMode = 'previous' | 'same';
+type ComparisonMonthPoint = { from: string; to: string; label: string; current: number | null; previous: number | null };
+type ComparisonBoxPoint = { category: string; count: number; min: number; q1: number; median: number; q3: number; max: number };
+type ComparisonHeatDay = { date: string; value: number | null };
+type ComparisonHeatWeek = { weekLabel: string; days: ComparisonHeatDay[] };
+
+const COMPARISON_MODE_LABELS: Record<ComparisonPeriodMode, string> = { day: '日', week: '週', month: '月', quarter: '季', year: '年', custom: '自訂' };
+const COMPARISON_WEEKDAY_LABELS = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
+
+function comparisonRange(from: string, to: string, mode: ComparisonCompareMode) {
+  const length = rangeLength(from, to);
+  const compareFrom = mode === 'same' ? addYears(from, -1) : addDays(from, -length);
+  return { compareFrom, compareTo: addDays(compareFrom, length - 1) };
+}
+function quantile(sorted: number[], p: number) {
+  if (!sorted.length) return 0;
+  const index = (sorted.length - 1) * p;
+  const lower = Math.floor(index), upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+}
+
+// 同期比較子系統：後端只有一支通用彙總 API（market_analysis），沒有「依維度拆分的每日序列」，
+// 所以年度 YoY 長條圖以 12 次月度呼叫（每次 from/to 天數與 compare_from/to 天數天然相等）組成，
+// 箱型圖以每個蔬果大類各呼叫一次取得 series 算四分位，熱力圖以單次長期間呼叫的 series 依週重排。
+function ComparisonWorkspace({ sources }: { sources: Source[] }) {
+  const decisionSources = useMemo(() => sources.filter(candidate => candidate.source_code !== 'market_demo' && candidate.config?.is_demo !== true), [sources]);
+  const [sourceId, setSourceId] = useState('');
+  const [periodMode, setPeriodMode] = useState<ComparisonPeriodMode>('month');
+  const [anchor, setAnchor] = useState(TODAY);
+  const [customFrom, setCustomFrom] = useState(TODAY);
+  const [customTo, setCustomTo] = useState(TODAY);
+  const [compareMode, setCompareMode] = useState<ComparisonCompareMode>('same');
+  const [market, setMarket] = useState('');
+  const [category, setCategory] = useState('');
+  const [item, setItem] = useState('');
+  const [dimensionOptions, setDimensionOptions] = useState<Record<string, Array<{ value: string; count: number }>>>({});
+  const [catalogLoaded, setCatalogLoaded] = useState(false);
+
+  const [summary, setSummary] = useState<Analysis | null>(null);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+
+  const [yoyData, setYoyData] = useState<ComparisonMonthPoint[]>([]);
+  const [yoyField, setYoyField] = useState<FieldDefinition | undefined>(undefined);
+  const [yoyBusy, setYoyBusy] = useState(false);
+  const [yoyError, setYoyError] = useState('');
+
+  const [boxplotData, setBoxplotData] = useState<ComparisonBoxPoint[]>([]);
+  const [boxplotField, setBoxplotField] = useState<FieldDefinition | undefined>(undefined);
+  const [boxplotBusy, setBoxplotBusy] = useState(false);
+  const [boxplotError, setBoxplotError] = useState('');
+
+  const [heatSeries, setHeatSeries] = useState<NonNullable<Analysis['series']>>([]);
+  const [heatRange, setHeatRange] = useState<{ from: string; to: string } | null>(null);
+  const [heatField, setHeatField] = useState<FieldDefinition | undefined>(undefined);
+  const [heatBusy, setHeatBusy] = useState(false);
+  const [heatError, setHeatError] = useState('');
+
+  const [updatedAt, setUpdatedAt] = useState('');
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  const source = decisionSources.find(candidate => candidate.source_id === sourceId);
+  const dimensionFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'dimension' && field.hidden !== true), [source]);
+  const measureFields = useMemo(() => (source?.field_definitions || []).filter(field => field.kind === 'measure'), [source]);
+  const fieldMap = useMemo(() => new Map((source?.field_definitions || []).map(field => [field.key, field])), [source]);
+  const hasItemDimension = dimensionFields.some(field => field.key === 'item');
+
+  useEffect(() => {
+    if (sourceId || !decisionSources.length) return;
+    const preferred = decisionSources.find(candidate => candidate.config?.is_default === true) || decisionSources[0];
+    if (preferred) {
+      setSourceId(preferred.source_id);
+      const latest = String(preferred.config?.latest_observed_on || preferred.config?.default_to || TODAY);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(latest)) setAnchor(latest);
+    }
+  }, [decisionSources, sourceId]);
+
+  const range = useMemo(() => {
+    if (periodMode === 'custom') return customFrom && customTo && customFrom <= customTo ? { from: customFrom, to: customTo } : { from: anchor, to: anchor };
+    return periodBounds(anchor, periodMode);
+  }, [periodMode, anchor, customFrom, customTo]);
+
+  const manualFilters = useMemo(() => Object.fromEntries([['market', market], ['category', category], ['item', item]].filter(([, value]) => value.trim())), [market, category, item]);
+  const catalogFilters = useMemo<Record<string, string>>(() => {
+    const next: Record<string, string> = {};
+    if (market.trim()) next.market = market.trim();
+    if (category.trim()) next.category = category.trim();
+    return next;
+  }, [market, category]);
+
+  useEffect(() => {
+    let active = true;
+    setDimensionOptions({}); setCatalogLoaded(false);
+    if (!source?.source_id) return () => { active = false; };
+    void invokeAppApi<{ options: Record<string, Array<{ value: string; count: number }>> }>('market_dimension_catalog', { source_id: source.source_id, filters: catalogFilters })
+      .then(result => { if (active) setDimensionOptions(result.options || {}); })
+      .catch(() => { if (active) setDimensionOptions({}); })
+      .finally(() => { if (active) setCatalogLoaded(true); });
+    return () => { active = false; };
+  }, [catalogFilters, source?.source_id]);
+
+  const loadSummary = useCallback(async () => {
+    if (!source?.source_id) return;
+    setSummaryBusy(true); setSummaryError('');
+    try {
+      const priority = ['average_price', 'total_value', 'quantity'];
+      const available = measureFields.map(field => field.key);
+      const summaryMeasures = [...priority.filter(key => available.includes(key)), ...available.filter(key => !priority.includes(key))].slice(0, 4);
+      if (!summaryMeasures.length) throw new Error('資料來源沒有可用的分析指標');
+      const { compareFrom, compareTo } = comparisonRange(range.from, range.to, compareMode);
+      const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: range.from, to: range.to, compare_from: compareFrom, compare_to: compareTo, dimensions: hasItemDimension ? ['item'] : [], measures: summaryMeasures, filters: manualFilters });
+      setSummary(result);
+    } catch (error) { setSummaryError(error instanceof Error ? error.message : '同期比較摘要載入失敗'); }
+    finally { setSummaryBusy(false); }
+  }, [source?.source_id, measureFields, hasItemDimension, range.from, range.to, compareMode, manualFilters]);
+
+  const months = useMemo(() => {
+    const parsed = new Date(`${anchor}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) return [];
+    return Array.from({ length: 12 }, (_, index) => {
+      const offset = 11 - index;
+      const year = parsed.getUTCFullYear();
+      const month = parsed.getUTCMonth() - offset;
+      const from = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+      const to = new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+      const labelDate = new Date(`${from}T00:00:00Z`);
+      return { from, to, label: `${labelDate.getUTCFullYear()}/${String(labelDate.getUTCMonth() + 1).padStart(2, '0')}` };
+    });
+  }, [anchor]);
+
+  const loadYoy = useCallback(async () => {
+    if (!source?.source_id || !months.length) return;
+    setYoyBusy(true); setYoyError('');
+    try {
+      const measureKey = fieldMap.has('quantity') ? 'quantity' : measureFields[0]?.key;
+      if (!measureKey) throw new Error('資料來源沒有可用的交易量指標');
+      const results = await Promise.all(months.map(async monthRange => {
+        const { compareFrom, compareTo } = comparisonRange(monthRange.from, monthRange.to, 'same');
+        const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: monthRange.from, to: monthRange.to, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: manualFilters });
+        return { ...monthRange, current: finiteNumber(result.totals.values[measureKey]), previous: finiteNumber(result.totals.compare_values[measureKey]) };
+      }));
+      setYoyField(fieldMap.get(measureKey)); setYoyData(results);
+    } catch (error) { setYoyError(error instanceof Error ? error.message : '年度同期比較載入失敗'); }
+    finally { setYoyBusy(false); }
+  }, [source?.source_id, months, fieldMap, measureFields, manualFilters]);
+
+  const loadBoxplot = useCallback(async () => {
+    if (!source?.source_id) return;
+    const categories = (dimensionOptions.category || []).map(option => option.value).slice(0, 8);
+    if (!categories.length) { setBoxplotData([]); return; }
+    setBoxplotBusy(true); setBoxplotError('');
+    try {
+      const measureKey = fieldMap.has('average_price') ? 'average_price' : measureFields.find(field => field.aggregation !== 'sum')?.key || measureFields[0]?.key;
+      if (!measureKey) throw new Error('資料來源沒有可用的價格指標');
+      const { compareFrom, compareTo } = comparisonRange(range.from, range.to, compareMode);
+      const results = await Promise.all(categories.map(async categoryValue => {
+        const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: range.from, to: range.to, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: { ...manualFilters, category: categoryValue } });
+        const values = (result.series || []).map(point => finiteNumber(point.values[measureKey])).filter((value): value is number => value !== null).sort((a, b) => a - b);
+        if (!values.length) return { category: categoryValue, count: 0, min: 0, q1: 0, median: 0, q3: 0, max: 0 };
+        return { category: categoryValue, count: values.length, min: values[0], q1: quantile(values, .25), median: quantile(values, .5), q3: quantile(values, .75), max: values[values.length - 1] };
+      }));
+      setBoxplotField(fieldMap.get(measureKey)); setBoxplotData(results);
+    } catch (error) { setBoxplotError(error instanceof Error ? error.message : '價格分布箱型圖載入失敗'); }
+    finally { setBoxplotBusy(false); }
+  }, [source?.source_id, dimensionOptions.category, fieldMap, measureFields, range.from, range.to, compareMode, manualFilters]);
+
+  const loadHeatmap = useCallback(async () => {
+    if (!source?.source_id) return;
+    setHeatBusy(true); setHeatError('');
+    try {
+      const measureKey = fieldMap.has('quantity') ? 'quantity' : measureFields[0]?.key;
+      if (!measureKey) throw new Error('資料來源沒有可用的交易量指標');
+      const heatTo = anchor;
+      const heatFrom = addDays(heatTo, -83);
+      const { compareFrom, compareTo } = comparisonRange(heatFrom, heatTo, 'previous');
+      const result = await invokeAppApi<Analysis>('market_analysis', { source_id: source.source_id, from: heatFrom, to: heatTo, compare_from: compareFrom, compare_to: compareTo, dimensions: [], measures: [measureKey], filters: manualFilters });
+      setHeatField(fieldMap.get(measureKey)); setHeatSeries(result.series || []); setHeatRange({ from: heatFrom, to: heatTo });
+    } catch (error) { setHeatError(error instanceof Error ? error.message : '交易熱力圖載入失敗'); }
+    finally { setHeatBusy(false); }
+  }, [source?.source_id, anchor, fieldMap, measureFields, manualFilters]);
+
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadSummary(), loadYoy(), loadBoxplot(), loadHeatmap()]);
+    setUpdatedAt(new Date().toISOString());
+  }, [loadSummary, loadYoy, loadBoxplot, loadHeatmap]);
+
+  useEffect(() => {
+    if (!hasLoadedOnce && source?.source_id && catalogLoaded) { setHasLoadedOnce(true); void loadAll(); }
+  }, [hasLoadedOnce, source?.source_id, catalogLoaded, loadAll]);
+
+  const busy = summaryBusy || yoyBusy || boxplotBusy || heatBusy;
+
+  const topItems = useMemo(() => {
+    if (!summary || !summary.dimensions.includes('item')) return [];
+    const measureKey = summary.measures[0];
+    if (!measureKey) return [];
+    return [...summary.rows].map(row => ({ label: chartRowLabel(row), value: finiteNumber(row.values[measureKey]) || 0 })).sort((a, b) => b.value - a.value).slice(0, 5);
+  }, [summary]);
+
+  const kpiRows = useMemo(() => {
+    if (!summary) return [];
+    const keys: Array<{ key: string; fraction: number }> = [{ key: 'average_price', fraction: 1 }, { key: 'total_value', fraction: 0 }, { key: 'quantity', fraction: 0 }];
+    return keys.filter(entry => summary.measures.includes(entry.key)).map(entry => {
+      const field = fieldMap.get(entry.key);
+      return { key: entry.key, label: field?.label || entry.key, unit: field?.unit || '', fraction: entry.fraction, value: summary.totals.values[entry.key], compare: summary.totals.compare_values[entry.key] };
+    });
+  }, [summary, fieldMap]);
+
+  const yoyChartData = useMemo(() => ({
+    labels: yoyData.map(month => month.label),
+    datasets: [
+      { label: '本年', data: yoyData.map(month => month.current), backgroundColor: '#0284c7', borderRadius: 5 },
+      { label: '去年同月', data: yoyData.map(month => month.previous), backgroundColor: '#7c3aed', borderRadius: 5 },
+    ],
+  }), [yoyData]);
+  const yoyChartOptions: ChartOptions<'bar'> = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: context => `${context.dataset.label}：${numberText(context.parsed.y)}${yoyField?.unit || ''}` } } },
+    scales: { x: { ticks: { color: 'var(--dim)' } }, y: { beginAtZero: true, ticks: { color: 'var(--dim)' }, grid: { color: 'color-mix(in srgb, var(--line) 70%, transparent)' } } },
+  };
+
+  const boxRange = useMemo(() => {
+    const values = boxplotData.filter(point => point.count > 0).flatMap(point => [point.min, point.max]);
+    if (!values.length) return { min: 0, max: 1 };
+    return { min: Math.min(...values), max: Math.max(...values) };
+  }, [boxplotData]);
+  const boxPosition = (value: number) => { const span = Math.max(boxRange.max - boxRange.min, 1); return Math.max(0, Math.min(100, (boxRange.max - value) / span * 100)); };
+
+  const heatmapGrid = useMemo<ComparisonHeatWeek[] | null>(() => {
+    if (!heatRange || !heatField) return null;
+    const measureKey = heatField.key;
+    const valueMap = new Map(heatSeries.map(point => [point.observed_on, finiteNumber(point.values[measureKey])]));
+    const start = new Date(`${heatRange.from}T00:00:00Z`);
+    const mondayOffset = (start.getUTCDay() + 6) % 7;
+    start.setUTCDate(start.getUTCDate() - mondayOffset);
+    const weeks: ComparisonHeatWeek[] = [];
+    for (let week = 0; week < 12; week += 1) {
+      const days: ComparisonHeatDay[] = [];
+      for (let weekday = 0; weekday < 7; weekday += 1) {
+        const date = new Date(start);
+        date.setUTCDate(date.getUTCDate() + week * 7 + weekday);
+        const iso = date.toISOString().slice(0, 10);
+        days.push({ date: iso, value: iso >= heatRange.from && iso <= heatRange.to ? (valueMap.get(iso) ?? null) : null });
+      }
+      weeks.push({ weekLabel: days[0].date.slice(5), days });
+    }
+    return weeks;
+  }, [heatSeries, heatRange, heatField]);
+  const heatMax = useMemo(() => Math.max(1, ...(heatmapGrid || []).flatMap(week => week.days.map(day => day.value || 0))), [heatmapGrid]);
+
+  const categoryOptions = dimensionOptions.category || [];
+  const marketOptions = dimensionOptions.market || [];
+  const itemOptions = dimensionOptions.item || [];
+
+  return <div className="market-comparison-page">
+    <section className="market-control-panel panel">
+      <div className="market-section-heading"><div><span className="market-kicker">同期比較</span><h2>同期比較分析</h2><p>設定資料來源、期間與比較基準後，一次更新年度同期長條圖、價格分布箱型圖與交易熱力圖。</p></div></div>
+      <div className="market-control-body">
+        <div className="market-control-grid">
+          <label>資料來源<select value={sourceId} onChange={event => { setSourceId(event.target.value); setMarket(''); setCategory(''); setItem(''); }}><option value="">請選擇資料來源</option>{decisionSources.map(candidate => <option key={candidate.source_id} value={candidate.source_id}>{candidate.source_name}</option>)}</select></label>
+          {periodMode === 'custom'
+            ? <div className="market-period-group"><span>比較期間</span><div className="market-date-pair"><LocalizedDateInput aria-label="期間起始日期" value={customFrom} onChange={event => setCustomFrom(event.target.value)} /><span>至</span><LocalizedDateInput aria-label="期間結束日期" value={customTo} onChange={event => setCustomTo(event.target.value)} /></div></div>
+            : <label>基準日期<LocalizedDateInput aria-label="同期比較基準日期" value={anchor} onChange={event => setAnchor(event.target.value)} /></label>}
+          <label>市場<select value={market} onChange={event => { setMarket(event.target.value); setCategory(''); setItem(''); }}><option value="">全部市場</option>{marketOptions.map(option => <option key={option.value} value={option.value}>{option.value}</option>)}</select></label>
+          <label>蔬果大類<select value={category} onChange={event => { setCategory(event.target.value); setItem(''); }}><option value="">全部大類</option>{categoryOptions.map(option => <option key={option.value} value={option.value}>{option.value}</option>)}</select></label>
+          <label>品項<select value={item} onChange={event => setItem(event.target.value)}><option value="">全部品項</option>{itemOptions.map(option => <option key={option.value} value={option.value}>{option.value}</option>)}</select></label>
+        </div>
+        <div className="market-period-presets" role="group" aria-label="同期比較期間">
+          <span>期間：</span>
+          {(Object.entries(COMPARISON_MODE_LABELS) as Array<[ComparisonPeriodMode, string]>).map(([value, label]) => <button type="button" key={value} className={periodMode === value ? 'active' : ''} aria-pressed={periodMode === value} onClick={() => setPeriodMode(value)}>{label}</button>)}
+          <small>{periodText(range)}</small>
+        </div>
+        <div className="market-compare-actions"><span>比較基準：</span><button type="button" className={compareMode === 'previous' ? 'active' : ''} onClick={() => setCompareMode('previous')}>前一段期間</button><button type="button" className={compareMode === 'same' ? 'active' : ''} onClick={() => setCompareMode('same')}>去年同期</button></div>
+        <div className="market-control-footer"><span>{updatedAt ? `更新於 ${updatedAt.slice(0, 16).replace('T', ' ')}` : '尚未載入分析結果'}</span><button type="button" className="primary-btn" disabled={busy || !sourceId} onClick={() => void loadAll()}>{busy ? '分析中…' : '更新比較分析'}</button></div>
+      </div>
+    </section>
+
+    <section className="panel">
+      <header className="market-result-heading"><div><span className="market-kicker">精簡指標</span><h2>同期比較摘要</h2><p>核心指標的精簡版，完整戰情摘要請見「市場戰情儀表板」模組。</p></div></header>
+      {summaryError && <p className="market-inline-message" role="alert">{summaryError}</p>}
+      {summary ? <div className="market-kpi-grid">
+        {kpiRows.map(row => <article className="market-kpi-card" key={row.key}><span>{row.label}</span><strong>{numberText(row.value, row.fraction)}<small>{row.unit}</small></strong><p><MarketMovementBadge value={changePercent(row.value, row.compare)} /></p></article>)}
+        <article className="market-kpi-card market-kpi-neutral"><span>交易筆數</span><strong>{numberText(summary.counts.current)}<small>筆</small></strong><p><MarketMovementBadge value={changePercent(summary.counts.current, summary.counts.compare)} /></p></article>
+        {topItems.length > 0 && <article className="market-kpi-card market-kpi-neutral market-comparison-top-items"><span>前五大品項</span><ol>{topItems.map((topItem, index) => <li key={topItem.label}>{index + 1}. {topItem.label}</li>)}</ol></article>}
+      </div> : <p className="market-empty">{summaryBusy ? '正在載入摘要…' : '按「更新比較分析」載入同期比較摘要。'}</p>}
+    </section>
+
+    <section className="panel market-comparison-yoy">
+      <header className="market-result-heading"><div><span className="market-kicker">年度同期比較</span><h2>近 12 個月交易量對照</h2><p>近十二個月交易量與去年同月對照；月份下方為年增率。</p></div></header>
+      {yoyError && <p className="market-inline-message" role="alert">{yoyError}</p>}
+      {yoyData.length ? <>
+        <div className="market-command-chart-frame">
+          <div className="market-chart-legend-row"><span><i style={{ background: '#0284c7' }} />本年</span><span><i style={{ background: '#7c3aed' }} />去年同月</span><small>單位：{yoyField?.unit || ''}</small></div>
+          <div className="market-command-chart"><Bar data={yoyChartData} options={yoyChartOptions} /></div>
+        </div>
+        <div className="market-comparison-yoy-rates">{yoyData.map(month => <div key={month.label}><span>{month.label}</span><MarketMovementBadge value={changePercent(month.current, month.previous)} /></div>)}</div>
+      </> : <p className="market-empty">{yoyBusy ? '正在載入年度同期比較…' : '按「更新比較分析」載入近 12 個月對照。'}</p>}
+    </section>
+
+    <section className="panel market-comparison-box">
+      <header className="market-result-heading"><div><span className="market-kicker">價格分布</span><h2>價格分布箱型圖</h2><p>各蔬果大類本期日均價的四分位分布；橫線為中位數，鬚線為極值。單位：{boxplotField?.unit || '元／公斤'}。</p></div></header>
+      {boxplotError && <p className="market-inline-message" role="alert">{boxplotError}</p>}
+      {boxplotData.some(point => point.count > 0) ? <div className="market-comparison-box-frame">
+        <div className="market-comparison-box-scale"><span>{numberText(boxRange.max, 1)}</span><span>{numberText(boxRange.min, 1)}</span></div>
+        <div className="market-comparison-box-plot">{boxplotData.filter(point => point.count > 0).map(point => <div className="market-comparison-box-column" key={point.category}>
+          <div className="market-comparison-box-track" title={`${point.category}　中位數 ${numberText(point.median, 1)}　Q1 ${numberText(point.q1, 1)}　Q3 ${numberText(point.q3, 1)}　最低 ${numberText(point.min, 1)}　最高 ${numberText(point.max, 1)}`}>
+            <i className="market-comparison-box-whisker" style={{ top: `${boxPosition(point.max)}%`, height: `${Math.max(1, boxPosition(point.min) - boxPosition(point.max))}%` }} />
+            <b className="market-comparison-box-box" style={{ top: `${boxPosition(point.q3)}%`, height: `${Math.max(2, boxPosition(point.q1) - boxPosition(point.q3))}%` }} />
+            <em className="market-comparison-box-median" style={{ top: `${boxPosition(point.median)}%` }} />
+          </div>
+          <span>{point.category}</span>
+        </div>)}</div>
+      </div> : <p className="market-empty">{boxplotBusy ? '正在載入價格分布箱型圖…' : '此期間沒有足夠的每日價格資料可繪製箱型圖。'}</p>}
+    </section>
+
+    <section className="panel market-comparison-heatmap">
+      <header className="market-result-heading"><div><span className="market-kicker">交易熱力圖</span><h2>近 12 週每日交易熱度</h2><p>依「週 × 星期幾」排列近 12 週每日{heatField?.label || '交易量'}，顏色越深代表當日數值越高；格狀色塊可左右捲動查看更早週次。</p></div></header>
+      {heatError && <p className="market-inline-message" role="alert">{heatError}</p>}
+      {heatmapGrid ? <>
+        <div className="market-comparison-heatmap-scroll"><div className="market-comparison-heatmap-grid">
+          <span className="market-comparison-heatmap-corner" aria-hidden="true" />
+          {heatmapGrid.map(week => <span className="market-comparison-heatmap-colhead" key={`head-${week.weekLabel}`}>{week.weekLabel}</span>)}
+          {COMPARISON_WEEKDAY_LABELS.map((label, weekdayIndex) => <Fragment key={label}>
+            <span className="market-comparison-heatmap-rowhead">{label}</span>
+            {heatmapGrid.map(week => { const day = week.days[weekdayIndex]; const intensity = day.value === null ? null : Math.round(Math.min(94, Math.max(6, (day.value / heatMax) * 94))); return <div key={day.date} className="market-comparison-heatmap-cell" title={`${day.date}　${day.value === null ? '無資料' : `${numberText(day.value)}${heatField?.unit || ''}`}`} style={{ background: intensity === null ? 'var(--panel2)' : `color-mix(in srgb, var(--cyan) ${intensity}%, var(--panel))` }} />; })}
+          </Fragment>)}
+        </div></div>
+        <div className="market-comparison-heatmap-legend"><span>低</span><i style={{ background: 'color-mix(in srgb, var(--cyan) 10%, var(--panel))' }} /><i style={{ background: 'color-mix(in srgb, var(--cyan) 40%, var(--panel))' }} /><i style={{ background: 'color-mix(in srgb, var(--cyan) 70%, var(--panel))' }} /><i style={{ background: 'color-mix(in srgb, var(--cyan) 94%, var(--panel))' }} /><span>高</span><small>單位：{heatField?.unit || ''}；期間最高 {numberText(heatMax)}</small></div>
+      </> : <p className="market-empty">{heatBusy ? '正在載入交易熱力圖…' : '按「更新比較分析」載入近 12 週交易熱力圖。'}</p>}
+    </section>
+  </div>;
+}
+
 function SourcesWorkspace({ sources, onSaved, reloadCatalog }: { sources: Source[]; onSaved: () => Promise<void>; reloadCatalog: () => Promise<void> }) {
   const [sourceCode, setSourceCode] = useState('market_daily_custom');
   const [sourceName, setSourceName] = useState('自訂交易行情');
@@ -1231,7 +1568,7 @@ export function MarketAnalyticsWorkspace({ system, module }: { system: SystemDef
     const [error, setError] = useState('');
     const loadCatalog = useCallback(async () => { setLoading(true); setError(''); try { const result = await invokeAppApi<{ sources: Source[]; templates: Template[] }>('market_catalog'); setSources(result.sources || []); setTemplates(result.templates || []); } catch (loadError) { setError(loadError instanceof Error ? loadError.message : '市場分析設定載入失敗'); } finally { setLoading(false); } }, []);
     useEffect(() => { void loadCatalog(); }, [loadCatalog]);
-    const page = module.key === 'sources' ? <SourcesWorkspace sources={sources} onSaved={loadCatalog} reloadCatalog={loadCatalog} /> : module.key === 'templates' ? <TemplatesWorkspace sources={sources} templates={templates} onSaved={loadCatalog} /> : <AnalysisWorkspace sources={sources} templates={templates} reloadCatalog={loadCatalog} />;
+    const page = module.key === 'sources' ? <SourcesWorkspace sources={sources} onSaved={loadCatalog} reloadCatalog={loadCatalog} /> : module.key === 'templates' ? <TemplatesWorkspace sources={sources} templates={templates} onSaved={loadCatalog} /> : module.key === 'comparison' ? <ComparisonWorkspace sources={sources} /> : <AnalysisWorkspace sources={sources} templates={templates} reloadCatalog={loadCatalog} />;
     return <AppShell profile={profile} title={system.title}><div className="page-actions"><div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div><div className="action-cluster"><button type="button" className="secondary-btn" disabled={loading} onClick={() => void loadCatalog()}>{loading ? '載入中…' : '重新載入設定'}</button></div></div>{loading && !sources.length ? <div className="market-empty-panel panel">正在載入市場分析設定…</div> : page}</AppShell>;
   }
   return <AuthGate>{profile => <Workspace profile={profile} />}</AuthGate>;

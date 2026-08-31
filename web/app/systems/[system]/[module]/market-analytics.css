@@ -149,3 +149,34 @@
 @media(max-width:1000px){.market-command-control-row{grid-template-columns:repeat(2,minmax(0,1fr))}.market-command-control-row .primary-btn{width:100%}.market-command-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.market-command-hero,.market-command-chart-panel>header{display:grid}.market-command-hero .market-command-status{justify-items:start}.market-command-control-row,.market-command-slicers{grid-template-columns:1fr}.market-command-control-row .primary-btn{width:100%}.market-command-periods small{width:100%;margin-left:0}.market-command-context{align-items:flex-start;flex-direction:column}.market-command-context>div:first-child{width:100%}.market-command-breadcrumb{justify-content:flex-start;min-width:0}.market-command-chart-switch{justify-content:flex-start}.market-command-chart-switch button{flex:1 1 68px}.market-command-chart{height:300px}.market-chart-legend-row small{width:100%;margin-left:0}}
 @media(max-width:430px){.market-command-kpis,.market-command-insight-row{grid-template-columns:1fr}.market-command-hero h2{font-size:21px}.market-command-chart-switch{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.market-command-chart-switch button{padding:7px 4px}.market-command-chart{height:270px}.market-kline-grid{min-width:620px}}
+
+/* 同期比較子系統：年度 YoY 長條圖、價格分布箱型圖與交易熱力圖，沿用既有 market- 前綴與雙主題色階。 */
+.market-comparison-page{--market-rise-color:var(--red);--market-fall-color:var(--green);--market-rise-readable:color-mix(in srgb,var(--market-rise-color) 72%,var(--text));--market-fall-readable:color-mix(in srgb,var(--market-fall-color) 68%,var(--text));display:grid;gap:16px;min-width:0}
+.market-comparison-page .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
+.market-comparison-page .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
+.market-comparison-top-items{grid-column:span 2}
+.market-comparison-top-items ol{margin:6px 0 0;padding-left:18px;color:var(--text);font-size:11px;line-height:1.7}
+.market-comparison-yoy-rates{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;margin-top:4px}
+.market-comparison-yoy-rates>div{display:grid;justify-items:center;gap:4px;padding:6px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);font-size:9px;text-align:center}
+.market-comparison-yoy-rates>div>span{color:var(--dim)}
+.market-comparison-box-frame{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px}
+.market-comparison-box-scale{display:grid;align-content:space-between;padding:4px 0;color:var(--dim);font-size:9px;text-align:right}
+.market-comparison-box-plot{display:flex;align-items:stretch;gap:18px;overflow-x:auto;padding-bottom:4px}
+.market-comparison-box-column{display:grid;grid-template-rows:260px auto;justify-items:center;gap:8px;min-width:56px}
+.market-comparison-box-track{position:relative;width:100%;height:260px}
+.market-comparison-box-whisker{position:absolute;left:50%;width:2px;transform:translateX(-50%);background:var(--dim);border-radius:2px}
+.market-comparison-box-box{position:absolute;left:50%;width:34px;transform:translateX(-50%);border:2px solid var(--cyan);border-radius:5px;background:color-mix(in srgb,var(--cyan) 16%,var(--panel));min-height:4px}
+.market-comparison-box-median{position:absolute;left:50%;width:34px;height:0;transform:translate(-50%,-50%);border-top:3px solid var(--amber)}
+.market-comparison-box-column>span{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:11px;text-align:center}
+.market-comparison-heatmap-scroll{overflow-x:auto;padding-bottom:4px}
+.market-comparison-heatmap-grid{display:grid;grid-template-columns:46px repeat(12,32px);gap:3px;min-width:max-content}
+.market-comparison-heatmap-corner{height:22px}
+.market-comparison-heatmap-colhead{display:flex;align-items:center;justify-content:center;height:22px;color:var(--dim);font-size:9px;white-space:nowrap}
+.market-comparison-heatmap-rowhead{display:flex;align-items:center;color:var(--dim);font-size:10px;white-space:nowrap}
+.market-comparison-heatmap-cell{width:32px;height:22px;border:1px solid var(--line);border-radius:4px;cursor:default}
+.market-comparison-heatmap-legend{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:10px}
+.market-comparison-heatmap-legend i{display:block;width:20px;height:10px;border:1px solid var(--line);border-radius:3px}
+.market-comparison-heatmap-legend small{margin-left:auto;color:var(--dim)}
+@media(max-width:900px){.market-comparison-top-items{grid-column:1/-1}.market-comparison-yoy-rates{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media(max-width:700px){.market-comparison-yoy-rates{grid-template-columns:repeat(4,minmax(0,1fr))}.market-comparison-box-plot{gap:12px}.market-comparison-box-column{min-width:48px}}
+@media(max-width:430px){.market-comparison-yoy-rates{grid-template-columns:repeat(3,minmax(0,1fr))}}
