@@ -16,11 +16,13 @@ cross join (values
   ('sys_guardpatrol'),
   ('sys_handover'),
   ('sys_equipment'),
+  ('sys_equipment_manage'),
   ('sys_structuremap'),
   ('sys_vehicle'),
   ('sys_meetingroom'),
   ('sys_officialdocs'),
-  ('sys_marketanalytics')
+  ('sys_marketanalytics'),
+  ('sys_dashboard')
 ) as p(perm)
 on conflict (role_id, perm) do nothing;
 

@@ -128,6 +128,28 @@ for (const contract of contracts) {
   if (contract.order && !columns.has(contract.order)) errors.push(`${contract.name}: 排序欄位 ${contract.table}.${contract.order} 不存在於 SQL schema`);
 }
 
+// 系統存取權限（sys_*）的清單散在三個地方，彼此沒有任何關聯：
+//   web/components/admin/shared.tsx     後台「系統存取權限」矩陣顯示的欄位
+//   supabase/functions/admin-api        admin_set_permission 的伺服器端白名單
+//   system/sql/system_access_seed.sql   新專案佈建時要建立的權限列
+// 只加前面沒加後面時，畫面上會出現一個勾得動、但伺服器一律回「權限代碼無效」的
+// 核取方塊——2026-08-31 加 sys_dashboard 就是這樣，看起來像「不能取消」。
+const sharedSource = fs.readFileSync(path.join(root, 'web/components/admin/shared.tsx'), 'utf8');
+const adminApiSource = fs.readFileSync(path.join(root, 'supabase/functions/admin-api/index.ts'), 'utf8');
+const seedSource = fs.readFileSync(path.join(root, 'system/sql/system_access_seed.sql'), 'utf8');
+
+const uiSystemPerms = [...(sharedSource.match(/SYSTEM_PERMISSIONS[\s\S]*?\] as const;/) || [''])[0]
+  .matchAll(/'(sys_[a-z_]+)'/g)].map(match => match[1]);
+const apiPerms = new Set([...(adminApiSource.match(/const PERMISSIONS = new Set\(\[[^\]]*\]/) || [''])[0]
+  .matchAll(/'(sys_[a-z_]+)'/g)].map(match => match[1]));
+const seedPerms = new Set([...seedSource.matchAll(/\('(sys_[a-z_]+)'\)/g)].map(match => match[1]));
+
+if (!uiSystemPerms.length) errors.push('系統存取權限：讀不到 shared.tsx 的 SYSTEM_PERMISSIONS');
+for (const perm of uiSystemPerms) {
+  if (!apiPerms.has(perm)) errors.push(`系統存取權限：${perm} 不在 admin-api 的 PERMISSIONS 白名單，後台會勾不動`);
+  if (!seedPerms.has(perm)) errors.push(`系統存取權限：${perm} 不在 system_access_seed.sql，新專案佈建會缺這一列`);
+}
+
 if (errors.length) {
   console.error(`資料表／前端欄位一致性檢查失敗（${errors.length} 項）：`);
   for (const error of unique(errors)) console.error(`- ${error}`);
