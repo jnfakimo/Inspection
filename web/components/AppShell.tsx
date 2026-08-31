@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { isMobileAllowedSystem, useIsMobile } from '@/lib/mobile-scope';
 import { AdminSidebar } from '@/components/AdminSidebar';
 import { ResponsiveTableLabels } from '@/components/ResponsiveTableLabels';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
@@ -48,10 +47,6 @@ export function AppShell({ profile, title, children, heading }: {
   const headingSystem = heading?.system || routeSystem;
   const headingModule = heading?.module || routeModule;
   const backHref = resolveAppBackHref(pathname);
-  // 手機版只開放派車與公文。入口頁已經不列出其他系統，但直接輸入網址或用舊書籤
-  // 仍會進來，所以在這裡一併擋掉——否則「其他關閉」只是把入口藏起來而已。
-  const mobile = useIsMobile();
-  const blockedOnMobile = Boolean(mobile && routeSystem && !isMobileAllowedSystem(routeSystem.key));
   const pageHeading = headingSystem && headingModule
     ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} description={heading?.description} />
     : null;
@@ -180,12 +175,6 @@ export function AppShell({ profile, title, children, heading }: {
     } finally { setProfileBusy(false); }
   }
 
-  const mobileBlockNotice = <section className="panel empty mobile-blocked-system">
-    <h2>{routeSystem?.title || '此系統'}在手機版未開放</h2>
-    <p>手機版只開放<b>公務車派車</b>與<b>公文傳送</b>兩個系統，其餘系統請改用電腦操作。</p>
-    <p><Link href="/systems/">回系統入口</Link></p>
-  </section>;
-
   return <div className="app-shell v1-shell">
     <ResponsiveTableLabels />
     <header className="v1-navbar">
@@ -233,9 +222,9 @@ export function AppShell({ profile, title, children, heading }: {
           <img src="/Inspection/assets/system-icons/admin-icon.png" alt="" />
           後台選單
         </button>
-        <main className="content v1-content admin-v2-content">{blockedOnMobile ? mobileBlockNotice : <>{pageHeading}{children}</>}</main>
+        <main className="content v1-content admin-v2-content">{pageHeading}{children}</main>
       </div>
-    </div> : <main className="content v1-content">{blockedOnMobile ? mobileBlockNotice : <>{pageHeading}{children}</>}</main>}
+    </div> : <main className="content v1-content">{pageHeading}{children}</main>}
     {profileOpen && <div className="profile-modal-bg" role="dialog" aria-modal="true" aria-labelledby="personal-profile-title">
       <section className="profile-modal">
         <header><div><small>個人設定</small><h2 id="personal-profile-title">個人資料設定</h2><p>查詢與維護本人的聯絡資料、登入安全及個人行事曆。</p></div><button type="button" aria-label="關閉" onClick={() => setProfileOpen(false)}>×</button></header>
