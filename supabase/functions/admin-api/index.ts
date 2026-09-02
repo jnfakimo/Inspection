@@ -42,10 +42,12 @@ const FIXED_SHIFT_DEFAULTS = [
 ];
 const LEGACY_ROLE: Record<string, string> = { reporter: 'inspector', duty: 'maintenance', dispatcher: 'maintenance', technician: 'maintenance', unit_supervisor: 'supervisor', sysadmin: 'admin', inspector: 'inspector', maintenance: 'maintenance', supervisor: 'supervisor', admin: 'admin' };
 const allowedOrigins = new Set(['https://jnfakimo.github.io', 'http://localhost:3000', 'http://127.0.0.1:3000']);
+// 自架站常見於內網 IP（RFC1918）；放行反射 CORS，Bearer token 驗證仍是主要防線。
+const PRIVATE_NET_ORIGIN = /^https?:\/\/(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})(?::\d{1,5})?$/;
 
 function cors(req: Request) {
   const origin = req.headers.get('origin') || '';
-  return { 'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://jnfakimo.github.io', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
+  return { 'Access-Control-Allow-Origin': allowedOrigins.has(origin) || PRIVATE_NET_ORIGIN.test(origin) ? origin : 'https://jnfakimo.github.io', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
 }
 function reply(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });

@@ -9,9 +9,11 @@ import { clientIpFromRequest } from "../_shared/client-ip.ts";
 const PROD_ORIGIN = "https://jnfakimo.github.io";
 const configuredOrigins = new Set((Deno.env.get("APP_ALLOWED_ORIGINS") || "")
   .split(",").map((value) => value.trim()).filter(Boolean));
+// 自架站常見於內網 IP（RFC1918）；放行反射 CORS。登入本身仍要帳密＋驗證碼。
+const PRIVATE_NET_ORIGIN = /^https?:\/\/(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})(?::\d{1,5})?$/;
 const allowedOrigin = (req: Request) => {
   const origin = req.headers.get("origin") || "";
-  if (origin === PROD_ORIGIN || configuredOrigins.has(origin) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  if (origin === PROD_ORIGIN || configuredOrigins.has(origin) || PRIVATE_NET_ORIGIN.test(origin) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
   return PROD_ORIGIN;
 };
 const cors = (req: Request) => ({
