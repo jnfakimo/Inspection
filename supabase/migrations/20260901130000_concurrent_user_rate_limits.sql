@@ -1,3 +1,5 @@
+begin;
+
 -- Allow normal concurrent use of the dashboard and analytics pages.
 -- Limits remain per authenticated subject (not shared by all users).
 create or replace function public.enforce_request_rate_limit(
@@ -72,3 +74,5 @@ $$;
 
 revoke all on function public.enforce_request_rate_limit(text,text,text,text,uuid) from public,anon,authenticated;
 grant execute on function public.enforce_request_rate_limit(text,text,text,text,uuid) to service_role;
+
+commit;
