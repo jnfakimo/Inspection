@@ -36,6 +36,8 @@
 .market-board-group dd{margin:0;color:var(--text);font:700 17px var(--head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .market-board-group dd small{margin-left:3px;color:var(--dim);font:500 9px var(--font)}
 .market-board-group .market-movement-badge{font-size:10px}
+.market-board-group-moves{display:flex;gap:10px;flex-wrap:wrap}
+.market-board-group-moves span{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--dim)}
 
 .market-board-trend{padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
 .market-board-trend h3{margin:0 0 4px;font:700 15px var(--head)}
@@ -75,6 +77,12 @@
 
 .market-board-ticker-page{display:grid;gap:14px}
 .market-board-ticker-page[data-fullscreen=true]{position:fixed;inset:0;z-index:70;padding:22px clamp(18px,3vw,40px) 28px;overflow:auto;background:var(--bg)}
+
+/* /board/ 免登入公開頁：滿版、無共用導覽，直接投放。 */
+.market-board-public-shell{min-height:100vh;padding:clamp(14px,2.4vw,30px);background:var(--bg);background-image:radial-gradient(circle at 84% 0,rgba(0,212,255,.08),transparent 34%)}
+.market-board-public-shell footer{margin-top:16px;color:var(--dim);font-size:11px;text-align:center}
+.market-board-page.market-board-public{gap:12px}
+.market-board-page.market-board-public .market-board-head h2{font-size:clamp(20px,2vw,28px)}
 
 @media(prefers-reduced-motion:reduce){.market-board-live i,.market-board-marquee>div{animation:none}}
 @media(max-width:1024px){.market-board-markets{grid-template-columns:1fr}}
