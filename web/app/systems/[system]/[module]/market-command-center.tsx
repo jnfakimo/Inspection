@@ -112,7 +112,9 @@ function ParetoChart({ analysis, measure, field, onSelect }: { analysis: Analysi
     { type: 'line' as const, label: '累積占比', data: cumulative, borderColor: PALETTE[2], backgroundColor: PALETTE[2], pointRadius: 3, tension: .25, yAxisID: 'percent' },
   ] };
   const options = { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index' as const, intersect: false }, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: 'var(--dim)', maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } }, value: { beginAtZero: true, title: { display: true, text: field?.unit ? `${field.label}（${field.unit}）` : field?.label || measure, color: 'var(--dim)' }, ticks: { color: 'var(--dim)' }, grid: { color: 'color-mix(in srgb, var(--line) 70%, transparent)' } }, percent: { beginAtZero: true, max: 100, position: 'right' as const, title: { display: true, text: '累積占比（%）', color: 'var(--dim)' }, ticks: { color: 'var(--dim)', callback: (value: string | number) => `${value}%` }, grid: { drawOnChartArea: false } } } };
-  const chartRef = useRef<ChartJS<'bar'> | null>(null);
+  // 混合長條＋折線的 <Chart>，ref 型別要涵蓋兩種 controller，否則 type check
+  // 會在 react-chartjs-2 的 ForwardedRef 上失敗（比照 market-interactive-dashboard）。
+  const chartRef = useRef<ChartJS<'bar' | 'line'> | null>(null);
   return <div className="market-command-chart-frame"><div className="market-chart-legend-row"><span><i style={{ background: PALETTE[0] }} />分類值</span><span><i className="line" style={{ borderColor: PALETTE[2] }} />累積占比</span><small>前 12 組，點選柱體可下鑽</small></div><div className="market-command-chart"><Chart ref={chartRef} type="bar" data={data} options={options} onClick={event => { const elements = chartRef.current?.getElementsAtEventForMode(event.nativeEvent, 'nearest', { intersect: true }, true) || []; const index = elements[0]?.index; if (index !== undefined) onSelect(rows[index]?.label || ''); }} /></div></div>;
 }
 
