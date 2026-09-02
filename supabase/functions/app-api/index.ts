@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/security-monitor.ts';
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
+import { clientIpFromRequest } from '../_shared/client-ip.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -202,12 +203,7 @@ async function nextOfficialDocumentNo(db: SupabaseClient, dateKey: string, minim
 }
 
 function extractClientIp(req: Request) {
-  const raw = req.headers.get('cf-connecting-ip')
-    || req.headers.get('x-real-ip')
-    || req.headers.get('x-forwarded-for')
-    || req.headers.get('fly-client-ip')
-    || '';
-  return text(raw.split(',')[0], 80) || null;
+  return clientIpFromRequest(req);
 }
 
 function normalizeFloorFields(row: Record<string, unknown>) {
@@ -1265,10 +1261,11 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'dashboard_market_rotation') {
-      if (!can('dashboard') && !can('marketanalytics')) {
-        return reply(req, { ok: false, message: '目前角色沒有戰情儀表板或市場營運分析系統權限' }, 403);
+      if (!can('dashboard') && !can('marketanalytics') && !can('marketboard')) {
+        return reply(req, { ok: false, message: '目前角色沒有戰情儀表板、市場營運分析或市場公開看板系統權限' }, 403);
       }
-      const view = text(body.view, 20) === 'trend' ? 'trend' : 'cards';
+      const requestedView = text(body.view, 20);
+      const view = requestedView === 'trend' ? 'trend' : requestedView === 'board' ? 'board' : 'cards';
       let widgetConfig: Record<string, unknown> = {};
       let refreshSeconds = 60;
       const layoutResult = await admin.from('dashboard_layouts')
@@ -1472,6 +1469,154 @@ export async function handleAppApiRequest(req: Request) {
             ...group,
             cards: group.cards.map(card => ({ ...card, trend: trendFor(card.market, card.category, card.item) })),
           })),
+        } });
+      }
+
+      if (view === 'board') {
+        // SYS-12「長官模式」公開看板：一市二市各大類的均價量對比、全場漲跌大表、
+        // 近 7 交易日量價趨勢與通知跑馬燈。全部由既有正式行情資料聚合，不新增資料表。
+        const boardMarkets = DASHBOARD_MARKETS as readonly string[];
+        const boardCategories = DASHBOARD_CATEGORIES as readonly string[];
+        const weightedSummary = (rows: MarketAggregate[]) => {
+          let quantity = 0, priceWeight = 0, totalValue = 0;
+          for (const row of rows) {
+            const qty = row.values.quantity ?? 0;
+            const price = row.values.average_price;
+            quantity += qty;
+            if (price !== null && qty > 0) { priceWeight += price * qty; totalValue += price * qty; }
+          }
+          return {
+            average_price: quantity > 0 ? Number((priceWeight / quantity).toFixed(2)) : null,
+            quantity,
+            total_value: quantity > 0 ? Math.round(totalValue) : null,
+          };
+        };
+        const groupsSummary = DASHBOARD_MARKETS.flatMap(market => DASHBOARD_CATEGORIES.map(category => ({
+          market,
+          category,
+          current: weightedSummary(currentAggregates.filter(row => row.dimensions.market === market && row.dimensions.category === category)),
+          previous: weightedSummary(previousAggregates.filter(row => (
+            row.dimensions.market === market && row.dimensions.category === category && row.dimensions.item !== '未分類'
+          ))),
+        })));
+
+        // 全場均價大表需要上／中／下價；rollup RPC 一次最多 4 個 measure，因此
+        // 針對「最新交易日 vs 前一交易日」單獨取一次價格 rollup，成交量沿用上面的彙總。
+        const priceMeasures = ['average_price', 'high_price', 'middle_price', 'low_price']
+          .filter(key => fieldMap.get(key)?.kind === 'measure').slice(0, 4);
+        const boardRollupResult = await admin.rpc('market_analysis_rollup', {
+          p_source_id: sourceId,
+          p_from: latestDate,
+          p_to: latestDate,
+          p_compare_from: previousDate,
+          p_compare_to: previousDate,
+          p_dimensions: ['market', 'category', 'item'],
+          p_measures: priceMeasures,
+          p_filters: {},
+          p_include_group_daily: false,
+        });
+        if (boardRollupResult.error) {
+          console.error('dashboard market board rollup failed:', boardRollupResult.error.message);
+          return reply(req, { ok: false, message: '市場行情彙總資料暫時無法讀取，請稍後再試' }, 503);
+        }
+        const boardRollup = marketJsonObject(boardRollupResult.data);
+        const boardGroupRows = (key: string) => (
+          Array.isArray(boardRollup[key])
+            ? (boardRollup[key] as unknown[]).filter(entry => entry && typeof entry === 'object').map(entry => entry as Record<string, unknown>)
+            : []
+        );
+        const priceValues = (value: unknown) => {
+          const raw = marketJsonObject(value);
+          return Object.fromEntries(priceMeasures.map(measure => [measure, marketNumeric(raw[measure])]));
+        };
+        const groupDimensionKey = (value: unknown) => {
+          const raw = marketJsonObject(value);
+          return `${text(raw.market, 20)}::${text(raw.category, 20)}::${text(raw.item, 160)}`;
+        };
+        const boardCurrentByKey = new Map<string, Record<string, number | null>>(boardGroupRows('current_groups').map(row => [groupDimensionKey(row.dimensions), priceValues(row.values)]));
+        const boardCompareByKey = new Map<string, Record<string, number | null>>(boardGroupRows('compare_groups').map(row => [groupDimensionKey(row.dimensions), priceValues(row.values)]));
+
+        const quantityByKey = new Map(currentAggregates.map(row => [
+          `${row.dimensions.market}::${row.dimensions.category}::${row.dimensions.item}`,
+          row.values.quantity ?? null,
+        ]));
+
+        const tableMap = new Map<string, { item: string; category: string; cells: Record<string, unknown> }>();
+        const registerCell = (market: string, category: string, item: string) => {
+          if (!boardCategories.includes(category) || !boardMarkets.includes(market) || item === '未分類') return;
+          const dimensionKey = `${market}::${category}::${item}`;
+          const current = boardCurrentByKey.get(dimensionKey);
+          const compare = boardCompareByKey.get(dimensionKey);
+          if (!current && !compare) return;
+          const rowKey = `${category}::${item}`;
+          const entry = tableMap.get(rowKey) || { item, category, cells: {} };
+          const avg = current?.average_price ?? null;
+          const prevAvg = compare?.average_price ?? null;
+          const change = avg !== null && prevAvg !== null ? Number((avg - prevAvg).toFixed(2)) : null;
+          const changePct = avg !== null && prevAvg !== null && prevAvg !== 0
+            ? Number(((avg - prevAvg) / Math.abs(prevAvg) * 100).toFixed(2)) : null;
+          entry.cells[market] = {
+            prev_avg: prevAvg, avg, change, change_pct: changePct,
+            high: current?.high_price ?? null,
+            middle: current?.middle_price ?? null,
+            low: current?.low_price ?? null,
+            quantity: quantityByKey.get(dimensionKey) ?? null,
+          };
+          tableMap.set(rowKey, entry);
+        };
+        const dimensionKeys = new Set<string>();
+        boardCurrentByKey.forEach((_value, key) => dimensionKeys.add(key));
+        boardCompareByKey.forEach((_value, key) => dimensionKeys.add(key));
+        dimensionKeys.forEach(key => {
+          const parts = key.split('::');
+          registerCell(parts[0] ?? '', parts[1] ?? '', parts[2] ?? '');
+        });
+        const tableRows = [...tableMap.values()]
+          .sort((left, right) => (left.category === right.category
+            ? left.item.localeCompare(right.item, 'zh-Hant')
+            : left.category.localeCompare(right.category, 'zh-Hant')))
+          .slice(0, 250);
+
+        const trend = Array.from({ length: 7 }, (_, index) => {
+          const observedOn = dashboardMarketShiftDate(currentFrom, index);
+          let quantity = 0, priceWeight = 0;
+          for (const row of dailyAggregates) {
+            if (row.observed_on !== observedOn || row.dimensions.item === '未分類') continue;
+            const qty = row.values.quantity ?? 0;
+            const price = row.values.average_price;
+            quantity += qty;
+            if (price !== null && qty > 0) priceWeight += price * qty;
+          }
+          return { observed_on: observedOn, quantity, average_price: quantity > 0 ? Number((priceWeight / quantity).toFixed(2)) : null };
+        });
+
+        const noticeResult = await admin.from('notifications')
+          .select('title,body,created_at').order('created_at', { ascending: false }).limit(60);
+        if (noticeResult.error) console.warn('dashboard market notices lookup failed:', noticeResult.error.message);
+        const seenNotice = new Set<string>();
+        const notices = ((noticeResult.data || []) as Array<Record<string, unknown>>)
+          .map(row => ({ title: text(row.title, 120), body: text(row.body, 200), created_at: text(row.created_at, 40) }))
+          .filter(row => {
+            if (!row.title && !row.body) return false;
+            const dedupeKey = `${row.title}|${row.body}`;
+            if (seenNotice.has(dedupeKey)) return false;
+            seenNotice.add(dedupeKey);
+            return true;
+          })
+          .slice(0, 15);
+
+        return reply(req, { ok: true, data: {
+          source: sourceSummary,
+          latest_date: latestDate,
+          previous_date: previousDate,
+          auto_step_seconds: rotation.autoStepSeconds,
+          refresh_seconds: refreshSeconds,
+          markets: DASHBOARD_MARKETS,
+          categories: DASHBOARD_CATEGORIES,
+          groups_summary: groupsSummary,
+          table: { markets: DASHBOARD_MARKETS, rows: tableRows },
+          trend,
+          notices,
         } });
       }
 

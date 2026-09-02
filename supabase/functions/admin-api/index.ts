@@ -26,7 +26,7 @@ const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_sup
 // Node.js 與 Edge Function 共用同一支處理器；前端會先檢查此版本，
 // 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
 const ADMIN_CONTRACT_VERSION = 2;
-const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'sys_dashboard', 'marketanalytics_manage']);
+const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'sys_dashboard', 'sys_marketboard', 'marketanalytics_manage']);
 const SAFE_SETTING_KEYS = new Set([
   'org_name', 'site_name', 'shifts', 'line_group_id', 'line_notify_anomaly', 'line_notify_repair',
   'line_notify_case', 'line_notify_security', 'line_notify_security_alerts', 'line_notify_error_threshold',

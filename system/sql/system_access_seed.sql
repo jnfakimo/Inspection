@@ -22,7 +22,8 @@ cross join (values
   ('sys_meetingroom'),
   ('sys_officialdocs'),
   ('sys_marketanalytics'),
-  ('sys_dashboard')
+  ('sys_dashboard'),
+  ('sys_marketboard')
 ) as p(perm)
 on conflict (role_id, perm) do nothing;
 
