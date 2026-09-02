@@ -100,22 +100,24 @@
 @media(max-width:640px){.market-board-market-groups{grid-template-columns:1fr}.market-board-head-actions{width:100%}}
 @media(max-width:400px){.market-board-stat-row{grid-template-columns:1fr}}
 
-/* 公開看板：字級 110%，市場色依名稱綁定，排序改變也不會交換配色。 */
+/* 公開頁與登入頁共用市場配色；公開看板另保留 110% 字級。 */
 .market-board-public-shell{--board-type-scale:1.1}
 .market-board-public{font-size:17.6px;--board-market-accent:var(--cyan)}
-.market-board-public [data-market="第一市場"]{--board-market-accent:var(--cyan)}
-.market-board-public [data-market="第二市場"]{--board-market-accent:var(--amber)}
-.market-board-public .market-board-market{background:color-mix(in srgb,var(--board-market-accent) 12%,var(--panel));border-color:color-mix(in srgb,var(--board-market-accent) 32%,var(--line));border-top-color:var(--board-market-accent)}
-.market-board-public .market-board-market>h4,.market-board-public .market-board-group>b{color:color-mix(in srgb,var(--board-market-accent) 45%,var(--text))}
-.market-board-public .market-board-group{background:color-mix(in srgb,var(--board-market-accent) 5%,var(--panel))}
-.market-board-public .market-board-stat>strong{white-space:normal;overflow:visible;overflow-wrap:anywhere}
-.market-board-public .market-board-stat>strong small{display:inline-block}
-.market-board-public .market-board-table [data-market]{background:color-mix(in srgb,var(--board-market-accent) 8%,var(--panel))}
-.market-board-public .market-board-table thead [data-market]{background:color-mix(in srgb,var(--board-market-accent) 15%,var(--panel));color:var(--text)}
-.market-board-public .market-board-table thead tr:first-child [data-market]{border-top:3px solid var(--board-market-accent)}
-.market-board-public .market-board-table tbody tr:hover [data-market]{background:color-mix(in srgb,var(--board-market-accent) 16%,var(--panel))}
-.market-board-public .market-board-table td{border-bottom-color:var(--line)}
-.market-board-public .market-board-table .market-board-cell-sep{border-left:2px solid color-mix(in srgb,var(--board-market-accent) 40%,var(--line))}
+.market-board-page [data-market="第一市場"]{--board-market-accent:var(--cyan)}
+.market-board-page [data-market="第二市場"]{--board-market-accent:var(--amber)}
+.market-board-page .market-board-market{background:color-mix(in srgb,var(--board-market-accent) 12%,var(--panel));border-color:color-mix(in srgb,var(--board-market-accent) 32%,var(--line));border-top-color:var(--board-market-accent)}
+.market-board-page .market-board-market>h4,.market-board-page .market-board-group>b{color:color-mix(in srgb,var(--board-market-accent) 45%,var(--text))}
+.market-board-page .market-board-group{background:color-mix(in srgb,var(--board-market-accent) 5%,var(--panel))}
+.market-board-page .market-board-stat>strong{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.market-board-page .market-board-stat>strong small{display:inline-block}
+.market-board-page .market-board-table tbody tr>:is(th,td){background:var(--panel)}
+/* 透明度 85% = 淺藍色佔 15%；套用整列，含品項與兩市場數值，文字不透明。 */
+.market-board-page .market-board-table tbody tr:nth-child(even)>:is(th,td){background:color-mix(in srgb,var(--cyan) 15%,var(--panel))}
+.market-board-page .market-board-table thead [data-market]{background:color-mix(in srgb,var(--board-market-accent) 15%,var(--panel));color:var(--text)}
+.market-board-page .market-board-table thead tr:first-child [data-market]{border-top:3px solid var(--board-market-accent)}
+.market-board-page .market-board-table tbody tr:hover>:is(th,td){background:color-mix(in srgb,var(--cyan) 20%,var(--panel))}
+.market-board-page .market-board-table td{border-bottom-color:var(--line)}
+.market-board-page .market-board-table .market-board-cell-sep{border-left:2px solid color-mix(in srgb,var(--board-market-accent) 40%,var(--line))}
 .market-board-public .market-board-head-actions .compact{font-size:12.1px}
 /* 圖示獨立放大 130%，不再疊乘文字的 110%。 */
 .market-board-public .market-movement-badge{display:inline-flex;align-items:center;gap:5px;line-height:1.4}
@@ -124,7 +126,7 @@
 .market-board-public .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
 .market-board-public .market-board-legend [data-direction] i{font-size:14.3px;line-height:1}
 
-.market-board-public{--board-muted:color-mix(in srgb,var(--dim) 80%,var(--text))}
-.market-board-public .market-board-stat>span,.market-board-public .market-board-stat>strong small,.market-board-public .market-board-stat>em,.market-board-public .market-board-stat .market-movement-badge{color:var(--board-muted)}
+.market-board-page{--board-muted:color-mix(in srgb,var(--dim) 80%,var(--text))}
+.market-board-page .market-board-stat>span,.market-board-page .market-board-stat>strong small,.market-board-page .market-board-stat>em,.market-board-page .market-board-stat .market-movement-badge{color:var(--board-muted)}
 .market-board-public .market-board-trend-range button.active{color:color-mix(in srgb,var(--cyan) 55%,var(--text))}
 .market-board-public .market-board-head p,.market-board-public-shell footer{color:color-mix(in srgb,var(--dim) 80%,var(--text))}
