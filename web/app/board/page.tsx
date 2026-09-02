@@ -33,8 +33,8 @@ export default function PublicMarketBoardPage() {
   const loadFeed = useCallback(() => loadPublicBoard(), []);
   return <div className="market-board-public-shell">
     <MarketExecutiveBoard
-      title="臺北農產 第一果菜市場 · 長官戰情看板"
-      subtitle="蔬果行情公開看板"
+      title="臺北農產運銷公司 行情表"
+      subtitle="第一、第二果菜批發市場蔬果行情"
       loadFeed={loadFeed}
       variant="public"
     />

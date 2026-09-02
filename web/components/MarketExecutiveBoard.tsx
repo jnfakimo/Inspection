@@ -138,21 +138,30 @@ function GroupCard({ label, group }: { label: string; group: GroupSummary | unde
   </div>;
 }
 
+const TREND_RANGES: Array<{ key: string; label: string; count: number }> = [
+  { key: '7', label: '近 7 日', count: 7 },
+  { key: '14', label: '近 14 日', count: 14 },
+  { key: '30', label: '近 1 個月', count: 999 },
+];
+
 function TrendChart({ points }: { points: TrendPoint[] }) {
   const [colors, setColors] = useState(chartColors);
+  const [rangeKey, setRangeKey] = useState('14');
   useEffect(() => {
     const refresh = () => setColors(chartColors());
     const observer = new MutationObserver(refresh);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
   }, []);
+  const range = TREND_RANGES.find(item => item.key === rangeKey) || TREND_RANGES[1];
+  const shown = useMemo(() => points.slice(-range.count), [points, range.count]);
   const data = useMemo(() => ({
-    labels: points.map(point => point.observed_on.slice(5).replace('-', '/')),
+    labels: shown.map(point => point.observed_on.slice(5).replace('-', '/')),
     datasets: [
       {
         type: 'bar' as const,
         label: '成交量（公斤）',
-        data: points.map(point => point.quantity),
+        data: shown.map(point => point.quantity),
         backgroundColor: colors.bar,
         borderColor: colors.barBorder,
         borderWidth: 1,
@@ -162,7 +171,7 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
       {
         type: 'line' as const,
         label: '加權平均價（元／公斤）',
-        data: points.map(point => point.average_price),
+        data: shown.map(point => point.average_price),
         borderColor: colors.price,
         backgroundColor: colors.price,
         borderWidth: 3,
@@ -172,7 +181,7 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
         yAxisID: 'price',
       },
     ],
-  }), [points, colors]);
+  }), [shown, colors]);
   const options = useMemo<ChartOptions<'bar' | 'line'>>(() => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -187,8 +196,20 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
       price: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: colors.text }, title: { display: true, text: '加權平均價（Y 軸右）', color: colors.text } },
     },
   }), [colors]);
-  if (!points.length) return <p className="market-board-empty">近 7 個交易日尚無可繪製的量價資料。</p>;
-  return <div className="market-board-trend-canvas"><Chart type="bar" data={data} options={options} /></div>;
+  if (!points.length) return <p className="market-board-empty">近期尚無可繪製的量價資料。</p>;
+  return <>
+    <div className="market-board-trend-range" role="group" aria-label="量價趨勢期間">
+      {TREND_RANGES.map(item => <button
+        key={item.key}
+        type="button"
+        className={item.key === rangeKey ? 'active' : ''}
+        aria-pressed={item.key === rangeKey}
+        onClick={() => setRangeKey(item.key)}
+      >{item.label}</button>)}
+      <small>共 {shown.length} 個交易日</small>
+    </div>
+    <div className="market-board-trend-canvas"><Chart type="bar" data={data} options={options} /></div>
+  </>;
 }
 
 function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: number }) {
@@ -353,7 +374,7 @@ export function MarketExecutiveBoard({ title, subtitle, loadFeed, headerExtra, v
 
       <section className="market-board-trend">
         <h3>量價趨勢</h3>
-        <p>近 7 個交易日的每日成交量（長條）與整體加權平均價（折線）。</p>
+        <p>每個交易日的全場成交量（長條）與成交量加權平均價（折線）；可切換近 7／14 日與近 1 個月。</p>
         <TrendChart points={feed.trend || []} />
       </section>
 

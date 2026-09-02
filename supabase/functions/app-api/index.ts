@@ -617,18 +617,38 @@ async function buildMarketBoardPayload(
       : left.category.localeCompare(right.category, 'zh-Hant')))
     .slice(0, 250);
 
-  const trend = Array.from({ length: 7 }, (_, index) => {
-    const observedOn = dashboardMarketShiftDate(currentFrom, index);
-    let quantity = 0, priceWeight = 0;
-    for (const row of dailyAggregates) {
-      if (row.observed_on !== observedOn || row.dimensions.item === '未分類') continue;
-      const qty = row.values.quantity ?? 0;
-      const price = row.values.average_price;
-      quantity += qty;
-      if (price !== null && qty > 0) priceWeight += price * qty;
-    }
-    return { observed_on: observedOn, quantity, average_price: quantity > 0 ? Number((priceWeight / quantity).toFixed(2)) : null };
+  // 量價趨勢：取近一個多月的每日總量與加權均價（daily grain，只含有交易的日子）。
+  // 前端提供近 7／14 日與近一月切換，這裡一次給足最多約 24 個交易日的點。
+  const trendRollup = await admin.rpc('market_analysis_rollup', {
+    p_source_id: sourceId,
+    p_from: dashboardMarketShiftDate(latestDate, -34),
+    p_to: latestDate,
+    p_compare_from: null,
+    p_compare_to: null,
+    p_dimensions: ['market'],
+    p_measures: ['quantity', 'average_price'],
+    p_filters: {},
+    p_include_group_daily: false,
   });
+  if (trendRollup.error) console.warn('market board trend rollup failed:', trendRollup.error.message);
+  const trendDaily = Array.isArray(marketJsonObject(trendRollup.data).current_daily)
+    ? marketJsonObject(trendRollup.data).current_daily as unknown[]
+    : [];
+  const trend = trendDaily
+    .map(entry => {
+      const row = marketJsonObject(entry);
+      const values = marketJsonObject(row.values);
+      const quantity = marketNumeric(values.quantity) ?? 0;
+      const averagePrice = marketNumeric(values.average_price);
+      return {
+        observed_on: text(row.observed_on, 10),
+        quantity,
+        average_price: averagePrice === null ? null : Number(averagePrice.toFixed(2)),
+      };
+    })
+    .filter(point => validISODate(point.observed_on))
+    .sort((left, right) => left.observed_on.localeCompare(right.observed_on))
+    .slice(-24);
 
   // 登入版跑馬燈沿用通知中心的最新內容（給現場人員看）。免登入公開版只顯示
   // 明確標記給看板的訊息（event='board_notice'），不把內部派工／公文通知投到大螢幕。
@@ -933,9 +953,11 @@ export async function handleAppApiRequest(req: Request) {
     const publicAction = text((await req.clone().json().catch(() => ({})))?.action, 40);
     if (publicAction === 'market_board_public') {
       const publicAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+      // 公開看板可能被整個辦公室的多台裝置共用一個對外 IP，用較寬的 app-api
+      // 額度（60 次/分）而不是 dashboard 的 12 次/分，避免正常投放被誤擋。
       const publicRate = await enforceDurableRateLimit(publicAdmin, req, {
         subject: `market-board-public:${extractClientIp(req) || 'unknown'}`,
-        scope: 'app-api:dashboard',
+        scope: 'app-api',
         requestId: securityEventRequestId,
       });
       if (publicRate.error) {

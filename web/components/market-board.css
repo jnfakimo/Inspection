@@ -45,6 +45,10 @@
 .market-board-trend{padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
 .market-board-trend h3{margin:0 0 4px;font:700 15px var(--head)}
 .market-board-trend p{margin:0 0 10px;color:var(--dim);font-size:11px}
+.market-board-trend-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.market-board-trend-range button{border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--dim);padding:5px 12px;font-size:11px;cursor:pointer}
+.market-board-trend-range button.active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,var(--panel2));color:var(--cyan);font-weight:700}
+.market-board-trend-range small{margin-left:auto;color:var(--dim);font-size:10px}
 .market-board-trend-canvas{position:relative;min-width:0;height:300px}
 
 .market-board-table-panel{padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
