@@ -75,8 +75,8 @@ if (-not (Test-Path (Join-Path $site 'v2\index.html'))) {
 Write-Host ""
 Write-Host ("[3/3] mirror _site -> {0}  (robocopy /MIR)" -f $Target) -ForegroundColor Yellow
 # /MIR removes files in Target that are not in _site (clears stale _next chunks).
-# Protect .git and App_Data if they happen to live there.
-robocopy $site $Target /MIR /XD .git App_Data /NFL /NDL /NJH /NP /R:2 /W:2
+# Keep a hand-placed web.config / IIS folders that the build does not produce.
+robocopy $site $Target /MIR /XF web.config /XD .git App_Data aspnet_client /NFL /NDL /NJH /NP /R:2 /W:2
 $rc = $LASTEXITCODE
 # robocopy exit codes 0-7 are success; 8+ is a real error.
 if ($rc -ge 8) { throw "robocopy failed (exit $rc)" }
