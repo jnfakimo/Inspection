@@ -39,6 +39,8 @@ import { Line, Doughnut } from 'react-chartjs-2';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
 type Row = Record<string, any>;
+type TrendPeriod = 'week' | 'month' | 'quarter' | 'halfyear' | 'year';
+type TrendPoint = { label: string; value: number };
 type LayoutItem = {
   widget_key: string; title: string; x: number; y: number; width: number; height: number;
   min_width: number; min_height: number; visible: boolean; refresh_seconds: number; sort_order: number;
@@ -89,6 +91,34 @@ const countBy = (rows: Row[], pick: (row: Row) => unknown): Array<[string, numbe
 };
 const average = (list: number[]) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
 
+function trendSpec(period: TrendPeriod, now: Date) {
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === 'week' || period === 'month') {
+    const days = period === 'week' ? 7 : 30;
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - days + 1);
+    return { start, end, points: Array.from({ length: days }, (_, index) => {
+      const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index);
+      return { start: date, end: date, label: `${date.getMonth() + 1}/${date.getDate()}` };
+    }) };
+  }
+  if (period === 'quarter') {
+    const weeks = 13;
+    const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - weeks * 7 + 1);
+    return { start, end, points: Array.from({ length: weeks }, (_, index) => {
+      const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + index * 7);
+      const pointEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 6);
+      return { start: date, end: pointEnd > end ? end : pointEnd, label: `${date.getMonth() + 1}/${date.getDate()}` };
+    }) };
+  }
+  const months = period === 'halfyear' ? 6 : 12;
+  const start = new Date(end.getFullYear(), end.getMonth() - months + 1, 1);
+  return { start, end, points: Array.from({ length: months }, (_, index) => {
+    const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
+    const pointEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    return { start: date, end: pointEnd > end ? end : pointEnd, label: `${date.getFullYear()}/${date.getMonth() + 1}` };
+  }) };
+}
+
 function normalizeLayout(rows: Row[]): LayoutItem[] {
   const byKey: Record<string, Row> = {};
   (Array.isArray(rows) ? rows : []).forEach(row => { if (row && CATALOG.some(item => item.key === row.widget_key)) byKey[row.widget_key] = row; });
@@ -122,9 +152,10 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   const [layoutNote, setLayoutNote] = useState('');
   const [requests, setRequests] = useState<Row[]>([]);
   const [orders, setOrders] = useState<Row[]>([]);
-  const [trend, setTrend] = useState<Array<{ label: string; value: number }>>([]);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [patrol, setPatrol] = useState({ points: 0, done: 0, shift: '', floors: [] as Array<[string, number]> });
   const [range, setRange] = useState<'today' | 'month' | 'year'>('month');
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>('month');
   const [from, setFrom] = useState(() => { const now = new Date(); return ymd(new Date(now.getFullYear(), now.getMonth(), 1)); });
   const [to, setTo] = useState(() => ymd(new Date()));
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [updatedAt, setUpdatedAt] = useState('');
@@ -156,8 +187,9 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const client = getSupabase();
     const rangeStart = `${from}T00:00:00+08:00`, rangeEnd = `${to}T23:59:59+08:00`;
     const now = new Date();
-    const trendStart = `${now.getFullYear() - (now.getMonth() < 11 ? 1 : 0)}-${pad(((now.getMonth() + 1) % 12) + 1)}-01`;
-    const trendEnd = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    const trendWindow = trendSpec(trendPeriod, now);
+    const trendStart = `${ymd(trendWindow.start)}T00:00:00+08:00`;
+    const trendEnd = `${ymd(trendWindow.end)}T23:59:59+08:00`;
     const day = today();
     const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult] = await Promise.all([
       client.from('repair_requests')
@@ -165,7 +197,8 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         .gte('created_at', rangeStart).lte('created_at', rangeEnd).limit(5000),
       client.from('maintenance_orders')
         .select('order_id,assignee_id,status,start_time,finish_time,expected_finish,created_at,hidden,users:assignee_id(name)').limit(5000),
-      client.rpc('repair_monthly_counts', { p_start: trendStart, p_end: trendEnd }),
+      client.from('repair_requests').select('created_at,hidden')
+        .gte('created_at', trendStart).lte('created_at', trendEnd).limit(10000),
       client.from('plan_markers').select('marker_id,floor_id,label,status').eq('kind', 'patrol').limit(5000),
       client.from('checkin_logs').select('checkin_id,target_id,label,floor_id')
         .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(5000),
@@ -184,21 +217,21 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const notices: string[] = [];
     const patrolFailure = markerResult.error || checkinResult.error;
     if (patrolFailure) notices.push(`當班巡檢資料載入失敗：${patrolFailure.message || '請稍後再試'}`);
-    if (trendResult.error) notices.push(`月趨勢統計載入失敗（repair_monthly_counts）：${trendResult.error.message || '請稍後再試'}`);
+    if (trendResult.error) notices.push(`走勢統計載入失敗：${trendResult.error.message || '請稍後再試'}`);
     if (notices.length) setError(notices.join('；'));
     setRequests((requestResult.data || []).filter(row => !row.hidden));
     setOrders((orderResult.data || []).filter(row => !row.hidden));
 
-    // 12 個月趨勢：RPC 失敗時以 0 補滿，畫面仍成立但不會假造數字。
-    const counts: Record<string, number> = {};
-    if (!trendResult.error) (trendResult.data || []).forEach((row: Row) => { counts[String(row.month_key)] = Number(row.total) || 0; });
-    const months: Array<{ label: string; value: number }> = [];
-    for (let i = 11; i >= 0; i -= 1) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      months.push({ label: `${d.getMonth() + 1}月`, value: counts[key] || 0 });
+    // 走勢依選取期間自動分桶；查詢失敗時保留空值，不虛構數字。
+    const trendCounts: TrendPoint[] = trendWindow.points.map(point => ({ label: point.label, value: 0 }));
+    if (!trendResult.error) {
+      (trendResult.data || []).filter((row: Row) => !row.hidden).forEach((row: Row) => {
+        const created = taipeiDate(row.created_at);
+        const index = trendWindow.points.findIndex(point => created != null && created >= ymd(point.start) && created <= ymd(point.end));
+        if (index >= 0) trendCounts[index].value += 1;
+      });
     }
-    setTrend(months);
+    setTrend(trendCounts);
 
     // 當班巡檢：以當日打卡對照巡邏點，班別取此刻進行中者，與 SYS-03 打卡矩陣同口徑。
     const points = (markerResult.data || [])
@@ -230,7 +263,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
 
     setUpdatedAt(new Date().toLocaleTimeString('zh-TW', { hour12: false }));
     setBusy(false);
-  }, [from, to]);
+  }, [from, to, trendPeriod]);
   useEffect(() => { void load(); }, [load]);
 
   const stats = useMemo(() => {
@@ -325,7 +358,19 @@ export function DashboardClient({ profile }: { profile: Profile }) {
           }]
         };
         const options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: 'gray' } }, x: { grid: { display: false }, ticks: { color: 'gray' } } } };
-        return <div style={{ position: 'relative', height: '100%', minHeight: '200px' }}><Line data={data} options={options} /></div>;
+        return <div className="trend-widget">
+          <div className="trend-controls">
+            <label htmlFor="dashboard-trend-period">走勢期間</label>
+            <select id="dashboard-trend-period" data-trend-version="20260901-2" value={trendPeriod} onChange={event => setTrendPeriod(event.target.value as TrendPeriod)}>
+              <option value="week">周走勢（近 7 日）</option>
+              <option value="month">月走勢（近 30 日）</option>
+              <option value="quarter">季走勢（近 13 週）</option>
+              <option value="halfyear">半年走勢（近 6 個月）</option>
+              <option value="year">年走勢（近 12 個月）</option>
+            </select>
+          </div>
+          <div style={{ position: 'relative', height: 'calc(100% - 42px)', minHeight: '200px' }}><Line data={data} options={options} /></div>
+        </div>;
       }
       case 'weather_taiwan': return <WeatherWidget />;
       case 'market_snapshot': return <>

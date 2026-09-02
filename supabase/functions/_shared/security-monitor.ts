@@ -2,6 +2,8 @@
 // 新版 RPC/告警類型尚未存在時，會退回既有限流 RPC 與 repeated_denied 告警，
 // 不讓 Edge Function 因部署先後順序而全面回應 500。
 
+import { clientIpFromRequest } from "./client-ip.ts";
+
 type SecurityDb = {
   from: (relation: string) => any;
   rpc: (
@@ -59,13 +61,7 @@ const clean = (value: unknown, max = 500) =>
     .trim()
     .slice(0, max);
 
-export const securityClientIp = (req: Request) => {
-  const raw = req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") ||
-    "";
-  return clean(raw.split(",")[0], 80) || null;
-};
+export const securityClientIp = clientIpFromRequest;
 
 export const securityRequestId = () => {
   if (typeof crypto?.randomUUID === "function") return crypto.randomUUID();

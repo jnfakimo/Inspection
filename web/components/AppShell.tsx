@@ -219,7 +219,7 @@ export function AppShell({ profile, title, children, heading }: {
           aria-controls="admin-v2-sidebar"
           onClick={() => setAdminMenuOpen(true)}
         >
-          <img src="/Inspection/assets/system-icons/admin-icon.png" alt="" />
+          <img src="/Inspection/assets/system-icons-v20260901/admin-icon.png" alt="" />
           後台選單
         </button>
         <main className="content v1-content admin-v2-content">{pageHeading}{children}</main>

@@ -11,17 +11,17 @@ import styles from './admin-system-hub.module.css';
 const adminSystem = findSystem('admin');
 
 const cardVisuals = [
-  { icon: '/Inspection/assets/system-icons/account-icon.png', accent: 'var(--icon-sky)' },
-  { icon: '/Inspection/assets/system-icons/account-icon.png', accent: '#4f8cff' },
-  { icon: '/Inspection/assets/system-icons/guardpatrol-list-icon.png', accent: '#00c985' },
-  { icon: '/Inspection/assets/system-icons/audit-icon.png', accent: '#9b70e8' },
-  { icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', accent: '#ef5b87' },
-  { icon: '/Inspection/assets/system-icons/guardpatrol-line-push-icon.png', accent: '#e5a100' },
-  { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: 'var(--icon-sky)' },
-  { icon: '/Inspection/assets/system-icons/guardpatrol-schedule-icon.png', accent: '#00c985' },
-  { icon: '/Inspection/assets/system-icons/audit-icon.png', accent: '#e5a100' },
-  { icon: '/Inspection/assets/system-icons/admin-icon.png', accent: '#4f8cff' },
-  { icon: '/Inspection/assets/system-icons/settings-icon.png', accent: '#ef5b87' },
+  { icon: '/Inspection/assets/system-icons-v20260901/account-icon.png', accent: 'var(--icon-sky)' },
+  { icon: '/Inspection/assets/system-icons-v20260901/account-icon.png', accent: '#4f8cff' },
+  { icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-list-icon.png', accent: '#00c985' },
+  { icon: '/Inspection/assets/system-icons-v20260901/audit-icon.png', accent: '#9b70e8' },
+  { icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-icon.png', accent: '#ef5b87' },
+  { icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-line-push-icon.png', accent: '#e5a100' },
+  { icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png', accent: 'var(--icon-sky)' },
+  { icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-schedule-icon.png', accent: '#00c985' },
+  { icon: '/Inspection/assets/system-icons-v20260901/audit-icon.png', accent: '#e5a100' },
+  { icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png', accent: '#4f8cff' },
+  { icon: '/Inspection/assets/system-icons-v20260901/settings-icon.png', accent: '#ef5b87' },
 ] as const;
 
 function AdminHub({ profile }: { profile: Profile }) {
@@ -49,7 +49,7 @@ function AdminHub({ profile }: { profile: Profile }) {
             >
               <span className={styles.badge}>系統設定</span>
               <span className={styles.icon} aria-hidden="true">
-                <img src="/Inspection/assets/system-icons/admin-icon.png" alt="" />
+                <img src="/Inspection/assets/system-icons-v20260901/admin-icon.png" alt="" />
               </span>
               <h3>系統設定</h3>
               <p>系統識別、組織、班別、LINE 推播及整合設定。</p>

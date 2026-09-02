@@ -4,11 +4,14 @@ import {
   recordRateLimitDenial,
   securityRequestId,
 } from "../_shared/security-monitor.ts";
+import { clientIpFromRequest } from "../_shared/client-ip.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
+const configuredOrigins = new Set((Deno.env.get("APP_ALLOWED_ORIGINS") || "")
+  .split(",").map((value) => value.trim()).filter(Boolean));
 const allowedOrigin = (req: Request) => {
   const origin = req.headers.get("origin") || "";
-  if (origin === PROD_ORIGIN || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  if (origin === PROD_ORIGIN || configuredOrigins.has(origin) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
   return PROD_ORIGIN;
 };
 const cors = (req: Request) => ({
@@ -29,11 +32,7 @@ type AdminClient = {
   from: (relation: string) => any;
   rpc: (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: any; error: any }>;
 };
-const clientIp = (req: Request) => {
-  const raw = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
-  return cleanText(raw.split(",")[0], 80) || null;
-};
+const clientIp = clientIpFromRequest;
 const CAPTCHA_TTL_SECONDS = 300;
 const CAPTCHA_LENGTH = 6;
 const CAPTCHA_SEGMENTS: Record<string, string[]> = {

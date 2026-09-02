@@ -1,10 +1,13 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 import { canonicalFloor } from "../_shared/floor.ts";
+import { clientIpFromRequest } from "../_shared/client-ip.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
+const configuredOrigins = new Set((Deno.env.get("APP_ALLOWED_ORIGINS") || "")
+  .split(",").map((value) => value.trim()).filter(Boolean));
 const allowedOrigin = (req: Request) => {
   const origin = req.headers.get("origin") || "";
-  if (origin === PROD_ORIGIN || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  if (origin === PROD_ORIGIN || configuredOrigins.has(origin) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
   return PROD_ORIGIN;
 };
 const cors = (req: Request) => ({
@@ -20,11 +23,7 @@ const reply = (req: Request, body: unknown, status = 200) => new Response(JSON.s
 
 const cleanText = (value: unknown, max = 500) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const isUuid = (value: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
-const clientIp = (req: Request) => {
-  const raw = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
-  return cleanText(raw.split(",")[0], 80) || null;
-};
+const clientIp = clientIpFromRequest;
 
 type JwtClaims = { aal?: string; amr?: Array<{ method?: string; timestamp?: number } | string>; session_id?: string; iat?: number };
 const decodeClaims = (token: string): JwtClaims => {
