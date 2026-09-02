@@ -183,3 +183,9 @@
 @media(max-width:900px){.market-comparison-top-items{grid-column:1/-1}.market-comparison-yoy-rates{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media(max-width:700px){.market-comparison-yoy-rates{grid-template-columns:repeat(4,minmax(0,1fr))}.market-comparison-box-plot{gap:12px}.market-comparison-box-column{min-width:48px}}
 @media(max-width:430px){.market-comparison-yoy-rates{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.market-import-panel,.market-import-summary{min-width:0}
+.market-import-summary-scroll{max-width:100%;overflow-x:auto}
+.market-import-summary table{width:100%;font-size:12px}
+.market-import-summary th,.market-import-summary td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);color:var(--text)}
+.market-import-summary th{background:var(--panel2);white-space:nowrap}
+.market-import-summary td:first-child{min-width:180px;overflow-wrap:anywhere}
