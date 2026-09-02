@@ -149,7 +149,7 @@ const TREND_RANGES: Array<{ key: string; label: string; count: number }> = [
   { key: '30', label: '近 1 個月', count: 999 },
 ];
 
-function TrendChart({ points }: { points: TrendPoint[] }) {
+function TrendChart({ points, textScale = 1 }: { points: TrendPoint[]; textScale?: number }) {
   const [colors, setColors] = useState(chartColors);
   const [rangeKey, setRangeKey] = useState('14');
   useEffect(() => {
@@ -192,15 +192,15 @@ function TrendChart({ points }: { points: TrendPoint[] }) {
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     plugins: {
-      legend: { position: 'top', labels: { color: colors.text, usePointStyle: true } },
-      tooltip: { callbacks: { label: context => `${context.dataset.label || ''}：${numberText(context.parsed.y, 1)}` } },
+      legend: { position: 'top', labels: { color: colors.text, usePointStyle: true, font: { size: 12 * textScale } } },
+      tooltip: { titleFont: { size: 12 * textScale }, bodyFont: { size: 12 * textScale }, callbacks: { label: context => `${context.dataset.label || ''}：${numberText(context.parsed.y, 1)}` } },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: colors.text }, title: { display: true, text: '交易日期（X 軸）', color: colors.text } },
-      quantity: { beginAtZero: true, position: 'left', grid: { color: colors.line }, ticks: { color: colors.text }, title: { display: true, text: '成交量（Y 軸左）', color: colors.text } },
-      price: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: colors.text }, title: { display: true, text: '加權平均價（Y 軸右）', color: colors.text } },
+      x: { grid: { display: false }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '交易日期（X 軸）', color: colors.text, font: { size: 12 * textScale } } },
+      quantity: { beginAtZero: true, position: 'left', grid: { color: colors.line }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '成交量（Y 軸左）', color: colors.text, font: { size: 12 * textScale } } },
+      price: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '加權平均價（Y 軸右）', color: colors.text, font: { size: 12 * textScale } } },
     },
-  }), [colors]);
+  }), [colors, textScale]);
   if (!points.length) return <p className="market-board-empty">近期尚無可繪製的量價資料。</p>;
   return <>
     <div className="market-board-trend-range" role="group" aria-label="量價趨勢期間">
@@ -228,17 +228,17 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
         <thead>
           <tr>
             <th className="market-board-col-item" rowSpan={2}>品項</th>
-            {markets.map(market => <th key={market} colSpan={7}>{market}</th>)}
+            {markets.map(market => <th data-market={market} key={market} colSpan={7}>{market}</th>)}
           </tr>
           <tr>
             {markets.map(market => [
-              <th key={`${market}-prev`} className="market-board-cell-sep">昨日均價</th>,
-              <th key={`${market}-avg`}>當日均價</th>,
-              <th key={`${market}-change`}>漲跌</th>,
-              <th key={`${market}-pct`}>漲跌幅</th>,
-              <th key={`${market}-high`}>上價</th>,
-              <th key={`${market}-middle`}>中價</th>,
-              <th key={`${market}-low`}>下價</th>,
+              <th data-market={market} key={`${market}-prev`} className="market-board-cell-sep">昨日均價</th>,
+              <th data-market={market} key={`${market}-avg`}>當日均價</th>,
+              <th data-market={market} key={`${market}-change`}>漲跌</th>,
+              <th data-market={market} key={`${market}-pct`}>漲跌幅</th>,
+              <th data-market={market} key={`${market}-high`}>上價</th>,
+              <th data-market={market} key={`${market}-middle`}>中價</th>,
+              <th data-market={market} key={`${market}-low`}>下價</th>,
             ])}
           </tr>
         </thead>
@@ -249,13 +249,13 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
               const cell = row.cells[market];
               const direction = cell && cell.change != null ? (cell.change > 0 ? 'rise' : cell.change < 0 ? 'fall' : 'steady') : undefined;
               return [
-                <td key={`${market}-prev`} className="market-board-cell-sep">{numberText(cell?.prev_avg)}</td>,
-                <td key={`${market}-avg`}>{numberText(cell?.avg)}</td>,
-                <td key={`${market}-change`} className="market-board-cell-change" data-direction={direction}>{signedText(cell?.change)}</td>,
-                <td key={`${market}-pct`} className="market-board-cell-change" data-direction={direction}>{cell?.change_pct == null ? '—' : `${signedText(cell.change_pct, 2)}%`}</td>,
-                <td key={`${market}-high`}>{numberText(cell?.high)}</td>,
-                <td key={`${market}-middle`}>{numberText(cell?.middle)}</td>,
-                <td key={`${market}-low`}>{numberText(cell?.low)}</td>,
+                <td data-market={market} key={`${market}-prev`} className="market-board-cell-sep">{numberText(cell?.prev_avg)}</td>,
+                <td data-market={market} key={`${market}-avg`}>{numberText(cell?.avg)}</td>,
+                <td data-market={market} key={`${market}-change`} className="market-board-cell-change" data-direction={direction}>{signedText(cell?.change)}</td>,
+                <td data-market={market} key={`${market}-pct`} className="market-board-cell-change" data-direction={direction}>{cell?.change_pct == null ? '—' : `${signedText(cell.change_pct, 2)}%`}</td>,
+                <td data-market={market} key={`${market}-high`}>{numberText(cell?.high)}</td>,
+                <td data-market={market} key={`${market}-middle`}>{numberText(cell?.middle)}</td>,
+                <td data-market={market} key={`${market}-low`}>{numberText(cell?.low)}</td>,
               ];
             })}
           </tr>)}
@@ -371,7 +371,7 @@ export function MarketExecutiveBoard({ title, subtitle, loadFeed, headerExtra, v
       <section className="market-board-overview">
         <h3>兩市統計總覽</h3>
         <div className="market-board-markets">
-          {markets.map(market => <div className="market-board-market" key={market}>
+          {markets.map(market => <div className="market-board-market" data-market={market} key={market}>
             <h4>{market}統計</h4>
             <div className="market-board-market-groups">
               {categories.map(category => <GroupCard key={category} label={`${category}總計`} group={groupByKey.get(`${market}::${category}`)} />)}
@@ -383,7 +383,7 @@ export function MarketExecutiveBoard({ title, subtitle, loadFeed, headerExtra, v
       <section className="market-board-trend">
         <h3>量價趨勢</h3>
         <p>每個交易日的全場成交量（長條）與成交量加權平均價（折線）；可切換近 7／14 日與近 1 個月。</p>
-        <TrendChart points={feed.trend || []} />
+        <TrendChart points={feed.trend || []} textScale={variant === 'public' ? 1.1 : 1} />
       </section>
 
       <section className="market-board-table-panel">
