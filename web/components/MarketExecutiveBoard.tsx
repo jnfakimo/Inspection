@@ -17,6 +17,7 @@ import {
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
 import { MarketMovementBadge } from '@/components/MarketMovementBadge';
+import { marketMovementPresentation } from '@/lib/market-movement';
 import './market-board.css';
 
 ChartJS.register(BarController, BarElement, CategoryScale, Filler, Legend, LineController, LineElement, LinearScale, PointElement, Tooltip);
@@ -120,20 +121,24 @@ function BoardMarquee({ notices }: { notices: BoardNotice[] }) {
   </div>;
 }
 
+function GroupStat({ label, current, previous, digits, unit }: {
+  label: string; current: Numeric; previous: Numeric; digits: number; unit: string;
+}) {
+  const change = percentChange(current, previous);
+  return <div className={`market-board-stat market-card-${marketMovementPresentation(change).tone}`}>
+    <span>{label}</span>
+    <strong>{numberText(current, digits)}<small>{unit}</small></strong>
+    <em>昨日 {numberText(previous, digits)}</em>
+    <MarketMovementBadge value={change} />
+  </div>;
+}
+
 function GroupCard({ label, group }: { label: string; group: GroupSummary | undefined }) {
-  const priceChange = percentChange(group?.current.average_price ?? null, group?.previous.average_price ?? null);
-  const volumeChange = percentChange(group?.current.quantity ?? null, group?.previous.quantity ?? null);
   return <div className="market-board-group">
     <b>{label}</b>
-    <dl>
-      <div><dt>當日均價</dt><dd>{numberText(group?.current.average_price)}<small>元／公斤</small></dd></div>
-      <div><dt>昨日均價</dt><dd>{numberText(group?.previous.average_price)}<small>元／公斤</small></dd></div>
-      <div><dt>當日成交量</dt><dd>{numberText(group?.current.quantity, 0)}<small>公斤</small></dd></div>
-      <div><dt>昨日成交量</dt><dd>{numberText(group?.previous.quantity, 0)}<small>公斤</small></dd></div>
-    </dl>
-    <div className="market-board-group-moves">
-      <span>均價 <MarketMovementBadge value={priceChange} /></span>
-      <span>成交量 <MarketMovementBadge value={volumeChange} /></span>
+    <div className="market-board-stat-row">
+      <GroupStat label="當日均價" current={group?.current.average_price ?? null} previous={group?.previous.average_price ?? null} digits={1} unit="元／公斤" />
+      <GroupStat label="當日成交量" current={group?.current.quantity ?? null} previous={group?.previous.quantity ?? null} digits={0} unit="公斤" />
     </div>
   </div>;
 }
@@ -363,14 +368,17 @@ export function MarketExecutiveBoard({ title, subtitle, loadFeed, headerExtra, v
     {feed && <BoardMarquee notices={feed.notices || []} />}
 
     {busy && !feed ? <p className="market-board-empty">市場公開看板載入中…</p> : feed && !staleFeed ? <>
-      <div className="market-board-markets">
-        {markets.map(market => <section className="market-board-market" key={market}>
-          <h3>{market}</h3>
-          <div className="market-board-market-groups">
-            {categories.map(category => <GroupCard key={category} label={`${category}總計`} group={groupByKey.get(`${market}::${category}`)} />)}
-          </div>
-        </section>)}
-      </div>
+      <section className="market-board-overview">
+        <h3>兩市統計總覽</h3>
+        <div className="market-board-markets">
+          {markets.map(market => <div className="market-board-market" key={market}>
+            <h4>{market}統計</h4>
+            <div className="market-board-market-groups">
+              {categories.map(category => <GroupCard key={category} label={`${category}總計`} group={groupByKey.get(`${market}::${category}`)} />)}
+            </div>
+          </div>)}
+        </div>
+      </section>
 
       <section className="market-board-trend">
         <h3>量價趨勢</h3>
