@@ -397,7 +397,10 @@ type MarketBoardResult =
 // SYS-12「長官模式」公開看板的資料組裝。同時給登入版（dashboard_market_rotation
 // view:'board'）與免登入版（action:'market_board_public'）使用，兩邊都只讀既有正式
 // 行情，不新增資料表。與輪播共用來源解析邏輯，但各自取自己需要的 rollup。
-async function buildMarketBoardPayload(admin: SupabaseClient): Promise<MarketBoardResult> {
+async function buildMarketBoardPayload(
+  admin: SupabaseClient,
+  options: { publicView?: boolean } = {},
+): Promise<MarketBoardResult> {
   let widgetConfig: Record<string, unknown> = {};
   let refreshSeconds = 60;
   const layoutResult = await admin.from('dashboard_layouts')
@@ -627,8 +630,11 @@ async function buildMarketBoardPayload(admin: SupabaseClient): Promise<MarketBoa
     return { observed_on: observedOn, quantity, average_price: quantity > 0 ? Number((priceWeight / quantity).toFixed(2)) : null };
   });
 
-  const noticeResult = await admin.from('notifications')
-    .select('title,body,created_at').order('created_at', { ascending: false }).limit(60);
+  // 登入版跑馬燈沿用通知中心的最新內容（給現場人員看）。免登入公開版只顯示
+  // 明確標記給看板的訊息（event='board_notice'），不把內部派工／公文通知投到大螢幕。
+  const noticeBase = admin.from('notifications').select('title,body,created_at');
+  const noticeResult = await (options.publicView ? noticeBase.eq('event', 'board_notice') : noticeBase)
+    .order('created_at', { ascending: false }).limit(60);
   if (noticeResult.error) console.warn('market board notices lookup failed:', noticeResult.error.message);
   const seenNotice = new Set<string>();
   const notices = ((noticeResult.data || []) as Array<Record<string, unknown>>)
@@ -939,7 +945,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!publicRate.allowed) {
         return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試', request_id: securityEventRequestId }, 429);
       }
-      const board = await buildMarketBoardPayload(publicAdmin);
+      const board = await buildMarketBoardPayload(publicAdmin, { publicView: true });
       return board.ok ? reply(req, { ok: true, data: board.data }) : reply(req, { ok: false, message: board.message }, board.status);
     }
 
