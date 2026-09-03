@@ -1,8 +1,37 @@
 'use client';
 
 import { getSupabase } from './supabase';
+import { SUPABASE_ANON_KEY } from './config';
 
 const USERNAME_LOGIN_TIMEOUT_MS = 15_000;
+
+const isIpAddress = (hostname: string) => /^(?:\d{1,3}\.){3}\d{1,3}$/u.test(hostname);
+
+async function invokeSameOrigin(body: Record<string, unknown>) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), USERNAME_LOGIN_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${window.location.origin}/functions/v1/username-login`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(String(payload?.message || `登入服務回應 ${response.status}`));
+      (error as Error & { status?: number }).status = response.status;
+      throw error;
+    }
+    return payload;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 async function localizedFunctionError(error: unknown, fallback: string) {
   const context = (error as { context?: unknown } | null)?.context;
@@ -19,6 +48,23 @@ async function localizedFunctionError(error: unknown, fallback: string) {
 }
 
 export async function invokeUsernameLogin<T>(body: Record<string, unknown>, fallback: string): Promise<T> {
+  // Self-hosted deployments are commonly opened by IP with a router port
+  // (e.g. https://1.34.250.22:5057). Force the request to the same origin so
+  // the browser never silently falls back to the cloud Supabase URL.
+  if (typeof window !== 'undefined' && (isIpAddress(window.location.hostname)
+    || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    try {
+      return await invokeSameOrigin(body) as T;
+    } catch (error) {
+      const status = (error as Error & { status?: number }).status;
+      // Do not retry a deliberate API response (bad credentials, expired
+      // captcha, rate limit, etc.); only surface a localized network error.
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        throw new Error(await localizedFunctionError(error, fallback));
+      }
+      throw new Error(await localizedFunctionError(error, fallback));
+    }
+  }
   const { data, error } = await getSupabase().functions.invoke('username-login', {
     body,
     timeout: USERNAME_LOGIN_TIMEOUT_MS,

@@ -66,14 +66,25 @@ export default function LoginPage() {
   }
   async function loadCaptcha() {
     setCaptcha(null);
-    try {
-      const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string }>(
-        { action: 'captcha' },
-        '驗證碼服務暫時無法連線，請稍後重試',
-      );
-      if (!data?.challenge_id || !data.image) return setMessage('驗證碼載入失敗，請確認網路後重新整理');
-      setCaptcha({ id: data.challenge_id, image: data.image });
-    } catch (error) { setMessage(friendlyError(error, '驗證碼服務暫時無法連線，請稍後重試')); }
+    // 行動網路剛切換 4G/5G 時，第一次請求可能在 DNS/NAT 建立期間失敗；
+    // 自動短暫重試，避免使用者看到「服務回應逾時」後必須手動重整整頁。
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string }>(
+          { action: 'captcha' },
+          '驗證碼服務暫時無法連線，請稍後重試',
+        );
+        if (!data?.challenge_id || !data.image) throw new Error('驗證碼載入失敗');
+        setMessage('');
+        setCaptcha({ id: data.challenge_id, image: data.image });
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 700 * (attempt + 1)));
+      }
+    }
+    setMessage(friendlyError(lastError, '驗證碼服務暫時無法連線，請稍後重試'));
   }
 
   useEffect(() => {
