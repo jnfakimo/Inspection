@@ -10,9 +10,11 @@ finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr1); [Runtime.Inte
 if ($plain1 -ne $plain2 -or $plain1 -notmatch '^\d{8}$') { throw 'Password must be the same 8 digits both times.' }
 $payload = @{ username = $Username; password = $plain1 } | ConvertTo-Json -Compress
 $plain1 = $null; $plain2 = $null
-$result = $payload | & wsl.exe -d Ubuntu -- bash -lc @'
+$payloadBytes = [Text.Encoding]::UTF8.GetBytes($payload)
+$payloadB64 = [Convert]::ToBase64String($payloadBytes)
+$runner = @'
 set -euo pipefail
-payload=$(cat)
+payload=$(printf '%s' '__PAYLOAD_B64__' | base64 -d)
 username=$(printf '%s' "$payload" | python3 -c 'import json,sys; print(json.load(sys.stdin)["username"])')
 password=$(printf '%s' "$payload" | python3 -c 'import json,sys; print(json.load(sys.stdin)["password"])')
 cd /opt/inspection/supabase
@@ -24,5 +26,7 @@ status=$(curl -sS -o /tmp/reset-password-response.json -w '%{http_code}' -X PUT 
 if [ "$status" != '200' ]; then echo "Password reset failed (service status $status)." >&2; exit 5; fi
 echo 'Password reset completed. Sign in with the new password.'
 '@
+$runner = $runner.Replace('__PAYLOAD_B64__', $payloadB64)
+$result = $runner | & wsl.exe -d Ubuntu -- bash -s
 if ($LASTEXITCODE -ne 0) { throw 'Password reset failed; the password was not written to output or disk.' }
 $result
