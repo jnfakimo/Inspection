@@ -7,7 +7,13 @@
 // @supabase/supabase-js 之後），改用 window.createDb() 取代原本的
 // supabase.createClient(SUPA_URL, SUPA_KEY)。一般登入憑證只放 sessionStorage；
 // 巡檢 QR 另有最長 2 小時的跨分頁橋接，供手機掃碼開新分頁時恢復工作階段。
-window.SUPA_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
+// 自建站台所在網路連不到 *.supabase.co，改沿用目前 origin 讓 IIS 反向代理轉發到雲端。
+var isSelfHosted = typeof window !== 'undefined' && (
+  /^https?:\/\/(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.|1\.34\.|localhost|127\.0\.0\.1)/.test(window.location.origin) ||
+  window.location.hostname === '1.34.250.22' ||
+  window.location.port === '5057'
+);
+window.SUPA_URL = isSelfHosted ? window.location.origin : 'https://qztffronusdhgxhjjubt.supabase.co';
 window.SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
 
 // 全站（V1/V2 共用）密碼政策。這只是前端提示；真正檢查由 app-api/admin-api
