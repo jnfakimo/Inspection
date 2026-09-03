@@ -269,7 +269,7 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
 }
 
 /**
- * SYS-12 長官戰情看板的呈現主體。資料載入由外部注入（登入版走 app-api，
+ * SYS-12 臺北農產公司交易行情（原「長官戰情看板」）的呈現主體。資料載入由外部注入（登入版走 app-api，
  * 公開版走 market_board_public），因此登入頁與 /board/ 公開頁共用同一份畫面。
  */
 export function MarketExecutiveBoard({ title, subtitle, loadFeed, headerExtra, variant = 'panel' }: {
