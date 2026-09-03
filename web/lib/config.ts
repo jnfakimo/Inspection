@@ -4,9 +4,10 @@ const CLOUD_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 // Local/self-hosted builds inject these two public values at build time. Keeping
 // the cloud defaults preserves the existing GitHub Pages build and rollback path.
 const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || CLOUD_SUPABASE_URL;
-// 本機站台可能透過路由器以不同外部埠（例如 5443）提供服務；瀏覽器端
-// 必須沿用目前頁面的 origin，否則手機 4G/5G 會把 API 呼叫送到內網 IP。
-const isLocalBuild = /^https?:\/\/(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(configuredSupabaseUrl);
+// 本機/自建站台可能透過 IP 或不同外部埠（例如 1.34.250.22:5057 / 5443）提供服務；
+// 瀏覽器端在連線至非 cloud 端點時沿用目前頁面的 origin。
+const isLocalBuild = /^https?:\/\/(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.|1\.34\.|localhost|127\.0\.0\.1)/.test(configuredSupabaseUrl)
+  || (typeof window !== 'undefined' && (window.location.hostname === '1.34.250.22' || window.location.port === '5057'));
 export const SUPABASE_URL = typeof window !== 'undefined' && isLocalBuild
   ? window.location.origin
   : configuredSupabaseUrl;
