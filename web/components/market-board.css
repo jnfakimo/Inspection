@@ -105,19 +105,24 @@
 .market-board-public{font-size:17.6px;--board-market-accent:var(--cyan)}
 .market-board-page [data-market="第一市場"]{--board-market-accent:var(--cyan)}
 .market-board-page [data-market="第二市場"]{--board-market-accent:var(--amber)}
-.market-board-page .market-board-market{background:color-mix(in srgb,var(--board-market-accent) 12%,var(--panel));border-color:color-mix(in srgb,var(--board-market-accent) 32%,var(--line));border-top-color:var(--board-market-accent)}
-.market-board-page .market-board-market>h4,.market-board-page .market-board-group>b{color:color-mix(in srgb,var(--board-market-accent) 45%,var(--text))}
-.market-board-page .market-board-group{background:color-mix(in srgb,var(--board-market-accent) 5%,var(--panel))}
+.market-board-page .market-board-market{background:color-mix(in srgb,var(--board-market-accent) 18%,var(--panel));border-color:color-mix(in srgb,var(--board-market-accent) 50%,var(--line));border-top-width:4px;border-top-color:var(--board-market-accent)}
+.market-board-page .market-board-market>h4{display:flex;align-items:center;gap:7px;color:color-mix(in srgb,var(--board-market-accent) 55%,var(--text))}
+.market-board-page .market-board-market>h4::before{content:'';width:9px;height:9px;flex:none;border-radius:50%;background:var(--board-market-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--board-market-accent) 22%,transparent)}
+.market-board-page .market-board-group>b{color:color-mix(in srgb,var(--board-market-accent) 45%,var(--text))}
+.market-board-page .market-board-group{background:color-mix(in srgb,var(--board-market-accent) 8%,var(--panel))}
 .market-board-page .market-board-stat>strong{white-space:normal;overflow:visible;overflow-wrap:anywhere}
 .market-board-page .market-board-stat>strong small{display:inline-block}
-.market-board-page .market-board-table tbody tr>:is(th,td){background:var(--panel)}
-/* 透明度 85% = 淺藍色佔 15%；套用整列，含品項與兩市場數值，文字不透明。 */
-.market-board-page .market-board-table tbody tr:nth-child(even)>:is(th,td){background:color-mix(in srgb,var(--cyan) 15%,var(--panel))}
-.market-board-page .market-board-table thead [data-market]{background:color-mix(in srgb,var(--board-market-accent) 15%,var(--panel));color:var(--text)}
-.market-board-page .market-board-table thead tr:first-child [data-market]{border-top:3px solid var(--board-market-accent)}
-.market-board-page .market-board-table tbody tr:hover>:is(th,td){background:color-mix(in srgb,var(--cyan) 20%,var(--panel))}
+/* 品項欄（無 data-market）維持中性灰階斑馬紋；兩市場資料欄改用各自的 accent 色，讓整張表一眼分辨市場區塊。 */
+.market-board-page .market-board-table tbody tr>th{background:var(--panel)}
+.market-board-page .market-board-table tbody tr:nth-child(even)>th{background:color-mix(in srgb,var(--dim) 12%,var(--panel))}
+.market-board-page .market-board-table tbody td[data-market]{background:color-mix(in srgb,var(--board-market-accent) 10%,var(--panel))}
+.market-board-page .market-board-table tbody tr:nth-child(even) td[data-market]{background:color-mix(in srgb,var(--board-market-accent) 20%,var(--panel))}
+.market-board-page .market-board-table thead [data-market]{background:color-mix(in srgb,var(--board-market-accent) 22%,var(--panel));color:var(--text)}
+.market-board-page .market-board-table thead tr:first-child [data-market]{border-top:4px solid var(--board-market-accent)}
+.market-board-page .market-board-table tbody tr:hover>th{background:color-mix(in srgb,var(--dim) 18%,var(--panel))}
+.market-board-page .market-board-table tbody tr:hover td[data-market]{background:color-mix(in srgb,var(--board-market-accent) 30%,var(--panel))}
 .market-board-page .market-board-table td{border-bottom-color:var(--line)}
-.market-board-page .market-board-table .market-board-cell-sep{border-left:2px solid color-mix(in srgb,var(--board-market-accent) 40%,var(--line))}
+.market-board-page .market-board-table .market-board-cell-sep{border-left:3px solid color-mix(in srgb,var(--board-market-accent) 55%,var(--line))}
 .market-board-public .market-board-head-actions .compact{font-size:12.1px}
 /* 圖示獨立放大 130%，不再疊乘文字的 110%。 */
 .market-board-public .market-movement-badge{display:inline-flex;align-items:center;gap:5px;line-height:1.4}
