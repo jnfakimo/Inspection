@@ -105,7 +105,6 @@ export function normalizeMarketSheet(matrix: unknown[][], file: string): ParsedM
 
 export async function parseMarketExcelFile(file: Pick<File, 'name' | 'arrayBuffer' | 'size'>): Promise<ParsedMarketFile> {
   if (file.size > 100 * 1024 * 1024) throw new Error('單一檔案不可超過 100 MB。');
-  // @ts-expect-error xlsx is loaded dynamically from CDN tarball
   const { read, utils } = await import('xlsx');
   const workbook = read(await file.arrayBuffer(), { type: 'array', cellDates: true, cellFormula: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
