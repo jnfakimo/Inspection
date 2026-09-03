@@ -1,5 +1,9 @@
 const CLOUD_SUPABASE_URL = 'https://qztffronusdhgxhjjubt.supabase.co';
 const CLOUD_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dGZmcm9udXNkaGd4aGpqdWJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2OTI1MzgsImV4cCI6MjA5NzI2ODUzOH0.FnUxot5YXI3yKCUCmJA5P4ysEJhmtaQQA6rM7MRy3oA';
+// The self-hosted stack signs requests with the anon key from its local .env.
+// It is intentionally public in a browser build, but must match the local JWT
+// issuer; the cloud anon key is not accepted by the local Auth gateway.
+const LOCAL_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzg4MjM1ODExLCJleHAiOjE5NDU5MTU4MTF9.quXojlju5ZREdYLgvaC9qMXccarzw15hY6kQw_PIwqA';
 
 // Local/self-hosted builds inject these two public values at build time. Keeping
 // the cloud defaults preserves the existing GitHub Pages build and rollback path.
@@ -15,7 +19,9 @@ const useBrowserOrigin = typeof window !== 'undefined' && (
   window.location.hostname === '127.0.0.1'
 );
 export const SUPABASE_URL = useBrowserOrigin ? window.location.origin : configuredSupabaseUrl;
-export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || CLOUD_SUPABASE_ANON_KEY;
+export const SUPABASE_ANON_KEY = useBrowserOrigin
+  ? (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || LOCAL_SUPABASE_ANON_KEY)
+  : (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || CLOUD_SUPABASE_ANON_KEY);
 export const LEGACY_BASE = '/Inspection/system';
 // 第一果菜市場。markets 只有 market1／market2 兩列（system/sql/locations_schema.sql:66），
 // floor_spaces 與 locations 的 market_id 都是 references markets(market_id)。
