@@ -263,7 +263,7 @@ def query(sql, read_only=False):
         raise RuntimeError('資料庫連線未完成；請重新執行，穩定鍵可防止重複匯入') from None
     if not response.ok:
         # Never log response bodies: they may contain SQL or credentials.
-        raise RuntimeError(f'資料庫拒絕操作 HTTP {response.status}；交易已設驗證保護，請查看來源格式與既有品項')
+        raise RuntimeError(f'資料庫拒絕操作 HTTP {response.status_code}；交易已設驗證保護，請查看來源格式與既有品項')
     return response.json()
 
 
