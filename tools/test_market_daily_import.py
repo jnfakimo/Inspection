@@ -45,6 +45,20 @@ class MarketImportTests(unittest.TestCase):
             with self.subTest(broken=broken[-80:]), self.assertRaises(ValueError):
                 parse_page(broken, DAY, '1', 'V')
 
+    def test_placeholder_row_is_skipped_and_page_of_placeholders_is_no_data(self):
+        html = page([['Q1', '蓮霧', '紅蓮霧', '.0', '', '.0', '.0', '.0']])
+        rows, stats = parse_page(html, DAY, '1', 'V')
+        self.assertEqual(rows, [])
+        self.assertEqual(stats['status'], 'no_data')
+        self.assertEqual(stats['placeholder_rows'], 1)
+        html = page([['Q1', '蓮霧', '紅蓮霧', '.0', '', '.0', '.0', '.0'], ['LP2', '九層塔', '', '73.5', '300', '100', '75', '50']])
+        rows, stats = parse_page(html, DAY, '1', 'V')
+        self.assertEqual([row['code'] for row in rows], ['LP2'])
+        self.assertEqual(stats['status'], 'ready')
+        # 成交量空白但價格非零仍視為格式錯誤，不能默默略過。
+        with self.assertRaises(ValueError):
+            parse_page(page([['Q1', '蓮霧', '紅蓮霧', '50', '', '60', '50', '40']]), DAY, '1', 'V')
+
     def test_no_data_requires_explicit_source_message(self):
         html = page([]).split('<table')[0]
         with self.assertRaises(ValueError):

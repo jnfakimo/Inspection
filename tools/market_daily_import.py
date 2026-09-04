@@ -36,6 +36,23 @@ def numeric(value):
     return n
 
 
+def is_placeholder_row(value_cells):
+    # 成交量空白，且所有量價欄都是空白或零（含「.0」）：這是來源的佔位列，不是成交紀錄。
+    quantity = value_cells[1].replace(',', '').strip()
+    if quantity not in ('', '0', '0.0', '.0'):
+        return False
+    for cell in value_cells:
+        text = cell.replace(',', '').strip()
+        if text == '':
+            continue
+        try:
+            if Decimal(text) != 0:
+                return False
+        except InvalidOperation:
+            return False
+    return True
+
+
 def parse_page(html, day, market, category):
     soup = BeautifulSoup(html, 'html.parser')
     field = soup.find('input', {'name': PREFIX + 'txtDate'})
@@ -70,11 +87,17 @@ def parse_page(html, day, market, category):
         raise ValueError('來源總筆數不符或表格為空')
     unique = {}
     duplicates = 0
+    placeholders = 0
     for tr in rows:
         cells = [x.get_text(' ', strip=True) for x in tr.find_all('td', recursive=False)]
         if len(cells) != 8 or not re.fullmatch(r'[A-Za-z0-9]+', cells[0]) or not cells[1]:
             raise ValueError('來源資料列格式不符')
         code, item, variety = cells[:3]
+        if is_placeholder_row(cells[3:]):
+            # 官網偶有整頁只剩一列「成交量空白、價格 .0」的佔位資料（例如 2022-03-28 一市水果），
+            # 不是成交紀錄；略過並計數，整頁都是佔位列時視同無資料。
+            placeholders += 1
+            continue
         values = tuple(numeric(x) for x in cells[3:])
         row = {'code': code, 'item': item, 'variety': variety, 'values': values}
         if code in unique:
@@ -83,7 +106,9 @@ def parse_page(html, day, market, category):
             duplicates += 1
         else:
             unique[code] = row
-    return list(unique.values()), {'raw_rows': len(rows), 'duplicate_rows': duplicates, 'status': 'ready'}
+    if not unique:
+        return [], {'raw_rows': len(rows), 'duplicate_rows': duplicates, 'placeholder_rows': placeholders, 'status': 'no_data'}
+    return list(unique.values()), {'raw_rows': len(rows), 'duplicate_rows': duplicates, 'placeholder_rows': placeholders, 'status': 'ready'}
 
 
 def fetch_scope(day, market, category):
