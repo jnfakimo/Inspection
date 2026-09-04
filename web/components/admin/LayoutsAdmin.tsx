@@ -525,6 +525,26 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
     void load();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 自動將目前編輯與預覽中的最新版面同步至 localStorage，確保全螢幕看板隨時即時同步
+  useEffect(() => {
+    if (items.length > 0) {
+      try {
+        localStorage.setItem(
+          'beinong_active_tv_layout',
+          JSON.stringify({
+            items,
+            cols: canvasGridCols,
+            canvasWidth,
+            canvasHeight,
+            updatedAt: Date.now(),
+          })
+        );
+      } catch {
+        // ignore
+      }
+    }
+  }, [items, canvasGridCols, canvasWidth, canvasHeight]);
+
   useEffect(() => {
     const warnUnsaved = (event: BeforeUnloadEvent) => {
       if (dirty) event.preventDefault();
