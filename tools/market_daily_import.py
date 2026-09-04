@@ -132,9 +132,12 @@ def fetch_scope(day, market, category):
                 response = session.post(URL, data=data, timeout=(15, 90))
                 response.raise_for_status()
                 return parse_page(response.content, day, market, category)
-        except requests.RequestException:
+        except requests.RequestException as exc:
             if attempt == len(FETCH_BACKOFF_SECONDS) - 1:
-                raise RuntimeError(f'北農來源連線失敗，已重試 {len(FETCH_BACKOFF_SECONDS)} 次') from None
+                # 只記例外類型與狀態碼，不記回應內容；用來分辨是被拒絕、逾時或連線失敗。
+                status = getattr(getattr(exc, 'response', None), 'status_code', None)
+                detail = type(exc).__name__ + (f' HTTP {status}' if status else '')
+                raise RuntimeError(f'北農來源連線失敗，已重試 {len(FETCH_BACKOFF_SECONDS)} 次（{detail}）') from None
             time.sleep(FETCH_BACKOFF_SECONDS[attempt])
 
 
