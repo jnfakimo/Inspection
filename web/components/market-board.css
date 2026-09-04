@@ -55,7 +55,7 @@
 .market-board-trend-range small{margin-left:auto;color:var(--dim);font-size:calc(10px * var(--board-type-scale,1))}
 .market-board-trend-canvas{position:relative;min-width:0;height:300px}
 
-.market-board-table-panel{padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.market-board-table-panel{container-type:inline-size;padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
 .market-board-table-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .market-board-table-head h3{margin:0;font:700 calc(15px * 1.18 * var(--board-type-scale,1)) var(--head);text-align:center}
 .market-board-table-head span{color:var(--dim);font-size:calc(11px * 1.18 * var(--board-type-scale,1));text-align:center}
@@ -76,6 +76,12 @@
 .market-board-table td.market-board-cell-change[data-direction=fall]{color:var(--market-fall-readable)}
 .market-board-table td.market-board-cell-sep{border-left:1px solid var(--line)}
 .market-board-table tbody tr:hover td,.market-board-table tbody tr:hover th{background:color-mix(in srgb,var(--cyan) 5%,transparent)}
+/* 面板窄於 1180px（登入版 1366 筆電約 1050px 可用）時取消 1.18 倍放大並再縮內距，維持一頁寬不橫向捲動。 */
+@container (max-width:1180px){
+  .market-board-table{font-size:calc(12px * var(--board-type-scale,1))}
+  .market-board-table td,.market-board-table tbody th{padding:6px 4px}
+  .market-board-table thead th{padding:5px 3px}
+}
 .market-board-table-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:10px}
 .market-board-table-dots span{width:16px;height:4px;border-radius:999px;background:color-mix(in srgb,var(--dim) 35%,transparent)}
 .market-board-table-dots span.active{width:30px;background:var(--cyan)}
