@@ -1,7 +1,7 @@
 from datetime import date
 import unittest
 
-from market_daily_import import aggregate, import_sql, parse_page, PREFIX, sql_literal
+from market_daily_import import aggregate, day_chunks, import_sql, parse_page, PREFIX, sql_literal
 
 DAY = date(2026, 9, 2)
 
@@ -61,6 +61,18 @@ class MarketImportTests(unittest.TestCase):
 
     def test_quote_in_external_text_is_escaped(self):
         self.assertEqual(sql_literal("農友's"), "'農友''s'")
+
+    def test_backfill_chunks_cover_range_without_gaps(self):
+        chunks = day_chunks(date(2021, 1, 1), date(2021, 1, 20), 7)
+        self.assertEqual(chunks, [(date(2021, 1, 1), date(2021, 1, 7)), (date(2021, 1, 8), date(2021, 1, 14)),
+                                  (date(2021, 1, 15), date(2021, 1, 20))])
+        self.assertEqual(day_chunks(date(2021, 1, 1), date(2021, 1, 1)), [(date(2021, 1, 1), date(2021, 1, 1))])
+        with self.assertRaises(ValueError):
+            day_chunks(date(2021, 1, 2), date(2021, 1, 1))
+
+    def test_backfill_sql_keeps_daily_run_record(self):
+        self.assertNotIn('daily_import_last_run', import_sql([], {'mode': 'backfill_imported'}, record_summary=False))
+        self.assertIn('daily_import_last_run', import_sql([], {'mode': 'imported'}))
 
     def test_local_sql_is_atomic_and_non_destructive(self):
         sql = import_sql([], {'mode': 'local_sql'})

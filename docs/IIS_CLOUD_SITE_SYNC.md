@@ -24,10 +24,10 @@ powershell.exe -NoProfile -File C:\InspectionRuntime\site-sync-source\tools\sync
 
 ## Edge function 更新（內網）
 
-`tools/sync-local-edge-functions.ps1` 在 Docker 主機上把 repo 檢出的 `supabase/functions/` 複製到 edge_runtime 容器的唯讀掛載目錄（預設 `C:\supabase-0705unctions`，容器 `supabase_edge_runtime_0705`），重啟容器，再呼叫本機 `app-api` 的 `market_board_public` 確認回應帶品名代碼。預設僅試跑列出會更新的檔案，`-Apply` 才寫入；寫入前先備份現行目錄到 `functions-backup-<時間>`。
+`tools/sync-local-edge-functions.ps1` 在 Docker 主機上把 repo 檢出的 `supabase/functions/` 複製到 edge_runtime 容器的唯讀掛載目錄（預設 `C:\supabase-0705\functions`，容器 `supabase_edge_runtime_0705`），重啟容器，再呼叫本機 `app-api` 的 `market_board_public` 確認回應帶品名代碼。預設僅試跑列出會更新的檔案，`-Apply` 才寫入；寫入前先備份現行目錄到 `functions-backup-<時間>`。
 
 ```powershell
-powershell.exe -NoProfile -File C:\InspectionRuntime\site-sync-source	ools\sync-local-edge-functions.ps1 -Apply
+powershell.exe -NoProfile -File C:\InspectionRuntime\site-sync-source\tools\sync-local-edge-functions.ps1 -Apply
 ```
 
 - 來源檢出落後 `origin/main` 時，`-Apply` 會先 `git pull --ff-only`；不想動檢出加 `-SkipPull`。

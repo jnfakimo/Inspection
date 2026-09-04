@@ -147,9 +147,14 @@ def json_sql(value):
     return sql_literal(json.dumps(value, ensure_ascii=False, allow_nan=False)) + '::jsonb'
 
 
-def import_sql(points, summary):
+def import_sql(points, summary, record_summary=True):
     # One transaction for all fetched dates, with cardinality and exact-value checks.
     # Reject changed code sets rather than appending a second aggregate for the same item.
+    # 回補歷史（record_summary=False）不覆蓋 daily_import_last_run，保留每日排程的紀錄。
+    summary_sql = f"""
+update public.market_data_sources set config=coalesce(config,'{{}}'::jsonb)
+ ||jsonb_build_object('daily_import_last_run',{json_sql(summary)}),updated_at=now()
+where source_id='{SOURCE_ID}';""" if record_summary else ''
     return f"""
 begin;
 set local standard_conforming_strings=on;
@@ -183,12 +188,37 @@ do $verify$ begin
      and i.dimensions->>'market'=p.dimensions->>'market' and i.dimensions->>'category'=p.dimensions->>'category')
    and not exists(select 1 from incoming_market_daily i where i.external_key=p.external_key)) then
    raise exception '來源品項少於已存資料，保留既有資料並停止匯入'; end if;
-end $verify$;
-update public.market_data_sources set config=coalesce(config,'{{}}'::jsonb)
- ||jsonb_build_object('daily_import_last_run',{json_sql(summary)}),updated_at=now()
-where source_id='{SOURCE_ID}';
+end $verify$;{summary_sql}
 commit;
 """
+
+
+def day_chunks(first, last, size=7):
+    # 回補歷史時每 size 天一個交易：單筆 Management API 請求與 statement_timeout 都有上限，
+    # 分批提交也讓中途失敗可從失敗批次的起日重跑（穩定鍵冪等，不會重複計量）。
+    if first > last:
+        raise ValueError('起日不可晚於迄日')
+    if size < 1:
+        raise ValueError('批次天數必須至少 1 天')
+    chunks, start = [], first
+    while start <= last:
+        end = min(start + timedelta(days=size - 1), last)
+        chunks.append((start, end))
+        start = end + timedelta(days=1)
+    return chunks
+
+
+def write_raw_rows(directory, day, market, category, rows):
+    # 逐品名代號（含品種）的原始列，供日後改成代碼粒度時直接載入，不必重抓官網。
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f'{day.isoformat()}-{market}-{category}.jsonl'
+    with path.open('w', encoding='utf-8') as handle:
+        for row in rows:
+            avg, qty, high, middle, low = (str(x) for x in row['values'])
+            handle.write(json.dumps({'observed_on': day.isoformat(), 'market': MARKETS[market], 'category': CATEGORIES[category],
+                                     'code': row['code'], 'item': row['item'], 'variety': row['variety'],
+                                     'average_price': avg, 'quantity': qty, 'high_price': high, 'middle_price': middle, 'low_price': low},
+                                    ensure_ascii=False) + '\n')
 
 
 def query(sql, read_only=False):
@@ -215,48 +245,97 @@ def main():
     parser.add_argument('--execute', action='store_true')
     parser.add_argument('--sql-output', type=Path,
                         help='通過來源驗證後輸出原子匯入 SQL，供隔離的本機資料庫執行')
+    parser.add_argument('--from', dest='from_date', type=date.fromisoformat,
+                        help='回補歷史：從此日到 --date 逐日抓取，每 --chunk-days 天一個交易寫入；忽略 --lookback')
+    parser.add_argument('--chunk-days', type=int, default=7, help='回補歷史時每個交易涵蓋的天數（預設 7）')
+    parser.add_argument('--raw-output', type=Path,
+                        help='另存逐品名代號（含品種）的原始列 JSONL 目錄，供日後改成代碼粒度時直接載入')
     args = parser.parse_args()
     if args.execute and args.sql_output:
         parser.error('--execute 與 --sql-output 不可同時使用')
     if args.date > datetime.now(TAIPEI).date():
         parser.error('不接受未來日期')
-    points, scopes = [], []
-    for offset in reversed(range(args.lookback)):
-        day = args.date - timedelta(days=offset)
-        for market in MARKETS:
-            for category in CATEGORIES:
-                rows, stats = fetch_scope(day, market, category)
-                batch = aggregate(rows, day, market, category)
-                points.extend(batch)
-                scope = {'date': day.isoformat(), 'market': MARKETS[market], 'category': CATEGORIES[category],
-                         **stats, 'points': len(batch)}
-                scopes.append(scope)
-                print(json.dumps(scope, ensure_ascii=False), flush=True)
-                time.sleep(0.5)
+    if args.from_date and args.from_date > args.date:
+        parser.error('--from 不可晚於 --date')
+    if args.chunk_days < 1 or args.chunk_days > 31:
+        parser.error('--chunk-days 必須介於 1 至 31')
+    backfill = args.from_date is not None
+    if backfill:
+        chunks = day_chunks(args.from_date, args.date, args.chunk_days)
+    else:
+        chunks = [(args.date - timedelta(days=args.lookback - 1), args.date)]
     mode = 'imported' if args.execute else ('local_sql' if args.sql_output else 'dry_run')
-    summary = {'completed_at': datetime.now(TAIPEI).isoformat(), 'requested_date': args.date.isoformat(),
-               'mode': mode, 'points': len(points), 'scopes': scopes,
-               'workflow_run': os.environ.get('GITHUB_RUN_ID', '')}
-    if args.execute:
-        query(import_sql(points, summary))
-        stored = query(f"select config->'daily_import_last_run' as result from public.market_data_sources where source_id='{SOURCE_ID}'", True)
-        if len(stored) != 1 or stored[0]['result'] != summary:
-            raise RuntimeError('匯入完成紀錄讀回不符')
-    elif args.sql_output:
+    if backfill:
+        mode = 'backfill_' + mode
+    if args.sql_output:
         args.sql_output.parent.mkdir(parents=True, exist_ok=True)
-        args.sql_output.write_text(import_sql(points, summary), encoding='utf-8')
+        args.sql_output.write_text('', encoding='utf-8')
+
+    def fetch_days(first, last):
+        points, scopes = [], []
+        day = first
+        while day <= last:
+            for market in MARKETS:
+                for category in CATEGORIES:
+                    rows, stats = fetch_scope(day, market, category)
+                    if args.raw_output and rows:
+                        write_raw_rows(args.raw_output, day, market, category, rows)
+                    batch = aggregate(rows, day, market, category)
+                    points.extend(batch)
+                    scope = {'date': day.isoformat(), 'market': MARKETS[market], 'category': CATEGORIES[category],
+                             **stats, 'points': len(batch)}
+                    scopes.append(scope)
+                    print(json.dumps(scope, ensure_ascii=False), flush=True)
+                    time.sleep(0.5)
+            day += timedelta(days=1)
+        return points, scopes
+
+    # 每個批次抓完、驗證完才寫入，再抓下一批；回補失敗時訊息會標出該批次起日以便重跑。
+    total_points, all_scopes, chunk_reports = 0, [], []
+    for first, last in chunks:
+        points, scopes = fetch_days(first, last)
+        summary = {'completed_at': datetime.now(TAIPEI).isoformat(), 'requested_date': args.date.isoformat(),
+                   'range_from': first.isoformat(), 'range_to': last.isoformat(),
+                   'mode': mode, 'points': len(points), 'scopes': scopes,
+                   'workflow_run': os.environ.get('GITHUB_RUN_ID', '')}
+        if points:
+            try:
+                if args.execute:
+                    query(import_sql(points, summary, record_summary=not backfill))
+                    if not backfill:
+                        stored = query(f"select config->'daily_import_last_run' as result from public.market_data_sources where source_id='{SOURCE_ID}'", True)
+                        if len(stored) != 1 or stored[0]['result'] != summary:
+                            raise RuntimeError('匯入完成紀錄讀回不符')
+                elif args.sql_output:
+                    with args.sql_output.open('a', encoding='utf-8') as handle:
+                        handle.write(import_sql(points, summary, record_summary=not backfill))
+            except Exception as exc:
+                raise RuntimeError(f'批次 {first}～{last} 失敗：{exc}；之前批次已提交，請以 --from {first} 重跑') from exc
+        total_points += len(points)
+        all_scopes.extend(scopes)
+        trading_days = len({s['date'] for s in scopes if s['status'] == 'ready'})
+        chunk_reports.append((first, last, trading_days, len(points)))
+        if backfill:
+            print(f'::notice::批次 {first}～{last}：{trading_days} 個交易日、{len(points)} 筆已{"寫入" if args.execute else "處理"}', flush=True)
+    points, scopes = total_points, all_scopes
     result_label = '正式匯入並讀回驗證' if args.execute else ('本機匯入 SQL 已驗證產生' if args.sql_output else '試讀')
-    lines = ['## 北農每日行情匯入', '', f"日期：{args.date}；{result_label} {len(points)} 筆。", '',
-             '| 日期 | 市場 | 品類 | 原始列 | 排除重複 | 匯入筆數 | 結果 |', '|---|---|---|---:|---:|---:|---|']
-    for s in scopes:
-        state = '已驗證' if s['status'] == 'ready' else '尚未結帳或無資料（未寫入）'
-        lines.append(f"| {s['date']} | {s['market']} | {s['category']} | {s['raw_rows']} | {s['duplicate_rows']} | {s['points']} | {state} |")
+    if backfill:
+        lines = ['## 北農行情歷史回補', '', f"期間：{args.from_date}～{args.date}；{result_label} {points} 筆。", '',
+                 '| 批次起日 | 批次迄日 | 交易日 | 匯入筆數 |', '|---|---|---:|---:|']
+        for first, last, trading_days, count in chunk_reports:
+            lines.append(f'| {first} | {last} | {trading_days} | {count} |')
+    else:
+        lines = ['## 北農每日行情匯入', '', f"日期：{args.date}；{result_label} {points} 筆。", '',
+                 '| 日期 | 市場 | 品類 | 原始列 | 排除重複 | 匯入筆數 | 結果 |', '|---|---|---|---:|---:|---:|---|']
+        for s in scopes:
+            state = '已驗證' if s['status'] == 'ready' else '尚未結帳或無資料（未寫入）'
+            lines.append(f"| {s['date']} | {s['market']} | {s['category']} | {s['raw_rows']} | {s['duplicate_rows']} | {s['points']} | {state} |")
     text = '\n'.join(lines) + '\n'
     print(text)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with Path(os.environ['GITHUB_STEP_SUMMARY']).open('a', encoding='utf8') as f:
             f.write(text)
-    if any(s['status'] == 'no_data' for s in scopes):
+    if not backfill and any(s['status'] == 'no_data' for s in scopes):
         print('::warning::部分查詢尚未結帳或無資料；未當作零成交量寫入，下次排程會回補最近三日。')
 
 

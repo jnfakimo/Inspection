@@ -1,7 +1,11 @@
 ﻿param(
     [string]$RuntimeRoot = 'C:\InspectionRuntime',
-    [int]$Lookback = 3
+    [int]$Lookback = 3,
+    [string]$From = '',
+    [string]$To = ''
 )
+# -From/-To（YYYY-MM-DD）改為歷史回補：逐日抓取整段期間、每 7 天一個交易寫入內網資料庫，
+# 逐代碼原始列另存到 market-import-logs\raw-rows。長期間請分段執行（一年約 40 分鐘）。
 
 $ErrorActionPreference = 'Stop'
 $runtime = [IO.Path]::GetFullPath($RuntimeRoot).TrimEnd('\')
@@ -12,6 +16,13 @@ if (-not (Test-Path -LiteralPath $python) -or -not (Test-Path -LiteralPath $impo
     throw '找不到行情匯入執行環境。'
 }
 if ($Lookback -lt 1 -or $Lookback -gt 7) { throw 'Lookback 必須介於 1 至 7。' }
+if (($From -ne '') -ne ($To -ne '')) { throw '-From 與 -To 必須同時指定。' }
+foreach ($value in @($From, $To)) {
+    if ($value -ne '' -and $value -notmatch '^\d{4}-\d{2}-\d{2}$') { throw '日期格式須為 YYYY-MM-DD。' }
+}
+$importArgs = if ($From -ne '') {
+    @('--from', $From, '--date', $To, '--raw-output', (Join-Path $logRoot ("raw-rows\$From" + '_' + $To)))
+} else { @('--lookback', $Lookback) }
 [IO.Directory]::CreateDirectory($logRoot) | Out-Null
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $sqlFile = Join-Path $logRoot "market-$stamp.sql"
@@ -19,7 +30,7 @@ $logFile = Join-Path $logRoot "market-$stamp.log"
 $lock = $null
 try {
     $lock = [IO.File]::Open((Join-Path $logRoot 'local-import.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
-    & $python -X utf8 $importer --lookback $Lookback --sql-output $sqlFile 2>&1 |
+    & $python -X utf8 $importer @importArgs --sql-output $sqlFile 2>&1 |
         Tee-Object -FilePath $logFile
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $sqlFile)) {
         throw '北農來源抓取或驗證失敗；本機資料庫未寫入。'

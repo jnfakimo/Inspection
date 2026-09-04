@@ -25,6 +25,15 @@ python tools/market_daily_import.py --date 2026-09-02 --lookback 1
 
 若來源有格式異動，先修正解析及測試；若既有品項代碼集合異動，核對原始量價後再決定資料修正，不能直接放寬保護或清空歷史資料。
 
+## 歷史回補（110 年起）
+
+官網同一查詢頁可回查 110 年（2021）以後的每日行情，格式與現在相同；休市日回「該日尚未結帳或無資料」，直接略過。
+
+- 雲端：GitHub Actions `Market history backfill` → `Run workflow`，填 `from`、`to`（含）。程式逐日抓四組（一市、二市 × 蔬菜、水果），**每 7 天一個交易**寫入；某批次失敗時之前批次已提交，錯誤訊息會標出該批次起日，重跑時把 `from` 改成該日即可（穩定鍵冪等，不會重複計量）。回補不覆蓋 `daily_import_last_run`。單次上限 6 小時，一年約 40 分鐘，建議一次 2～3 年。
+- 內網：在伺服器執行 `tools/run-local-market-import.ps1 -From 2021-01-01 -To 2021-12-31`，流程同每日排程（產生 SQL → 單一連線寫入本機資料庫）。
+- 逐品名代號（含品種）的原始列會另存 JSONL：雲端為 workflow artifact `market-raw-rows-<from>-<to>`（保留 90 天），內網在 `C:\InspectionRuntime\market-import-logs\raw-rows\`。目前資料庫粒度是「日期 × 市場 × 品類 × 品名」（同品名各品種代碼合併，代碼集合存於 `item_key`）；日後若要改成代碼粒度，可直接由這些原始列載入，不必重抓官網。
+- 本機試跑：`python tools/market_daily_import.py --from 2021-01-05 --date 2021-01-12 --sql-output out.sql --raw-output raw/`。
+
 # 北農行情：內網每日排程
 
 雲端 GitHub Actions 與內網 IIS 現在各自更新自己的 Supabase。內網 Windows 工作排程 `Inspection Daily Market Import` 每日 12:00 啟動，至 18:00 每 30 分鐘重試，以處理第一、第二市場不同時間結帳。每次回補最近三日，使用穩定鍵冪等寫入。
