@@ -2,33 +2,593 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
+<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
+<script src="theme.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/admin/layouts/">
-<title>V2 戰情版面設定 — 臺北農產公司 V2</title>
-<script>
-  (function() {
-    var target = "/Inspection/v2/systems/admin/layouts/" + window.location.search + window.location.hash;
-    window.location.replace(target);
-  })();
-  </script>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>戰情版面設定 — 臺北農產公司</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack.min.css">
+<script src="vendor/supabase-js-2.min.js"></script>
+<script src="supabase-config.js?v=20260825-auth1"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@12.4.0/dist/gridstack-all.js"></script>
+<script src="dashboard-layout.js?v=20260904-1"></script>
 <style>
-  body {
-    margin: 0; min-height: 100vh; background: #020b18; color: #00d4ff;
-    font-family: system-ui, -apple-system, sans-serif; display: flex;
-    align-items: center; justify-content: center; text-align: center;
-  }
-  .box { padding: 32px; background: #05101e; border: 1px solid #0c2840; border-radius: 12px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,212,255,0.2); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  a { color: #00ff9d; font-weight: bold; text-decoration: underline; font-size: 0.95rem; }
+:root{--bg:#020b18;--panel:#05101e;--surface:#041428;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--purple:#b48aff;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#4c7798}
+:root[data-theme="light"]{--bg:#f4f6fa;--panel:#fff;--surface:#fff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--green:#059669;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans TC',system-ui,sans-serif}
+body{background-image:linear-gradient(rgba(0,212,255,.014) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,.014) 1px,transparent 1px);background-size:40px 40px}
+.navbar{min-height:52px;padding:8px 16px;background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50}
+:root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}
+.nav-title{font-size:1.05rem;font-weight:700;color:var(--cyan);letter-spacing:.05em}.nav-space{flex:1}.nav-link{font-size:.72rem;color:var(--text-dim);border:1px solid var(--border);padding:6px 10px;border-radius:3px;text-decoration:none}.nav-link:hover{color:var(--cyan);border-color:var(--cyan)}
+.app{display:grid;grid-template-columns:280px minmax(0,1fr) 290px;gap:14px;max-width:1920px;margin:0 auto;padding:14px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:6px;min-width:0;display:flex;flex-direction:column}.panel-head{padding:12px 14px;border-bottom:1px solid var(--border)}.panel-head h2{font-size:.92rem;color:var(--text-hi);margin:0 0 4px}.panel-head p{font-size:.68rem;color:var(--text-dim);margin:0;line-height:1.5}
+.catalog-filters{display:flex;gap:4px;padding:8px 10px;background:rgba(0,0,0,0.2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.cat-btn{padding:3px 7px;border-radius:3px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-size:10px;cursor:pointer}
+.cat-btn.active{background:var(--cyan);color:#00131c;border-color:var(--cyan);font-weight:700}
+.catalog{padding:10px;display:grid;gap:8px;overflow-y:auto;max-height:calc(100vh - 190px)}
+.catalog-item{padding:9px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface);cursor:pointer;transition:all .15s}
+.catalog-item:hover,.catalog-item.active{border-color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.12)}
+.catalog-title{font-size:.78rem;color:var(--text-hi);font-weight:700;display:flex;align-items:center;gap:6px}
+.catalog-desc{font-size:.64rem;color:var(--text-dim);margin-top:3px;line-height:1.4}
+.catalog-badge{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:auto}
+.badge-10{background:rgba(245,158,11,0.2);color:#fbbf24}.badge-11{background:rgba(239,68,68,0.2);color:#fca5a5}.badge-12{background:rgba(34,197,94,0.2);color:#86efac}
+.catalog-state{font-size:.62rem;color:var(--green);margin-left:4px}.catalog-state.off{color:var(--red)}
+
+.workspace{min-width:0}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px}
+.toolbar .title{font-weight:700;color:var(--text-hi);margin-right:auto;display:flex;align-items:center;gap:6px}
+.btn{border:1px solid var(--border-hi);background:rgba(0,212,255,.06);color:var(--cyan);border-radius:4px;padding:6px 12px;font:inherit;font-size:.72rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.btn:hover{border-color:var(--cyan);background:rgba(0,212,255,.12)}.btn.primary{color:#00131c;background:var(--cyan);font-weight:700}.btn.warn{color:var(--amber);border-color:rgba(255,179,0,.55);background:rgba(255,179,0,.06)}.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* 長條矩形可調式工具列 */
+.resizer-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 12px;margin-bottom:12px;background:rgba(15,23,42,0.8);border:1px solid var(--border);border-radius:6px}
+.resizer-bar select,.resizer-bar input{background:var(--bg);color:var(--text-hi);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:12px}
+
+.save-state{font-size:.66rem;color:var(--text-dim);width:100%;margin-top:4px}.save-state.ok{color:var(--green)}.save-state.err{color:var(--red)}
+.canvas-wrapper{padding:8px;background:rgba(4,20,40,.55);border:1px dashed var(--border-hi);border-radius:6px;min-height:680px;overflow:auto}
+.canvas-inner{transition:width .2s}
+.grid-stack{min-height:650px}
+.grid-stack-placeholder>.placeholder-content{background:rgba(0,212,255,.12);border:1px dashed var(--cyan)}
+.grid-stack-item-content{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,.25)}
+.grid-stack-item.selected .grid-stack-item-content{border-color:var(--cyan);box-shadow:0 0 18px rgba(0,212,255,.25)}
+.grid-stack-item.is-hidden .grid-stack-item-content{opacity:.35;border-style:dashed}
+
+.widget-preview{height:100%;display:flex;flex-direction:column}
+.widget-drag{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);cursor:move;background:rgba(0,212,255,.04)}
+.widget-drag strong{font-size:.75rem;color:var(--text-hi);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drag-mark{color:var(--cyan);letter-spacing:-2px}
+.widget-sys-tag{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700}
+.widget-badge{font-size:.58rem;border:1px solid var(--border);padding:1px 5px;border-radius:8px;color:var(--text-dim)}
+.widget-body{flex:1;display:grid;place-items:center;padding:10px;color:var(--text-dim);font-size:.72rem;text-align:center;background:linear-gradient(135deg,transparent,rgba(0,212,255,.025))}
+.widget-bars{display:flex;align-items:flex-end;gap:4px;height:38px;margin-bottom:6px}
+.widget-bars i{display:block;width:10px;background:linear-gradient(var(--cyan),rgba(0,212,255,.2));border-radius:2px 2px 0 0}
+
+.inspector{padding:12px}.field{margin-bottom:12px}.field label{display:block;font-size:.67rem;color:var(--text-dim);margin-bottom:5px}.field input,.field select{width:100%;padding:8px 9px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px}.field input:focus,.field select:focus{outline:none;border-color:var(--cyan)}.field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.check{display:flex;align-items:center;gap:7px;font-size:.74rem;color:var(--text-hi);cursor:pointer}.check input{accent-color:var(--cyan)}
+.version-list{border-top:1px solid var(--border);padding:12px}.version-list h3{font-size:.76rem;color:var(--text-hi);margin:0 0 8px}.version-list select{width:100%;padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;margin-bottom:8px}.version-meta{font-size:.62rem;color:var(--text-dim);line-height:1.55}
+.notice{padding:9px 12px;border:1px solid rgba(255,179,0,.45);background:rgba(255,179,0,.08);color:var(--amber);border-radius:4px;font-size:.7rem;margin-bottom:12px;display:none}.notice.show{display:block}
+.loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:9999;color:var(--cyan);letter-spacing:.08em}
+.fatal{max-width:680px;padding:24px;border:1px solid var(--red);border-radius:6px;background:var(--panel);color:var(--text);line-height:1.7}
+.fatal strong{color:var(--red)}
+.fatal-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.fatal-actions a,.fatal-actions button{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border:1px solid var(--border-hi);border-radius:4px;background:rgba(0,212,255,.06);color:var(--cyan);font:inherit;font-size:.72rem;text-decoration:none;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="box">
-  <div class="spinner"></div>
-  <h2 style="font-size: 1.15rem; margin: 0 0 10px; color: #d4eeff;">系統已全面升級至 V2</h2>
-  <p style="font-size: 0.85rem; color: #a8d8f0; margin: 0 0 20px;">正在為您自動跳轉至 V2 戰情版面設定…</p>
-  <a href="/Inspection/v2/systems/admin/layouts/">點此立即前往</a>
-</div>
+<div id="loading" class="loading">戰情版面編輯器載入中…</div>
+
+<nav class="navbar">
+  <div class="nav-title">戰情版面設定 · SYS-01</div>
+  <div class="nav-space"></div>
+  <a class="nav-link" href="/Inspection/v2/systems/dashboard/display/" target="_blank">🖥️ 開啟全螢幕戰情看板</a>
+  <a class="nav-link" href="/Inspection/v2/systems/admin/layouts/">V2 後台版面</a>
+  <a class="nav-link" href="dashboard.html">返回戰情儀表板</a>
+</nav>
+
+<main class="app">
+  <!-- 左側：圖塊元件庫 (完整支援 10, 11, 12 系統) -->
+  <aside class="panel" aria-label="圖塊元件庫">
+    <div class="panel-head">
+      <h2>圖塊元件庫</h2>
+      <p>點選或由右側調整標題、尺寸與顯示狀態；點選圖塊即可加入畫布。</p>
+    </div>
+    <div class="catalog-filters">
+      <button type="button" class="cat-btn active" onclick="filterCatalog('all', this)">全部</button>
+      <button type="button" class="cat-btn" onclick="filterCatalog('10', this)">系統10</button>
+      <button type="button" class="cat-btn" onclick="filterCatalog('11', this)">系統11</button>
+      <button type="button" class="cat-btn" onclick="filterCatalog('12', this)">系統12</button>
+    </div>
+    <div id="catalog" class="catalog"></div>
+  </aside>
+
+  <!-- 中央：可調式長條矩形 (3500*400) 畫布與操作工作區 -->
+  <section class="workspace">
+    <!-- 頂部快速下拉式選單與主按鈕 -->
+    <div class="toolbar">
+      <div class="title">
+        <span>營運戰情總覽 ·</span>
+        <span id="canvasColsLabel" style="color:var(--cyan);">12 欄長條可調式版面</span>
+      </div>
+
+      <!-- 下拉式選單新增 (滿足使用者：可以再加入 10 11 12 項的資料，可以增加移除用下拉式選單增加) -->
+      <div style="display:flex;align-items:center;gap:6px;">
+        <select id="quickAddSelect" style="background:var(--bg);color:var(--text-hi);border:1px solid var(--border);padding:5px 8px;border-radius:4px;font-size:12px;">
+          <optgroup label="🟧 系統 10 · 市場營運分析">
+            <option value="trading_kpi">📦 市場交易量分析</option>
+            <option value="price_comparison">📈 蔬果價格同期比較</option>
+            <option value="weekly_trend">📉 每週交易趨勢走勢</option>
+            <option value="market_allocation">🎯 配置與妥善率儀表</option>
+            <option value="supplier_ranking">🚛 主要產地進貨排行</option>
+            <option value="price_volatility">⚠️ 行情波動異常警示</option>
+            <option value="auction_efficiency">⚡ 拍賣場次交易進度</option>
+            <option value="floor_congestion">🅿️ 卸貨場車流滿載動態</option>
+          </optgroup>
+          <optgroup label="🟥 系統 11 · 戰情指揮中心">
+            <option value="alerts">🚨 重要提醒與異常警報</option>
+            <option value="kpis">⚡ 營運關鍵指標</option>
+            <option value="patrol">🛡️ 駐衛警巡檢即時</option>
+            <option value="repairs">🔧 報修案件分佈</option>
+            <option value="equipment_status">⚙️ 設備狀態監控</option>
+            <option value="realtime_incident_map">🗺️ 全場異常事件即時地圖</option>
+            <option value="sla_compliance">⏱️ 維修 SLA 達成率與 MTTR</option>
+            <option value="staff_duty_matrix">👥 在勤人員打卡與跨班排班</option>
+            <option value="cctv_ipcam_grid">📹 關鍵場區攝影機監控</option>
+            <option value="weather_risk_radar">🌧️ 氣象特報與防汛應變</option>
+            <option value="weather_taiwan">🌦️ 臺灣即時氣象特報</option>
+            <option value="rank_dept">📊 各單位報修排行</option>
+            <option value="rank_equipment">🛠️ 各設備故障排行</option>
+            <option value="rank_technician">👷 維修人員案件數</option>
+            <option value="rank_fault">🔍 故障類型分析</option>
+            <option value="trend">📅 各月份報修趨勢</option>
+          </optgroup>
+          <optgroup label="🟩 系統 12 · 市場公開即時看板">
+            <option value="public_price_board">💹 公開大宗即時報價看板</option>
+            <option value="market_turnover">🌾 市場公開總成交額</option>
+            <option value="commodity_ratio">🥦 品項交易佔比分佈</option>
+            <option value="realtime_ticker">📢 即時滾動跑馬燈行情</option>
+            <option value="top_gainers_losers">📊 今日蔬果漲跌幅排行榜</option>
+            <option value="origin_weather_map">⛅ 主要產地天氣與供貨狀態</option>
+            <option value="historical_price_curve">📉 30日/同季歷史價格曲線</option>
+            <option value="consumer_guide_board">🛒 平價蔬果專區與供應指引</option>
+          </optgroup>
+        </select>
+        <button class="btn" type="button" onclick="quickAddWidget()">➕ 加入此圖塊</button>
+      </div>
+
+      <button class="btn" id="previewBtn" type="button">開啟實際資料預覽</button>
+      <button class="btn warn" id="resetBtn" type="button">套用預設版面</button>
+      <button class="btn" id="saveBtn" type="button">儲存草稿</button>
+      <button class="btn primary" id="publishBtn" type="button">🚀 發布新版</button>
+      <div id="saveState" class="save-state">拖曳或縮放圖塊，可儲存草稿或發布新版。</div>
+    </div>
+
+    <!-- 長條矩形比例與自訂畫布解析度調校器 (滿足使用者：營運戰情總覽 我要可以調整長條矩形，舉例3500*400 所以要作為可調式) -->
+    <div class="resizer-bar">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:#fbbf24;font-weight:700;">📐 螢幕尺寸與長條矩形比例：</span>
+        <select id="canvasPresetSelect" onchange="applyCanvasPreset(this.value)">
+          <option value="16:9">📺 16:9 標準螢幕 (1920 × 1080)</option>
+          <option value="3500x400" selected>📏 超寬長條看板 (3500 × 400)</option>
+          <option value="2560x400">🎛️ 橫向 LED 長條 (2560 × 400)</option>
+          <option value="3840x1080">🖥️ 雙螢幕超寬拼接 (3840 × 1080)</option>
+          <option value="custom">⚙️ 自訂長寬像素</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);">
+          寬: <input type="number" id="canvasWidthInput" value="3500" min="600" max="10000" step="50" style="width:65px;text-align:center;font-weight:700;color:var(--cyan);" onchange="updateCanvasDimension()"> px
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-dim);">
+          高: <input type="number" id="canvasHeightInput" value="400" min="200" max="5000" step="20" style="width:58px;text-align:center;font-weight:700;color:var(--cyan);" onchange="updateCanvasDimension()"> px
+        </label>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;">
+        <button type="button" class="btn" id="colToggleBtn" onclick="toggleCanvasColumns()">切換 24 欄制</button>
+        <button type="button" class="btn" id="scaleToggleBtn" onclick="toggleCanvasScale()">↔️ 100%橫向捲動</button>
+      </div>
+    </div>
+
+    <div id="notice" class="notice"></div>
+
+    <!-- 畫布滾動與縮放容器 -->
+    <div class="canvas-wrapper" id="canvasWrapper">
+      <div class="canvas-inner" id="canvasInner">
+        <div id="layoutGrid" class="grid-stack"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 右側：圖塊設定與版本發布還原 -->
+  <aside class="panel right-panel" aria-label="圖塊設定">
+    <div class="panel-head">
+      <h2>圖塊設定</h2>
+      <p id="selectedHint">請選取圖塊以調整參數。</p>
+    </div>
+    <div class="inspector">
+      <div class="field">
+        <label for="widgetTitle">顯示標題</label>
+        <input id="widgetTitle" maxlength="80" disabled>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="widgetWidth" id="widthLabel">寬度 (1~12)</label>
+          <input id="widgetWidth" type="number" min="1" max="24" disabled>
+        </div>
+        <div class="field">
+          <label for="widgetHeight">高度 (1~20)</label>
+          <input id="widgetHeight" type="number" min="1" max="20" disabled>
+        </div>
+      </div>
+      <div class="field">
+        <label class="check">
+          <input id="widgetVisible" type="checkbox" disabled> 前台顯示此區塊
+        </label>
+      </div>
+      <div style="margin-top:8px;">
+        <button type="button" class="btn" id="removeWidgetBtn" style="width:100%;color:#fca5a5;border-color:rgba(239,68,68,0.4);" onclick="removeSelectedWidget()" disabled>✕ 從畫布移除此圖塊</button>
+      </div>
+    </div>
+
+    <div class="version-list">
+      <h3>版本發布與還原</h3>
+      <select id="versionSelect"><option value="">載入中…</option></select>
+      <button class="btn" id="loadVersionBtn" type="button" style="width:100%;margin-bottom:8px">載入選取版本預覽</button>
+      <button class="btn warn" id="restoreBtn" type="button" style="width:100%">將選取版本重新發布</button>
+      <div id="versionMeta" class="version-meta"></div>
+    </div>
+  </aside>
+</main>
+
+<script>
+const db = createDb();
+let grid=null,layoutRow=null,versions=[],selectedKey=null,dirty=false;
+let titles={},visibility={};
+let currentFilter='all';
+let currentCols=12;
+let isFitScale=true;
+
+function setState(message,type=''){
+  const el=document.getElementById('saveState');el.textContent=message;el.className='save-state '+type;
+}
+function showNotice(message){const el=document.getElementById('notice');el.textContent=message;el.classList.add('show');}
+function fatal(message){
+  document.getElementById('loading').innerHTML='<div class="fatal"><strong>無法載入戰情版面設定</strong><br>'+DashboardLayout.escapeHTML(message)+'<div class="fatal-actions"><button type="button" onclick="location.reload()">重新檢查</button><a href="dashboard.html">返回戰情儀表板</a></div></div>';
+}
+function markDirty(){dirty=true;setState('版面已有未儲存的修改。');}
+
+function previewMarkup(c){
+  const bars=[20,36,28,45,26,42,32].map(h=>'<i style="height:'+h+'px"></i>').join('');
+  const badgeCls = c.system === 10 ? 'badge-10' : c.system === 12 ? 'badge-12' : 'badge-11';
+  return '<div class="widget-preview">' +
+    '<div class="widget-drag">' +
+      '<span class="drag-mark">⋮⋮</span>' +
+      '<strong data-preview-title>'+DashboardLayout.escapeHTML(titles[c.key]||c.title)+'</strong>' +
+      '<span class="widget-sys-tag '+badgeCls+'">系統'+(c.system||11)+'</span>' +
+      '<span class="widget-badge">'+DashboardLayout.escapeHTML(c.key)+'</span>' +
+    '</div>' +
+    '<div class="widget-body">' +
+      '<div>' +
+        '<div class="widget-bars">'+bars+'</div>' +
+        DashboardLayout.escapeHTML(c.description) +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function buildGrid(items){
+  if(grid)grid.destroy(false);
+  document.getElementById('layoutGrid').innerHTML='';
+  grid=GridStack.init({
+    column:currentCols,
+    cellHeight:58,
+    margin:6,
+    float:false,
+    animate:true,
+    handle:'.widget-drag',
+    resizable:{handles:'all'}
+  },'#layoutGrid');
+
+  const normalized=DashboardLayout.normalize(items);
+  normalized.forEach(item=>{
+    const c=DashboardLayout.byKey[item.widget_key]||{key:item.widget_key,title:item.title,description:'',system:11};
+    titles[item.widget_key]=item.title;
+    visibility[item.widget_key]=item.visible;
+    const el=grid.addWidget({
+      id:item.widget_key,
+      x:item.x,
+      y:item.y,
+      w:Math.min(currentCols, item.width),
+      h:item.height,
+      minW:item.min_width,
+      minH:item.min_height
+    });
+    const content=el.querySelector('.grid-stack-item-content');
+    if(content)content.innerHTML=previewMarkup(c);
+    el.dataset.widgetKey=item.widget_key;
+    el.classList.toggle('is-hidden',!item.visible);
+    el.addEventListener('click',()=>selectWidget(item.widget_key));
+  });
+
+  grid.on('change resize',markDirty);
+  renderCatalog();
+  if(normalized.length>0) selectWidget(normalized[0].widget_key);
+  dirty=false;
+}
+
+function renderCatalog(){
+  const catalogList = DashboardLayout.catalog.filter(c=>{
+    if(currentFilter==='all') return true;
+    return String(c.system)===currentFilter;
+  });
+
+  document.getElementById('catalog').innerHTML=catalogList.map(c=>{
+    const badgeCls = c.system === 10 ? 'badge-10' : c.system === 12 ? 'badge-12' : 'badge-11';
+    const isVisible = visibility[c.key]!==false;
+    return '<div class="catalog-item '+(c.key===selectedKey?'active':'')+'" data-key="'+c.key+'" onclick="handleCatalogClick(\''+c.key+'\')">' +
+      '<div class="catalog-title">' +
+        '<span>'+DashboardLayout.escapeHTML(titles[c.key]||c.title)+'</span>' +
+        '<span class="catalog-badge '+badgeCls+'">系統'+(c.system||11)+'</span>' +
+        '<span class="catalog-state '+(isVisible?'':'off')+'">'+(isVisible?'顯示':'隱藏')+'</span>' +
+      '</div>' +
+      '<div class="catalog-desc">'+DashboardLayout.escapeHTML(c.description)+'</div>' +
+    '</div>';
+  }).join('');
+}
+
+function filterCatalog(sys, btn){
+  currentFilter=sys;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderCatalog();
+}
+
+function handleCatalogClick(key){
+  const el=document.querySelector('.grid-stack-item[data-widget-key="'+key+'"]');
+  if(el){
+    selectWidget(key);
+  } else {
+    addWidgetToCanvas(key);
+  }
+}
+
+function selectWidget(key){
+  selectedKey=key;
+  document.querySelectorAll('.grid-stack-item').forEach(el=>el.classList.toggle('selected',el.dataset.widgetKey===key));
+  renderCatalog();
+  const el=document.querySelector('.grid-stack-item[data-widget-key="'+key+'"]');
+  const n=el&&el.gridstackNode;
+  const def = DashboardLayout.byKey[key]||{description:'',title:key};
+  document.getElementById('selectedHint').textContent=def.description||'已選取圖塊';
+  const t=document.getElementById('widgetTitle'),w=document.getElementById('widgetWidth'),h=document.getElementById('widgetHeight'),v=document.getElementById('widgetVisible'),r=document.getElementById('removeWidgetBtn');
+  [t,w,h,v,r].forEach(x=>x.disabled=false);
+  t.value=titles[key]||def.title;
+  w.max=currentCols;
+  w.value=n?.w||def.w||6;
+  h.value=n?.h||def.h||3;
+  v.checked=visibility[key]!==false;
+  document.getElementById('widthLabel').textContent=`寬度 (1~${currentCols})`;
+}
+
+function updateSelected(){
+  if(!selectedKey)return;
+  const el=document.querySelector('.grid-stack-item[data-widget-key="'+selectedKey+'"]');
+  if(!el)return;
+  const def = DashboardLayout.byKey[selectedKey]||{title:selectedKey};
+  titles[selectedKey]=document.getElementById('widgetTitle').value.trim()||def.title;
+  visibility[selectedKey]=document.getElementById('widgetVisible').checked;
+  const w=Math.max(1,Math.min(currentCols,Number(document.getElementById('widgetWidth').value)||1));
+  const h=Math.max(1,Math.min(20,Number(document.getElementById('widgetHeight').value)||1));
+  grid.update(el,{w,h});
+  el.classList.toggle('is-hidden',!visibility[selectedKey]);
+  const title=el.querySelector('[data-preview-title]');
+  if(title)title.textContent=titles[selectedKey];
+  renderCatalog();
+  markDirty();
+}
+
+function quickAddWidget(){
+  const key = document.getElementById('quickAddSelect').value;
+  if(key) addWidgetToCanvas(key);
+}
+
+function addWidgetToCanvas(key){
+  const def = DashboardLayout.byKey[key]||{title:key,w:6,h:3,minW:3,minH:2,system:11,description:''};
+  titles[key]=def.title;
+  visibility[key]=true;
+  let el=document.querySelector('.grid-stack-item[data-widget-key="'+key+'"]');
+  if(el){
+    visibility[key]=true;
+    grid.update(el,{id:key,w:def.w,h:def.h});
+    el.classList.remove('is-hidden');
+  } else {
+    el=grid.addWidget({
+      id:key,
+      x:0,
+      y:999,
+      w:Math.min(currentCols, def.w||6),
+      h:def.h||3,
+      minW:def.minW||1,
+      minH:def.minH||1
+    });
+    const content=el.querySelector('.grid-stack-item-content');
+    if(content)content.innerHTML=previewMarkup(def);
+    el.dataset.widgetKey=key;
+    el.addEventListener('click',()=>selectWidget(key));
+  }
+  selectWidget(key);
+  markDirty();
+  setState('已加入圖塊：'+def.title,'ok');
+}
+
+function removeSelectedWidget(){
+  if(!selectedKey)return;
+  const el=document.querySelector('.grid-stack-item[data-widget-key="'+selectedKey+'"]');
+  if(el){
+    grid.removeWidget(el,true,true);
+    visibility[selectedKey]=false;
+    renderCatalog();
+    markDirty();
+    setState('已從畫布移除圖塊。','ok');
+    document.getElementById('widgetTitle').disabled=true;
+    document.getElementById('widgetWidth').disabled=true;
+    document.getElementById('widgetHeight').disabled=true;
+    document.getElementById('widgetVisible').disabled=true;
+    document.getElementById('removeWidgetBtn').disabled=true;
+    selectedKey=null;
+  }
+}
+
+// 畫布解析度與長條矩形 (3500*400) 調整
+function applyCanvasPreset(preset){
+  const wInput=document.getElementById('canvasWidthInput');
+  const hInput=document.getElementById('canvasHeightInput');
+  if(preset==='3500x400'){
+    wInput.value=3500; hInput.value=400; currentCols=24;
+  } else if(preset==='2560x400'){
+    wInput.value=2560; hInput.value=400; currentCols=24;
+  } else if(preset==='3840x1080'){
+    wInput.value=3840; hInput.value=1080; currentCols=24;
+  } else if(preset==='16:9'){
+    wInput.value=1920; hInput.value=1080; currentCols=12;
+  }
+  updateCanvasDimension();
+}
+
+function updateCanvasDimension(){
+  const w=Number(document.getElementById('canvasWidthInput').value)||1920;
+  const h=Number(document.getElementById('canvasHeightInput').value)||1080;
+  const inner=document.getElementById('canvasInner');
+  if(!isFitScale){
+    inner.style.width=w+'px';
+  } else {
+    inner.style.width='100%';
+  }
+  document.getElementById('canvasColsLabel').textContent=`${currentCols} 欄長條可調式版面 (${w} × ${h} px)`;
+  if(grid && grid.opts.column !== currentCols){
+    grid.column(currentCols);
+  }
+}
+
+function toggleCanvasColumns(){
+  currentCols = currentCols === 12 ? 24 : 12;
+  document.getElementById('colToggleBtn').textContent = currentCols === 12 ? '切換 24 欄制' : '切換 12 欄制';
+  updateCanvasDimension();
+}
+
+function toggleCanvasScale(){
+  isFitScale = !isFitScale;
+  document.getElementById('scaleToggleBtn').textContent = isFitScale ? '↔️ 100%橫向捲動' : '🔍 縮放符合視窗';
+  updateCanvasDimension();
+}
+
+function currentPayload(){return DashboardLayout.payloadFromGrid(grid,titles,visibility);}
+
+async function loadItems(versionId){
+  if(!versionId){buildGrid(DashboardLayout.defaults());return;}
+  const {data,error}=await db.from('dashboard_layout_items').select('*').eq('version_id',versionId).order('sort_order');
+  if(error)throw error;
+  buildGrid(data);
+}
+
+async function loadVersions(){
+  const {data,error}=await db.from('dashboard_layout_versions').select('*').eq('layout_id',layoutRow.layout_id).order('version_no',{ascending:false}).limit(50);
+  if(error)throw error;
+  versions=data||[];
+  const select=document.getElementById('versionSelect');
+  select.innerHTML=versions.map(v=>'<option value="'+v.version_id+'">V'+v.version_no+' · '+({published:'已發布',draft:'草稿',archived:'歷史',failed:'失敗'}[v.state]||v.state)+' · '+SystemDate.formatDateTime(v.created_at)+'</option>').join('');
+  select.value=layoutRow.published_version_id||versions[0]?.version_id||'';
+  updateVersionMeta();
+}
+
+function updateVersionMeta(){
+  const v=versions.find(x=>x.version_id===document.getElementById('versionSelect').value);
+  document.getElementById('versionMeta').textContent=v?(v.version_note||'無版本說明')+'｜建立時間 '+SystemDate.formatDateTime(v.created_at):'尚無版本';
+}
+
+async function saveVersion(publish){
+  const note=prompt(publish?'請輸入本次發布說明：':'請輸入草稿說明：',publish?'調整 3500*400 戰情長條看板版面':'版面調整草稿');
+  if(note===null)return;
+  toggleButtons(true);
+  setState(publish?'正在發布新版…':'正在儲存草稿…');
+  const {data,error}=await db.rpc('save_dashboard_layout_version',{
+    p_layout_id:layoutRow.layout_id,
+    p_items:currentPayload(),
+    p_note:note,
+    p_publish:publish
+  });
+  toggleButtons(false);
+  if(error){setState('儲存失敗：'+safeDbError(error),'err');return;}
+  dirty=false;
+  setState(publish?'新版已發布，大螢幕看板重新整理後即會套用。':'草稿已儲存。','ok');
+  const {data:fresh,error:freshErr}=await db.from('dashboard_layouts').select('*').eq('layout_code','operations_main').single();
+  if(fresh) layoutRow=fresh;
+  await loadVersions();
+  if(typeof data==='string') document.getElementById('versionSelect').value=data;
+  updateVersionMeta();
+}
+
+async function restoreVersion(){
+  const id=document.getElementById('versionSelect').value;
+  if(!id)return;
+  const v=versions.find(x=>x.version_id===id);
+  if(!confirm('確定將 V'+v.version_no+' 重新發布為正式大螢幕看板？'))return;
+  toggleButtons(true);
+  const {error}=await db.rpc('publish_dashboard_layout_version',{p_version_id:id});
+  toggleButtons(false);
+  if(error){setState('還原失敗：'+safeDbError(error),'err');return;}
+  layoutRow.published_version_id=id;
+  setState('V'+v.version_no+' 已重新發布為大螢幕生效版面。','ok');
+  await loadVersions();
+}
+
+function toggleButtons(disabled){
+  ['saveBtn','publishBtn','previewBtn','restoreBtn','loadVersionBtn','resetBtn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=disabled;
+  });
+}
+
+async function init(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){location.href='login.html?redirect=dashboard-builder.html';return;}
+  const {data:allowed,error:accessError}=await db.rpc('can_manage_dashboard_layout');
+  if(accessError){fatal('載入權限檢查失敗：'+accessError.message);return;}
+  if(!allowed){fatal('目前帳號沒有編輯戰情儀表板版面的權限。');return;}
+  const {data,error}=await db.from('dashboard_layouts').select('*').eq('layout_code','operations_main').single();
+  if(error||!data){fatal('找不到儀表板版面主檔。');return;}
+  layoutRow=data;
+  await loadVersions();
+  await loadItems(layoutRow.published_version_id);
+  document.getElementById('loading').style.display='none';
+  applyCanvasPreset('3500x400');
+  setState('已載入目前發布版面 (3500 × 400 長條矩形預設)。','ok');
+}
+
+document.getElementById('widgetTitle').addEventListener('change',updateSelected);
+document.getElementById('widgetWidth').addEventListener('change',updateSelected);
+document.getElementById('widgetHeight').addEventListener('change',updateSelected);
+document.getElementById('widgetVisible').addEventListener('change',updateSelected);
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(confirm('確定將編輯畫布恢復為系統預設版面？')){
+    titles={};visibility={};buildGrid(DashboardLayout.defaults());markDirty();
+  }
+});
+document.getElementById('saveBtn').addEventListener('click',()=>saveVersion(false));
+document.getElementById('publishBtn').addEventListener('click',()=>saveVersion(true));
+document.getElementById('previewBtn').addEventListener('click',()=>{
+  const id=document.getElementById('versionSelect').value;
+  window.open('/Inspection/v2/systems/dashboard/display/','_blank','noopener');
+});
+document.getElementById('restoreBtn').addEventListener('click',restoreVersion);
+document.getElementById('loadVersionBtn').addEventListener('click',async()=>{
+  const id=document.getElementById('versionSelect').value;
+  if(!id)return;
+  if(dirty&&!confirm('目前有尚未儲存的修改，確定載入其他版本？'))return;
+  await loadItems(id);
+  setState('已載入選取版本，可繼續調整後另存草稿或發布。','ok');
+});
+document.getElementById('versionSelect').addEventListener('change',updateVersionMeta);
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+init().catch(e=>fatal(e.message||String(e)));
+</script>
 </body>
 </html>
