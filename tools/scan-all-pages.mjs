@@ -67,9 +67,11 @@ function localReferenceTarget(pagePath, rawReference) {
   if (!clean) return null;
   const normalized = clean.startsWith('/word-cloud/')
     ? clean.slice('/word-cloud/'.length)
-    : clean.startsWith('/')
-      ? clean.slice(1)
-      : toPosix(path.normalize(path.join(path.posix.dirname(pagePath), clean)));
+    : clean.startsWith('/Inspection/')
+      ? clean.slice('/Inspection/'.length)
+      : clean.startsWith('/')
+        ? clean.slice(1)
+        : toPosix(path.normalize(path.join(path.posix.dirname(pagePath), clean)));
   return normalized.endsWith('/') ? `${normalized}index.html` : normalized;
 }
 

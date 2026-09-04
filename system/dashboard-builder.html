@@ -80,7 +80,7 @@ body{background-image:linear-gradient(rgba(0,212,255,.014) 1px,transparent 1px),
 <nav class="navbar">
   <div class="nav-title">戰情版面設定 · SYS-01</div>
   <div class="nav-space"></div>
-  <a class="nav-link" href="/Inspection/v2/systems/dashboard/display/" target="_blank">🖥️ 開啟全螢幕戰情看板</a>
+  <a class="nav-link" href="/Inspection/v2/tv-dashboard/" target="_blank">🖥️ 開啟全螢幕戰情看板</a>
   <a class="nav-link" href="/Inspection/v2/systems/admin/layouts/">V2 後台版面</a>
   <a class="nav-link" href="dashboard.html">返回戰情儀表板</a>
 </nav>
@@ -576,7 +576,7 @@ document.getElementById('saveBtn').addEventListener('click',()=>saveVersion(fals
 document.getElementById('publishBtn').addEventListener('click',()=>saveVersion(true));
 document.getElementById('previewBtn').addEventListener('click',()=>{
   const id=document.getElementById('versionSelect').value;
-  window.open('/Inspection/v2/systems/dashboard/display/','_blank','noopener');
+  window.open('/Inspection/v2/tv-dashboard/','_blank','noopener');
 });
 document.getElementById('restoreBtn').addEventListener('click',restoreVersion);
 document.getElementById('loadVersionBtn').addEventListener('click',async()=>{

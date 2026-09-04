@@ -325,11 +325,13 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
 
-  // 視覺化編輯與畫布設定狀態
+  // 視覺化編輯與視窗畫布狀態
   const [viewMode, setViewMode] = useState<'visual' | 'table'>('visual');
   const [selectedSystemFilter, setSelectedSystemFilter] = useState<number | 'all'>('all');
   const [dropdownSelectedKey, setDropdownSelectedKey] = useState<string>('trading_kpi');
   const [showRightCatalog, setShowRightCatalog] = useState(true);
+  const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   // 長條矩形 / 自訂畫布尺寸可調式設定 (例如 3500 * 400)
   const [canvasWidth, setCanvasWidth] = useState<number>(1920);
@@ -337,6 +339,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
   const [canvasGridCols, setCanvasGridCols] = useState<12 | 24>(12);
   const [canvasViewScale, setCanvasViewScale] = useState<'fit' | '100%'>('fit');
   const [customRatioMode, setCustomRatioMode] = useState<string>('16:9');
+
+  // 拖曳排序狀態
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const load = useCallback(
     async (options: { preferredVersionId?: string; preserveNote?: boolean } = {}) => {
@@ -348,35 +353,51 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
           .from('dashboard_layouts')
           .select('*')
           .eq('layout_code', 'operations_main')
-          .maybeSingle();
+          .single();
+
         if (layoutResult.error || !layoutResult.data) {
-          setNote(`失敗：${errorMessage(layoutResult.error, '戰情版面主檔載入失敗')}`);
+          setNote(`失敗：${errorMessage(layoutResult.error, '載入主戰情版面失敗')}`);
+          setBusy(false);
           return;
         }
+
+        setLayout(layoutResult.data);
         const [versionResult, itemResult] = await Promise.all([
           client
             .from('dashboard_layout_versions')
             .select('*')
             .eq('layout_id', layoutResult.data.layout_id)
-            .order('version_no', { ascending: false })
-            .limit(200),
-          client.from('dashboard_layout_items').select('*').order('sort_order').limit(1000),
+            .order('version_no', { ascending: false }),
+          client
+            .from('dashboard_layout_items')
+            .select('*')
+            .eq('layout_id', layoutResult.data.layout_id)
+            .order('sort_order', { ascending: true }),
         ]);
-        if (versionResult.error || itemResult.error) {
-          setNote(
-            `失敗：${errorMessage(versionResult.error || itemResult.error, '戰情版面版本載入失敗')}`
-          );
+
+        if (versionResult.error) {
+          setNote(`失敗：${errorMessage(versionResult.error, '載入版本清單失敗')}`);
+          setBusy(false);
+          return;
         }
+
+        if (itemResult.error) {
+          setNote(`失敗：${errorMessage(itemResult.error, '載入元件清單失敗')}`);
+          setBusy(false);
+          return;
+        }
+
         const versionRows = versionResult.data || [];
         const versionIds = new Set(versionRows.map(row => row.version_id));
-        const grouped: Record<string, Row[]> = {};
-        (itemResult.data || [])
-          .filter(row => versionIds.has(row.version_id))
-          .forEach(row => {
-            (grouped[row.version_id] ||= []).push(row);
-          });
-        setLayout(layoutResult.data);
         setVersions(versionRows);
+
+        const grouped: Record<string, Row[]> = {};
+        for (const item of itemResult.data || []) {
+          const versionId = String(item.version_id || '');
+          if (!grouped[versionId]) grouped[versionId] = [];
+          grouped[versionId].push(item);
+        }
+
         setItemsByVersion(grouped);
         const desiredVersion = options.preferredVersionId || selected;
         const preferred =
@@ -428,7 +449,46 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
 
   const removeItem = (index: number) => {
     setItems(current => current.filter((_, itemIndex) => itemIndex !== index));
+    if (activeItemIndex === index) setActiveItemIndex(null);
     setDirty(true);
+  };
+
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+    setItems(current => {
+      const next = [...current];
+      const temp = next[index];
+      next[index] = next[targetIndex];
+      next[targetIndex] = temp;
+      return next.map((item, idx) => ({ ...item, sort_order: (idx + 1) * 10 }));
+    });
+    setActiveItemIndex(targetIndex);
+    setDirty(true);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    setItems(current => {
+      const next = [...current];
+      const draggedItem = next[draggedIndex];
+      next.splice(draggedIndex, 1);
+      next.splice(index, 0, draggedItem);
+      return next.map((item, idx) => ({ ...item, sort_order: (idx + 1) * 10 }));
+    });
+    setDraggedIndex(index);
+    setActiveItemIndex(index);
+    setDirty(true);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const addWidget = (widgetKey: string) => {
@@ -444,9 +504,10 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
       height: def.defaultHeight,
       visible: true,
       refresh_seconds: 60,
-      sort_order: items.length * 10 + 10,
+      sort_order: (items.length + 1) * 10,
     };
     setItems(current => [...current, newItem]);
+    setActiveItemIndex(items.length);
     setDirty(true);
   };
 
@@ -583,12 +644,28 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
           }
         }}
         action={
-          <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="primary-btn compact"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#0284c7',
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              onClick={() => setPreviewModalOpen(true)}
+            >
+              👁️ 視窗化即時預覽
+            </button>
             <a
-              href="/Inspection/v2/systems/dashboard/display/"
+              href="/Inspection/v2/tv-dashboard/"
               target="_blank"
               rel="noopener noreferrer"
-              className="primary-btn compact"
+              className="secondary-btn compact"
               style={{
                 textDecoration: 'none',
                 display: 'inline-flex',
@@ -596,7 +673,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 gap: '4px',
               }}
             >
-              🖥️ 開啟全螢幕戰情看板
+              🖥️ 開啟全螢幕看板
             </a>
             <a
               href={`${LEGACY_BASE}/dashboard-builder.html`}
@@ -683,7 +760,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               }}
               onClick={() => setViewMode('visual')}
             >
-              🎨 視覺化畫布排版
+              🎨 互動式視窗畫布
             </button>
             <button
               type="button"
@@ -711,7 +788,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             marginTop: '12px',
             padding: '12px 16px',
             borderRadius: '8px',
-            background: 'rgba(15, 23, 42, 0.6)',
+            background: 'rgba(15, 23, 42, 0.7)',
             border: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
             justifyContent: 'space-between',
@@ -894,7 +971,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               alignItems: 'flex-start',
             }}
           >
-            {/* 左側 / 中央可調式畫布 (Canvas) */}
+            {/* 左側 / 中央可調式視窗畫布 (Interactive Window Canvas) */}
             <div style={{ flex: 1, minWidth: 0 }}>
               {/* 系統來源過濾標籤 */}
               <div
@@ -991,7 +1068,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 </button>
               </div>
 
-              {/* 畫布容器 (支援長條 3500*400 縮放與滾動) */}
+              {/* 視窗畫布容器 (支援長條 3500*400 縮放與滾動) */}
               <div
                 style={{
                   background: '#070d1e',
@@ -1019,14 +1096,14 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     <span style={{ color: '#38bdf8' }}>{canvasWidth} × {canvasHeight} px</span>
                     {canvasWidth >= 3000 && <span style={{ marginLeft: '6px', color: '#fbbf24' }}>[超寬長條矩形看板]</span>}
                   </span>
-                  <span>網格制式：{canvasGridCols} 欄分佈 ｜ 顯示圖塊數：{sortedItems.length} 個</span>
+                  <span>網格制式：{canvasGridCols} 欄分佈 ｜ 視窗圖塊數：{sortedItems.length} 個</span>
                 </div>
 
-                {/* 網格區塊 */}
+                {/* 網格互動視窗卡片區塊 (支援拖曳排序與直接視窗調整) */}
                 <div
                   style={{
                     width: canvasViewScale === '100%' ? `${canvasWidth}px` : '100%',
-                    minHeight: `${Math.max(320, canvasHeight * (canvasViewScale === 'fit' ? 0.35 : 1))}px`,
+                    minHeight: `${Math.max(340, canvasHeight * (canvasViewScale === 'fit' ? 0.35 : 1))}px`,
                     display: 'grid',
                     gridTemplateColumns: `repeat(${canvasGridCols}, 1fr)`,
                     gap: '12px',
@@ -1043,7 +1120,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     const isVisible = Boolean(item.visible);
                     const width = Math.min(canvasGridCols, Math.max(1, Number(item.width ?? 6)));
                     const height = Math.max(1, Number(item.height ?? 2));
-                    const heightPx = Math.max(120, height * 65);
+                    const heightPx = Math.max(130, height * 68);
+                    const isFocused = activeItemIndex === index;
 
                     if (selectedSystemFilter !== 'all' && info.systemId !== selectedSystemFilter) {
                       return null;
@@ -1052,25 +1130,38 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     return (
                       <div
                         key={`${item.widget_key}-${index}`}
+                        draggable
+                        onDragStart={e => handleDragStart(e, index)}
+                        onDragOver={e => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => setActiveItemIndex(index)}
                         style={{
                           gridColumn: `span ${width}`,
                           minHeight: `${heightPx}px`,
                           background: isVisible
-                            ? 'rgba(30, 41, 59, 0.9)'
+                            ? isFocused
+                              ? 'rgba(30, 48, 75, 0.95)'
+                              : 'rgba(23, 32, 48, 0.9)'
                             : 'rgba(15, 23, 42, 0.4)',
-                          border: isVisible
+                          border: isFocused
+                            ? '2px solid #38bdf8'
+                            : isVisible
                             ? '1px solid rgba(255,255,255,0.18)'
                             : '1px dashed rgba(255,255,255,0.08)',
                           borderRadius: '10px',
-                          padding: '12px',
+                          padding: '10px 12px',
                           display: 'flex',
                           flexDirection: 'column',
                           position: 'relative',
                           opacity: isVisible ? 1 : 0.6,
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                          boxShadow: isFocused
+                            ? '0 0 20px rgba(56,189,248,0.3)'
+                            : '0 4px 16px rgba(0,0,0,0.3)',
+                          cursor: 'default',
+                          transition: 'border-color 0.2s, box-shadow 0.2s',
                         }}
                       >
-                        {/* 卡片標頭與快速控制 */}
+                        {/* 視窗標頭與拖曳把手 */}
                         <div
                           style={{
                             display: 'flex',
@@ -1078,9 +1169,11 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             alignItems: 'center',
                             marginBottom: '8px',
                             gap: '8px',
-                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            borderBottom: '1px solid rgba(255,255,255,0.08)',
                             paddingBottom: '6px',
+                            cursor: 'grab',
                           }}
+                          title="按住此處可拖曳調整順序"
                         >
                           <div
                             style={{
@@ -1091,7 +1184,10 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                               flex: 1,
                             }}
                           >
-                            <span style={{ fontSize: '16px' }}>{info.icon}</span>
+                            <span style={{ color: '#38bdf8', fontSize: '13px', cursor: 'grab' }} title="拖曳排序握把">
+                              ⠿
+                            </span>
+                            <span style={{ fontSize: '15px' }}>{info.icon}</span>
                             <input
                               type="text"
                               value={item.title || ''}
@@ -1133,7 +1229,51 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             </span>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {/* 快速視窗操控按鈕 (上移、下移、顯示開關、移除) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              type="button"
+                              style={{
+                                background: 'rgba(255,255,255,0.06)',
+                                color: '#94a3b8',
+                                border: 'none',
+                                borderRadius: '4px',
+                                width: '22px',
+                                height: '22px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                              }}
+                              title="順序往前"
+                              disabled={index === 0}
+                              onClick={e => {
+                                e.stopPropagation();
+                                moveItem(index, 'up');
+                              }}
+                            >
+                              ⬆️
+                            </button>
+                            <button
+                              type="button"
+                              style={{
+                                background: 'rgba(255,255,255,0.06)',
+                                color: '#94a3b8',
+                                border: 'none',
+                                borderRadius: '4px',
+                                width: '22px',
+                                height: '22px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                              }}
+                              title="順序往後"
+                              disabled={index === items.length - 1}
+                              onClick={e => {
+                                e.stopPropagation();
+                                moveItem(index, 'down');
+                              }}
+                            >
+                              ⬇️
+                            </button>
+
                             <label
                               style={{
                                 fontSize: '11px',
@@ -1142,7 +1282,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                 gap: '3px',
                                 color: 'var(--muted)',
                                 cursor: 'pointer',
+                                marginLeft: '4px',
                               }}
+                              onClick={e => e.stopPropagation()}
                             >
                               <input
                                 type="checkbox"
@@ -1151,6 +1293,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                               />
                               顯示
                             </label>
+
                             <button
                               type="button"
                               style={{
@@ -1158,27 +1301,31 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                 color: '#fca5a5',
                                 border: 'none',
                                 borderRadius: '4px',
-                                width: '20px',
-                                height: '20px',
+                                width: '22px',
+                                height: '22px',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontSize: '12px',
+                                marginLeft: '2px',
                               }}
-                              title="移除此圖塊"
-                              onClick={() => removeItem(index)}
+                              title="移除此視窗圖塊"
+                              onClick={e => {
+                                e.stopPropagation();
+                                removeItem(index);
+                              }}
                             >
                               ✕
                             </button>
                           </div>
                         </div>
 
-                        {/* 卡片內容示意（即時感受區） */}
+                        {/* 視窗主體動態示意（模擬實際大螢幕圖表畫面） */}
                         <div
                           style={{
                             flex: 1,
-                            background: 'rgba(0,0,0,0.25)',
+                            background: 'rgba(0,0,0,0.3)',
                             borderRadius: '6px',
                             padding: '8px 10px',
                             display: 'flex',
@@ -1284,7 +1431,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             </div>
                           )}
 
-                          {/* 未特定預覽通用卡片 */}
+                          {/* 通用卡片 */}
                           {!['alerts', 'kpis', 'patrol', 'repairs', 'equipment_status', 'trading_kpi', 'price_comparison', 'supplier_ranking', 'public_price_board', 'realtime_ticker'].includes(item.widget_key) && (
                             <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
                               <div>{info.desc || `圖塊代碼: ${item.widget_key}`}</div>
@@ -1293,7 +1440,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                           )}
                         </div>
 
-                        {/* 底部尺寸調整工具列 */}
+                        {/* 視窗底部尺寸調整快速工具列 (點選直接切換視窗寬度與高度) */}
                         <div
                           style={{
                             display: 'flex',
@@ -1304,48 +1451,88 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             borderTop: '1px solid rgba(255,255,255,0.06)',
                             fontSize: '11px',
                           }}
+                          onClick={e => e.stopPropagation()}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ color: 'var(--muted)', fontSize: '10px' }}>寬:</span>
-                            {(canvasGridCols === 24 ? [4, 6, 8, 12, 24] : [3, 4, 6, 8, 12]).map(w => (
-                              <button
-                                key={w}
-                                type="button"
-                                style={{
-                                  padding: '1px 5px',
-                                  borderRadius: '3px',
-                                  fontSize: '10px',
-                                  border: '1px solid rgba(255,255,255,0.1)',
-                                  background: width === w ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                                  color: width === w ? '#fff' : '#94a3b8',
-                                  cursor: 'pointer',
-                                }}
-                                onClick={() => updateItem(index, { width: w })}
-                              >
-                                {w === canvasGridCols ? '全寬' : `${w}/${canvasGridCols}`}
-                              </button>
-                            ))}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexWrap: 'wrap' }}>
+                            <span style={{ color: 'var(--muted)', fontSize: '10px', marginRight: '2px' }}>視窗寬:</span>
+                            {(canvasGridCols === 24 ? [4, 6, 8, 12, 16, 24] : [3, 4, 6, 8, 12]).map(w => {
+                              const label =
+                                w === canvasGridCols
+                                  ? '全寬'
+                                  : w === canvasGridCols / 2
+                                  ? '1/2'
+                                  : w === canvasGridCols / 3
+                                  ? '1/3'
+                                  : w === canvasGridCols / 4
+                                  ? '1/4'
+                                  : `${w}欄`;
+                              return (
+                                <button
+                                  key={w}
+                                  type="button"
+                                  style={{
+                                    padding: '2px 5px',
+                                    borderRadius: '3px',
+                                    fontSize: '10px',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    background: width === w ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                                    color: width === w ? '#fff' : '#94a3b8',
+                                    cursor: 'pointer',
+                                    fontWeight: width === w ? 700 : 400,
+                                  }}
+                                  onClick={() => updateItem(index, { width: w })}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                             <span style={{ color: 'var(--muted)', fontSize: '10px' }}>高:</span>
-                            <input
-                              type="number"
-                              min="1"
-                              max="20"
-                              value={height}
+                            <button
+                              type="button"
                               style={{
-                                width: '38px',
-                                padding: '1px 3px',
-                                borderRadius: '3px',
-                                background: 'rgba(0,0,0,0.3)',
-                                border: '1px solid rgba(255,255,255,0.15)',
+                                background: 'rgba(255,255,255,0.08)',
+                                border: 'none',
                                 color: '#e2e8f0',
-                                textAlign: 'center',
-                                fontSize: '10px',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                               }}
-                              onChange={e => updateItem(index, { height: Number(e.target.value) })}
-                            />
+                              onClick={() => updateItem(index, { height: Math.max(1, height - 1) })}
+                              title="減少高度"
+                            >
+                              -
+                            </button>
+                            <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 700, minWidth: '16px', textAlign: 'center' }}>
+                              {height}
+                            </span>
+                            <button
+                              type="button"
+                              style={{
+                                background: 'rgba(255,255,255,0.08)',
+                                border: 'none',
+                                color: '#e2e8f0',
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '3px',
+                                cursor: 'pointer',
+                                fontSize: '11px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              onClick={() => updateItem(index, { height: Math.min(20, height + 1) })}
+                              title="增加高度"
+                            >
+                              +
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1362,7 +1549,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       }}
                     >
                       <div style={{ fontSize: '32px', marginBottom: '10px' }}>📋</div>
-                      目前版面尚未設定任何圖塊，請使用上方下拉式選單或右側圖塊庫加入。
+                      目前版面尚未設定任何圖塊視窗，請使用上方下拉式選單或右側圖塊庫加入。
                     </div>
                   )}
                 </div>
@@ -1655,6 +1842,159 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
           </div>
         </div>
       </section>
+
+      {/* 彈出式即時視窗預覽 Modal (滿足：互動式可調整畫面的互動程式) */}
+      {previewModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(2, 11, 24, 0.85)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '20px',
+          }}
+          onClick={() => setPreviewModalOpen(false)}
+        >
+          <div
+            style={{
+              background: '#041022',
+              border: '1px solid #00d4ff',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              flex: 1,
+              overflow: 'hidden',
+              boxShadow: '0 0 40px rgba(0, 212, 255, 0.25)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* 視窗頂部標頭 */}
+            <div
+              style={{
+                padding: '12px 18px',
+                background: 'rgba(5, 16, 30, 0.95)',
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '18px' }}>🖥️</span>
+                <strong>戰情看板即時視窗預覽</strong>
+                <span style={{ fontSize: '12px', color: '#38bdf8' }}>
+                  ({canvasWidth} × {canvasHeight} px · {canvasGridCols} 欄模式)
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <a
+                  href="/Inspection/v2/tv-dashboard/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="primary-btn compact"
+                  style={{ textDecoration: 'none', fontSize: '12px' }}
+                >
+                  ↗ 全螢幕視窗開啟
+                </a>
+                <button
+                  type="button"
+                  style={{
+                    background: 'rgba(239,68,68,0.2)',
+                    color: '#f87171',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                  }}
+                  onClick={() => setPreviewModalOpen(false)}
+                >
+                  ✕ 關閉
+                </button>
+              </div>
+            </div>
+
+            {/* 視窗內部畫布 */}
+            <div
+              style={{
+                flex: 1,
+                overflow: 'auto',
+                padding: '20px',
+                background: '#020b18',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'flex-start',
+              }}
+            >
+              <div
+                style={{
+                  width: `${canvasWidth}px`,
+                  minHeight: `${canvasHeight}px`,
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${canvasGridCols}, 1fr)`,
+                  gap: '16px',
+                  background: '#070f22',
+                  padding: '20px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(0,212,255,0.2)',
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+                }}
+              >
+                {sortedItems
+                  .filter(({ item }) => item.visible)
+                  .map(({ item, index }) => {
+                    const info = WIDGET_CATALOG[item.widget_key] || {
+                      icon: '📊',
+                      systemId: 11,
+                    };
+                    const width = Math.min(canvasGridCols, Math.max(1, Number(item.width ?? 6)));
+                    const height = Math.max(1, Number(item.height ?? 2));
+                    return (
+                      <div
+                        key={`preview-${item.widget_key}-${index}`}
+                        style={{
+                          gridColumn: `span ${width}`,
+                          minHeight: `${height * 70}px`,
+                          background: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(0, 212, 255, 0.25)',
+                          borderRadius: '8px',
+                          padding: '14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                          <span>{info.icon}</span>
+                          <strong style={{ color: '#00d4ff', fontSize: '14px' }}>{item.title}</strong>
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              fontSize: '10px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(0, 212, 255, 0.1)',
+                              color: '#38bdf8',
+                            }}
+                          >
+                            系統 {info.systemId}
+                          </span>
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '12px' }}>
+                          即時戰情訊號運作中 · 更新頻率 {item.refresh_seconds || 60}s
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
