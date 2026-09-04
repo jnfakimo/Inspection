@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/security-monitor.ts';
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
+import { clientIpFromRequest } from '../_shared/client-ip.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -30,11 +31,14 @@ const allowedOrigins = new Set([
   ...(denoRuntime?.env?.get('APP_ALLOWED_ORIGINS') || nodeEnvironment?.APP_ALLOWED_ORIGINS || '')
     .split(',').map(origin => origin.trim()).filter(Boolean),
 ]);
+// 自架站常見於內網 IP（RFC1918）。放行這些來源反射 CORS，讓地端 IIS／反向
+// 代理不必逐一設 APP_ALLOWED_ORIGINS；Bearer token 驗證仍是主要防線。
+const PRIVATE_NET_ORIGIN = /^https?:\/\/(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})(?::\d{1,5})?$/;
 
 function cors(req: Request) {
   const origin = req.headers.get('origin') || '';
   return {
-    'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://jnfakimo.github.io',
+    'Access-Control-Allow-Origin': allowedOrigins.has(origin) || PRIVATE_NET_ORIGIN.test(origin) ? origin : 'https://jnfakimo.github.io',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Vary': 'Origin',
@@ -202,12 +206,7 @@ async function nextOfficialDocumentNo(db: SupabaseClient, dateKey: string, minim
 }
 
 function extractClientIp(req: Request) {
-  const raw = req.headers.get('cf-connecting-ip')
-    || req.headers.get('x-real-ip')
-    || req.headers.get('x-forwarded-for')
-    || req.headers.get('fly-client-ip')
-    || '';
-  return text(raw.split(',')[0], 80) || null;
+  return clientIpFromRequest(req);
 }
 
 function normalizeFloorFields(row: Record<string, unknown>) {
@@ -264,6 +263,460 @@ async function repairRequestSummary(db: SupabaseClient) {
   ];
 }
 
+type MarketFieldDefinition = {
+  key: string;
+  label: string;
+  kind: 'dimension' | 'measure';
+  unit?: string;
+  aggregation?: 'sum' | 'avg' | 'weighted_avg' | 'min' | 'max';
+  weight_key?: string;
+  required?: boolean;
+  hidden?: boolean;
+  filterable?: boolean;
+};
+
+function marketFieldDefinitions(value: unknown): MarketFieldDefinition[] {
+  const source = Array.isArray(value) ? value : [];
+  return source.map(item => {
+    const row = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+    const key = text(row.key, 60).toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/^_+|_+$/g, '');
+    const kind: MarketFieldDefinition['kind'] = row.kind === 'measure' ? 'measure' : 'dimension';
+    const aggregation = ['sum', 'avg', 'weighted_avg', 'min', 'max'].includes(String(row.aggregation))
+      ? String(row.aggregation) as MarketFieldDefinition['aggregation'] : kind === 'measure' ? 'sum' : undefined;
+    const weightKey = text(row.weight_key, 60).toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/^_+|_+$/g, '');
+    return {
+      key, label: text(row.label, 100) || key, kind,
+      unit: text(row.unit, 40) || undefined, aggregation,
+      weight_key: aggregation === 'weighted_avg' && /^[a-z][a-z0-9_-]{0,59}$/.test(weightKey) ? weightKey : undefined,
+      required: row.required === true,
+      hidden: typeof row.hidden === 'boolean' ? row.hidden : undefined,
+      filterable: typeof row.filterable === 'boolean' ? row.filterable : undefined,
+    };
+  }).filter(field => /^[a-z][a-z0-9_-]{0,59}$/.test(field.key));
+}
+
+function marketJsonObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function marketSimulationJsonObject(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const object = value as Record<string, unknown>;
+  return JSON.stringify(object).length <= 100_000 ? object : null;
+}
+
+function marketPermissionEnabled(value: unknown) {
+  return value === true || (typeof value === 'string' && value.toLowerCase() === 'true');
+}
+
+function marketNumeric(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(String(value).replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function marketImportExternalKey(sourceId: string, observedOn: string, dimensions: Record<string, string>, naturalKeyFields: string[]) {
+  const payload = [sourceId, observedOn, ...naturalKeyFields.map(key => `${key}=${dimensions[key] || ''}`)].join('\u001f');
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
+  return `market-import:${[...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('')}`;
+}
+
+type MarketAggregate = {
+  dimensions: Record<string, string>;
+  values: Record<string, number | null>;
+};
+
+function marketDateRange(value: unknown, fallback: string) {
+  const candidate = text(value, 10);
+  return validISODate(candidate) ? candidate : fallback;
+}
+
+const DASHBOARD_MARKETS = ['第一市場', '第二市場'] as const;
+const DASHBOARD_CATEGORIES = ['蔬菜', '水果'] as const;
+type DashboardMarket = typeof DASHBOARD_MARKETS[number];
+type DashboardCategory = typeof DASHBOARD_CATEGORIES[number];
+type DashboardRotationItem = {
+  market: DashboardMarket;
+  category: DashboardCategory;
+  item: string;
+  enabled: boolean;
+  sortOrder: number;
+};
+type DashboardMarketRotation = {
+  sourceId: string;
+  autoStepSeconds: number;
+  cardsPerGroup: number;
+  items: DashboardRotationItem[];
+};
+
+function dashboardMarketRotationConfig(value: unknown): DashboardMarketRotation {
+  const root = marketJsonObject(value);
+  const raw = marketJsonObject(root.market_rotation);
+  const marketSet = new Set<string>(DASHBOARD_MARKETS);
+  const categorySet = new Set<string>(DASHBOARD_CATEGORIES);
+  const seen = new Map<string, number>();
+  const items: DashboardRotationItem[] = [];
+  (Array.isArray(raw.items) ? raw.items : []).forEach((entry, index) => {
+    const row = marketJsonObject(entry);
+    const market = text(row.market, 20);
+    const category = text(row.category, 20);
+    const item = text(row.item, 160);
+    if (!marketSet.has(market) || !categorySet.has(category) || !item) return;
+    const key = `${market}::${category}::${item}`;
+    const parsedOrder = Number(row.sort_order);
+    const normalizedItem: DashboardRotationItem = {
+      market: market as DashboardMarket,
+      category: category as DashboardCategory,
+      item,
+      enabled: row.enabled !== false,
+      sortOrder: Number.isFinite(parsedOrder) ? Math.max(0, Math.min(9999, Math.round(parsedOrder))) : (index + 1) * 10,
+    };
+    const existingIndex = seen.get(key);
+    if (existingIndex !== undefined) { items[existingIndex] = normalizedItem; return; }
+    if (items.length >= 96) return;
+    seen.set(key, items.length);
+    items.push(normalizedItem);
+  });
+  const autoStepSeconds = Number(raw.auto_step_seconds);
+  const cardsPerGroup = Number(raw.cards_per_group);
+  return {
+    sourceId: id(raw.source_id),
+    autoStepSeconds: Number.isFinite(autoStepSeconds) ? Math.max(2, Math.min(30, autoStepSeconds)) : 3.5,
+    cardsPerGroup: Number.isFinite(cardsPerGroup) ? Math.max(4, Math.min(24, Math.round(cardsPerGroup))) : 12,
+    items: items.sort((left, right) => left.sortOrder - right.sortOrder),
+  };
+}
+
+function dashboardMarketShiftDate(value: string, offset: number) {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
+type MarketBoardResult =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; message: string; status: number };
+
+// SYS-12「長官模式」公開看板的資料組裝。同時給登入版（dashboard_market_rotation
+// view:'board'）與免登入版（action:'market_board_public'）使用，兩邊都只讀既有正式
+// 行情，不新增資料表。與輪播共用來源解析邏輯，但各自取自己需要的 rollup。
+async function buildMarketBoardPayload(
+  admin: SupabaseClient,
+  options: { publicView?: boolean } = {},
+): Promise<MarketBoardResult> {
+  let widgetConfig: Record<string, unknown> = {};
+  let refreshSeconds = 60;
+  const layoutResult = await admin.from('dashboard_layouts')
+    .select('published_version_id').eq('layout_code', 'operations_main').eq('status', 'active').maybeSingle();
+  if (layoutResult.error) console.warn('market board layout lookup failed:', layoutResult.error.message);
+  if (layoutResult.data?.published_version_id) {
+    const widgetResult = await admin.from('dashboard_layout_items')
+      .select('config,refresh_seconds').eq('version_id', layoutResult.data.published_version_id)
+      .eq('widget_key', 'market_snapshot').maybeSingle();
+    if (widgetResult.error) console.warn('market board widget lookup failed:', widgetResult.error.message);
+    if (widgetResult.data) {
+      widgetConfig = marketJsonObject(widgetResult.data.config);
+      const parsedRefresh = Number(widgetResult.data.refresh_seconds);
+      if (Number.isFinite(parsedRefresh)) refreshSeconds = Math.max(15, Math.min(86400, Math.round(parsedRefresh)));
+    }
+  }
+  const rotation = dashboardMarketRotationConfig(widgetConfig);
+
+  const sourceResult = await admin.from('market_data_sources')
+    .select('source_id,source_code,source_name,field_definitions,config')
+    .eq('status', 'active').order('source_name').limit(200);
+  if (sourceResult.error) {
+    console.error('market board source lookup failed:', sourceResult.error.message);
+    return { ok: false, message: '市場行情資料來源暫時無法讀取', status: 503 };
+  }
+  const sourceCandidates = (sourceResult.data || []) as Array<Record<string, unknown>>;
+  const isDecisionSource = (row: Record<string, unknown>) => (
+    text(row.source_code, 60) !== 'market_demo' && marketJsonObject(row.config).is_demo !== true
+  );
+  const source = sourceCandidates.find(row => rotation.sourceId && text(row.source_id, 80) === rotation.sourceId && isDecisionSource(row))
+    || sourceCandidates.find(row => {
+      const config = marketJsonObject(row.config);
+      return isDecisionSource(row) && config.is_default === true && config.is_actual === true;
+    })
+    || sourceCandidates.find(row => isDecisionSource(row) && marketJsonObject(row.config).is_actual === true)
+    || sourceCandidates.find(isDecisionSource);
+  if (!source) return { ok: false, message: '尚未設定可供市場看板使用的正式市場行情資料來源', status: 503 };
+
+  const sourceId = id(source.source_id);
+  const fields = marketFieldDefinitions(source.field_definitions);
+  const fieldMap = new Map(fields.map(field => [field.key, field]));
+  const dimensions = new Set(fields.filter(field => field.kind === 'dimension').map(field => field.key));
+  const measures = ['quantity', 'average_price', 'high_price', 'low_price'].filter(key => fieldMap.get(key)?.kind === 'measure');
+  if (!['market', 'category', 'item'].every(key => dimensions.has(key)) || !measures.includes('quantity') || !measures.includes('average_price')) {
+    return { ok: false, message: '正式行情資料缺少市場、大類、品項、成交量或平均價欄位', status: 503 };
+  }
+
+  const rangeResult = await admin.rpc('market_source_date_ranges');
+  if (rangeResult.error) {
+    console.error('market board date range failed:', rangeResult.error.message);
+    return { ok: false, message: '市場行情交易日期暫時無法讀取', status: 503 };
+  }
+  const range = ((rangeResult.data || []) as Array<Record<string, unknown>>).find(row => text(row.source_id, 80) === sourceId);
+  const latestDate = text(range?.latest_observed_on, 10);
+  const previousDate = text(range?.previous_observed_on, 10);
+  if (!validISODate(latestDate) || !validISODate(previousDate)) {
+    return { ok: false, message: '市場行情尚未建立最新與前一交易日的比較資料', status: 503 };
+  }
+
+  const currentFrom = dashboardMarketShiftDate(latestDate, -6);
+  const compareFrom = dashboardMarketShiftDate(latestDate, -13);
+  const compareTo = dashboardMarketShiftDate(latestDate, -7);
+  const primaryRollup = await admin.rpc('market_analysis_rollup', {
+    p_source_id: sourceId,
+    p_from: currentFrom,
+    p_to: latestDate,
+    p_compare_from: compareFrom,
+    p_compare_to: compareTo,
+    p_dimensions: ['market', 'category', 'item'],
+    p_measures: measures,
+    p_filters: {},
+    p_include_group_daily: true,
+  });
+  if (primaryRollup.error) {
+    const missingRollup = ['PGRST202', '42883'].includes(String(primaryRollup.error.code || ''))
+      || /market_analysis_rollup.*(?:not find|not found|does not exist)/i.test(String(primaryRollup.error.message || ''));
+    console.error('market board rollup failed:', primaryRollup.error.message);
+    return {
+      ok: false,
+      message: missingRollup ? '市場行情彙總功能尚未完成設定，請先套用資料庫效能更新' : '市場行情彙總資料暫時無法讀取，請稍後再試',
+      status: 503,
+    };
+  }
+  const rollup = marketJsonObject(primaryRollup.data);
+  const rollupRows = (key: string) => (
+    Array.isArray(rollup[key])
+      ? (rollup[key] as unknown[]).filter(item => item && typeof item === 'object').map(item => item as Record<string, unknown>)
+      : []
+  );
+  const rollupValues = (value: unknown) => {
+    const raw = marketJsonObject(value);
+    return Object.fromEntries(measures.map(measure => [measure, marketNumeric(raw[measure])]));
+  };
+  const dailyAggregates = [
+    ...rollupRows('current_group_daily'),
+    ...rollupRows('compare_group_daily'),
+  ].flatMap(row => {
+    const observedOn = text(row.observed_on, 10);
+    const rowDimensions = marketJsonObject(row.dimensions);
+    if (!validISODate(observedOn)) return [];
+    return [{
+      observed_on: observedOn,
+      dimensions: {
+        market: text(rowDimensions.market, 20) || '未分類',
+        category: text(rowDimensions.category, 20) || '未分類',
+        item: text(rowDimensions.item, 160) || '未分類',
+      },
+      values: rollupValues(row.values),
+    }];
+  });
+  const aggregateKey = (row: MarketAggregate) => [row.dimensions.market, row.dimensions.category, row.dimensions.item].join('::');
+  const currentAggregates = dailyAggregates.filter(row => row.observed_on === latestDate && row.dimensions.item !== '未分類');
+  const previousAggregates = dailyAggregates.filter(row => row.observed_on === previousDate);
+  const previousByKey = new Map(previousAggregates.map(row => [aggregateKey(row), row]));
+
+  const boardMarkets = DASHBOARD_MARKETS as readonly string[];
+  const boardCategories = DASHBOARD_CATEGORIES as readonly string[];
+  const weightedSummary = (rows: MarketAggregate[]) => {
+    let quantity = 0, priceWeight = 0, totalValue = 0;
+    for (const row of rows) {
+      const qty = row.values.quantity ?? 0;
+      const price = row.values.average_price;
+      quantity += qty;
+      if (price !== null && qty > 0) { priceWeight += price * qty; totalValue += price * qty; }
+    }
+    return {
+      average_price: quantity > 0 ? Number((priceWeight / quantity).toFixed(2)) : null,
+      quantity,
+      total_value: quantity > 0 ? Math.round(totalValue) : null,
+    };
+  };
+  const groupsSummary = DASHBOARD_MARKETS.flatMap(market => DASHBOARD_CATEGORIES.map(category => ({
+    market,
+    category,
+    current: weightedSummary(currentAggregates.filter(row => row.dimensions.market === market && row.dimensions.category === category)),
+    previous: weightedSummary(previousAggregates.filter(row => (
+      row.dimensions.market === market && row.dimensions.category === category && row.dimensions.item !== '未分類'
+    ))),
+  })));
+
+  // 全場均價大表需要上／中／下價；rollup RPC 一次最多 4 個 measure，因此針對
+  // 「最新交易日 vs 前一交易日」單獨取一次價格 rollup，成交量沿用上面的彙總。
+  const priceMeasures = ['average_price', 'high_price', 'middle_price', 'low_price']
+    .filter(key => fieldMap.get(key)?.kind === 'measure').slice(0, 4);
+  const priceRollup = await admin.rpc('market_analysis_rollup', {
+    p_source_id: sourceId,
+    p_from: latestDate,
+    p_to: latestDate,
+    p_compare_from: previousDate,
+    p_compare_to: previousDate,
+    // item_key 是匯入時保存的全國統一品名代碼（同品名多代碼以「|」串接），
+    // 全場均價大表以此當「品名代碼」欄；rollup 最多 4 個維度，這裡剛好用滿。
+    p_dimensions: ['market', 'category', 'item', 'item_key'],
+    p_measures: priceMeasures,
+    p_filters: {},
+    p_include_group_daily: false,
+  });
+  if (priceRollup.error) {
+    console.error('market board price rollup failed:', priceRollup.error.message);
+    return { ok: false, message: '市場行情彙總資料暫時無法讀取，請稍後再試', status: 503 };
+  }
+  const priceRollupObject = marketJsonObject(priceRollup.data);
+  const priceGroupRows = (key: string) => (
+    Array.isArray(priceRollupObject[key])
+      ? (priceRollupObject[key] as unknown[]).filter(entry => entry && typeof entry === 'object').map(entry => entry as Record<string, unknown>)
+      : []
+  );
+  const priceValues = (value: unknown) => {
+    const raw = marketJsonObject(value);
+    return Object.fromEntries(priceMeasures.map(measure => [measure, marketNumeric(raw[measure])]));
+  };
+  const groupDimensionKey = (value: unknown) => {
+    const raw = marketJsonObject(value);
+    return `${text(raw.market, 20)}::${text(raw.category, 20)}::${text(raw.item, 160)}`;
+  };
+  const boardCurrentByKey = new Map<string, Record<string, number | null>>(priceGroupRows('current_groups').map(row => [groupDimensionKey(row.dimensions), priceValues(row.values)]));
+  const boardCompareByKey = new Map<string, Record<string, number | null>>(priceGroupRows('compare_groups').map(row => [groupDimensionKey(row.dimensions), priceValues(row.values)]));
+  // 品名代碼全國統一，同一品名在兩市場、兩交易日應為同一組代碼；以最新交易日優先。
+  const itemCodes = (value: unknown) => text(marketJsonObject(value).item_key, 120)
+    .split('|').map(code => code.trim()).filter(code => /^[A-Za-z0-9]+$/.test(code));
+  const boardCodeByKey = new Map<string, string[]>();
+  for (const row of [...priceGroupRows('compare_groups'), ...priceGroupRows('current_groups')]) {
+    const codes = itemCodes(row.dimensions);
+    if (codes.length) boardCodeByKey.set(groupDimensionKey(row.dimensions), codes);
+  }
+  const quantityByKey = new Map(currentAggregates.map(row => [
+    `${row.dimensions.market}::${row.dimensions.category}::${row.dimensions.item}`,
+    row.values.quantity ?? null,
+  ]));
+
+  const tableMap = new Map<string, { item: string; category: string; code: string; codes: string[]; cells: Record<string, unknown> }>();
+  const registerCell = (market: string, category: string, item: string) => {
+    if (!boardCategories.includes(category) || !boardMarkets.includes(market) || item === '未分類') return;
+    const dimensionKey = `${market}::${category}::${item}`;
+    const current = boardCurrentByKey.get(dimensionKey);
+    const compare = boardCompareByKey.get(dimensionKey);
+    if (!current && !compare) return;
+    const rowKey = `${category}::${item}`;
+    const entry = tableMap.get(rowKey) || { item, category, code: '', codes: [], cells: {} };
+    const codes = boardCodeByKey.get(dimensionKey);
+    if (codes && !entry.codes.length) {
+      entry.codes = codes;
+      entry.code = codes.join('、');
+    }
+    const avg = current?.average_price ?? null;
+    const prevAvg = compare?.average_price ?? null;
+    const change = avg !== null && prevAvg !== null ? Number((avg - prevAvg).toFixed(2)) : null;
+    const changePct = avg !== null && prevAvg !== null && prevAvg !== 0
+      ? Number(((avg - prevAvg) / Math.abs(prevAvg) * 100).toFixed(2)) : null;
+    entry.cells[market] = {
+      prev_avg: prevAvg, avg, change, change_pct: changePct,
+      high: current?.high_price ?? null,
+      middle: current?.middle_price ?? null,
+      low: current?.low_price ?? null,
+      quantity: quantityByKey.get(dimensionKey) ?? null,
+    };
+    tableMap.set(rowKey, entry);
+  };
+  const dimensionKeys = new Set<string>();
+  boardCurrentByKey.forEach((_value, key) => dimensionKeys.add(key));
+  boardCompareByKey.forEach((_value, key) => dimensionKeys.add(key));
+  dimensionKeys.forEach(key => {
+    const parts = key.split('::');
+    registerCell(parts[0] ?? '', parts[1] ?? '', parts[2] ?? '');
+  });
+  // 依品類、品名代碼（全國統一，數字在前英文在後，與北農官網行情表同序）、品名排序；
+  // 沒有代碼的列排在該品類最後。
+  const compareCodes = (left: string[], right: string[]) => {
+    if (!left.length || !right.length) return Number(!left.length) - Number(!right.length);
+    return left[0].localeCompare(right[0], 'en', { numeric: true, sensitivity: 'base' });
+  };
+  const tableRows = [...tableMap.values()]
+    .sort((left, right) => (
+      left.category.localeCompare(right.category, 'zh-Hant')
+      || compareCodes(left.codes, right.codes)
+      || left.item.localeCompare(right.item, 'zh-Hant')
+    ))
+    .map(({ codes: _codes, ...row }) => row)
+    .slice(0, 250);
+
+  // 量價趨勢：取近一個多月的每日總量與加權均價（daily grain，只含有交易的日子）。
+  // 前端提供近 7／14 日與近一月切換，這裡一次給足最多約 24 個交易日的點。
+  const trendRollup = await admin.rpc('market_analysis_rollup', {
+    p_source_id: sourceId,
+    p_from: dashboardMarketShiftDate(latestDate, -34),
+    p_to: latestDate,
+    p_compare_from: null,
+    p_compare_to: null,
+    p_dimensions: ['market'],
+    p_measures: ['quantity', 'average_price'],
+    p_filters: {},
+    p_include_group_daily: false,
+  });
+  if (trendRollup.error) console.warn('market board trend rollup failed:', trendRollup.error.message);
+  const trendDaily = Array.isArray(marketJsonObject(trendRollup.data).current_daily)
+    ? marketJsonObject(trendRollup.data).current_daily as unknown[]
+    : [];
+  const trend = trendDaily
+    .map(entry => {
+      const row = marketJsonObject(entry);
+      const values = marketJsonObject(row.values);
+      const quantity = marketNumeric(values.quantity) ?? 0;
+      const averagePrice = marketNumeric(values.average_price);
+      return {
+        observed_on: text(row.observed_on, 10),
+        quantity,
+        average_price: averagePrice === null ? null : Number(averagePrice.toFixed(2)),
+      };
+    })
+    .filter(point => validISODate(point.observed_on))
+    .sort((left, right) => left.observed_on.localeCompare(right.observed_on))
+    .slice(-24);
+
+  // 登入版跑馬燈沿用通知中心的最新內容（給現場人員看）。免登入公開版只顯示
+  // 明確標記給看板的訊息（event='board_notice'），不把內部派工／公文通知投到大螢幕。
+  const noticeBase = admin.from('notifications').select('title,body,created_at');
+  const noticeResult = await (options.publicView ? noticeBase.eq('event', 'board_notice') : noticeBase)
+    .order('created_at', { ascending: false }).limit(60);
+  if (noticeResult.error) console.warn('market board notices lookup failed:', noticeResult.error.message);
+  const seenNotice = new Set<string>();
+  const notices = ((noticeResult.data || []) as Array<Record<string, unknown>>)
+    .map(row => ({ title: text(row.title, 120), body: text(row.body, 200), created_at: text(row.created_at, 40) }))
+    .filter(row => {
+      if (!row.title && !row.body) return false;
+      const dedupeKey = `${row.title}|${row.body}`;
+      if (seenNotice.has(dedupeKey)) return false;
+      seenNotice.add(dedupeKey);
+      return true;
+    })
+    .slice(0, 15);
+
+  return {
+    ok: true,
+    data: {
+      source: {
+        source_id: sourceId,
+        source_code: text(source.source_code, 60),
+        source_name: text(source.source_name, 120),
+      },
+      latest_date: latestDate,
+      previous_date: previousDate,
+      auto_step_seconds: rotation.autoStepSeconds,
+      refresh_seconds: refreshSeconds,
+      markets: DASHBOARD_MARKETS,
+      categories: DASHBOARD_CATEGORIES,
+      groups_summary: groupsSummary,
+      table: { markets: DASHBOARD_MARKETS, rows: tableRows },
+      trend,
+      notices,
+    },
+  };
+}
+
 async function writeAudit(
   db: AuditClient, operatorId: string, table: string, recordId: string,
   auditAction: 'insert' | 'update' | 'status_change', before: unknown, after: unknown,
@@ -282,25 +735,23 @@ type OfficialDocumentActor = {
   role: string;
   dept_id?: string | null;
   department?: string | null;
+  supervisor_id?: string | null;
 };
 
 const OFFICIAL_MANAGER_ROLES = new Set(['sysadmin', 'admin', 'dispatcher', 'duty']);
 const OFFICIAL_PEOPLE_VIEWER_ROLES = new Set([...OFFICIAL_MANAGER_ROLES, 'unit_supervisor', 'mgmt_supervisor']);
 const OFFICIAL_APPROVAL_UNIT_CODES = new Set(['BOARD', 'GM', 'VGM', 'SECRE']);
 const OFFICIAL_APPROVAL_UNIT_NAMES = new Set(['董事長室', '總經理室', '副總經理', '副總經理室', '秘書室']);
+const OFFICIAL_SECRETARY_UNIT_CODES = new Set(['SECRE']);
+const OFFICIAL_SECRETARY_UNIT_NAMES = new Set(['秘書室']);
+const OFFICIAL_DEPUTY_GM_UNIT_CODES = new Set(['VGM']);
+const OFFICIAL_DEPUTY_GM_UNIT_NAMES = new Set(['副總經理', '副總經理室']);
 const officialDocumentUnitCapabilities = (unit: { name?: unknown; code?: unknown } | null | undefined) => {
   const code = text(unit?.code, 40).toUpperCase();
   const name = text(unit?.name, 100).replace(/\s+/g, '');
   const isSecretary = code === 'SECRE' || name === '秘書室';
   const canApprove = OFFICIAL_APPROVAL_UNIT_CODES.has(code) || OFFICIAL_APPROVAL_UNIT_NAMES.has(name);
   return { canApprove, canCoSign: !canApprove || isSecretary };
-};
-const officialDocumentManager = (actor: OfficialDocumentActor, sysadmin: boolean) => {
-  if (sysadmin || OFFICIAL_MANAGER_ROLES.has(String(actor.role || ''))) return true;
-  const permissions = (actor as OfficialDocumentActor & { permissions?: Record<string, unknown> }).permissions || {};
-  return permissions.official_document_manager === true
-    || String(permissions.official_document_manager || '').toLowerCase() === 'true'
-    || permissions['officialdocs.manage'] === true;
 };
 const officialDocumentPeopleViewer = (actor: OfficialDocumentActor, sysadmin: boolean) => {
   if (sysadmin || OFFICIAL_PEOPLE_VIEWER_ROLES.has(String(actor.role || ''))) return true;
@@ -327,6 +778,23 @@ function departmentScope(rows: Array<{ dept_id?: unknown; parent_id?: unknown }>
     });
   }
   return scope;
+}
+
+// 公文流程節點以第一階「部／室」保存，但人員通常掛在其下的課／組／隊。
+// 所有收文、簽收與通知都以這個範圍判斷，避免只比對根部門 ID 讓子單位人員永遠收不到。
+function departmentContains(rows: Array<{ dept_id?: unknown; parent_id?: unknown }>, rootId: unknown, memberId: unknown) {
+  const member = id(memberId);
+  return Boolean(member && departmentScope(rows, rootId).has(member));
+}
+
+function departmentRole(value: { role?: unknown; rbac_role?: unknown } | null | undefined) {
+  return text(value?.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[String(value?.role || '')] || value?.role, 40);
+}
+
+function namedDepartment(unit: { code?: unknown; name?: unknown } | null | undefined, codes: Set<string>, names: Set<string>) {
+  const code = text(unit?.code, 40).toUpperCase();
+  const name = text(unit?.name, 100).replace(/\s+/g, '');
+  return Boolean((code && codes.has(code)) || (name && names.has(name)));
 }
 
 const officialDocumentEvent = async (
@@ -396,7 +864,7 @@ const MODULE_SOURCES:Record<string,ModuleSource>={
   'workorder/orders':source('maintenance_orders','workorder','維修工單',[['created_at','建立時間'],['order_id','工單 ID'],['request_id','報修 ID'],['assignee_id','維修人員'],['start_time','開始'],['finish_time','完成'],['status','狀態'],['result_desc','處理結果']],'created_at'),
   'workorder/attachments':source('repair_attachments','workorder','維修附件',[['uploaded_at','上傳時間'],['request_id','報修 ID'],['order_id','工單 ID'],['file_name','檔名'],['file_path','儲存路徑'],['kind','類型']],'uploaded_at'),
   'workorder/analytics':source('repair_requests','workorder','維修分析資料',[['created_at','報修時間'],['req_no','案件編號'],['department','單位'],['fault_type','故障類型'],['urgency','急迫度'],['status','狀態']],'created_at'),
-  'guardpatrol/checkins':source('checkin_logs','guardpatrol','巡邏打卡',[['checkin_at','打卡時間'],['user_name','巡檢人員'],['floor_id','樓層'],['label','巡邏點'],['target_type','類型']],'checkin_at'),
+  'guardpatrol/checkins':source('checkin_logs','guardpatrol','巡邏打卡',[['checkin_at','打卡時間'],['user_name','巡檢人員'],['floor_id','樓層'],['label','巡邏點'],['target_type','類型'],['checkin_source','簽到方式']],'checkin_at'),
   'guardpatrol/points':source('plan_markers','guardpatrol','巡邏點清單',[['floor_id','樓層'],['label','巡邏點'],['kind','類型'],['note','巡檢說明'],['status','狀態'],['updated_at','更新時間']],'updated_at',['kind','patrol']),
   'guardpatrol/shifts':source('patrol_shifts','guardpatrol','巡檢排班',[['shift_date','日期'],['name','班別'],['start_time','開始'],['end_time','結束'],['assigned_user_ids','排定人員']],'shift_date'),
   'guardpatrol/notifications':source('patrol_timeout_notifications','guardpatrol','逾時推播',[['shift_date','日期'],['shift_name','班別'],['expected_count','應巡'],['checked_count','已巡'],['unchecked_count','未巡'],['status','狀態'],['sent_at','發送時間']],'shift_date'),
@@ -506,6 +974,30 @@ export async function handleAppApiRequest(req: Request) {
   try {
     const authorization = req.headers.get('authorization') || '';
     const token = authorization.replace(/^Bearer\s+/i, '').trim();
+
+    // SYS-12 市場公開看板：免登入的唯讀行情。只回聚合行情與看板訊息，走 IP 限流，
+    // 不觸及任何使用者資料。必須放在使用者驗證之前。
+    const publicAction = text((await req.clone().json().catch(() => ({})))?.action, 40);
+    if (publicAction === 'market_board_public') {
+      const publicAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+      // 公開看板可能被整個辦公室的多台裝置共用一個對外 IP，用較寬的 app-api
+      // 額度（60 次/分）而不是 dashboard 的 12 次/分，避免正常投放被誤擋。
+      const publicRate = await enforceDurableRateLimit(publicAdmin, req, {
+        subject: `market-board-public:${extractClientIp(req) || 'unknown'}`,
+        scope: 'app-api',
+        requestId: securityEventRequestId,
+      });
+      if (publicRate.error) {
+        console.error('market board public rate limit failed:', publicRate.error.message);
+        return reply(req, { ok: false, message: '安全限流服務暫時無法使用' }, 503);
+      }
+      if (!publicRate.allowed) {
+        return reply(req, { ok: false, message: '請求過於頻繁，請稍後再試', request_id: securityEventRequestId }, 429);
+      }
+      const board = await buildMarketBoardPayload(publicAdmin, { publicView: true });
+      return board.ok ? reply(req, { ok: true, data: board.data }) : reply(req, { ok: false, message: board.message }, board.status);
+    }
+
     if (!token) return reply(req, { ok: false, message: '未登入' }, 401);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
@@ -538,7 +1030,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     const { data: profile, error: profileError } = await admin.from('users')
-      .select('user_id,username,email,name,phone,department,dept_id,role,rbac_role,status,permissions')
+      .select('user_id,username,email,name,phone,department,dept_id,role,rbac_role,supervisor_id,status,permissions')
       .eq('auth_id', authData.user.id).eq('status', 'active').maybeSingle();
     if (profileError || !profile) return reply(req, { ok: false, message: '找不到啟用中的系統帳號' }, 403);
     // users.department 只是依 dept_id 從 departments 查出來後寫回的副本，兩者可能不同步。
@@ -558,10 +1050,11 @@ export async function handleAppApiRequest(req: Request) {
 
     const roleId = profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor', maintenance: 'technician', inspector: 'reporter' } as Record<string, string>)[profile.role] || profile.role;
     const isSysadmin = roleId === 'sysadmin' || profile.role === 'admin';
-    const { data: permissions } = await admin.from('role_permissions').select('perm,allowed').eq('role_id', roleId).eq('allowed', true).like('perm', 'sys_%');
-    const allowedSystems = new Set((permissions || []).map(row => String(row.perm).replace(/^sys_/, '')));
+    const { data: permissions } = await admin.from('role_permissions').select('perm,allowed').eq('role_id', roleId).eq('allowed', true);
+    const allowedSystems = new Set((permissions || []).filter(row => String(row.perm).startsWith('sys_')).map(row => String(row.perm).replace(/^sys_/, '')));
     const can = (system: string) => isSysadmin || allowedSystems.has(system);
     const isAdmin = profile.role === 'admin' || ['admin', 'sysadmin'].includes(String(profile.rbac_role || ''));
+    const roleCanManageMarket = (permissions || []).some(row => String(row.perm) === 'marketanalytics_manage');
 
     const userDb = createClient(SUPABASE_URL, ANON_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -569,7 +1062,7 @@ export async function handleAppApiRequest(req: Request) {
     });
     const body = await req.json().catch(() => ({}));
     const action = text(body.action, 40);
-  const actionScope = ({
+    const actionScope = ({
       module_data: 'app-api:module_data',
       dashboard: 'app-api:dashboard',
       inspections: 'app-api:inspections',
@@ -602,7 +1095,16 @@ export async function handleAppApiRequest(req: Request) {
       workorder_detail: 'app-api',
       workorder_create_request: 'admin-api:write',
       workorder_workflow: 'admin-api:write',
-  } as Record<string, string>)[action];
+      market_catalog: 'app-api',
+      market_dimension_catalog: 'app-api',
+      market_analysis: 'app-api',
+      dashboard_market_rotation: 'app-api:dashboard',
+      market_simulation_list: 'app-api',
+      market_simulation_save: 'admin-api:write',
+      market_source_save: 'admin-api:write',
+      market_template_save: 'admin-api:write',
+      market_import_rows: 'admin-api:write',
+    } as Record<string, string>)[action];
     if (actionScope) {
       const actionRate = await enforceDurableRateLimit(admin, req, {
         subject: authData.user.id,
@@ -670,7 +1172,7 @@ export async function handleAppApiRequest(req: Request) {
       const [documentResult, departmentResult, peopleResult] = await Promise.all([
         admin.from('official_documents').select('document_id,document_no,document_type,subject,originator_id,originator_dept_id,responsible_dept_id,responsible_user_id,status,current_step_id,barcode_value,created_at,updated_at,closed_at').order('updated_at', { ascending: false }).limit(500),
         admin.from('departments').select('dept_id,parent_id,name,code,level').eq('status', 'active').order('sort_order').order('name').limit(500),
-        admin.from('users').select('user_id,name,dept_id,role,rbac_role,department').eq('status', 'active').order('name').limit(1000),
+        admin.from('users').select('user_id,name,dept_id,role,rbac_role,supervisor_id,department').eq('status', 'active').order('name').limit(1000),
       ]);
       if (documentResult.error) throw documentResult.error;
       if (departmentResult.error) throw departmentResult.error;
@@ -688,6 +1190,28 @@ export async function handleAppApiRequest(req: Request) {
         : new Set(Array.from(actorScope).map(deptId => id(departmentPaths.rootForId(deptId)?.dept_id)).filter(Boolean));
       const visibleRootDepartments = rootDepartments.filter(row => scopeRootIds.has(id(row.dept_id)));
       const currentRootDepartment = departmentPaths.rootForId(profile.dept_id);
+      const routingScopeCache = new Map<string, Set<string>>();
+      const routingScope = (unitId: unknown) => {
+        const key = id(unitId);
+        if (!key) return new Set<string>();
+        const cached = routingScopeCache.get(key);
+        if (cached) return cached;
+        const scope = departmentScope(allDepartments, key);
+        routingScopeCache.set(key, scope);
+        return scope;
+      };
+      const rootUnit = (deptId: unknown) => departmentPaths.rootForId(deptId) as Record<string, unknown> | null;
+      const isSecretaryUnit = (deptId: unknown) => namedDepartment(rootUnit(deptId), OFFICIAL_SECRETARY_UNIT_CODES, OFFICIAL_SECRETARY_UNIT_NAMES);
+      const isDeputyGmUnit = (deptId: unknown) => namedDepartment(rootUnit(deptId), OFFICIAL_DEPUTY_GM_UNIT_CODES, OFFICIAL_DEPUTY_GM_UNIT_NAMES);
+      const actorSupervisor = allPeople.find(person => id(person.user_id) === id(profile.supervisor_id));
+      const delegatedApprovalForActor = (step: Record<string, unknown> | null | undefined) => Boolean(
+        step?.step_type === 'approval'
+        && isSecretaryUnit(profile.dept_id)
+        && isDeputyGmUnit(step.unit_id)
+        && actorSupervisor
+        && ['unit_supervisor', 'sysadmin'].includes(departmentRole(actorSupervisor))
+        && departmentContains(allDepartments, step.unit_id, actorSupervisor.dept_id),
+      );
       const ids = allDocuments.map(row => id(row.document_id)).filter(Boolean);
       const steps: Array<Record<string, unknown>> = [];
       const events: Array<Record<string, unknown>> = [];
@@ -709,11 +1233,25 @@ export async function handleAppApiRequest(req: Request) {
       const visible = allDocuments.filter(row => {
         const documentId = id(row.document_id);
         const documentSteps = stepsByDocument.get(documentId) || [];
+        const currentDocumentStep = documentSteps.find(step => String(step.step_id || '') === String(row.current_step_id || ''));
+        // 收文／簽收是目前節點的單位作業；只要登入者屬於該部／室或其子單位，
+        // 即使不是主管或公文管理角色，也必須看得到這筆待處理公文。
+        const incomingForActor = Boolean(
+          currentDocumentStep && profile.dept_id
+          && routingScope(currentDocumentStep.unit_id).has(String(profile.dept_id)),
+        ) || delegatedApprovalForActor(currentDocumentStep);
+        const originatorUnitForActor = Boolean(
+          row.status === 'awaiting_originator' && profile.dept_id && row.originator_dept_id
+          && id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id)
+          && id(departmentPaths.rootForId(profile.dept_id)?.dept_id)
+          && id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id)
+            === id(departmentPaths.rootForId(profile.dept_id)?.dept_id),
+        );
         const inUnitScope = peopleViewer && (isAdmin || actorScope.has(String(row.originator_dept_id || ''))
           || documentSteps.some(step => actorScope.has(String(step.unit_id || ''))));
         const ownDocument = String(row.originator_id || '') === String(profile.user_id);
         const textMatch = !lookup || [row.document_no, row.subject, row.barcode_value].some(value => String(value || '').toLocaleLowerCase().includes(lookup));
-        return textMatch && (isAdmin || inUnitScope || ownDocument);
+        return textMatch && (isAdmin || incomingForActor || originatorUnitForActor || inUnitScope || ownDocument);
       });
       const visiblePeople = isAdmin
         ? allPeople
@@ -727,10 +1265,13 @@ export async function handleAppApiRequest(req: Request) {
           originator_name: names.get(String(row.originator_id)) || '',
           originator_department: departmentPaths.pathForId(row.originator_dept_id) || null,
           originator_root_department: text(departmentPaths.rootForId(row.originator_dept_id)?.name, 100) || null,
+          originator_root_department_id: id(departmentPaths.rootForId(row.originator_dept_id)?.dept_id) || null,
           steps: stepsByDocument.get(id(row.document_id)) || [],
           events: eventsByDocument.get(id(row.document_id)) || [],
         })),
-        departments: allDepartments.filter(row => isAdmin || actorScope.has(id(row.dept_id))),
+        // 路由下拉選單只需要第一階部／室；名稱可供所有 SYS-09 使用者選擇，
+        // 第二階單位仍只回傳目前帳號所屬範圍，避免人員資料跨單位曝光。
+        departments: allDepartments.filter(row => isAdmin || !id(row.parent_id) || actorScope.has(id(row.dept_id))),
         scope_root_departments: visibleRootDepartments,
         current_root_department: currentRootDepartment ? {
           dept_id: id(currentRootDepartment.dept_id),
@@ -739,6 +1280,7 @@ export async function handleAppApiRequest(req: Request) {
           code: text(currentRootDepartment.code, 100) || null,
           level: Number(currentRootDepartment.level || 1),
         } : null,
+        actor_supervisor_dept_id: id(actorSupervisor?.dept_id) || null,
         people: visiblePeople.map(row => ({
           ...row,
           department: departmentPaths.pathForId(row.dept_id) || formatDepartment(row.department, departmentPaths.byName) || null,
@@ -751,8 +1293,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'official_document_create') {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
-      const createActor = { ...profile, role: roleId, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> };
-      if (!officialDocumentManager(createActor, isSysadmin)) return reply(req, { ok: false, message: '只有公文管理人員可以建立公文' }, 403);
+      const createActor = { ...profile, role: roleId } as OfficialDocumentActor;
       const subject = text(body.subject, 300);
       if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
       const rawDocumentNo = String(body.document_no ?? '').trim();
@@ -764,10 +1305,10 @@ export async function handleAppApiRequest(req: Request) {
       const responsibleDeptId = id(body.responsible_dept_id) || id(profile.dept_id);
       const responsibleUserId = id(body.responsible_user_id) || id(profile.user_id);
       const accessibleDepartments = departmentScope((await admin.from('departments').select('dept_id,parent_id').eq('status', 'active')).data || [], profile.dept_id);
-      if (!isAdmin && !accessibleDepartments.has(responsibleDeptId)) return reply(req, { ok: false, message: '只能選擇登入者第一階單位所屬的第二階單位' }, 403);
+      if (!isAdmin && !accessibleDepartments.has(responsibleDeptId)) return reply(req, { ok: false, message: '只能選擇登入者部／室所屬的課／組／隊' }, 403);
       const responsiblePerson = await admin.from('users').select('user_id,dept_id,status').eq('user_id', responsibleUserId).eq('status', 'active').maybeSingle();
       if (responsiblePerson.error) throw responsiblePerson.error;
-      if (!responsiblePerson.data || id(responsiblePerson.data.dept_id) !== responsibleDeptId) return reply(req, { ok: false, message: '承辦人員不屬於所選第二階單位' }, 400);
+      if (!responsiblePerson.data || id(responsiblePerson.data.dept_id) !== responsibleDeptId) return reply(req, { ok: false, message: '承辦人員不屬於所選課／組／隊' }, 400);
       const documentId = nextRequestRequestId();
       const dateKey = taipeiRocDateKey();
       let serialHint = 1;
@@ -828,14 +1369,63 @@ export async function handleAppApiRequest(req: Request) {
       const currentStep = steps.find(step => String(step.step_id) === String(document.current_step_id)) || null;
       const role = roleId;
       const actor = { ...profile, role } as OfficialDocumentActor;
-      const manager = officialDocumentManager({ ...actor, permissions: profile.permissions || {} } as OfficialDocumentActor & { permissions?: Record<string, unknown> }, isSysadmin);
-      const departmentsForScope = await admin.from('departments').select('dept_id,parent_id').eq('status', 'active').limit(1000);
+      const departmentsForScope = await admin.from('departments').select('dept_id,parent_id,name,code').eq('status', 'active').limit(1000);
       if (departmentsForScope.error) throw departmentsForScope.error;
-      const actorScope = departmentScope((departmentsForScope.data || []) as Array<Record<string, unknown>>, profile.dept_id);
-      const documentInActorScope = isAdmin || actorScope.has(String(document.originator_dept_id || ''))
-        || steps.some(step => actorScope.has(String(step.unit_id || '')));
-      const managerCanOperate = manager && documentInActorScope;
-      const inCurrentUnit = Boolean(currentStep && profile.dept_id && String(currentStep.unit_id) === String(profile.dept_id));
+      const departmentRows = (departmentsForScope.data || []) as Array<Record<string, unknown>>;
+      const rootDepartmentId = (deptId: unknown) => {
+        let current = id(deptId);
+        const seen = new Set<string>();
+        while (current && !seen.has(current)) {
+          seen.add(current);
+          const row = departmentRows.find(item => id(item.dept_id) === current);
+          const parent = id(row?.parent_id);
+          if (!parent) return current;
+          current = parent;
+        }
+        return id(deptId);
+      };
+      const sameUnit = (unitId: unknown, memberId: unknown) => departmentContains(departmentRows, unitId, memberId)
+        || departmentContains(departmentRows, memberId, unitId);
+      const sameRootUnit = (unitId: unknown, memberId: unknown) => {
+        const left = rootDepartmentId(unitId);
+        const right = rootDepartmentId(memberId);
+        return Boolean(left && right && left === right);
+      };
+      const departmentAtRoot = (deptId: unknown) => {
+        let current = id(deptId);
+        const seen = new Set<string>();
+        let row: Record<string, unknown> | null = null;
+        while (current && !seen.has(current)) {
+          seen.add(current);
+          row = departmentRows.find(item => id(item.dept_id) === current) || null;
+          const parent = id(row?.parent_id);
+          if (!parent) return row;
+          current = parent;
+        }
+        return row;
+      };
+      const isSecretaryUnit = (deptId: unknown) => namedDepartment(departmentAtRoot(deptId), OFFICIAL_SECRETARY_UNIT_CODES, OFFICIAL_SECRETARY_UNIT_NAMES);
+      const isDeputyGmUnit = (deptId: unknown) => namedDepartment(departmentAtRoot(deptId), OFFICIAL_DEPUTY_GM_UNIT_CODES, OFFICIAL_DEPUTY_GM_UNIT_NAMES);
+      const supervisorResult = profile.supervisor_id
+        ? await admin.from('users').select('user_id,dept_id,role,rbac_role,status').eq('user_id', profile.supervisor_id).eq('status', 'active').maybeSingle()
+        : { data: null, error: null };
+      if (supervisorResult.error) throw supervisorResult.error;
+      const actorSupervisor = supervisorResult.data as Record<string, unknown> | null;
+      const delegatedApprovalReceiver = Boolean(
+        currentStep?.step_type === 'approval'
+        && isSecretaryUnit(profile.dept_id)
+        && isDeputyGmUnit(currentStep.unit_id)
+        && actorSupervisor
+        && ['unit_supervisor', 'sysadmin'].includes(departmentRole(actorSupervisor))
+        && departmentContains(departmentRows, currentStep.unit_id, actorSupervisor.dept_id),
+      );
+      // 流程所屬部／室及其子單位的人員都能接續已完成的節點；跨單位仍由這道檢查擋下。
+      const documentInActorScope = isAdmin || sameRootUnit(document.originator_dept_id, profile.dept_id)
+        || steps.some(step => sameUnit(step.unit_id, profile.dept_id));
+      const canOperateDocument = documentInActorScope;
+      const inCurrentUnit = Boolean(currentStep && departmentContains(departmentRows, currentStep.unit_id, profile.dept_id));
+      const canReceiveCurrentStep = inCurrentUnit || delegatedApprovalReceiver;
+      const inOriginatorUnit = sameRootUnit(document.originator_dept_id, profile.dept_id);
       const isOriginator = String(document.originator_id) === String(profile.user_id);
       const fail = (message: string, status = 409) => reply(req, { ok: false, message }, status);
       const updateDocument = async (fromStatus: string | string[], patch: Record<string, unknown>) => {
@@ -855,7 +1445,7 @@ export async function handleAppApiRequest(req: Request) {
         ? await admin.from('departments').select('dept_id,name,code,parent_id').eq('dept_id', targetUnitId).eq('status', 'active').is('parent_id', null).maybeSingle()
         : { data: null, error: null };
       if (unitResult.error) throw unitResult.error;
-      if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部室', 400);
+      if (targetUnitId && !unitResult.data) return fail('找不到指定的有效部／室', 400);
       const unitName = text(unitResult.data?.name, 100);
       const unitCapability = officialDocumentUnitCapabilities(unitResult.data);
       const eventFields = (fromStatus: string | null, toStatus: string | null, stepId: string | null = currentStep ? String(currentStep.step_id) : null) => ({
@@ -865,10 +1455,25 @@ export async function handleAppApiRequest(req: Request) {
         target_unit_id: targetUnitId || (currentStep ? currentStep.unit_id : null),
         note,
       });
-
+      const activeUsersForUnit = async (unitId: string, includeSecretaryDelegates = false) => {
+        const recipientDeptIds = Array.from(departmentScope(departmentRows, unitId));
+        if (!recipientDeptIds.length) return [] as Array<Record<string, unknown>>;
+        const result = await admin.from('users').select('user_id,dept_id,supervisor_id,role,rbac_role').eq('status', 'active').limit(1000);
+        if (result.error) throw result.error;
+        const rows = (result.data || []) as Array<Record<string, unknown>>;
+        const targetSupervisorIds = new Set(rows
+          .filter(row => recipientDeptIds.includes(id(row.dept_id)) && ['unit_supervisor', 'sysadmin'].includes(departmentRole(row)))
+          .map(row => id(row.user_id)).filter(Boolean));
+        return rows.filter(row => recipientDeptIds.includes(id(row.dept_id)) || (
+          includeSecretaryDelegates
+          && isSecretaryUnit(row.dept_id)
+          && isDeputyGmUnit(unitId)
+          && targetSupervisorIds.has(id(row.supervisor_id))
+        )).map(row => ({ user_id: row.user_id }));
+      };
       if (documentAction === 'send_co_sign') {
-        if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出會辦', 403);
-        if (!targetUnitId) return fail('請選擇下一個會辦部室', 400);
+        if (!canOperateDocument) return fail('只有公文所屬部／室人員可以送出會辦', 403);
+        if (!targetUnitId) return fail('請選擇下一個會辦部／室', 400);
         if (!unitCapability.canCoSign) return fail('董事長室、總經理室與副總經理室只能作為陳核單位；秘書室可會辦也可陳核', 400);
         if (!['draft', 'ready_for_next'].includes(String(document.status))) return fail('目前狀態不可送出會辦');
         if (currentStep && (currentStep.step_type !== 'co_sign' || currentStep.status !== 'completed')) return fail('前一個流程節點尚未完成');
@@ -880,14 +1485,14 @@ export async function handleAppApiRequest(req: Request) {
         if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
         const event = await officialDocumentEvent(admin, actor, documentId, 'send_co_sign', idempotencyKey, eventFields(String(document.status), nextStatus, String(createdStep.data.step_id)));
         const dueAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-        const recipients = await admin.from('users').select('user_id').eq('dept_id', targetUnitId).eq('status', 'active').limit(500);
-        for (const recipient of (recipients.data || []) as Array<Record<string, unknown>>) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文會辦待收文', `${document.document_no}｜${document.subject}`, dueAt);
+        const recipients = await activeUsersForUnit(targetUnitId);
+        for (const recipient of recipients) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文會辦待收文', `${document.document_no}｜${document.subject}`, dueAt);
         return reply(req, { ok: true, data: { status: nextStatus, step: createdStep.data, event_id: event.data?.event_id } });
       }
 
       if (documentAction === 'send_approval') {
-        if (!managerCanOperate) return fail('只有本單位公文管理人員可以送出陳核', 403);
-        if (!targetUnitId) return fail('請選擇陳核部室', 400);
+        if (!canOperateDocument) return fail('只有公文所屬部／室人員可以送出陳核', 403);
+        if (!targetUnitId) return fail('請選擇陳核部／室', 400);
         if (!unitCapability.canApprove) return fail('陳核僅能送至董事長室、總經理室、副總經理室或秘書室', 400);
         // 條件是「沒有還沒完成的會辦」，不是「完全沒有節點」：退回補正後狀態回到 draft，
         // 但既有節點還留在時間軸上，用 steps.length === 0 會讓補正過的公文永遠送不出陳核
@@ -903,22 +1508,39 @@ export async function handleAppApiRequest(req: Request) {
         if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
         const event = await officialDocumentEvent(admin, actor, documentId, 'send_approval', idempotencyKey, eventFields(String(document.status), nextStatus, String(createdStep.data.step_id)));
         const dueAt = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString();
-        const recipients = await admin.from('users').select('user_id').eq('dept_id', targetUnitId).eq('status', 'active').limit(500);
-        for (const recipient of (recipients.data || []) as Array<Record<string, unknown>>) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文陳核待收文', `${document.document_no}｜${document.subject}`, dueAt);
+        const recipients = await activeUsersForUnit(targetUnitId, true);
+        for (const recipient of recipients) await officialDocumentNotification(admin, documentId, String(createdStep.data.step_id), String(recipient.user_id), 'new_step', '有新的公文陳核待收文', `${document.document_no}｜${document.subject}`, dueAt);
         return reply(req, { ok: true, data: { status: nextStatus, step: createdStep.data, event_id: event.data?.event_id } });
       }
 
       if (documentAction === 'receive') {
-        if (!currentStep || !inCurrentUnit) return fail('只有目前收文部室的人員可以收文', 403);
+        if (!currentStep || !inCurrentUnit) return fail('只有目前收文部／室的人員可以收文', 403);
         if (currentStep.status !== 'sent') return fail('這個流程節點已收文，請勿重複操作');
-        const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
+        const receivedAt = new Date().toISOString();
+        const autoComplete = currentStep.step_type === 'co_sign';
+        const updatedStep = await updateStep('sent', autoComplete
+          ? { status: 'completed', received_by: profile.user_id, received_at: receivedAt, completed_by: profile.user_id, completed_at: receivedAt }
+          : { status: 'received', received_by: profile.user_id, received_at: receivedAt });
         if (!updatedStep) return fail('這筆公文已被其他人收文，請重新整理');
+        if (autoComplete) {
+          const nextStatus = 'ready_for_next';
+          const updated = await updateDocument('awaiting_co_sign', { status: nextStatus, current_step_id: currentStep.step_id });
+          if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
+          const receiveEvent = await officialDocumentEvent(admin, actor, documentId, 'receive', idempotencyKey, eventFields('awaiting_co_sign', 'awaiting_co_sign'));
+          const completeEvent = await officialDocumentEvent(admin, actor, documentId, 'co_sign_complete', `${idempotencyKey}:complete`, eventFields('awaiting_co_sign', nextStatus));
+          return reply(req, { ok: true, data: { status: nextStatus, event_id: completeEvent.data?.event_id || receiveEvent.data?.event_id, auto_completed: true } });
+        }
         const event = await officialDocumentEvent(admin, actor, documentId, 'receive', idempotencyKey, eventFields(String(document.status), String(document.status)));
         return reply(req, { ok: true, data: { status: document.status, event_id: event.data?.event_id } });
       }
 
       if (documentAction === 'co_sign_complete') {
-        if (!currentStep || currentStep.step_type !== 'co_sign' || !inCurrentUnit) return fail('只有目前會辦部室的人員可以完成會辦', 403);
+        if (!currentStep || currentStep.step_type !== 'co_sign' || !inCurrentUnit) return fail('只有目前會辦部／室的人員可以完成會辦', 403);
+        // 舊版畫面仍可能送出第二個完成動作；收文已自動完成時安全回傳目前狀態，
+        // 不再要求使用者再按一次按鈕，也不新增重複事件。
+        if (currentStep.status === 'completed' && String(document.status) === 'ready_for_next') {
+          return reply(req, { ok: true, data: { status: 'ready_for_next', already_completed: true } });
+        }
         if (currentStep.status !== 'received') return fail('完成會辦前請先收文');
         const updatedStep = await updateStep('received', { status: 'completed', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });
         if (!updatedStep) return fail('這個會辦節點已被完成，請重新整理');
@@ -930,7 +1552,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'approval_receive') {
-        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部室的人員可以簽收', 403);
+        if (!currentStep || currentStep.step_type !== 'approval' || !canReceiveCurrentStep) return fail('只有目前陳核部／室或其指定收文人員可以簽收', 403);
         if (currentStep.status !== 'sent') return fail('這筆公文已簽收，請勿重複操作');
         const updatedStep = await updateStep('sent', { status: 'received', received_by: profile.user_id, received_at: new Date().toISOString() });
         if (!updatedStep) return fail('這筆公文已被其他人簽收，請重新整理');
@@ -939,7 +1561,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'approve' || documentAction === 'return') {
-        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部室的人員可以核決', 403);
+        if (!currentStep || currentStep.step_type !== 'approval' || !inCurrentUnit) return fail('只有目前陳核部／室的人員可以核決', 403);
         if (currentStep.status !== 'received') return fail('核決前請先完成陳核簽收');
         const nextStatus = documentAction === 'approve' ? 'awaiting_originator' : 'returned';
         const updatedStep = await updateStep('received', { status: documentAction === 'approve' ? 'completed' : 'returned', completed_by: profile.user_id, completed_at: new Date().toISOString(), note });
@@ -947,8 +1569,13 @@ export async function handleAppApiRequest(req: Request) {
         const updated = await updateDocument('awaiting_approval', { status: nextStatus, current_step_id: currentStep.step_id });
         if (!updated) return fail('公文狀態已被其他視窗更新，請重新整理');
         const event = await officialDocumentEvent(admin, actor, documentId, documentAction, idempotencyKey, eventFields('awaiting_approval', nextStatus));
-        const title = documentAction === 'approve' ? '公文已核決，請原申請人收訖' : '公文退回，請原申請人補正重送';
-        await officialDocumentNotification(admin, documentId, String(currentStep.step_id), String(document.originator_id), documentAction === 'approve' ? 'approved' : 'returned', title, `${document.document_no}｜${document.subject}${note ? `｜${note}` : ''}`);
+        const title = documentAction === 'approve' ? '公文已核決，請創文單位簽收' : '公文退回，請原申請人補正重送';
+        const recipients = documentAction === 'approve' && document.originator_dept_id
+          ? await activeUsersForUnit(rootDepartmentId(document.originator_dept_id))
+          : [{ user_id: document.originator_id }];
+        for (const recipient of recipients) {
+          await officialDocumentNotification(admin, documentId, String(currentStep.step_id), String(recipient.user_id), documentAction === 'approve' ? 'approved' : 'returned', title, `${document.document_no}｜${document.subject}${note ? `｜${note}` : ''}`);
+        }
         return reply(req, { ok: true, data: { status: nextStatus, event_id: event.data?.event_id } });
       }
 
@@ -962,7 +1589,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'originator_receive') {
-        if (!isOriginator) return fail('只有原申請人可以收訖公文', 403);
+        if (!isOriginator && !inOriginatorUnit) return fail('只有創文部／室人員可以簽收公文', 403);
         if (String(document.status) !== 'awaiting_originator') return fail('目前沒有待收訖的核決公文');
         const updated = await updateDocument('awaiting_originator', { status: 'closed', closed_at: new Date().toISOString() });
         if (!updated) return fail('這筆公文已完成收訖，請勿重複操作');
@@ -971,7 +1598,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (documentAction === 'barcode_generate') {
-        if (!managerCanOperate && !isOriginator) return fail('只有原申請人或本單位公文管理人員可以產生文號', 403);
+        if (!canOperateDocument && !isOriginator) return fail('只有公文所屬部／室人員可以產生文號', 403);
         const currentBarcode = text(document.barcode_value, 200);
         if (currentBarcode) return reply(req, { ok: true, data: { status: document.status, barcode_value: currentBarcode, duplicate: true } });
         const barcode = text(document.document_no, 100);
@@ -982,6 +1609,695 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       return fail('公文流程動作無效', 400);
+    }
+
+    if (action === 'dashboard_market_rotation') {
+      if (!can('dashboard') && !can('marketanalytics') && !can('marketboard')) {
+        return reply(req, { ok: false, message: '目前角色沒有戰情儀表板、市場營運分析或市場公開看板系統權限' }, 403);
+      }
+      const requestedView = text(body.view, 20);
+      const view = requestedView === 'trend' ? 'trend' : requestedView === 'board' ? 'board' : 'cards';
+      if (view === 'board') {
+        const board = await buildMarketBoardPayload(admin);
+        return board.ok ? reply(req, { ok: true, data: board.data }) : reply(req, { ok: false, message: board.message }, board.status);
+      }
+      let widgetConfig: Record<string, unknown> = {};
+      let refreshSeconds = 60;
+      const layoutResult = await admin.from('dashboard_layouts')
+        .select('published_version_id').eq('layout_code', 'operations_main').eq('status', 'active').maybeSingle();
+      if (layoutResult.error) console.warn('dashboard market layout lookup failed:', layoutResult.error.message);
+      if (layoutResult.data?.published_version_id) {
+        const widgetResult = await admin.from('dashboard_layout_items')
+          .select('config,refresh_seconds').eq('version_id', layoutResult.data.published_version_id)
+          .eq('widget_key', 'market_snapshot').maybeSingle();
+        if (widgetResult.error) console.warn('dashboard market widget lookup failed:', widgetResult.error.message);
+        if (widgetResult.data) {
+          widgetConfig = marketJsonObject(widgetResult.data.config);
+          const parsedRefresh = Number(widgetResult.data.refresh_seconds);
+          if (Number.isFinite(parsedRefresh)) refreshSeconds = Math.max(15, Math.min(86400, Math.round(parsedRefresh)));
+        }
+      }
+      const rotation = dashboardMarketRotationConfig(widgetConfig);
+
+      const sourceResult = await admin.from('market_data_sources')
+        .select('source_id,source_code,source_name,field_definitions,config')
+        .eq('status', 'active').order('source_name').limit(200);
+      if (sourceResult.error) {
+        console.error('dashboard market source lookup failed:', sourceResult.error.message);
+        return reply(req, { ok: false, message: '市場行情資料來源暫時無法讀取' }, 503);
+      }
+      const sourceCandidates = (sourceResult.data || []) as Array<Record<string, unknown>>;
+      const isDecisionSource = (row: Record<string, unknown>) => (
+        text(row.source_code, 60) !== 'market_demo' && marketJsonObject(row.config).is_demo !== true
+      );
+      const source = sourceCandidates.find(row => rotation.sourceId && text(row.source_id, 80) === rotation.sourceId && isDecisionSource(row))
+        || sourceCandidates.find(row => {
+          const config = marketJsonObject(row.config);
+          return isDecisionSource(row) && config.is_default === true && config.is_actual === true;
+        })
+        || sourceCandidates.find(row => isDecisionSource(row) && marketJsonObject(row.config).is_actual === true)
+        || sourceCandidates.find(isDecisionSource);
+      if (!source) return reply(req, { ok: false, message: '尚未設定可供戰情儀表板使用的正式市場行情資料來源' }, 503);
+
+      const sourceId = id(source.source_id);
+      const fields = marketFieldDefinitions(source.field_definitions);
+      const fieldMap = new Map(fields.map(field => [field.key, field]));
+      const dimensions = new Set(fields.filter(field => field.kind === 'dimension').map(field => field.key));
+      const measures = ['quantity', 'average_price', 'high_price', 'low_price'].filter(key => fieldMap.get(key)?.kind === 'measure');
+      if (!['market', 'category', 'item'].every(key => dimensions.has(key)) || !measures.includes('quantity') || !measures.includes('average_price')) {
+        return reply(req, { ok: false, message: '正式行情資料缺少市場、大類、品項、成交量或平均價欄位' }, 503);
+      }
+
+      const rangeResult = await admin.rpc('market_source_date_ranges');
+      if (rangeResult.error) {
+        console.error('dashboard market date range failed:', rangeResult.error.message);
+        return reply(req, { ok: false, message: '市場行情交易日期暫時無法讀取' }, 503);
+      }
+      const range = ((rangeResult.data || []) as Array<Record<string, unknown>>)
+        .find(row => text(row.source_id, 80) === sourceId);
+      const latestDate = text(range?.latest_observed_on, 10);
+      const previousDate = text(range?.previous_observed_on, 10);
+      if (!validISODate(latestDate) || !validISODate(previousDate)) {
+        return reply(req, { ok: false, message: '市場行情尚未建立最新與前一交易日的比較資料' }, 503);
+      }
+
+      const requestedMarket = text(body.market, 20);
+      const requestedCategory = text(body.category, 20);
+      const requestedItem = text(body.item, 160);
+      const currentFrom = dashboardMarketShiftDate(latestDate, -6);
+      const compareFrom = dashboardMarketShiftDate(latestDate, -13);
+      const compareTo = dashboardMarketShiftDate(latestDate, -7);
+      const rollupResult = await admin.rpc('market_analysis_rollup', {
+        p_source_id: sourceId,
+        p_from: currentFrom,
+        p_to: latestDate,
+        p_compare_from: compareFrom,
+        p_compare_to: compareTo,
+        p_dimensions: ['market', 'category', 'item'],
+        p_measures: measures,
+        p_filters: {},
+        p_include_group_daily: true,
+      });
+      if (rollupResult.error) {
+        const missingRollup = ['PGRST202', '42883'].includes(String(rollupResult.error.code || ''))
+          || /market_analysis_rollup.*(?:not find|not found|does not exist)/i.test(String(rollupResult.error.message || ''));
+        console.error('dashboard market rollup failed:', rollupResult.error.message);
+        return reply(req, {
+          ok: false,
+          message: missingRollup
+            ? '市場行情彙總功能尚未完成設定，請先套用資料庫效能更新'
+            : '市場行情彙總資料暫時無法讀取，請稍後再試',
+        }, 503);
+      }
+
+      const rollup = marketJsonObject(rollupResult.data);
+      const rollupRows = (key: string) => (
+        Array.isArray(rollup[key])
+          ? (rollup[key] as unknown[]).filter(item => item && typeof item === 'object')
+            .map(item => item as Record<string, unknown>)
+          : []
+      );
+      const rollupValues = (value: unknown) => {
+        const raw = marketJsonObject(value);
+        return Object.fromEntries(measures.map(measure => [measure, marketNumeric(raw[measure])]));
+      };
+      const dailyAggregates = [
+        ...rollupRows('current_group_daily'),
+        ...rollupRows('compare_group_daily'),
+      ].flatMap(row => {
+        const observedOn = text(row.observed_on, 10);
+        const rowDimensions = marketJsonObject(row.dimensions);
+        if (!validISODate(observedOn)) return [];
+        return [{
+          observed_on: observedOn,
+          dimensions: {
+            market: text(rowDimensions.market, 20) || '未分類',
+            category: text(rowDimensions.category, 20) || '未分類',
+            item: text(rowDimensions.item, 160) || '未分類',
+          },
+          values: rollupValues(row.values),
+        }];
+      });
+      const aggregateKey = (row: MarketAggregate) => [
+        row.dimensions.market,
+        row.dimensions.category,
+        row.dimensions.item,
+      ].join('::');
+      const dailyAggregateKey = (observedOn: string, market: string, category: string, item: string) => (
+        [observedOn, market, category, item].join('::')
+      );
+      const dailyByKey = new Map(dailyAggregates.map(row => [
+        dailyAggregateKey(row.observed_on, row.dimensions.market, row.dimensions.category, row.dimensions.item),
+        row,
+      ]));
+      const currentAggregates = dailyAggregates
+        .filter(row => row.observed_on === latestDate && row.dimensions.item !== '未分類');
+      const previousAggregates = dailyAggregates.filter(row => row.observed_on === previousDate);
+      const previousByKey = new Map(previousAggregates.map(row => [aggregateKey(row), row]));
+      const configuredItems = rotation.items.filter(item => item.enabled);
+
+      const groups = DASHBOARD_MARKETS.flatMap(market => DASHBOARD_CATEGORIES.map(category => {
+        const inGroup = currentAggregates.filter(row => row.dimensions.market === market && row.dimensions.category === category)
+          .sort((left, right) => (right.values.quantity || 0) - (left.values.quantity || 0));
+        const currentByItem = new Map(inGroup.map(row => [row.dimensions.item, row]));
+        const pinned = configuredItems.filter(item => item.market === market && item.category === category)
+          .slice(0, rotation.cardsPerGroup);
+        const availablePinned: Array<{ item: string; current?: MarketAggregate; configured: boolean }> = [];
+        const unavailablePinned: Array<{ item: string; current?: MarketAggregate; configured: boolean }> = [];
+        pinned.forEach(item => {
+          const current = currentByItem.get(item.item);
+          const comparison = previousByKey.get(`${market}::${category}::${item.item}`);
+          (current || comparison ? availablePinned : unavailablePinned).push({ item: item.item, current, configured: true });
+        });
+        const selected = [...availablePinned];
+        const seen = new Set(pinned.map(item => item.item));
+        for (const row of inGroup) {
+          if (selected.length >= rotation.cardsPerGroup) break;
+          if (seen.has(row.dimensions.item)) continue;
+          seen.add(row.dimensions.item);
+          selected.push({ item: row.dimensions.item, current: row, configured: false });
+        }
+        for (const missing of unavailablePinned) {
+          if (selected.length >= rotation.cardsPerGroup) break;
+          selected.push(missing);
+        }
+        const cards = selected.map(selection => {
+          const key = `${market}::${category}::${selection.item}`;
+          const comparison = previousByKey.get(key);
+          return {
+            key, market, category, item: selection.item, configured: selection.configured,
+            price: marketNumeric(selection.current?.values.average_price),
+            previous_price: marketNumeric(comparison?.values.average_price),
+            quantity: marketNumeric(selection.current?.values.quantity),
+            high_price: marketNumeric(selection.current?.values.high_price),
+            low_price: marketNumeric(selection.current?.values.low_price),
+          };
+        });
+        return { key: `${market}::${category}`, market, category, cards };
+      }));
+
+      const sourceSummary = {
+        source_id: sourceId,
+        source_code: text(source.source_code, 60),
+        source_name: text(source.source_name, 120),
+      };
+      const trendFor = (market: string, category: string, item: string) => {
+        const series = Array.from({ length: 7 }, (_, index) => {
+          const observedOn = dashboardMarketShiftDate(currentFrom, index);
+          const compareObservedOn = dashboardMarketShiftDate(compareFrom, index);
+          const current = dailyByKey.get(dailyAggregateKey(observedOn, market, category, item))?.values || {};
+          const comparison = dailyByKey.get(dailyAggregateKey(compareObservedOn, market, category, item))?.values || {};
+          return { observed_on: observedOn, compare_observed_on: compareObservedOn, values: current, compare_values: comparison };
+        });
+        return { periods: { from: currentFrom, to: latestDate, compare_from: compareFrom, compare_to: compareTo }, series };
+      };
+      if (view === 'cards') {
+        return reply(req, { ok: true, data: {
+          source: sourceSummary,
+          latest_date: latestDate,
+          previous_date: previousDate,
+          auto_step_seconds: rotation.autoStepSeconds,
+          refresh_seconds: refreshSeconds,
+          cards_per_slide: 4,
+          cards_per_group: rotation.cardsPerGroup,
+          groups: groups.map(group => ({
+            ...group,
+            cards: group.cards.map(card => ({ ...card, trend: trendFor(card.market, card.category, card.item) })),
+          })),
+        } });
+      }
+
+      if (!(DASHBOARD_MARKETS as readonly string[]).includes(requestedMarket)
+        || !(DASHBOARD_CATEGORIES as readonly string[]).includes(requestedCategory)
+        || !requestedItem) {
+        return reply(req, { ok: false, message: '單品趨勢的市場、大類或品項不正確' }, 400);
+      }
+      const selectedGroup = groups.find(group => group.market === requestedMarket && group.category === requestedCategory);
+      if (!selectedGroup?.cards.some(card => card.item === requestedItem)) {
+        return reply(req, { ok: false, message: '此品項不在目前發布的戰情輪播清單中' }, 403);
+      }
+      return reply(req, { ok: true, data: {
+        source: sourceSummary,
+        ...trendFor(requestedMarket, requestedCategory, requestedItem),
+      } });
+    }
+
+    if (action === 'market_catalog') {
+      if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const [sourceResult, templateResult, rangeResult] = await Promise.all([
+        admin.from('market_data_sources').select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').eq('status', 'active').order('source_name').limit(200),
+        admin.from('market_analysis_templates').select('template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status,updated_at').eq('status', 'active').order('template_name').limit(200),
+        admin.rpc('market_source_date_ranges'),
+      ]);
+      if (sourceResult.error || templateResult.error || rangeResult.error) {
+        console.error('market catalog query failed:', sourceResult.error?.message || templateResult.error?.message || rangeResult.error?.message);
+        return reply(req, { ok: false, message: '市場行情資料尚未完成設定，請先套用市場分析資料庫腳本' }, 503);
+      }
+      const rangeRows = (rangeResult.data || []) as Array<Record<string, unknown>>;
+      const ranges = new Map<string, Record<string, unknown>>(rangeRows.map(row => [String(row.source_id), row]));
+      const sources = (sourceResult.data || []).map((row: Record<string, unknown>) => {
+        const range = ranges.get(String(row.source_id));
+        if (!range?.latest_observed_on) return row;
+        const latest = text(range.latest_observed_on, 10);
+        const previous = text(range.previous_observed_on, 10);
+        return { ...row, config: {
+          ...marketJsonObject(row.config),
+          period_from: text(range.first_observed_on, 10), period_to: latest, latest_observed_on: latest,
+          default_from: latest, default_to: latest,
+          ...(previous ? { default_compare_from: previous, default_compare_to: previous } : {}),
+        } };
+      });
+      return reply(req, { ok: true, data: { sources, templates: templateResult.data || [] } });
+    }
+
+    if (action === 'market_dimension_catalog') {
+      if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const sourceId = id(body.source_id);
+      const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions,config').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+      if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
+      const allDimensions = marketFieldDefinitions(sourceResult.data.field_definitions)
+        .filter(field => field.kind === 'dimension' && field.hidden !== true && field.filterable !== false);
+      const dimensions = allDimensions.slice(0, 8);
+      const dimensionKeys = new Set(allDimensions.map(field => field.key));
+      const rawFilters = marketJsonObject(body.filters);
+      const catalogFilters = Object.fromEntries(Object.entries(rawFilters)
+        .filter(([key, value]) => dimensionKeys.has(key) && typeof value === 'string')
+        .map(([key, value]) => [key, text(value, 200)] as const)
+        .filter(([, value]) => Boolean(value))
+        .slice(0, 8));
+      const results = await Promise.all(dimensions.map(async field => {
+        const filters = Object.fromEntries(Object.entries(catalogFilters).filter(([key]) => key !== field.key));
+        const filteredResult = await admin.rpc('market_dimension_values_filtered', {
+          p_source_id: sourceId, p_dimension: field.key, p_filters: filters, p_limit: 500,
+        });
+        if (!filteredResult.error) return { field, result: filteredResult };
+        const missingFilteredRpc = ['PGRST202', '42883'].includes(String(filteredResult.error.code || ''))
+          || /market_dimension_values_filtered.*(?:not find|not found|does not exist)/i.test(String(filteredResult.error.message || ''));
+        if (!missingFilteredRpc) return { field, result: filteredResult };
+        const fallbackResult = await admin.rpc('market_dimension_values', { p_source_id: sourceId, p_dimension: field.key, p_limit: 500 });
+        return { field, result: fallbackResult };
+      }));
+      const failed = results.find(item => item.result.error);
+      if (failed) {
+        console.error('market dimension catalog failed:', failed.result.error?.message);
+        return reply(req, { ok: false, message: '市場行情篩選選項尚未完成設定，仍可直接輸入篩選文字' }, 503);
+      }
+      return reply(req, { ok: true, data: { options: Object.fromEntries(results.map(item => [
+        item.field.key,
+        (item.result.data || []).map((row: Record<string, unknown>) => ({ value: text(row.value, 200), count: Number(row.point_count) || 0 })).filter((row: { value: string }) => row.value),
+      ])) } });
+    }
+
+    if (action === 'market_analysis') {
+      if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const sourceId = id(body.source_id);
+      let sourceResult;
+      if (sourceId) {
+        sourceResult = await admin.from('market_data_sources')
+          .select('source_id,source_code,source_name,field_definitions')
+          .eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+      } else {
+        // 未指定來源的中央戰情摘要只使用明確標記的預設來源，避免名稱排序剛好
+        // 取到示範資料；舊環境尚未設定預設來源時才退回第一個啟用來源。
+        const preferred = await admin.from('market_data_sources')
+          .select('source_id,source_code,source_name,field_definitions')
+          .eq('status', 'active').contains('config', { is_default: true }).order('source_name').limit(1).maybeSingle();
+        sourceResult = preferred.data || preferred.error
+          ? preferred
+          : await admin.from('market_data_sources')
+            .select('source_id,source_code,source_name,field_definitions')
+            .eq('status', 'active').order('source_name').limit(1).maybeSingle();
+      }
+      if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
+      const source = sourceResult.data as Record<string, unknown>;
+      const fields = marketFieldDefinitions(source.field_definitions);
+      const dimensionKeys = fields.filter(field => field.kind === 'dimension').map(field => field.key);
+      const measureKeys = fields.filter(field => field.kind === 'measure').map(field => field.key);
+      const hasRequestedDimensions = Array.isArray(body.dimensions);
+      const hasRequestedMeasures = Array.isArray(body.measures);
+      const dimensionInput: unknown[] = Array.isArray(body.dimensions) ? body.dimensions : [];
+      const measureInput: unknown[] = Array.isArray(body.measures) ? body.measures : [];
+      const requestedDimensions: string[] = dimensionInput.map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => dimensionKeys.includes(key)).slice(0, 4);
+      const requestedMeasures: string[] = measureInput.map((value: unknown) => text(value, 60).toLowerCase()).filter((key: string) => measureKeys.includes(key)).slice(0, 4);
+      const dimensions: string[] = hasRequestedDimensions ? [...new Set(requestedDimensions)] : dimensionKeys.slice(0, 2);
+      const measures: string[] = hasRequestedMeasures ? [...new Set(requestedMeasures)] : measureKeys.slice(0, 2);
+      const rawFilters = marketJsonObject(body.filters);
+      const filterEntries = dimensionKeys.map(key => [key, text(rawFilters[key], 200)] as const).filter(([, value]) => Boolean(value));
+      if (filterEntries.length > 4) return reply(req, { ok: false, message: '單次最多套用 4 個資料內容篩選，請移除較次要的篩選條件' }, 400);
+      const filters = Object.fromEntries(filterEntries);
+      if (!measures.length) return reply(req, { ok: false, message: '資料來源至少需要一個可分析的數值欄位' }, 400);
+      const nowISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
+      const from = marketDateRange(body.from, nowISO);
+      const to = marketDateRange(body.to, from);
+      const compareFrom = marketDateRange(body.compare_from, from);
+      const compareTo = marketDateRange(body.compare_to, to);
+      if (from > to || compareFrom > compareTo) return reply(req, { ok: false, message: '分析期間起訖日期不正確' }, 400);
+      const rangeDays = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+      const compareRangeDays = Math.round((Date.parse(`${compareTo}T00:00:00Z`) - Date.parse(`${compareFrom}T00:00:00Z`)) / 86400000) + 1;
+      if (rangeDays > 366 || compareRangeDays > 366) return reply(req, { ok: false, message: '單次分析期間與比較期間最多 366 天' }, 400);
+      if (rangeDays !== compareRangeDays) return reply(req, { ok: false, message: '分析期間與比較期間必須使用相同天數' }, 400);
+      const rollupResult = await admin.rpc('market_analysis_rollup', {
+        p_source_id: source.source_id,
+        p_from: from,
+        p_to: to,
+        p_compare_from: compareFrom,
+        p_compare_to: compareTo,
+        p_dimensions: dimensions,
+        p_measures: measures,
+        p_filters: filters,
+        p_include_group_daily: false,
+      });
+      if (rollupResult.error) {
+        const missingRollup = ['PGRST202', '42883'].includes(String(rollupResult.error.code || ''))
+          || /market_analysis_rollup.*(?:not find|not found|does not exist)/i.test(String(rollupResult.error.message || ''));
+        console.error('market analysis rollup failed:', rollupResult.error.message);
+        return reply(req, {
+          ok: false,
+          message: missingRollup
+            ? '市場行情彙總功能尚未完成設定，請先套用資料庫效能更新'
+            : '市場行情分析資料彙總失敗，請稍後再試',
+        }, 503);
+      }
+
+      const rollup = marketJsonObject(rollupResult.data);
+      const rollupArray = (key: string) => (
+        Array.isArray(rollup[key])
+          ? (rollup[key] as unknown[]).filter(item => item && typeof item === 'object')
+            .map(item => item as Record<string, unknown>)
+          : []
+      );
+      const rollupValues = (value: unknown, includeNulls = true) => {
+        const raw = marketJsonObject(value);
+        return Object.fromEntries(measures.flatMap(measure => {
+          const numeric = marketNumeric(raw[measure]);
+          return includeNulls || numeric !== null ? [[measure, numeric] as const] : [];
+        }));
+      };
+      const rollupDimensions = (value: unknown) => {
+        const raw = marketJsonObject(value);
+        return Object.fromEntries(dimensions.map(key => [key, text(raw[key], 160) || '未分類']));
+      };
+      const counts = marketJsonObject(rollup.counts);
+      const currentCount = Math.max(0, Math.round(Number(counts.current) || 0));
+      const compareCount = Math.max(0, Math.round(Number(counts.compare) || 0));
+      const current = rollupArray('current_groups').map(row => ({
+        dimensions: rollupDimensions(row.dimensions),
+        values: rollupValues(row.values),
+      }));
+      const comparison = rollupArray('compare_groups').map(row => ({
+        dimensions: rollupDimensions(row.dimensions),
+        values: rollupValues(row.values),
+      }));
+      const marketGroupKey = (row: MarketAggregate) => JSON.stringify(dimensions.map(key => row.dimensions[key] || '未分類'));
+      const compareByKey = new Map(comparison.map(row => [marketGroupKey(row), row]));
+      const currentGroupKeys = new Set(current.map(marketGroupKey));
+      const rows = current.map(row => {
+        const key = marketGroupKey(row);
+        const other = compareByKey.get(key);
+        const values: Record<string, number | null> = {};
+        const compareValues: Record<string, number | null> = {};
+        const changes: Record<string, number | null> = {};
+        measures.forEach(measure => {
+          const currentValue = row.values[measure] ?? null;
+          const compareValue = other?.values[measure] ?? null;
+          values[measure] = currentValue;
+          compareValues[measure] = compareValue;
+          changes[measure] = currentValue !== null && compareValue !== null ? currentValue - compareValue : null;
+        });
+        return { dimensions: row.dimensions, values, compare_values: compareValues, changes, current_count: currentCount, compare_count: compareCount };
+      });
+      comparison.forEach(row => {
+        const key = marketGroupKey(row);
+        if (currentGroupKeys.has(key)) return;
+        rows.push({
+          dimensions: row.dimensions,
+          values: {},
+          compare_values: rollupValues(row.values),
+          changes: {},
+          current_count: currentCount,
+          compare_count: compareCount,
+        });
+      });
+      const rankMeasure = measures[0];
+      rows.sort((left, right) => Math.max(Math.abs(Number(right.values[rankMeasure]) || 0), Math.abs(Number(right.compare_values[rankMeasure]) || 0))
+        - Math.max(Math.abs(Number(left.values[rankMeasure]) || 0), Math.abs(Number(left.compare_values[rankMeasure]) || 0)));
+      const totalGroupCount = rows.length;
+      const returnedGroupCount = Math.min(totalGroupCount, 500);
+      const groupsTruncated = returnedGroupCount < totalGroupCount;
+      const totalsCurrent = rollupValues(rollup.current_totals, false);
+      const totalsCompare = rollupValues(rollup.compare_totals, false);
+
+      const marketSummary = dimensionKeys.includes('market')
+        ? (() => {
+          const currentByMarket = rollupArray('current_market').map(row => ({
+            market: text(row.market, 160) || '未分類市場',
+            values: rollupValues(row.values, false),
+          }));
+          const compareByMarket = new Map(rollupArray('compare_market').map(row => [
+            text(row.market, 160) || '未分類市場',
+            rollupValues(row.values, false),
+          ]));
+          const currentMarkets = new Set(currentByMarket.map(row => row.market));
+          const result = currentByMarket.map(row => ({
+            market: row.market,
+            values: row.values,
+            compare_values: compareByMarket.get(row.market) || {},
+          }));
+          compareByMarket.forEach((values, market) => {
+            if (!currentMarkets.has(market)) result.push({ market, values: {}, compare_values: values });
+          });
+          return result;
+        })()
+        : [];
+
+      const dailyValues = (key: string) => new Map<string, Record<string, number | null>>(
+        rollupArray(key).flatMap(row => {
+          const observedOn = text(row.observed_on, 10);
+          return validISODate(observedOn) ? [[observedOn, rollupValues(row.values)] as const] : [];
+        }),
+      );
+      const currentDaily = dailyValues('current_daily');
+      const compareDaily = dailyValues('compare_daily');
+      const emptyValues = () => Object.fromEntries(measures.map(measure => [measure, null]));
+      // 圖表以「區間第 N 天」對齊；沒有交易資料的日期保留 null，不補成 0。
+      const series = Array.from({ length: rangeDays }, (_, offset) => {
+        const observedOn = dashboardMarketShiftDate(from, offset);
+        const candidateCompareOn = dashboardMarketShiftDate(compareFrom, offset);
+        const compareObservedOn = candidateCompareOn <= compareTo ? candidateCompareOn : null;
+        return {
+          observed_on: observedOn,
+          compare_observed_on: compareObservedOn,
+          values: currentDaily.get(observedOn) || emptyValues(),
+          compare_values: compareObservedOn ? compareDaily.get(compareObservedOn) || emptyValues() : emptyValues(),
+        };
+      });
+      const latestCandidate = text(rollup.latest_observed_on, 10);
+      const latestObservedOn = validISODate(latestCandidate) ? latestCandidate : null;
+      const totalsChanges = Object.fromEntries(measures.map(measure => {
+        const currentValue = totalsCurrent[measure];
+        const compareValue = totalsCompare[measure];
+        return [
+          measure,
+          currentValue !== null && currentValue !== undefined
+            && compareValue !== null && compareValue !== undefined
+            && Number.isFinite(currentValue) && Number.isFinite(compareValue)
+            ? currentValue - compareValue
+            : null,
+        ];
+      }));
+      return reply(req, { ok: true, data: {
+        source: { source_id: source.source_id, source_code: source.source_code, source_name: source.source_name }, filters,
+        fields, dimensions, measures, periods: { from, to, compare_from: compareFrom, compare_to: compareTo },
+        totals: { values: totalsCurrent, compare_values: totalsCompare, changes: totalsChanges },
+        counts: { current: currentCount, compare: compareCount },
+        quality: {
+          latest_observed_on: latestObservedOn,
+          current_loaded_count: currentCount,
+          compare_loaded_count: compareCount,
+          is_truncated: false,
+          total_group_count: totalGroupCount,
+          returned_group_count: returnedGroupCount,
+          groups_truncated: groupsTruncated,
+        },
+        series, market_summary: marketSummary,
+        rows: rows.slice(0, returnedGroupCount),
+      } });
+    }
+
+    if (action === 'market_simulation_list') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const sourceResult = await admin.from('market_data_sources').select('source_id,source_code,config').eq('status', 'active');
+      if (sourceResult.error) return reply(req, { ok: false, message: '市場行情來源暫時無法讀取' }, 503);
+      const decisionSourceIds = (sourceResult.data || []).filter(source => source.source_code !== 'market_demo'
+        && marketJsonObject(source.config).is_demo !== true).map(source => String(source.source_id));
+      if (!decisionSourceIds.length) return reply(req, { ok: true, data: [] });
+      let query = admin.from('market_simulation_runs')
+        .select('simulation_id,name,source_id,period_from,period_to,base_totals,assumptions,projected_totals,created_by,created_at,status')
+        .in('source_id', decisionSourceIds).order('created_at', { ascending: false }).limit(50);
+      if (!canManageMarket) query = query.eq('created_by', profile.user_id);
+      const result = await query;
+      if (result.error) {
+        console.error('market simulation list failed:', result.error.message);
+        return reply(req, { ok: false, message: '市場模擬紀錄尚未完成設定，請先套用市場模擬資料庫腳本' }, 503);
+      }
+      return reply(req, { ok: true, data: result.data || [] });
+    }
+
+    if (action === 'market_simulation_save') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      const name = text(body.name, 120);
+      const sourceId = id(body.source_id);
+      const periodFrom = text(body.period_from, 10);
+      const periodTo = text(body.period_to, 10);
+      if (!name) return reply(req, { ok: false, message: '請輸入模擬情境名稱' }, 400);
+      if (!sourceId) return reply(req, { ok: false, message: '請選擇有效的市場行情資料來源' }, 400);
+      if (!validISODate(periodFrom) || !validISODate(periodTo) || periodFrom > periodTo) {
+        return reply(req, { ok: false, message: '模擬期間起訖日期不正確，請使用 YYYY-MM-DD' }, 400);
+      }
+      const rangeDays = Math.round((Date.parse(`${periodTo}T00:00:00Z`) - Date.parse(`${periodFrom}T00:00:00Z`)) / 86400000) + 1;
+      if (rangeDays > 366) return reply(req, { ok: false, message: '單次模擬期間最多 366 天' }, 400);
+      const baseTotals = marketSimulationJsonObject(body.base_totals);
+      const assumptions = marketSimulationJsonObject(body.assumptions);
+      const projectedTotals = marketSimulationJsonObject(body.projected_totals);
+      if (!baseTotals || !assumptions || !projectedTotals) {
+        return reply(req, { ok: false, message: '基準合計、模擬假設與推估合計必須是有效的資料物件，且單項不得超過 100 KB' }, 400);
+      }
+      const sourceResult = await admin.from('market_data_sources').select('source_id').eq('source_id', sourceId).maybeSingle();
+      if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到指定的市場行情資料來源' }, 404);
+      const status = body.status === 'draft' ? 'draft' : 'completed';
+      const result = await admin.from('market_simulation_runs').insert({
+        name, source_id: sourceId, period_from: periodFrom, period_to: periodTo,
+        base_totals: baseTotals, assumptions, projected_totals: projectedTotals,
+        created_by: profile.user_id, status,
+      }).select('simulation_id,name,source_id,period_from,period_to,base_totals,assumptions,projected_totals,created_by,created_at,status').single();
+      if (result.error || !result.data) return reply(req, { ok: false, message: dbMessage(result.error, '市場模擬紀錄儲存失敗') }, 400);
+      await writeAudit(admin, profile.user_id, 'market_simulation_runs', String(result.data.simulation_id), 'insert', null, result.data);
+      return reply(req, { ok: true, data: result.data });
+    }
+
+    if (action === 'market_source_save') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以修改資料來源' }, 403);
+      const sourceId = id(body.source_id);
+      const sourceCode = text(body.source_code, 60).toLowerCase();
+      const sourceName = text(body.source_name, 120);
+      const sourceType = text(body.source_type, 20) || 'manual';
+      let fields = marketFieldDefinitions(body.field_definitions);
+      if (!/^[a-z][a-z0-9_-]{1,59}$/.test(sourceCode) || !sourceName) return reply(req, { ok: false, message: '資料來源代碼與名稱不可空白，代碼需使用英文字母、數字、底線或連字號' }, 400);
+      if (!['manual', 'csv', 'json', 'api'].includes(sourceType)) return reply(req, { ok: false, message: '資料來源類型不正確' }, 400);
+      if (!fields.some(field => field.kind === 'dimension') || !fields.some(field => field.kind === 'measure')) return reply(req, { ok: false, message: '資料來源至少需要一個分類欄位與一個數值欄位' }, 400);
+      const fieldKeys = fields.map(field => field.key);
+      if (new Set(fieldKeys).size !== fieldKeys.length) return reply(req, { ok: false, message: '欄位代碼不可重複，請合併或重新命名重複欄位' }, 400);
+      const measureKeys = new Set(fields.filter(field => field.kind === 'measure').map(field => field.key));
+      const invalidWeightedField = fields.find(field => field.aggregation === 'weighted_avg'
+        && (!field.weight_key || field.weight_key === field.key || !measureKeys.has(field.weight_key)));
+      if (invalidWeightedField) return reply(req, { ok: false, message: `「${invalidWeightedField.label}」使用加權平均時，必須指定另一個已定義的數值欄位作為權重` }, 400);
+      if (sourceId) {
+        const currentSource = await admin.from('market_data_sources').select('field_definitions').eq('source_id', sourceId).maybeSingle();
+        if (currentSource.error || !currentSource.data) return reply(req, { ok: false, message: '找不到要更新的市場行情資料來源' }, 404);
+        const currentFields = new Map(marketFieldDefinitions(currentSource.data.field_definitions).map(field => [field.key, field]));
+        fields = fields.map(field => {
+          const current = currentFields.get(field.key);
+          return {
+            ...field,
+            hidden: field.hidden ?? current?.hidden,
+            filterable: field.filterable ?? current?.filterable,
+          };
+        });
+      }
+      const payload: Record<string, unknown> = { source_code: sourceCode, source_name: sourceName, source_type: sourceType, endpoint_url: text(body.endpoint_url, 500) || null, field_definitions: fields, status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
+      // 更新時若前端沒有送 config，保留資料庫中的既有設定；只有明確送出
+      // config 才覆寫。新增來源仍以空物件作為安全預設值。
+      if (!sourceId || Object.prototype.hasOwnProperty.call(body, 'config')) payload.config = marketJsonObject(body.config);
+      const result = sourceId
+        ? await admin.from('market_data_sources').update(payload).eq('source_id', sourceId).select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').maybeSingle()
+        : await admin.from('market_data_sources').insert({ ...payload, created_by: profile.user_id }).select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').single();
+      if (result.error || !result.data) return reply(req, { ok: false, message: dbMessage(result.error, '資料來源儲存失敗') }, 400);
+      await writeAudit(admin, profile.user_id, 'market_data_sources', String(result.data.source_id), sourceId ? 'update' : 'insert', null, result.data);
+      return reply(req, { ok: true, data: result.data });
+    }
+
+    if (action === 'market_template_save') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以修改分析模板' }, 403);
+      const templateId = id(body.template_id);
+      const templateCode = text(body.template_code, 60).toLowerCase();
+      const templateName = text(body.template_name, 120);
+      const dimensions: string[] = Array.isArray(body.dimensions) ? body.dimensions.map((value: unknown) => text(value, 60).toLowerCase()).filter((value: string) => Boolean(value)).slice(0, 8) : [];
+      const measures: string[] = Array.isArray(body.measures) ? body.measures.map((value: unknown) => text(value, 60).toLowerCase()).filter((value: string) => Boolean(value)).slice(0, 8) : [];
+      const chartType = ['bar', 'pie', 'doughnut', 'line', 'area', 'table', 'cards'].includes(text(body.chart_type, 20)) ? text(body.chart_type, 20) : 'bar';
+      if (!/^[a-z][a-z0-9_-]{1,59}$/.test(templateCode) || !templateName || !measures.length) return reply(req, { ok: false, message: '模板代碼、名稱與至少一個分析指標為必填' }, 400);
+      const sourceId = id(body.source_id) || null;
+      if (sourceId) {
+        const sourceResult = await admin.from('market_data_sources').select('field_definitions').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+        if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到模板使用的市場行情資料來源' }, 404);
+        const sourceFields = marketFieldDefinitions(sourceResult.data.field_definitions);
+        const visibleDimensionKeys = new Set(sourceFields.filter(field => field.kind === 'dimension' && field.hidden !== true).map(field => field.key));
+        const sourceMeasureKeys = new Set(sourceFields.filter(field => field.kind === 'measure').map(field => field.key));
+        if (dimensions.some(key => !visibleDimensionKeys.has(key))) return reply(req, { ok: false, message: '模板包含不存在或不可顯示的分析維度，請重新選擇' }, 400);
+        if (measures.some(key => !sourceMeasureKeys.has(key))) return reply(req, { ok: false, message: '模板包含不存在的分析指標，請重新選擇' }, 400);
+      }
+      const payload = { template_code: templateCode, template_name: templateName, description: text(body.description, 500) || null, source_id: sourceId, dimensions, measures, chart_type: chartType, default_config: marketJsonObject(body.default_config), status: body.status === 'inactive' ? 'inactive' : 'active', updated_at: new Date().toISOString() };
+      const result = templateId
+        ? await admin.from('market_analysis_templates').update(payload).eq('template_id', templateId).select('template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status,updated_at').maybeSingle()
+        : await admin.from('market_analysis_templates').insert({ ...payload, created_by: profile.user_id }).select('template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status,updated_at').single();
+      if (result.error || !result.data) return reply(req, { ok: false, message: dbMessage(result.error, '分析模板儲存失敗') }, 400);
+      await writeAudit(admin, profile.user_id, 'market_analysis_templates', String(result.data.template_id), templateId ? 'update' : 'insert', null, result.data);
+      return reply(req, { ok: true, data: result.data });
+    }
+
+    if (action === 'market_import_rows') {
+      const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
+      if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以匯入行情資料' }, 403);
+      const sourceId = id(body.source_id);
+      const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions,config').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
+      if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可匯入的資料來源' }, 404);
+      const fields = marketFieldDefinitions(sourceResult.data.field_definitions);
+      const dimensions = fields.filter(field => field.kind === 'dimension');
+      const measures = fields.filter(field => field.kind === 'measure');
+      const dimensionKeys = new Set(dimensions.map(field => field.key));
+      const sourceConfig = marketJsonObject((sourceResult.data as unknown as Record<string, unknown>).config);
+      const configuredNaturalKeys = Array.isArray(sourceConfig.natural_key_fields)
+        ? (sourceConfig.natural_key_fields as unknown[]).map(value => text(value, 60)).filter(key => dimensionKeys.has(key))
+        : [];
+      const naturalKeyFields = configuredNaturalKeys.length ? [...new Set(configuredNaturalKeys)] : dimensions.map(field => field.key);
+      const inputRows: unknown[] = Array.isArray(body.rows) ? body.rows : [];
+      if (!inputRows.length) return reply(req, { ok: false, message: '沒有可匯入的資料列' }, 400);
+      if (inputRows.length > 2000) return reply(req, { ok: false, message: '單次最多匯入 2,000 筆行情資料；為避免漏匯，請將檔案分批後再試。' }, 413);
+      let rows: Array<Record<string, unknown>>;
+      try {
+        rows = await Promise.all(inputRows.map(async (item: unknown, index: number) => {
+          const row = marketJsonObject(item);
+          const observedOn = text(row.observed_on, 10);
+          if (!validISODate(observedOn)) throw new Error(`第 ${index + 1} 列日期格式不正確`);
+          const rawDimensions = marketJsonObject(row.dimensions), rawMeasures = marketJsonObject(row.measures);
+          const normalizedDimensions = Object.fromEntries(dimensions.map(field => [field.key, text(rawDimensions[field.key], 200)]).filter(([, value]) => value));
+          const normalizedMeasures: Record<string, number> = {};
+          measures.forEach(field => { const value = marketNumeric(rawMeasures[field.key]); if (value !== null) normalizedMeasures[field.key] = value; });
+          const requiredMissing = dimensions.filter(field => field.required && !normalizedDimensions[field.key]);
+          if (requiredMissing.length) throw new Error(`第 ${index + 1} 列缺少${requiredMissing.map(field => field.label).join('、')}`);
+          const externalKey = text(row.external_key, 200) || await marketImportExternalKey(sourceId, observedOn, normalizedDimensions, naturalKeyFields);
+          return { observed_on: observedOn, dimensions: normalizedDimensions, measures: normalizedMeasures, metadata: marketJsonObject(row.metadata), external_key: externalKey };
+        }));
+        const keyRows = new Map<string, number>();
+        rows.forEach((row, index) => {
+          const key = String(row.external_key);
+          const previousIndex = keyRows.get(key);
+          if (previousIndex !== undefined) throw new Error(`同一批第 ${previousIndex + 1} 列與第 ${index + 1} 列的日期及分類欄位重複；請先合併該筆行情後再匯入。`);
+          keyRows.set(key, index);
+        });
+        const result = await admin.rpc('market_import_data_points', { p_source_id: sourceId, p_rows: rows, p_imported_by: profile.user_id });
+        if (result.error) return reply(req, { ok: false, message: dbMessage(result.error, '行情資料匯入失敗') }, 400);
+        const counts = Array.isArray(result.data) ? result.data[0] as Record<string, unknown> | undefined : undefined;
+        const inserted = Number(counts?.inserted_count) || 0;
+        const updated = Number(counts?.updated_count) || 0;
+        await writeAudit(admin, profile.user_id, 'market_data_points', sourceId, 'insert', null, { inserted, updated, row_count: rows.length });
+        return reply(req, { ok: true, data: { imported: inserted + updated, inserted, updated } });
+      } catch (error) {
+        return reply(req, { ok: false, message: error instanceof Error ? error.message : '行情資料格式不正確' }, 400);
+      }
     }
 
     if (action === 'module_data') {
@@ -1219,7 +2535,8 @@ export async function handleAppApiRequest(req: Request) {
       const requestSnapshot = {
         request_id: requestId,
         req_no: reqNo,
-        source: 'app-api',
+        // V2 表單是直接通報；沿用 repair_requests 既有合法來源值。
+        source: 'direct',
         reporter: text(requestPayload.reporter, 100) || profile.name,
         phone: text(requestPayload.phone, 40) || null,
         department: text(requestPayload.department, 100) || text(profile.department, 100) || null,
@@ -1313,7 +2630,8 @@ export async function handleAppApiRequest(req: Request) {
       const requestRow = {
         request_id: requestId,
         req_no: reqNo,
-        source: 'app-api',
+        // V2 表單是直接通報；沿用 repair_requests 既有合法來源值。
+        source: 'direct',
         reporter: text(requestData.reporter, 100) || profile.name,
         phone: text(requestData.phone, 40) || null,
         department: text(requestData.department, 100) || text(profile.department, 100) || null,

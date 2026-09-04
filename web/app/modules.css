@@ -24,7 +24,46 @@
 .module-hero{background:linear-gradient(120deg,color-mix(in srgb,var(--icon-sky) 12%,transparent),var(--panel))}
 .module-hero span{color:var(--icon-sky-text)}
 
-/* 49 個子系統共用桌面圖卡尺寸；窄版由斷點恢復彈性寬度。 */
+/* 54 個子系統共用桌面圖卡尺寸；窄版由斷點恢復彈性寬度。 */
 .module-grid{grid-template-columns:repeat(3,269px);justify-content:center}
 .module-grid a{width:269px;height:200px;min-height:200px}
 @media(max-width:1100px){.module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.module-grid a{width:auto}}
+
+/* 54 個子系統共用的手機頁首操作列：說明與操作按鈕優先同列靠上，
+   空間不足時以 flex-wrap 自動換行，避免按鈕壓住文字或造成水平溢出。 */
+@media(max-width:760px){
+  .page-actions{
+    flex-direction:row;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .page-actions>div:first-child{
+    min-width:0;
+    flex:1 1 140px;
+  }
+  .page-actions>div:first-child p{
+    margin:0;
+    line-height:1.45;
+  }
+  .page-actions>div:last-child,
+  .page-actions>.action-cluster,
+  .page-actions>button{
+    min-width:0;
+    flex:0 1 auto;
+  }
+  .page-actions>div:last-child,
+  .page-actions>.action-cluster{
+    width:auto;
+    justify-content:flex-end;
+    margin-left:auto;
+  }
+  .page-actions>div:last-child button,
+  .page-actions>div:last-child a,
+  .page-actions>.action-cluster button,
+  .page-actions>.action-cluster a,
+  .page-actions>button{
+    white-space:nowrap;
+  }
+}

@@ -290,8 +290,12 @@ async function writeSignedProvenance() {
   const publicKey = await readFile(publicKeySource, 'utf8');
   await writeFile(path.join(outputRoot, 'provenance-public-key.pem'), publicKey, 'utf8');
 
+  // .nojekyll 是給舊版 gh-pages 分支部署看的空標記檔；GitHub 的
+  // actions/upload-pages-artifact 在打包給 Actions 式 Pages 部署時會把它拿掉
+  // （這種部署本來就不會跑 Jekyll，不需要它），所以清單裡列了它、產物裡卻找不到，
+  // 會讓內網同步腳本的雜湊驗證卡住。此檔案本身沒有安全或功能意義，直接排除追蹤。
   const files = (await listFiles(outputRoot))
-    .filter((file) => !['provenance.json', 'provenance.sig'].includes(path.basename(file)));
+    .filter((file) => !['provenance.json', 'provenance.sig', '.nojekyll'].includes(path.basename(file)));
   const entries = [];
   for (const file of files) {
     entries.push({

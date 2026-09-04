@@ -341,6 +341,51 @@
   image-rendering: pixelated;
 }
 
+.v1list-qr-body .nfc-url-label {
+  margin-top: 14px;
+  color: var(--dim);
+  font-size: .7rem;
+  text-align: left;
+}
+
+.v1list-qr-body .nfc-url {
+  display: block;
+  margin-top: 4px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .66rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: left;
+  user-select: all;
+}
+
+.v1list-qr-body .nfc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.v1list-qr-body .nfc-actions .mini { margin: 0; }
+
+.v1list-qr-body .nfc-message,
+.v1list-qr-body .nfc-help {
+  margin: 9px 0 0;
+  color: var(--dim);
+  font-size: .68rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.v1list-qr-body .nfc-message.success { color: var(--green); }
+.v1list-qr-body .nfc-message.error { color: var(--red); }
+
 @media (prefers-reduced-motion: reduce) {
   .v1list-floor-head .caret,
   .v1list-row { transition: none; }

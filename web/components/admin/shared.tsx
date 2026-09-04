@@ -9,32 +9,48 @@ export type AdminProps = { profile: Profile; module: ModuleDefinition };
 export type AdminAction = { action: string; [key: string]: unknown };
 export const PAGE_SIZE = 10;
 export const ROLE_LABELS: Record<string, string> = {
-  reporter: '一般報修人員', duty: '值班人員', dispatcher: '派工管理員', technician: '維修技術人員',
+  // 角色名稱以 roles.name 為準；這裡只作為資料載入失敗或舊資料的備援。
+  reporter: '一般使用者', duty: '值班人員', dispatcher: '派工管理員', technician: '維修技術人員',
   unit_supervisor: '單位主管', mgmt_supervisor: '管理部主管（已停用）', sysadmin: '系統管理員',
 };
+export function roleLabel(value: unknown, roles?: ReadonlyArray<Row>) {
+  const roleId = String(value || '');
+  const configuredName = roles?.find(role => String(role.role_id) === roleId)?.name;
+  return String(configuredName || ROLE_LABELS[roleId] || roleId || '—');
+}
 export const PERMISSIONS = [
   ['create', '新增'], ['update', '修改'], ['delete', '刪除'], ['read', '查詢'], ['dispatch', '派工'],
-  ['close', '結案'], ['sign', '簽核'], ['export', '匯出'], ['admin', '後台管理'],
+  ['close', '結案'], ['sign', '簽核'], ['export', '匯出'], ['admin', '後台管理'], ['marketanalytics_manage', '市場分析資料管理'],
 ] as const;
 export const SYSTEM_PERMISSIONS = [
   ['sys_admin', '後台管理'], ['sys_workorder', '報修／派工／完工'], ['sys_guardpatrol', '駐衛警巡檢'],
   ['sys_handover', '電子交接簿'], ['sys_equipment', '設備建置'], ['sys_structuremap', '設備圖臺'],
-  ['sys_equipment_manage', '設備與圖臺管理'], ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'], ['sys_officialdocs', '公文傳送'],
+  ['sys_equipment_manage', '設備與圖臺管理'], ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'], ['sys_officialdocs', '公文傳送'], ['sys_marketanalytics', '市場營運分析'], ['sys_dashboard', '戰情儀表板'], ['sys_marketboard', '市場公開看板'],
 ] as const;
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
   const raw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error) ? String((error as Record<string, unknown>).message) : String(error || '');
-  if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(raw)) return '目前帳號沒有執行此操作的權限';
-  if (/duplicate|unique/i.test(raw)) return '資料已存在，請勿重複建立';
-  if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(raw)) return '網路連線失敗，請確認連線後再試';
-  if (/jwt.*expired|token.*expired|invalid.*jwt|invalid.*token|auth session missing|refresh.*token/i.test(raw)) return '登入已過期，請重新登入';
-  if (/not authenticated|unauthorized|尚未登入|未登入|登入狀態無效/i.test(raw)) return '無法確認登入狀態，請重新登入';
-  if (/timeout|timed out|gateway timeout/i.test(raw)) return '系統回應逾時，請稍後再試';
-  if (/rate limit|too many requests|security purposes.*seconds/i.test(raw)) return '操作過於頻繁，請稍後再試';
-  if (/foreign key|violates.*reference/i.test(raw)) return '關聯資料不完整，無法完成操作';
-  if (/not-null|null value|required|cannot be blank/i.test(raw)) return '請完整填寫必填欄位';
-  if (/check constraint|invalid input|invalid format|malformed/i.test(raw)) return '輸入資料格式不正確';
-  return raw || fallback;
+  // Edge Function 的錯誤外層標籤不應直接顯示給使用者；保留真正的業務訊息，
+  // 讓「預計出發時間已過」等繁中訊息能正常呈現。
+  const message = raw.replace(/^\s*(?:Edge Function|Function)\s*(?:失敗|錯誤|failed|error)\s*[:：-]?\s*/i, '').trim();
+  if (/row-level security|permission denied|沒有.*權限|無操作權限/i.test(message)) return '目前帳號沒有執行此操作的權限';
+  if (/duplicate|unique/i.test(message)) return '資料已存在，請勿重複建立';
+  // 排除約束（同一資源的時段重疊）不屬於 unique，先前會一路掉到最後的通用備援
+  // 「操作失敗，請稍後再試」，讓使用者誤以為是暫時性故障而重試。
+  if (/exclusion constraint|23P01/i.test(message)) return '所選時段與現有安排重疊，請改選其他時段或資源';
+  if (/failed to fetch|network\s*error|network request failed|load failed|fetch failed/i.test(message)) return '網路連線失敗，請確認連線後再試';
+  if (/jwt.*expired|token.*expired|invalid.*jwt|invalid.*token|auth session missing|refresh.*token/i.test(message)) return '登入已過期，請重新登入';
+  if (/not authenticated|unauthorized|尚未登入|未登入|登入狀態無效/i.test(message)) return '無法確認登入狀態，請重新登入';
+  if (/timeout|timed out|gateway timeout/i.test(message)) return '系統回應逾時，請稍後再試';
+  if (/rate limit|too many requests|security purposes.*seconds/i.test(message)) return '操作過於頻繁，請稍後再試';
+  if (/foreign key|violates.*reference/i.test(message)) return '關聯資料不完整，無法完成操作';
+  if (/not-null|null value|required|cannot be blank/i.test(message)) return '請完整填寫必填欄位';
+  if (/check constraint|invalid input|invalid format|malformed|syntax.*type/i.test(message)) return '輸入資料格式不正確';
+  if (/not found|does not exist|no rows/i.test(message)) return '找不到相關資料，請重新整理後再試';
+  if (/edge function|internal server error|server error|unexpected error|unknown error/i.test(message)) return '系統服務暫時無法完成，請稍後再試';
+  // 未對應的純英文平台錯誤不要直接露出；資料內容若已有繁中則保留業務訊息。
+  if (message && !/[\u3400-\u9fff]/.test(message) && /^[\x20-\x7e\s]+$/.test(message)) return fallback;
+  return message || fallback;
 }
 export function fmt(value: unknown) {
   if (value == null || value === '') return '—';

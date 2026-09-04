@@ -23,7 +23,10 @@ const SUPABASE_URL = requiredEnvironment('SUPABASE_URL');
 const SERVICE_ROLE_KEY = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
 const ANON_KEY = requiredEnvironment('SUPABASE_ANON_KEY');
 const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_supervisor', 'sysadmin']);
-const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom']);
+// Node.js 與 Edge Function 共用同一支處理器；前端會先檢查此版本，
+// 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
+const ADMIN_CONTRACT_VERSION = 2;
+const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'sys_dashboard', 'sys_marketboard', 'marketanalytics_manage']);
 const SAFE_SETTING_KEYS = new Set([
   'org_name', 'site_name', 'shifts', 'line_group_id', 'line_notify_anomaly', 'line_notify_repair',
   'line_notify_case', 'line_notify_security', 'line_notify_security_alerts', 'line_notify_error_threshold',
@@ -39,10 +42,12 @@ const FIXED_SHIFT_DEFAULTS = [
 ];
 const LEGACY_ROLE: Record<string, string> = { reporter: 'inspector', duty: 'maintenance', dispatcher: 'maintenance', technician: 'maintenance', unit_supervisor: 'supervisor', sysadmin: 'admin', inspector: 'inspector', maintenance: 'maintenance', supervisor: 'supervisor', admin: 'admin' };
 const allowedOrigins = new Set(['https://jnfakimo.github.io', 'http://localhost:3000', 'http://127.0.0.1:3000']);
+// 自架站常見於內網 IP（RFC1918）；放行反射 CORS，Bearer token 驗證仍是主要防線。
+const PRIVATE_NET_ORIGIN = /^https?:\/\/(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})(?::\d{1,5})?$/;
 
 function cors(req: Request) {
   const origin = req.headers.get('origin') || '';
-  return { 'Access-Control-Allow-Origin': allowedOrigins.has(origin) ? origin : 'https://jnfakimo.github.io', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
+  return { 'Access-Control-Allow-Origin': allowedOrigins.has(origin) || PRIVATE_NET_ORIGIN.test(origin) ? origin : 'https://jnfakimo.github.io', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
 }
 function reply(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors(req), 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -54,7 +59,20 @@ function dbMessage(error: { code?: string; message?: string } | null, fallback: 
   const code = String(error?.code || '');
   if (code === '23505') return '資料已存在，請勿重複提交';
   if (code === '23503') return '關聯資料不存在，請先確認相關資料';
-  if (code === '23514') return '資料不符合系統規則';
+  if (code === '23514') {
+    // 帳號階層觸發器會回傳已翻譯的業務訊息；保留它，讓管理員知道
+    // 是哪一位主管或哪一項指派不符合，而不是只看到無法處理的通用錯誤。
+    const message = clean(error?.message, 300);
+    const knownRule = [
+      '主管及系統管理員不可設定直屬主管', '啟用中的一般人員必須指定直屬主管',
+      '啟用中的一般人員必須指定直屬課室主管', '直屬主管必須是啟用中的帳號',
+      '直屬主管必須具備單位主管或系統管理員角色', '直屬主管必須具備課室主管或系統管理員角色',
+      '直屬主管必須位於人員所屬單位或其上層部／室', '直屬主管必須與人員屬於同一單位',
+      '這位主管底下還有', '此人原有', '接任主管不可設定為原主管本人',
+      '接任主管必須是另一位啟用中的單位主管或系統管理員', '接任主管無法管理全部原直屬人員',
+    ].find(prefix => message.includes(prefix));
+    return knownRule ? message : '資料不符合系統規則';
+  }
   if (code === '22P02') return '數值或格式不正確';
   if (code === '23502') return '缺少必填欄位';
   const message = clean(error?.message, 300);
@@ -126,7 +144,7 @@ export async function handleAdminApiRequest(req: Request) {
     const roleId = profile.rbac_role || (profile.role === 'admin' ? 'sysadmin' : profile.role);
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = clean(body.action, 50);
-    if (action !== 'admin_get_settings') {
+    if (!['admin_get_settings', 'admin_get_contract'].includes(action)) {
       const writeRate = await enforceDurableRateLimit(admin, req, {
         subject: authData.user.id,
         scope: 'admin-api:write',
@@ -162,13 +180,46 @@ export async function handleAdminApiRequest(req: Request) {
       const { data } = await admin.from('departments').select('name').eq('dept_id', deptId).maybeSingle();
       return data?.name || null;
     };
+    const supervisorWithinUnitHierarchy = async (memberDeptId: string | null, supervisorDeptId: string | null) => {
+      const supervisorId = id(supervisorDeptId);
+      let currentId = id(memberDeptId);
+      const seen = new Set<string>();
+      if (!supervisorId || !currentId) return true;
+      while (currentId && !seen.has(currentId)) {
+        if (currentId === supervisorId) return true;
+        seen.add(currentId);
+        const { data } = await admin.from('departments').select('parent_id').eq('dept_id', currentId).eq('status', 'active').maybeSingle();
+        currentId = id(data?.parent_id);
+      }
+      return false;
+    };
+    const secretaryReportsToDeputy = async (memberDeptId: string | null, supervisorDeptId: string | null) => {
+      const walkRoot = async (deptId: string | null) => {
+        let currentId = id(deptId);
+        const seen = new Set<string>();
+        let root: Record<string, unknown> | null = null;
+        while (currentId && !seen.has(currentId)) {
+          seen.add(currentId);
+          const { data } = await admin.from('departments').select('parent_id,code,name').eq('dept_id', currentId).eq('status', 'active').maybeSingle();
+          if (!data) break;
+          root = data as Record<string, unknown>;
+          currentId = id(data.parent_id);
+        }
+        return root;
+      };
+      const memberRoot = await walkRoot(memberDeptId), supervisorRoot = await walkRoot(supervisorDeptId);
+      const rootCode = (row: Record<string, unknown> | null) => clean(row?.code, 40).toUpperCase();
+      const rootName = (row: Record<string, unknown> | null) => clean(row?.name, 100).replace(/\s+/g, '');
+      return (rootCode(memberRoot) === 'SECRE' || rootName(memberRoot) === '秘書室')
+        && (rootCode(supervisorRoot) === 'VGM' || ['副總經理', '副總經理室'].includes(rootName(supervisorRoot)));
+    };
     const roleExists = async (rbacRole: string) => {
       const { data } = await admin.from('roles').select('role_id').eq('role_id', rbacRole).maybeSingle();
       return Boolean(data);
     };
     const validateSupervisor = async (supervisorId: string | null, deptId: string | null, rbacRole: string, targetUserId = '') => {
       if (['unit_supervisor', 'sysadmin'].includes(rbacRole)) return { supervisorId: null, message: '' };
-      if (!supervisorId) return { supervisorId: null, message: '一般人員必須指定直屬課室主管' };
+      if (!supervisorId) return { supervisorId: null, message: '一般人員必須指定直屬主管' };
       if (supervisorId === targetUserId) return { supervisorId: null, message: '直屬主管不可設定為本人' };
       const { data: supervisor } = await admin.from('users')
         .select('user_id,dept_id,role,rbac_role,status')
@@ -177,11 +228,17 @@ export async function handleAdminApiRequest(req: Request) {
       if (!supervisor || !['unit_supervisor', 'sysadmin'].includes(String(supervisorRole || ''))) {
         return { supervisorId: null, message: '直屬主管必須是啟用中的單位主管或系統管理員' };
       }
-      if (supervisorRole !== 'sysadmin' && deptId && supervisor.dept_id !== deptId) {
-        return { supervisorId: null, message: '一般人員與直屬課室主管必須屬於同一單位' };
+      if (supervisorRole !== 'sysadmin' && deptId && supervisor.dept_id
+        && !(await supervisorWithinUnitHierarchy(deptId, supervisor.dept_id))
+        && !(await secretaryReportsToDeputy(deptId, supervisor.dept_id))) {
+        return { supervisorId: null, message: '直屬主管必須位於人員所屬單位或其上層部／室' };
       }
       return { supervisorId, message: '' };
     };
+
+    if (action === 'admin_get_contract') {
+      return reply(req, { ok: true, data: { contract_version: ADMIN_CONTRACT_VERSION } });
+    }
 
     if (action === 'admin_get_settings') {
       const keys = [...SAFE_SETTING_KEYS, 'line_channel_token'];
@@ -388,11 +445,9 @@ export async function handleAdminApiRequest(req: Request) {
         return reply(req, { ok: false, message: '登入帳號或電子郵件已存在，無法核准此申請' }, 409);
       }
 
-      // bcrypt（Supabase Auth 的預設密碼雜湊）只處理前 72 bytes；兩組完整
-      // UUID 以連字號串接會剛好變成 73 字元，導致核准帳號時只回傳
-      // 「Auth 帳號建立失敗：Internal Server Error」。臨時密碼只供建立帳號，
-      // 使用者仍會透過啟用連結設定正式密碼，因此保留隨機性並控制在上限內。
-      const temporaryPassword = `P0!${crypto.randomUUID()}${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}A1`;
+      // 帳號核准時先建立一組測試用 8 位數臨時密碼，使用者仍可透過啟用連結
+      // 設定正式密碼。以密碼學亂數取樣，避免批次核准時重複。
+      const temporaryPassword = Array.from(crypto.getRandomValues(new Uint8Array(8)), value => String(value % 10)).join('');
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email: application.email, password: temporaryPassword, email_confirm: true,
         user_metadata: { name: application.name, username: application.username },
@@ -452,6 +507,53 @@ export async function handleAdminApiRequest(req: Request) {
       return reply(req, { ok: true, message: '帳號申請已退回' });
     }
 
+    if (action === 'admin_create_users_batch') {
+      const source = Array.isArray(body.rows) ? body.rows : [];
+      if (!source.length) return reply(req, { ok: false, message: '沒有可匯入的人員資料' }, 400);
+      if (source.length > 200) return reply(req, { ok: false, message: '單次最多匯入 200 筆人員資料' }, 400);
+      const { data: existing, error: existingError } = await admin.from('users').select('username,email').limit(5000);
+      if (existingError) return reply(req, { ok: false, message: dbMessage(existingError, '人員資料載入失敗') }, 400);
+      const existingUsernames = new Set((existing || []).map(row => clean(row.username, 64).toLowerCase()));
+      const existingEmails = new Set((existing || []).map(row => clean(row.email, 200).toLowerCase()));
+      const details: string[] = [], createdUsernames: string[] = [];
+      let success = 0, skipped = 0, failed = 0;
+      const addFailure = (rowNumber: number, username: string, message: string) => {
+        details.push(`第 ${rowNumber} 列「${username || '未命名'}」：${message}`);
+        failed += 1;
+      };
+      for (const [index, raw] of source.entries()) {
+        const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+        const rowNumber = Number.isInteger(Number(row.row_number)) && Number(row.row_number) > 0 ? Number(row.row_number) : index + 2;
+        const name = clean(row.name, 100), username = clean(row.username, 64), email = clean(row.email, 200).toLowerCase();
+        const phone = clean(row.phone, 50), deptId = id(row.dept_id) || null, rbacRole = clean(row.rbac_role, 40);
+        const supervisorId = id(row.supervisor_id) || null, password = String(row.password || '');
+        if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) { addFailure(rowNumber, username, '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號'); continue; }
+        if (!/^\S+@\S+\.\S+$/.test(email) || /[(),]/.test(email)) { addFailure(rowNumber, username, '電子郵件格式不正確'); continue; }
+        if (existingUsernames.has(username.toLowerCase()) || existingEmails.has(email)) { details.push(`第 ${rowNumber} 列「${username}」：帳號或電子郵件已存在，已跳過`); skipped += 1; continue; }
+        const passwordError = passwordPolicyMessage(password);
+        if (passwordError) { addFailure(rowNumber, username, `初始${passwordError}`); continue; }
+        if (!ROLES.has(rbacRole) && !(await roleExists(rbacRole))) { addFailure(rowNumber, username, '系統角色設定無效'); continue; }
+        const supervisorValidation = await validateSupervisor(supervisorId, deptId, rbacRole);
+        if (supervisorValidation.message) { addFailure(rowNumber, username, supervisorValidation.message); continue; }
+        const { data: created, error: createError } = await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { name, username } });
+        if (createError || !created.user) { addFailure(rowNumber, username, '登入帳號建立失敗，請確認電子郵件未被使用'); continue; }
+        const profileData = {
+          auth_id: created.user.id, name, username, email, phone: phone || null, dept_id: deptId,
+          department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector',
+          rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, permissions: {}, status: 'active', created_by: profile.user_id,
+        };
+        const { data: createdProfile, error: profileError } = await admin.from('users').insert(profileData).select('user_id').single();
+        if (profileError || !createdProfile) {
+          await admin.auth.admin.deleteUser(created.user.id);
+          addFailure(rowNumber, username, `人員主檔建立失敗：${dbMessage(profileError, '資料格式不符合規則')}`);
+          continue;
+        }
+        await audit('users', createdProfile.user_id, 'insert', { name, username, email, dept_id: deptId, rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, status: 'active', source: 'batch-import' });
+        existingUsernames.add(username.toLowerCase()); existingEmails.add(email); createdUsernames.push(username); success += 1;
+      }
+      return reply(req, { ok: true, data: { success, skipped, failed, details: details.slice(0, 200), created_usernames: createdUsernames }, message: `匯入完成：成功 ${success} 筆、略過 ${skipped} 筆、失敗 ${failed} 筆` });
+    }
+
     if (action === 'admin_create_user') {
       const name = clean(body.name, 100), username = clean(body.username, 64), email = clean(body.email, 200).toLowerCase(), phone = clean(body.phone, 50), password = String(body.password || ''), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
       if (!name || !/^[A-Za-z0-9._-]{3,64}$/.test(username)) return reply(req, { ok: false, message: '姓名必填；登入帳號須為 3–64 個英數字、句點、底線或連字號' }, 400);
@@ -467,13 +569,13 @@ export async function handleAdminApiRequest(req: Request) {
       if (createError || !created.user) return reply(req, { ok: false, message: `Auth 帳號建立失敗：${createError?.message || '未知錯誤'}` }, 400);
       const profileData = { auth_id: created.user.id, name, username, email, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, permissions: {}, status: 'active', created_by: profile.user_id };
       const { data, error } = await admin.from('users').insert(profileData).select('user_id').single();
-      if (error) { await admin.auth.admin.deleteUser(created.user.id); return reply(req, { ok: false, message: `人員主檔建立失敗：${error.message}` }, 400); }
+      if (error) { await admin.auth.admin.deleteUser(created.user.id); return reply(req, { ok: false, message: `人員主檔建立失敗：${dbMessage(error, '資料格式不符合規則')}` }, 400); }
       await audit('users', data.user_id, 'insert', { name, username, email, dept_id: deptId, rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId, status: 'active' });
       return reply(req, { ok: true, data });
     }
 
     if (action === 'admin_update_user') {
-      const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null;
+      const userId = id(body.user_id), name = clean(body.name, 100), username = clean(body.username, 64), phone = clean(body.phone, 50), rbacRole = clean(body.rbac_role, 40), deptId = id(body.dept_id) || null, supervisorId = id(body.supervisor_id) || null, replacementSupervisorId = id(body.replacement_supervisor_id) || null;
       if (!userId || !name || !/^[A-Za-z0-9._-]{3,64}$/.test(username) || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '人員資料或角色設定無效' }, 400);
       const { data: before } = await admin.from('users').select('user_id,auth_id,name,username,phone,dept_id,department,role,rbac_role,supervisor_id,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
@@ -483,25 +585,51 @@ export async function handleAdminApiRequest(req: Request) {
       // 更新前檢查 username 是否與其他使用者重複（排除自己），避免重名帳號。
       const { count: usernameCount } = await admin.from('users').select('*', { count: 'exact', head: true }).eq('username', username).neq('user_id', userId);
       if (Number(usernameCount || 0) > 0) return reply(req, { ok: false, message: '登入帳號已存在' }, 409);
-      // 更新姓名/電話不應清除個人權限覆寫（permissions 欄位保留原值）。
+      // 單位、課室及角色輪調必須與原直屬人員改派同一交易完成；若任一步不合法，
+      // PostgreSQL 會整筆回滾，避免只改到一半。個人 permissions 覆寫維持原值。
       const changes = { name, username, phone: phone || null, dept_id: deptId, department: await departmentName(deptId), role: LEGACY_ROLE[rbacRole] ?? 'inspector', rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId };
-      const { error } = await admin.from('users').update(changes).eq('user_id', userId);
+      const { data: rotation, error } = await admin.rpc('admin_rotate_user_assignment', {
+        p_user_id: userId, p_name: name, p_username: username, p_phone: phone,
+        p_dept_id: deptId, p_department: changes.department, p_role: changes.role,
+        p_rbac_role: rbacRole, p_supervisor_id: supervisorValidation.supervisorId,
+        p_replacement_supervisor_id: replacementSupervisorId,
+      });
       if (error) return reply(req, { ok: false, message: dbMessage(error, '人員資料更新失敗') }, 400);
       if (before.auth_id) {
         const { error: authError } = await admin.auth.admin.updateUserById(before.auth_id, { user_metadata: { name, username } });
         if (authError) console.warn('admin auth metadata sync failed:', authError.message);
       }
-      await audit('users', userId, 'update', { before, after: changes });
-      return reply(req, { ok: true });
+      const reassignedCount = Number((rotation as Record<string, unknown> | null)?.reassigned_count || 0);
+      await audit('users', userId, 'update', { before, after: changes, replacement_supervisor_id: replacementSupervisorId, reassigned_count: reassignedCount });
+      return reply(req, { ok: true, message: reassignedCount > 0 ? `人員資料已更新，並同步改派 ${reassignedCount} 位原直屬人員` : '人員資料已更新' });
     }
 
     if (action === 'admin_toggle_user') {
       const userId = id(body.user_id), nextStatus = status(body.status);
       if (!userId) return reply(req, { ok: false, message: '使用者識別碼無效' }, 400);
       if (userId === profile.user_id && nextStatus === 'inactive') return reply(req, { ok: false, message: '不可停用目前登入的管理員帳號' }, 400);
-      const { data: before } = await admin.from('users').select('user_id,name,status,auth_id').eq('user_id', userId).maybeSingle();
+      const { data: before } = await admin.from('users').select('user_id,name,status,auth_id,dept_id,supervisor_id,role,rbac_role').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
-      const { error } = await admin.from('users').update({ status: nextStatus }).eq('user_id', userId);
+      // 啟用前先用同一套主管規則檢查，避免只顯示資料庫約束錯誤；主管／系統
+      // 管理員若留有歷史 supervisor_id，啟用時一併清除，維持帳號階層一致。
+      const targetRole = String(before.rbac_role || (before.role === 'admin' ? 'sysadmin' : before.role === 'supervisor' ? 'unit_supervisor' : before.role === 'maintenance' ? 'technician' : before.role === 'inspector' ? 'reporter' : before.role) || 'reporter');
+      if (nextStatus === 'active') {
+        const supervisorValidation = await validateSupervisor(id(before.supervisor_id) || null, id(before.dept_id) || null, targetRole, userId);
+        if (supervisorValidation.message) return reply(req, { ok: false, message: `帳號啟用失敗：${supervisorValidation.message}` }, 400);
+      }
+      // 任何仍掛著這位帳號的啟用人員都會失去可用主管；先要求改派，
+      // 即使資料庫尚未套用主管異動觸發器也不會產生孤兒指派。
+      if (nextStatus === 'inactive') {
+        const { data: dependents, error: dependentError } = await admin.from('users')
+          .select('name').eq('supervisor_id', userId).eq('status', 'active').order('name').limit(200);
+        if (dependentError) return reply(req, { ok: false, message: '帳號狀態檢查失敗，請重新整理後再試' }, 400);
+        if ((dependents || []).length > 0) {
+          const names = (dependents || []).map(row => String(row.name || '')).filter(Boolean).join('、');
+          return reply(req, { ok: false, message: `無法停用：此帳號仍是 ${dependents?.length || 0} 位啟用人員的直屬主管（${names.slice(0, 200)}），請先改派其他主管` }, 409);
+        }
+      }
+      const changes = { status: nextStatus, ...(nextStatus === 'active' && ['unit_supervisor', 'sysadmin'].includes(targetRole) ? { supervisor_id: null } : {}) };
+      const { error } = await admin.from('users').update(changes).eq('user_id', userId);
       if (error) return reply(req, { ok: false, message: dbMessage(error, '帳號狀態更新失敗') }, 400);
       // 同步停用/啟用 Supabase Auth，確保離職/停用帳號無法再登入或延續既有 session。
       if (before.auth_id) {
@@ -567,9 +695,30 @@ export async function handleAdminApiRequest(req: Request) {
       const userId = id(body.user_id), rbacRole = clean(body.rbac_role, 40);
       if (!userId || (!ROLES.has(rbacRole) && !(await roleExists(rbacRole)))) return reply(req, { ok: false, message: '使用者或角色設定無效' }, 400);
       if (userId === profile.user_id) return reply(req, { ok: false, message: '不可變更目前登入管理員自己的角色' }, 400);
-      const { data: before } = await admin.from('users').select('rbac_role,role').eq('user_id', userId).maybeSingle();
+      const { data: before } = await admin.from('users').select('user_id,rbac_role,role,dept_id,supervisor_id,status').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
-      const changes = { rbac_role: rbacRole, role: LEGACY_ROLE[rbacRole] ?? 'inspector', permissions: {} };
+      if (!['unit_supervisor', 'sysadmin'].includes(rbacRole)) {
+        const { data: directReports, error: directReportError } = await admin.from('users')
+          .select('name').eq('supervisor_id', userId).eq('status', 'active').order('name').limit(200);
+        if (directReportError) return reply(req, { ok: false, message: '人員主管關係檢查失敗，請重新整理後再試' }, 400);
+        if ((directReports || []).length > 0) {
+          const names = (directReports || []).map(row => String(row.name || '')).filter(Boolean).join('、');
+          return reply(req, { ok: false, message: `此帳號仍有 ${directReports?.length || 0} 位直屬人員（${names.slice(0, 200)}）；請到帳號管理調整角色並選擇接任主管` }, 409);
+        }
+      }
+      // 「使用者角色指派」也必須和帳號管理共用主管規則。升為主管時清除舊
+      // supervisor_id；改為一般角色時保留既有主管，若已無效則明確提示改到
+      // 帳號管理重新指派，避免角色頁把人員留在無法啟用的狀態。
+      const requestedSupervisorId = ['unit_supervisor', 'sysadmin'].includes(rbacRole)
+        ? null
+        : id(body.supervisor_id) || id(before.supervisor_id) || null;
+      let normalizedSupervisorId = requestedSupervisorId;
+      if (before.status === 'active' || requestedSupervisorId) {
+        const supervisorValidation = await validateSupervisor(requestedSupervisorId, id(before.dept_id) || null, rbacRole, userId);
+        if (supervisorValidation.message) return reply(req, { ok: false, message: `使用者角色更新失敗：${supervisorValidation.message}；請到帳號管理指定所屬單位與直屬主管` }, 400);
+        normalizedSupervisorId = supervisorValidation.supervisorId;
+      }
+      const changes = { rbac_role: rbacRole, role: LEGACY_ROLE[rbacRole] ?? 'inspector', supervisor_id: normalizedSupervisorId, permissions: {} };
       const { error } = await admin.from('users').update(changes).eq('user_id', userId);
       if (error) return reply(req, { ok: false, message: `使用者角色更新失敗：${error.message}` }, 400);
       await audit('users', userId, 'update', { before, after: changes });
@@ -625,8 +774,8 @@ export async function handleAdminApiRequest(req: Request) {
       let level = 1;
       if (parentId) {
         const { data: parent } = await admin.from('departments').select('level,parent_id,status').eq('dept_id', parentId).maybeSingle();
-        if (!parent || parent.status !== 'active' || Number(parent.level) !== 1 || parent.parent_id) return reply(req, { ok: false, message: '上層部門必須是啟用中的一級部門' }, 400);
-        if (deptId) { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId); if (count) return reply(req, { ok: false, message: '已有下層部門的一級部門不可再改為二級部門' }, 400); }
+        if (!parent || parent.status !== 'active' || Number(parent.level) !== 1 || parent.parent_id) return reply(req, { ok: false, message: '上層部門必須是啟用中的部／室' }, 400);
+        if (deptId) { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId); if (count) return reply(req, { ok: false, message: '已有課／組／隊的部／室不可再改為課／組／隊' }, 400); }
         level = 2;
       }
       const values: Record<string, unknown> = { parent_id: parentId, name, code, level, sort_order: sortOrder };
@@ -649,7 +798,7 @@ export async function handleAdminApiRequest(req: Request) {
       if (!deptId) return reply(req, { ok: false, message: '部門識別碼無效' }, 400);
       const { data: before } = await admin.from('departments').select('status').eq('dept_id', deptId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定部門' }, 404);
-      if (nextStatus === 'inactive') { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId).eq('status', 'active'); if (count) return reply(req, { ok: false, message: '請先停用所屬的二級部門，再停用此一級部門' }, 400); }
+      if (nextStatus === 'inactive') { const { count } = await admin.from('departments').select('*', { count: 'exact', head: true }).eq('parent_id', deptId).eq('status', 'active'); if (count) return reply(req, { ok: false, message: '請先停用所屬的課／組／隊，再停用此部／室' }, 400); }
       const { error } = await admin.from('departments').update({ status: nextStatus }).eq('dept_id', deptId);
       if (error) return reply(req, { ok: false, message: dbMessage(error, '部門狀態更新失敗') }, 400); await audit('departments', deptId, 'status_change', { before: before.status, after: nextStatus }); return reply(req, { ok: true });
     }

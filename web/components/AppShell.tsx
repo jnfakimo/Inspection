@@ -13,6 +13,7 @@ import { clearProfile } from '@/lib/profile-cache';
 import { localAuth } from '@/lib/local-auth';
 import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
+import { resolveAppBackHref } from '@/lib/app-navigation';
 
 
 function taipeiClock() {
@@ -46,6 +47,7 @@ export function AppShell({ profile, title, children, heading }: {
   const routeModule = routeSystem ? findModule(routeSystem.key, pathParts[systemsIndex + 2] || '') : undefined;
   const headingSystem = heading?.system || routeSystem;
   const headingModule = heading?.module || routeModule;
+  const backHref = resolveAppBackHref(pathname);
   const pageHeading = headingSystem && headingModule
     ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} description={heading?.description} />
     : null;
@@ -185,10 +187,10 @@ export function AppShell({ profile, title, children, heading }: {
         <time>{clock}</time>
       </div>
       <nav className="v1-actions" aria-label="主要導覽">
-        <button type="button" className="v1-back-action" onClick={() => window.history.back()}>
+        <Link href={backHref} className="v1-back-action">
           <span className="generated-nav-icon nav-back" aria-hidden="true" />
           <span>上頁</span>
-        </button>
+        </Link>
         <Link href="/systems/" className={pathname === '/systems/' ? 'is-current' : ''}>
           <span className="generated-nav-icon nav-home" aria-hidden="true" />
           <span>首頁</span>
@@ -219,7 +221,7 @@ export function AppShell({ profile, title, children, heading }: {
           aria-controls="admin-v2-sidebar"
           onClick={() => setAdminMenuOpen(true)}
         >
-          <img src="/Inspection/assets/system-icons/admin-icon.png" alt="" />
+          <img src="/Inspection/assets/system-icons-v20260901/admin-icon.png" alt="" />
           後台選單
         </button>
         <main className="content v1-content admin-v2-content">{pageHeading}{children}</main>
@@ -232,12 +234,16 @@ export function AppShell({ profile, title, children, heading }: {
           <form className="profile-section profile-section-basic" onSubmit={saveProfile}>
             <div className="profile-section-title"><span>01</span><div><b>基本資料</b><small>帳號、單位及權限由管理員維護</small></div></div>
             <div className="profile-form-grid">
-              <label>登入帳號<input value={profileDetails.username || ''} readOnly /></label>
-              <label>電子郵件<input value={profileDetails.email || ''} readOnly /></label>
-              <label>姓名<input name="name" defaultValue={profileDetails.name} key={`name-${profileDetails.name}`} maxLength={100} required /></label>
-              <label>聯絡電話<input name="phone" defaultValue={profileDetails.phone || ''} key={`phone-${profileDetails.phone || ''}`} maxLength={40} inputMode="tel" /></label>
-              <label>所屬單位<input value={profileDetails.department || '未設定'} readOnly /></label>
-              <label>帳號角色<input value={profileDetails.rbac_role || profileDetails.role || '未設定'} readOnly /></label>
+              <div className="profile-basic-account-fields">
+                <label>登入帳號<input value={profileDetails.username || ''} readOnly /></label>
+                <label>電子郵件<input value={profileDetails.email || ''} readOnly /></label>
+              </div>
+              <div className="profile-basic-contact-fields">
+                <label>姓名<input name="name" defaultValue={profileDetails.name} key={`name-${profileDetails.name}`} maxLength={100} required /></label>
+                <label>聯絡電話<input name="phone" defaultValue={profileDetails.phone || ''} key={`phone-${profileDetails.phone || ''}`} maxLength={40} inputMode="tel" /></label>
+                <label>所屬單位<input value={profileDetails.department || '未設定'} readOnly /></label>
+                <label>帳號角色<input value={profileDetails.rbac_role || profileDetails.role || '未設定'} readOnly /></label>
+              </div>
             </div>
             {profileMessage && <p className="profile-message">{profileMessage}</p>}
             <div className="profile-actions"><button type="submit" className="primary-btn compact" disabled={profileBusy}>儲存個人資料</button></div>
@@ -254,8 +260,8 @@ export function AppShell({ profile, title, children, heading }: {
           </section>
 
           <form className="profile-section profile-section-security" onSubmit={changePassword}>
-            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>至少 {PASSWORD_POLICY.minLength} 個字元，且符合複雜度要求</small></div></div>
-            <div className="profile-form-grid"><label>新密碼<input type="password" name="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} required autoComplete="new-password" /></label></div>
+            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>{PASSWORD_POLICY.minLength} 位數字</small></div></div>
+            <div className="profile-form-grid"><label>新密碼<input type="password" name="password" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" minLength={PASSWORD_POLICY.minLength} maxLength={PASSWORD_POLICY.maxLength} pattern="[0-9]{8}" inputMode="numeric" required autoComplete="new-password" /></label></div>
             {passwordMessage && <p className="profile-message">{passwordMessage}</p>}
             <div className="profile-actions"><button className="primary-btn compact">更新密碼</button></div>
           </form>

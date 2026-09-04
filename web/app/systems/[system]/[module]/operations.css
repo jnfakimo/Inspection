@@ -111,12 +111,12 @@
 .operations-portal-grid.equipment-portal .operations-portal-card p,.operations-portal-grid.structuremap-portal .operations-portal-card p{margin-bottom:8px;font-size:12px;line-height:1.5}
 @media(max-width:900px){.operations-portal-grid.equipment-portal,.operations-portal-grid.structuremap-portal{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-portal-grid.equipment-portal .operations-portal-card,.operations-portal-grid.structuremap-portal .operations-portal-card{width:auto;height:auto;min-height:200px}}
 @media(max-width:600px){.operations-portal-grid.equipment-portal,.operations-portal-grid.structuremap-portal{grid-template-columns:1fr}}
-.generated-module-icon{display:block;width:42px;height:42px;margin-bottom:10px;background-image:url('/Inspection/assets/system-icons/equipment-structure-icons-ai.png');background-size:400% 400%;background-repeat:no-repeat}
+.generated-module-icon{display:block;width:42px;height:42px;margin-bottom:10px;background-image:url('/Inspection/assets/system-icons-v20260901/equipment-structure-icons-ai.png');background-size:400% 400%;background-repeat:no-repeat}
 .equipment-portal .generated-module-icon-0{background-position:0 0}.equipment-portal .generated-module-icon-1{background-position:33.333% 0}.equipment-portal .generated-module-icon-2{background-position:66.667% 0}.equipment-portal .generated-module-icon-3{background-position:100% 0}.equipment-portal .generated-module-icon-4{background-position:0 33.333%}.equipment-portal .generated-module-icon-5{background-position:33.333% 33.333%}.equipment-portal .generated-module-icon-6{background-position:66.667% 33.333%}.equipment-portal .generated-module-icon-7{background-position:100% 33.333%}
 .structuremap-portal .generated-module-icon-0{background-position:0 66.667%}.structuremap-portal .generated-module-icon-1{background-position:33.333% 66.667%}.structuremap-portal .generated-module-icon-2{background-position:66.667% 66.667%}.structuremap-portal .generated-module-icon-3{background-position:100% 66.667%}.structuremap-portal .generated-module-icon-4{background-position:0 100%}.structuremap-portal .generated-module-icon-5{background-position:33.333% 100%}
 .operations-portal-grid.patrol .operations-portal-card p{margin-bottom:14px;font-size:12px}
 .operations-portal-grid.patrol .operations-portal-card b{font-size:12px}
-/* 交接紀錄同樣納入 49 個子系統桌面圖卡規範。 */
+/* 交接紀錄同樣納入 54 個子系統桌面圖卡規範。 */
 .operations-portal-grid.handover{grid-template-columns:repeat(3,269px);justify-content:center}
 .operations-portal-grid.handover .operations-portal-card{width:269px;height:200px;min-height:200px;padding:18px}
 @media (max-width:1100px){

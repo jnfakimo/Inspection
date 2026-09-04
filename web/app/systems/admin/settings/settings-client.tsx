@@ -87,7 +87,7 @@ const cards: SettingsCard[] = [
     title: '系統識別',
     english: 'SYSTEM IDENTITY',
     description: '設定組織與場域名稱，供全系統品牌列與文件共用。',
-    icon: '/Inspection/assets/system-icons/admin-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png',
     accent: 'var(--icon-sky)',
     section: 'identity',
   },
@@ -96,7 +96,7 @@ const cards: SettingsCard[] = [
     title: '組織架構',
     english: 'ORGANIZATION',
     description: '維護兩層式部門樹、代碼、排序與啟用狀態。',
-    icon: '/Inspection/assets/system-icons/account-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/account-icon.png',
     accent: '#3977e8',
     section: 'departments',
   },
@@ -105,7 +105,7 @@ const cards: SettingsCard[] = [
     title: '班別管理',
     english: 'SHIFT MANAGEMENT',
     description: '維護早、中、夜班等班別名稱與跨日作業時段。',
-    icon: '/Inspection/assets/system-icons/handover-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/handover-icon.png',
     accent: '#00a86b',
     section: 'shifts',
   },
@@ -114,7 +114,7 @@ const cards: SettingsCard[] = [
     title: 'LINE 推播',
     english: 'LINE NOTIFICATION',
     description: '管理群組、通知事件及測試推播；Token 永不回顯。',
-    icon: '/Inspection/assets/system-icons/guardpatrol-line-push-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-line-push-icon.png',
     accent: '#7657d6',
     section: 'line',
   },
@@ -123,7 +123,7 @@ const cards: SettingsCard[] = [
     title: '圖資專案設定',
     english: 'MAP PROJECT',
     description: '統一管理 3D 建模、平面圖、3D 圖、標記與巡檢雲臺的共用圖資。',
-    icon: '/Inspection/assets/system-icons/equipment-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/equipment-icon.png',
     accent: '#d14e78',
     href: '/systems/structuremap/models/',
   },
@@ -132,7 +132,7 @@ const cards: SettingsCard[] = [
     title: '權限管理 RBAC',
     english: 'ROLE ACCESS CONTROL',
     description: '前往角色與系統權限矩陣，控管功能存取範圍。',
-    icon: '/Inspection/assets/system-icons/account-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/account-icon.png',
     accent: '#d98b00',
     href: '/systems/admin/permissions/',
   },
@@ -141,7 +141,7 @@ const cards: SettingsCard[] = [
     title: '整合 API 文件',
     english: 'INTEGRATION API',
     description: '檢視核心連線、共用鍵值及十一項系統整合邊界。',
-    icon: '/Inspection/assets/system-icons/admin-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png',
     accent: 'var(--icon-sky)',
     section: 'api',
   },
@@ -150,7 +150,7 @@ const cards: SettingsCard[] = [
     title: '通知中心',
     english: 'NOTICE CENTER',
     description: '前往通知收件匣，查看個人通知與已讀狀態。',
-    icon: '/Inspection/assets/system-icons/audit-icon.png',
+    icon: '/Inspection/assets/system-icons-v20260901/audit-icon.png',
     accent: '#64748b',
     href: '/systems/admin/notices/',
   },
@@ -561,11 +561,11 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       return;
     }
     if (parent?.parent_id) {
-      setNotice({ kind: 'error', text: '組織架構最多兩層，第二層部門不可再新增子部門。' });
+      setNotice({ kind: 'error', text: '組織架構最多兩層，課／組／隊不可再新增下層單位。' });
       return;
     }
     if (hasChildren && departmentEditor.parent_id) {
-      setNotice({ kind: 'error', text: '已有子部門的第一層部門不可改掛至其他部門。' });
+      setNotice({ kind: 'error', text: '已有課／組／隊的部／室不可改掛至其他部／室。' });
       return;
     }
     setBusy('department-save');
@@ -574,7 +574,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       departmentEditor.dept_id &&
       departments.some(item => item.parent_id === departmentEditor.dept_id && item.status === 'active')
     ) {
-      setNotice({ kind: 'error', text: '此部門仍有啟用中的子部門，請先停用子部門。' });
+      setNotice({ kind: 'error', text: '此部／室仍有啟用中的課／組／隊，請先停用課／組／隊。' });
       return;
     }
     try {
@@ -605,7 +605,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       nextStatus === 'inactive' &&
       departments.some(item => item.parent_id === department.dept_id && item.status === 'active')
     ) {
-      setNotice({ kind: 'error', text: '此部門仍有啟用中的子部門，請先停用子部門。' });
+      setNotice({ kind: 'error', text: '此部／室仍有啟用中的課／組／隊，請先停用課／組／隊。' });
       return;
     }
     if (!window.confirm(`確定${nextStatus === 'inactive' ? '停用' : '啟用'}「${department.name}」？`)) {
@@ -644,7 +644,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       <div className={styles.rowActions}>
         {!child && department.status === 'active' ? (
           <button type="button" onClick={() => openDepartmentEditor(undefined, department.dept_id)}>
-            新增子部門
+            新增課／組／隊
           </button>
         ) : null}
         <button type="button" onClick={() => openDepartmentEditor(department)}>編輯</button>
@@ -708,12 +708,12 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       <div className={styles.panelHeading}>
         <div>
           <h3>組織架構</h3>
-          <p>採兩層式樹狀管理；歷史資料使用軟停用，不刪除部門。</p>
+          <p>採部／室與課／組／隊兩層式樹狀管理；歷史資料使用軟停用，不刪除部門。</p>
         </div>
         <div className={styles.headingActions}>
           <span className={styles.codeBadge}>SYS-02</span>
           <button className={styles.primaryButton} type="button" onClick={() => openDepartmentEditor()}>
-            ＋ 新增第一層部門
+            ＋ 新增部／室
           </button>
         </div>
       </div>
@@ -725,7 +725,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
               .filter(item => item.parent_id === root.dept_id)
               .map(child => departmentRow(child, true))}
           </div>
-        )) : <div className={styles.emptyState}>目前沒有部門資料，請先新增第一層部門。</div>}
+        )) : <div className={styles.emptyState}>目前沒有部門資料，請先新增部／室。</div>}
         {orphanDepartments.length ? (
           <div className={styles.orphanGroup}>
             <strong>找不到上層部門的資料</strong>
@@ -1088,7 +1088,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
                   value={departmentEditor.parent_id}
                   onChange={event => setDepartmentEditor(current => current ? ({ ...current, parent_id: event.target.value }) : null)}
                 >
-                  <option value="">第一層部門</option>
+                  <option value="">部／室</option>
                   {roots
                     .filter(root => (
                       root.dept_id !== departmentEditor.dept_id &&

@@ -8,14 +8,14 @@
  *   SUPABASE_E2E_BOOTSTRAP=1
  *
  * 角色彼此分離，各自有獨立的 Auth 帳號與部室：
- *   公文管理人員（原申請人）  企劃部          permissions.official_document_manager
+ *   流程起案人（原申請人）    企劃部          SYS-09 公文傳送權限
  *   承辦人員                  企劃推廣課      驗證第二階單位／人員連動
  *   會辦收發                  業務部          收文 → 完成會辦
  *   陳核／核決                秘書室          簽收 → 核決／退回
  *   他部室人員                財務部          越權防護的對照組
  *
  * 驗收範圍對應 Obsidian/05-待辦清單.md 的唯一未結 P0：
- *   建立／送出 → 會辦收發 → 陳核／核決 → 原申請人收訖、退回補正、
+ *   建立／送出 → 會辦收發 → 陳核／核決 → 創文單位簽收、退回補正、
  *   條碼查詢、不可刪除時間軸，以及每一段的越權防護。
  *
  * 測試資料以 hidden=true 建立、主旨標註「驗收測試（勿使用）」；
@@ -115,6 +115,12 @@ async function request(path, { key = ANON_KEY, token, method = 'GET', body, pref
 const authAdmin = (path, options = {}) => request(`/auth/v1/admin${path}`, { ...options, key: SERVICE_KEY, token: SERVICE_KEY });
 const rest = (path, options = {}) => request(`/rest/v1${path}`, options);
 const service = (path, options = {}) => rest(path, { ...options, key: SERVICE_KEY, token: SERVICE_KEY });
+
+// 收文角色刻意放在業務部的子單位，驗證流程節點雖記錄根部門，
+// 子單位人員仍能看到通知並完成收文／會辦。
+const businessChildRows = await service('/departments?code=eq.BIZ-TRADE&select=dept_id,parent_id&limit=1');
+const businessChild = businessChildRows.find(row => String(row.parent_id || '') === DEPT.biz);
+const CO_SIGN_DEPT = String(businessChild?.dept_id || DEPT.biz);
 
 async function signIn(email, password) {
   const session = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: { email, password } });
@@ -216,8 +222,8 @@ const record = (name, detail) => { stages.push({ name, detail }); console.log(` 
 
 console.log('■ 建立五個彼此分離的測試角色');
 // guard_user_supervisor_hierarchy 要求啟用中的一般人員必須掛直屬主管，且主管須同單位；
-// 系統管理員身分的主管不受同單位限制，公文流程本身完全不讀 supervisor_id，
-// 因此以一個測試用系統管理員當五個角色的共同直屬主管，不影響驗收語意。
+// 系統管理員身分的主管不受同單位限制；公文流程只在秘書室代收副總經理陳核時
+// 讀取 supervisor_id，因此以一個測試用系統管理員當五個角色的共同直屬主管，不影響驗收語意。
 const fixtureSupervisor = await createProfile({
   label: '固定裝置主管', emailLabel: 'sup', usernamePrefix: 'sup',
   rbacRole: 'sysadmin', role: 'admin',
@@ -225,25 +231,28 @@ const fixtureSupervisor = await createProfile({
 const asStaff = deptId => ({ deptId, supervisorId: fixtureSupervisor.profile.user_id });
 
 const manager = await createProfile({
-  label: '公文管理人員', emailLabel: 'manager', usernamePrefix: 'mgr',
+  label: '流程起案人', emailLabel: 'manager', usernamePrefix: 'mgr',
   ...asStaff(DEPT.plan), permissions: { official_document_manager: true },
 });
 const responsible = await createProfile({ label: '承辦人員', emailLabel: 'staff', usernamePrefix: 'staff', ...asStaff(DEPT.planPromo) });
-const coSigner = await createProfile({ label: '會辦收發', emailLabel: 'cosign', usernamePrefix: 'cos', ...asStaff(DEPT.biz) });
+const coSigner = await createProfile({ label: '會辦收發', emailLabel: 'cosign', usernamePrefix: 'cos', ...asStaff(CO_SIGN_DEPT) });
 const approver = await createProfile({ label: '陳核核決', emailLabel: 'approver', usernamePrefix: 'apv', ...asStaff(DEPT.secretary) });
 const outsider = await createProfile({ label: '他部室人員', emailLabel: 'outsider', usernamePrefix: 'out', ...asStaff(DEPT.finance) });
-record('五個角色建立完成', '企劃部／企劃推廣課／業務部／秘書室／財務部各一人');
+record('五個角色建立完成', `企劃部／企劃推廣課／業務部${businessChild ? '（貿易課收文）' : ''}／秘書室／財務部各一人`);
 
 let exitCode = 0;
 try {
   // ------------------------------------------------------- 流程 A：核決結案
 
-  console.log('\n■ 流程 A：建立 → 會辦 → 陳核 → 核決 → 原申請人收訖');
+  console.log('\n■ 流程 A：建立 → 會辦 → 陳核 → 核決 → 創文單位簽收');
 
-  await expectDenied(coSigner.token, {
-    action: 'official_document_create', subject: '驗收測試（勿使用）越權建立', responsible_dept_id: DEPT.biz,
-  }, { label: '非公文管理人員建立公文', status: 403 });
-  record('越權防護：非公文管理人員不能建立公文', 'HTTP 403');
+  const coSignerDocument = await appApi(coSigner.token, {
+    action: 'official_document_create', subject: '驗收測試（勿使用）一般使用者建立公文',
+    responsible_dept_id: CO_SIGN_DEPT, responsible_user_id: coSigner.profile.user_id,
+  });
+  created.documents.push(String(coSignerDocument.data.document_id));
+  assert(coSignerDocument.data.barcode_value === coSignerDocument.data.document_no, '具 SYS-09 權限的人員應可建立並自動取號');
+  record('一般使用者建立公文並自動取號', `文號 ${coSignerDocument.data.document_no}`);
 
   await expectDenied(manager.token, {
     action: 'official_document_create',
@@ -284,14 +293,16 @@ try {
 
   await expectDenied(coSigner.token, {
     action: 'official_document_action', document_id: documentId, document_action: 'send_co_sign', target_unit_id: DEPT.biz,
-  }, { label: '非管理人員送出會辦', status: 403 });
-  record('越權防護：非公文管理人員不能送出會辦', 'HTTP 403');
+  }, { label: '未參與公文的跨單位人員送出會辦', status: 403 });
+  record('越權防護：未參與公文的跨單位人員不能送出會辦', 'HTTP 403');
 
   await docAction(manager.token, documentId, 'send_co_sign', { target_unit_id: DEPT.biz, note: '請業務部會辦' });
   let state = await readDocument(documentId);
   assert(state.document.status === 'awaiting_co_sign', `送出會辦後狀態應為 awaiting_co_sign，實際 ${state.document.status}`);
   assert(state.steps.length === 1 && state.steps[0].step_type === 'co_sign', '應建立一個會辦節點');
-  record('公文管理人員送出會辦', `→ 業務部（狀態 ${state.document.status}）`);
+  const coSignNotifications = await service(`/official_document_notifications?document_id=eq.${documentId}&step_id=eq.${state.steps[0].step_id}&recipient_id=eq.${coSigner.profile.user_id}&select=notification_id&limit=1`);
+  assert(coSignNotifications.length === 1, '會辦通知應送達根部門下的子單位收文人員');
+  record('流程起案人送出會辦', `→ 業務部（狀態 ${state.document.status}）`);
 
   await expectDenied(outsider.token, {
     action: 'official_document_action', document_id: documentId, document_action: 'receive',
@@ -303,28 +314,29 @@ try {
   }, { label: '未收文即完成會辦', status: 409 });
   record('順序防護：未收文不能直接完成會辦', 'HTTP 409');
 
-  await docAction(coSigner.token, documentId, 'receive');
-  state = await readDocument(documentId);
-  assert(state.steps[0].status === 'received', '收文後節點狀態應為 received');
-  assert(String(state.steps[0].received_by) === String(coSigner.profile.user_id), '收文者應記錄為會辦收發本人');
-  record('會辦部室收文', '業務部節點 sent → received');
-
   await expectDenied(manager.token, {
     action: 'official_document_action', document_id: documentId, document_action: 'send_approval', target_unit_id: DEPT.secretary,
   }, { label: '會辦未完成即送陳核', status: 409 });
   record('順序防護：會辦未完成不能送出陳核', 'HTTP 409');
 
-  await docAction(coSigner.token, documentId, 'co_sign_complete', { note: '業務部會辦完成' });
+  await docAction(coSigner.token, documentId, 'receive');
   state = await readDocument(documentId);
-  assert(state.document.status === 'ready_for_next', `完成會辦後狀態應為 ready_for_next，實際 ${state.document.status}`);
-  record('會辦完成', `狀態 → ${state.document.status}`);
+  assert(state.steps[0].status === 'completed', '會辦收文後節點應自動完成');
+  assert(String(state.steps[0].received_by) === String(coSigner.profile.user_id), '收文者應記錄為會辦收發本人');
+  assert(String(state.steps[0].completed_by) === String(coSigner.profile.user_id), '自動完成者應記錄為會辦收發本人');
+  assert(state.document.status === 'ready_for_next', '會辦收文後公文應直接進入下一站選擇');
+  record('會辦部室收文並自動完成會辦', '業務部節點 sent → completed，公文進入下一站選擇');
+
+  const legacyComplete = await docAction(coSigner.token, documentId, 'co_sign_complete', { note: '舊版完成動作相容測試' });
+  assert(legacyComplete.data?.already_completed === true, '舊版會辦完成動作應安全回傳已完成');
+  record('舊版會辦完成動作相容', '不新增重複事件');
 
   await expectDenied(manager.token, {
     action: 'official_document_action', document_id: documentId, document_action: 'send_approval', target_unit_id: DEPT.biz,
   }, { label: '陳核送到不可陳核的部室', status: 400 });
   record('資格防護：陳核只能送董事長室／總經理室／副總經理室／秘書室', 'HTTP 400');
 
-  await docAction(manager.token, documentId, 'send_approval', { target_unit_id: DEPT.secretary, note: '陳請核決' });
+  await docAction(coSigner.token, documentId, 'send_approval', { target_unit_id: DEPT.secretary, note: '陳請核決' });
   state = await readDocument(documentId);
   assert(state.document.status === 'awaiting_approval', `送出陳核後狀態應為 awaiting_approval，實際 ${state.document.status}`);
   assert(state.steps.length === 2 && state.steps[1].step_type === 'approval', '應建立第二個陳核節點');
@@ -345,8 +357,8 @@ try {
 
   await expectDenied(manager.token, {
     action: 'official_document_action', document_id: documentId, document_action: 'originator_receive',
-  }, { label: '尚未核決即由原申請人收訖', status: 409 });
-  record('順序防護：尚未核決不能收訖', 'HTTP 409');
+  }, { label: '尚未核決即由創文單位簽收', status: 409 });
+  record('順序防護：尚未核決不能由創文單位簽收', 'HTTP 409');
 
   await docAction(approver.token, documentId, 'approve', { note: '核決同意' });
   state = await readDocument(documentId);
@@ -355,17 +367,17 @@ try {
 
   await expectDenied(coSigner.token, {
     action: 'official_document_action', document_id: documentId, document_action: 'originator_receive',
-  }, { label: '非原申請人收訖', status: 403 });
-  record('越權防護：只有原申請人可以收訖', 'HTTP 403');
+  }, { label: '非創文單位人員簽收', status: 403 });
+  record('越權防護：只有創文部／室人員可以簽收', 'HTTP 403');
 
   const closeKey = `p0-doc-close-${suffix}`;
-  await docAction(manager.token, documentId, 'originator_receive', { idempotency_key: closeKey });
+  await docAction(responsible.token, documentId, 'originator_receive', { idempotency_key: closeKey });
   state = await readDocument(documentId);
   assert(state.document.status === 'closed', `收訖後狀態應為 closed，實際 ${state.document.status}`);
   assert(state.document.closed_at, '結案時間 closed_at 應寫入');
-  record('原申請人收訖結案', `狀態 → closed（${state.document.closed_at}）`);
+  record('創文單位人員簽收結案', `狀態 → closed（${state.document.closed_at}）`);
 
-  const duplicate = await docAction(manager.token, documentId, 'originator_receive', { idempotency_key: closeKey });
+  const duplicate = await docAction(responsible.token, documentId, 'originator_receive', { idempotency_key: closeKey });
   assert(duplicate.data?.duplicate === true, '重複送出相同 idempotency_key 應回報 duplicate');
   record('冪等防護：重複送出同一動作不會產生第二筆事件', 'duplicate=true');
 

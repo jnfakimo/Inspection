@@ -7,12 +7,12 @@
 export type SharedAction = { href: string; label: string; icon: string; sysKey?: string };
 
 export const SHARED_ACTIONS: SharedAction[] = [
-  { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons/home-nav-icon.png' },
-  { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons/admin-icon.png' },
-  { href: '/systems/workorder/', label: '維修／派完工', icon: '/Inspection/assets/system-icons/maintenance-icon.png', sysKey: 'workorder' },
-  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/Inspection/assets/system-icons/guardpatrol-icon.png', sysKey: 'guardpatrol' },
-  { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons/handover-icon.png', sysKey: 'handover' },
-  { href: '/systems/admin/', label: '後台', icon: '/Inspection/assets/system-icons/admin-icon.png', sysKey: 'admin' },
+  { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons-v20260901/home-nav-icon.png' },
+  { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png' },
+  { href: '/systems/workorder/', label: '維修／派完工', icon: '/Inspection/assets/system-icons-v20260901/maintenance-icon.png', sysKey: 'workorder' },
+  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-icon.png', sysKey: 'guardpatrol' },
+  { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons-v20260901/handover-icon.png', sysKey: 'handover' },
+  { href: '/systems/admin/', label: '後台', icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png', sysKey: 'admin' },
 ];
 
 /** 依帳號可用的系統過濾；allowed_systems 含 '*' 代表全開。 */

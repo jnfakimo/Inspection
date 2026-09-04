@@ -28,6 +28,9 @@ import type { Profile } from '@/types/app';
 type Props = { module: ModuleDefinition; profile: Profile };
 type Point = { marker_id: string; floor_id: string; label: string; note: string | null };
 type PrintTag = { markerId: string; label: string; floor: string; image: string };
+type NfcStatus = 'idle' | 'writing' | 'success' | 'unsupported' | 'error';
+type NdefReaderLike = { write: (message: { records: Array<{ recordType: 'url'; data: string }> }) => Promise<void> };
+type NdefReaderConstructor = new () => NdefReaderLike;
 
 /** 與 V1 的 translateError 逐條對齊。 */
 function translateError(error: unknown) {
@@ -58,8 +61,13 @@ function fmtTime(value: unknown) {
 const wait = (ms: number) => new Promise(resolve => { window.setTimeout(resolve, ms); });
 
 // 與現場已張貼的標籤同一組網址：簽到頁仍在 V1，改成 V2 網址會讓舊標籤指向別處。
-const checkinUrl = (markerId: string) =>
-  `${location.origin}${LEGACY_BASE}/patrolcheckin.html?marker=${encodeURIComponent(markerId)}`;
+const checkinUrl = (markerId: string, source: 'qr' | 'nfc' = 'qr') =>
+  `${location.origin}${LEGACY_BASE}/patrolcheckin.html?marker=${encodeURIComponent(markerId)}&source=${source}`;
+
+function ndefReaderConstructor() {
+  if (typeof window === 'undefined') return null;
+  return (window as Window & { NDEFReader?: NdefReaderConstructor }).NDEFReader || null;
+}
 
 async function qrDataUrl(text: string, cellSize: number) {
   const qrcode = (await import('qrcode-generator')).default;
@@ -79,7 +87,7 @@ export function PointListModule({ module, profile }: Props) {
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  const [qr, setQr] = useState<{ label: string; floor: string; image: string } | null>(null);
+  const [qr, setQr] = useState<{ label: string; floor: string; image: string; nfcUrl: string; nfcStatus: NfcStatus; nfcMessage: string } | null>(null);
   const [printTags, setPrintTags] = useState<PrintTag[] | null>(null);
 
   const load = useCallback(async (attempt = 0) => {
@@ -146,8 +154,51 @@ export function PointListModule({ module, profile }: Props) {
 
   const openQr = async (point: Point) => {
     try {
-      setQr({ label: point.label, floor: point.floor_id, image: await qrDataUrl(checkinUrl(point.marker_id), 5) });
+      setQr({
+        label: point.label,
+        floor: point.floor_id,
+        image: await qrDataUrl(checkinUrl(point.marker_id, 'qr'), 5),
+        nfcUrl: checkinUrl(point.marker_id, 'nfc'),
+        nfcStatus: 'idle',
+        nfcMessage: '',
+      });
     } catch (error) { window.alert(`QR 產生失敗：${translateError(error)}`); }
+  };
+
+  const copyNfcUrl = async () => {
+    if (!qr) return;
+    try {
+      await navigator.clipboard.writeText(qr.nfcUrl);
+      setQr(current => current ? { ...current, nfcMessage: 'NFC 網址已複製，可貼到 NFC Tools 寫入標籤。' } : current);
+    } catch {
+      setQr(current => current ? { ...current, nfcMessage: '瀏覽器不允許自動複製，請長按下方網址後複製。' } : current);
+    }
+  };
+
+  const writeNfcTag = async () => {
+    if (!qr) return;
+    const Constructor = ndefReaderConstructor();
+    if (!Constructor) {
+      await copyNfcUrl();
+      setQr(current => current ? {
+        ...current,
+        nfcStatus: 'unsupported',
+        nfcMessage: '目前瀏覽器不支援直接寫入 NFC，網址已複製，請用 NFC Tools 的「寫入 URL」功能。',
+      } : current);
+      return;
+    }
+    setQr(current => current ? { ...current, nfcStatus: 'writing', nfcMessage: '請將可寫入的 NFC 標籤靠近手機背面。' } : current);
+    try {
+      const reader = new Constructor();
+      await reader.write({ records: [{ recordType: 'url', data: qr.nfcUrl }] });
+      setQr(current => current ? { ...current, nfcStatus: 'success', nfcMessage: 'NFC 標籤寫入完成，之後碰觸即可開啟此巡檢點簽到。' } : current);
+    } catch (error) {
+      setQr(current => current ? {
+        ...current,
+        nfcStatus: 'error',
+        nfcMessage: `NFC 寫入失敗：${translateError(error)}。也可以複製網址後用 NFC Tools 寫入。`,
+      } : current);
+    }
   };
 
   const locate = (point: Point) => {
@@ -204,7 +255,7 @@ export function PointListModule({ module, profile }: Props) {
 
       <p className="v1list-hint">
         彙總所有樓層目前已放置的「巡邏點」標示（唯讀）。新增、移動或停用巡邏點請至
-        「整合標記系統」的平面圖操作，本頁只呈現結果並提供 QR 標籤。
+        「整合標記系統」的平面圖操作，本頁只呈現結果並提供 QR 標籤與 NFC 感應網址。
       </p>
 
       <div className="v1list-stats">
@@ -277,7 +328,17 @@ export function PointListModule({ module, profile }: Props) {
             <div className="qname">{qr.label}</div>
             <div className="qfloor">{qr.floor}</div>
             <div className="qbox"><img src={qr.image} alt={`${qr.floor} ${qr.label} 的簽到 QR code`} /></div>
-            <button className="mini" onClick={() => window.print()}>🖶 列印</button>
+            <div className="nfc-url-label">NFC 感應網址</div>
+            <code className="nfc-url">{qr.nfcUrl}</code>
+            <div className="nfc-actions">
+              <button className="mini" onClick={() => void writeNfcTag()} disabled={qr.nfcStatus === 'writing'}>
+                {qr.nfcStatus === 'writing' ? '等待感應…' : '寫入 NFC 標籤'}
+              </button>
+              <button className="mini" onClick={() => void copyNfcUrl()}>複製網址</button>
+              <button className="mini" onClick={() => window.print()}>🖶 列印 QR</button>
+            </div>
+            {qr.nfcMessage && <p className={`nfc-message ${qr.nfcStatus}`}>{qr.nfcMessage}</p>}
+            <p className="nfc-help">Android Chrome 可直接寫入；其他手機請用 NFC Tools 寫入 URL。標籤需支援 NDEF 且尚未鎖定。</p>
           </div>
         </div>
       </div>}

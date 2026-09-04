@@ -6,6 +6,40 @@
 .profile-modal-body{flex:1 1 auto;min-height:0;grid-auto-rows:max-content;align-content:start}
 .profile-section{min-height:max-content;overflow:visible}
 
+/* 基本資料在桌面仍沿用原本的兩欄網格；兩組容器在寬版攤平，
+   讓欄位順序與既有版面完全一致。手機再各自收斂成可操作的一列。 */
+.profile-basic-account-fields,.profile-basic-contact-fields{display:contents}
+
 @media(max-width:600px){
   .profile-modal-body{grid-auto-rows:max-content}
+
+  .profile-section-basic .profile-form-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  .profile-basic-account-fields{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    min-width:0;
+  }
+  .profile-basic-contact-fields{
+    display:grid;
+    grid-template-columns:minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.4fr) minmax(0,.8fr);
+    gap:8px;
+    min-width:0;
+  }
+  .profile-section-basic .profile-form-grid label{min-width:0}
+  .profile-basic-account-fields input{min-width:0}
+  .profile-basic-contact-fields input{
+    min-width:0;
+    padding-inline:5px;
+    font-size:12px;
+  }
+}
+
+@media(max-width:360px){
+  .profile-basic-account-fields,.profile-basic-contact-fields{gap:6px}
+  .profile-basic-contact-fields input{padding-inline:4px;font-size:10px}
 }

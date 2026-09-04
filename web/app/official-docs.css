@@ -55,7 +55,7 @@
 .od-layout .od-list-panel{border-top:6px solid var(--green);box-shadow:none}
 .od-page .od-create-panel{border-top:6px solid var(--amber);box-shadow:none}
 .od-header-unit-stat small{font-size:0}
-.od-header-unit-stat small::after{content:'部門';font-size:14px;line-height:1.45}
+.od-header-unit-stat small::after{content:'部／室';font-size:14px;line-height:1.45}
 .od-route-actions .primary-btn{background:color-mix(in srgb,var(--cyan) 80%,transparent);border-color:color-mix(in srgb,var(--cyan) 80%,var(--line));color:#fff}
 .od-route-actions .secondary-btn{background:color-mix(in srgb,var(--green) 80%,transparent);border-color:color-mix(in srgb,var(--green) 80%,var(--line));color:#fff}
 .od-route-actions .primary-btn:hover:not(:disabled){background:color-mix(in srgb,var(--cyan) 88%,transparent)}

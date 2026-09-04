@@ -1,10 +1,15 @@
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 import { canonicalFloor } from "../_shared/floor.ts";
+import { clientIpFromRequest } from "../_shared/client-ip.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
+const configuredOrigins = new Set((Deno.env.get("APP_ALLOWED_ORIGINS") || "")
+  .split(",").map((value) => value.trim()).filter(Boolean));
+// 自架站常見於內網 IP（RFC1918）；放行反射 CORS。
+const PRIVATE_NET_ORIGIN = /^https?:\/\/(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|192\.168(?:\.\d{1,3}){2})(?::\d{1,5})?$/;
 const allowedOrigin = (req: Request) => {
   const origin = req.headers.get("origin") || "";
-  if (origin === PROD_ORIGIN || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  if (origin === PROD_ORIGIN || configuredOrigins.has(origin) || PRIVATE_NET_ORIGIN.test(origin) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
   return PROD_ORIGIN;
 };
 const cors = (req: Request) => ({
@@ -20,11 +25,7 @@ const reply = (req: Request, body: unknown, status = 200) => new Response(JSON.s
 
 const cleanText = (value: unknown, max = 500) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 const isUuid = (value: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
-const clientIp = (req: Request) => {
-  const raw = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
-  return cleanText(raw.split(",")[0], 80) || null;
-};
+const clientIp = clientIpFromRequest;
 
 type JwtClaims = { aal?: string; amr?: Array<{ method?: string; timestamp?: number } | string>; session_id?: string; iat?: number };
 const decodeClaims = (token: string): JwtClaims => {
@@ -89,7 +90,6 @@ Deno.serve(async (req) => {
     if (sessionAge === null || sessionAge < -60 || sessionAge > 2 * 60 * 60) {
       return reply(req, { ok: false, code: "patrol_session_expired", message: "巡檢登入已超過兩小時，請重新登入後再簽到" }, 401);
     }
-
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -128,8 +128,9 @@ Deno.serve(async (req) => {
     const targetType = cleanText(body.target_type, 20);
     const targetId = String(body.target_id || "");
     const requestedCheckinId = String(body.checkin_id || "");
+    const checkinSource = body.checkin_source === "nfc" ? "nfc" : "qr";
     if (!(["marker", "space"] as string[]).includes(targetType) || !isUuid(targetId)) {
-      return reply(req, { ok: false, code: "invalid_target", message: "巡檢 QR Code 資料格式不正確" }, 400);
+      return reply(req, { ok: false, code: "invalid_target", message: "巡檢掃描碼資料格式不正確" }, 400);
     }
     const checkinId = isUuid(requestedCheckinId) ? requestedCheckinId : crypto.randomUUID();
 
@@ -181,7 +182,7 @@ Deno.serve(async (req) => {
       verification_method: "password_session",
       source_ip: clientIp(req),
       user_agent: cleanText(req.headers.get("user-agent"), 1000) || null,
-      checkin_source: "qr"
+      checkin_source: checkinSource
     };
     const { data: inserted, error: insertError } = await admin.from("checkin_logs").insert(event).select("*").single();
     if (insertError) {

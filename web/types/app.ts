@@ -6,6 +6,7 @@ export type Profile = {
   phone?: string | null;
   department?: string | null;
   dept_id?: string | null;
+  supervisor_id?: string | null;
   role: string;
   rbac_role?: string | null;
   status?: string | null;

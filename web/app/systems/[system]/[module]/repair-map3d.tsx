@@ -53,7 +53,7 @@ export function RepairMap3DModule({ module, profile: _profile, system: _system }
     {busy && <div className="f3-loading"><div className="ld-t">載入報修 3D 平面圖…</div><div className="ld-bar"><div className="ld-fill" style={{ width: '70%' }} /></div><div className="ld-m">讀取共用樓層圖資與報修標記…</div></div>}
     <div className="f3-topbar" data-system-page-heading="compact" data-system-key="workorder" data-module-key="repairmap3d">
       <span className="tb-logo">臺北農產公司 第一果菜市場</span><span className="tb-sep" />
-      <img className="tb-system-icon" src="/Inspection/assets/system-icons/maintenance-icon.png" alt="" data-system-page-logo /><span className="tb-title">{module.title}</span><span className="tb-space" />
+      <img className="tb-system-icon" src="/Inspection/assets/system-icons-v20260901/maintenance-icon.png" alt="" data-system-page-logo /><span className="tb-title">{module.title}</span><span className="tb-space" />
       <StructuremapTopbarActions planeHref="/Inspection/v2/systems/structuremap/floor2d/?kind=repair" label="切換平面圖" />
     </div>
     <div className="f3-stage">{models.length ? <FloorStack3D models={models as never} markers={stackMarkers} showMarkers={showMarkers} showLabels={showLabels} visibleFloors={visibleFloors} gap={explode * GAP_PER_STEP} apiRef={apiRef} /> : !busy && <p className="f3-empty">尚未設定樓層圖資，請至「圖資專案設定」建立。</p>}</div>

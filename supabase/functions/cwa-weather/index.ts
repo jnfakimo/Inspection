@@ -15,6 +15,20 @@ const CORS = {
   "Cache-Control": "no-store",
 };
 
+// CWA occasionally stalls on one dataset.  Keep the Edge Function alive long
+// enough to return the other datasets (and the stale cache) instead of letting
+// the isolate be terminated by the platform.
+const CWA_FETCH_TIMEOUT_MS = 8000;
+async function fetchCwaUrl(input: string | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CWA_FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const COUNTIES = [
   "基隆市", "臺北市", "新北市", "桃園市", "新竹市", "新竹縣", "苗栗縣",
   "臺中市", "彰化縣", "南投縣", "雲林縣", "嘉義市", "嘉義縣", "臺南市",
@@ -411,7 +425,7 @@ function rocTyphoonTime(value: string | null) {
 }
 
 async function fetchTyphoonHomepageStatus() {
-  const response = await fetch(`https://www.cwa.gov.tw/Data/js/typhoon/TY_NEWS-Data.js?T=${Date.now()}`, {
+  const response = await fetchCwaUrl(`https://www.cwa.gov.tw/Data/js/typhoon/TY_NEWS-Data.js?T=${Date.now()}`, {
     headers: { Accept: "text/javascript" },
   });
   if (!response.ok) throw new Error(`中央氣象署颱風消息回應 ${response.status}`);
@@ -436,7 +450,7 @@ async function fetchTyphoonHomepageStatus() {
 }
 
 async function fetchHomepageBulletins() {
-  const response = await fetch(`https://www.cwa.gov.tw/Data/js/warn/Warning_Content.js?v=${Date.now()}`, {
+  const response = await fetchCwaUrl(`https://www.cwa.gov.tw/Data/js/warn/Warning_Content.js?v=${Date.now()}`, {
     headers: { Accept: "text/javascript" },
   });
   if (!response.ok) throw new Error(`中央氣象署重要資訊回應 ${response.status}`);
@@ -558,7 +572,7 @@ async function fetchCwa(dataset: string, params: Record<string, string> = {}) {
   url.searchParams.set("Authorization", CWA_KEY);
   url.searchParams.set("format", "JSON");
   for (const [name, value] of Object.entries(params)) if (value) url.searchParams.set(name, value);
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await fetchCwaUrl(url, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(`中央氣象署 ${dataset} 回應 ${response.status}`);
   const payload = await response.json();
   if (payload?.success === "false" || payload?.success === false) {

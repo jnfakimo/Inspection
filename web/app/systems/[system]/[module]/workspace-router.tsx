@@ -54,6 +54,22 @@ const RepairMap3DModule = dynamic(
   () => import('./repair-map3d').then((mod) => mod.RepairMap3DModule),
   { ssr: false, loading: moduleLoading },
 );
+const MarketAnalyticsWorkspace = dynamic<WorkspaceProps>(
+  () => import('./market-analytics-workspace').then((mod) => mod.MarketAnalyticsWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
+const MarketCommandCenterWorkspace = dynamic<WorkspaceProps>(
+  () => import('./market-command-center').then((mod) => mod.MarketCommandCenterWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
+const MarketInteractiveDashboardWorkspace = dynamic<WorkspaceProps>(
+  () => import('./market-interactive-dashboard').then((mod) => mod.MarketInteractiveDashboardWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
+const MarketBoardWorkspace = dynamic<WorkspaceProps>(
+  () => import('./market-board-workspace').then((mod) => mod.MarketBoardWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'handover' || system.key === 'guardpatrol') {
@@ -79,6 +95,18 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   }
   if (system.key === 'officialdocs') {
     return <OfficialDocsWorkspace system={system} module={module} />;
+  }
+  if (system.key === 'marketboard') {
+    return <MarketBoardWorkspace system={system} module={module} />;
+  }
+  if (system.key === 'marketanalytics') {
+    if (module.key === 'command-center') {
+      return <MarketCommandCenterWorkspace system={system} module={module} />;
+    }
+    if (module.key === 'interactive-dashboard') {
+      return <MarketInteractiveDashboardWorkspace system={system} module={module} />;
+    }
+    return <MarketAnalyticsWorkspace system={system} module={module} />;
   }
   return <ModuleWorkspace system={system} module={module} />;
 }

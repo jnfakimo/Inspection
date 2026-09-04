@@ -496,7 +496,7 @@ function BookingModal({ rooms, init, myPhone, now, calendarStatus, onClose, onDo
                   {r.name}{r.capacity ? `（${r.capacity} 人）` : ''}{r.floor ? `｜${r.floor}` : ''}</option>)}
               </select></div>
             <div className="field"><label>日期（年/月/日）</label><LocalizedDateInput aria-label="預約日期（年/月/日）" min={taipeiToday()} value={date} onChange={e => setDate(e.target.value)} /></div>
-            <div className="field"><label>會議名稱</label><select value={purpose} onChange={e => setPurpose(e.target.value)}><option value="">-- 請選擇 --</option><option>主管會議</option><option>擴大主管會議</option><option>面試</option><option>管控會議</option><option>教育訓練</option><option>開／決標</option></select></div>
+            <div className="field"><label>會議名稱</label><input list="meeting-purpose-options" value={purpose} onChange={e => setPurpose(e.target.value)} placeholder="-- 請選擇或輸入 --" /><datalist id="meeting-purpose-options"><option value="" /><option value="主管會議" /><option value="擴大主管會議" /><option value="面試" /><option value="管控會議" /><option value="教育訓練" /><option value="開／決標" /></datalist></div>
           </div>
         </section>
         <section className="booking-form-section">
@@ -677,7 +677,7 @@ function NotificationsModule({ module, profile }: Props) {
           const b = (row.meeting_bookings as Row) || {}, room = (b.meeting_rooms as Row) || {};
           return <tr key={String(row.notification_id)}>
             <td>{fmtTime(row.created_at)}</td>
-            <td><strong>{fmt(b.booking_no)}</strong><small>{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</small></td>
+            <td><strong>{fmt(b.booking_no)}</strong><small className="notification-booking-meta">{fmt(room.name)}｜{fmt(b.booking_date)} {hhmm(b.start_time)}–{hhmm(b.end_time)}</small></td>
             <td>{notificationTypeLabel(row.notification_type)}</td>
             <td>{notificationStatusLabel(row.status)}</td>
             <td>{fmtTime(row.sent_at)}</td>

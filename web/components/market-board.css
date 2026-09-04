@@ -1,0 +1,152 @@
+/* SYS-12 市場公開看板（長官模式）。紅漲綠跌沿用戰情儀表板的 --market-rise/fall 代號。 */
+.market-board-page{--market-rise-color:var(--red);--market-fall-color:var(--green);--market-rise-readable:color-mix(in srgb,var(--red) 72%,var(--text));--market-fall-readable:color-mix(in srgb,var(--green) 68%,var(--text));display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+/* 單欄 grid 若不釘住 minmax(0,1fr)，會被全場均價大表（min-width）撐寬造成整頁橫向捲動。 */
+.market-board-overview,.market-board-markets,.market-board-market,.market-board-market-groups,.market-board-group,.market-board-trend,.market-board-table-panel{min-width:0}
+.market-board-market,.market-board-trend,.market-board-table-panel{grid-template-columns:minmax(0,1fr)}
+.market-board-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.market-board-head h2{margin:2px 0 4px;font:750 calc(22px * var(--board-type-scale,1)) var(--head)}
+.market-board-head p{margin:0;color:var(--dim);font-size:calc(12px * var(--board-type-scale,1));line-height:1.6}
+.market-board-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.market-board-live{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);padding:6px 11px;color:var(--dim);font-size:calc(10px * var(--board-type-scale,1))}
+.market-board-live i{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 color-mix(in srgb,var(--green) 45%,transparent);animation:market-board-pulse 1.9s infinite}
+.market-board-live b{color:var(--text);font-size:calc(11px * var(--board-type-scale,1))}
+@keyframes market-board-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--green) 45%,transparent)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+
+.market-board-legend{display:flex;flex-wrap:wrap;align-items:center;gap:7px 14px;padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--text);font-size:calc(11px * var(--board-type-scale,1))}
+.market-board-legend b{font-size:calc(11px * var(--board-type-scale,1))}
+.market-board-legend span{display:inline-flex;align-items:center;gap:4px}
+.market-board-legend i{font-style:normal;font-weight:700}
+.market-board-legend span[data-direction=rise] i{color:var(--market-rise-readable)}
+.market-board-legend span[data-direction=fall] i{color:var(--market-fall-readable)}
+.market-board-legend small{margin-left:auto;color:var(--dim);font-size:calc(10px * var(--board-type-scale,1))}
+
+.market-board-marquee{overflow:hidden;border:1px solid var(--line);border-radius:8px;background:color-mix(in srgb,var(--amber) 6%,var(--panel2))}
+.market-board-marquee>div{display:inline-flex;gap:44px;white-space:nowrap;padding:9px 0;animation:market-board-marquee var(--market-board-marquee-duration,42s) linear infinite}
+.market-board-marquee span{color:var(--text);font-size:calc(12px * var(--board-type-scale,1))}
+.market-board-marquee span b{color:var(--amber);margin-right:6px}
+.market-board-marquee:hover>div{animation-play-state:paused}
+@keyframes market-board-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+.market-board-overview{display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.market-board-overview>h3{margin:0;font:700 calc(15px * var(--board-type-scale,1)) var(--head)}
+.market-board-markets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.market-board-market{display:grid;gap:10px;padding:14px;border:1px solid var(--line);border-top:3px solid var(--cyan);border-radius:9px;background:var(--panel2)}
+.market-board-market>h4{margin:0;font:750 calc(14px * var(--board-type-scale,1)) var(--head);color:var(--cyan)}
+.market-board-market-groups{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.market-board-group{display:grid;gap:8px;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.market-board-group>b{color:var(--cyan);font:700 calc(12px * var(--board-type-scale,1)) var(--head);letter-spacing:.06em}
+.market-board-stat-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.market-board-stat{display:grid;gap:2px;min-width:0;padding:9px 10px;border:1px solid var(--line);border-left:3px solid var(--dim);border-radius:7px;background:var(--panel2)}
+.market-board-stat.market-card-rise{border-left-color:var(--market-rise-color);background:color-mix(in srgb,var(--market-rise-color) 7%,var(--panel2))}
+.market-board-stat.market-card-fall{border-left-color:var(--market-fall-color);background:color-mix(in srgb,var(--market-fall-color) 7%,var(--panel2))}
+.market-board-stat.market-card-steady{border-left-color:var(--cyan)}
+.market-board-stat>span{color:var(--dim);font-size:calc(10px * var(--board-type-scale,1))}
+.market-board-stat>strong{margin:1px 0;color:var(--text);font:750 clamp(calc(17px * var(--board-type-scale,1)),calc(1.7vw * var(--board-type-scale,1)),calc(24px * var(--board-type-scale,1))) var(--head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.market-board-stat>strong small{margin-left:4px;color:var(--dim);font:500 calc(9px * var(--board-type-scale,1)) var(--font)}
+.market-board-stat>em{color:var(--dim);font-size:calc(10px * var(--board-type-scale,1));font-style:normal}
+.market-board-stat .market-movement-badge{margin-top:2px;font-size:calc(10px * var(--board-type-scale,1))}
+
+.market-board-trend{padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.market-board-trend h3{margin:0 0 4px;font:700 calc(15px * var(--board-type-scale,1)) var(--head)}
+.market-board-trend p{margin:0 0 10px;color:var(--dim);font-size:calc(11px * var(--board-type-scale,1))}
+.market-board-trend-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.market-board-trend-range button{border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--dim);padding:5px 12px;font-size:calc(11px * var(--board-type-scale,1));cursor:pointer}
+.market-board-trend-range button.active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,var(--panel2));color:var(--cyan);font-weight:700}
+.market-board-trend-range small{margin-left:auto;color:var(--dim);font-size:calc(10px * var(--board-type-scale,1))}
+.market-board-trend-canvas{position:relative;min-width:0;height:300px}
+
+.market-board-table-panel{container-type:inline-size;padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--panel)}
+.market-board-table-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.market-board-table-head h3{margin:0;font:700 calc(15px * 1.18 * var(--board-type-scale,1)) var(--head);text-align:center}
+.market-board-table-head span{color:var(--dim);font-size:calc(11px * 1.18 * var(--board-type-scale,1));text-align:center}
+.market-board-table-scroll{overflow-x:auto}
+.market-board-table{width:100%;border-collapse:collapse;font-size:calc(12px * 1.18 * var(--board-type-scale,1))}
+/* 表頭可換行（名稱一行、單位一行）、內距收斂，讓 2 市場 × 8 欄在筆電寬度也塞進一頁；數字格維持 nowrap，太窄時由外層容器橫向捲動。 */
+.market-board-table thead th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);color:var(--dim);font-weight:600;padding:6px 4px;text-align:center;vertical-align:bottom;white-space:normal;line-height:1.25}
+.market-board-table thead th small{display:block;color:var(--dim);font-size:.82em;font-weight:500;white-space:nowrap}
+.market-board-table thead th.market-board-col-item,.market-board-table tbody th{text-align:center}
+.market-board-table thead tr:first-child th{text-align:center;border-bottom:1px solid var(--line)}
+.market-board-table tbody th{padding:7px 6px;color:var(--text);font-weight:600;white-space:nowrap}
+.market-board-table tbody th small{display:block;color:var(--dim);font-weight:400;font-size:calc(10px * 1.18 * var(--board-type-scale,1))}
+.market-board-table td{padding:7px 5px;text-align:center;border-bottom:1px solid rgba(23,57,82,.5);white-space:nowrap;font-variant-numeric:tabular-nums}
+/* 同一品名對應多個品種代碼（例如甘藍 FK3、FK40…）時允許在「、」處折行，不撐寬整張表。 */
+.market-board-table .market-board-col-code,.market-board-table .market-board-row-code{min-width:64px;max-width:108px;text-align:center}
+.market-board-table .market-board-row-code{color:var(--dim);font-weight:600;background:var(--panel);font-variant-numeric:tabular-nums;letter-spacing:.02em;white-space:normal;overflow-wrap:anywhere;line-height:1.3;font-size:.92em}
+.market-board-table td.market-board-cell-change[data-direction=rise]{color:var(--market-rise-readable)}
+.market-board-table td.market-board-cell-change[data-direction=fall]{color:var(--market-fall-readable)}
+.market-board-table td.market-board-cell-sep{border-left:1px solid var(--line)}
+.market-board-table tbody tr:hover td,.market-board-table tbody tr:hover th{background:color-mix(in srgb,var(--cyan) 5%,transparent)}
+/* 面板窄於 1180px（登入版 1366 筆電約 1050px 可用）時取消 1.18 倍放大並再縮內距，維持一頁寬不橫向捲動。 */
+@container (max-width:1180px){
+  .market-board-table{font-size:calc(12px * var(--board-type-scale,1))}
+  .market-board-table td,.market-board-table tbody th{padding:6px 4px}
+  .market-board-table thead th{padding:5px 3px}
+}
+.market-board-table-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;margin-top:10px}
+.market-board-table-dots span{width:16px;height:4px;border-radius:999px;background:color-mix(in srgb,var(--dim) 35%,transparent)}
+.market-board-table-dots span.active{width:30px;background:var(--cyan)}
+
+.market-board-empty{padding:34px;color:var(--dim);text-align:center}
+.market-board-stale{margin:0;padding:10px 12px;border:1px solid color-mix(in srgb,var(--amber) 42%,var(--line));border-radius:7px;background:color-mix(in srgb,var(--amber) 7%,var(--panel2));color:var(--dim);font-size:calc(11px * var(--board-type-scale,1));line-height:1.6}
+.market-board-stale b{color:var(--text)}
+
+/* 全螢幕公開播放：蓋掉共用導覽，適合大螢幕投放。 */
+.market-board-page[data-fullscreen=true]{position:fixed;inset:0;z-index:70;margin:0;padding:22px clamp(18px,3vw,40px) 28px;overflow:auto;background:var(--bg);background-image:radial-gradient(circle at 82% 0,rgba(0,212,255,.09),transparent 34%)}
+.market-board-page[data-fullscreen=true] .market-board-head h2{font-size:clamp(calc(24px * var(--board-type-scale,1)),calc(2.4vw * var(--board-type-scale,1)),calc(34px * var(--board-type-scale,1)))}
+.market-board-page[data-fullscreen=true] .market-board-stat>strong{font-size:clamp(calc(22px * var(--board-type-scale,1)),calc(2.4vw * var(--board-type-scale,1)),calc(34px * var(--board-type-scale,1)))}
+.market-board-page[data-fullscreen=true] .market-board-trend-canvas{height:clamp(300px,32vh,420px)}
+.market-board-page[data-fullscreen=true] .market-board-table{font-size:clamp(calc(12px * var(--board-type-scale,1)),calc(1.05vw * var(--board-type-scale,1)),calc(15px * var(--board-type-scale,1)))}
+
+.market-board-ticker-page{display:grid;gap:14px}
+.market-board-ticker-page[data-fullscreen=true]{position:fixed;inset:0;z-index:70;padding:22px clamp(18px,3vw,40px) 28px;overflow:auto;background:var(--bg)}
+
+/* /board/ 免登入公開頁：滿版、無共用導覽，直接投放。 */
+.market-board-public-shell{min-height:100vh;padding:clamp(14px,2.4vw,30px);background:var(--bg);background-image:radial-gradient(circle at 84% 0,rgba(0,212,255,.08),transparent 34%)}
+.market-board-public-shell footer{margin-top:16px;color:var(--dim);font-size:calc(11px * var(--board-type-scale,1));text-align:center}
+.market-board-page.market-board-public{gap:12px}
+.market-board-page.market-board-public .market-board-head h2{font-size:clamp(calc(20px * var(--board-type-scale,1)),calc(2vw * var(--board-type-scale,1)),calc(28px * var(--board-type-scale,1)))}
+
+@media(prefers-reduced-motion:reduce){.market-board-live i,.market-board-marquee>div{animation:none}}
+@media(max-width:1024px){.market-board-markets{grid-template-columns:1fr}}
+@media(max-width:640px){.market-board-market-groups{grid-template-columns:1fr}.market-board-head-actions{width:100%}}
+@media(max-width:400px){.market-board-stat-row{grid-template-columns:1fr}}
+
+/* 公開頁與登入頁共用市場配色；公開看板另保留 110% 字級。 */
+.market-board-public-shell{--board-type-scale:1.1}
+.market-board-public{font-size:17.6px;--board-market-accent:var(--cyan)}
+.market-board-page [data-market="第一市場"]{--board-market-accent:var(--cyan)}
+.market-board-page [data-market="第二市場"]{--board-market-accent:var(--amber)}
+.market-board-page .market-board-market{background:color-mix(in srgb,var(--board-market-accent) 18%,var(--panel));border-color:color-mix(in srgb,var(--board-market-accent) 50%,var(--line));border-top-width:4px;border-top-color:var(--board-market-accent)}
+.market-board-page .market-board-market>h4{display:flex;align-items:center;gap:7px;color:color-mix(in srgb,var(--board-market-accent) 55%,var(--text))}
+.market-board-page .market-board-market>h4::before{content:'';width:9px;height:9px;flex:none;border-radius:50%;background:var(--board-market-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--board-market-accent) 22%,transparent)}
+.market-board-page .market-board-group>b{color:color-mix(in srgb,var(--board-market-accent) 45%,var(--text))}
+.market-board-page .market-board-group{background:color-mix(in srgb,var(--board-market-accent) 8%,var(--panel))}
+.market-board-page .market-board-stat>strong{white-space:normal;overflow:visible;overflow-wrap:anywhere}
+.market-board-page .market-board-stat>strong small{display:inline-block}
+/* 品項欄（無 data-market）維持中性灰階斑馬紋；兩市場資料欄改用各自的 accent 色，讓整張表一眼分辨市場區塊。 */
+.market-board-page .market-board-table tbody tr>th{background:var(--panel)}
+.market-board-page .market-board-table tbody tr:nth-child(even)>th{background:color-mix(in srgb,var(--dim) 12%,var(--panel))}
+.market-board-page .market-board-table tbody td[data-market]{background:color-mix(in srgb,var(--board-market-accent) 10%,var(--panel))}
+.market-board-page .market-board-table tbody tr:nth-child(even) td[data-market]{background:color-mix(in srgb,var(--board-market-accent) 20%,var(--panel))}
+.market-board-page .market-board-table thead [data-market]{background:color-mix(in srgb,var(--board-market-accent) 22%,var(--panel));color:var(--text)}
+.market-board-page .market-board-table thead tr:first-child [data-market]{border-top:4px solid var(--board-market-accent)}
+.market-board-page .market-board-table tbody tr:hover>th{background:color-mix(in srgb,var(--dim) 18%,var(--panel))}
+.market-board-page .market-board-table tbody tr:hover td[data-market]{background:color-mix(in srgb,var(--board-market-accent) 30%,var(--panel))}
+.market-board-page .market-board-table td{border-bottom-color:var(--line)}
+.market-board-page .market-board-table .market-board-cell-sep{border-left:3px solid color-mix(in srgb,var(--board-market-accent) 55%,var(--line))}
+.market-board-public .market-board-head-actions .compact{font-size:12.1px}
+/* 漲跌圖示的顏色規則要掛在 .market-board-page（登入版與公開版共用）。
+   登入版 /systems/marketboard/executive/ 是獨立的動態 chunk，不會載到
+   market-analytics.css 的 .market-movement-badge 通用規則；先前只寫在
+   .market-board-public 底下，登入版的 ▲▼ 就只剩灰色。 */
+.market-board-page .market-movement-badge{display:inline-flex;align-items:center;gap:5px;line-height:1.4;font-weight:700;white-space:nowrap}
+.market-board-page .market-movement-badge .market-movement-glyph{font-size:13px;line-height:1}
+.market-board-page .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
+.market-board-page .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
+.market-board-page .market-movement-badge.steady .market-movement-glyph{color:var(--dim)}
+.market-board-page .market-board-legend [data-direction] i{font-size:14.3px;line-height:1}
+
+.market-board-page{--board-muted:color-mix(in srgb,var(--dim) 80%,var(--text))}
+.market-board-page .market-board-stat>span,.market-board-page .market-board-stat>strong small,.market-board-page .market-board-stat>em,.market-board-page .market-board-stat .market-movement-badge{color:var(--board-muted)}
+.market-board-public .market-board-trend-range button.active{color:color-mix(in srgb,var(--cyan) 55%,var(--text))}
+.market-board-public .market-board-head p,.market-board-public-shell footer{color:color-mix(in srgb,var(--dim) 80%,var(--text))}

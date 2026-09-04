@@ -7,9 +7,10 @@
 //   vehicle_request_action  —— 核可／退回／派車／接單／取消（security definer，內含 RLS 等價檢查）
 //   complete_vehicle_trip   —— 司機行車回報（單一交易內更新申請單、車輛里程與流程歷程）
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ExcelJS from 'exceljs';
 import '@/app/admin-workspace.css';
+import './vehicle-request-form.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
@@ -18,6 +19,7 @@ import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, 
 import { TimeSelect } from '@/components/TimeSelect';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { escHtml } from '@/lib/html-escape';
+import { useFleetRole } from '@/lib/fleet-role';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -71,6 +73,85 @@ function numberOrNull(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const VEHICLE_ORIGIN_OPTIONS = ['第二市場', '市場處'];
+const VEHICLE_DESTINATION_OPTIONS = ['第一市場', '市場處'];
+const VEHICLE_PURPOSE_OPTIONS = ['會勘', '開會', '考察'];
+
+/**
+ * 可輸入文字／數字、也可從常用選項挑選的派車欄位。
+ * 桌面維持原生 datalist；手機改成欄位內的展開按鈕與 listbox，避免 iOS 把選項
+ * 放到鍵盤上方，使用者能清楚看到選項屬於哪一個輸入框。
+ */
+function VehicleCombobox({
+  id, value, options, onChange, placeholder = '可輸入文字或數字',
+}: {
+  id: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const [mobile, setMobile] = useState(false);
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const listId = `${id}-options`;
+  const visibleOptions = options.filter(option => !value.trim() || option.includes(value.trim()));
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 800px), (pointer: coarse)');
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeWhenOutside = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', closeWhenOutside);
+    return () => document.removeEventListener('pointerdown', closeWhenOutside);
+  }, [open]);
+
+  return <div ref={containerRef} className={`vehicle-combobox${mobile ? ' is-mobile' : ''}`}>
+    <div className="vehicle-combobox-control">
+      <input
+        id={id}
+        list={mobile ? undefined : listId}
+        value={value}
+        placeholder={placeholder}
+        autoComplete="off"
+        role={mobile ? 'combobox' : undefined}
+        aria-autocomplete={mobile ? 'list' : undefined}
+        aria-expanded={mobile ? open : undefined}
+        aria-controls={mobile ? `${id}-menu` : undefined}
+        onFocus={() => { if (mobile) setOpen(true); }}
+        onChange={event => { onChange(event.target.value); if (mobile) setOpen(true); }}
+      />
+      {mobile && <button
+        type="button"
+        className="vehicle-combobox-toggle"
+        aria-label={open ? '收合選項' : '展開選項'}
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+      >⌄</button>}
+    </div>
+    <datalist id={listId}>{options.map(option => <option key={option} value={option} />)}</datalist>
+    {mobile && open && <div id={`${id}-menu`} className="vehicle-combobox-menu" role="listbox">
+      {visibleOptions.map(option => <button
+        type="button"
+        role="option"
+        aria-selected={value === option}
+        className={value === option ? 'is-selected' : ''}
+        key={option}
+        onClick={() => { onChange(option); setOpen(false); }}
+      >{option}</button>)}
+      {!visibleOptions.length && <span className="vehicle-combobox-empty">可保留自訂文字或數字</span>}
+    </div>}
+  </div>;
+}
+
 function missingNumber(value: unknown) {
   return value === null || value === undefined || String(value).trim() === '' || !Number.isFinite(Number(value));
 }
@@ -113,28 +194,59 @@ function blocksVehicleDispatch(row: Row, today: string, nowTime: string) {
   return false;
 }
 
+/** 排除約束 vehicle_dispatch_no_time_overlap 納入計算的狀態，兩邊必須一致。 */
+const VEHICLE_OCCUPYING_STATUSES = ['pending_approval', 'approved', 'assigned', 'completed'];
+
+/**
+ * 同一台車在重疊時段只能有一張派車單（資料庫的排除約束
+ * vehicle_dispatch_no_time_overlap 才是最終依據）。這裡先在畫面上算一次，
+ * 讓已被佔用的車輛在下拉選單就是停用狀態，而不是讓派車管理員按下去才被退回。
+ * 只看得到自己有權限讀到的申請單，所以可能少偵測、但不會誤判成不可用。
+ */
+function overlapsTripWindow(candidate: Row, target: Row) {
+  if (String(candidate.request_id) === String(target.request_id)) return false;
+  if (!VEHICLE_OCCUPYING_STATUSES.includes(String(candidate.status || ''))) return false;
+  const span = (row: Row) => {
+    const date = String(row.trip_date || '');
+    const from = String(row.planned_departure_time || '');
+    const to = String(row.planned_return_time || '');
+    return date && from && to ? { from: `${date} ${from}`, to: `${date} ${to}` } : null;
+  };
+  const a = span(candidate);
+  const b = span(target);
+  if (!a || !b) return false;
+  return a.from < b.to && b.from < a.to;   // 半開區間 [from, to)，與資料庫的 '[)' 一致
+}
+
+/**
+ * 三個維護用模組不開放給一般使用人。系統入口已不顯示這三張圖卡，
+ * 但直接輸入網址仍會進來，所以這裡用同一份判斷（`@/lib/fleet-role`）再擋一次。
+ * 這是介面層的防線，資料層仍以 Supabase RLS 為準。
+ */
+function VehicleModuleGate({ system, module, profile }: { system: SystemDefinition; module: ModuleDefinition; profile: Profile }) {
+  const { isAdmin, canManageFleet } = useFleetRole(profile);
+  const allowed = module.key === 'vehicles' ? canManageFleet : isAdmin;
+  if (!allowed) {
+    return <AppShell profile={profile} title={module.title}>
+      <div className="notice danger">目前角色沒有此子系統權限，請由管理員開放。</div>
+    </AppShell>;
+  }
+  return module.key === 'vehicles'
+    ? <VehiclesModule system={system} module={module} profile={profile} />
+    : <RosterModule system={system} module={module} profile={profile} />;
+}
+
 export function VehicleWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
   return <AuthGate>{profile => {
     if (module.key === 'requests') return <RequestsModule system={system} module={module} profile={profile} />;
-    if (module.key === 'vehicles') return <VehiclesModule system={system} module={module} profile={profile} />;
-    if (module.key === 'drivers' || module.key === 'managers') return <RosterModule system={system} module={module} profile={profile} />;
+    if (module.key === 'vehicles' || module.key === 'drivers' || module.key === 'managers') {
+      return <VehicleModuleGate system={system} module={module} profile={profile} />;
+    }
     return <LogsModule system={system} module={module} profile={profile} />;
   }}</AuthGate>;
 }
 
-function useFleetRole(profile: Profile) {
-  const [isManager, setIsManager] = useState(false);
-  const role = String(profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[profile.role] || profile.role || '');
-  const isAdmin = role === 'sysadmin' || role === 'admin';
-  const isUnitSupervisor = role === 'unit_supervisor';
-  useEffect(() => {
-    let active = true;
-    getSupabase().from('vehicle_dispatch_managers').select('user_id,active').eq('user_id', profile.user_id).eq('active', true).maybeSingle()
-      .then(({ data }) => { if (active) setIsManager(Boolean(data)); });
-    return () => { active = false; };
-  }, [profile.user_id]);
-  return { isAdmin, isUnitSupervisor, isManager, canManageFleet: isAdmin || isManager };
-}
+// useFleetRole 已移到 @/lib/fleet-role，與系統入口圖卡的顯示條件共用同一份判斷。
 
 /* ──────────────────────────── 派車申請 (100% V1 視覺對齊) ──────────────────────────── */
 
@@ -191,6 +303,10 @@ function RequestsModule({ module, profile }: Props) {
   const blockedVehicleIds = useMemo(() => new Set(rows
     .filter(row => blocksVehicleDispatch(row, today, nowTime) && row.vehicle_id)
     .map(row => String(row.vehicle_id))), [rows, today, nowTime]);
+  // 與目前這張單的用車時段重疊、已被其他派車單佔用的車輛。
+  const occupiedVehicleIds = useMemo(() => new Set(detail
+    ? rows.filter(row => row.vehicle_id && overlapsTripWindow(row, detail)).map(row => String(row.vehicle_id))
+    : []), [rows, detail]);
 
   // KPI 統計數字
   const kApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_approval').length, [rows]);
@@ -359,7 +475,7 @@ function RequestsModule({ module, profile }: Props) {
 
     {detail && <DetailModal row={detail} logs={logs} busy={busy} profile={profile}
       vehicles={vehicles} drivers={drivers} canDispatch={canManageFleet || isAdmin}
-      blockedVehicleIds={blockedVehicleIds}
+      blockedVehicleIds={blockedVehicleIds} occupiedVehicleIds={occupiedVehicleIds}
       canApprove={isAdmin || (isUnitSupervisor && detail.applicant_id !== profile.user_id)}
       onClose={() => setDetail(null)} onAct={act} onTrip={() => { setTripFor(detail); setDetail(null); }} />}
 
@@ -571,7 +687,7 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
     try {
       await invokeAppApi('save_official_vehicle', editing.vehicle_id ? { vehicle_id: String(editing.vehicle_id), ...payload } : payload);
       setEditing(null); await load();
-    } catch (error) { alert(`失敗：${error instanceof Error ? error.message : String(error)}`); }
+    } catch (error) { alert(`失敗：${errorMessage(error)}`); }
     setBusy(false);
   };
 
@@ -623,7 +739,7 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
 function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: Profile; onClose: () => void; onDone: (message: string) => void }) {
   const [form, setForm] = useState({
     trip_date: taipeiToday(), planned_departure_time: '09:00', planned_return_time: '12:00',
-    origin_location: '第一果菜市場', destination_location: '', trip_purpose: '',
+    origin_location: '', destination_location: '', trip_purpose: '',
     passenger_count: '1', applicant_phone: '', applicant_note: '',
   });
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
@@ -645,22 +761,22 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
       });
       onDone('派車申請已送出，待單位主管核可');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(errorMessage(error));
       setBusy(false); return;
     }
   };
 
   return <AdminModal title="新增派車申請" onClose={onClose}>
-    <div className="admin-form-grid">
+    <div className="admin-form-grid vehicle-request-form">
       <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
       <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
       <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
       <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
-      <label>出發地<input value={form.origin_location} onChange={e => set('origin_location', e.target.value)} /></label>
-      <label>目的地（必填）<input value={form.destination_location} onChange={e => set('destination_location', e.target.value)} placeholder="例：第二果菜市場" /></label>
+      <label>出發地<VehicleCombobox id="vehicle-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
+      <label>目的地（必填）<VehicleCombobox id="vehicle-destination" value={form.destination_location} options={VEHICLE_DESTINATION_OPTIONS} onChange={value => set('destination_location', value)} /></label>
       <label>聯絡電話<input value={form.applicant_phone} onChange={e => set('applicant_phone', e.target.value)} placeholder="分機或手機" /></label>
-      <label className="wide">用途（必填）<input value={form.trip_purpose} onChange={e => set('trip_purpose', e.target.value)} placeholder="例：會勘" /></label>
-      <label className="wide">備註<textarea rows={2} value={form.applicant_note} onChange={e => set('applicant_note', e.target.value)} /></label>
+      <label className="wide vehicle-request-purpose">用途（必填）<VehicleCombobox id="vehicle-purpose" value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} onChange={value => set('trip_purpose', value)} /></label>
+      <label className="wide vehicle-request-note">備註<textarea rows={2} value={form.applicant_note} onChange={e => set('applicant_note', e.target.value)} /></label>
     </div>
     {message && <p className="inline-message danger">{message}</p>}
     <footer>
@@ -670,9 +786,9 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
   </AdminModal>;
 }
 
-function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehicleIds, canDispatch, canApprove, onClose, onAct, onTrip }: {
+function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehicleIds, occupiedVehicleIds, canDispatch, canApprove, onClose, onAct, onTrip }: {
   row: Row; logs: Row[]; busy: boolean; profile: Profile; vehicles: Row[]; drivers: Row[]; canDispatch: boolean; canApprove: boolean;
-  blockedVehicleIds: Set<string>;
+  blockedVehicleIds: Set<string>; occupiedVehicleIds: Set<string>;
   onClose: () => void; onTrip: () => void;
   onAct: (requestId: string, action: string, extra?: { note?: string; vehicleId?: string; driverId?: string }, success?: string) => Promise<boolean>;
 }) {
@@ -685,6 +801,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
     && (row.applicant_id === profile.user_id || row.driver_id === profile.user_id || canDispatch);
   const followup = vehicleFollowup(row, taipeiToday(), taipeiCurrentTime());
   const selectedVehicleBlocked = Boolean(vehicleId && blockedVehicleIds.has(vehicleId));
+  const selectedVehicleOccupied = Boolean(vehicleId && occupiedVehicleIds.has(vehicleId));
 
   const field = (label: string, value: unknown) => <div><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
 
@@ -728,7 +845,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
     {row.status === 'approved' && canDispatch && <div className="admin-form-grid">
       <label>指派車輛<select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
         <option value="">-- 請選擇 --</option>
-        {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : ''}</option>; })}
+        {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); const occupied = occupiedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked || occupied}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : occupied ? '（該時段已被派用）' : ''}</option>; })}
       </select></label>
       <label>指派駕駛<select value={driverId} onChange={e => setDriverId(e.target.value)}>
         <option value="">-- 請選擇 --</option>
@@ -736,6 +853,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       </select></label>
       <label className="wide">派車備註<input value={reason} onChange={e => setReason(e.target.value)} /></label>
       {selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛上一趟行程尚未補齊里程，暫停派車；請先由司機完成回報。</p>}
+      {selectedVehicleOccupied && !selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛在本申請的用車時段已被其他派車單使用，請改派其他車輛或調整用車時段。</p>}
     </div>}
     {canCancel && <div className="admin-form-grid">
       <label className="wide">取消原因（取消時必填）<select value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
@@ -753,7 +871,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'approve', { note: reason }, '已核可申請')}>核可</button>
       </>}
       {row.status === 'approved' && canDispatch &&
-        <button className="primary-btn compact" disabled={busy || !vehicleId || !driverId || selectedVehicleBlocked} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}
+        <button className="primary-btn compact" disabled={busy || !vehicleId || !driverId || selectedVehicleBlocked || selectedVehicleOccupied} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}
       {row.status === 'assigned' && isDriver && !row.driver_accepted_at &&
         <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'accept', {}, '已接單')}>接單</button>}
       {row.status === 'assigned' && isDriver && row.driver_accepted_at &&
@@ -902,7 +1020,7 @@ function VehiclesModule({ module, profile }: Props) {
     </div>
 
     {editor && <AdminModal title={editor.vehicle_id ? `編輯車輛｜${fmt(editor.plate_no)}` : '新增車輛'} onClose={() => setEditor(null)}>
-      <div className="admin-form-grid">
+      <div className="admin-form-grid vehicle-master-edit-form">
         <label>車號（必填）<input value={String(editor.plate_no || '')} onChange={e => setEditor({ ...editor, plate_no: e.target.value })} /></label>
         <label>車名<input value={String(editor.vehicle_name || '')} onChange={e => setEditor({ ...editor, vehicle_name: e.target.value })} placeholder="例：7人座車" /></label>
         <label>廠牌<input value={String(editor.brand || '')} onChange={e => setEditor({ ...editor, brand: e.target.value })} /></label>

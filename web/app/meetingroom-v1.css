@@ -253,9 +253,77 @@
   .calendar-link-status{width:100%;order:3}.calendar-sync-option{align-items:stretch}
 }
 
-/* 會議室管理彈窗的送出按鈕列：桌面沿用原本的靠左排列（等同原本的行內 flex），
-   手機版改為靠右，與各頁頁首按鈕的方向一致。 */
-.mr-form-actions{display:flex;gap:8px}
-@media (max-width:800px){
-  .mr-form-actions{justify-content:flex-end}
+/* 手機預約彈窗第 03 段：電話欄位並排，重複預約與 Google 行事曆各占一列。 */
+@media (max-width:700px){
+  .booking-modal .booking-form-section:nth-of-type(3){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .booking-modal .booking-form-section:nth-of-type(3)>.booking-section-head{grid-column:1/-1}
+  .booking-modal .booking-form-section:nth-of-type(3)>.row2{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .booking-modal .booking-form-section:nth-of-type(3)>.booking-repeat-panel{grid-column:1/-1}
+}
+@media (max-width:520px){
+  .booking-modal .booking-form-section:nth-of-type(3){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .booking-modal .booking-form-section:nth-of-type(3)>.row2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .booking-modal .localized-date-input>input:first-child:focus{outline:0!important;border-color:color-mix(in srgb,var(--line) 88%,var(--dim))!important;box-shadow:none!important}
+  .booking-modal .localized-date-input>input:first-child{user-select:none;-webkit-user-select:none;caret-color:transparent;-webkit-tap-highlight-color:transparent}
+  .booking-modal .localized-date-input>input:first-child::selection{background:transparent;color:inherit}
+  .booking-modal .localized-date-input>button{display:none}
+  .booking-modal .localized-date-native{outline:0!important;border:0!important;box-shadow:none!important;background:transparent!important;color:transparent!important;-webkit-text-fill-color:transparent!important;caret-color:transparent!important}
+  .mr-page .mr-hero{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .mr-page .mr-hero>div:first-child{grid-column:1/-1}
+  .mr-page .mr-hero>.spacer{display:none}
+  .mr-page .mr-hero>.calendar-link-status,.mr-page .mr-hero>.btn{width:100%;min-width:0;font-size:.68rem}
+  .mr-page .mr-schedule-panel .mr-panel-head{display:grid;grid-template-columns:1fr;gap:8px}
+  .mr-page .mr-schedule-panel .week-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:4px;align-items:center}
+  .mr-page .mr-schedule-panel .week-nav .btn{min-width:0;padding:7px 5px;font-size:.78rem;white-space:nowrap}
+  .mr-page .mr-schedule-panel .week-label{min-width:0;font-size:.82rem;white-space:nowrap}
+}
+
+/* 會議室管理的兩組基本欄位在手機仍各自維持同列，保留足夠的觸控高度。 */
+@media (max-width:700px){
+  .mr-modal.wide:not(.booking-modal) .row2{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .mr-modal.wide:not(.booking-modal) .field input,
+  .mr-modal.wide:not(.booking-modal) .field select{min-height:48px;font-size:16px}
+}
+
+/* 提醒卡的預約房間、日期與時段合併為單列，窄版以省略號保護卡片寬度。 */
+@media (max-width:640px){
+  .meetingroom-notifications-page .notification-booking-meta{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
+/* 會議室管理彈窗的送出按鈕列統一靠右，讓「新增會議室」與表單操作邏輯一致。 */
+.mr-form-actions{display:flex;justify-content:flex-end;gap:8px}
+
+/* 會議系統手機版頁首：說明與「重新載入」同列，避免按鈕獨占一行留下過多空白。
+   僅套用會議預約／變更／提醒頁，其他使用 AdminHeader 的子系統維持共用版型。 */
+@media (max-width:760px){
+  .content.v1-content:has(.mr-page) .admin-page-actions,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions{
+    flex-direction:row;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:first-child,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:first-child{
+    min-width:0;
+    flex:1 1 auto;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:first-child p,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:first-child p{
+    margin:0;
+    line-height:1.45;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:last-child,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:last-child{
+    width:auto;
+    flex:0 0 auto;
+    justify-content:flex-end;
+    margin-left:auto;
+  }
+  .content.v1-content:has(.mr-page) .admin-page-actions>div:last-child button,
+  .content.v1-content:has(.meetingroom-notifications-page) .admin-page-actions>div:last-child button{
+    min-height:36px;
+    padding:7px 10px;
+    white-space:nowrap;
+  }
 }

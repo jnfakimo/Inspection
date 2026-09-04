@@ -136,7 +136,7 @@ export function PatrolMap3DModule({ module, profile }: Props) {
     <div className="f3-topbar" data-system-page-heading="compact" data-system-key="guardpatrol" data-module-key="map3d">
       <span className="tb-logo">臺北農產公司 第一果菜市場</span>
       <span className="tb-sep" />
-      <img className="tb-system-icon" src="/Inspection/assets/system-icons/guardpatrol-icon.png" alt="" data-system-page-logo />
+      <img className="tb-system-icon" src="/Inspection/assets/system-icons-v20260901/guardpatrol-icon.png" alt="" data-system-page-logo />
       <span className="tb-title">{module.title}</span>
       <span className="tb-space" />
       <StructuremapTopbarActions planeHref={`${STRUCTUREMAP_ROUTES.floor2d}?kind=patrol`} label="切換平面圖" />

@@ -11,7 +11,7 @@ const AUTO_RETRY_LIMIT = 2;
 
 const isTransientAuthError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
-  return /安全限流服務暫時無法使用|Failed to fetch|NetworkError|network\s+error|timed out|timeout/i.test(message);
+  return /安全限流服務暫時無法使用|系統服務回應逾時|Failed to fetch|Failed to send|NetworkError|network\s+error|timed out|timeout/i.test(message);
 };
 
 export function AuthGate({ children }: { children: (profile: Profile) => React.ReactNode }) {

@@ -30,11 +30,11 @@ revoke insert, update, delete on public.checkin_logs from anon, authenticated;
 grant select on public.checkin_logs to authenticated;
 
 comment on table public.checkin_logs is
-  '巡檢 QR 簽到紀錄；寫入僅允許 patrol-checkin Edge Function，必須通過登入與 MFA AAL2。';
-comment on column public.checkin_logs.auth_level is 'Supabase Authenticator Assurance Level，巡檢簽到應為 aal2';
-comment on column public.checkin_logs.verification_method is 'MFA 驗證方式，例如 totp 或 passkey';
+  '巡檢 QR／NFC 簽到紀錄；寫入僅允許 patrol-checkin Edge Function，必須通過登入、巡檢權限與工作階段期限。';
+comment on column public.checkin_logs.auth_level is 'Supabase Authenticator Assurance Level，記錄簽到當下的登入安全等級';
+comment on column public.checkin_logs.verification_method is '登入驗證方式，例如 password_session';
 comment on column public.checkin_logs.source_ip is '後端取得的來源 IP（不信任瀏覽器提供值）';
 comment on column public.checkin_logs.user_agent is '後端取得的瀏覽器／裝置識別資訊';
-comment on column public.checkin_logs.checkin_source is '簽到來源，例如 qr';
+comment on column public.checkin_logs.checkin_source is '簽到來源，例如 qr 或 nfc';
 
 commit;
