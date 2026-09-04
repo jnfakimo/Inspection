@@ -105,11 +105,26 @@ export function normalizeMarketSheet(matrix: unknown[][], file: string): ParsedM
 
 export async function parseMarketExcelFile(file: Pick<File, 'name' | 'arrayBuffer' | 'size'>): Promise<ParsedMarketFile> {
   if (file.size > 100 * 1024 * 1024) throw new Error('單一檔案不可超過 100 MB。');
-  const { read, utils } = await import('xlsx');
-  const workbook = read(await file.arrayBuffer(), { type: 'array', cellDates: true, cellFormula: false });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  if (!sheet) throw new Error('檔案中找不到工作表。');
-  return normalizeMarketSheet(utils.sheet_to_json(sheet, { header: 1, defval: '', raw: true }), file.name);
+  const ExcelJS = await import('exceljs');
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await file.arrayBuffer());
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) throw new Error('檔案中找不到工作表。');
+  const rows: unknown[][] = [];
+  worksheet.eachRow({ includeEmpty: true }, (row) => {
+    const rowValues = Array.isArray(row.values) ? row.values.slice(1) : [];
+    rows.push(
+      rowValues.map(val => {
+        if (val == null) return '';
+        if (typeof val === 'object' && val !== null) {
+          if ('result' in val) return (val as any).result ?? '';
+          if ('text' in val) return (val as any).text ?? '';
+        }
+        return val;
+      })
+    );
+  });
+  return normalizeMarketSheet(rows, file.name);
 }
 
 /** Identical downloads are ignored; conflicting exports of one scope must not be summed. */

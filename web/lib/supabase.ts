@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 import { reportIfInfrastructureError } from './error-tracker';
 import { emitSecurityDataRead } from './security-audit-sink';
+import { cachedRequest, requestCacheKey } from './request-cache';
 
 let client: SupabaseClient | null = null;
 const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
@@ -120,4 +121,15 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
   }
   recordAppRead(action);
   return data.data as T;
+}
+
+export async function invokeCachedAppApi<T>(
+  action: string,
+  payload: Record<string, unknown> = {},
+  options?: number | { ttlMs?: number; force?: boolean }
+): Promise<T> {
+  const key = requestCacheKey('app-api', action, payload);
+  const ttlMs = typeof options === 'number' ? options : options?.ttlMs ?? 30000;
+  const force = typeof options === 'object' ? Boolean(options.force) : false;
+  return cachedRequest(key, () => invokeAppApi<T>(action, payload), { ttlMs, force });
 }
