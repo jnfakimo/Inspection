@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { LEGACY_BASE } from '@/lib/config';
@@ -348,12 +348,27 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
   const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
+  // 畫布容器 Ref 用於計算精確網格欄寬
+  const canvasGridRef = useRef<HTMLDivElement>(null);
+
   // 長條矩形 / 自訂畫布尺寸可調式設定 (例如 3500 * 400)
   const [canvasWidth, setCanvasWidth] = useState<number>(1920);
   const [canvasHeight, setCanvasHeight] = useState<number>(1080);
   const [canvasGridCols, setCanvasGridCols] = useState<12 | 24>(12);
   const [canvasViewScale, setCanvasViewScale] = useState<'fit' | '100%'>('fit');
   const [customRatioMode, setCustomRatioMode] = useState<string>('16:9');
+
+  // 滑鼠拖曳縮放狀態 (Interactive Mouse Resize Handle)
+  const [resizingState, setResizingState] = useState<{
+    index: number;
+    handleType: 'se' | 'e' | 's'; // se: 右下角(寬+高), e: 右邊緣(寬), s: 底部邊緣(高)
+    startX: number;
+    startY: number;
+    initialWidth: number;
+    initialHeight: number;
+    containerWidth: number;
+    gridCols: number;
+  } | null>(null);
 
   // 彈出預覽縮放比例 (例如 50%, 75%, 100%, 125%, 150%, fit)
   const [previewZoomScale, setPreviewZoomScale] = useState<'fit' | number>('fit');
@@ -566,6 +581,75 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
     setDraggedIndex(null);
   };
 
+  // 互動式滑鼠拖曳縮放起點事件 (支援 Corner / Edge Resize)
+  const startResize = (
+    e: React.MouseEvent,
+    index: number,
+    handleType: 'se' | 'e' | 's',
+    currentWidth: number,
+    currentHeight: number
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = canvasGridRef.current?.getBoundingClientRect();
+    const containerWidth = rect ? rect.width : 1000;
+    setActiveItemIndex(index);
+    setResizingState({
+      index,
+      handleType,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialWidth: currentWidth,
+      initialHeight: currentHeight,
+      containerWidth,
+      gridCols: canvasGridCols,
+    });
+  };
+
+  // 監聽 Window 滑鼠移動與放開，計算互動式網格縮放
+  useEffect(() => {
+    if (!resizingState) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { index, handleType, startX, startY, initialWidth, initialHeight, containerWidth, gridCols } =
+        resizingState;
+      const colWidth = Math.max(20, containerWidth / gridCols);
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      let nextWidth = initialWidth;
+      let nextHeight = initialHeight;
+
+      if (handleType === 'se' || handleType === 'e') {
+        const deltaCols = Math.round(deltaX / colWidth);
+        nextWidth = Math.max(1, Math.min(gridCols, initialWidth + deltaCols));
+      }
+
+      if (handleType === 'se' || handleType === 's') {
+        const deltaRows = Math.round(deltaY / 42);
+        nextHeight = Math.max(1, Math.min(20, initialHeight + deltaRows));
+      }
+
+      setItems(current =>
+        current.map((item, idx) =>
+          idx === index ? { ...item, width: nextWidth, height: nextHeight } : item
+        )
+      );
+      setDirty(true);
+    };
+
+    const handleMouseUp = () => {
+      setResizingState(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingState]);
+
   const addWidget = (widgetKey: string) => {
     const def = WIDGET_CATALOG[widgetKey] || {
       defaultTitle: widgetKey,
@@ -603,6 +687,14 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
     } else if (preset === '3840x1080') {
       setCanvasWidth(3840);
       setCanvasHeight(1080);
+      setCanvasGridCols(24);
+    } else if (preset === '21:9') {
+      setCanvasWidth(2560);
+      setCanvasHeight(1080);
+      setCanvasGridCols(24);
+    } else if (preset === '32:9') {
+      setCanvasWidth(5120);
+      setCanvasHeight(1440);
       setCanvasGridCols(24);
     }
   };
@@ -952,7 +1044,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             </button>
           </div>
 
-          {/* 長條矩形 / 畫布尺寸與長寬可調式設定 (滿足使用者：營運戰情總覽 我要可以調整長條矩形，舉例3500*400 所以要作為可調式) */}
+          {/* 長條矩形 / 畫布尺寸與長寬可調式設定 (支援長條 3500*400、2560*400 等無捲軸自適應模式) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>📐</span> 看板尺寸與長條矩形比例：
@@ -960,12 +1052,14 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             <select
               value={customRatioMode}
               onChange={e => handleRatioPresetChange(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: '6px', background: '#1e293b', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px' }}
+              style={{ padding: '6px 10px', borderRadius: '6px', background: '#1e293b', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}
             >
               <option value="16:9">📺 16:9 標準螢幕 (1920 × 1080)</option>
               <option value="3500x400">📏 超寬長條看板 (3500 × 400)</option>
               <option value="2560x400">🎛️ 橫向 LED 長條 (2560 × 400)</option>
               <option value="3840x1080">🖥️ 雙螢幕超寬拼接 (3840 × 1080)</option>
+              <option value="21:9">🎬 21:9 寬螢幕看板 (2560 × 1080)</option>
+              <option value="32:9">🌌 32:9 超寬曲面看板 (5120 × 1440)</option>
               <option value="custom">⚙️ 自訂長寬像素</option>
             </select>
 
@@ -999,39 +1093,41 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               <span style={{ fontSize: '11px', color: 'var(--muted)' }}>px</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <button
                 type="button"
                 style={{
-                  padding: '4px 8px',
+                  padding: '4px 10px',
                   borderRadius: '4px',
                   fontSize: '11px',
+                  fontWeight: 600,
                   border: '1px solid rgba(255,255,255,0.15)',
-                  background: canvasGridCols === 24 ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                  background: canvasGridCols === 24 ? '#0284c7' : 'rgba(255,255,255,0.05)',
                   color: canvasGridCols === 24 ? '#fff' : '#94a3b8',
                   cursor: 'pointer',
                 }}
                 onClick={() => setCanvasGridCols(canvasGridCols === 24 ? 12 : 24)}
-                title="切換 12 或 24 欄制（24 欄制適合 3500px 超長條螢幕細部配置）"
+                title="切換 12 或 24 欄制（24 欄制適合 3500px 長條細部配置）"
               >
-                {canvasGridCols} 欄制
+                {canvasGridCols} 欄分佈
               </button>
-              <button
-                type="button"
+              <span
                 style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
                   fontSize: '11px',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  background: canvasViewScale === 'fit' ? '#10b981' : 'rgba(255,255,255,0.05)',
-                  color: canvasViewScale === 'fit' ? '#fff' : '#94a3b8',
-                  cursor: 'pointer',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#34d399',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
-                onClick={() => setCanvasViewScale(canvasViewScale === 'fit' ? '100%' : 'fit')}
-                title="縮放符合目前編輯視窗或以 100% 原始長寬像素橫向捲動"
+                title="畫布已啟用自適應等比縮放，不產生任何橫向或縱向捲軸"
               >
-                {canvasViewScale === 'fit' ? '🔍 縮放符合' : '↔️ 100%捲動'}
-              </button>
+                <span>✨</span> 無捲軸自適應視窗
+              </span>
             </div>
           </div>
         </div>
@@ -1143,15 +1239,18 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 </button>
               </div>
 
-              {/* 視窗畫布容器 (支援長條 3500*400 縮放與滾動) */}
+              {/* 視窗畫布容器 (零捲軸自適應寬高與長條矩形比例) */}
               <div
                 style={{
                   background: '#070d1e',
                   padding: '16px',
                   borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  overflowX: canvasViewScale === '100%' ? 'auto' : 'hidden',
-                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(0, 212, 255, 0.25)',
+                  boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.7), 0 4px 20px rgba(0,0,0,0.5)',
+                  overflow: 'hidden',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.3s',
                 }}
               >
                 <div
@@ -1159,30 +1258,57 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: '10px',
-                    paddingBottom: '6px',
+                    marginBottom: '12px',
+                    paddingBottom: '8px',
                     borderBottom: '1px dashed rgba(255,255,255,0.08)',
                     fontSize: '12px',
                     color: '#94a3b8',
+                    flexWrap: 'wrap',
+                    gap: '8px',
                   }}
                 >
-                  <span>
-                    🖥️ <strong>畫布目標解析度：</strong>
-                    <span style={{ color: '#38bdf8' }}>{canvasWidth} × {canvasHeight} px</span>
-                    {canvasWidth >= 3000 && <span style={{ marginLeft: '6px', color: '#fbbf24' }}>[超寬長條矩形看板]</span>}
-                  </span>
-                  <span>網格制式：{canvasGridCols} 欄分佈 ｜ 視窗圖塊數：{sortedItems.length} 個</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span>
+                      🖥️ <strong>畫布目標解析度：</strong>
+                      <span style={{ color: '#38bdf8', fontWeight: 700 }}>
+                        {canvasWidth} × {canvasHeight} px
+                      </span>
+                      <span style={{ marginLeft: '6px', color: '#94a3b8', fontSize: '11px' }}>
+                        (比例 {(canvasWidth / Math.max(1, canvasHeight)).toFixed(2)}:1)
+                      </span>
+                      {canvasWidth >= 2500 && (
+                        <span style={{ marginLeft: '6px', color: '#fbbf24', fontWeight: 600 }}>
+                          [超寬長條看板模式]
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ color: '#34d399', fontSize: '11px' }}>
+                      ｜ 網格：{canvasGridCols} 欄無捲軸自適應
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#60a5fa' }}>
+                    <span>🖱️</span>
+                    <span>按住圖塊右下角 <strong>◢</strong> 或邊緣可直接滑鼠拖曳縮放</span>
+                  </div>
                 </div>
 
-                {/* 網格互動視窗卡片區塊 (支援拖曳排序與直接視窗調整) */}
+                {/* 網格互動視窗卡片區塊 (支援滑鼠直接拖曳縮放寬高、拖曳排序與快速操控) */}
                 <div
+                  ref={canvasGridRef}
                   style={{
-                    width: canvasViewScale === '100%' ? `${canvasWidth}px` : '100%',
-                    minHeight: `${Math.max(340, canvasHeight * (canvasViewScale === 'fit' ? 0.35 : 1))}px`,
+                    width: '100%',
+                    minHeight:
+                      canvasWidth / canvasHeight > 4
+                        ? '180px'
+                        : canvasWidth / canvasHeight > 2.5
+                        ? '240px'
+                        : '340px',
                     display: 'grid',
                     gridTemplateColumns: `repeat(${canvasGridCols}, 1fr)`,
                     gap: '12px',
-                    alignItems: 'start',
+                    alignItems: 'stretch',
+                    boxSizing: 'border-box',
+                    userSelect: resizingState ? 'none' : 'auto',
                   }}
                 >
                   {sortedItems.map(({ item, index }) => {
@@ -1195,8 +1321,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     const isVisible = Boolean(item.visible);
                     const width = Math.min(canvasGridCols, Math.max(1, Number(item.width ?? 6)));
                     const height = Math.max(1, Number(item.height ?? 2));
-                    const heightPx = Math.max(130, height * 68);
+                    const heightPx = Math.max(120, height * 54);
                     const isFocused = activeItemIndex === index;
+                    const isResizing = resizingState?.index === index;
 
                     if (selectedSystemFilter !== 'all' && info.systemId !== selectedSystemFilter) {
                       return null;
@@ -1205,7 +1332,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     return (
                       <div
                         key={`${item.widget_key}-${index}`}
-                        draggable
+                        draggable={!resizingState}
                         onDragStart={e => handleDragStart(e, index)}
                         onDragOver={e => handleDragOver(e, index)}
                         onDragEnd={handleDragEnd}
@@ -1214,11 +1341,15 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                           gridColumn: `span ${width}`,
                           minHeight: `${heightPx}px`,
                           background: isVisible
-                            ? isFocused
+                            ? isResizing
+                              ? 'rgba(14, 116, 144, 0.4)'
+                              : isFocused
                               ? 'rgba(30, 48, 75, 0.95)'
                               : 'rgba(23, 32, 48, 0.9)'
                             : 'rgba(15, 23, 42, 0.4)',
-                          border: isFocused
+                          border: isResizing
+                            ? '2px solid #00d4ff'
+                            : isFocused
                             ? '2px solid #38bdf8'
                             : isVisible
                             ? '1px solid rgba(255,255,255,0.18)'
@@ -1229,11 +1360,16 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                           flexDirection: 'column',
                           position: 'relative',
                           opacity: isVisible ? 1 : 0.6,
-                          boxShadow: isFocused
+                          boxShadow: isResizing
+                            ? '0 0 24px rgba(0,212,255,0.6)'
+                            : isFocused
                             ? '0 0 20px rgba(56,189,248,0.3)'
                             : '0 4px 16px rgba(0,0,0,0.3)',
                           cursor: 'default',
-                          transition: 'border-color 0.2s, box-shadow 0.2s',
+                          transition: isResizing
+                            ? 'none'
+                            : 'border-color 0.2s, box-shadow 0.2s, background 0.2s',
+                          boxSizing: 'border-box',
                         }}
                       >
                         {/* 視窗標頭與拖曳把手 */}
@@ -1248,7 +1384,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             paddingBottom: '6px',
                             cursor: 'grab',
                           }}
-                          title="按住此處可拖曳調整順序"
+                          title="按住此處可拖曳調整卡片順序"
                         >
                           <div
                             style={{
@@ -1275,7 +1411,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                 borderBottom: '1px solid rgba(255,255,255,0.2)',
                                 padding: '2px 4px',
                                 width: '100%',
-                                maxWidth: '200px',
+                                maxWidth: '180px',
                               }}
                               onChange={e => updateItem(index, { title: e.target.value })}
                             />
@@ -1302,6 +1438,22 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             >
                               系統{info.systemId}
                             </span>
+                            {isResizing && (
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: 700,
+                                  background: '#0284c7',
+                                  color: '#fff',
+                                  boxShadow: '0 0 8px rgba(2,132,199,0.8)',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                📐 調整中: {width}/{canvasGridCols} 欄 × {height} 高
+                              </span>
+                            )}
                           </div>
 
                           {/* 快速視窗操控按鈕 (上移、下移、顯示開關、移除) */}
@@ -1407,6 +1559,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             flexDirection: 'column',
                             justifyContent: 'center',
                             width: '100%',
+                            boxSizing: 'border-box',
                           }}
                         >
                           <DashboardWidgetContent widgetKey={item.widget_key} desc={info.desc} />
@@ -1447,7 +1600,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                     borderRadius: '3px',
                                     fontSize: '10px',
                                     border: '1px solid rgba(255,255,255,0.1)',
-                                    background: width === w ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                                    background: width === w ? '#0284c7' : 'rgba(255,255,255,0.05)',
                                     color: width === w ? '#fff' : '#94a3b8',
                                     cursor: 'pointer',
                                     fontWeight: width === w ? 700 : 400,
@@ -1507,6 +1660,63 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             </button>
                           </div>
                         </div>
+
+                        {/* 互動式滑鼠拖曳縮放把手 (Interactive Mouse Resize Handles) */}
+                        {/* 1. 右下角角標 (同時調整寬度與高度) */}
+                        <div
+                          onMouseDown={e => startResize(e, index, 'se', width, height)}
+                          style={{
+                            position: 'absolute',
+                            right: '2px',
+                            bottom: '2px',
+                            width: '18px',
+                            height: '18px',
+                            cursor: 'se-resize',
+                            display: 'flex',
+                            alignItems: 'flex-end',
+                            justifyContent: 'flex-end',
+                            color: isResizing || isFocused ? '#00d4ff' : '#64748b',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                            userSelect: 'none',
+                            zIndex: 20,
+                            padding: '2px',
+                            opacity: 0.9,
+                          }}
+                          title="按住滑鼠拖曳縮放（可同時調整寬度與高度）"
+                        >
+                          ◢
+                        </div>
+
+                        {/* 2. 右側邊界 (調整寬度) */}
+                        <div
+                          onMouseDown={e => startResize(e, index, 'e', width, height)}
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '32px',
+                            bottom: '18px',
+                            width: '8px',
+                            cursor: 'ew-resize',
+                            zIndex: 15,
+                          }}
+                          title="按住滑鼠左右拖曳調整寬度"
+                        />
+
+                        {/* 3. 底部邊界 (調整高度) */}
+                        <div
+                          onMouseDown={e => startResize(e, index, 's', width, height)}
+                          style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: '12px',
+                            right: '18px',
+                            height: '8px',
+                            cursor: 'ns-resize',
+                            zIndex: 15,
+                          }}
+                          title="按住滑鼠上下拖曳調整高度"
+                        />
                       </div>
                     );
                   })}
