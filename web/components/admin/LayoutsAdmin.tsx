@@ -355,6 +355,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
   const [canvasViewScale, setCanvasViewScale] = useState<'fit' | '100%'>('fit');
   const [customRatioMode, setCustomRatioMode] = useState<string>('16:9');
 
+  // 彈出預覽縮放比例 (例如 50%, 75%, 100%, 125%, 150%, fit)
+  const [previewZoomScale, setPreviewZoomScale] = useState<'fit' | number>('fit');
+
   // 拖曳排序狀態
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
@@ -1840,15 +1843,17 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             }}
             onClick={e => e.stopPropagation()}
           >
-            {/* 視窗頂部標頭 */}
+            {/* 視窗頂部標頭與縮放工具列 */}
             <div
               style={{
-                padding: '12px 18px',
+                padding: '10px 18px',
                 background: 'rgba(5, 16, 30, 0.95)',
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '10px',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1857,8 +1862,95 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 <span style={{ fontSize: '12px', color: '#38bdf8' }}>
                   ({canvasWidth} × {canvasHeight} px · {canvasGridCols} 欄模式)
                 </span>
+                {canvasWidth >= 2500 && (
+                  <span style={{ fontSize: '11px', background: 'rgba(245,158,11,0.2)', color: '#fbbf24', padding: '1px 6px', borderRadius: '4px' }}>
+                    長條矩形看板
+                  </span>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+              {/* 預覽縮放工具列 (滿足：不要有卷軸，配置圖面可以放大縮小) */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '6px' }}>
+                  <button
+                    type="button"
+                    style={{
+                      background: previewZoomScale === 'fit' ? '#10b981' : 'transparent',
+                      color: previewZoomScale === 'fit' ? '#fff' : '#94a3b8',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '3px 8px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      fontWeight: previewZoomScale === 'fit' ? 700 : 400,
+                    }}
+                    onClick={() => setPreviewZoomScale('fit')}
+                    title="自動縮放整張看板完整適應視窗，不產生捲軸"
+                  >
+                    🔍 畫面自適應 (無卷軸)
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      background: previewZoomScale === 0.5 ? '#0284c7' : 'transparent',
+                      color: previewZoomScale === 0.5 ? '#fff' : '#94a3b8',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setPreviewZoomScale(0.5)}
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      background: previewZoomScale === 0.75 ? '#0284c7' : 'transparent',
+                      color: previewZoomScale === 0.75 ? '#fff' : '#94a3b8',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setPreviewZoomScale(0.75)}
+                  >
+                    75%
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      background: previewZoomScale === 1 ? '#0284c7' : 'transparent',
+                      color: previewZoomScale === 1 ? '#fff' : '#94a3b8',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setPreviewZoomScale(1)}
+                  >
+                    100%
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      background: previewZoomScale === 1.25 ? '#0284c7' : 'transparent',
+                      color: previewZoomScale === 1.25 ? '#fff' : '#94a3b8',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '3px 6px',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setPreviewZoomScale(1.25)}
+                  >
+                    125%
+                  </button>
+                </div>
+
                 <a
                   href="/Inspection/v2/tv-dashboard/"
                   target="_blank"
@@ -1887,30 +1979,33 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               </div>
             </div>
 
-            {/* 視窗內部畫布 */}
+            {/* 視窗內部畫布容器 */}
             <div
               style={{
                 flex: 1,
-                overflow: 'auto',
-                padding: '20px',
+                overflow: previewZoomScale === 'fit' ? 'hidden' : 'auto',
+                padding: '16px',
                 background: '#020b18',
                 display: 'flex',
                 justifyContent: 'center',
-                alignItems: 'flex-start',
+                alignItems: 'center',
+                position: 'relative',
               }}
             >
               <div
                 style={{
-                  width: `${canvasWidth}px`,
-                  minHeight: `${canvasHeight}px`,
+                  width: previewZoomScale === 'fit' ? '100%' : `${canvasWidth * (typeof previewZoomScale === 'number' ? previewZoomScale : 1)}px`,
+                  maxWidth: '100%',
+                  maxHeight: previewZoomScale === 'fit' ? '100%' : 'none',
                   display: 'grid',
                   gridTemplateColumns: `repeat(${canvasGridCols}, 1fr)`,
-                  gap: '16px',
+                  gap: previewZoomScale === 'fit' ? '10px' : '14px',
                   background: '#070f22',
-                  padding: '20px',
+                  padding: '16px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(0,212,255,0.2)',
+                  border: '1px solid rgba(0,212,255,0.25)',
                   boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+                  boxSizing: 'border-box',
                 }}
               >
                 {sortedItems
@@ -1927,33 +2022,34 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         key={`preview-${item.widget_key}-${index}`}
                         style={{
                           gridColumn: `span ${width}`,
-                          minHeight: `${height * 70}px`,
+                          minHeight: previewZoomScale === 'fit' ? 'auto' : `${height * 65}px`,
                           background: 'rgba(15, 23, 42, 0.95)',
                           border: '1px solid rgba(0, 212, 255, 0.25)',
                           borderRadius: '8px',
-                          padding: '14px',
+                          padding: '10px 12px',
                           display: 'flex',
                           flexDirection: 'column',
                           boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                           <span>{info.icon}</span>
-                          <strong style={{ color: '#00d4ff', fontSize: '14px' }}>{item.title}</strong>
+                          <strong style={{ color: '#00d4ff', fontSize: '13px' }}>{item.title}</strong>
                           <span
                             style={{
                               marginLeft: 'auto',
-                              fontSize: '10px',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
+                              fontSize: '9px',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
                               background: 'rgba(0, 212, 255, 0.1)',
                               color: '#38bdf8',
+                              fontWeight: 700,
                             }}
                           >
                             系統 {info.systemId}
                           </span>
                         </div>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '6px 0' }}>
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                           <DashboardWidgetContent widgetKey={item.widget_key} desc={info.desc} />
                         </div>
                       </div>
