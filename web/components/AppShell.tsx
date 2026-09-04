@@ -10,7 +10,6 @@ import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-ca
 import type { Profile } from '@/types/app';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile } from '@/lib/profile-cache';
-import { localAuth } from '@/lib/local-auth';
 import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
 import { resolveAppBackHref } from '@/lib/app-navigation';
@@ -126,7 +125,7 @@ export function AppShell({ profile, title, children, heading }: {
   }, [adminMenuOpen]);
 
   async function logout() {
-    try { await localAuth.logout(); }
+    try { await getSupabase().auth.signOut({ scope: 'local' }); }
     catch (error) { console.warn('logout failed:', error); }
     clearProfile();
     location.replace('/Inspection/v2/login/');

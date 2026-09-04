@@ -37,9 +37,7 @@ const isTransientNodeResponse = (response: Response) => (
 export function getSupabase() {
   if (client) return client;
   if (typeof window === 'undefined') throw new Error('地端資料相容客戶端無法在預先轉譯期間使用');
-  // 完全地端模式：supabase-js 僅保留為既有查詢語法相容層，實際 URL 指向
-  // 同源 IIS／FastAPI，再由後端查詢 SQL Server，不連接 Supabase 雲端。
-  client = createClient(window.location.origin, SUPABASE_ANON_KEY, {
+  client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       storage: window.sessionStorage,
       persistSession: true,
