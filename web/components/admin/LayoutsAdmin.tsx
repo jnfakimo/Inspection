@@ -319,14 +319,15 @@ const WIDGET_CATALOG: Record<
 const DEFAULT_FALLBACK_ITEMS: Row[] = [
   { widget_key: 'alerts', title: '重要提醒與異常警報', width: 12, height: 2, visible: true, refresh_seconds: 60, sort_order: 10 },
   { widget_key: 'kpis', title: '營運關鍵指標', width: 12, height: 2, visible: true, refresh_seconds: 60, sort_order: 20 },
-  { widget_key: 'patrol', title: '駐衛警巡檢即時', width: 8, height: 6, visible: true, refresh_seconds: 60, sort_order: 30 },
-  { widget_key: 'repairs', title: '報修案件分佈', width: 4, height: 6, visible: true, refresh_seconds: 60, sort_order: 40 },
+  { widget_key: 'patrol', title: '駐衛警巡檢即時', width: 8, height: 4, visible: true, refresh_seconds: 60, sort_order: 30 },
+  { widget_key: 'repairs', title: '報修案件分佈', width: 4, height: 4, visible: true, refresh_seconds: 60, sort_order: 40 },
   { widget_key: 'equipment_status', title: '設備狀態監控', width: 6, height: 4, visible: true, refresh_seconds: 60, sort_order: 50 },
   { widget_key: 'trading_kpi', title: '市場交易量分析', width: 6, height: 3, visible: true, refresh_seconds: 60, sort_order: 60 },
   { widget_key: 'price_comparison', title: '蔬果價格同期比較', width: 6, height: 4, visible: true, refresh_seconds: 60, sort_order: 70 },
   { widget_key: 'public_price_board', title: '公開大宗即時報價看板', width: 6, height: 5, visible: true, refresh_seconds: 60, sort_order: 80 },
   { widget_key: 'rank_dept', title: '各單位報修排行', width: 6, height: 4, visible: true, refresh_seconds: 60, sort_order: 90 },
-  { widget_key: 'trend', title: '各月份報修趨勢', width: 12, height: 4, visible: true, refresh_seconds: 60, sort_order: 100 },
+  { widget_key: 'origin_weather_map', title: '主要產地天氣與供貨狀態', width: 6, height: 4, visible: true, refresh_seconds: 60, sort_order: 95 },
+  { widget_key: 'historical_price_curve', title: '30日/同季歷史價格曲線', width: 12, height: 4, visible: true, refresh_seconds: 60, sort_order: 100 },
 ];
 
 export function LayoutsAdmin({ profile, module }: AdminProps) {
@@ -418,22 +419,14 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
 
         setLayout(validLayout);
 
-        // 2. 查詢版本清單與元件項目
-        const [versionResult, itemResult] = await Promise.all([
-          client
-            .from('dashboard_layout_versions')
-            .select('*')
-            .eq('layout_id', validLayout.layout_id)
-            .order('version_no', { ascending: false }),
-          client
-            .from('dashboard_layout_items')
-            .select('*')
-            .eq('layout_id', validLayout.layout_id)
-            .order('sort_order', { ascending: true }),
-        ]);
+        // 2. 查詢版本清單
+        const versionResult = await client
+          .from('dashboard_layout_versions')
+          .select('*')
+          .eq('layout_id', validLayout.layout_id)
+          .order('version_no', { ascending: false });
 
         let versionRows = versionResult.data || [];
-        const itemRows = itemResult.data || [];
 
         // 如果資料庫尚無版本，自動建立虛擬初始版本
         if (versionRows.length === 0) {
@@ -450,8 +443,19 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
           ];
         }
 
-        const versionIds = new Set(versionRows.map(row => row.version_id));
+        const versionIds = versionRows.map(row => row.version_id);
         setVersions(versionRows);
+
+        // 3. 依據版本 ID 批次讀取各版本元件 (dashboard_layout_items 是以 version_id 關聯)
+        let itemRows: Row[] = [];
+        if (versionIds.length > 0) {
+          const itemResult = await client
+            .from('dashboard_layout_items')
+            .select('*')
+            .in('version_id', versionIds)
+            .order('sort_order', { ascending: true });
+          itemRows = itemResult.data || [];
+        }
 
         const grouped: Record<string, Row[]> = {};
         for (const item of itemRows) {
@@ -460,12 +464,23 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
           grouped[versionId].push(item);
         }
 
-        // 若各版本沒有元件，預設填入 DEFAULT_FALLBACK_ITEMS
+        // 若各版本沒有元件，嘗試從 localStorage 或預設清單補齊
+        let cachedPublished: { items?: Row[] } | null = null;
+        try {
+          const raw = localStorage.getItem('beinong_published_layout');
+          if (raw) cachedPublished = JSON.parse(raw);
+        } catch {
+          // ignore
+        }
+
         versionRows.forEach(v => {
           if (!grouped[v.version_id] || grouped[v.version_id].length === 0) {
-            grouped[v.version_id] = DEFAULT_FALLBACK_ITEMS.map(item => ({
+            const fallback =
+              v.state === 'published' && cachedPublished?.items && cachedPublished.items.length > 0
+                ? cachedPublished.items
+                : DEFAULT_FALLBACK_ITEMS;
+            grouped[v.version_id] = fallback.map(item => ({
               ...item,
-              layout_id: validLayout.layout_id,
               version_id: v.version_id,
             }));
           }
@@ -474,7 +489,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
         setItemsByVersion(grouped);
         const desiredVersion = options.preferredVersionId || selected;
         const preferred =
-          desiredVersion && versionIds.has(desiredVersion)
+          desiredVersion && versionIds.includes(desiredVersion)
             ? desiredVersion
             : validLayout.published_version_id || versionRows[0]?.version_id || '';
         setSelected(preferred);
@@ -738,6 +753,23 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
         p_note: noteText.trim() || (publish ? 'V2 後台發布' : 'V2 後台草稿'),
         p_publish: publish,
       });
+
+      // 同步寫入 localStorage 供 TV 看板與各終端即時同步
+      try {
+        if (publish) {
+          localStorage.setItem(
+            'beinong_published_layout',
+            JSON.stringify({
+              layout_id: layout.layout_id,
+              items: payload,
+              canvas_dimension: { width: canvasWidth, height: canvasHeight, cols: canvasGridCols },
+              published_at: new Date().toISOString(),
+            })
+          );
+        }
+      } catch {
+        // ignore
+      }
 
       if (error) {
         setNote(`失敗：${errorMessage(error, '版面版本儲存失敗')}`);
