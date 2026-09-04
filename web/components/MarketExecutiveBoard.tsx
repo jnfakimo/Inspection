@@ -227,6 +227,7 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
       <table className="market-board-table">
         <thead>
           <tr>
+            <th className="market-board-col-number" rowSpan={2}>編號</th>
             <th className="market-board-col-item" rowSpan={2}>品項</th>
             {markets.map(market => <th data-market={market} key={market} colSpan={7}>{market}</th>)}
           </tr>
@@ -243,7 +244,8 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
           </tr>
         </thead>
         <tbody>
-          {rows.map(row => <tr key={`${row.category}::${row.item}`}>
+          {rows.map((row, index) => <tr key={`${row.category}::${row.item}`}>
+            <td className="market-board-row-number">{safePage * TABLE_ROWS_PER_PAGE + index + 1}</td>
             <th scope="row">{row.item}<small>{row.category}</small></th>
             {markets.map(market => {
               const cell = row.cells[market];
