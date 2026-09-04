@@ -218,6 +218,9 @@ function TrendChart({ points, textScale = 1 }: { points: TrendPoint[]; textScale
   </>;
 }
 
+// 表頭「名稱＋單位」拆成兩行，讓 2 市場 × 8 欄的全場均價表塞得進一頁寬而不需橫向捲動。
+const UnitHead = ({ label, unit }: { label: string; unit: string }) => <>{label}<small>{unit}</small></>;
+
 function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: number }) {
   const markets = table.markets;
   const totalPages = Math.max(1, Math.ceil(table.rows.length / TABLE_ROWS_PER_PAGE));
@@ -234,14 +237,14 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
           </tr>
           <tr>
             {markets.map(market => [
-              <th data-market={market} key={`${market}-prev`} className="market-board-cell-sep">昨日均價(元/公斤)</th>,
-              <th data-market={market} key={`${market}-avg`}>當日均價(元/公斤)</th>,
+              <th data-market={market} key={`${market}-prev`} className="market-board-cell-sep"><UnitHead label="昨日均價" unit="(元/公斤)" /></th>,
+              <th data-market={market} key={`${market}-avg`}><UnitHead label="當日均價" unit="(元/公斤)" /></th>,
               <th data-market={market} key={`${market}-change`}>漲跌</th>,
               <th data-market={market} key={`${market}-pct`}>漲跌幅</th>,
-              <th data-market={market} key={`${market}-quantity`}>成交量(公斤)</th>,
-              <th data-market={market} key={`${market}-high`}>上價(元/公斤)</th>,
-              <th data-market={market} key={`${market}-middle`}>中價(元/公斤)</th>,
-              <th data-market={market} key={`${market}-low`}>下價(元/公斤)</th>,
+              <th data-market={market} key={`${market}-quantity`}><UnitHead label="成交量" unit="(公斤)" /></th>,
+              <th data-market={market} key={`${market}-high`}><UnitHead label="上價" unit="(元/公斤)" /></th>,
+              <th data-market={market} key={`${market}-middle`}><UnitHead label="中價" unit="(元/公斤)" /></th>,
+              <th data-market={market} key={`${market}-low`}><UnitHead label="下價" unit="(元/公斤)" /></th>,
             ])}
           </tr>
         </thead>
