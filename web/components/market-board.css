@@ -60,15 +60,15 @@
 .market-board-table-head h3{margin:0;font:700 calc(15px * 1.18 * var(--board-type-scale,1)) var(--head);text-align:center}
 .market-board-table-head span{color:var(--dim);font-size:calc(11px * 1.18 * var(--board-type-scale,1));text-align:center}
 .market-board-table-scroll{overflow-x:auto}
-.market-board-table{min-width:820px;font-size:calc(12px * 1.18 * var(--board-type-scale,1))}
+.market-board-table{min-width:1080px;font-size:calc(12px * 1.18 * var(--board-type-scale,1))}
 .market-board-table thead th{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);color:var(--dim);font-weight:600;padding:8px 9px;text-align:center;white-space:nowrap}
 .market-board-table thead th.market-board-col-item,.market-board-table tbody th{text-align:center}
 .market-board-table thead tr:first-child th{text-align:center;border-bottom:1px solid var(--line)}
 .market-board-table tbody th{padding:8px 9px;color:var(--text);font-weight:600;white-space:nowrap}
 .market-board-table tbody th small{display:block;color:var(--dim);font-weight:400;font-size:calc(10px * 1.18 * var(--board-type-scale,1))}
 .market-board-table td{padding:8px 9px;text-align:center;border-bottom:1px solid rgba(23,57,82,.5);white-space:nowrap;font-variant-numeric:tabular-nums}
-.market-board-table .market-board-col-number,.market-board-table .market-board-row-number{width:54px;min-width:54px;text-align:center}
-.market-board-table .market-board-row-number{color:var(--dim);font-weight:600;background:var(--panel)}
+.market-board-table .market-board-col-code,.market-board-table .market-board-row-code{min-width:64px;text-align:center;white-space:nowrap}
+.market-board-table .market-board-row-code{color:var(--dim);font-weight:600;background:var(--panel);font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .market-board-table td.market-board-cell-change[data-direction=rise]{color:var(--market-rise-readable)}
 .market-board-table td.market-board-cell-change[data-direction=fall]{color:var(--market-fall-readable)}
 .market-board-table td.market-board-cell-sep{border-left:1px solid var(--line)}
@@ -126,12 +126,16 @@
 .market-board-page .market-board-table td{border-bottom-color:var(--line)}
 .market-board-page .market-board-table .market-board-cell-sep{border-left:3px solid color-mix(in srgb,var(--board-market-accent) 55%,var(--line))}
 .market-board-public .market-board-head-actions .compact{font-size:12.1px}
-/* 圖示獨立放大 130%，不再疊乘文字的 110%。 */
-.market-board-public .market-movement-badge{display:inline-flex;align-items:center;gap:5px;line-height:1.4}
-.market-board-public .market-movement-badge:is(.rise,.fall) .market-movement-glyph{font-size:13px;line-height:1}
-.market-board-public .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
-.market-board-public .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
-.market-board-public .market-board-legend [data-direction] i{font-size:14.3px;line-height:1}
+/* 漲跌圖示的顏色規則要掛在 .market-board-page（登入版與公開版共用）。
+   登入版 /systems/marketboard/executive/ 是獨立的動態 chunk，不會載到
+   market-analytics.css 的 .market-movement-badge 通用規則；先前只寫在
+   .market-board-public 底下，登入版的 ▲▼ 就只剩灰色。 */
+.market-board-page .market-movement-badge{display:inline-flex;align-items:center;gap:5px;line-height:1.4;font-weight:700;white-space:nowrap}
+.market-board-page .market-movement-badge .market-movement-glyph{font-size:13px;line-height:1}
+.market-board-page .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
+.market-board-page .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
+.market-board-page .market-movement-badge.steady .market-movement-glyph{color:var(--dim)}
+.market-board-page .market-board-legend [data-direction] i{font-size:14.3px;line-height:1}
 
 .market-board-page{--board-muted:color-mix(in srgb,var(--dim) 80%,var(--text))}
 .market-board-page .market-board-stat>span,.market-board-page .market-board-stat>strong small,.market-board-page .market-board-stat>em,.market-board-page .market-board-stat .market-movement-badge{color:var(--board-muted)}

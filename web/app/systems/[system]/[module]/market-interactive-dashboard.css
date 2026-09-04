@@ -334,3 +334,11 @@
   .mid-small-chart{height:285px}
 }
 @media(prefers-reduced-motion:reduce){.mid-loading i{animation:none}}
+
+/* 漲跌圖示紅漲綠跌。本頁是獨立的動態 chunk，載不到 market-analytics.css 的通用 .market-movement-badge 規則，須自帶。 */
+.mid-page{--market-rise-color:var(--red);--market-fall-color:var(--green);--market-rise-readable:color-mix(in srgb,var(--market-rise-color) 72%,var(--text));--market-fall-readable:color-mix(in srgb,var(--market-fall-color) 68%,var(--text))}
+.mid-page .market-movement-badge{display:inline-flex;align-items:center;gap:4px;color:var(--text);font-weight:700;white-space:nowrap}
+.mid-page .market-movement-glyph{font-size:12px;line-height:1}
+.mid-page .market-movement-badge.rise .market-movement-glyph{color:var(--market-rise-readable)}
+.mid-page .market-movement-badge.fall .market-movement-glyph{color:var(--market-fall-readable)}
+.mid-page .market-movement-badge.steady .market-movement-glyph,.mid-page .market-movement-badge.neutral{color:var(--dim)}

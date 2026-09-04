@@ -554,7 +554,9 @@ async function buildMarketBoardPayload(
     p_to: latestDate,
     p_compare_from: previousDate,
     p_compare_to: previousDate,
-    p_dimensions: ['market', 'category', 'item'],
+    // item_key 是匯入時保存的全國統一品名代碼（同品名多代碼以「|」串接），
+    // 全場均價大表以此當「品名代碼」欄；rollup 最多 4 個維度，這裡剛好用滿。
+    p_dimensions: ['market', 'category', 'item', 'item_key'],
     p_measures: priceMeasures,
     p_filters: {},
     p_include_group_daily: false,
@@ -579,12 +581,20 @@ async function buildMarketBoardPayload(
   };
   const boardCurrentByKey = new Map<string, Record<string, number | null>>(priceGroupRows('current_groups').map(row => [groupDimensionKey(row.dimensions), priceValues(row.values)]));
   const boardCompareByKey = new Map<string, Record<string, number | null>>(priceGroupRows('compare_groups').map(row => [groupDimensionKey(row.dimensions), priceValues(row.values)]));
+  // 品名代碼全國統一，同一品名在兩市場、兩交易日應為同一組代碼；以最新交易日優先。
+  const itemCodes = (value: unknown) => text(marketJsonObject(value).item_key, 120)
+    .split('|').map(code => code.trim()).filter(code => /^[A-Za-z0-9]+$/.test(code));
+  const boardCodeByKey = new Map<string, string[]>();
+  for (const row of [...priceGroupRows('compare_groups'), ...priceGroupRows('current_groups')]) {
+    const codes = itemCodes(row.dimensions);
+    if (codes.length) boardCodeByKey.set(groupDimensionKey(row.dimensions), codes);
+  }
   const quantityByKey = new Map(currentAggregates.map(row => [
     `${row.dimensions.market}::${row.dimensions.category}::${row.dimensions.item}`,
     row.values.quantity ?? null,
   ]));
 
-  const tableMap = new Map<string, { item: string; category: string; cells: Record<string, unknown> }>();
+  const tableMap = new Map<string, { item: string; category: string; code: string; codes: string[]; cells: Record<string, unknown> }>();
   const registerCell = (market: string, category: string, item: string) => {
     if (!boardCategories.includes(category) || !boardMarkets.includes(market) || item === '未分類') return;
     const dimensionKey = `${market}::${category}::${item}`;
@@ -592,7 +602,12 @@ async function buildMarketBoardPayload(
     const compare = boardCompareByKey.get(dimensionKey);
     if (!current && !compare) return;
     const rowKey = `${category}::${item}`;
-    const entry = tableMap.get(rowKey) || { item, category, cells: {} };
+    const entry = tableMap.get(rowKey) || { item, category, code: '', codes: [], cells: {} };
+    const codes = boardCodeByKey.get(dimensionKey);
+    if (codes && !entry.codes.length) {
+      entry.codes = codes;
+      entry.code = codes.join('、');
+    }
     const avg = current?.average_price ?? null;
     const prevAvg = compare?.average_price ?? null;
     const change = avg !== null && prevAvg !== null ? Number((avg - prevAvg).toFixed(2)) : null;
@@ -614,10 +629,19 @@ async function buildMarketBoardPayload(
     const parts = key.split('::');
     registerCell(parts[0] ?? '', parts[1] ?? '', parts[2] ?? '');
   });
+  // 依品類、品名代碼（全國統一，數字在前英文在後，與北農官網行情表同序）、品名排序；
+  // 沒有代碼的列排在該品類最後。
+  const compareCodes = (left: string[], right: string[]) => {
+    if (!left.length || !right.length) return Number(!left.length) - Number(!right.length);
+    return left[0].localeCompare(right[0], 'en', { numeric: true, sensitivity: 'base' });
+  };
   const tableRows = [...tableMap.values()]
-    .sort((left, right) => (left.category === right.category
-      ? left.item.localeCompare(right.item, 'zh-Hant')
-      : left.category.localeCompare(right.category, 'zh-Hant')))
+    .sort((left, right) => (
+      left.category.localeCompare(right.category, 'zh-Hant')
+      || compareCodes(left.codes, right.codes)
+      || left.item.localeCompare(right.item, 'zh-Hant')
+    ))
+    .map(({ codes: _codes, ...row }) => row)
     .slice(0, 250);
 
   // 量價趨勢：取近一個多月的每日總量與加權均價（daily grain，只含有交易的日子）。

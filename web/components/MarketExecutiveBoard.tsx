@@ -29,7 +29,8 @@ type TableCell = {
   prev_avg: Numeric; avg: Numeric; change: Numeric; change_pct: Numeric;
   high: Numeric; middle: Numeric; low: Numeric; quantity: Numeric;
 };
-type TableRow = { item: string; category: string; cells: Record<string, TableCell | undefined> };
+// code：全國統一品名代碼；同一品名對應多個代碼時以「、」串接（例如 小番茄 70、72、74）。
+type TableRow = { item: string; category: string; code?: string; cells: Record<string, TableCell | undefined> };
 type TrendPoint = { observed_on: string; quantity: number; average_price: Numeric };
 type BoardNotice = { title: string; body: string; created_at: string };
 export type MarketBoardFeed = {
@@ -196,9 +197,9 @@ function TrendChart({ points, textScale = 1 }: { points: TrendPoint[]; textScale
       tooltip: { titleFont: { size: 12 * textScale }, bodyFont: { size: 12 * textScale }, callbacks: { label: context => `${context.dataset.label || ''}：${numberText(context.parsed.y, 1)}` } },
     },
     scales: {
-      x: { grid: { display: false }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '交易日期（X 軸）', color: colors.text, font: { size: 12 * textScale } } },
-      quantity: { beginAtZero: true, position: 'left', grid: { color: colors.line }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '成交量（Y 軸左）', color: colors.text, font: { size: 12 * textScale } } },
-      price: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '加權平均價（Y 軸右）', color: colors.text, font: { size: 12 * textScale } } },
+      x: { grid: { display: false }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '交易日期', color: colors.text, font: { size: 12 * textScale } } },
+      quantity: { beginAtZero: true, position: 'left', grid: { color: colors.line }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '成交量', color: colors.text, font: { size: 12 * textScale } } },
+      price: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: colors.text, font: { size: 12 * textScale } }, title: { display: true, text: '加權平均價', color: colors.text, font: { size: 12 * textScale } } },
     },
   }), [colors, textScale]);
   if (!points.length) return <p className="market-board-empty">近期尚無可繪製的量價資料。</p>;
@@ -227,25 +228,26 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
       <table className="market-board-table">
         <thead>
           <tr>
-            <th className="market-board-col-number" rowSpan={2}>編號</th>
+            <th className="market-board-col-code" rowSpan={2}>品名代碼</th>
             <th className="market-board-col-item" rowSpan={2}>品項</th>
-            {markets.map(market => <th data-market={market} key={market} colSpan={7}>{market}</th>)}
+            {markets.map(market => <th data-market={market} key={market} colSpan={8}>{market}</th>)}
           </tr>
           <tr>
             {markets.map(market => [
-              <th data-market={market} key={`${market}-prev`} className="market-board-cell-sep">昨日均價</th>,
-              <th data-market={market} key={`${market}-avg`}>當日均價</th>,
+              <th data-market={market} key={`${market}-prev`} className="market-board-cell-sep">昨日均價(元/公斤)</th>,
+              <th data-market={market} key={`${market}-avg`}>當日均價(元/公斤)</th>,
               <th data-market={market} key={`${market}-change`}>漲跌</th>,
               <th data-market={market} key={`${market}-pct`}>漲跌幅</th>,
-              <th data-market={market} key={`${market}-high`}>上價</th>,
-              <th data-market={market} key={`${market}-middle`}>中價</th>,
-              <th data-market={market} key={`${market}-low`}>下價</th>,
+              <th data-market={market} key={`${market}-quantity`}>成交量(公斤)</th>,
+              <th data-market={market} key={`${market}-high`}>上價(元/公斤)</th>,
+              <th data-market={market} key={`${market}-middle`}>中價(元/公斤)</th>,
+              <th data-market={market} key={`${market}-low`}>下價(元/公斤)</th>,
             ])}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => <tr key={`${row.category}::${row.item}`}>
-            <td className="market-board-row-number">{safePage * TABLE_ROWS_PER_PAGE + index + 1}</td>
+          {rows.map(row => <tr key={`${row.category}::${row.item}`}>
+            <td className="market-board-row-code">{row.code || '—'}</td>
             <th scope="row">{row.item}<small>{row.category}</small></th>
             {markets.map(market => {
               const cell = row.cells[market];
@@ -255,6 +257,7 @@ function BoardTable({ table, page }: { table: MarketBoardFeed['table']; page: nu
                 <td data-market={market} key={`${market}-avg`}>{numberText(cell?.avg)}</td>,
                 <td data-market={market} key={`${market}-change`} className="market-board-cell-change" data-direction={direction}>{signedText(cell?.change)}</td>,
                 <td data-market={market} key={`${market}-pct`} className="market-board-cell-change" data-direction={direction}>{cell?.change_pct == null ? '—' : `${signedText(cell.change_pct, 2)}%`}</td>,
+                <td data-market={market} key={`${market}-quantity`}>{numberText(cell?.quantity, 0)}</td>,
                 <td data-market={market} key={`${market}-high`}>{numberText(cell?.high)}</td>,
                 <td data-market={market} key={`${market}-middle`}>{numberText(cell?.middle)}</td>,
                 <td data-market={market} key={`${market}-low`}>{numberText(cell?.low)}</td>,
