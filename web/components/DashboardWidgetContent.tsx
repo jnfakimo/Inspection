@@ -1,20 +1,63 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string; desc?: string }) {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => (t + 1) % 1000);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
+
   switch (widgetKey) {
     // === 系統 11 (戰情指揮中心) ===
     case 'alerts':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-          <div style={{ fontSize: '13px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(239,68,68,0.1)', padding: '6px 10px', borderRadius: '4px' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444', display: 'inline-block', boxShadow: '0 0 8px #ef4444' }}></span>
-            <b>[緊急]</b> 冷凍庫 B2 溫度異常 (-2.1°C) — 3 分鐘前通報
+          <div
+            style={{
+              fontSize: '13px',
+              color: '#f87171',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(239,68,68,0.12)',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: '1px solid rgba(239,68,68,0.3)',
+              animation: 'pulse 2s infinite',
+            }}
+          >
+            <span
+              style={{
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#ef4444',
+                display: 'inline-block',
+                boxShadow: '0 0 10px #ef4444',
+                animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+              }}
+            ></span>
+            <b>[即時警報]</b> 冷凍庫 B2 溫度異常 (-2.1°C) — 3 分鐘前通報
           </div>
-          <div style={{ fontSize: '13px', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(245,158,11,0.1)', padding: '6px 10px', borderRadius: '4px' }}>
+          <div
+            style={{
+              fontSize: '13px',
+              color: '#fbbf24',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'rgba(245,158,11,0.1)',
+              padding: '8px 12px',
+              borderRadius: '6px',
+            }}
+          >
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }}></span>
-            <b>[警示]</b> 第二拍賣場 月臺 3 卸貨排程延遲 15 分鐘
+            <b>[運作提示]</b> 第二拍賣場 月臺 3 卸貨排程延遲 15 分鐘
           </div>
         </div>
       );
@@ -22,19 +65,21 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'kpis':
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', width: '100%', textAlign: 'center' }}>
-          <div style={{ background: 'rgba(0,212,255,0.06)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.15)' }}>
+          <div style={{ background: 'rgba(0,212,255,0.08)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.2)' }}>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>今日進場車次</div>
-            <div style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>1,280 <small style={{ fontSize: '11px' }}>車</small></div>
+            <div style={{ fontSize: '20px', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>
+              {1280 + (tick % 5)} <small style={{ fontSize: '11px' }}>車</small>
+            </div>
           </div>
-          <div style={{ background: 'rgba(16,185,129,0.06)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.15)' }}>
+          <div style={{ background: 'rgba(16,185,129,0.08)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>巡檢達標率</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#34d399', marginTop: '2px' }}>94.2%</div>
           </div>
-          <div style={{ background: 'rgba(239,68,68,0.06)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.15)' }}>
+          <div style={{ background: 'rgba(239,68,68,0.08)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>待處理異常</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#f87171', marginTop: '2px' }}>3 <small style={{ fontSize: '11px' }}>件</small></div>
           </div>
-          <div style={{ background: 'rgba(168,85,247,0.06)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.15)' }}>
+          <div style={{ background: 'rgba(168,85,247,0.08)', padding: '10px 6px', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)' }}>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>在線設備率</div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>99.8%</div>
           </div>
@@ -46,13 +91,20 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', fontSize: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
             <span>第一市場 巡邏動線 A (12/14 處打卡)</span>
-            <b style={{ color: '#34d399' }}>85.7%</b>
+            <b style={{ color: '#34d399' }}>85.7% (執勤中)</b>
           </div>
-          <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ width: '85.7%', height: '100%', background: 'linear-gradient(90deg, #0284c7, #10b981)' }}></div>
+          <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+            <div
+              style={{
+                width: '85.7%',
+                height: '100%',
+                background: 'linear-gradient(90deg, #0284c7, #10b981)',
+                boxShadow: '0 0 10px #10b981',
+              }}
+            ></div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '11px' }}>
-            <span>在勤警衛：林○安 (夜班執勤中)</span>
+            <span>在勤警衛：林○安 (即時定位正常)</span>
             <span>下次打卡點：B1 配電室</span>
           </div>
         </div>
@@ -272,9 +324,27 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
 
     case 'realtime_ticker':
       return (
-        <div style={{ fontSize: '12px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(2,132,199,0.1)', padding: '6px 12px', borderRadius: '4px', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-          <span style={{ fontSize: '15px' }}>📢</span>
-          <span>【即時成交廣播】05:42 批號 A-882 西螺甘藍 2,000kg $28.5 順利敲定 ｜ 05:41 批號 B-103 溪湖青蔥 800kg $85.0 成交</span>
+        <div
+          style={{
+            fontSize: '13px',
+            color: '#38bdf8',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            background: 'rgba(2,132,199,0.15)',
+            padding: '8px 14px',
+            borderRadius: '6px',
+            width: '100%',
+            overflow: 'hidden',
+            border: '1px solid rgba(0,212,255,0.3)',
+          }}
+        >
+          <span style={{ fontSize: '18px' }}>📢</span>
+          <div style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            <span style={{ display: 'inline-block', paddingLeft: '100%', animation: 'marqueeScroll 15s linear infinite' }}>
+              【即時成交廣播】05:42 批號 A-882 西螺甘藍 2,000kg $28.5 順利敲定 ｜ 05:41 批號 B-103 溪湖青蔥 800kg $85.0 成交 ｜ 05:40 批號 C-092 屏東檸檬 1,200kg $42.0 結標
+            </span>
+          </div>
         </div>
       );
 
