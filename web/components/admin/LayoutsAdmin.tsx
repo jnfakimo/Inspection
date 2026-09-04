@@ -184,6 +184,60 @@ const WIDGET_CATALOG: Record<
     defaultHeight: 3,
     desc: '降雨機率、颱風豪雨警報與防汛整備級別',
   },
+  weather_taiwan: {
+    systemId: 11,
+    systemName: '戰情指揮中心',
+    defaultTitle: '臺灣即時氣象特報',
+    icon: '🌦️',
+    defaultWidth: 12,
+    defaultHeight: 4,
+    desc: '中央氣象署警特報、縣市觀測與鄉鎮預報',
+  },
+  rank_dept: {
+    systemId: 11,
+    systemName: '戰情指揮中心',
+    defaultTitle: '各單位報修排行',
+    icon: '📊',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    desc: '各單位區間報修件數分析統計',
+  },
+  rank_equipment: {
+    systemId: 11,
+    systemName: '戰情指揮中心',
+    defaultTitle: '各設備故障排行',
+    icon: '🛠️',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    desc: '設備故障件數與維修頻率排行',
+  },
+  rank_technician: {
+    systemId: 11,
+    systemName: '戰情指揮中心',
+    defaultTitle: '維修人員承辦件數',
+    icon: '👷',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    desc: '技術人員承辦件數與結案效率',
+  },
+  rank_fault: {
+    systemId: 11,
+    systemName: '戰情指揮中心',
+    defaultTitle: '故障類型分析',
+    icon: '🔍',
+    defaultWidth: 6,
+    defaultHeight: 4,
+    desc: '電氣、機械、管線故障類型佔比',
+  },
+  trend: {
+    systemId: 11,
+    systemName: '戰情指揮中心',
+    defaultTitle: '各月份報修趨勢',
+    icon: '📅',
+    defaultWidth: 12,
+    defaultHeight: 4,
+    desc: '最近十二個月報修累積趨勢折線圖',
+  },
 
   // === 系統 12 (市場公開看板) ===
   public_price_board: {
@@ -271,11 +325,18 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
 
-  // 視覺化編輯相關狀態
+  // 視覺化編輯與畫布設定狀態
   const [viewMode, setViewMode] = useState<'visual' | 'table'>('visual');
   const [selectedSystemFilter, setSelectedSystemFilter] = useState<number | 'all'>('all');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [modalFilter, setModalFilter] = useState<number | 'all'>('all');
+  const [dropdownSelectedKey, setDropdownSelectedKey] = useState<string>('trading_kpi');
+  const [showRightCatalog, setShowRightCatalog] = useState(true);
+
+  // 長條矩形 / 自訂畫布尺寸可調式設定 (例如 3500 * 400)
+  const [canvasWidth, setCanvasWidth] = useState<number>(1920);
+  const [canvasHeight, setCanvasHeight] = useState<number>(1080);
+  const [canvasGridCols, setCanvasGridCols] = useState<12 | 24>(12);
+  const [canvasViewScale, setCanvasViewScale] = useState<'fit' | '100%'>('fit');
+  const [customRatioMode, setCustomRatioMode] = useState<string>('16:9');
 
   const load = useCallback(
     async (options: { preferredVersionId?: string; preserveNote?: boolean } = {}) => {
@@ -373,7 +434,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
   const addWidget = (widgetKey: string) => {
     const def = WIDGET_CATALOG[widgetKey] || {
       defaultTitle: widgetKey,
-      defaultWidth: 6,
+      defaultWidth: canvasGridCols === 24 ? 8 : 6,
       defaultHeight: 3,
     };
     const newItem: Row = {
@@ -387,7 +448,27 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
     };
     setItems(current => [...current, newItem]);
     setDirty(true);
-    setShowAddModal(false);
+  };
+
+  const handleRatioPresetChange = (preset: string) => {
+    setCustomRatioMode(preset);
+    if (preset === '16:9') {
+      setCanvasWidth(1920);
+      setCanvasHeight(1080);
+      setCanvasGridCols(12);
+    } else if (preset === '3500x400') {
+      setCanvasWidth(3500);
+      setCanvasHeight(400);
+      setCanvasGridCols(24);
+    } else if (preset === '2560x400') {
+      setCanvasWidth(2560);
+      setCanvasHeight(400);
+      setCanvasGridCols(24);
+    } else if (preset === '3840x1080') {
+      setCanvasWidth(3840);
+      setCanvasHeight(1080);
+      setCanvasGridCols(24);
+    }
   };
 
   const rpc = async (publish: boolean) => {
@@ -403,13 +484,16 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
         title: String(item.title || '').trim(),
         x: Number(item.x ?? 0),
         y: Number(item.y ?? 0),
-        width: Math.max(1, Math.min(12, Number(item.width || 6))),
+        width: Math.max(1, Math.min(24, Number(item.width || 6))),
         height: Math.max(1, Math.min(20, Number(item.height || 3))),
         min_width: Number(item.min_width ?? 1),
         min_height: Number(item.min_height ?? 1),
         visible: Boolean(item.visible),
         refresh_seconds: Math.max(0, Math.min(86400, Number(item.refresh_seconds || 60))),
-        config: item.config || {},
+        config: {
+          ...(item.config || {}),
+          canvas_dimension: { width: canvasWidth, height: canvasHeight, cols: canvasGridCols },
+        },
         sort_order: Number.isFinite(item.sort_order) ? Number(item.sort_order) : index * 10 + 10,
       }));
 
@@ -487,13 +571,6 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
     [items]
   );
 
-  const filteredModalCatalog = useMemo(() => {
-    return Object.entries(WIDGET_CATALOG).filter(([_, def]) => {
-      if (modalFilter === 'all') return true;
-      return def.systemId === modalFilter;
-    });
-  }, [modalFilter]);
-
   return (
     <AppShell profile={profile} title={module.title}>
       <AdminHeader
@@ -540,7 +617,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
       />
 
       <section className="panel admin-panel" style={{ marginTop: '12px' }}>
-        {/* 控制列：版本切換與編輯模式 */}
+        {/* 頂部控制列：版本切換與編輯模式 */}
         <div
           className="admin-toolbar"
           style={{
@@ -606,7 +683,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               }}
               onClick={() => setViewMode('visual')}
             >
-              🎨 12欄視覺化畫布
+              🎨 視覺化畫布排版
             </button>
             <button
               type="button"
@@ -628,688 +705,803 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
           </div>
         </div>
 
-        {viewMode === 'visual' ? (
-          /* 12 欄視覺化互動排版區 */
-          <div style={{ marginTop: '16px' }}>
-            {/* 工具列：新增模組圖塊 & 系統篩選 */}
-            <div
+        {/* 快速下拉式選單新增圖塊模組 & 長條矩形比例控制列 */}
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '14px',
+          }}
+        >
+          {/* 下拉式選單新增 (滿足使用者：可以再加入 10 11 12 項的資料，可以增加移除用下拉式選單增加) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>⚡</span> 快速下拉選單加入：
+            </span>
+            <select
+              value={dropdownSelectedKey}
+              onChange={e => setDropdownSelectedKey(e.target.value)}
               style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '12px',
-                marginBottom: '16px',
-                background: 'rgba(0,0,0,0.2)',
-                padding: '12px 16px',
-                borderRadius: '8px',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid rgba(255,255,255,0.2)',
+                fontSize: '13px',
+                fontWeight: 500,
+                maxWidth: '360px',
               }}
             >
-              <div
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}
+              <optgroup label="🟧 第 10 系統 · 市場營運分析系統">
+                <option value="trading_kpi">📦 市場交易量分析 (trading_kpi)</option>
+                <option value="price_comparison">📈 蔬果價格同期比較 (price_comparison)</option>
+                <option value="weekly_trend">📉 每週交易趨勢走勢 (weekly_trend)</option>
+                <option value="market_allocation">🎯 配置與妥善率儀表 (market_allocation)</option>
+                <option value="supplier_ranking">🚛 主要產地進貨排行 (supplier_ranking)</option>
+                <option value="price_volatility">⚠️ 行情波動異常警示 (price_volatility)</option>
+                <option value="auction_efficiency">⚡ 拍賣場次交易進度 (auction_efficiency)</option>
+                <option value="floor_congestion">🅿️ 卸貨場滿載車流動態 (floor_congestion)</option>
+              </optgroup>
+              <optgroup label="🟥 第 11 系統 · 戰情儀表與指揮中心">
+                <option value="alerts">🚨 重要提醒與異常警報 (alerts)</option>
+                <option value="kpis">⚡ 營運關鍵指標 (kpis)</option>
+                <option value="patrol">🛡️ 駐衛警巡檢即時 (patrol)</option>
+                <option value="repairs">🔧 報修案件分佈 (repairs)</option>
+                <option value="equipment_status">⚙️ 設備狀態監控 (equipment_status)</option>
+                <option value="realtime_incident_map">🗺️ 全場異常事件即時地圖 (realtime_incident_map)</option>
+                <option value="sla_compliance">⏱️ 維修 SLA 達成率與 MTTR (sla_compliance)</option>
+                <option value="staff_duty_matrix">👥 在勤人員打卡與跨班排班 (staff_duty_matrix)</option>
+                <option value="cctv_ipcam_grid">📹 關鍵場區攝影機監控 (cctv_ipcam_grid)</option>
+                <option value="weather_risk_radar">🌧️ 氣象特報與防汛應變 (weather_risk_radar)</option>
+                <option value="weather_taiwan">🌦️ 臺灣即時氣象 (weather_taiwan)</option>
+                <option value="rank_dept">📊 各單位報修排行 (rank_dept)</option>
+                <option value="rank_equipment">🛠️ 各設備故障排行 (rank_equipment)</option>
+                <option value="rank_technician">👷 維修人員案件數 (rank_technician)</option>
+                <option value="rank_fault">🔍 故障類型分析 (rank_fault)</option>
+                <option value="trend">📅 各月份報修趨勢 (trend)</option>
+              </optgroup>
+              <optgroup label="🟩 第 12 系統 · 市場公開即時看板">
+                <option value="public_price_board">💹 公開大宗即時報價看板 (public_price_board)</option>
+                <option value="market_turnover">🌾 市場公開總成交額 (market_turnover)</option>
+                <option value="commodity_ratio">🥦 品項交易佔比分佈 (commodity_ratio)</option>
+                <option value="realtime_ticker">📢 即時滾動跑馬燈行情 (realtime_ticker)</option>
+                <option value="top_gainers_losers">📊 今日蔬果漲跌幅排行榜 (top_gainers_losers)</option>
+                <option value="origin_weather_map">⛅ 主要產地天氣與供貨 (origin_weather_map)</option>
+                <option value="historical_price_curve">📉 30日/同季歷史價格曲線 (historical_price_curve)</option>
+                <option value="consumer_guide_board">🛒 平價蔬果專區與供應指引 (consumer_guide_board)</option>
+              </optgroup>
+            </select>
+            <button
+              type="button"
+              className="primary-btn compact"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: '#0284c7',
+                color: '#fff',
+                border: 'none',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+              onClick={() => addWidget(dropdownSelectedKey)}
+            >
+              <span>➕</span> 加入此圖塊
+            </button>
+          </div>
+
+          {/* 長條矩形 / 畫布尺寸與長寬可調式設定 (滿足使用者：營運戰情總覽 我要可以調整長條矩形，舉例3500*400 所以要作為可調式) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>📐</span> 看板尺寸與長條矩形比例：
+            </span>
+            <select
+              value={customRatioMode}
+              onChange={e => handleRatioPresetChange(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: '6px', background: '#1e293b', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px' }}
+            >
+              <option value="16:9">📺 16:9 標準螢幕 (1920 × 1080)</option>
+              <option value="3500x400">📏 超寬長條看板 (3500 × 400)</option>
+              <option value="2560x400">🎛️ 橫向 LED 長條 (2560 × 400)</option>
+              <option value="3840x1080">🖥️ 雙螢幕超寬拼接 (3840 × 1080)</option>
+              <option value="custom">⚙️ 自訂長寬像素</option>
+            </select>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '6px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>寬:</span>
+              <input
+                type="number"
+                min="600"
+                max="10000"
+                step="10"
+                value={canvasWidth}
+                style={{ width: '60px', padding: '3px 4px', borderRadius: '4px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)', color: '#38bdf8', fontSize: '12px', textAlign: 'center', fontWeight: 700 }}
+                onChange={e => {
+                  setCanvasWidth(Number(e.target.value) || 1920);
+                  setCustomRatioMode('custom');
+                }}
+              />
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>× 高:</span>
+              <input
+                type="number"
+                min="200"
+                max="5000"
+                step="10"
+                value={canvasHeight}
+                style={{ width: '56px', padding: '3px 4px', borderRadius: '4px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)', color: '#38bdf8', fontSize: '12px', textAlign: 'center', fontWeight: 700 }}
+                onChange={e => {
+                  setCanvasHeight(Number(e.target.value) || 1080);
+                  setCustomRatioMode('custom');
+                }}
+              />
+              <span style={{ fontSize: '11px', color: 'var(--muted)' }}>px</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: canvasGridCols === 24 ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                  color: canvasGridCols === 24 ? '#fff' : '#94a3b8',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setCanvasGridCols(canvasGridCols === 24 ? 12 : 24)}
+                title="切換 12 或 24 欄制（24 欄制適合 3500px 超長條螢幕細部配置）"
               >
-                <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: 600 }}>
-                  圖塊系統來源：
-                </span>
+                {canvasGridCols} 欄制
+              </button>
+              <button
+                type="button"
+                style={{
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  background: canvasViewScale === 'fit' ? '#10b981' : 'rgba(255,255,255,0.05)',
+                  color: canvasViewScale === 'fit' ? '#fff' : '#94a3b8',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setCanvasViewScale(canvasViewScale === 'fit' ? '100%' : 'fit')}
+                title="縮放符合目前編輯視窗或以 100% 原始長寬像素橫向捲動"
+              >
+                {canvasViewScale === 'fit' ? '🔍 縮放符合' : '↔️ 100%捲動'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {viewMode === 'visual' ? (
+          /* 12/24 欄視覺化互動排版區 + 右側圖塊元件庫 */
+          <div
+            style={{
+              marginTop: '16px',
+              display: 'flex',
+              gap: '16px',
+              alignItems: 'flex-start',
+            }}
+          >
+            {/* 左側 / 中央可調式畫布 (Canvas) */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* 系統來源過濾標籤 */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  marginBottom: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--muted)', fontWeight: 600 }}>
+                    圖塊系統來源篩選：
+                  </span>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid var(--line)',
+                      background: selectedSystemFilter === 'all' ? 'var(--cyan)' : 'transparent',
+                      color: selectedSystemFilter === 'all' ? '#000' : 'var(--text)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setSelectedSystemFilter('all')}
+                  >
+                    全部系統 ({sortedItems.length})
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #f59e0b',
+                      background: selectedSystemFilter === 10 ? '#f59e0b' : 'rgba(245,158,11,0.1)',
+                      color: selectedSystemFilter === 10 ? '#000' : '#fbbf24',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setSelectedSystemFilter(10)}
+                  >
+                    系統 10（市場營運）
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ef4444',
+                      background: selectedSystemFilter === 11 ? '#ef4444' : 'rgba(239,68,68,0.1)',
+                      color: selectedSystemFilter === 11 ? '#fff' : '#fca5a5',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setSelectedSystemFilter(11)}
+                  >
+                    系統 11（戰情指揮）
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #22c55e',
+                      background: selectedSystemFilter === 12 ? '#22c55e' : 'rgba(34,197,94,0.1)',
+                      color: selectedSystemFilter === 12 ? '#000' : '#86efac',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setSelectedSystemFilter(12)}
+                  >
+                    系統 12（公開看板）
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   style={{
-                    padding: '4px 10px',
+                    padding: '3px 10px',
                     borderRadius: '4px',
-                    border: '1px solid var(--line)',
-                    background: selectedSystemFilter === 'all' ? 'var(--cyan)' : 'transparent',
-                    color: selectedSystemFilter === 'all' ? '#000' : 'var(--text)',
-                    fontSize: '12px',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    background: showRightCatalog ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)',
+                    color: showRightCatalog ? '#60a5fa' : '#94a3b8',
+                    fontSize: '11px',
                     cursor: 'pointer',
+                    fontWeight: 600,
                   }}
-                  onClick={() => setSelectedSystemFilter('all')}
+                  onClick={() => setShowRightCatalog(!showRightCatalog)}
                 >
-                  全部系統
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: '1px solid #f59e0b',
-                    background:
-                      selectedSystemFilter === 10 ? '#f59e0b' : 'rgba(245,158,11,0.1)',
-                    color: selectedSystemFilter === 10 ? '#000' : '#fbbf24',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setSelectedSystemFilter(10)}
-                >
-                  系統 10（市場營運）
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: '1px solid #ef4444',
-                    background:
-                      selectedSystemFilter === 11 ? '#ef4444' : 'rgba(239,68,68,0.1)',
-                    color: selectedSystemFilter === 11 ? '#fff' : '#fca5a5',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setSelectedSystemFilter(11)}
-                >
-                  系統 11（戰情指揮）
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '4px',
-                    border: '1px solid #22c55e',
-                    background:
-                      selectedSystemFilter === 12 ? '#22c55e' : 'rgba(34,197,94,0.1)',
-                    color: selectedSystemFilter === 12 ? '#000' : '#86efac',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setSelectedSystemFilter(12)}
-                >
-                  系統 12（公開看板）
+                  {showRightCatalog ? '▶ 收合右側元件庫' : '◀ 開啟右側圖塊庫'}
                 </button>
               </div>
 
-              <button
-                type="button"
-                className="primary-btn compact"
+              {/* 畫布容器 (支援長條 3500*400 縮放與滾動) */}
+              <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  background: '#3b82f6',
-                  color: '#fff',
-                  border: 'none',
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
+                  background: '#070d1e',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  overflowX: canvasViewScale === '100%' ? 'auto' : 'hidden',
+                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.6)',
                 }}
-                onClick={() => setShowAddModal(true)}
               >
-                <span>➕</span> 新增圖塊模組
-              </button>
-            </div>
-
-            {/* 12 欄制視覺化畫布 (Visual Grid Canvas) */}
-            <div
-              style={{
-                background: '#0b1329',
-                padding: '16px',
-                borderRadius: '12px',
-                border: '1px solid rgba(255,255,255,0.08)',
-                minHeight: '420px',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(12, 1fr)',
-                gap: '14px',
-                alignItems: 'start',
-              }}
-            >
-              {sortedItems.map(({ item, index }) => {
-                const info = WIDGET_CATALOG[item.widget_key] || {
-                  systemId: 11,
-                  systemName: '戰情系統',
-                  icon: '📊',
-                  desc: '',
-                };
-                const isVisible = Boolean(item.visible);
-                const width = Math.min(12, Math.max(1, Number(item.width ?? 6)));
-                const height = Math.max(1, Number(item.height ?? 2));
-                const heightPx = Math.max(130, height * 70);
-
-                if (selectedSystemFilter !== 'all' && info.systemId !== selectedSystemFilter) {
-                  return null;
-                }
-
-                return (
-                  <div
-                    key={`${item.widget_key}-${index}`}
-                    style={{
-                      gridColumn: `span ${width}`,
-                      minHeight: `${heightPx}px`,
-                      background: isVisible
-                        ? 'rgba(30, 41, 59, 0.85)'
-                        : 'rgba(15, 23, 42, 0.4)',
-                      border: isVisible
-                        ? '1px solid rgba(255,255,255,0.15)'
-                        : '1px dashed rgba(255,255,255,0.08)',
-                      borderRadius: '10px',
-                      padding: '14px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      position: 'relative',
-                      opacity: isVisible ? 1 : 0.6,
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-                    }}
-                  >
-                    {/* 卡片標頭與快速控制 */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '10px',
-                        gap: '8px',
-                        borderBottom: '1px solid rgba(255,255,255,0.06)',
-                        paddingBottom: '8px',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          minWidth: 0,
-                        }}
-                      >
-                        <span style={{ fontSize: '18px' }}>{info.icon}</span>
-                        <input
-                          type="text"
-                          value={item.title || ''}
-                          style={{
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: '#e2e8f0',
-                            background: 'transparent',
-                            border: '1px solid transparent',
-                            borderBottom: '1px solid rgba(255,255,255,0.2)',
-                            padding: '2px 4px',
-                            width: '100%',
-                            maxWidth: '240px',
-                          }}
-                          onChange={e => updateItem(index, { title: e.target.value })}
-                        />
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            whiteSpace: 'nowrap',
-                            background:
-                              info.systemId === 10
-                                ? 'rgba(245,158,11,0.2)'
-                                : info.systemId === 12
-                                ? 'rgba(34,197,94,0.2)'
-                                : 'rgba(239,68,68,0.2)',
-                            color:
-                              info.systemId === 10
-                                ? '#fbbf24'
-                                : info.systemId === 12
-                                ? '#86efac'
-                                : '#fca5a5',
-                          }}
-                        >
-                          系統{info.systemId}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <label
-                          style={{
-                            fontSize: '11px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            color: 'var(--muted)',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isVisible}
-                            onChange={e => updateItem(index, { visible: e.target.checked })}
-                          />
-                          顯示
-                        </label>
-                        <button
-                          type="button"
-                          style={{
-                            background: 'rgba(239,68,68,0.15)',
-                            color: '#fca5a5',
-                            border: 'none',
-                            borderRadius: '4px',
-                            width: '22px',
-                            height: '22px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          title="移除圖塊"
-                          onClick={() => removeItem(index)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 卡片內容示意（即時感受區） */}
-                    <div
-                      style={{
-                        flex: 1,
-                        background: 'rgba(0,0,0,0.25)',
-                        borderRadius: '6px',
-                        padding: '10px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {/* 系統 11 預覽 */}
-                      {item.widget_key === 'alerts' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              color: '#f87171',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                background: '#ef4444',
-                              }}
-                            ></span>
-                            冷凍庫 B2 溫度異常 (-2.1°C) - 3分鐘前
-                          </div>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              color: '#fbbf24',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <span
-                              style={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                background: '#f59e0b',
-                              }}
-                            ></span>
-                            月臺 3 派工排程延遲 15 分鐘
-                          </div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'kpis' && (
-                        <div
-                          style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 1fr)',
-                            gap: '8px',
-                            textAlign: 'center',
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: 'rgba(0,0,0,0.2)',
-                              padding: '6px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>今日車次</div>
-                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#60a5fa' }}>
-                              1,280
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              background: 'rgba(0,0,0,0.2)',
-                              padding: '6px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>巡檢完成</div>
-                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#34d399' }}>
-                              94.2%
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              background: 'rgba(0,0,0,0.2)',
-                              padding: '6px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>異常案件</div>
-                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#f87171' }}>
-                              3 件
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              background: 'rgba(0,0,0,0.2)',
-                              padding: '6px',
-                              borderRadius: '4px',
-                            }}
-                          >
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>在線系統</div>
-                            <div style={{ fontSize: '18px', fontWeight: 700, color: '#a78bfa' }}>
-                              100%
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'patrol' && (
-                        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
-                            <span>巡檢路線 12/14 處已完成</span>
-                            <span style={{ color: '#34d399' }}>85.7%</span>
-                          </div>
-                          <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-                            <div style={{ width: '85.7%', height: '100%', background: '#10b981' }}></div>
-                          </div>
-                          <div style={{ color: '#64748b', fontSize: '10px', marginTop: '2px' }}>巡邏中人員：4 名 ｜ 異常通報：0 筆</div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'repairs' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', fontSize: '11px' }}>
-                          <div><div style={{ color: '#ef4444', fontWeight: 700, fontSize: '16px' }}>1</div><div style={{ color: '#64748b' }}>緊急處理</div></div>
-                          <div><div style={{ color: '#f59e0b', fontWeight: 700, fontSize: '16px' }}>8</div><div style={{ color: '#64748b' }}>進行中</div></div>
-                          <div><div style={{ color: '#10b981', fontWeight: 700, fontSize: '16px' }}>24</div><div style={{ color: '#64748b' }}>已結案</div></div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'equipment_status' && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', fontSize: '11px' }}>
-                          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '4px', borderRadius: '4px' }}><div style={{ color: '#38bdf8' }}>低溫冷鏈</div><b style={{ color: '#4ade80' }}>99.2%</b></div>
-                          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '4px', borderRadius: '4px' }}><div style={{ color: '#38bdf8' }}>自動磅秤</div><b style={{ color: '#4ade80' }}>100%</b></div>
-                          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '4px', borderRadius: '4px' }}><div style={{ color: '#38bdf8' }}>排風系統</div><b style={{ color: '#facc15' }}>97.5%</b></div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'realtime_incident_map' && (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span style={{ color: '#94a3b8' }}>🗺️ 果菜 A 棟 / 卸貨月台熱區</span>
-                          <span style={{ color: '#f87171', fontWeight: 600 }}>2 處待派工處理</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'sla_compliance' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
-                          <div>SLA 達標率: <b style={{ color: '#34d399' }}>98.6%</b></div>
-                          <div>平均修復: <b style={{ color: '#60a5fa' }}>42 分鐘</b></div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'staff_duty_matrix' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span>在勤人力: <b>38 人</b></span>
-                          <span style={{ color: '#60a5fa' }}>早班 28 ｜ 駐警 6 ｜ 機電 4</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'cctv_ipcam_grid' && (
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '11px', color: '#94a3b8' }}>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
-                          CAM-01 拍賣一場 ｜ CAM-04 北進貨門 [即時聯播]
-                        </div>
-                      )}
-
-                      {item.widget_key === 'weather_risk_radar' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
-                          <span>降雨機率: <b style={{ color: '#60a5fa' }}>20% (氣溫 26°C)</b></span>
-                          <span style={{ color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 6px', borderRadius: '4px' }}>防汛綠燈正常</span>
-                        </div>
-                      )}
-
-                      {/* 系統 10 預覽 */}
-                      {item.widget_key === 'trading_kpi' && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', textAlign: 'center', fontSize: '11px' }}>
-                          <div><div style={{ color: '#64748b', fontSize: '10px' }}>總交易量</div><b style={{ color: '#fbbf24' }}>1,480t</b></div>
-                          <div><div style={{ color: '#64748b', fontSize: '10px' }}>總交易額</div><b style={{ color: '#34d399' }}>$4,820萬</b></div>
-                          <div><div style={{ color: '#64748b', fontSize: '10px' }}>品項數</div><b style={{ color: '#60a5fa' }}>186種</b></div>
-                          <div><div style={{ color: '#64748b', fontSize: '10px' }}>成交率</div><b style={{ color: '#a78bfa' }}>99.4%</b></div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'price_comparison' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                            <span style={{ width: '50px' }}>葉菜類</span>
-                            <div style={{ flex: 1, height: '8px', background: '#3b82f6', borderRadius: '4px' }}></div>
-                            <span>$38.5</span>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px' }}>
-                            <span style={{ width: '50px' }}>瓜果類</span>
-                            <div style={{ flex: 1, height: '8px', background: '#f59e0b', borderRadius: '4px', width: '70%' }}></div>
-                            <span>$52.0</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'weekly_trend' && (
-                        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
-                            <span>近 7 日批發成交量曲線</span>
-                            <span style={{ color: '#38bdf8' }}>穩健上升 +4.2%</span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '4px', height: '24px', alignItems: 'flex-end', paddingTop: '4px' }}>
-                            <div style={{ flex: 1, height: '40%', background: '#3b82f6', borderRadius: '2px' }}></div>
-                            <div style={{ flex: 1, height: '60%', background: '#3b82f6', borderRadius: '2px' }}></div>
-                            <div style={{ flex: 1, height: '50%', background: '#3b82f6', borderRadius: '2px' }}></div>
-                            <div style={{ flex: 1, height: '80%', background: '#3b82f6', borderRadius: '2px' }}></div>
-                            <div style={{ flex: 1, height: '70%', background: '#3b82f6', borderRadius: '2px' }}></div>
-                            <div style={{ flex: 1, height: '95%', background: '#10b981', borderRadius: '2px' }}></div>
-                            <div style={{ flex: 1, height: '85%', background: '#10b981', borderRadius: '2px' }}></div>
-                          </div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'market_allocation' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span>場區滿載率: <b style={{ color: '#f59e0b' }}>86%</b></span>
-                          <span>搬運車配置: <b style={{ color: '#60a5fa' }}>42/48 台</b></span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'supplier_ranking' && (
-                        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>1. 雲林西螺農會</span><b>420 噸</b></div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>2. 彰化溪湖果菜</span><b>310 噸</b></div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'price_volatility' && (
-                        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span>波動品項: <b>青蔥 (+24.5%)</b></span>
-                          <span style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '2px 4px', borderRadius: '3px' }}>漲幅過高</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'auction_efficiency' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span>第 1 拍賣場: <b style={{ color: '#34d399' }}>88%</b></span>
-                          <span>均速: <b style={{ color: '#60a5fa' }}>12 秒/批</b></span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'floor_congestion' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span>泊位佔用: <b style={{ color: '#f59e0b' }}>8/10</b></span>
-                          <span>進場排隊: <b>4 輛</b></span>
-                        </div>
-                      )}
-
-                      {/* 系統 12 預覽 */}
-                      {item.widget_key === 'public_price_board' && (
-                        <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '2px' }}>
-                            <span>品名</span><span>今日均價</span><span>漲跌</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>初秋高麗菜</span><b>$28.5 / kg</b><span style={{ color: '#4ade80' }}>▲ 2.5</span>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span>牛番茄</span><b>$65.0 / kg</b><span style={{ color: '#f87171' }}>▼ 1.2</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'market_turnover' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
-                          <span>累積成交額: <b style={{ color: '#22c55e', fontSize: '13px' }}>$48,250,000</b></span>
-                          <span style={{ color: '#4ade80' }}>+6.8%</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'commodity_ratio' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', fontSize: '11px' }}>
-                          <div><div style={{ color: '#34d399' }}>葉菜</div><b>45%</b></div>
-                          <div><div style={{ color: '#f59e0b' }}>根莖</div><b>28%</b></div>
-                          <div><div style={{ color: '#60a5fa' }}>瓜果</div><b>18%</b></div>
-                          <div><div style={{ color: '#a78bfa' }}>其他</div><b>9%</b></div>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'realtime_ticker' && (
-                        <div style={{ fontSize: '11px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#38bdf8' }}></span>
-                          【拍賣廣播】05:42 批號 A-882 西螺甘藍 2,000kg 順利敲定...
-                        </div>
-                      )}
-
-                      {item.widget_key === 'top_gainers_losers' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span style={{ color: '#4ade80' }}>▲ 牛角椒 +28%</span>
-                          <span style={{ color: '#f87171' }}>▼ 胡瓜 -18%</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'origin_weather_map' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span>雲林: <b>多雲 24°C</b></span>
-                          <span style={{ color: '#34d399' }}>供貨正常</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'historical_price_curve' && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
-                          <span>本月均價: <b>$34.2</b></span>
-                          <span style={{ color: '#64748b' }}>去年同期 $31.8</span>
-                        </div>
-                      )}
-
-                      {item.widget_key === 'consumer_guide_board' && (
-                        <div style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>今日平價推薦: <b>包心白菜 ($22/kg)</b></span>
-                        </div>
-                      )}
-
-                      {/* 未定義預設 fallback */}
-                      {!WIDGET_CATALOG[item.widget_key] && (
-                        <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
-                          {info.desc || `代碼: ${item.widget_key}`}
-                          <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '4px' }}>
-                            即時動態數據連線中...
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 底部尺寸調整工具列 */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginTop: '10px',
-                        paddingTop: '8px',
-                        borderTop: '1px solid rgba(255,255,255,0.06)',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: 'var(--muted)', fontSize: '11px' }}>寬度:</span>
-                        {[3, 4, 6, 8, 12].map(w => (
-                          <button
-                            key={w}
-                            type="button"
-                            style={{
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              background: width === w ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                              color: width === w ? '#fff' : '#94a3b8',
-                              cursor: 'pointer',
-                            }}
-                            onClick={() => updateItem(index, { width: w })}
-                          >
-                            {w === 12
-                              ? '全寬'
-                              : w === 6
-                              ? '1/2'
-                              : w === 4
-                              ? '1/3'
-                              : w === 3
-                              ? '1/4'
-                              : `${w}/12`}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ color: 'var(--muted)', fontSize: '11px' }}>高度:</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="20"
-                          value={height}
-                          style={{
-                            width: '44px',
-                            padding: '2px 4px',
-                            borderRadius: '4px',
-                            background: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(255,255,255,0.15)',
-                            color: '#e2e8f0',
-                            textAlign: 'center',
-                            fontSize: '11px',
-                          }}
-                          onChange={e => updateItem(index, { height: Number(e.target.value) })}
-                        />
-                        <span style={{ color: 'var(--muted)', fontSize: '10px' }}>({heightPx}px)</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {sortedItems.length === 0 && (
                 <div
                   style={{
-                    gridColumn: 'span 12',
-                    textAlign: 'center',
-                    padding: '60px 20px',
-                    color: '#64748b',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '10px',
+                    paddingBottom: '6px',
+                    borderBottom: '1px dashed rgba(255,255,255,0.08)',
+                    fontSize: '12px',
+                    color: '#94a3b8',
                   }}
                 >
-                  <div style={{ fontSize: '32px', marginBottom: '10px' }}>📋</div>
-                  目前版面尚未設定任何圖塊，請點選上方「➕ 新增圖塊模組」開始排版。
+                  <span>
+                    🖥️ <strong>畫布目標解析度：</strong>
+                    <span style={{ color: '#38bdf8' }}>{canvasWidth} × {canvasHeight} px</span>
+                    {canvasWidth >= 3000 && <span style={{ marginLeft: '6px', color: '#fbbf24' }}>[超寬長條矩形看板]</span>}
+                  </span>
+                  <span>網格制式：{canvasGridCols} 欄分佈 ｜ 顯示圖塊數：{sortedItems.length} 個</span>
                 </div>
-              )}
+
+                {/* 網格區塊 */}
+                <div
+                  style={{
+                    width: canvasViewScale === '100%' ? `${canvasWidth}px` : '100%',
+                    minHeight: `${Math.max(320, canvasHeight * (canvasViewScale === 'fit' ? 0.35 : 1))}px`,
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${canvasGridCols}, 1fr)`,
+                    gap: '12px',
+                    alignItems: 'start',
+                  }}
+                >
+                  {sortedItems.map(({ item, index }) => {
+                    const info = WIDGET_CATALOG[item.widget_key] || {
+                      systemId: 11,
+                      systemName: '戰情系統',
+                      icon: '📊',
+                      desc: '',
+                    };
+                    const isVisible = Boolean(item.visible);
+                    const width = Math.min(canvasGridCols, Math.max(1, Number(item.width ?? 6)));
+                    const height = Math.max(1, Number(item.height ?? 2));
+                    const heightPx = Math.max(120, height * 65);
+
+                    if (selectedSystemFilter !== 'all' && info.systemId !== selectedSystemFilter) {
+                      return null;
+                    }
+
+                    return (
+                      <div
+                        key={`${item.widget_key}-${index}`}
+                        style={{
+                          gridColumn: `span ${width}`,
+                          minHeight: `${heightPx}px`,
+                          background: isVisible
+                            ? 'rgba(30, 41, 59, 0.9)'
+                            : 'rgba(15, 23, 42, 0.4)',
+                          border: isVisible
+                            ? '1px solid rgba(255,255,255,0.18)'
+                            : '1px dashed rgba(255,255,255,0.08)',
+                          borderRadius: '10px',
+                          padding: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          position: 'relative',
+                          opacity: isVisible ? 1 : 0.6,
+                          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        {/* 卡片標頭與快速控制 */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '8px',
+                            gap: '8px',
+                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            paddingBottom: '6px',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              minWidth: 0,
+                              flex: 1,
+                            }}
+                          >
+                            <span style={{ fontSize: '16px' }}>{info.icon}</span>
+                            <input
+                              type="text"
+                              value={item.title || ''}
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                color: '#e2e8f0',
+                                background: 'transparent',
+                                border: '1px solid transparent',
+                                borderBottom: '1px solid rgba(255,255,255,0.2)',
+                                padding: '2px 4px',
+                                width: '100%',
+                                maxWidth: '200px',
+                              }}
+                              onChange={e => updateItem(index, { title: e.target.value })}
+                            />
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                padding: '1px 5px',
+                                borderRadius: '3px',
+                                fontWeight: 700,
+                                whiteSpace: 'nowrap',
+                                background:
+                                  info.systemId === 10
+                                    ? 'rgba(245,158,11,0.2)'
+                                    : info.systemId === 12
+                                    ? 'rgba(34,197,94,0.2)'
+                                    : 'rgba(239,68,68,0.2)',
+                                color:
+                                  info.systemId === 10
+                                    ? '#fbbf24'
+                                    : info.systemId === 12
+                                    ? '#86efac'
+                                    : '#fca5a5',
+                              }}
+                            >
+                              系統{info.systemId}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <label
+                              style={{
+                                fontSize: '11px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                color: 'var(--muted)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isVisible}
+                                onChange={e => updateItem(index, { visible: e.target.checked })}
+                              />
+                              顯示
+                            </label>
+                            <button
+                              type="button"
+                              style={{
+                                background: 'rgba(239,68,68,0.15)',
+                                color: '#fca5a5',
+                                border: 'none',
+                                borderRadius: '4px',
+                                width: '20px',
+                                height: '20px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '12px',
+                              }}
+                              title="移除此圖塊"
+                              onClick={() => removeItem(index)}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 卡片內容示意（即時感受區） */}
+                        <div
+                          style={{
+                            flex: 1,
+                            background: 'rgba(0,0,0,0.25)',
+                            borderRadius: '6px',
+                            padding: '8px 10px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {/* 系統 11 預覽 */}
+                          {item.widget_key === 'alerts' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ fontSize: '11px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444' }}></span>
+                                冷凍庫 B2 溫度異常 (-2.1°C) - 3分鐘前
+                              </div>
+                              <div style={{ fontSize: '11px', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                                月臺 3 派工排程延遲 15 分鐘
+                              </div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'kpis' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', textAlign: 'center' }}>
+                              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '4px' }}><div style={{ fontSize: '9px', color: '#64748b' }}>今日車次</div><div style={{ fontSize: '15px', fontWeight: 700, color: '#60a5fa' }}>1,280</div></div>
+                              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '4px' }}><div style={{ fontSize: '9px', color: '#64748b' }}>巡檢完成</div><div style={{ fontSize: '15px', fontWeight: 700, color: '#34d399' }}>94.2%</div></div>
+                              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '4px' }}><div style={{ fontSize: '9px', color: '#64748b' }}>異常案件</div><div style={{ fontSize: '15px', fontWeight: 700, color: '#f87171' }}>3 件</div></div>
+                              <div style={{ background: 'rgba(0,0,0,0.2)', padding: '4px', borderRadius: '4px' }}><div style={{ fontSize: '9px', color: '#64748b' }}>在線系統</div><div style={{ fontSize: '15px', fontWeight: 700, color: '#a78bfa' }}>100%</div></div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'patrol' && (
+                            <div style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+                                <span>巡檢路線 12/14 處完成</span>
+                                <span style={{ color: '#34d399' }}>85.7%</span>
+                              </div>
+                              <div style={{ height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <div style={{ width: '85.7%', height: '100%', background: '#10b981' }}></div>
+                              </div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'repairs' && (
+                            <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', fontSize: '11px' }}>
+                              <div><div style={{ color: '#ef4444', fontWeight: 700, fontSize: '14px' }}>1</div><div style={{ color: '#64748b', fontSize: '10px' }}>緊急處理</div></div>
+                              <div><div style={{ color: '#f59e0b', fontWeight: 700, fontSize: '14px' }}>8</div><div style={{ color: '#64748b', fontSize: '10px' }}>進行中</div></div>
+                              <div><div style={{ color: '#10b981', fontWeight: 700, fontSize: '14px' }}>24</div><div style={{ color: '#64748b', fontSize: '10px' }}>已結案</div></div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'equipment_status' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4px', textAlign: 'center', fontSize: '10px' }}>
+                              <div style={{ background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '4px' }}><div style={{ color: '#38bdf8' }}>低溫冷鏈</div><b style={{ color: '#4ade80' }}>99.2%</b></div>
+                              <div style={{ background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '4px' }}><div style={{ color: '#38bdf8' }}>自動磅秤</div><b style={{ color: '#4ade80' }}>100%</b></div>
+                              <div style={{ background: 'rgba(255,255,255,0.04)', padding: '3px', borderRadius: '4px' }}><div style={{ color: '#38bdf8' }}>排風系統</div><b style={{ color: '#facc15' }}>97.5%</b></div>
+                            </div>
+                          )}
+
+                          {/* 系統 10 預覽 */}
+                          {item.widget_key === 'trading_kpi' && (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', textAlign: 'center', fontSize: '10px' }}>
+                              <div><div style={{ color: '#64748b' }}>總量</div><b style={{ color: '#fbbf24', fontSize: '13px' }}>1,480t</b></div>
+                              <div><div style={{ color: '#64748b' }}>金額</div><b style={{ color: '#34d399', fontSize: '13px' }}>$4,820萬</b></div>
+                              <div><div style={{ color: '#64748b' }}>品項</div><b style={{ color: '#60a5fa', fontSize: '13px' }}>186種</b></div>
+                              <div><div style={{ color: '#64748b' }}>成交</div><b style={{ color: '#a78bfa', fontSize: '13px' }}>99.4%</b></div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'price_comparison' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+                                <span style={{ width: '45px' }}>葉菜類</span>
+                                <div style={{ flex: 1, height: '6px', background: '#3b82f6', borderRadius: '3px' }}></div>
+                                <span>$38.5</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+                                <span style={{ width: '45px' }}>瓜果類</span>
+                                <div style={{ flex: 1, height: '6px', background: '#f59e0b', borderRadius: '3px', width: '70%' }}></div>
+                                <span>$52.0</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'supplier_ranking' && (
+                            <div style={{ fontSize: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>1. 雲林西螺 <b>420t</b></span>
+                              <span>2. 彰化溪湖 <b>310t</b></span>
+                            </div>
+                          )}
+
+                          {/* 系統 12 預覽 */}
+                          {item.widget_key === 'public_price_board' && (
+                            <div style={{ fontSize: '10px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}><span>初秋高麗菜</span><b>$28.5 / kg</b><span style={{ color: '#4ade80' }}>▲ 2.5</span></div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>牛番茄</span><b>$65.0 / kg</b><span style={{ color: '#f87171' }}>▼ 1.2</span></div>
+                            </div>
+                          )}
+
+                          {item.widget_key === 'realtime_ticker' && (
+                            <div style={{ fontSize: '10px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>📢</span>
+                              【批發行情廣播】05:42 批號 A-882 西螺甘藍 2,000kg 順利敲定...
+                            </div>
+                          )}
+
+                          {/* 未特定預覽通用卡片 */}
+                          {!['alerts', 'kpis', 'patrol', 'repairs', 'equipment_status', 'trading_kpi', 'price_comparison', 'supplier_ranking', 'public_price_board', 'realtime_ticker'].includes(item.widget_key) && (
+                            <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
+                              <div>{info.desc || `圖塊代碼: ${item.widget_key}`}</div>
+                              <div style={{ fontSize: '10px', color: '#38bdf8', marginTop: '2px' }}>即時動態數據連線中...</div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 底部尺寸調整工具列 */}
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginTop: '8px',
+                            paddingTop: '6px',
+                            borderTop: '1px solid rgba(255,255,255,0.06)',
+                            fontSize: '11px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: 'var(--muted)', fontSize: '10px' }}>寬:</span>
+                            {(canvasGridCols === 24 ? [4, 6, 8, 12, 24] : [3, 4, 6, 8, 12]).map(w => (
+                              <button
+                                key={w}
+                                type="button"
+                                style={{
+                                  padding: '1px 5px',
+                                  borderRadius: '3px',
+                                  fontSize: '10px',
+                                  border: '1px solid rgba(255,255,255,0.1)',
+                                  background: width === w ? '#3b82f6' : 'rgba(255,255,255,0.05)',
+                                  color: width === w ? '#fff' : '#94a3b8',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => updateItem(index, { width: w })}
+                              >
+                                {w === canvasGridCols ? '全寬' : `${w}/${canvasGridCols}`}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: 'var(--muted)', fontSize: '10px' }}>高:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="20"
+                              value={height}
+                              style={{
+                                width: '38px',
+                                padding: '1px 3px',
+                                borderRadius: '3px',
+                                background: 'rgba(0,0,0,0.3)',
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                color: '#e2e8f0',
+                                textAlign: 'center',
+                                fontSize: '10px',
+                              }}
+                              onChange={e => updateItem(index, { height: Number(e.target.value) })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {sortedItems.length === 0 && (
+                    <div
+                      style={{
+                        gridColumn: `span ${canvasGridCols}`,
+                        textAlign: 'center',
+                        padding: '60px 20px',
+                        color: '#64748b',
+                      }}
+                    >
+                      <div style={{ fontSize: '32px', marginBottom: '10px' }}>📋</div>
+                      目前版面尚未設定任何圖塊，請使用上方下拉式選單或右側圖塊庫加入。
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* 右側常駐圖塊元件庫 (滿足使用者：右側圖塊元件庫 沒有10 11 12 項次內容) */}
+            {showRightCatalog && (
+              <aside
+                style={{
+                  width: '320px',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  maxHeight: 'calc(100vh - 200px)',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                }}
+              >
+                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>📦</span> 圖塊元件庫 (共 {Object.keys(WIDGET_CATALOG).length} 款)
+                  </h4>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+                    點選下方任意圖塊卡片即可直接加入排版畫布。
+                  </p>
+                </div>
+
+                {/* 系統 10 區塊 */}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🟧</span> 系統 10 · 市場營運分析 (8)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {Object.entries(WIDGET_CATALOG)
+                      .filter(([_, d]) => d.systemId === 10)
+                      .map(([k, d]) => (
+                        <div
+                          key={k}
+                          style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(245,158,11,0.2)',
+                            borderRadius: '6px',
+                            padding: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = '#f59e0b')}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(245,158,11,0.2)')}
+                          onClick={() => addWidget(k)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>
+                            <span>{d.icon}</span>
+                            <span>{d.defaultTitle}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#f59e0b' }}>➕</span>
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{d.desc}</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* 系統 11 區塊 */}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#fca5a5', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🟥</span> 系統 11 · 戰情指揮中心 (10)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {Object.entries(WIDGET_CATALOG)
+                      .filter(([_, d]) => d.systemId === 11)
+                      .map(([k, d]) => (
+                        <div
+                          key={k}
+                          style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(239,68,68,0.2)',
+                            borderRadius: '6px',
+                            padding: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = '#ef4444')}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)')}
+                          onClick={() => addWidget(k)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>
+                            <span>{d.icon}</span>
+                            <span>{d.defaultTitle}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#ef4444' }}>➕</span>
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{d.desc}</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* 系統 12 區塊 */}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#86efac', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>🟩</span> 系統 12 · 市場公開看板 (8)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {Object.entries(WIDGET_CATALOG)
+                      .filter(([_, d]) => d.systemId === 12)
+                      .map(([k, d]) => (
+                        <div
+                          key={k}
+                          style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(34,197,94,0.2)',
+                            borderRadius: '6px',
+                            padding: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = '#22c55e')}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(34,197,94,0.2)')}
+                          onClick={() => addWidget(k)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>
+                            <span>{d.icon}</span>
+                            <span>{d.defaultTitle}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#22c55e' }}>➕</span>
+                          </div>
+                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{d.desc}</div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </aside>
+            )}
           </div>
         ) : (
           /* 傳統表格編輯模式 */
-          <div className="responsive-table layout-editor">
+          <div className="responsive-table layout-editor" style={{ marginTop: '16px' }}>
             <table>
               <thead>
                 <tr>
@@ -1317,7 +1509,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   <th>圖塊代碼</th>
                   <th>顯示標題</th>
                   <th>顯示</th>
-                  <th>寬 (1~12)</th>
+                  <th>寬 (1~24)</th>
                   <th>高 (1~20)</th>
                   <th>更新秒數</th>
                   <th>操作</th>
@@ -1347,7 +1539,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       <input
                         type="number"
                         min="1"
-                        max="12"
+                        max="24"
                         value={item.width ?? 3}
                         onChange={event => updateItem(index, { width: Number(event.target.value) })}
                       />
@@ -1427,7 +1619,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 setNoteText(event.target.value);
                 setDirty(true);
               }}
-              placeholder="例如：擴充第10、11、12系統完整圖塊版面"
+              placeholder="例如：設定 3500*400 超寬長條戰情矩形版面"
             />
             {dirty && (
               <small style={{ color: '#f59e0b', whiteSpace: 'nowrap' }}>
@@ -1462,249 +1654,6 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               )}
           </div>
         </div>
-
-        {/* 新增圖塊 Modal (具備分類切換) */}
-        {showAddModal && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(0,0,0,0.7)',
-              backdropFilter: 'blur(4px)',
-              zIndex: 999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '20px',
-            }}
-            onClick={() => setShowAddModal(false)}
-          >
-            <div
-              style={{
-                background: '#1e293b',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: '12px',
-                width: '100%',
-                maxWidth: '780px',
-                maxHeight: '85vh',
-                display: 'flex',
-                flexDirection: 'column',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-                overflow: 'hidden',
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '20px 24px 14px',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
-                }}
-              >
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: '#e2e8f0' }}>
-                    📦 選擇要加入的系統圖塊模組
-                  </h3>
-                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
-                    點選下列圖塊即可加入至目前戰情排版中，加入後可直接在畫布上調整寬度與高度。
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#94a3b8',
-                    fontSize: '20px',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setShowAddModal(false)}
-                >
-                  ✕
-                </button>
-              </div>
-
-              {/* 彈窗分類標籤 */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  padding: '12px 24px',
-                  background: 'rgba(0,0,0,0.2)',
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid var(--line)',
-                    background: modalFilter === 'all' ? '#3b82f6' : 'transparent',
-                    color: modalFilter === 'all' ? '#fff' : '#94a3b8',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setModalFilter('all')}
-                >
-                  全部 ({Object.keys(WIDGET_CATALOG).length})
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid #f59e0b',
-                    background: modalFilter === 10 ? '#f59e0b' : 'rgba(245,158,11,0.1)',
-                    color: modalFilter === 10 ? '#000' : '#fbbf24',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setModalFilter(10)}
-                >
-                  系統 10（市場營運分析 · 8）
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid #ef4444',
-                    background: modalFilter === 11 ? '#ef4444' : 'rgba(239,68,68,0.1)',
-                    color: modalFilter === 11 ? '#fff' : '#fca5a5',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setModalFilter(11)}
-                >
-                  系統 11（戰情指揮中心 · 10）
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    border: '1px solid #22c55e',
-                    background: modalFilter === 12 ? '#22c55e' : 'rgba(34,197,94,0.1)',
-                    color: modalFilter === 12 ? '#000' : '#86efac',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                  }}
-                  onClick={() => setModalFilter(12)}
-                >
-                  系統 12（市場公開看板 · 8）
-                </button>
-              </div>
-
-              {/* 彈窗圖塊列表 */}
-              <div
-                style={{
-                  padding: '20px 24px',
-                  overflowY: 'auto',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                  gap: '12px',
-                }}
-              >
-                {filteredModalCatalog.map(([key, def]) => (
-                  <div
-                    key={key}
-                    style={{
-                      background: 'rgba(0,0,0,0.25)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '8px',
-                      padding: '14px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '4px',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = '#3b82f6';
-                      e.currentTarget.style.background = 'rgba(59,130,246,0.1)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                      e.currentTarget.style.background = 'rgba(0,0,0,0.25)';
-                    }}
-                    onClick={() => addWidget(key)}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      <span style={{ fontSize: '20px' }}>{def.icon}</span>
-                      <strong style={{ fontSize: '14px', color: '#f1f5f9' }}>
-                        {def.defaultTitle}
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: '10px',
-                          padding: '1px 6px',
-                          borderRadius: '3px',
-                          marginLeft: 'auto',
-                          fontWeight: 700,
-                          background:
-                            def.systemId === 10
-                              ? '#f59e0b22'
-                              : def.systemId === 12
-                              ? '#22c55e22'
-                              : '#ef444422',
-                          color:
-                            def.systemId === 10
-                              ? '#fbbf24'
-                              : def.systemId === 12
-                              ? '#86efac'
-                              : '#fca5a5',
-                        }}
-                      >
-                        系統{def.systemId}
-                      </span>
-                    </div>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: '12px',
-                        color: '#94a3b8',
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {def.desc}
-                    </p>
-                    <div
-                      style={{
-                        marginTop: '6px',
-                        fontSize: '11px',
-                        color: '#64748b',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      <span>
-                        代碼: <code>{key}</code>
-                      </span>
-                      <span>
-                        預設寬 {def.defaultWidth}/12 · 高 {def.defaultHeight}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </section>
     </AppShell>
   );
