@@ -111,9 +111,13 @@ def parse_page(html, day, market, category):
     return list(unique.values()), {'raw_rows': len(rows), 'duplicate_rows': duplicates, 'placeholder_rows': placeholders, 'status': 'ready'}
 
 
+FETCH_BACKOFF_SECONDS = (3, 6, 15, 40, 90)
+
+
 def fetch_scope(day, market, category):
     # Retry the entire WebForms exchange so cookies, viewstate and validation stay paired.
-    for attempt in range(3):
+    # 歷史回補會連續抓上千頁，官網偶爾會短暫拒絕連線；退避到 90 秒再放棄，避免整批中止。
+    for attempt in range(len(FETCH_BACKOFF_SECONDS)):
         try:
             with requests.Session() as session:
                 response = session.get(URL, timeout=(15, 90))
@@ -129,9 +133,9 @@ def fetch_scope(day, market, category):
                 response.raise_for_status()
                 return parse_page(response.content, day, market, category)
         except requests.RequestException:
-            if attempt == 2:
-                raise RuntimeError('北農來源連線失敗，已重試三次') from None
-            time.sleep(3 * (attempt + 1))
+            if attempt == len(FETCH_BACKOFF_SECONDS) - 1:
+                raise RuntimeError(f'北農來源連線失敗，已重試 {len(FETCH_BACKOFF_SECONDS)} 次') from None
+            time.sleep(FETCH_BACKOFF_SECONDS[attempt])
 
 
 def aggregate(rows, day, market, category):
