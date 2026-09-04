@@ -246,8 +246,17 @@ grant execute on function market_dimension_values_filtered(uuid,text,jsonb,integ
 create or replace function market_source_date_ranges()
 returns table(source_id uuid,first_observed_on date,latest_observed_on date,previous_observed_on date)
 language sql stable security invoker set search_path=public,pg_temp as $$
-  with source_days as (
-    select distinct p.source_id,p.observed_on from market_data_points p
+  with grouped_days as (
+    select p.source_id,p.observed_on,s.source_code,
+      count(distinct nullif(p.dimensions->>'market','')) as market_count,
+      count(distinct nullif(p.dimensions->>'category','')) as category_count,
+      count(distinct concat_ws(E'\x1f',p.dimensions->>'market',p.dimensions->>'category'))
+        filter (where coalesce(p.dimensions->>'market','')<>'' and coalesce(p.dimensions->>'category','')<>'') as scope_count
+    from market_data_points p join market_data_sources s on s.source_id=p.source_id
+    group by p.source_id,p.observed_on,s.source_code
+  ), source_days as (
+    select source_id,observed_on from grouped_days
+    where source_code<>'tapmc_market_actual' or (market_count=2 and category_count=2 and scope_count=4)
   )
   select d.source_id,min(d.observed_on),max(d.observed_on),(array_agg(d.observed_on order by d.observed_on desc))[2]
   from source_days d

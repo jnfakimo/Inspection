@@ -213,7 +213,11 @@ def main():
     parser.add_argument('--date', type=date.fromisoformat, default=datetime.now(TAIPEI).date())
     parser.add_argument('--lookback', type=int, choices=range(1, 8), default=3)
     parser.add_argument('--execute', action='store_true')
+    parser.add_argument('--sql-output', type=Path,
+                        help='通過來源驗證後輸出原子匯入 SQL，供隔離的本機資料庫執行')
     args = parser.parse_args()
+    if args.execute and args.sql_output:
+        parser.error('--execute 與 --sql-output 不可同時使用')
     if args.date > datetime.now(TAIPEI).date():
         parser.error('不接受未來日期')
     points, scopes = [], []
@@ -229,15 +233,20 @@ def main():
                 scopes.append(scope)
                 print(json.dumps(scope, ensure_ascii=False), flush=True)
                 time.sleep(0.5)
+    mode = 'imported' if args.execute else ('local_sql' if args.sql_output else 'dry_run')
     summary = {'completed_at': datetime.now(TAIPEI).isoformat(), 'requested_date': args.date.isoformat(),
-               'mode': 'imported' if args.execute else 'dry_run', 'points': len(points), 'scopes': scopes,
+               'mode': mode, 'points': len(points), 'scopes': scopes,
                'workflow_run': os.environ.get('GITHUB_RUN_ID', '')}
     if args.execute:
         query(import_sql(points, summary))
         stored = query(f"select config->'daily_import_last_run' as result from public.market_data_sources where source_id='{SOURCE_ID}'", True)
         if len(stored) != 1 or stored[0]['result'] != summary:
             raise RuntimeError('匯入完成紀錄讀回不符')
-    lines = ['## 北農每日行情匯入', '', f"日期：{args.date}；{'正式匯入並讀回驗證' if args.execute else '試讀'} {len(points)} 筆。", '',
+    elif args.sql_output:
+        args.sql_output.parent.mkdir(parents=True, exist_ok=True)
+        args.sql_output.write_text(import_sql(points, summary), encoding='utf-8')
+    result_label = '正式匯入並讀回驗證' if args.execute else ('本機匯入 SQL 已驗證產生' if args.sql_output else '試讀')
+    lines = ['## 北農每日行情匯入', '', f"日期：{args.date}；{result_label} {len(points)} 筆。", '',
              '| 日期 | 市場 | 品類 | 原始列 | 排除重複 | 匯入筆數 | 結果 |', '|---|---|---|---:|---:|---:|---|']
     for s in scopes:
         state = '已驗證' if s['status'] == 'ready' else '尚未結帳或無資料（未寫入）'

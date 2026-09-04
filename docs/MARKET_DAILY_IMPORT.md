@@ -24,3 +24,11 @@ python tools/market_daily_import.py --date 2026-09-02 --lookback 1
 本機預設不寫資料。正式匯入需由安全環境提供 token，並加 `--execute`。可用 `--lookback 1`～`7` 控制回補天數。
 
 若來源有格式異動，先修正解析及測試；若既有品項代碼集合異動，核對原始量價後再決定資料修正，不能直接放寬保護或清空歷史資料。
+
+# 北農行情：內網每日排程
+
+雲端 GitHub Actions 與內網 IIS 現在各自更新自己的 Supabase。內網 Windows 工作排程 `Inspection Daily Market Import` 每日 12:00 啟動，至 18:00 每 30 分鐘重試，以處理第一、第二市場不同時間結帳。每次回補最近三日，使用穩定鍵冪等寫入。
+
+本機流程由 `tools/run-local-market-import.ps1` 呼叫 `market_daily_import.py --sql-output`；來源四組都逐一驗證後才產生 SQL，資料庫在單一交易內寫入並讀回最新日期。執行紀錄在 `C:\InspectionRuntime\market-import-logs`，不含密鑰。
+
+北農正式來源的看板日期只採一市、二市 × 蔬菜、水果四組完整日。中午部分市場尚未結帳時可先保留已取得明細，但量價趨勢不會把半日成交量當成完整日；後續重試補齊四組後自動切換。

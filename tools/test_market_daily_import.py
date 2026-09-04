@@ -1,7 +1,7 @@
 from datetime import date
 import unittest
 
-from market_daily_import import aggregate, parse_page, PREFIX, sql_literal
+from market_daily_import import aggregate, import_sql, parse_page, PREFIX, sql_literal
 
 DAY = date(2026, 9, 2)
 
@@ -61,6 +61,14 @@ class MarketImportTests(unittest.TestCase):
 
     def test_quote_in_external_text_is_escaped(self):
         self.assertEqual(sql_literal("農友's"), "'農友''s'")
+
+    def test_local_sql_is_atomic_and_non_destructive(self):
+        sql = import_sql([], {'mode': 'local_sql'})
+        lowered = sql.lower()
+        self.assertIn('begin;', lowered)
+        self.assertIn('commit;', lowered)
+        self.assertNotIn('delete ', lowered)
+        self.assertNotIn('truncate ', lowered)
 
 
 if __name__ == '__main__':
