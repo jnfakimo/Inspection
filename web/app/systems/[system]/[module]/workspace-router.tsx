@@ -70,8 +70,15 @@ const MarketBoardWorkspace = dynamic<WorkspaceProps>(
   () => import('./market-board-workspace').then((mod) => mod.MarketBoardWorkspace),
   { ssr: false, loading: moduleLoading },
 );
+const AdminWorkspace = dynamic<{ profile: import('@/types/app').Profile; module: ModuleDefinition }>(
+  () => import('@/components/AdminWorkspace').then((mod) => mod.AdminWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
+  if (system.key === 'admin') {
+    return <AuthGate>{profile => <AdminWorkspace profile={profile} module={module} />}</AuthGate>;
+  }
   if (system.key === 'handover' || system.key === 'guardpatrol') {
     return <OperationsWorkspace system={system} module={module} />;
   }
