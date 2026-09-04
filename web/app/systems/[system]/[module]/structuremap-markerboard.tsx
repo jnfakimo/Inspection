@@ -140,9 +140,9 @@ export function MarkerBoardModule({ profile }: Props) {
     const client = getSupabase();
     const [markerResult, equipmentResult, spaceResult, repairResult] = await Promise.all([
       client.from('plan_markers').select('*').eq('status', 'active'),
-      client.from('equipment').select('equipment_id,name,location').limit(3000),
+      client.from('equipment').select('equipment_id,name,location').limit(1000),
       client.from('floor_spaces').select('space_id,floor,space_name')
-        .eq('market_id', MARKET_ID).eq('status', 'active').limit(5000),
+        .eq('market_id', MARKET_ID).eq('status', 'active').limit(1000),
       client.from('repair_requests').select('request_id,req_no,fault_type,fault_desc,status')
         .order('created_at', { ascending: false }).limit(500),
     ]);

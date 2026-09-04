@@ -144,11 +144,11 @@ function AnalyticsModule({ module, profile }: Props) {
     const toEnd = `${to}T23:59:59+08:00`, fromStart = `${from}T00:00:00+08:00`;
     const [r, o, c] = await Promise.all([
       client.from('repair_requests').select('request_id,req_no,department,fault_type,urgency,status,created_at,equipment(name)')
-        .gte('created_at', fromStart).lte('created_at', toEnd).limit(5000),
+        .gte('created_at', fromStart).lte('created_at', toEnd).limit(1000),
       client.from('maintenance_orders').select('order_id,request_id,status,labor_hours,start_time,finish_time,expected_finish,created_at,assignee_id,users!maintenance_orders_assignee_id_fkey(name)')
-        .gte('created_at', fromStart).lte('created_at', toEnd).limit(5000),
+        .gte('created_at', fromStart).lte('created_at', toEnd).limit(1000),
       client.from('cost_records').select('cost_id,cost_type,amount,vendor,cost_date,equipment(name)')
-        .gte('cost_date', from).lte('cost_date', to).limit(5000),
+        .gte('cost_date', from).lte('cost_date', to).limit(1000),
     ]);
     if (r.error || o.error || c.error) { setNote(`失敗：${errorMessage(r.error || o.error || c.error, '分析資料載入失敗')}`); setBusy(false); return; }
     const reqs = (r.data || []) as Row[], ords = (o.data || []) as Row[], costs = (c.data || []) as Row[];

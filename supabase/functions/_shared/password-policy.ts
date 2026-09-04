@@ -1,6 +1,6 @@
 // 密碼政策集中在受信任後端，前端提示只是提升操作體驗，不能取代這裡的檢查。
 export const PASSWORD_POLICY = {
-  minLength: 12,
+  minLength: 8,
   maxLength: 200,
   requiredCharacterClasses: 3,
 } as const;

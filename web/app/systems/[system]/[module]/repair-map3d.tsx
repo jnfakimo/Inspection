@@ -29,7 +29,7 @@ export function RepairMap3DModule({ module, profile: _profile, system: _system }
     setBusy(true); setNote(''); const client = getSupabase();
     const [m, p] = await Promise.all([
       client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
-      client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status').in('kind', ['repair', 'space']).limit(5000),
+      client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status').in('kind', ['repair', 'space']).limit(1000),
     ]);
     if (m.error || p.error) setNote(`失敗：${String((m.error || p.error)?.message || '圖資載入失敗')}`);
     const source = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })).sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));

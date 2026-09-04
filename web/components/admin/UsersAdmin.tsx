@@ -17,7 +17,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     try {
       const client = getSupabase();
       const [u, r, d, a] = await Promise.all([
-        client.from('users').select('user_id,auth_id,username,email,name,phone,department,dept_id,role,rbac_role,supervisor_id,status,created_at').order('name').limit(2000),
+        client.from('users').select('user_id,auth_id,username,email,name,phone,department,dept_id,role,rbac_role,supervisor_id,status,created_at').order('name').limit(1000),
         client.from('roles').select('role_id,name,sort_order').order('sort_order'),
         client.from('departments').select('dept_id,parent_id,name,code,level,status,sort_order').order('sort_order'),
         invokeAdminApi<{ data?: Row[] }>('admin_list_account_applications'),

@@ -92,6 +92,28 @@ async function fetchIpcamFrame(targetUrl: URL, username: string, password: strin
   });
 }
 
+function isPrivateCameraHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "::1") return true;
+  const octets = host.split(".").map(Number);
+  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  return octets[0] === 10 ||
+    octets[0] === 127 ||
+    (octets[0] === 169 && octets[1] === 254) ||
+    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+    (octets[0] === 192 && octets[1] === 168);
+}
+
+function configuredCameraUrl() {
+  const configured = Deno.env.get("IPCAM_JPEG_URL");
+  if (!configured) throw new Error("IPCAM_JPEG_URL is not configured");
+  const target = new URL(configured);
+  if (target.username || target.password) throw new Error("IPCAM_JPEG_URL must not contain credentials");
+  if (target.protocol === "https:") return target;
+  if (target.protocol === "http:" && isPrivateCameraHost(target.hostname)) return target;
+  throw new Error("IPCAM_JPEG_URL must use HTTPS unless it targets a private network address");
+}
+
 async function authorize(req: Request) {
   const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (!bearer) return null;
@@ -137,7 +159,9 @@ Deno.serve(async (req) => {
       return jsonResponse({ ok: true, fn: "ipcam-proxy", time: new Date().toISOString() });
     }
 
-    const target = new URL(Deno.env.get("IPCAM_JPEG_URL") || "http://1.34.250.22:8085/ipcam/jpegcif");
+    // Never fall back to a public clear-text camera URL. Legacy cameras may
+    // use HTTP only when they are confined to a private/loopback address.
+    const target = configuredCameraUrl();
     target.searchParams.set("ts", Date.now().toString());
 
     const username = Deno.env.get("IPCAM_USERNAME");

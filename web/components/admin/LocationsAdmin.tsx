@@ -15,7 +15,7 @@ export function LocationsAdmin({ profile, module }: AdminProps) {
     try {
       const client = getSupabase();
       const [locationResult, departmentResult, marketResult] = await Promise.all([
-        client.from('locations').select('location_id,market_id,floor,floor_order,area,area_order,detail,detail_order,status,created_at').order('floor_order').order('area_order').limit(2000),
+        client.from('locations').select('location_id,market_id,floor,floor_order,area,area_order,detail,detail_order,status,created_at').order('floor_order').order('area_order').limit(1000),
         client.from('departments').select('dept_id,parent_id,name,code,level,sort_order,status,created_at').order('sort_order').limit(1000),
         client.from('markets').select('market_id,name,short_name,status').order('name'),
       ]);

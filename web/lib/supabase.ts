@@ -7,8 +7,7 @@ import { emitSecurityDataRead } from './security-audit-sink';
 
 let client: SupabaseClient | null = null;
 const nodeAppApiUrl = process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
-// Render 的免費／低用量服務可能需要冷啟動；不能讓前端無限等待。
-// 逾時後沿用既有的 Supabase Edge Function 備援，讓畫面可繼續工作。
+// 地端相容 API 不能讓前端無限等待；逾時後改走同源地端 app-api。
 const NODE_API_TIMEOUT_MS = 5000;
 const READ_ACTION_LABELS: Record<string, string> = {
   profile: '讀取個人帳號資料',
@@ -22,8 +21,7 @@ const READ_ACTION_LABELS: Record<string, string> = {
   official_documents: '讀取公文傳送資料',
 };
 
-// 公文流程的寫入動作固定走 Edge Function，避免舊版 Node API 尚未包含
-// 自動取號／不可刪除時間軸時，前端先收到不支援或欄位錯誤。
+// 公文流程動作固定走同源地端 app-api；名稱保留供既有路由相容。
 const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action']);
 
 const recordAppRead = (action: string) => {
@@ -37,8 +35,10 @@ const isTransientNodeResponse = (response: Response) => (
 
 export function getSupabase() {
   if (client) return client;
-  if (typeof window === 'undefined') throw new Error('Supabase browser client is not available during prerendering');
-  client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  if (typeof window === 'undefined') throw new Error('地端資料相容客戶端無法在預先轉譯期間使用');
+  // 完全地端模式：supabase-js 僅保留為既有查詢語法相容層，實際 URL 指向
+  // 同源 IIS／FastAPI，再由後端查詢 SQL Server，不連接 Supabase 雲端。
+  client = createClient(window.location.origin, SUPABASE_ANON_KEY, {
     auth: {
       storage: window.sessionStorage,
       persistSession: true,
@@ -50,9 +50,7 @@ export function getSupabase() {
 }
 
 export async function invokeAppApi<T>(action: string, payload: Record<string, unknown> = {}) {
-  // 查詢直接走與資料庫同區的 Edge Function。Render 在低用量時會冷啟動，實測會先
-  // 等滿 3～5 秒才回覆或進入 Edge 備援，導致每一頁的 AuthGate 與模組資料都延後。
-  // 寫入仍沿用既有 Node-first 路徑，避免在尚未確認結果時跨兩個後端重送同一動作。
+  // 查詢與寫入均維持同源地端路徑；Node-first 僅保留既有相容流程，避免重送動作。
   if (nodeAppApiUrl && !READ_ACTION_LABELS[action] && !EDGE_ONLY_ACTIONS.has(action)) {
     const supabase = getSupabase();
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -75,8 +73,8 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
         signal: controller.signal,
       });
     } catch {
-      console.warn('Node.js API connection timed out or failed; falling back to Supabase Edge Function');
-      // Do nothing, let it fall through to the Supabase Edge Function below
+      console.warn('Node.js API 連線逾時或失敗，改走同源地端 app-api');
+      // Do nothing, let it fall through to the same-origin local app-api below.
     } finally {
       if (timeoutId !== undefined) window.clearTimeout(timeoutId);
     }
@@ -91,14 +89,14 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
           reportIfInfrastructureError(result?.message, { action, via: 'node-api' });
           throw new Error(result?.message || '系統服務回傳失敗');
         }
-        console.warn(`Node.js API 尚未支援 ${action}，改由 Supabase Edge Function 處理`);
+        console.warn(`Node.js API 尚未支援 ${action}，改由同源地端 app-api 處理`);
       } else {
         recordAppRead(action);
         return result.data as T;
       }
     }
     if (response) {
-      console.warn(`Node.js API returned ${response.status}; falling back to Supabase Edge Function`);
+      console.warn(`Node.js API 回傳 ${response.status}，改走同源地端 app-api`);
     }
   }
 
@@ -106,7 +104,7 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
     body: { action, ...payload },
   });
   if (error) {
-    console.error('Edge Function Error:', error);
+    console.error('地端 app-api 錯誤:', error);
     let msg = error.message || '連線失敗';
     if ((error as any).context && typeof (error as any).context.json === 'function') {
       try {
@@ -114,10 +112,10 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
         if (errData?.message) msg = errData.message;
       } catch { /* ignore */ }
     }
-    throw new Error(`Edge Function 失敗: ${msg}`);
+    throw new Error(`地端 app-api 失敗: ${msg}`);
   }
   if (!data?.ok) {
-    reportIfInfrastructureError(data?.message, { action, via: 'edge-function' });
+    reportIfInfrastructureError(data?.message, { action, via: 'local-app-api' });
     throw new Error(data?.message || '系統服務回傳失敗');
   }
   recordAppRead(action);

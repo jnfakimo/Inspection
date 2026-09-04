@@ -16,8 +16,8 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
       const client = getSupabase();
       const [rolesResult, permissionResult, usersResult] = await Promise.all([
         client.from('roles').select('role_id,name,sort_order').order('sort_order'),
-        client.from('role_permissions').select('role_id,permission:perm,allowed').limit(2000),
-        client.from('users').select('user_id,name,username,email,department,role,rbac_role,status').order('name').limit(2000),
+        client.from('role_permissions').select('role_id,permission:perm,allowed').limit(1000),
+        client.from('users').select('user_id,name,username,email,department,role,rbac_role,status').order('name').limit(1000),
       ]);
       if (rolesResult.error || permissionResult.error || usersResult.error) setNote(`失敗：${errorMessage(rolesResult.error || permissionResult.error || usersResult.error, '角色權限載入失敗')}`);
       setRoles((rolesResult.data || []).filter(row => row.role_id !== 'mgmt_supervisor')); setPermissions(permissionResult.data || []); setUsers(usersResult.data || []);

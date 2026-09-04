@@ -24,7 +24,7 @@ import type { Profile } from '@/types/app';
 type Props = { module: ModuleDefinition; profile: Profile };
 
 // 與 V1 相同的上限：市場的空間與標記數量都遠低於此，一次取完不必分頁。
-const QUERY_LIMIT = 5000;
+const QUERY_LIMIT = 1000;
 const ICON_BASE = '/Inspection/assets/system-icons';
 
 const LOADING_TEXT = '…';

@@ -177,7 +177,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       client.from('meeting_booking_change_requests')
         .select('*,meeting_bookings!target_booking_id(booking_no,booking_date,start_time,end_time,status,user_id,purpose,meeting_rooms(name)),users!requester_id(name,department)')
         .order('created_at', { ascending: false }).limit(100),
-      client.from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(2000),
+      client.from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(1000),
       client.from('users').select('phone').eq('user_id', profile.user_id).maybeSingle(),
     ]);
     if (r.error || w.error) setNote(`失敗：${errorMessage(r.error || w.error, '會議室資料載入失敗')}`);

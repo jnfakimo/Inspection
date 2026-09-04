@@ -67,9 +67,9 @@ export function PatrolMap3DModule({ module, profile }: Props) {
     const client = getSupabase();
     const [m, p, c] = await Promise.all([
       client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
-      client.from('plan_markers').select('marker_id,floor_id,label,x,y,status').eq('kind', 'patrol').limit(5000),
+      client.from('plan_markers').select('marker_id,floor_id,label,x,y,status').eq('kind', 'patrol').limit(1000),
       client.from('checkin_logs').select('checkin_id,target_id,label,floor_id,user_name,checkin_at')
-        .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(5000),
+        .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(1000),
     ]);
     if (m.error || p.error || c.error) setNote(`失敗：${errorMessage(m.error || p.error || c.error, '立體巡檢資料載入失敗')}`);
     const sourceRows = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))

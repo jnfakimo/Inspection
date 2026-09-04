@@ -2,110 +2,33 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
-<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
-<title>通知中心 — 報修派工管理系統</title>
-<script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260825-auth1"></script>
+<meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/admin/notices/">
+<title>V2 系統通知管理 — 臺北農產公司 V2</title>
+<script>
+  (function() {
+    var target = "/Inspection/v2/systems/admin/notices/" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  })();
+  </script>
 <style>
-:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;--cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;--font-head:'Rajdhani',sans-serif}
-:root[data-theme="light"]{--bg:#f4f6fa;--surface:#ffffff;--panel:#ffffff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
-/* light mode overrides */
-:root[data-theme="light"] body{background-image:none}
-:root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}
-:root[data-theme="light"] .nav-title{text-shadow:none}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-a{color:inherit;text-decoration:none}
-.navbar{background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px}
-.nav-title{font-family:var(--font-head);font-size:1.1rem;font-weight:700;color:var(--cyan);letter-spacing:.06em;text-shadow:0 0 14px rgba(0,212,255,.5)}
-.nav-sub{font-size:.7rem;color:var(--text-dim)}.nav-space{flex:1}
-.nav-back{font-size:.7rem;color:var(--text-dim);border:1px solid var(--border);padding:5px 10px;border-radius:2px;cursor:pointer;background:none}
-.nav-back:hover{border-color:var(--cyan);color:var(--cyan)}
-.wrap{max-width:760px;margin:0 auto;padding:16px}
-.bar{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-.bar .c{font-size:.74rem;color:var(--text-dim)}.bar .sp{flex:1}
-.btn{font-size:.72rem;border:1px solid var(--border);background:none;color:var(--text-dim);padding:6px 12px;border-radius:2px;cursor:pointer}.btn:hover{border-color:var(--cyan);color:var(--cyan)}
-.n{display:flex;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:4px;margin-bottom:8px;background:var(--panel)}
-.n.unread{border-color:var(--border-hi);background:rgba(0,212,255,.04)}
-.n .dot{width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-top:6px;flex-shrink:0;box-shadow:0 0 6px var(--cyan)}
-.n.read .dot{background:var(--text-dim);box-shadow:none}
-.n .body{flex:1}
-.n .t{font-size:.82rem;color:var(--text-hi);font-weight:600}
-.n .b{font-size:.76rem;color:var(--text);margin-top:2px}
-.n .m{font-size:.66rem;color:var(--text-dim);margin-top:4px}
-.n .ev{font-size:.62rem;padding:1px 7px;border-radius:8px;border:1px solid var(--border);color:var(--text-dim);margin-left:auto;white-space:nowrap;height:fit-content}
-.empty{text-align:center;color:var(--text-dim);padding:40px;font-size:.84rem}
-
+  body {
+    margin: 0; min-height: 100vh; background: #020b18; color: #00d4ff;
+    font-family: system-ui, -apple-system, sans-serif; display: flex;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .box { padding: 32px; background: #05101e; border: 1px solid #0c2840; border-radius: 12px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,212,255,0.2); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: #00ff9d; font-weight: bold; text-decoration: underline; font-size: 0.95rem; }
 </style>
-<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
-<link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
-<nav class="navbar">
-  <div><div class="nav-title">通知中心</div><div class="nav-sub">站內即時通知</div></div>
-  <div class="nav-space"></div>
-<a href="dashboard.html"><button class="nav-back"><span class="ic ic-dashboard"></span> 戰情儀表板</button></a>
-<a href="admin.html#repairs"><button class="nav-back"><span class="ic ic-dispatch"></span> 報修系統</button></a>
-<a href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7"><button class="nav-back"><img src="../assets/system-icons/guardpatrol-icon.png" alt="" style="width:16px;height:16px;vertical-align:-3px;object-fit:contain"> 駐衛警巡檢</button></a>
-<a href="dispatch.html"><button class="nav-back"><span class="ic ic-dispatch"></span> 派工系統</button></a>
-  <a href="admin.html"><button class="nav-back">← 返回上一層</button></a>
-</nav>
-<div class="wrap">
-  <div class="bar"><span class="c" id="cnt"></span><div class="sp"></div><button class="btn" onclick="markAll()">全部標為已讀</button></div>
-  <div id="list"><div class="empty">載入中…</div></div>
+<div class="box">
+  <div class="spinner"></div>
+  <h2 style="font-size: 1.15rem; margin: 0 0 10px; color: #d4eeff;">系統已全面升級至 V2</h2>
+  <p style="font-size: 0.85rem; color: #a8d8f0; margin: 0 0 20px;">正在為您自動跳轉至 V2 系統通知管理…</p>
+  <a href="/Inspection/v2/systems/admin/notices/">點此立即前往</a>
 </div>
-<script>
-const db = createDb();
-(async()=>{const {data:{session}}=await db.auth.getSession();if(!session){location.href='login.html';}})();
-function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-const EV={new_repair:'新報修',dispatch:'派工',return:'退件',overdue:'逾期',complete:'完成',close:'結案',sign:'簽核'};
-let me_={user_id:null};
-function fmt(t){if(!t)return'';const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-async function init(){
-  let identityFailed=false;
-  try{
-    const {data:{session}}=await db.auth.getSession();
-    if(session){
-      try { me_=await window.SystemAuth.loadProfile(db); }
-      catch(error){identityFailed=true;console.warn('共用人員資料載入失敗',error);}
-    }
-  }catch(e){identityFailed=true;}
-  // 查不到自己的身分時絕不能落到 load()：load() 只在 me_.user_id 有值時才會
-  // 依收件人篩選，身分未知時等於會顯示「所有人」的通知，是越權讀取風險。
-  if(identityFailed){
-    document.getElementById('list').innerHTML='<div class="empty" style="color:var(--red)">無法確認登入身分，請重新整理頁面或重新登入。</div>';
-    return;
-  }
-  load();
-}
-async function load(){
-  let q=db.from('notifications').select('*').order('created_at',{ascending:false}).limit(200);
-  if(me_.user_id) q=q.eq('recipient_id',me_.user_id);
-  const {data,error}=await q;
-  const box=document.getElementById('list');
-  if(error){box.innerHTML='<div class="empty" style="color:var(--amber)">尚未建立 notifications 表，請先執行 work_order_schema.sql</div>';return;}
-  if(!data||!data.length){box.innerHTML='<div class="empty">目前沒有通知</div>';document.getElementById('cnt').textContent='';return;}
-  const unread=data.filter(n=>!n.is_read).length;
-  document.getElementById('cnt').textContent=`${data.length} 則通知 · ${unread} 則未讀`;
-  box.innerHTML=data.map(n=>`<div class="n ${n.is_read?'read':'unread'}" onclick="markOne('${n.notif_id}',${n.is_read})">
-    <div class="dot"></div><div class="body"><div class="t">${escHtml(n.title||EV[n.event]||'通知')}</div>
-    ${n.body?`<div class="b">${escHtml(n.body)}</div>`:''}<div class="m">${fmt(n.created_at)}</div></div>
-    <span class="ev">${escHtml(EV[n.event]||n.event||'')}</span></div>`).join('');
-}
-// 標記已讀失敗原本被靜默忽略，且緊接著 load() 會蓋掉現象，使用者只會看到狀態沒變
-// 卻不知原因。改為沿用本頁既有的錯誤顯示方式，失敗時不重新載入以保留訊息。
-function markFailed(prefix,error){
-  document.getElementById('list').innerHTML=
-    `<div class="empty" style="color:var(--red)">${escHtml(prefix)}：${escHtml(window.safeDbError?window.safeDbError(error):error.message)}</div>`;
-}
-async function markOne(id,read){ if(read)return; const {error}=await db.from('notifications').update({is_read:true}).eq('notif_id',id); if(error){markFailed('標記已讀失敗',error);return;} load(); }
-async function markAll(){ let q=db.from('notifications').update({is_read:true}).eq('is_read',false); if(me_.user_id)q=q.eq('recipient_id',me_.user_id); const {error}=await q; if(error){markFailed('全部標記已讀失敗',error);return;} load(); }
-init();
-</script>
 </body>
 </html>

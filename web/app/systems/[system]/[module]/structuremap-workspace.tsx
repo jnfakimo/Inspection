@@ -51,7 +51,7 @@ function RelationsModule({ module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const { data, error } = await getSupabase().from('locations').select('*')
-      .eq('market_id', MARKET_ID).order('floor_order').order('area_order').order('detail_order').limit(5000);
+      .eq('market_id', MARKET_ID).order('floor_order').order('area_order').order('detail_order').limit(1000);
     if (error) setNote(`失敗：${errorMessage(error, '場域位置載入失敗')}`);
     setRows((data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) }))); setBusy(false);
   }, []);

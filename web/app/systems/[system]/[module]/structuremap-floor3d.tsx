@@ -93,7 +93,7 @@ export function Floor3DBoardModule({ profile }: Props) {
     const [modelResult, markerResult] = await Promise.all([
       client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
       client.from('plan_markers').select('marker_id,floor_id,x,y,kind,label,color,status')
-        .eq('status', 'active').limit(5000),
+        .eq('status', 'active').limit(1000),
     ]);
     if (modelResult.error) {
       setLoadError('無法讀取樓層模型，請確認資料庫設定與權限。');

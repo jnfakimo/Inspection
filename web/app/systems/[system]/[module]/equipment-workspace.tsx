@@ -352,10 +352,10 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
     setBusy(true); setNote('');
     const client = getSupabase();
     const jobs: Array<PromiseLike<any>> = [
-      client.from(spec.table).select(spec.select || '*').order(spec.orderBy, { ascending: spec.ascending ?? false, nullsFirst: false }).limit(2000),
+      client.from(spec.table).select(spec.select || '*').order(spec.orderBy, { ascending: spec.ascending ?? false, nullsFirst: false }).limit(1000),
     ];
     jobs.push(spec.equipmentScoped || spec.table === 'equipment'
-      ? client.from('equipment').select('equipment_id,asset_code,qr_code,name,floor,status').order('name').limit(5000)
+      ? client.from('equipment').select('equipment_id,asset_code,qr_code,name,floor,status').order('name').limit(1000)
       : Promise.resolve({ data: [], error: null }));
     jobs.push(spec.table === 'materials'
       ? client.from('material_categories').select('category_id,name,code,status').order('sort_order')

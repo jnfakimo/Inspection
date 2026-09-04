@@ -6,6 +6,15 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 import { COAST_MARGIN, MARKER_MIN_GAP, COUNTY_MARGIN_OFFSET, COUNTY_MARKER_POSITIONS } from '@/lib/weather-map-tuning';
 
 type Row = Record<string, any>;
+type MapCountyShape = {
+  id: string;
+  county: string;
+  centerX: number;
+  centerY: number;
+  path: string;
+  title: string;
+};
+
 
 const COUNTIES = ['基隆市', '臺北市', '新北市', '桃園市', '新竹市', '新竹縣', '苗栗縣', '臺中市', '彰化縣', '南投縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣'];
 
@@ -137,7 +146,9 @@ export function WeatherWidget() {
   const [county, setCounty] = useState('臺北市');
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  const [mapSvg, setMapSvg] = useState<string>('');
+  // SVG is parsed into a narrow, typed set of React attributes. Keeping raw
+  // markup out of state avoids an injection sink if the asset is replaced.
+  const [mapShapes, setMapShapes] = useState<MapCountyShape[]>([]);
   const [countyCenters, setCountyCenters] = useState<Record<string, [number, number]>>({});
   // 依台灣輪廓量出的自動落點；有手動定位時由 COUNTY_MARKER_POSITIONS 優先取用。
   const [coastSpots, setCoastSpots] = useState<Record<string, [number, number]>>({});
@@ -156,24 +167,39 @@ export function WeatherWidget() {
         const TX = 180;
         const TY = 140;
 
+        if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg') {
+          throw new Error('Invalid Taiwan county SVG');
+        }
+
         const centers: Record<string, [number, number]> = {};
-        doc.querySelectorAll('.county').forEach(el => {
+        const shapes: MapCountyShape[] = [];
+        doc.querySelectorAll('path.county').forEach((el, index) => {
           const c = el.getAttribute('data-county');
           const cx = el.getAttribute('data-cx');
           const cy = el.getAttribute('data-cy');
-          if (c && cx && cy) {
+          const path = el.getAttribute('d');
+          const centerX = Number(cx);
+          const centerY = Number(cy);
+          if (c && path && Number.isFinite(centerX) && Number.isFinite(centerY)) {
             // Normalize "台" to "臺" just in case the SVG uses "台"
             const canonicalName = c.replace('台', '臺');
             centers[canonicalName] = [
-              Number(cx) * SCALE + TX,
-              Number(cy) * SCALE + TY
+              centerX * SCALE + TX,
+              centerY * SCALE + TY
             ];
+            shapes.push({
+              id: 'county-shape-' + index,
+              county: canonicalName,
+              centerX,
+              centerY,
+              path,
+              title: el.querySelector('title')?.textContent || canonicalName,
+            });
           }
         });
+        if (!shapes.length) throw new Error('Taiwan county SVG has no county paths');
         setCountyCenters(centers);
-        
-        // Extract inner HTML of the <svg> tag
-        setMapSvg(doc.documentElement.innerHTML);
+        setMapShapes(shapes);
       }
     } catch (err) {
       console.error('Map loading failed', err);
@@ -220,7 +246,7 @@ export function WeatherWidget() {
   useEffect(() => {
     const group = mapGroupRef.current;
     const names = Object.keys(countyCenters);
-    if (!group || !mapSvg || !names.length) return;
+    if (!group || !mapShapes.length || !names.length) return;
     const paths = Array.from(group.querySelectorAll('.county')) as SVGGeometryElement[];
     if (!paths.length) return;
     const toLocal = ([x, y]: [number, number]): [number, number] =>
@@ -237,7 +263,7 @@ export function WeatherWidget() {
       spots[name] = [lx * MAP_SCALE + MAP_TX, ly * MAP_SCALE + MAP_TY];
     });
     setCoastSpots(spots);
-  }, [mapSvg, countyCenters]);
+  }, [mapShapes, countyCenters]);
 
   if (busy && !summary) return <p className="empty">正在取得中央氣象署資料…</p>;
   if (error && !summary) return <p className="empty">氣象服務暫時無法使用：{error}</p>;
@@ -270,9 +296,8 @@ export function WeatherWidget() {
               fill: rgba(34, 211, 238, 0.2);
             }
           `}</style>
-          {/* 地圖是以 dangerouslySetInnerHTML 注入的，React 無法對裡面的節點加 class，
-              所以改用 data-county 屬性選擇器點亮選取的縣市。縣市名同時比對「臺」與
-              「台」兩種寫法，SVG 用哪一種都吃得到。
+          {/* 地圖路徑由 React 安全地建立，並用 data-county 屬性選擇器點亮選取的縣市。
+              縣市名同時比對「臺」與「台」兩種寫法，SVG 用哪一種都吃得到。
               county 只可能是 COUNTIES 裡的固定值，這裡再擋一次，避免任何外部字串
               被插進樣式表。 */}
           {COUNTIES.includes(county) && <style>{`
@@ -284,7 +309,20 @@ export function WeatherWidget() {
             }
           `}</style>}
           
-          <g ref={mapGroupRef} transform="translate(180, 140) scale(0.65)" dangerouslySetInnerHTML={{ __html: mapSvg }} />
+          <g ref={mapGroupRef} transform="translate(180, 140) scale(0.65)" fillRule="evenodd">
+            {mapShapes.map(shape => (
+              <path
+                key={shape.id}
+                className="county"
+                data-county={shape.county}
+                data-cx={shape.centerX}
+                data-cy={shape.centerY}
+                d={shape.path}
+              >
+                <title>{shape.title}</title>
+              </path>
+            ))}
+          </g>
 
           <g className="weather-marker-layer">
             {(() => {

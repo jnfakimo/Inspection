@@ -1,258 +1,34 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-TW">
 <head>
-<meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>電子交接簿登入</title>
-<script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260825-auth1"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="refresh" content="0; url=/Inspection/v2/login/?redirect=%2Fsystems%2Fhandover%2F">
+<title>V2 電子交接簿登入 — 臺北農產公司 V2</title>
+<script>
+  (function() {
+    var target = "/Inspection/v2/login/?redirect=%2Fsystems%2Fhandover%2F" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  })();
+  </script>
 <style>
-:root{
-  --bg:#eef4fb;
-  --panel:#ffffff;
-  --line:#cfe0f1;
-  --text:#0f2538;
-  --muted:#647994;
-  --blue:#008fe8;
-  --blue-dark:#006fb8;
-  --danger:#d92f3b;
-}
-*{box-sizing:border-box}
-body{
-  margin:0;
-  min-height:100vh;
-  display:grid;
-  place-items:center;
-  padding:24px;
-  color:var(--text);
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.76),rgba(238,244,251,.94)),
-    radial-gradient(circle at 20% 10%,rgba(0,143,232,.18),transparent 34%),
-    var(--bg);
-  font-family:"Noto Sans TC","Microsoft JhengHei",Arial,sans-serif;
-}
-.card{
-  width:min(440px,100%);
-  background:var(--panel);
-  border:1px solid var(--line);
-  border-radius:8px;
-  padding:34px 32px 30px;
-  box-shadow:0 18px 48px rgba(31,70,107,.14);
-}
-.brand{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin-bottom:24px;
-}
-.mark{
-  width:38px;
-  height:38px;
-  border-radius:8px;
-  display:grid;
-  place-items:center;
-  color:#fff;
-  background:linear-gradient(135deg,var(--blue),#18c9ff);
-  font-weight:800;
-  letter-spacing:.08em;
-}
-.eyebrow{
-  color:var(--blue);
-  font-size:.78rem;
-  letter-spacing:.18em;
-  text-transform:uppercase;
-}
-h1{
-  margin:4px 0 0;
-  font-size:1.75rem;
-  letter-spacing:0;
-}
-.hint{
-  margin:0 0 24px;
-  color:var(--muted);
-  line-height:1.7;
-}
-label{
-  display:block;
-  margin:14px 0 7px;
-  color:#38536c;
-  font-size:.9rem;
-  font-weight:700;
-}
-input{
-  width:100%;
-  min-height:46px;
-  border:1px solid #bfd4e8;
-  border-radius:6px;
-  padding:0 14px;
-  font:inherit;
-  color:var(--text);
-  background:#f9fcff;
-  outline:none;
-}
-input:focus{
-  border-color:var(--blue);
-  box-shadow:0 0 0 3px rgba(0,143,232,.14);
-}
-.captcha-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch;margin-bottom:8px}
-.captcha-image{display:block;width:100%;height:54px;min-width:0;object-fit:fill;border:1px solid var(--line);border-radius:8px;background:#f8fafc}
-.captcha-refresh{width:auto;min-width:94px;min-height:54px;padding:8px 12px;font-size:.84rem;background:var(--panel);color:var(--blue-dark);border:1px solid var(--line)}
-.captcha-refresh:hover{background:#e9f5ff}
-.captcha-status{min-height:20px;margin:-2px 0 10px;color:var(--muted);font-size:.78rem;line-height:1.4}
-button{
-  width:100%;
-  min-height:48px;
-  margin-top:22px;
-  border:0;
-  border-radius:6px;
-  background:var(--blue);
-  color:white;
-  font:inherit;
-  font-weight:800;
-  cursor:pointer;
-}
-button:hover{background:var(--blue-dark)}
-button:disabled{opacity:.64;cursor:wait}
-.message{
-  min-height:22px;
-  margin-top:14px;
-  color:var(--danger);
-  font-weight:700;
-  line-height:1.5;
-}
-.support{
-  margin-top:18px;
-  color:var(--muted);
-  font-size:.85rem;
-  line-height:1.6;
-}
-@media (max-width:520px){
-  body{padding:16px;place-items:start center}
-  .card{padding:26px 22px;margin-top:36px}
-  h1{font-size:1.55rem}
-}
+  body {
+    margin: 0; min-height: 100vh; background: #020b18; color: #00d4ff;
+    font-family: system-ui, -apple-system, sans-serif; display: flex;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .box { padding: 32px; background: #05101e; border: 1px solid #0c2840; border-radius: 12px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,212,255,0.2); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: #00ff9d; font-weight: bold; text-decoration: underline; font-size: 0.95rem; }
 </style>
 </head>
 <body>
-<main class="card" aria-label="電子交接簿登入">
-  <div class="brand">
-    <div class="mark">交</div>
-    <div>
-      <div class="eyebrow">Taipei Agricultural Products</div>
-      <h1>電子交接簿登入</h1>
-    </div>
-  </div>
-  <p class="hint">登入後只會進入電子交接簿，不顯示其他系統選單。</p>
-  <form id="loginForm">
-    <label for="username">帳號</label>
-    <input id="username" name="username" autocomplete="username" required>
-    <label for="password">密碼</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required>
-    <label for="captchaAnswer">驗證碼</label>
-    <div class="captcha-row">
-      <img id="captchaImage" class="captcha-image" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="登入驗證碼">
-      <button id="captchaRefreshBtn" class="captcha-refresh" type="button">重新產生</button>
-    </div>
-    <input id="captchaAnswer" name="captcha" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" placeholder="請輸入圖中的六位數字" required>
-    <div id="captchaStatus" class="captcha-status" aria-live="polite"></div>
-    <button id="loginBtn" type="submit">登入交接簿</button>
-    <div id="message" class="message" role="alert"></div>
-  </form>
-  <div class="support">忘記密碼或無法登入時，請洽系統管理員協助重設。</div>
-</main>
-
-<script>
-const HANDOVER_TARGET = 'handover.html';
-const db = createDb();
-
-const form = document.getElementById('loginForm');
-const usernameEl = document.getElementById('username');
-const passwordEl = document.getElementById('password');
-const captchaImage = document.getElementById('captchaImage');
-const captchaRefreshBtn = document.getElementById('captchaRefreshBtn');
-const captchaAnswer = document.getElementById('captchaAnswer');
-const captchaStatus = document.getElementById('captchaStatus');
-const buttonEl = document.getElementById('loginBtn');
-const messageEl = document.getElementById('message');
-let captchaChallengeId = '';
-
-function setMessage(text) {
-  messageEl.textContent = text || '';
-}
-
-async function loadCaptcha() {
-  captchaChallengeId = '';
-  captchaImage.removeAttribute('src');
-  captchaAnswer.value = '';
-  captchaStatus.textContent = '驗證碼載入中…';
-  captchaRefreshBtn.disabled = true;
-  try {
-    const { data, error } = await db.functions.invoke('username-login', { body: { action: 'captcha' } });
-    if (error || !data?.challenge_id || !data?.image) throw new Error('驗證碼載入失敗');
-    captchaChallengeId = data.challenge_id;
-    captchaImage.src = data.image;
-    captchaStatus.textContent = '5 分鐘內有效，送出後即失效';
-  } catch (_) {
-    captchaStatus.textContent = '驗證碼載入失敗，請重新產生';
-  } finally {
-    captchaRefreshBtn.disabled = false;
-  }
-}
-
-function setBusy(isBusy) {
-  buttonEl.disabled = isBusy;
-  buttonEl.textContent = isBusy ? '登入中...' : '登入交接簿';
-}
-
-(async function redirectExistingSession() {
-  const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    try {
-      if (await window.SystemAuth.restoreProfile(db)) { location.replace(HANDOVER_TARGET); return; }
-    } catch (_) {
-      await db.auth.signOut({ scope: 'local' }).catch(() => {});
-    }
-  }
-  await loadCaptcha();
-})();
-
-captchaRefreshBtn.addEventListener('click', loadCaptcha);
-captchaAnswer.addEventListener('input', () => { captchaAnswer.value = captchaAnswer.value.replace(/\D/g, '').slice(0, 6); });
-
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  setMessage('');
-  const username = usernameEl.value.trim();
-  const password = passwordEl.value;
-  const captcha = captchaAnswer.value.trim();
-  if (!username || !password) {
-    setMessage('請輸入帳號與密碼。');
-    return;
-  }
-  if (!captchaChallengeId || !/^\d{6}$/.test(captcha)) {
-    setMessage(captchaChallengeId ? '請輸入圖中的六位數字驗證碼。' : '驗證碼尚未載入，請重新產生。');
-    return;
-  }
-
-  setBusy(true);
-  try {
-    const { data, error } = await db.functions.invoke('username-login', { body: {
-      identifier: username,
-      password,
-      captcha_id: captchaChallengeId,
-      captcha_answer: captcha,
-    } });
-    if (error || !data?.access_token || !data?.refresh_token) throw new Error(data?.message || '帳號或密碼錯誤。');
-    await window.SystemAuth.establishSession(db, data);
-    location.href = HANDOVER_TARGET;
-  } catch (err) {
-    setMessage(err.message || '登入失敗，請稍後再試。');
-    await loadCaptcha();
-  } finally {
-    setBusy(false);
-  }
-});
-</script>
+<div class="box">
+  <div class="spinner"></div>
+  <h2 style="font-size: 1.15rem; margin: 0 0 10px; color: #d4eeff;">系統已全面升級至 V2</h2>
+  <p style="font-size: 0.85rem; color: #a8d8f0; margin: 0 0 20px;">正在為您自動跳轉至 V2 電子交接簿登入…</p>
+  <a href="/Inspection/v2/login/?redirect=%2Fsystems%2Fhandover%2F">點此立即前往</a>
+</div>
 </body>
 </html>

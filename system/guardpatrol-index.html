@@ -1,268 +1,34 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="駐衛警巡檢系統入口，整合巡檢表與 3D 巡檢雲台；管理功能依權限顯示。">
-  <title>駐衛警巡檢系統</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&amp;family=Rajdhani:wght@500;600;700&amp;display=swap" rel="stylesheet">
-  <script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260825-auth1"></script>
-  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('siteTheme') || 'tech');</script>
-<script src="theme.js?v=20260825-floor1"></script>
-  <style>
-    :root {
-      --bg: #020b18;
-      --surface: #04111f;
-      --panel: #071827;
-      --border: #123653;
-      --border-hi: #225d82;
-      --cyan: #00d4ff;
-      --green: #00ff9d;
-      --amber: #ffb300;
-      --red: #ff3b3b;
-      --patrol: #c77dff;
-      --text: #a8d8f0;
-      --text-hi: #e8f7ff;
-      --text-dim: #668da6;
-      --font-head: 'Rajdhani', 'Noto Sans TC', sans-serif;
-      --font-mono: 'Rajdhani', monospace;
-    }
-    :root[data-theme="light"] {
-      --bg: #f4f6fa;
-      --surface: #ffffff;
-      --panel: #ffffff;
-      --border: #dbe4ee;
-      --border-hi: #93b4d6;
-      --cyan: #0284c7;
-      --green: #059669;
-      --amber: #b45309;
-      --red: #dc2626;
-      --patrol: #7c3aed;
-      --text: #334155;
-      --text-hi: #0f172a;
-      --text-dim: #64748b;
-    }
-
-    * { box-sizing: border-box; }
-    html { min-height: 100%; background: var(--bg); }
-    body {
-      min-height: 100vh;
-      margin: 0;
-      color: var(--text);
-      font-family: 'Noto Sans TC', system-ui, sans-serif;
-      background:
-        radial-gradient(circle at 18% 12%, rgba(0, 212, 255, .09), transparent 30rem),
-        radial-gradient(circle at 82% 80%, rgba(199, 125, 255, .08), transparent 28rem),
-        var(--bg);
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(0, 212, 255, .025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 212, 255, .025) 1px, transparent 1px);
-      background-size: 42px 42px;
-      mask-image: linear-gradient(to bottom, #000, transparent 88%);
-    }
-    :root[data-theme="light"] body { background: var(--bg); }
-    :root[data-theme="light"] body::before { display: none; }
-
-    .navbar {
-      position: relative;
-      z-index: 10;
-      min-height: 54px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 8px 20px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(2, 9, 19, .94);
-      backdrop-filter: blur(14px);
-    }
-    :root[data-theme="light"] .navbar { background: rgba(255, 255, 255, .97); }
-    .brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      margin-right: auto;
-      color: var(--text-hi);
-      text-decoration: none;
-      white-space: nowrap;
-    }
-    .brand-copy strong { display: block; font-size: .92rem; letter-spacing: .06em; }
-    .brand-copy small { display: block; margin-top: 1px; color: var(--text-dim); font: 600 .62rem var(--font-head); letter-spacing: .14em; }
-
-    main {
-      position: relative;
-      z-index: 1;
-      width: min(1180px, calc(100% - 36px));
-      margin: 0 auto;
-      padding: 38px 0 56px;
-    }
-    .hero { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--border); position: relative; }
-    .hero::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 136px; height: 2px; background: var(--cyan); box-shadow: 0 0 12px rgba(0, 212, 255, .45); }
-    h1 {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 0;
-      color: var(--cyan);
-      font-family: var(--font-head);
-      font-size: 1.65rem;
-      font-weight: 700;
-      line-height: normal;
-      letter-spacing: .06em;
-      text-shadow: 0 0 18px rgba(0, 212, 255, .22);
-      text-transform: uppercase;
-    }
-    .title-icon { width: 45px; height: 45px; object-fit: contain; filter: drop-shadow(0 0 8px rgba(255, 59, 59, .28)); }
-    .hero p { margin: 7px 0 0 57px; color: var(--text-dim); font-size: .78rem; line-height: 1.6; letter-spacing: .04em; }
-    .workflow-note { margin: 0 0 15px; color: var(--text-dim); font: 600 .69rem var(--font-head); letter-spacing: .12em; }
-    .workflow-note::before { content: '■'; margin-right: 9px; color: var(--cyan); }
-
-    .portal-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-    html.is-sysadmin .portal-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .portal-card[data-sysadmin-only][hidden] { display: none !important; }
-    .portal-card {
-      --accent: var(--cyan);
-      --accent-rgb: 0, 212, 255;
-      position: relative;
-      min-height: 302px;
-      display: flex;
-      flex-direction: column;
-      padding: 28px 24px 22px;
-      overflow: hidden;
-      color: inherit;
-      text-decoration: none;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      background: linear-gradient(145deg, rgba(var(--accent-rgb), .07), transparent 46%), rgba(4, 17, 31, .9);
-      box-shadow: 0 18px 48px rgba(0, 0, 0, .2);
-      transition: transform .24s ease, border-color .24s ease, box-shadow .24s ease;
-    }
-    :root[data-theme="light"] .portal-card {
-      background: linear-gradient(145deg, rgba(var(--accent-rgb), .055), transparent 48%), #fff;
-      box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
-    }
-    .portal-card::before { content: ''; position: absolute; top: 0; left: 0; width: 42%; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); }
-    .portal-card::after { content: ''; position: absolute; right: -38px; bottom: -46px; width: 150px; height: 150px; border: 1px solid rgba(var(--accent-rgb), .16); transform: rotate(45deg); }
-    .portal-card:nth-child(2) { --accent: var(--patrol); --accent-rgb: 199, 125, 255; }
-    .portal-card:nth-child(3) { --accent: var(--amber); --accent-rgb: 255, 179, 0; }
-    .portal-card:nth-child(4) { --accent: var(--green); --accent-rgb: 0, 255, 157; }
-    .portal-card:hover, .portal-card:focus-visible { transform: translateY(-7px); border-color: var(--accent); box-shadow: 0 22px 50px rgba(var(--accent-rgb), .13); outline: none; }
-    .card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .card-number { color: var(--accent); font: 700 .72rem var(--font-head); letter-spacing: .18em; }
-    .card-status { display: inline-flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: .65rem; }
-    .card-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px var(--green); }
-    .card-icon { width: 58px; height: 58px; display: flex; align-items: center; margin: 27px 0 14px; }
-    .card-icon img { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 12px rgba(var(--accent-rgb), .36)); }
-    .portal-card h2 { margin: 0 0 10px; color: var(--text-hi); font-size: 1.3rem; letter-spacing: .03em; }
-    .portal-card p { margin: 0 0 24px; color: var(--text-dim); font-size: .78rem; line-height: 1.7; }
-    .enter { display: inline-flex; align-items: center; gap: 9px; margin-top: auto; color: var(--accent); font: 700 .72rem var(--font-head); letter-spacing: .16em; }
-    .enter span { transition: transform .2s ease; }
-    .portal-card:hover .enter span, .portal-card:focus-visible .enter span { transform: translateX(5px); }
-
-    footer { position: relative; z-index: 1; padding: 22px 18px 30px; color: var(--text-dim); text-align: center; font: 600 .65rem var(--font-head); letter-spacing: .12em; }
-
-    @media (max-width: 1100px) {
-      .navbar { align-items: flex-start; flex-wrap: wrap; }
-      .brand { min-height: 38px; }
-      .portal-grid, html.is-sysadmin .portal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @media (max-width: 720px) {
-      body { overflow-x: hidden; }
-      .navbar { padding: 10px 14px; }
-      .navbar > .system-actions-unified {
-        flex: 0 0 100% !important;
-        width: 100% !important;
-        max-width: 100% !important;
-      }
-      .navbar > .system-meta-unified {
-        flex: 0 0 100%;
-        width: 100%;
-        max-width: 100%;
-        overflow: hidden;
-      }
-      .brand-copy small { display: none; }
-      main { width: min(calc(100% - 28px), 520px); padding-top: 44px; }
-      .hero { margin-bottom: 26px; }
-      h1 { font-size: 1.3rem; gap: 8px; }
-      .title-icon { width: 38px; height: 38px; }
-      .hero p { margin-left: 47px; font-size: .75rem; }
-      .portal-grid, html.is-sysadmin .portal-grid { grid-template-columns: 1fr; }
-      .portal-card { min-height: 272px; grid-column: auto; padding: 22px; }
-      .card-icon { width: 58px; height: 58px; margin: 24px 0 14px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/guardpatrol/">
+<title>V2 駐衛警巡檢入口 — 臺北農產公司 V2</title>
+<script>
+  (function() {
+    var target = "/Inspection/v2/systems/guardpatrol/" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  })();
+  </script>
+<style>
+  body {
+    margin: 0; min-height: 100vh; background: #020b18; color: #00d4ff;
+    font-family: system-ui, -apple-system, sans-serif; display: flex;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .box { padding: 32px; background: #05101e; border: 1px solid #0c2840; border-radius: 12px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,212,255,0.2); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: #00ff9d; font-weight: bold; text-decoration: underline; font-size: 0.95rem; }
+</style>
 </head>
 <body>
-  <header class="navbar">
-    <a class="brand" href="index.html" aria-label="回到系統首頁">
-      <span class="brand-copy"><strong>駐衛警巡檢系統</strong><small>GUARD PATROL OPERATIONS</small></span>
-    </a>
-  </header>
-
-  <main>
-    <section class="hero" aria-labelledby="page-title">
-      <h1 id="page-title"><img class="title-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">駐衛警巡檢系統</h1>
-      <p>巡檢紀錄與 3D 場域雲台入口；管理功能僅供系統管理員使用。</p>
-    </section>
-
-    <div class="workflow-note">GUARD PATROL WORKFLOW · 點選圖卡進入功能系統</div>
-    <section class="portal-grid" aria-label="駐衛警巡檢功能">
-      <a class="portal-card" href="guardpatrol.html">
-        <div class="card-top"><span class="card-number">MODULE 01</span><span class="card-status">系統連線</span></div>
-        <div class="card-icon"><img src="../assets/system-icons/guardpatrol-list-icon.png" alt=""></div>
-        <h2>駐衛警巡檢表</h2>
-        <p>查詢各樓層與巡檢點的打卡狀態，即時掌握待巡與逾期項目。</p>
-        <span class="enter">ENTER SYSTEM <span aria-hidden="true">→</span></span>
-      </a>
-
-      <a class="portal-card" href="guardpatrol3d.html">
-        <div class="card-top"><span class="card-number">MODULE 02</span><span class="card-status">系統連線</span></div>
-        <div class="card-icon"><img src="../assets/system-icons/guardpatrol-3d-icon.png" alt=""></div>
-        <h2>3D 駐警巡檢雲台</h2>
-        <p>以立體場域視角查看巡檢點位與打卡狀態，快速定位異常區域。</p>
-        <span class="enter">OPEN 3D VIEW <span aria-hidden="true">→</span></span>
-      </a>
-
-      <a class="portal-card" href="patrolshifts.html?v=20260719-2" data-sysadmin-only hidden>
-        <div class="card-top"><span class="card-number">MODULE 03</span><span class="card-status">系統連線</span></div>
-        <div class="card-icon"><img src="../assets/system-icons/guardpatrol-schedule-icon.png" alt=""></div>
-        <h2>巡檢排班系統</h2>
-        <p>管理每日巡檢班別、執勤人員與時段，維持排班資訊清楚且一致。</p>
-        <span class="enter">MANAGE SHIFTS <span aria-hidden="true">→</span></span>
-      </a>
-
-      <a class="portal-card" href="patrol-notifications.html" data-sysadmin-only hidden>
-        <div class="card-top"><span class="card-number">MODULE 04</span><span class="card-status">系統連線</span></div>
-        <div class="card-icon"><img src="../assets/system-icons/guardpatrol-line-push-icon.png" alt=""></div>
-        <h2>LINE推播紀錄</h2>
-        <p>查詢巡檢逾時推播的發送時間、完成狀況、排定人員與 LINE 回應。</p>
-        <span class="enter">VIEW NOTIFICATIONS <span aria-hidden="true">→</span></span>
-      </a>
-    </section>
-  </main>
-
-  <footer>臺北農產運銷股份有限公司 · 第一果菜市場 ｜ GUARD PATROL PORTAL</footer>
-<script>
-  const db = createDb();
-  (async()=>{
-    const {data:{session}}=await db.auth.getSession();
-    if(!session){location.href='login.html?redirect='+encodeURIComponent('guardpatrol-index.html');return;}
-    if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
-      await window.SystemAccess.enforce('guardpatrol');
-    }
-  })();
-</script>
+<div class="box">
+  <div class="spinner"></div>
+  <h2 style="font-size: 1.15rem; margin: 0 0 10px; color: #d4eeff;">系統已全面升級至 V2</h2>
+  <p style="font-size: 0.85rem; color: #a8d8f0; margin: 0 0 20px;">正在為您自動跳轉至 V2 駐衛警巡檢入口…</p>
+  <a href="/Inspection/v2/systems/guardpatrol/">點此立即前往</a>
+</div>
 </body>
 </html>

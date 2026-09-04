@@ -64,7 +64,7 @@ function useFloorData() {
     const client = getSupabase();
     const [m, k] = await Promise.all([
       client.from('floor_models').select('*').order('floor_id').limit(200),
-      client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status,note,equipment_id').limit(5000),
+      client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status,note,equipment_id').limit(1000),
     ]);
     if (m.error || k.error) setNote(`失敗：${errorMessage(m.error || k.error, '圖臺資料載入失敗')}`);
     const sorted = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
@@ -158,7 +158,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
     let cancelled = false;
     void getSupabase().from('checkin_logs').select('checkin_id,target_id,label,floor_id')
       .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`)
-      .limit(5000).then(({ data, error }) => {
+      .limit(1000).then(({ data, error }) => {
         if (cancelled) return;
         if (error) { setNote(`失敗：${errorMessage(error, '打卡資料載入失敗')}`); return; }
         setCheckins((data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));

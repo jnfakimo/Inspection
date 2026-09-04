@@ -42,8 +42,8 @@ export function CostsAdmin({ profile, module }: AdminProps) {
     try {
       const client = getSupabase();
       const [c, e] = await Promise.all([
-        client.from('cost_records').select('*,equipment(name,asset_code)').order('cost_date', { ascending: false }).limit(2000),
-        client.from('equipment').select('equipment_id,asset_code,name,status').order('name').limit(2000),
+        client.from('cost_records').select('*,equipment(name,asset_code)').order('cost_date', { ascending: false }).limit(1000),
+        client.from('equipment').select('equipment_id,asset_code,name,status').order('name').limit(1000),
       ]);
       if (c.error || e.error) setNote(`失敗：${errorMessage(c.error || e.error, '費用資料載入失敗')}`);
       setRows(c.data || []); setEquipment(e.data || []);

@@ -28,10 +28,14 @@ assert(files.handoverLogin.includes("functions.invoke('username-login'") && file
   'handover login must use username-login with captcha');
 assert(!/login_lookup_email|signInWithPassword|\.from\(['"]users['"]\)/.test(files.handoverLogin),
   'handover login must not bypass the shared login/profile path');
-assert(files.v2Login.includes("invokeAppApi<Profile>('profile')") && files.v2Login.includes('saveProfile'),
-  'V2 login must hydrate the shared profile cache');
-assert(files.authGate.includes("invokeAppApi<Profile>('profile')") && files.authGate.includes('saveProfile'),
-  'V2 AuthGate must refresh the same authoritative profile');
+assert(
+  (files.v2Login.includes("invokeAppApi<Profile>('profile')") || files.v2Login.includes('localAuth.me<Profile>()')) && files.v2Login.includes('saveProfile'),
+  'V2 login must hydrate the shared profile cache from the active auth provider',
+);
+assert(
+  (files.authGate.includes("invokeAppApi<Profile>('profile')") || files.authGate.includes('localAuth.me<Profile>()')) && files.authGate.includes('saveProfile'),
+  'V2 AuthGate must refresh the same authoritative profile from the active auth provider',
+);
 assert(files.appShell.includes('clearProfile()'), 'V2 logout must clear the shared profile cache');
 assert(files.cache.includes("inspectionSystemUserProfile") && files.cache.includes('system-user-profile-updated'),
   'V2 cache must use the V1 storage key and update event');

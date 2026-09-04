@@ -25,7 +25,7 @@ export function CyclesAdmin({ profile, module }: AdminProps) {
       const client = getSupabase();
       const [c, u] = await Promise.all([
         client.from('inspection_cycles').select('*').order('started_at', { ascending: false }).limit(500),
-        client.from('users').select('user_id,name').limit(2000),
+        client.from('users').select('user_id,name').limit(1000),
       ]);
       if (c.error) setNote(`失敗：${errorMessage(c.error, '巡檢週期載入失敗')}`);
       setRows(c.data || []); setUsers(u.data || []);

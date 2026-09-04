@@ -190,7 +190,7 @@ function ShiftsModule({ module, profile }: Props) {
     const [s, t, u, c, d] = await Promise.all([
       client.from('patrol_shifts').select('*').in('shift_date', [date, overnightStorageDate]).order('sort_order').order('start_time'),
       client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
-      client.from('users').select('user_id,name,username,department,dept_id').eq('status', 'active').order('name').limit(2000),
+      client.from('users').select('user_id,name,username,department,dept_id').eq('status', 'active').order('name').limit(1000),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
       client.from('departments').select('dept_id,name').limit(1000),
     ]);

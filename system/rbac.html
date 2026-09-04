@@ -2,273 +2,33 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
-<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
-<title>權限管理 RBAC — 報修派工管理系統</title>
-<script src="vendor/supabase-js-2.min.js"></script>
-<script src="supabase-config.js?v=20260825-auth1"></script>
+<meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/admin/permissions/">
+<title>V2 權限管理 — 臺北農產公司 V2</title>
+<script>
+  (function() {
+    var target = "/Inspection/v2/systems/admin/permissions/" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  })();
+  </script>
 <style>
-:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--border-hi:#1a4a70;
-  --cyan:#00d4ff;--blue:#1a7fff;--green:#00ff9d;--amber:#ffb300;--red:#ff3b3b;
-  --text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;--font-head:'Rajdhani',sans-serif}
-:root[data-theme="light"]{--bg:#f4f6fa;--surface:#ffffff;--panel:#ffffff;--border:#dbe4ee;--border-hi:#93b4d6;--cyan:#0284c7;--blue:#2563eb;--green:#059669;--amber:#b45309;--red:#dc2626;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
-/* light mode overrides */
-:root[data-theme="light"] body{background-image:none}
-:root[data-theme="light"] .navbar{background:rgba(255,255,255,.97)}
-:root[data-theme="light"] .nav-title{text-shadow:none}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:40px}
-a{color:inherit;text-decoration:none}
-.navbar{background:rgba(3,10,22,.97);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50}
-.nav-title{font-family:var(--font-head);font-size:1.1rem;font-weight:700;color:var(--cyan);letter-spacing:.06em;text-shadow:0 0 14px rgba(0,212,255,.5)}
-.nav-sub{font-size:.7rem;color:var(--text-dim)}.nav-space{flex:1}
-.nav-back{font-size:.7rem;color:var(--text-dim);border:1px solid var(--border);padding:5px 10px;border-radius:2px;cursor:pointer;background:none;transition:all .2s}
-.nav-back:hover{border-color:var(--cyan);color:var(--cyan)}
-.wrap{max-width:1100px;margin:0 auto;padding:16px}
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px}
-.tab{padding:9px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text-dim);cursor:pointer;font-size:.8rem;font-family:var(--font-head);letter-spacing:.04em}
-.tab.on{color:var(--cyan);border-bottom-color:var(--cyan)}
-.pane{display:none}.pane.on{display:block}
-.card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:16px;margin-bottom:14px}
-.card h3{font-family:var(--font-head);font-size:.92rem;color:var(--cyan);margin-bottom:12px;letter-spacing:.04em}
-table{width:100%;border-collapse:collapse;font-size:.76rem}
-th{color:var(--text-dim);padding:8px;border-bottom:1px solid var(--border);font-weight:600;font-size:.7rem}
-td{padding:8px;border-bottom:1px solid rgba(12,40,64,.4);text-align:center}
-td.rolename{text-align:left;color:var(--text-hi);font-weight:600;white-space:nowrap}
-input[type=checkbox]{width:17px;height:17px;accent-color:var(--cyan);cursor:pointer}
-select,input[type=text]{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:2px;font-size:.76rem;outline:none}
-select:focus,input[type=text]:focus{border-color:var(--cyan)}
-.manager-tools{display:flex;align-items:center;gap:10px;margin-bottom:10px}.manager-tools input{flex:1;max-width:420px}.manager-list{max-height:480px;overflow:auto;border:1px solid var(--border);border-radius:3px}.manager-badge{display:inline-block;margin-left:7px;padding:1px 7px;border:1px solid rgba(0,255,157,.45);border-radius:9px;color:var(--green);font-size:.61rem}
-.personnel-card{padding:0;overflow:visible}.personnel-card summary{list-style:none;display:flex;align-items:center;gap:10px;padding:15px 16px;color:var(--cyan);font-family:var(--font-head);font-size:.92rem;font-weight:700;letter-spacing:.04em;cursor:pointer;user-select:none}.personnel-card summary::-webkit-details-marker{display:none}.personnel-card summary::after{content:'▼';margin-left:auto;color:var(--text-dim);font-size:.68rem;transition:transform .2s}.personnel-card[open] summary::after{transform:rotate(180deg);color:var(--cyan)}.personnel-card[open] summary{border-bottom:1px solid var(--border)}.personnel-count{margin-left:4px;padding:2px 8px;border:1px solid var(--border-hi);border-radius:10px;color:var(--text-dim);font:600 .64rem var(--font-head)}.personnel-dropdown{padding:12px 16px 16px}.personnel-card:not([open]) .personnel-dropdown{display:none}
-.hint{font-size:.68rem;color:var(--text-dim);margin-top:8px;line-height:1.7}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-hi);color:var(--text);padding:9px 18px;border-radius:4px;font-size:.76rem;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none}.toast.show{opacity:1}
-.empty{color:var(--text-dim);text-align:center;padding:24px;font-size:.8rem}
-
+  body {
+    margin: 0; min-height: 100vh; background: #020b18; color: #00d4ff;
+    font-family: system-ui, -apple-system, sans-serif; display: flex;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .box { padding: 32px; background: #05101e; border: 1px solid #0c2840; border-radius: 12px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,212,255,0.2); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: #00ff9d; font-weight: bold; text-decoration: underline; font-size: 0.95rem; }
 </style>
-<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1">
-<link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
 </head>
 <body>
-<nav class="navbar">
-  <div><div class="nav-title">權限管理 RBAC</div><div class="nav-sub">角色權限矩陣 · 使用者角色指派</div></div>
-  <div class="nav-space"></div>
-<a href="dashboard.html"><button class="nav-back"><span class="ic ic-dashboard"></span> 戰情儀表板</button></a>
-<a href="admin.html#repairs"><button class="nav-back"><span class="ic ic-dispatch"></span> 報修系統</button></a>
-<a href="https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7"><button class="nav-back"><img src="../assets/system-icons/guardpatrol-icon.png" alt="" style="width:16px;height:16px;vertical-align:-3px;object-fit:contain"> 駐衛警巡檢</button></a>
-<a href="dispatch.html"><button class="nav-back"><span class="ic ic-dispatch"></span> 派工系統</button></a>
-  <a href="admin.html"><button class="nav-back">← 返回上一層</button></a>
-</nav>
-<div class="wrap">
-  <div class="tabs">
-    <button class="tab on" onclick="tab(0)">角色權限矩陣</button>
-    <button class="tab" onclick="tab(1)">系統存取權限</button>
-    <button class="tab" onclick="tab(2)">使用者角色</button>
-  </div>
-  <div class="pane on" id="p0">
-    <div class="card"><h3>角色 × 權限（勾選即時儲存）</h3>
-      <div id="matrix"><div class="empty">載入中…</div></div>
-      <div class="hint">權限說明：新增/修改/刪除/查詢/派工/結案/簽核/匯出/後台管理。<br>※ 此為權限設定資料，前端各頁可依登入者角色讀取 role_permissions 控制按鈕顯示（將於各頁逐步套用）。</div>
-    </div>
-  </div>
-  <div class="pane" id="p1">
-    <div class="card"><h3>角色 × 系統（勾選即時儲存，決定系統入口是否開放）</h3>
-      <div id="sysMatrix"><div class="empty">載入中…</div></div>
-      <div class="hint">未勾選的系統：該角色在系統入口頁看不到該卡片，直接輸入網址也會被導回入口頁。<br>sysadmin 一律視為全部允許（程式邏輯寫死，不受此表設定影響），故該列固定打勾且無法取消。</div>
-    </div>
-    <details class="card personnel-card" ontoggle="toggleVehicleRoster(this)"><summary>公務車派車管理｜派車管理員指派 <span class="personnel-count" id="vehicleManagerCount">已指派 0 人</span></summary>
-      <div class="personnel-dropdown"><div class="manager-tools"><input type="text" id="vehicleManagerSearch" placeholder="搜尋姓名、單位或目前角色" oninput="renderVehicleManagerList()"></div>
-        <div class="manager-list" id="vehicleManagerTbl"><div class="empty">載入中…</div></div>
-        <div class="hint">勾選後，該人員可進行派車、維護公務車主檔及產出派車報表。系統管理員自動具備權限；單位主管若未被指派，仍只能查看本單位資料且不會顯示報表功能。</div>
-      </div>
-    </details>
-    <details class="card personnel-card" ontoggle="toggleVehicleRoster(this)"><summary>公務車派車管理｜司機人員指派 <span class="personnel-count" id="vehicleDriverCount">已指派 0 人</span></summary>
-      <div class="personnel-dropdown"><div class="manager-tools"><input type="text" id="vehicleDriverSearch" placeholder="搜尋姓名、單位或目前角色" oninput="renderVehicleDriverList()"></div>
-        <div class="manager-list" id="vehicleDriverTbl"><div class="empty">載入中…</div></div>
-        <div class="hint">建議只勾選實際執勤的 2–3 位司機。司機可進入派車系統，但只會看到指派給自己的任務；用車當日接單後，才能填寫實際時間、里程、加油、異常及照片。司機不具派車、車輛主檔或報表權限。</div>
-      </div>
-    </details>
-  </div>
-  <div class="pane" id="p2">
-    <div class="card"><h3>使用者角色指派</h3>
-      <div id="userTbl"><div class="empty">載入中…</div></div>
-    </div>
-  </div>
+<div class="box">
+  <div class="spinner"></div>
+  <h2 style="font-size: 1.15rem; margin: 0 0 10px; color: #d4eeff;">系統已全面升級至 V2</h2>
+  <p style="font-size: 0.85rem; color: #a8d8f0; margin: 0 0 20px;">正在為您自動跳轉至 V2 權限管理…</p>
+  <a href="/Inspection/v2/systems/admin/permissions/">點此立即前往</a>
 </div>
-<div class="toast" id="toast"></div>
-<script>
-const db = createDb();
-(async()=>{
-  const {data:{session}}=await db.auth.getSession();
-  if(!session){location.href='login.html';return;}
-  if(window.SystemAccess&&typeof window.SystemAccess.enforce==='function'){
-    await window.SystemAccess.enforce('admin');
-  }
-})();
-function escHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function translateError(msg) {
-  if (!msg) return '未知錯誤';
-  if (msg.includes('duplicate key value')) return '資料重複，請確認是否已存在';
-  if (msg.includes('null value in column')) return '必填欄位不可空白';
-  if (msg.includes('violates row-level security')) return '無操作權限';
-  if (msg.includes('permission denied')) return '無操作權限';
-  if (msg.includes('relation') && msg.includes('does not exist')) return '資料表不存在，請確認資料庫設定';
-  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')) return '網路連線失敗，請稍後再試';
-  return '操作失敗，請稍後再試或聯絡系統管理員';
-}
-const PERMS=[['create','新增'],['update','修改'],['delete','刪除'],['read','查詢'],['dispatch','派工'],['close','結案'],['sign','簽核'],['export','匯出'],['admin','後台管理']];
-const SYS_KEYS=[['sys_admin','後台管理系統'],['sys_workorder','報修/派工/完工系統'],['sys_guardpatrol','駐衛警巡檢系統'],['sys_handover','電子交接簿'],['sys_equipment','設備建置系統'],['sys_structuremap','專案核心樹狀關係圖'],['sys_vehicle','公務車派車管理'],['sys_meetingroom','會議室預約系統']];
-const LEGACY_ROLE_BY_RBAC={reporter:'inspector',duty:'maintenance',dispatcher:'maintenance',technician:'maintenance',unit_supervisor:'supervisor',mgmt_supervisor:'supervisor',sysadmin:'admin'};
-const MENU_PRESETS={
-  reporter:{maintenance:true,repair:true},
-  duty:{maintenance:true,handover:true,repair:true},
-  dispatcher:{maintenance:true,repair:true},
-  technician:{maintenance:true},
-  unit_supervisor:{maintenance:true,handover:true,repair:true},
-  mgmt_supervisor:{maintenance:true,handover:true},
-  sysadmin:{inspector:true,maintenance:true,handover:true,repair:true}
-};
-let roles=[],perms={},departments=[],departmentMap=new Map();
-function tab(i){document.querySelectorAll('.tab').forEach((t,n)=>t.classList.toggle('on',n===i));document.querySelectorAll('.pane').forEach((p,n)=>p.classList.toggle('on',n===i));}
-function toggleVehicleRoster(details){if(!details.open)return;document.querySelectorAll('.personnel-card[open]').forEach(item=>{if(item!==details)item.open=false;});}
-function departmentPath(deptId){
-  const names=[],seen=new Set();let current=departmentMap.get(deptId),guard=0;
-  while(current&&guard++<10&&!seen.has(current.dept_id)){seen.add(current.dept_id);names.unshift(current.name);current=departmentMap.get(current.parent_id);}
-  return names.join(' / ');
-}
-function departmentForUser(user){return departmentPath(user?.dept_id)||String(user?.department||'').trim()||'未設定單位';}
-function permissionsForRole(role){
-  const out={inspector:false,maintenance:false,handover:false,repair:false};
-  Object.assign(out,MENU_PRESETS[role]||{});
-  PERMS.forEach(p=>{out[p[0]]=perms[role+'|'+p[0]]===true;});
-  return out;
-}
-
-async function init(){
-  const [{data:r,error:re},{data:rp,error:rpe},{data:d,error:de}]=await Promise.all([
-    db.from('roles').select('*').order('sort_order'),
-    db.from('role_permissions').select('*'),
-    db.from('departments').select('dept_id,parent_id,name,status').eq('status','active').order('sort_order').limit(5000)
-  ]);
-  if(re||rpe||de){document.getElementById('matrix').innerHTML='<div class="empty" style="color:var(--amber)">角色或權限主檔讀取失敗，請通知系統管理員。</div>';return;}
-  // 管理部主管已停用，不再於角色權限矩陣／系統存取權限／使用者角色指派中出現
-  roles=(r||[]).filter(x=>x.role_id!=='mgmt_supervisor'); perms={}; (rp||[]).forEach(x=>{perms[x.role_id+'|'+x.perm]=x.allowed;});
-  departments=d||[];departmentMap=new Map(departments.map(x=>[x.dept_id,x]));
-  renderMatrix(); renderSysMatrix(); renderUsers(); renderVehiclePersonnel();
-}
-function buildMatrixHtml(list,opts){
-  opts=opts||{};
-  let h='<table><tr><th class="rolename" style="text-align:left">角色＼'+(opts.colHeader||'權限')+'</th>'+list.map(p=>`<th>${p[1]}</th>`).join('')+'</tr>';
-  roles.forEach(r=>{
-    h+=`<tr><td class="rolename">${escHtml(r.name)}</td>`+list.map(p=>{
-      if(opts.forceRoleId&&r.role_id===opts.forceRoleId){
-        return `<td><input type="checkbox" checked disabled title="sysadmin 永遠允許"></td>`;
-      }
-      const on=perms[r.role_id+'|'+p[0]]===true;
-      return `<td><input type="checkbox" ${on?'checked':''} onchange="togglePerm('${r.role_id}','${p[0]}',this.checked)"></td>`;
-    }).join('')+'</tr>';
-  });
-  h+='</table>';
-  return h;
-}
-function renderMatrix(){document.getElementById('matrix').innerHTML=buildMatrixHtml(PERMS);}
-function renderSysMatrix(){document.getElementById('sysMatrix').innerHTML=buildMatrixHtml(SYS_KEYS,{colHeader:'系統',forceRoleId:'sysadmin'});}
-async function togglePerm(role,perm,val){
-  perms[role+'|'+perm]=val;
-  const {error}=await db.from('role_permissions').upsert({role_id:role,perm,allowed:val},{onConflict:'role_id,perm'});
-  toast(error?('儲存失敗：'+translateError(error.message)):'已更新',!!error);
-}
-let allRbacUsers=[], rbacUserPage=1;
-const RBAC_USER_PAGE_SIZE=20;
-async function renderUsers(){
-  const {data:users}=await db.from('users').select('user_id,name,role,rbac_role,dept_id,department').eq('status','active').order('name');
-  allRbacUsers=users||[];
-  rbacUserPage=1;
-  renderUsersPage();
-}
-function changeUsersPage(delta){
-  rbacUserPage+=delta;
-  renderUsersPage();
-}
-function renderUsersPage(){
-  const box=document.getElementById('userTbl');
-  const users=allRbacUsers;
-  if(!users||!users.length){box.innerHTML='<div class="empty">無使用者</div>';return;}
-  const totalPages=Math.max(1,Math.ceil(users.length/RBAC_USER_PAGE_SIZE));
-  if(rbacUserPage>totalPages)rbacUserPage=totalPages;
-  if(rbacUserPage<1)rbacUserPage=1;
-  const pageUsers=users.slice((rbacUserPage-1)*RBAC_USER_PAGE_SIZE,rbacUserPage*RBAC_USER_PAGE_SIZE);
-  const table='<table><tr><th style="text-align:left">姓名</th><th style="text-align:left">單位</th><th style="text-align:left">系統角色(RBAC)</th></tr>'+
-    pageUsers.map(u=>{
-      // 管理部主管已從選單移除；若有人現有指派仍是這個角色，保留一個唯讀顯示用選項，避免下拉選單顯示錯誤
-      const stale = u.rbac_role==='mgmt_supervisor' ? `<option value="mgmt_supervisor" selected>管理部主管（已停用）</option>` : '';
-      return `<tr><td class="rolename">${escHtml(u.name)}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(departmentForUser(u))}</td>
-      <td style="text-align:left"><select onchange="setUserRole('${u.user_id}',this.value)">
-        <option value="">（未指定）</option>${stale}${roles.map(r=>`<option value="${r.role_id}" ${u.rbac_role===r.role_id?'selected':''}>${escHtml(r.name)}</option>`).join('')}
-      </select></td></tr>`;
-    }).join('')+'</table>';
-  const pager=`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;color:var(--text-dim);font-family:var(--font-mono);font-size:.78rem">
-    <button onclick="changeUsersPage(-1)" ${rbacUserPage<=1?'disabled':''} style="padding:4px 12px;background:rgba(12,40,64,.5);border:1px solid var(--border);color:${rbacUserPage<=1?'var(--text-dim)':'var(--cyan)'};cursor:${rbacUserPage<=1?'default':'pointer'};border-radius:2px;font-family:var(--font-mono)">◀</button>
-    <span>第 ${rbacUserPage} / ${totalPages} 頁（共 ${users.length} 筆，每頁 ${RBAC_USER_PAGE_SIZE} 筆）</span>
-    <button onclick="changeUsersPage(1)" ${rbacUserPage>=totalPages?'disabled':''} style="padding:4px 12px;background:rgba(12,40,64,.5);border:1px solid var(--border);color:${rbacUserPage>=totalPages?'var(--text-dim)':'var(--cyan)'};cursor:${rbacUserPage>=totalPages?'default':'pointer'};border-radius:2px;font-family:var(--font-mono)">▶</button>
-  </div>`;
-  box.innerHTML=table+pager;
-}
-async function setUserRole(uid,role){
-  const updates = role ? { rbac_role:role, role:LEGACY_ROLE_BY_RBAC[role] || 'inspector', permissions:permissionsForRole(role) } : { rbac_role:null };
-  const {error}=await db.from('users').update(updates).eq('user_id',uid);
-  toast(error?('儲存失敗：'+translateError(error.message)):'已指派角色',!!error);
-}
-let vehiclePersonnelUsers=[],vehicleManagerAssignments=new Map(),vehicleDriverAssignments=new Map();
-async function renderVehiclePersonnel(){
-  const [usersResult,managersResult,driversResult]=await Promise.all([
-    db.from('users').select('user_id,name,dept_id,department,rbac_role,role').eq('status','active').order('name').limit(5000),
-    db.from('vehicle_dispatch_managers').select('user_id,active').limit(5000),
-    db.from('vehicle_dispatch_drivers').select('user_id,active').limit(5000)
-  ]);
-  if(usersResult.error||managersResult.error||driversResult.error){
-    const message='<div class="empty" style="color:var(--amber)">派車人員資料尚未建立，請先套用最新資料庫 migration。</div>';
-    document.getElementById('vehicleManagerTbl').innerHTML=message;document.getElementById('vehicleDriverTbl').innerHTML=message;return;
-  }
-  vehiclePersonnelUsers=(usersResult.data||[]).sort((a,b)=>departmentForUser(a).localeCompare(departmentForUser(b),'zh-Hant')||String(a.name||'').localeCompare(String(b.name||''),'zh-Hant'));
-  vehicleManagerAssignments=new Map((managersResult.data||[]).map(x=>[x.user_id,x.active===true]));
-  vehicleDriverAssignments=new Map((driversResult.data||[]).map(x=>[x.user_id,x.active===true]));
-  renderVehicleManagerList();renderVehicleDriverList();
-}
-function vehicleManagerRoleName(user){const roleId=user.rbac_role||'';const role=roles.find(x=>x.role_id===roleId);return role?.name||(roleId==='mgmt_supervisor'?'管理部主管（已停用）':roleId||'未指定');}
-function renderVehicleManagerList(){
-  document.getElementById('vehicleManagerCount').textContent=`已指派 ${[...vehicleManagerAssignments.values()].filter(Boolean).length} 人`;
-  renderVehicleAssignmentList({boxId:'vehicleManagerTbl',searchId:'vehicleManagerSearch',label:'派車管理員',assignments:vehicleManagerAssignments,toggleName:'toggleVehicleManager',sysadminAutomatic:true});
-}
-function renderVehicleDriverList(){
-  document.getElementById('vehicleDriverCount').textContent=`已指派 ${[...vehicleDriverAssignments.values()].filter(Boolean).length} 人`;
-  renderVehicleAssignmentList({boxId:'vehicleDriverTbl',searchId:'vehicleDriverSearch',label:'司機人員',assignments:vehicleDriverAssignments,toggleName:'toggleVehicleDriver',sysadminAutomatic:false});
-}
-function renderVehicleAssignmentList(options){
-  const box=document.getElementById(options.boxId),q=String(document.getElementById(options.searchId)?.value||'').trim().toLowerCase();
-  const users=vehiclePersonnelUsers.filter(u=>!q||[u.name,departmentForUser(u),vehicleManagerRoleName(u)].some(v=>String(v||'').toLowerCase().includes(q)));
-  if(!users.length){box.innerHTML='<div class="empty">沒有符合條件的人員</div>';return;}
-  box.innerHTML=`<table><tr><th>${options.label}</th><th style="text-align:left">姓名</th><th style="text-align:left">單位</th><th style="text-align:left">目前系統角色</th></tr>`+users.map(u=>{
-    const sysadmin=u.rbac_role==='sysadmin'||u.role==='admin',automatic=options.sysadminAutomatic&&sysadmin,assigned=automatic||options.assignments.get(u.user_id)===true;
-    return `<tr><td><input type="checkbox" ${assigned?'checked':''} ${automatic?'disabled title="系統管理員自動具備派車管理權限"':''} onchange="${options.toggleName}('${u.user_id}',this.checked,this)"></td><td class="rolename">${escHtml(u.name)}${assigned&&!automatic?'<span class="manager-badge">已指派</span>':''}</td><td style="text-align:left;color:var(--text-dim)">${escHtml(departmentForUser(u))}</td><td style="text-align:left">${escHtml(vehicleManagerRoleName(u))}${automatic?'<span class="manager-badge">自動授權</span>':''}</td></tr>`;
-  }).join('')+'</table>';
-}
-async function toggleVehicleManager(userId,active,checkbox){
-  await toggleVehicleAssignment('vehicle_dispatch_managers',vehicleManagerAssignments,userId,active,checkbox,renderVehicleManagerList,'派車管理員');
-}
-async function toggleVehicleDriver(userId,active,checkbox){
-  await toggleVehicleAssignment('vehicle_dispatch_drivers',vehicleDriverAssignments,userId,active,checkbox,renderVehicleDriverList,'司機人員');
-}
-async function toggleVehicleAssignment(table,assignments,userId,active,checkbox,render,label){
-  checkbox.disabled=true;const {error}=await db.from(table).upsert({user_id:userId,active},{onConflict:'user_id'});checkbox.disabled=false;
-  if(error){checkbox.checked=!active;toast('儲存失敗：'+translateError(error.message),true);return;}
-  assignments.set(userId,active);render();toast(active?`已指派${label}`:`已取消${label}權限`);
-}
-let _tt;function toast(m,err){const el=document.getElementById('toast');el.textContent=m;el.style.borderColor=err?'var(--red)':'var(--border-hi)';el.style.color=err?'var(--red)':'var(--text)';el.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>el.classList.remove('show'),2200);}
-init();
-</script>
 </body>
 </html>

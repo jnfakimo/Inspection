@@ -1,5 +1,5 @@
 export const PASSWORD_POLICY = {
-  minLength: 12,
+  minLength: 8,
   maxLength: 200,
   requiredCharacterClasses: 3,
 } as const;

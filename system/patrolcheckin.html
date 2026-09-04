@@ -2,28 +2,33 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:">
-<script>document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'tech');</script>
-<script src="theme.js?v=20260825-floor1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0">
-<title>巡邏點簽到 — 臺北農產巡檢系統</title>
-<script src="vendor/supabase-js-2.min.js"></script><script src="supabase-config.js?v=20260825-auth1"></script><script src="patrol-offline.js?v=20260825-offline1"></script>
-<style>
-:root{--bg:#020b18;--surface:#04111f;--panel:#05101e;--border:#0c2840;--patrol:#c77dff;--green:#00ff9d;--red:#ff5470;--text:#a8d8f0;--text-hi:#d4eeff;--text-dim:#3a6a8a;--font-head:'Rajdhani',sans-serif}
-:root[data-theme="light"]{--bg:#f4f6fa;--surface:#fff;--panel:#fff;--border:#dbe4ee;--patrol:#9333ea;--green:#059669;--red:#dc2626;--text:#1e293b;--text-hi:#0f172a;--text-dim:#64748b}
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px}.card{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:26px 22px;text-align:center}.icon{font-size:2.6rem;margin-bottom:10px}.icon.ok{color:var(--green);text-shadow:0 0 18px rgba(0,255,157,.5)}.icon.err{color:var(--red);text-shadow:0 0 18px rgba(255,84,112,.5)}.icon.load{color:var(--patrol);text-shadow:0 0 18px rgba(199,125,255,.5)}h1{font-family:var(--font-head);font-size:1.2rem;color:var(--text-hi);letter-spacing:.04em;margin-bottom:6px}.sub{font-size:.8rem;color:var(--text-dim);margin-bottom:18px}.detail{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px;text-align:left;font-size:.82rem;line-height:2;margin-bottom:18px}.detail b{color:var(--text-hi)}.detail .k{color:var(--text-dim);display:inline-block;width:86px}.btn{display:inline-block;padding:10px 20px;margin:4px;border-radius:3px;font-size:.8rem;font-family:var(--font-head);letter-spacing:.05em;border:1px solid var(--patrol);color:var(--patrol);background:rgba(199,125,255,.1);cursor:pointer;text-decoration:none}.btn:hover{background:rgba(199,125,255,.2)}.btn:disabled{opacity:.55;cursor:wait}.btn.secondary{border-color:var(--border);color:var(--text-dim);background:transparent}.mfa-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:16px;text-align:left}.mfa-help{font-size:.78rem;line-height:1.7;color:var(--text-dim);margin-bottom:12px}.mfa-qr{display:block;width:180px;height:180px;object-fit:contain;margin:0 auto 12px;background:#fff;border-radius:4px}.mfa-secret{font-size:.7rem;color:var(--text-dim);word-break:break-all;margin-bottom:12px}.mfa-secret code{color:var(--text-hi)}.mfa-label{display:block;font-size:.8rem;color:var(--text-dim);margin-bottom:6px}.mfa-code{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:4px;background:var(--panel);color:var(--text-hi);font-size:1.1rem;letter-spacing:.25em;text-align:center}.mfa-error{color:var(--red);font-size:.76rem;margin-top:8px;text-align:center}.hist{margin-top:20px;text-align:left}.hist-t{font-size:.72rem;color:var(--text-dim);margin-bottom:8px;letter-spacing:.04em}.hist-row{display:flex;justify-content:space-between;font-size:.76rem;color:var(--text);padding:6px 0;border-top:1px solid rgba(12,40,64,.6)}.hist-row .u{color:var(--text-dim)}.hist-empty,.hist-error{padding:12px 0;border-top:1px solid rgba(12,40,64,.6);color:var(--text-dim);font-size:.76rem;text-align:center}.hist-error{color:var(--red)}
-@media(max-width:480px){body{padding:18px 10px}.card{padding:22px 14px}.mfa-qr{width:160px;height:160px}.detail{font-size:.78rem}}
-</style>
-<link rel="stylesheet" href="light-mode-fix.css?v=20260806-1"><link rel="stylesheet" href="mobile-unified.css?v=20260717-1">
-</head>
-<body><div class="card" id="card"><div class="icon load">◐</div><h1>處理中…</h1><div class="sub">正在確認登入狀態</div></div>
+<meta http-equiv="refresh" content="0; url=/Inspection/v2/systems/guardpatrol/checkins/">
+<title>V2 巡檢打卡 — 臺北農產公司 V2</title>
 <script>
-// 舊版曾支援離線直寫；安全版 QR 簽到必須即時連線，移除舊 service worker 與快取。
-if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});}
-if('caches' in window){caches.keys().then(keys=>keys.filter(k=>/^patrol-checkin-/i.test(k)).forEach(k=>caches.delete(k))).catch(()=>{});}
-if(window.PatrolOffline?.sync){void window.PatrolOffline.sync();}
-</script>
-<script src="patrolcheckin-app.js?v=20260814-password-session1"></script>
+  (function() {
+    var target = "/Inspection/v2/systems/guardpatrol/checkins/" + window.location.search + window.location.hash;
+    window.location.replace(target);
+  })();
+  </script>
+<style>
+  body {
+    margin: 0; min-height: 100vh; background: #020b18; color: #00d4ff;
+    font-family: system-ui, -apple-system, sans-serif; display: flex;
+    align-items: center; justify-content: center; text-align: center;
+  }
+  .box { padding: 32px; background: #05101e; border: 1px solid #0c2840; border-radius: 12px; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(0,212,255,0.2); border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: #00ff9d; font-weight: bold; text-decoration: underline; font-size: 0.95rem; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="spinner"></div>
+  <h2 style="font-size: 1.15rem; margin: 0 0 10px; color: #d4eeff;">系統已全面升級至 V2</h2>
+  <p style="font-size: 0.85rem; color: #a8d8f0; margin: 0 0 20px;">正在為您自動跳轉至 V2 巡檢打卡…</p>
+  <a href="/Inspection/v2/systems/guardpatrol/checkins/">點此立即前往</a>
+</div>
 </body>
 </html>

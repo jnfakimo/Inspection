@@ -10,6 +10,7 @@ import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-ca
 import type { Profile } from '@/types/app';
 import { PASSWORD_POLICY, passwordPolicyMessage } from '@/lib/password-policy';
 import { clearProfile } from '@/lib/profile-cache';
+import { localAuth } from '@/lib/local-auth';
 import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
 
@@ -123,14 +124,15 @@ export function AppShell({ profile, title, children, heading }: {
   }, [adminMenuOpen]);
 
   async function logout() {
-    try { await getSupabase().auth.signOut({ scope: 'local' }); }
+    try { await localAuth.logout(); }
     catch (error) { console.warn('logout failed:', error); }
     clearProfile();
     location.replace('/Inspection/v2/login/');
   }
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const password = String(form.get('password') || '');
     const confirm = String(form.get('confirm') || '');
     const passwordError = passwordPolicyMessage(password);
@@ -139,7 +141,7 @@ export function AppShell({ profile, title, children, heading }: {
     try {
       await invokeAppApi('change_password', { password });
       setPasswordMessage('密碼已更改');
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) { setPasswordMessage(error instanceof Error ? error.message : '密碼更新失敗，請檢查網路後重試'); }
   }
   async function saveProfile(event: FormEvent<HTMLFormElement>) {

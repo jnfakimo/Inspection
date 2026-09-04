@@ -7,7 +7,6 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { TimeSelect } from '@/components/TimeSelect';
 import { invokeAdminApi } from '@/lib/admin-api';
-import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 import styles from './settings.module.css';
 
@@ -332,15 +331,12 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
   }, []);
 
   const loadDepartments = useCallback(async () => {
-    const { data, error } = await getSupabase()
-      .from('departments')
-      .select('dept_id,parent_id,name,code,level,sort_order,status')
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
-      .limit(1000);
-    if (error) throw error;
+    const response = await fetch('/api/local/admin/departments', { credentials: 'include', cache: 'no-store' });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(result?.detail || '部門資料載入失敗');
+    const data = result?.data ?? [];
     setDepartments(
-      (data ?? []).map(row => ({
+      data.map((row: Record<string, unknown>) => ({
         dept_id: String(row.dept_id),
         parent_id: row.parent_id ? String(row.parent_id) : null,
         name: String(row.name ?? ''),
@@ -490,13 +486,8 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     setBusy('line-test');
     setNotice({ kind: 'info', text: '正在傳送 LINE 測試訊息…' });
     try {
-      const { data, error } = await getSupabase().functions.invoke<{
-        ok?: boolean;
-        msg?: string;
-        message?: string;
-      }>('line-notify', { body: { test: true } });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.msg || data?.message || 'Edge Function 未回傳成功狀態');
+      const data = await invokeAdminApi<{ ok?: boolean; msg?: string; message?: string }>('admin_test_line_notification');
+      if (!data?.ok) throw new Error(data?.msg || data?.message || '地端服務未回傳成功狀態');
       setNotice({ kind: 'success', text: '測試訊息已送出，請至設定的 LINE 群組確認。' });
     } catch (error) {
       setNotice({ kind: 'error', text: `LINE 測試推播失敗：${messageOf(error)}` });

@@ -161,13 +161,13 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     const [requestResult, orderResult, trendResult, markerResult, checkinResult, patrolYesterdayResult, patrolTodayResult] = await Promise.all([
       client.from('repair_requests')
         .select('request_id,department,equipment_id,status,fault_type,created_at,desired_finish,hidden,equipment(name,category)')
-        .gte('created_at', rangeStart).lte('created_at', rangeEnd).limit(5000),
+        .gte('created_at', rangeStart).lte('created_at', rangeEnd).limit(1000),
       client.from('maintenance_orders')
-        .select('order_id,assignee_id,status,start_time,finish_time,expected_finish,created_at,hidden,users:assignee_id(name)').limit(5000),
+        .select('order_id,assignee_id,status,start_time,finish_time,expected_finish,created_at,hidden,users:assignee_id(name)').limit(1000),
       client.rpc('repair_monthly_counts', { p_start: trendStart, p_end: trendEnd }),
-      client.from('plan_markers').select('marker_id,floor_id,label,status').eq('kind', 'patrol').limit(5000),
+      client.from('plan_markers').select('marker_id,floor_id,label,status').eq('kind', 'patrol').limit(1000),
       client.from('checkin_logs').select('checkin_id,target_id,label,floor_id')
-        .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(5000),
+        .gte('checkin_at', `${day}T00:00:00+08:00`).lte('checkin_at', `${day}T23:59:59+08:00`).limit(1000),
       getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
       getPatrolShiftsForDate(client, day),
     ]);

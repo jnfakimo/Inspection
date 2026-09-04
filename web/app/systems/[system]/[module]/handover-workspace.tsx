@@ -119,7 +119,7 @@ function RecordsModule({ system, module, profile }: Props) {
     // 直接查表才拿得到 record_id／takeover_by／confirmed_at，接收流程才可能成立。
     const [r, u, d, s] = await Promise.all([
       client.from('handover_records').select('*').order('shift_date', { ascending: false }).order('created_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(2000),
+      client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
       client.from('system_settings').select('value').eq('key', 'shifts').maybeSingle(),
     ]);
@@ -273,7 +273,7 @@ function CreateRecordModal({ users, departments, shifts, profile, onClose, onDon
     if (!bounds) return;
     const { data, error } = await getSupabase().from('inspection_records')
       .select('run_status,abnormal_note,equipment(name)')
-      .gte('inspect_time', bounds.start.toISOString()).lte('inspect_time', bounds.end.toISOString()).limit(2000);
+      .gte('inspect_time', bounds.start.toISOString()).lte('inspect_time', bounds.end.toISOString()).limit(1000);
     if (error) { setEquipment(prev => ({ ...prev, note: `巡檢結果載入失敗：${errorMessage(error)}` })); return; }
     const records = data || [];
     const abnormal = records.filter(row => row.run_status === 'abnormal');
@@ -462,7 +462,7 @@ function CasesModule({ module, profile }: Props) {
     const client = getSupabase();
     const [c, u, d] = await Promise.all([
       client.from('handover_cases').select('*').order('created_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(2000),
+      client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
     ]);
     if (c.error || u.error) setNote(`失敗：${errorMessage(c.error || u.error, '案件資料載入失敗')}`);
@@ -815,7 +815,7 @@ function EquipmentOverview({ module, profile }: Props) {
     setBusy(true); setNote('');
     const { data, error } = await getSupabase().from('equipment')
       .select('equipment_id,asset_code,qr_code,name,category,floor,location,status,next_maintenance_on,responsible_name')
-      .order('floor').order('name').limit(2000);
+      .order('floor').order('name').limit(1000);
     if (error) setNote(`失敗：${errorMessage(error, '設備概況載入失敗')}`);
     setRows((data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) }))); setBusy(false);
   }, []);

@@ -39,10 +39,10 @@ export function LocationAnalysisAdmin({ profile, module }: AdminProps) {
       const [i, r] = await Promise.all([
         client.from('inspection_records')
           .select('location_id,run_status,inspect_time,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
-          .not('location_id', 'is', null).limit(5000),
+          .not('location_id', 'is', null).limit(1000),
         client.from('repair_requests')
           .select('location_id,locations(market_id,floor,floor_order,area,area_order,detail,detail_order,markets(name))')
-          .not('location_id', 'is', null).limit(5000),
+          .not('location_id', 'is', null).limit(1000),
       ]);
       if (i.error || r.error) setNote(`失敗：${errorMessage(i.error || r.error, '位置分析資料載入失敗')}`);
       const normalize = (row: Row) => {
@@ -210,7 +210,7 @@ export function LocationAnalysisAdmin({ profile, module }: AdminProps) {
       {!busy && rows.length === 0 && <p className="empty">沒有綁定場域位置的巡檢或報修紀錄</p>}
       <p className="inline-message">
         只統計已綁定場域位置的紀錄，未綁定位置者不計入；點擊市場或樓層列可收合下層。
-        本頁彙總 {fmt(inspections.length)} 筆巡檢與 {fmt(repairs.length)} 筆報修（各取最近 5000 筆）。
+        本頁彙總 {fmt(inspections.length)} 筆巡檢與 {fmt(repairs.length)} 筆報修（各取最近 1000 筆）。
       </p>
     </section>
   </AppShell>;
