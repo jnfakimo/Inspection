@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { LEGACY_BASE } from '@/lib/config';
 import { AdminHeader, type AdminProps, errorMessage, fmtTime, type Row } from './shared';
+import { DashboardWidgetContent } from '@/components/DashboardWidgetContent';
 
 // 系統 10 / 11 / 12 圖塊模組庫完整定義
 const WIDGET_CATALOG: Record<
@@ -2055,8 +2056,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             系統 {info.systemId}
                           </span>
                         </div>
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: '12px' }}>
-                          即時戰情訊號運作中 · 更新頻率 {item.refresh_seconds || 60}s
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '6px 0' }}>
+                          <DashboardWidgetContent widgetKey={item.widget_key} desc={info.desc} />
                         </div>
                       </div>
                     );

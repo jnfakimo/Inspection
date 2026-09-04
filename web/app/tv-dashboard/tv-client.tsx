@@ -1,76 +1,231 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import type { Profile } from '@/types/app';
+import { getSupabase } from '@/lib/supabase';
+import { DashboardWidgetContent } from '@/components/DashboardWidgetContent';
 import '../dashboard.css';
 
 type TvClientProps = { profile: Profile };
 
+type LayoutItem = {
+  widget_key: string;
+  title: string;
+  width?: number;
+  height?: number;
+  visible?: boolean;
+  refresh_seconds?: number;
+  config?: {
+    canvas_dimension?: {
+      width?: number;
+      height?: number;
+      cols?: number;
+    };
+  };
+};
+
+const DEFAULT_ITEMS: LayoutItem[] = [
+  { widget_key: 'alerts', title: '重要提醒與異常警報', width: 12, height: 2, visible: true },
+  { widget_key: 'kpis', title: '營運關鍵指標', width: 12, height: 2, visible: true },
+  { widget_key: 'trading_kpi', title: '市場交易量分析', width: 6, height: 3, visible: true },
+  { widget_key: 'price_comparison', title: '蔬果價格同期比較', width: 6, height: 4, visible: true },
+  { widget_key: 'public_price_board', title: '公開大宗即時報價看板', width: 6, height: 5, visible: true },
+  { widget_key: 'supplier_ranking', title: '主要產地／供應商進貨排行', width: 6, height: 4, visible: true },
+  { widget_key: 'patrol', title: '駐衛警巡檢即時', width: 8, height: 4, visible: true },
+  { widget_key: 'repairs', title: '報修案件分佈', width: 4, height: 4, visible: true },
+  { widget_key: 'equipment_status', title: '設備狀態監控', width: 6, height: 4, visible: true },
+  { widget_key: 'realtime_ticker', title: '即時滾動跑馬燈行情', width: 12, height: 2, visible: true },
+];
+
 export function TvClient({ profile: _profile }: TvClientProps) {
   const [time, setTime] = useState(new Date());
-  
+  const [items, setItems] = useState<LayoutItem[]>(DEFAULT_ITEMS);
+  const [cols, setCols] = useState<number>(12);
+  const [isUltrawide, setIsUltrawide] = useState(false);
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    async function loadPublishedLayout() {
+      try {
+        const client = getSupabase();
+        const layoutRes = await client
+          .from('dashboard_layouts')
+          .select('published_version_id, layout_id')
+          .eq('layout_code', 'operations_main')
+          .maybeSingle();
+
+        const publishedVersionId = layoutRes.data?.published_version_id;
+        if (publishedVersionId) {
+          const itemsRes = await client
+            .from('dashboard_layout_items')
+            .select('*')
+            .eq('version_id', publishedVersionId)
+            .order('sort_order', { ascending: true });
+
+          if (itemsRes.data && itemsRes.data.length > 0) {
+            setItems(itemsRes.data);
+            const firstCfg = itemsRes.data[0]?.config?.canvas_dimension;
+            if (firstCfg?.cols) {
+              setCols(firstCfg.cols);
+              setIsUltrawide(firstCfg.cols === 24 || (firstCfg.width || 0) >= 2500);
+            }
+          }
+        }
+      } catch {
+        // 使用預設配置
+      }
+    }
+    void loadPublishedLayout();
+  }, []);
+
+  const visibleItems = items.filter(item => item.visible !== false);
+
   return (
-    <div style={{ backgroundColor: 'var(--bg)', minHeight: '100vh', padding: '30px', color: 'var(--text)', display: 'flex', flexDirection: 'column' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', paddingBottom: '20px', borderBottom: '1px solid rgba(0, 212, 255, 0.2)' }}>
-        <h1 style={{ margin: 0, fontSize: '36px', color: 'var(--cyan)', textShadow: '0 0 15px rgba(0, 212, 255, 0.6)' }}>
-          TAIPEC-MKT-1 戰情室大螢幕看板
-        </h1>
-        <div style={{ fontSize: '32px', color: 'var(--text)', fontFamily: 'var(--head)' }}>
-          {time.toLocaleString('zh-TW', { hour12: false })}
+    <div
+      style={{
+        backgroundColor: '#020b18',
+        minHeight: '100vh',
+        padding: '20px 24px',
+        color: '#f8fafc',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '20px',
+          paddingBottom: '14px',
+          borderBottom: '1px solid rgba(0, 212, 255, 0.25)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '28px' }}>🖥️</span>
+          <div>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: '24px',
+                fontWeight: 800,
+                color: '#00d4ff',
+                letterSpacing: '1px',
+                textShadow: '0 0 16px rgba(0, 212, 255, 0.6)',
+              }}
+            >
+              臺北農產公司 · 營運戰情大螢幕即時看板
+            </h1>
+            <div style={{ fontSize: '12px', color: '#38bdf8', marginTop: '2px' }}>
+              即時系統監控 · 智慧巡檢 · 市場批發行情全聯網
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div
+            style={{
+              fontSize: '22px',
+              color: '#34d399',
+              fontWeight: 700,
+              fontFamily: 'monospace',
+              background: 'rgba(16, 185, 129, 0.1)',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+            }}
+          >
+            {time.toLocaleString('zh-TW', { hour12: false })}
+          </div>
+          <a
+            href="/Inspection/v2/systems/admin/layouts/"
+            style={{
+              color: '#94a3b8',
+              fontSize: '12px',
+              textDecoration: 'none',
+              padding: '6px 12px',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: '6px',
+            }}
+          >
+            ⚙️ 版面設定
+          </a>
         </div>
       </header>
 
-      <div className="dash-grid" style={{ flex: 1, gap: '24px' }}>
-        <div className="dash-widget" style={{ gridColumn: 'span 12', minHeight: '140px', borderLeft: '6px solid var(--red)' }}>
-          <h2 style={{ color: 'var(--red)', textShadow: '0 0 10px rgba(255, 59, 59, 0.6)', marginTop: 0, fontSize: '24px' }}>即時重大警報 (自動輪播)</h2>
-          <div style={{ fontSize: '28px', display: 'flex', gap: '40px', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '16px' }}>
-            <span style={{ color: 'var(--amber)' }}>⚠ 空調主機 2 號 溫度異常 (10 分鐘前)</span>
-            <span style={{ color: 'var(--red)' }}>⚠ B1 消防幫浦 水壓不足 (已逾期 2 小時)</span>
-          </div>
-        </div>
+      {/* 依設定之格線模式呈現畫布 (支援 12 欄與 24 欄長條看板) */}
+      <main
+        style={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gap: '16px',
+          alignContent: 'start',
+        }}
+      >
+        {visibleItems.map((item, index) => {
+          const width = Math.min(cols, Math.max(1, Number(item.width ?? (cols === 24 ? 6 : 6))));
+          const height = Math.max(1, Number(item.height ?? 3));
+          return (
+            <div
+              key={`${item.widget_key}-${index}`}
+              style={{
+                gridColumn: `span ${width}`,
+                minHeight: `${height * 75}px`,
+                background: 'rgba(10, 20, 38, 0.95)',
+                border: '1px solid rgba(0, 212, 255, 0.25)',
+                borderRadius: '8px',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                position: 'relative',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '10px',
+                  paddingBottom: '6px',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
+                <strong style={{ color: '#00d4ff', fontSize: '15px' }}>{item.title}</strong>
+                <span
+                  style={{
+                    fontSize: '10px',
+                    color: '#64748b',
+                    background: 'rgba(255,255,255,0.04)',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                  }}
+                >
+                  即時聯網
+                </span>
+              </div>
 
-        <div className="dash-kpis" style={{ gridColumn: 'span 12', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
-          <div className="dash-kpi" style={{ '--kpi': 'var(--cyan)', padding: '24px' } as any}>
-            <span style={{ fontSize: '20px' }}>今日派工數</span>
-            <b style={{ fontSize: '48px', marginTop: '10px' }}>45 <small style={{ fontSize: '20px' }}>件</small></b>
-          </div>
-          <div className="dash-kpi" style={{ '--kpi': 'var(--green)', padding: '24px' } as any}>
-            <span style={{ fontSize: '20px' }}>已完工數</span>
-            <b style={{ fontSize: '48px', marginTop: '10px' }}>32 <small style={{ fontSize: '20px' }}>件</small></b>
-          </div>
-          <div className="dash-kpi" style={{ '--kpi': 'var(--amber)', padding: '24px' } as any}>
-            <span style={{ fontSize: '20px' }}>處理中</span>
-            <b style={{ fontSize: '48px', marginTop: '10px' }}>10 <small style={{ fontSize: '20px' }}>件</small></b>
-          </div>
-          <div className="dash-kpi" style={{ '--kpi': 'var(--red)', padding: '24px' } as any}>
-            <span style={{ fontSize: '20px' }}>緊急/逾期</span>
-            <b style={{ fontSize: '48px', marginTop: '10px' }}>3 <small style={{ fontSize: '20px' }}>件</small></b>
-          </div>
-        </div>
-
-        <div className="dash-widget" style={{ gridColumn: 'span 6', minHeight: '500px' }}>
-          <h2 style={{ fontSize: '24px' }}>重點設備健康度</h2>
-          <div className="bar-list" style={{ marginTop: '30px', gap: '20px' }}>
-            <div className="bar-row" style={{ fontSize: '18px' }}><span className="nm">高壓發電機</span><div className="bar-track" style={{ height: '14px' }}><div className="bar-fill" style={{ width: '95%', background: 'var(--green)' }}></div></div><span className="vv" style={{ fontSize: '18px' }}>正常</span></div>
-            <div className="bar-row" style={{ fontSize: '18px' }}><span className="nm">消防總機</span><div className="bar-track" style={{ height: '14px' }}><div className="bar-fill" style={{ width: '100%', background: 'var(--green)' }}></div></div><span className="vv" style={{ fontSize: '18px' }}>正常</span></div>
-            <div className="bar-row" style={{ fontSize: '18px' }}><span className="nm">空調冰水主機</span><div className="bar-track" style={{ height: '14px' }}><div className="bar-fill" style={{ width: '60%', background: 'var(--amber)' }}></div></div><span className="vv" style={{ fontSize: '18px' }}>警告</span></div>
-            <div className="bar-row" style={{ fontSize: '18px' }}><span className="nm">B1 排風機組</span><div className="bar-track" style={{ height: '14px' }}><div className="bar-fill" style={{ width: '20%', background: 'var(--red)' }}></div></div><span className="vv" style={{ fontSize: '18px' }}>故障</span></div>
-          </div>
-        </div>
-
-        <div className="dash-widget" style={{ gridColumn: 'span 6', minHeight: '500px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <h2 style={{ fontSize: '24px', alignSelf: 'flex-start' }}>設備位置熱區預覽 (3D/2D 模組預留)</h2>
-          <div style={{ width: '100%', height: '400px', border: '1px dashed var(--line)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--dim)', position: 'relative', marginTop: '20px' }}>
-            [2D/3D 微縮地圖嵌卡區]
-            <div style={{ position: 'absolute', top: '40%', left: '30%', width: '16px', height: '16px', background: 'var(--red)', borderRadius: '50%', boxShadow: '0 0 15px var(--red)' }}></div>
-          </div>
-        </div>
-      </div>
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                }}
+              >
+                <DashboardWidgetContent widgetKey={item.widget_key} />
+              </div>
+            </div>
+          );
+        })}
+      </main>
     </div>
   );
 }
