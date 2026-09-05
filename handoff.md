@@ -1,118 +1,105 @@
 # 交接檔 handoff
 
-> 這份只放「下次接手需要知道的事」。durable 的技術規範已寫進 `AGENTS.md`
-> （V2 手機版版型規範、樓層平面圖的圖檔與效能、系統子頁標題規範等節），
-> 完整脈絡與踩坑細節寫在 `Obsidian/04-開發與部署.md`，這裡不重複。
+> 這份只放「下次接手需要知道的事」。durable 的技術規範寫在 `AGENTS.md`，
+> 完整脈絡與踩坑細節寫在 `Obsidian/`，這裡不重複。
 
 ## ⏯️ 目前做到哪
 
-**2026-08-28：一整天處理現場回報的「系統很慢」與手機版版型，並把圖資效能做了治本。
-本機 commit 89 筆（含其他 session）。**
+**2026-09-04～09-05：市場公開看板品名代碼／一頁寬版型；北農行情 110 年起歷史回補完成；
+內網後端停擺待處理。**
 
-### 圖資效能（治本，四步完成）
+### 已完成（雲端）
 
-平面圖／3D 原本的流程是「下載 4096px 原圖 → `getImageData` → 逐像素重畫 → `toBlob`」，
-實測桌機 250～450ms、手機 3～6 倍，且每次切樓層都重跑。改為**上傳時就備好成品圖**：
+- 全場均價表改用全國品名代碼（`item_key`，同品名多代碼以「、」串接）、補成交量欄、
+  表頭兩行、一頁寬（窄面板取消 1.18 倍）；登入版 ▲▼ 顏色修正（規則改掛 `.market-board-page`）。
+- **北農全場交易行情 2021-01-01～2026-09-04 已全部寫入雲端** `tapmc_market_actual`
+  （每年約 6～7 萬筆，總計約 50 萬筆）。流程：`Market history backfill` workflow（`--from` 區間、
+  每 7 天一交易）；9/5 起 GitHub runner 連官網一律 ConnectTimeout，改由本機
+  `--raw-output` 抓原始列 → GitHub Release `market-raw-20260905` → workflow `raw_release` 匯入。
+  逐品名代號（含品種）原始列保存在該 Release 與各 run 的 artifact。
+- 資料量變大後 `market_source_date_ranges` 全表掃描逾時（看板 503），已改為每來源最近 90 天
+  視窗（migration `20260905130000_market_source_date_ranges_window.sql`，雲端已套用）。
 
-1. 建模系統 `saveModel()` 產生並上傳 `desktop/`、`light/`、`light/mobile/`、`tech/`、`tech/mobile/`
-2. 建模頁新增「⟳ 補產生衍生圖」，為既有樓層補課（不必重傳 DXF）
-3. 已執行，35 張衍生圖全部落地（`floorplans` 物件 13 → 48）
-4. **四個檢視器**（平面圖、3D 樓層圖、駐衛警立體雲台、整合標記圖臺）改為直接開成品圖
+### 待處理
 
-選圖規則收斂成 `web/lib/floorplan-storage.ts` 的 `signFloorPlanVariants()`，四頁共用。
+1. **內網後端停擺**：`1.34.250.22:5057` 的 `/rest`、`/auth`、`/functions` 全 502，Docker 主機
+   `192.168.50.192` ping 通但 54321／8000 無回應 → 本機 Supabase Docker 堆疊沒在跑。
+   須在伺服器啟動後：(a) 跑 `tools/sync-local-edge-functions.ps1 -Apply` 更新 app-api
+   （否則品名代碼欄全是「—」）；(b) 套用 `20260905130000_market_source_date_ranges_window.sql`；
+   (c) 若要內網也有歷史行情，分年跑 `run-local-market-import.ps1 -From … -To …`
+   或改寫成讀 Release 原始列。
+2. 資料粒度仍是「日期×市場×品類×品名」。若要逐品名代號（含品種）呈現，原始列已備妥，
+   但需改匯入模型與看板表格（見 `docs/MARKET_DAILY_IMPORT.md`）。
 
-### 其他效能
 
-- **系統圖示 13.6MB → 2.18MB**：24 個被引用的圖示以 1024～1254px 原尺寸進版控（單檔 1～1.5MB），
-  但最大顯示只有 88px。縮到 320px（Sprite 依格數換算）；入口頁圖示 2.63MB → 769KB。
+**2026-09-05：自架站台 `1.34.250.22:5057`（內網主機 192.168.50.192）登入修復——尚未完成。**
+現場「驗證碼服務暫時無法連線」，登入進不去。這是**自架部署**問題（那台跑
+`AI\Antigravity\0705` 這份專案的 Supabase 本機 Docker stack），與 market 主線開發無關。
 
-### 功能修復
+已定位出登入的三層根因：
 
-- **公文條碼掃描**：iOS 上「有權限卻沒有影像」是 `decodeFromStream` 重複指派 `srcObject`；
-  另補「拍照辨識」（系統相機對焦後的靜態影像），使用者確認可用。
-- **日期欄位在 iOS 沒有日曆**：`showPicker()` 對不可見元素會丟例外。觸控裝置改為把原生
-  `<input type="date">` 變成覆蓋整個欄位的透明層。使用者實機確認可用，全站約 20 處受益。
-
-### 手機版版型
-
-- **49 個子系統頁首操作按鈕一律靠右**（一條全站規則，並刪掉先前六條分頁專用宣告）
-- 巡檢排班、巡邏打卡、逾時推播、派車申請、公務車主檔、駕駛人員、派車紀錄、會議室四頁、
-  完工回報等頁的欄位排列收斂
+1. **anon key**（repo 已處理）：前端若用雲端 anon key 打本機 GoTrue（不同 JWT secret）會 401。
+   `web/lib/config.ts` 已有 `useBrowserOrigin` 分流，自架站台改用 `LOCAL_SUPABASE_ANON_KEY`
+   （issuer=`supabase`、iat 2026-08-31 那把，是本機 stack 真正的 anon key）。**本次未動這檔。**
+2. **IIS 反代**：`5057` 目前只把 `/functions` 反代到本機 54321，`/auth`、`/rest` 沒轉
+   （會回 IIS 自己的純文字 `401 Unauthorized`）。範本已備：
+   `tools/selfhosted-iis-supabase-proxy.web.config`。
+3. **edge_runtime boot（主卡點）**：`supabase_edge_runtime_0705` 把 functions 從
+   **Google Drive**（`G:\我的雲端硬碟\AI\Antigravity\0705\supabase\functions`）bind mount，
+   Docker Desktop 經 WSL2 掛 Google Drive 虛擬磁碟時**容器內讀不到內容**
+   → `failed to determine entrypoint`。
 
 ## 🚦 目前狀態
 
-本機與 `origin/main` 同步在 `e030200`，工作區乾淨。`npm run typecheck:v2`、`build:v2`、
-完整 `npm test`、`security:audit`（錯誤 0／既有警告 4）全部通過。
-
-**工作區已改為 `C:\claude-code\Inspection`**，Google Drive 上那份已停用（見注意事項）。
+- **登入仍不通**，卡在第 3 層。
+- functions 已複製到伺服器真實磁碟 `C:\supabase-0705\functions`（`username-login/index.ts`
+  20789 bytes 正常）。完整 supabase 目錄也複製到 `C:\supabase-0705\supabase`。
+- 用純 docker 手動重建 edge_runtime 掛 C: 後，錯誤變成 `main worker boot error`：
+  CMD 是 `edge-runtime start --main-service=/root`，而 `/root` 的 main router 是
+  **`supabase start` 啟動時即時生成注入的**，純 docker `docker run` 補不出來。
+- `db` 資料在 `supabase_db_0705` volume（168MB），**全程未動**。
 
 ## ➡️ 下一步
 
-1. **四個圖資頁實機驗收**：平面樓層圖、3D 模型圖、駐衛警立體雲台、整合標記圖臺。
-   看進場速度、圖面是否正常、切換一般版／科技版是否正確。3D 若某層空白，
-   代表那層成品圖有問題，可在建模頁重按「補產生衍生圖」。
-2. **P0 公文傳送流程跨角色端到端驗收**（`Obsidian/05-待辦清單.md` 唯一未結的 P0）：
-   程式與 migration 都已上線，缺登入後實際跑一輪。
-3. **追查「上傳回報成功但檔案沒落地」的根因**：08-28 晚間已排除 supabase-js
-   （讀過 2.112.2 原始碼，路徑清理與錯誤處理都正確，`fullPath` 取自伺服器的 `Key`），
-   也確認原圖未被誤覆蓋。事後不可重現，**無法再往下查**；若再發生，請先保留回應的
-   `x-request-id` 再向 Supabase 查伺服器端紀錄。
+1. **找到 supabase CLI**（伺服器 192.168.50.192 上）：`supabase` 不在 `C:\WINDOWS\system32`
+   的 admin PowerShell PATH（多半裝在使用者 PATH：scoop shims / winget / 或 npx）。
+   stack 當初是 `supabase start` 起的，CLI 一定存在於某環境。找到後：
+   ```
+   cd C:\supabase-0705
+   <supabase 完整路徑> start      # 或在當初起 stack 的那個終端/程式裡跑
+   ```
+   `supabase start` 會重用 `db` volume、用 **C: 的 functions** 重建 edge_runtime，
+   並自動生成 `/root` main service。**務必從 `C:\supabase-0705` 跑，不可回 Google Drive
+   目錄跑**，否則 functions 又掛回 Drive、白做。
+2. 通了驗證：`POST http://127.0.0.1:54321/functions/v1/username-login` body `{"action":"captcha"}`
+   回 `challenge_id`＋`image` 即成功；回登入頁 `Ctrl+Shift+R`。
+3. 若前端走 origin proxy：IIS 補 `/auth`、`/rest` 反代（見 `tools/...web.config` 範本）。
+4. 一勞永逸：把整個 `0705` 專案移出 Google Drive 到本機碟，固定從那裡 `supabase start`。
 
-## ⚠️ 注意事項
+## ⚠️ 注意事項（本次新踩的坑）
 
-**這次新增的**
+- **Google Drive 上的專案不能給 Docker bind mount**：檔案在 Windows 端一切正常
+  （Attributes=Normal、大小正確），但容器讀不到（虛擬串流磁碟 + WSL2 mount 不相容），
+  症狀就是 `failed to determine entrypoint`。解法：放本機真實磁碟（C:）。
+- **PowerShell 5.1 讀含中文的 `.ps1` 會用 Big5 解碼 → 全亂碼 → 語法爆掉**。
+  自架用的腳本要**純 ASCII**：`tools/fix-selfhosted-login.ps1` 訊息全英文、來源路徑
+  執行時從 `docker inspect` 動態取得，不寫死中文。
+- **PowerShell 貼多行腳本會在 `>> }` 斷掉**——改用單行、base64 一行、或存檔 `-File` 執行。
+- **本機 Supabase 埠**：54321 API/Kong、54322 Postgres、54323 Studio；`supabase_vector_0705`
+  一直 `Restarting`（log sink，與登入無關，可先不理）。路由器：外部 5057→內部
+  192.168.50.192:443(IIS)、54321/54322/54323 直接對外轉發。
+- 本次新增 `tools/fix-selfhosted-login.ps1`（純 docker 重建 edge_runtime，**缺 main service，
+  僅供理解流程，非最終解**）、`tools/selfhosted-iis-supabase-proxy.web.config`（IIS 反代範本）。
 
-- **工作區改為 `C:\claude-code\Inspection`**。`G:\我的雲端硬碟\AI\Codex\北農巡檢系統` 已停用：
-  Drive 同步一天內弄壞 `.git` 兩次（生出重複檔 `refs/heads/main (1)` 讓 fetch 噴
-  `bad object`；`packed-refs.lock` 卡 0 bytes）。那份是 `blob:none` partial clone，
-  本機獨有的舊部署分支缺 blob 搬不過來，且掛著兩個 worktree，所以**保留不刪**，
-  根目錄放了 `讀我-此資料夾已停用.md`。
-- **上傳回報成功但檔案沒落地（根因未明）**。補產生衍生圖前兩次回報「35 張」，實際 0 張；
-  已排除專案接錯、RLS、桶限制、觸發器、Service Worker、部署未生效、**supabase-js 本身**，
-  並實測 Storage API 會正確拒絕無效身分、原圖也未被誤覆蓋。第三次成功前唯一差異是硬重整。
-  **不要只看 `upload()` 的 error，也不要只看 `data.path`**——`path` 是 SDK 用本地變數填的，
-  沒有鑑別力；真正有效的是其後以 `storage.list()` 實際列出來數的那道驗證，**要保留**。
-- **不要用行內樣式排版**。`style={{...}}` 優先序高於任何選擇器，media query 蓋不過去。
-  今天被擋三次（`LocalizedDateInput` 的原生日期欄位、會議室彈窗按鈕列、巡檢排班外框）。
-- **手機版「明明空間夠卻換行」先查 `flex-basis`**，不是 `flex-wrap`：`flex:1 1 auto` 會取
-  內容寬度當基準，先佔滿一行把後面的項目擠下去。
-- **`display:contents` 的容器要先改回 `display:flex` 才能分列**（巡邏打卡工具列）。
-- **改版型後用建置產出的實際 CSS chunk 建靜態重現頁量測**，並**務必把基礎樣式 chunk 一起載入**
-  ——只載含新規則的那一個會量到錯誤結果，今天差點誤判規則沒生效。
-- **驗證線上部署用「本機建置的 chunk 檔名去線上對抓」**：V2 多數頁面的 CSS/JS 是動態載入，
-  只掃 HTML 裡的 `<link>`／`<script>` 會漏掉。
-- **圖示一律收在 320px 以內**再進版控（`npm test` 會擋下超過 200KB 的系統 Logo）。
-  不要用 256 色量化：實測 3D 光澤圖示在 88px 顯示時色差 RMS 達 5～17，看得見色帶。
+## 主線（market 開發，本次未涉及）
 
-**沿用的**
-
-- **查正式庫用 `npx supabase db query --linked --project-ref qztffronusdhgxhjjubt "<SQL>"`**。
-  Storage 也可用 `supabase storage ls ss:///floorplans/ --experimental`（但 `cp` 在此版本
-  不支援遠端↔本機，無法從命令列上傳）。
-- **`supabase migration list` 與 `db push` 不可信**；**絕對不要跑 `supabase config push`**。
-- **`users.department` 只是副本**，以 `dept_id` 為準。
-- **驗收剛推的修正前先 `Ctrl+Shift+R`**（GitHub Pages 的 CDN 會快取 HTML）。
-- **多個 agent 並行推送**，推送前務必 `git fetch` 並 rebase。今天撞到多次，
-  `Obsidian/04-開發與部署.md` 也發生過內容衝突（兩邊都往檔尾追加，解法是兩段都保留）。
-- **測試資料刪不掉**（41 張表有 `trg_prevent_removal`），名稱請註明「驗收測試（勿使用）」。
-- **收工前看一眼 CI**。
-
-**未處理、另行追蹤**
-
-- `tools/build-floorplan-variants.py` 是衍生圖的批次備援（需 service_role key），
-  主線走建模頁的按鈕，這支保留給 CI／批次重產。
-- 成品圖是「烘死」的：日後若改 `renderNeon` 或 `preparePlanCanvas` 的演算法，
-  要重按一次「補產生衍生圖」。
-- `RF.png` 在 Storage 沒有 `mobile/` 版本（選圖邏輯會自動退回原圖）。
-- 會議室的「最後可預約刻度」寫死 23:30；`exceljs` 帶進的 `uuid@8.3.2` 有 dependabot 告警。
+本 session 只碰自架部署除錯。repo 主線（SYS-10/11/12 market dashboard 等）進度以 `git log`
+為準（近期 `bb7dbb12a`、`7c92d10a6`…）。2026-08-28 之前的圖資效能／手機版版型交接，
+狀態已隨主線推進，以 git log 為準。
 
 ## 🕐 最後更新
 
-2026-08-28 21:0x · Claude Opus 5 @ DESKTOP-0CFB6UK · Git push：✅ 已推（02b12cf）
-· 本次：圖資效能治本（上傳時產生成品圖＋四個檢視器直接開，桌機省 250～450ms、
-  手機省 1～2.5 秒、3D 再乘 7 層）、系統圖示 13.6MB→2.18MB、公文掃描器與 iOS 日期日曆修復、
-  49 個子系統手機版頁首靠右、工作區搬離 Google Drive
-· 新規範已寫進 AGENTS.md：V2 手機版版型規範、樓層平面圖的圖檔與效能（含兩個已驗證無效的方向）
-· 新增 5 條 `npm test` 斷言：頁首靠右、禁止逐頁複製該宣告、系統 Logo 200KB 上限、
-  選圖邏輯必須留在共用檔案、短效連結（放寬為接受 `signFloorPlanVariants`）
-· L3 Obsidian：repo 內 `Obsidian/`，本日 11 筆紀錄已寫入 `04-開發與部署.md`
+2026-09-05 19:42 · Claude Opus 4.8 @ DESKTOP-0CFB6UK（開發機；操作對象為伺服器 192.168.50.192）
+· Git push：待推
+· 本次：診斷自架站台登入三層根因、functions 已複製到伺服器 `C:\supabase-0705`、確認需用
+  supabase CLI 從 C: 重啟以生成 main service（卡在伺服器上找不到 CLI）；新增兩支自架部署工具檔。
