@@ -22,9 +22,10 @@
 
 ### 待處理
 
-1. **內網後端停擺**：`1.34.250.22:5057` 的 `/rest`、`/auth`、`/functions` 全 502，Docker 主機
-   `192.168.50.192` ping 通但 54321／8000 無回應 → 本機 Supabase Docker 堆疊沒在跑。
-   須在伺服器啟動後：(a) 跑 `tools/sync-local-edge-functions.ps1 -Apply` 更新 app-api
+1. **內網後端不通**（⚠️ 這段原本的判斷有誤，見下方「自架站台登入修復」）：
+   實際上本機 Supabase 堆疊**有在跑**，只是 Kong 走 HTTPS，先前用 `http://…:54321`
+   探測才誤判成「沒回應」。真正的問題是 edge_runtime 沒起來 + IIS 反代缺漏。
+   須在登入修好後：(a) 跑 `tools/sync-local-edge-functions.ps1 -Apply` 更新 app-api
    （否則品名代碼欄全是「—」）；(b) 套用 `20260905130000_market_source_date_ranges_window.sql`；
    (c) 若要內網也有歷史行情，分年跑 `run-local-market-import.ps1 -From … -To …`
    或改寫成讀 Release 原始列。
@@ -32,52 +33,95 @@
    但需改匯入模型與看板表格（見 `docs/MARKET_DAILY_IMPORT.md`）。
 
 
-**2026-09-05：自架站台 `1.34.250.22:5057`（內網主機 192.168.50.192）登入修復——尚未完成。**
-現場「驗證碼服務暫時無法連線」，登入進不去。這是**自架部署**問題（那台跑
-`AI\Antigravity\0705` 這份專案的 Supabase 本機 Docker stack），與 market 主線開發無關。
+**2026-09-05：自架站台 `1.34.250.22:5057`（內網主機 192.168.50.192）登入修復——尚未完成，
+但根因已改寫。** 稍早那版診斷有兩處是錯的，實測後更正如下。
 
-已定位出登入的三層根因：
+### 實測結果（2026-09-05，從開發機同時探測內網與外部）
 
-1. **anon key**（repo 已處理）：前端若用雲端 anon key 打本機 GoTrue（不同 JWT secret）會 401。
-   `web/lib/config.ts` 已有 `useBrowserOrigin` 分流，自架站台改用 `LOCAL_SUPABASE_ANON_KEY`
-   （issuer=`supabase`、iat 2026-08-31 那把，是本機 stack 真正的 anon key）。**本次未動這檔。**
-2. **IIS 反代**：`5057` 目前只把 `/functions` 反代到本機 54321，`/auth`、`/rest` 沒轉
-   （會回 IIS 自己的純文字 `401 Unauthorized`）。範本已備：
-   `tools/selfhosted-iis-supabase-proxy.web.config`。
-3. **edge_runtime boot（主卡點）**：`supabase_edge_runtime_0705` 把 functions 從
-   **Google Drive**（`G:\我的雲端硬碟\AI\Antigravity\0705\supabase\functions`）bind mount，
-   Docker Desktop 經 WSL2 掛 Google Drive 虛擬磁碟時**容器內讀不到內容**
-   → `failed to determine entrypoint`。
+| 端點 | 直連本機 Kong `192.168.50.192:54321` | 走 `https://1.34.250.22:5057` |
+|---|---|---|
+| `/auth/v1/health` | **200** GoTrue v2.196.0 | 401 IIS 純文字 |
+| `/rest/v1/` | **200** postgrest/14.5（87 張表，schema 正確） | 401 IIS 純文字 |
+| `/functions/v1/username-login` | **503** kong `name resolution failed` | 200 captcha，但**來自雲端** |
+| `/storage/v1/bucket` | — | 400，**來自雲端** |
+
+### 更正兩處先前的誤判
+
+1. **本機 stack 沒有停擺。** 先前記「54321 無回應」是因為對它送了 plain HTTP——
+   這台的 **Kong 走 HTTPS**，`http://…:54321` 會回 Kong 的
+   「400 The plain HTTP request was sent to HTTPS port」。改用 `https://` 就通了，
+   GoTrue 與 PostgREST 都健康，資料庫是對的那顆（87 張表、含 patrol_shifts／equipment／markets）。
+2. **anon key 不是原因。** 拿雲端 key 與本機 key 分別打本機
+   `/auth/v1/token?grant_type=password`，兩把都回同一個 `400 invalid_credentials`——
+   本機 GoTrue 根本沒驗 anon key 的簽章。`web/lib/config.ts` 的
+   `LOCAL_SUPABASE_ANON_KEY` 分流可以留著，但它不影響登入。
+
+### 真正剩下的兩個卡點
+
+1. **edge_runtime 沒跑**：本機 Kong 對 `/functions` 一律 503 `name resolution failed`
+   （Docker 內嵌 DNS 解不到已停止的容器名）。仍須用 supabase CLI 從 `C:\supabase-0705`
+   跑 `supabase start` 重建——純 `docker run` 補不出 `/root` main service，這點稍早的結論仍成立。
+2. **IIS 反代指錯地方**：`/auth`、`/rest`、`/realtime` 完全沒反代（落到 IIS 自己的純文字 401）；
+   `/functions`、`/storage` **被轉到雲端專案**（回應帶 `x-envoy-upstream-service-time`，
+   `access-control-allow-origin` 是 `https://jnfakimo.github.io`）。
+   這比「沒反代」更麻煩：`username-login` 會拿**雲端資料庫**驗身分、發出雲端 session，
+   再被本機 GoTrue／PostgREST 拒絕。五個前綴必須指向同一個後端。
 
 ## 🚦 目前狀態
 
-- **登入仍不通**，卡在第 3 層。
+- **登入仍不通**，但卡點從「三層」收斂成上面兩個，且都有腳本可一次處理。
 - functions 已複製到伺服器真實磁碟 `C:\supabase-0705\functions`（`username-login/index.ts`
   20789 bytes 正常）。完整 supabase 目錄也複製到 `C:\supabase-0705\supabase`。
-- 用純 docker 手動重建 edge_runtime 掛 C: 後，錯誤變成 `main worker boot error`：
-  CMD 是 `edge-runtime start --main-service=/root`，而 `/root` 的 main router 是
-  **`supabase start` 啟動時即時生成注入的**，純 docker `docker run` 補不出來。
 - `db` 資料在 `supabase_db_0705` volume（168MB），**全程未動**。
+- **本次只做讀取式探測，沒有對伺服器做任何變更**——開發機對那台沒有遠端執行權限
+  （445 通但 admin share 拒絕、WinRM 5985/5986 關、SSH 22 關、Docker TCP 2375/2376 關），
+  只有 HTTP/HTTPS 端點搆得到。所以下面全部要在伺服器上執行。
 
 ## ➡️ 下一步
 
-1. **找到 supabase CLI**（伺服器 192.168.50.192 上）：`supabase` 不在 `C:\WINDOWS\system32`
-   的 admin PowerShell PATH（多半裝在使用者 PATH：scoop shims / winget / 或 npx）。
-   stack 當初是 `supabase start` 起的，CLI 一定存在於某環境。找到後：
-   ```
-   cd C:\supabase-0705
-   <supabase 完整路徑> start      # 或在當初起 stack 的那個終端/程式裡跑
-   ```
-   `supabase start` 會重用 `db` volume、用 **C: 的 functions** 重建 edge_runtime，
-   並自動生成 `/root` main service。**務必從 `C:\supabase-0705` 跑，不可回 Google Drive
-   目錄跑**，否則 functions 又掛回 Drive、白做。
-2. 通了驗證：`POST http://127.0.0.1:54321/functions/v1/username-login` body `{"action":"captcha"}`
-   回 `challenge_id`＋`image` 即成功；回登入頁 `Ctrl+Shift+R`。
-3. 若前端走 origin proxy：IIS 補 `/auth`、`/rest` 反代（見 `tools/...web.config` 範本）。
-4. 一勞永逸：把整個 `0705` 專案移出 Google Drive 到本機碟，固定從那裡 `supabase start`。
+**在伺服器 192.168.50.192 的「系統管理員」PowerShell 跑這支就好：**
+
+```
+powershell -ExecutionPolicy Bypass -File <repo>\tools\selfhosted-restore-login.ps1
+```
+
+不加參數是**空跑**，只印出它打算做什麼；確認計畫沒問題再加 `-Apply` 實際套用。
+腳本會依序：列出 supabase 容器狀態與 Kong 的埠對應 → 在 PATH／scoop／winget／npm／
+使用者設定檔裡找 supabase CLI → 檢查 `C:\supabase-0705` 是真實磁碟（不是 Google Drive）
+→ `supabase start` → 自動判斷 Kong 是 https 還 http → 檢查 URL Rewrite／ARR 是否安裝、
+開啟 ARR proxy → 找出綁在 443 的站台、**備份 web.config**、移除指向雲端的規則、
+把 `^(auth|rest|storage|realtime|functions)/(.*)` → `https://127.0.0.1:54321/{R:1}/{R:2}`
+插成第一條 → 最後對 `https://1.34.250.22:5057` 做端到端驗證。
+
+`-Step stack|iis|verify` 可只跑其中一段；`-KongHost 192.168.50.192` 可從別台機器遠端跑
+驗證段（IIS 段仍須在該台本機執行）。跑完三項端到端檢查都綠之後，回登入頁 `Ctrl+Shift+R`。
+
+**若腳本在某一步卡住，各步驟的手動等價做法：**
+
+1. 找 CLI：`Get-Command supabase`；沒有就翻 `~\scoop\shims`、
+   `%LOCALAPPDATA%\Microsoft\WinGet\Links`、`%APPDATA%\npm`。
+   stack 當初是 `supabase start` 起的，CLI 一定存在於某個環境。
+2. 起 stack：`cd C:\supabase-0705` 再跑 `<supabase 完整路徑> start`。
+   **務必從 `C:\supabase-0705` 跑，不可回 Google Drive 目錄跑**，否則 functions
+   又掛回 Drive、白做。
+3. 驗 function：對 `https://127.0.0.1:54321/functions/v1/username-login` POST
+   `{"action":"captcha"}`（注意是 **https**），回 `challenge_id` 即成功。
+4. IIS：範本在 `tools/selfhosted-iis-supabase-proxy.web.config`，**合併**進站台既有
+   web.config，不要整檔覆蓋（安全標頭要保留）。
+5. 一勞永逸：把整個 `0705` 專案移出 Google Drive 到本機碟，固定從那裡 `supabase start`。
 
 ## ⚠️ 注意事項（本次新踩的坑）
 
+- **本機 Kong 走 HTTPS，別預設 http**。對 `http://…:54321` 探測會拿到 Kong 的
+  400「plain HTTP request was sent to HTTPS port」，很容易被誤讀成「服務沒起來」——
+  8/19 那版交接就是這樣把健康的 stack 判成停擺。`tools/fix-selfhosted-login.ps1` 裡的
+  `http://127.0.0.1:54321` 也是同一個錯；新腳本改成兩種 scheme 都試。
+- **判斷回應來自本機還是雲端，看標頭**：雲端 Supabase 帶
+  `x-envoy-upstream-service-time`；本機 Kong 帶 `Server: kong/2.8.1`；
+  IIS 自己擋掉的兩者都沒有、body 是純文字 `Unauthorized`。
+  這三種一眼可分，比看狀態碼可靠得多。
+- **開發機對 192.168.50.192 沒有任何遠端執行權限**（445 通但 admin share 拒絕、
+  5985/5986/22/2375/2376 全關）。要動那台一定得人到現場或遠端桌面，別再花時間找自動化路徑。
 - **Google Drive 上的專案不能給 Docker bind mount**：檔案在 Windows 端一切正常
   （Attributes=Normal、大小正確），但容器讀不到（虛擬串流磁碟 + WSL2 mount 不相容），
   症狀就是 `failed to determine entrypoint`。解法：放本機真實磁碟（C:）。
@@ -88,8 +132,12 @@
 - **本機 Supabase 埠**：54321 API/Kong、54322 Postgres、54323 Studio；`supabase_vector_0705`
   一直 `Restarting`（log sink，與登入無關，可先不理）。路由器：外部 5057→內部
   192.168.50.192:443(IIS)、54321/54322/54323 直接對外轉發。
-- 本次新增 `tools/fix-selfhosted-login.ps1`（純 docker 重建 edge_runtime，**缺 main service，
-  僅供理解流程，非最終解**）、`tools/selfhosted-iis-supabase-proxy.web.config`（IIS 反代範本）。
+- 自架相關的三支工具檔：
+  - `tools/selfhosted-restore-login.ps1` — **目前該用這支**。一鍵診斷＋修復，預設空跑。
+  - `tools/selfhosted-iis-supabase-proxy.web.config` — IIS 反代範本（目標已改為
+    `https://127.0.0.1:54321`，並記下 /functions 與 /storage 目前被轉到雲端這件事）。
+  - `tools/fix-selfhosted-login.ps1` — 純 docker 重建 edge_runtime，**缺 main service，
+    僅供理解流程，非最終解**；裡面的 `http://127.0.0.1:54321` 也是錯的 scheme。
 
 ## 主線（market 開發，本次未涉及）
 
@@ -99,7 +147,9 @@
 
 ## 🕐 最後更新
 
-2026-09-05 19:42 · Claude Opus 4.8 @ DESKTOP-0CFB6UK（開發機；操作對象為伺服器 192.168.50.192）
-· Git push：✅ 已推（tools 兩檔 `35359f8a6`；自架登入交接已隨 `adff540bc` 進 repo）
-· 本次：診斷自架站台登入三層根因、functions 已複製到伺服器 `C:\supabase-0705`、確認需用
-  supabase CLI 從 C: 重啟以生成 main service（卡在伺服器上找不到 CLI）；新增兩支自架部署工具檔。
+2026-09-05 · Claude Opus 5 @ DESKTOP-0CFB6UK（開發機；操作對象為伺服器 192.168.50.192）
+· 本次：重新實測自架站台，**更正兩處誤判**（本機 stack 其實健康，只是 Kong 走 HTTPS；
+  anon key 不是原因），確認真正卡點是 edge_runtime 沒跑 ＋ IIS 把 `/functions`、`/storage`
+  轉到雲端；新增一鍵修復腳本 `tools/selfhosted-restore-login.ps1`（預設空跑，`-Apply` 才動手），
+  修正 IIS 反代範本的 http→https。**未對伺服器做任何變更**（開發機無遠端執行權限）。
+· Git push：待推
