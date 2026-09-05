@@ -20,6 +20,10 @@ on:
         description: '僅試讀驗證，不寫入資料庫'
         type: boolean
         default: false
+      raw_release:
+        description: '不連官網，改用此 GitHub Release 標籤中的 raw-rows-*.zip（本機先以 --raw-output 抓好的原始列）'
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -45,15 +49,27 @@ jobs:
       - name: 逐日抓取並分批匯入
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           RANGE_FROM: ${{ inputs.from }}
           RANGE_TO: ${{ inputs.to }}
           DRY_RUN: ${{ inputs.dry_run }}
+          RAW_RELEASE: ${{ inputs.raw_release }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$RANGE_FROM" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo '::error::起日格式錯誤'; exit 1; }
           [[ "$RANGE_TO" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo '::error::迄日格式錯誤'; exit 1; }
-          args=(--from "$RANGE_FROM" --date "$RANGE_TO" --raw-output "raw-rows/${RANGE_FROM}_${RANGE_TO}")
+          args=(--from "$RANGE_FROM" --date "$RANGE_TO")
+          if [ -n "$RAW_RELEASE" ]; then
+            [[ "$RAW_RELEASE" =~ ^[A-Za-z0-9._-]+$ ]] || { echo '::error::Release 標籤格式錯誤'; exit 1; }
+            gh release download "$RAW_RELEASE" --repo "$GITHUB_REPOSITORY" --pattern 'raw-rows-*.zip' --dir raw-release
+            mkdir -p raw-in
+            for archive in raw-release/raw-rows-*.zip; do unzip -q -o -j "$archive" '*.jsonl' -d raw-in; done
+            echo "原始列檔案：$(ls raw-in | wc -l)"
+            args+=(--raw-input raw-in)
+          else
+            args+=(--raw-output "raw-rows/${RANGE_FROM}_${RANGE_TO}")
+          fi
           if [ "$DRY_RUN" != 'true' ]; then args+=(--execute); fi
           python tools/market_daily_import.py "${args[@]}"
       - name: 保存逐代碼原始列

@@ -1,7 +1,10 @@
 from datetime import date
 import unittest
 
-from market_daily_import import aggregate, day_chunks, import_sql, parse_page, PREFIX, sql_literal
+import tempfile
+from pathlib import Path
+
+from market_daily_import import aggregate, day_chunks, import_sql, load_raw_rows, parse_page, PREFIX, sql_literal, write_raw_rows
 
 DAY = date(2026, 9, 2)
 
@@ -87,6 +90,19 @@ class MarketImportTests(unittest.TestCase):
     def test_backfill_sql_keeps_daily_run_record(self):
         self.assertNotIn('daily_import_last_run', import_sql([], {'mode': 'backfill_imported'}, record_summary=False))
         self.assertIn('daily_import_last_run', import_sql([], {'mode': 'imported'}))
+
+    def test_raw_rows_round_trip_matches_live_parse(self):
+        html = page([['72', '小番茄', '聖女', '69.1', '4,256', '82.5', '69.6', '53.9'],
+                     ['74', '小番茄', '玉女', '191.6', '456', '349.8', '195.7', '21.2']])
+        rows, _ = parse_page(html, DAY, '1', 'V')
+        with tempfile.TemporaryDirectory() as folder:
+            write_raw_rows(Path(folder), DAY, '1', 'V', rows)
+            loaded, stats = load_raw_rows(Path(folder), DAY, '1', 'V')
+            missing, missing_stats = load_raw_rows(Path(folder), DAY, '2', 'F')
+        self.assertEqual(loaded, rows)
+        self.assertEqual(stats['status'], 'ready')
+        self.assertEqual(aggregate(loaded, DAY, '1', 'V')[0]['external_key'], aggregate(rows, DAY, '1', 'V')[0]['external_key'])
+        self.assertEqual((missing, missing_stats['status']), ([], 'no_data'))
 
     def test_local_sql_is_atomic_and_non_destructive(self):
         sql = import_sql([], {'mode': 'local_sql'})

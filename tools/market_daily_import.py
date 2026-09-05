@@ -253,6 +253,39 @@ def write_raw_rows(directory, day, market, category, rows):
                                     ensure_ascii=False) + '\n')
 
 
+def load_raw_rows(directory, day, market, category):
+    # 讀回 write_raw_rows 存的逐品名代號原始列；沒有檔案視同該日無資料。
+    # 官網有時對 GitHub runner 出口 IP 限流，改由能連線的機器先抓成原始列，再交給有
+    # 資料庫權杖的 workflow 匯入；彙總、去重與保護與直接抓取完全相同。
+    path = directory / f'{day.isoformat()}-{market}-{category}.jsonl'
+    if not path.exists():
+        return [], {'raw_rows': 0, 'duplicate_rows': 0, 'placeholder_rows': 0, 'status': 'no_data', 'source': 'raw'}
+    unique = {}
+    duplicates = 0
+    with path.open(encoding='utf-8') as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            if (record.get('observed_on') != day.isoformat() or record.get('market') != MARKETS[market]
+                    or record.get('category') != CATEGORIES[category]):
+                raise ValueError(f'原始列 {path.name} 的日期、市場或品類與檔名不符')
+            code, item = str(record.get('code', '')), str(record.get('item', ''))
+            if not re.fullmatch(r'[A-Za-z0-9]+', code) or not item:
+                raise ValueError(f'原始列 {path.name} 的品名代號或品名格式不符')
+            values = tuple(numeric(str(record[key])) for key in ('average_price', 'quantity', 'high_price', 'middle_price', 'low_price'))
+            row = {'code': code, 'item': item, 'variety': str(record.get('variety', '')), 'values': values}
+            if code in unique:
+                if unique[code]['values'] != values or unique[code]['item'] != item:
+                    raise ValueError(f'品名代號 {code} 有互相衝突的資料')
+                duplicates += 1
+            else:
+                unique[code] = row
+    rows = list(unique.values())
+    return rows, {'raw_rows': len(rows) + duplicates, 'duplicate_rows': duplicates, 'placeholder_rows': 0,
+                  'status': 'ready' if rows else 'no_data', 'source': 'raw'}
+
+
 def query(sql, read_only=False):
     token = os.environ.get('SUPABASE_ACCESS_TOKEN')
     if not token:
@@ -282,7 +315,13 @@ def main():
     parser.add_argument('--chunk-days', type=int, default=7, help='回補歷史時每個交易涵蓋的天數（預設 7）')
     parser.add_argument('--raw-output', type=Path,
                         help='另存逐品名代號（含品種）的原始列 JSONL 目錄，供日後改成代碼粒度時直接載入')
+    parser.add_argument('--raw-input', type=Path,
+                        help='不連官網，改讀此目錄中先前以 --raw-output 存下的原始列（<日期>-<市場>-<品類>.jsonl）')
     args = parser.parse_args()
+    if args.raw_input and args.raw_output:
+        parser.error('--raw-input 與 --raw-output 不可同時使用')
+    if args.raw_input and not args.raw_input.is_dir():
+        parser.error('--raw-input 目錄不存在')
     if args.execute and args.sql_output:
         parser.error('--execute 與 --sql-output 不可同時使用')
     if args.date > datetime.now(TAIPEI).date():
@@ -309,7 +348,10 @@ def main():
         while day <= last:
             for market in MARKETS:
                 for category in CATEGORIES:
-                    rows, stats = fetch_scope(day, market, category)
+                    if args.raw_input:
+                        rows, stats = load_raw_rows(args.raw_input, day, market, category)
+                    else:
+                        rows, stats = fetch_scope(day, market, category)
                     if args.raw_output and rows:
                         write_raw_rows(args.raw_output, day, market, category, rows)
                     batch = aggregate(rows, day, market, category)
@@ -318,7 +360,8 @@ def main():
                              **stats, 'points': len(batch)}
                     scopes.append(scope)
                     print(json.dumps(scope, ensure_ascii=False), flush=True)
-                    time.sleep(0.5)
+                    if not args.raw_input:
+                        time.sleep(0.5)
             day += timedelta(days=1)
         return points, scopes
 
