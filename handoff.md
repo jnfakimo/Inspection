@@ -100,6 +100,6 @@
 ## 🕐 最後更新
 
 2026-09-05 19:42 · Claude Opus 4.8 @ DESKTOP-0CFB6UK（開發機；操作對象為伺服器 192.168.50.192）
-· Git push：待推
+· Git push：✅ 已推（tools 兩檔 `35359f8a6`；自架登入交接已隨 `adff540bc` 進 repo）
 · 本次：診斷自架站台登入三層根因、functions 已複製到伺服器 `C:\supabase-0705`、確認需用
   supabase CLI 從 C: 重啟以生成 main service（卡在伺服器上找不到 CLI）；新增兩支自架部署工具檔。
