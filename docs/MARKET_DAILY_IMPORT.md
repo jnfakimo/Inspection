@@ -34,6 +34,18 @@ python tools/market_daily_import.py --date 2026-09-02 --lookback 1
 - 逐品名代號（含品種）的原始列會另存 JSONL：雲端為 workflow artifact `market-raw-rows-<from>-<to>`（保留 90 天），內網在 `C:\InspectionRuntime\market-import-logs\raw-rows\`。目前資料庫粒度是「日期 × 市場 × 品類 × 品名」（同品名各品種代碼合併，代碼集合存於 `item_key`）；日後若要改成代碼粒度，可直接由這些原始列載入，不必重抓官網。
 - 本機試跑：`python tools/market_daily_import.py --from 2021-01-05 --date 2021-01-12 --sql-output out.sql --raw-output raw/`。
 
+### GitHub runner 連不上官網時（2026-09-05 起發生）
+
+官網對 GitHub 出口 IP 限流時，runner 會一律 `ConnectTimeout`（本機正常）。改成兩段：
+
+1. 在能連線的機器抓原始列，不寫資料庫：
+   `python -X utf8 tools/market_daily_import.py --from 2026-01-01 --date 2026-09-04 --raw-output raw-2026/`
+   （長期間可分段平行抓，各自輸出目錄再合併；檔名是 `<日期>-<市場代碼>-<品類代碼>.jsonl`，休市日沒有檔案。）
+2. 把目錄壓成 `raw-rows-<說明>.zip` 上傳到 GitHub Release：
+   `gh release create market-raw-20260905 raw-rows-2026.zip --title "北農原始列 2026" --notes "..."`
+3. 觸發 `Market history backfill`，`from`／`to` 照填，`raw_release` 填該 Release 標籤；runner 會下載
+   `raw-rows-*.zip`、解壓後以 `--raw-input` 匯入，彙總、去重、穩定鍵與保護和直接抓取完全相同。
+
 # 北農行情：內網每日排程
 
 雲端 GitHub Actions 與內網 IIS 現在各自更新自己的 Supabase。內網 Windows 工作排程 `Inspection Daily Market Import` 每日 12:00 啟動，至 18:00 每 30 分鐘重試，以處理第一、第二市場不同時間結帳。每次回補最近三日，使用穩定鍵冪等寫入。
