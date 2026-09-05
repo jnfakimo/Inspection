@@ -120,6 +120,11 @@ powershell -ExecutionPolicy Bypass -File <repo>\tools\selfhosted-restore-login.p
   `x-envoy-upstream-service-time`；本機 Kong 帶 `Server: kong/2.8.1`；
   IIS 自己擋掉的兩者都沒有、body 是純文字 `Unauthorized`。
   這三種一眼可分，比看狀態碼可靠得多。
+- **ARR 反代到自簽憑證的 HTTPS 後端容易回 502.3**。腳本因此會先找 Kong 有沒有另外
+  publish plain-HTTP 埠（先試 8000 再試 54321），有就拿它當反代目標；只有 HTTPS 時會
+  先警告。若套完規則真的出現 502.3，就把 Kong 容器的 8000 埠 publish 到主機再重跑
+  `-Step iis`。**IIS 段是這支腳本唯一沒被實跑驗證過的部分**（開發機沒裝 IIS），
+  所以它預設空跑、且動手前一定先備份 web.config。
 - **開發機對 192.168.50.192 沒有任何遠端執行權限**（445 通但 admin share 拒絕、
   5985/5986/22/2375/2376 全關）。要動那台一定得人到現場或遠端桌面，別再花時間找自動化路徑。
 - **Google Drive 上的專案不能給 Docker bind mount**：檔案在 Windows 端一切正常

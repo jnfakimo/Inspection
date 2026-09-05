@@ -109,7 +109,8 @@ Say '=============================================================='
 # ---------------------------------------------------------------------------
 # 1. Supabase stack
 # ---------------------------------------------------------------------------
-$kongBase = $null
+$kongBase  = $null
+$kongPlain = $null
 
 if ($Step -eq 'all' -or $Step -eq 'stack') {
   Head '1. Docker stack'
@@ -234,6 +235,19 @@ if ($Step -eq 'all' -or $Step -eq 'stack' -or $Step -eq 'verify' -or $Step -eq '
     $rest = Invoke-Probe ($kongBase + '/rest/v1/')
     if ($rest.Status -eq 200) { Ok 'rest/v1  200 (PostgREST)' } else { Bad ('rest/v1 -> ' + $rest.Status) }
 
+    # ARR is fragile in front of a self-signed HTTPS backend (it answers 502.3).
+    # If Kong also publishes a plain-HTTP port on the host, that is the safer
+    # target for the IIS rewrite rule.
+    foreach ($h in @(('http://' + $KongHost + ':8000'), ('http://' + $KongHost + ':54321'))) {
+      $probe = Invoke-Probe ($h + '/auth/v1/health')
+      if ($probe.Status -eq 200) { $kongPlain = $h; break }
+    }
+    if ($kongPlain) {
+      Ok ('plain-HTTP gateway at ' + $kongPlain + ' - the IIS rule will use this')
+    } elseif ($kongBase -like 'https:*') {
+      Warn 'only HTTPS is published on the gateway. If ARR answers 502.3 after the rule is installed, publish Kong container port 8000 on the host (docker compose / config.toml) and re-run -Step iis.'
+    }
+
     $fn = Invoke-Probe ($kongBase + '/functions/v1/username-login') 'POST' '{"action":"captcha"}'
     if ($fn.Status -eq 200 -and $fn.Body -match 'challenge_id') {
       Ok 'functions/v1/username-login  200 with challenge_id - edge runtime is healthy'
@@ -315,7 +329,8 @@ if ($Step -eq 'all' -or $Step -eq 'iis') {
           Warn ($cloudRules.Count.ToString() + ' rule(s) forward to the cloud project. They must go, otherwise /functions and /storage keep hitting a different database than /auth and /rest.')
         }
 
-        $wantTarget = $kongBase
+        $wantTarget = $kongPlain
+        if (-not $wantTarget) { $wantTarget = $kongBase }
         if (-not $wantTarget) { $wantTarget = 'https://127.0.0.1:54321' }
         # The IIS rule always dials the loopback, never -KongHost.
         $wantTarget = $wantTarget -replace '://[^:/]+:', '://127.0.0.1:'
