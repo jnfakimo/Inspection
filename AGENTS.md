@@ -3,6 +3,14 @@
 > Instructions for AI coding agents (OpenCode, etc.) working in this repo.
 > Human setup lives in `README.md`; deeper context in `PROJECT_CONTEXT.md`.
 
+## 協作角色與測試責任（2026-09-07 使用者指定）
+
+- 以資訊工程師角色主動完成問題定位、修正、測試與結果驗證；可由代理執行的工作由代理自行完成。
+- 不要反覆要求使用者執行測試、重試、貼截圖或確認檔案；先使用現有工具、檔案、日誌及可存取環境取得證據。
+- 只有必須由使用者完成的登入／驗證碼、授權，或代理確實無法存取的設備操作，才請使用者協助；先說明已嘗試的方法與具體阻礙，並一次整理最少必要步驟。
+- 未能驗證的項目明確標示「未驗證」及原因，不以推測宣稱成功；測試通過後直接回報結果，不再要求使用者重做相同測試。
+- 本規範不授權繞過權限、變更安全設定或執行未經授權的破壞性操作。
+
 ## What this is
 A web-based **equipment inspection / repair / dispatch / maintenance** system for
 臺北農產運銷股份有限公司 第一果菜市場, plus floor-plan (2D) and stacked-floor (3D)
