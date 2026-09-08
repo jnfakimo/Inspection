@@ -2,9 +2,9 @@
 
 ## 目前採用方向（2026-09-08 桌機 FindTag 介接）
 
-使用者最新要求為沿用桌機 BlueStacks 中已登入的 FindTag，先驗證可讀資料，再決定網站介接。下列原生手機 App 架構為已存在的另一條路徑，保留原始碼，但不表示使用者仍需換裝 App 或先購買 Apple 開發者資格。
+使用者最新要求為沿用桌機 BlueStacks 中已登入的 FindTag 自動同步。桌機收集器、限權接收層與網站同步區見 `docs/FINDTAG_AUTO_SYNC.md`。下列原生手機 App 架構為備選路徑，不表示使用者須換裝 App 或購買 Apple 開發者資格。
 
-本機可見資料探測與限制見 `docs/FINDTAG_LOCAL_PROBE.md`。目前已實測讀到設備清單的名稱、地址及原始時間文字，尚無可用的經緯度介接；不把地址觀測寫入手機勤務定位表、不宣稱正式同步完成。原廠授權 API、設備映射與第三方接收層仍待驗證。
+本機可見資料探測與限制見 `docs/FINDTAG_LOCAL_PROBE.md`。可見名稱、地址及原始時間同步與 GPS 定位分開；尚無經緯度介接，不能將本次工作稱為完整 GPS 軌跡同步。實際部署與桌機驗收狀態見開發紀錄。
 
 ## 定位來源與系統邊界
 
@@ -25,13 +25,13 @@
 
 - `vehicle_tracking_devices`：BLE 設備主檔與最後定位。
 - `vehicle_tracking_sessions`：手機、車輛、設備與駕駛人的勤務工作階段。
-- `vehicle_location_points`：原始定位點，保存 90 天。
+- `vehicle_location_points`：原始定位點，受永久保護；未啟用舊版 90 天實體清除。
 - `vehicle_location_daily_summaries`：每日里程／移動／停留彙總，保存至少 1 年。
 - `vehicle_geofences`：電子圍籬。
 - `vehicle_tracking_events`：告警與處理紀錄。
 
-資料庫腳本為 `system/sql/vehicle_tracking.sql`，正式遷移檔為
-`supabase/migrations/20260908181500_vehicle_tracking_system.sql`。
+原始參考腳本為 `system/sql/vehicle_tracking.sql`。正式環境使用非破壞性的
+`20260908212000_vehicle_tracking_safe_bootstrap.sql`；不要直接執行含清除函式與全面角色種子的舊 migration。
 
 ## 地圖
 

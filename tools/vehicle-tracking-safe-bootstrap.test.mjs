@@ -6,7 +6,7 @@ export const fixture = `
 create role anon; create role authenticated; create role service_role;
 create schema auth;
 create function auth.role() returns text language sql stable as $$select current_user::text$$;
-create table users(user_id uuid primary key, active boolean default true);
+create table users(user_id uuid primary key, status text default 'active',role text default 'admin',rbac_role text default 'sysadmin');
 create table official_vehicles(vehicle_id uuid primary key);
 create table vehicle_dispatch_requests(request_id uuid primary key);
 create table vehicle_dispatch_managers(user_id uuid references users, active boolean);
@@ -17,7 +17,7 @@ create function has_system_access(text) returns boolean language sql stable as $
 create function is_admin() returns boolean language sql stable as $$select current_setting('test.admin',true)='yes'$$;
 create function has_app_permission(text) returns boolean language sql stable as $$select false$$;
 create function reject_physical_data_removal() returns trigger language plpgsql as $$begin raise exception '禁止刪除'; end$$;
-insert into users values('00000000-0000-0000-0000-000000000001',true);
+insert into users(user_id) values('00000000-0000-0000-0000-000000000001');
 select set_config('test.user','00000000-0000-0000-0000-000000000001',false);
 select set_config('test.access','yes',false),set_config('test.admin','yes',false);
 `;

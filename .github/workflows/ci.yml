@@ -40,6 +40,8 @@ jobs:
         run: python tools/gmail-repair.test.py
       - name: Verify FindTag visible-data probe with synthetic data only
         run: python tools/findtag-visible-probe.test.py
+      - name: Verify FindTag sync DPAPI and offline queue with synthetic data only
+        run: python tools/findtag-sync.test.py
       - name: Parse cutover collector with Windows PowerShell 5.1
         shell: powershell
         run: |
@@ -71,6 +73,8 @@ jobs:
 
       - name: Verify cutover SQL with isolated PostgreSQL engine
         run: node tools/local-cutover-sql-check.mjs
+      - name: Verify protected FindTag sync database with synthetic data only
+        run: node tools/findtag-sync-schema.test.mjs
 
       - name: Build Node.js API
         run: npm run typecheck:api && npm run build:api

@@ -7,6 +7,7 @@ import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { AdminHeader, AdminModal, errorMessage, fmtTime, type Row } from '@/components/admin/shared';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
+import { FindTagSyncPanel } from '@/components/FindTagSyncPanel';
 import { getSupabase } from '@/lib/supabase';
 import { useFleetRole } from '@/lib/fleet-role';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -270,7 +271,16 @@ function TrackingMap({ points, devices, geofences, routeVehicleId, noteMapError 
 }
 
 function TrackingDataShell({ system, module, profile }: Props) {
-  const { canManageFleet } = useFleetRole(profile);
+  const { isAdmin } = useFleetRole(profile);
+  const [canManageFleet, setCanManageFleet] = useState(false);
+  const [dataFailed, setDataFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getSupabase().rpc('can_manage_vehicle_tracking').then(({ data, error }) => {
+      if (active) setCanManageFleet(!error && data === true);
+    });
+    return () => { active = false; };
+  }, []);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [points, setPoints] = useState<Point[]>([]);
@@ -287,6 +297,7 @@ function TrackingDataShell({ system, module, profile }: Props) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
+    try {
     const client = getSupabase();
     const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
     const [vehicleResult, deviceResult, pointResult, fenceResult, eventResult] = await Promise.all([
@@ -297,13 +308,21 @@ function TrackingDataShell({ system, module, profile }: Props) {
       client.from('vehicle_tracking_events').select('*').order('occurred_at', { ascending: false }).limit(500),
     ]);
     const firstError = vehicleResult.error || deviceResult.error || pointResult.error || fenceResult.error || eventResult.error;
-    if (firstError) setNote(`定位系統資料載入失敗：${errorMessage(firstError, '請確認定位資料庫已完成設定')}`);
+    if (firstError) {
+      setDataFailed(true);
+      setNote(`定位系統資料載入失敗：${errorMessage(firstError, '請確認定位資料庫已完成設定')}`);
+      return;
+    }
+    setDataFailed(false);
     setVehicles((vehicleResult.data || []) as Vehicle[]);
     setDevices((deviceResult.data || []) as unknown as Device[]);
     setPoints((pointResult.data || []) as Point[]);
     setGeofences((fenceResult.data || []) as Geofence[]);
     setEvents((eventResult.data || []) as TrackingEvent[]);
-    setBusy(false);
+    } catch {
+      setDataFailed(true);
+      setNote('定位系統暫時無法連線。保留上次資料，請勿視為即時狀態。');
+    } finally { setBusy(false); }
   }, []);
 
   useEffect(() => { void load(); }, [load]);
@@ -469,8 +488,10 @@ function TrackingDataShell({ system, module, profile }: Props) {
           : module.key === 'geofences' && canManageFleet ? <button className="primary-btn compact" onClick={() => setGeofenceEditor({ radius_m: 300, notify_on_enter: true, notify_on_exit: true, status: 'active' })}>＋ 新增電子圍籬</button> : undefined} />
 
       {(module.key === 'live' || module.key === 'history') && <>
+        {module.key === 'live' && <FindTagSyncPanel isAdmin={isAdmin} />}
+        {dataFailed && <p className="notice danger" role="alert">車輛定位資料未能完整讀取，暫不顯示統計，避免把錯誤當成零筆。</p>}
         {filters}
-        {module.key === 'live' ? <section className="tracking-metrics">
+        {!dataFailed && (module.key === 'live' ? <section className="tracking-metrics">
           <article><span>已綁定設備</span><strong>{devices.filter(device => device.status === 'active').length}</strong></article>
           <article><span>目前在線</span><strong>{onlineCount}</strong></article>
           <article><span>未更新／離線</span><strong>{staleCount}</strong></article>
@@ -480,7 +501,7 @@ function TrackingDataShell({ system, module, profile }: Props) {
           <article><span>推估里程</span><strong>{routeStats.distance.toFixed(1)} <small>公里</small></strong></article>
           <article><span>停留次數</span><strong>{routeStats.stops}</strong></article>
           <article><span>超過5分鐘缺口</span><strong>{routeStats.gaps}</strong></article>
-        </section>}
+        </section>)}
         <section className="tracking-map-layout panel">
           <TrackingMap points={periodPoints} devices={devices} geofences={geofences} routeVehicleId={module.key === 'history' ? selectedVehicle : ''} noteMapError={mapError} />
           <aside className="tracking-vehicle-list">
@@ -494,14 +515,15 @@ function TrackingDataShell({ system, module, profile }: Props) {
                 <em>{device.last_speed_kmh == null ? '—' : `${Number(device.last_speed_kmh).toFixed(0)} km/h`}</em>
               </button>;
             })}
-            {!devices.length && <p className="empty">尚未綁定藍牙設備</p>}
+            {!devices.length && <p className="empty">{dataFailed ? '資料讀取失敗，無法判斷設備狀態' : '尚未綁定具有座標的藍牙設備；FindTag 文字觀測請見上方同步區。'}</p>}
           </aside>
         </section>
       </>}
 
+      {module.key === 'devices' && <FindTagSyncPanel isAdmin={isAdmin} />}
       {module.key === 'devices' && <section className="panel tracking-table-panel">
-        <h2>手機藍牙綁定說明</h2>
-        <p>本頁是設備管理後台，不會掃描手機藍牙。iPhone 請使用已安裝的「北農公務車定位」原生 App；Safari 網頁無法代替原生 App 掃描。FindTag 的掃描結果不會自動匯入本系統。</p>
+        <h2>備選方案：原生手機藍牙綁定</h2>
+        <p>目前採用的 FindTag 桌機同步請使用上方功能，不必另裝手機 App。以下保留原生定位方案的設備管理；Safari 網頁本身不提供藍牙掃描，兩種來源也不會依同名設備自動合併。</p>
         <ol>
           <li>先在原生 App 使用「免登入藍牙檢測」確認是否找得到實物標籤。</li>
           <li>管理員新增設備並指定車輛；登入原生 App，選擇該車與設備，再掃描並點選「綁定」。</li>

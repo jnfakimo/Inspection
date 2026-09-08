@@ -1,4 +1,17 @@
 .vehicle-tracking-page{display:grid;gap:16px}
+.findtag-sync{min-width:0}
+.findtag-sync p{font-size:.875rem;line-height:1.65;overflow-wrap:anywhere}
+.findtag-sync h2{font-size:1.2rem;margin:0;color:var(--text)}
+.findtag-sync h3{font-size:1rem;margin:0;color:var(--text)}
+.findtag-sync-heading,.findtag-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.findtag-source{border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:16px;background:var(--panel2)}
+.findtag-setup{border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
+.findtag-setup summary{cursor:pointer;font-weight:700;color:var(--text)}
+.findtag-actions{justify-content:flex-start;align-items:flex-end}
+.findtag-actions label{display:grid;gap:6px;min-width:0;flex:1 1 180px}
+.findtag-actions input{min-width:0;width:100%}
+.findtag-sync .responsive-table{max-width:100%;overflow:auto}
+.findtag-sync td{white-space:normal;overflow-wrap:anywhere}
 .tracking-filter{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;padding:16px}
 .tracking-filter>label{display:grid;gap:7px;min-width:220px;color:var(--dim);font-size:.86rem}
 .tracking-filter select,.tracking-filter input{min-height:42px}
