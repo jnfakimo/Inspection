@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { fixture,safeSchema } from './vehicle-tracking-safe-bootstrap.test.mjs';
 const schema=readFileSync(new URL('../supabase/migrations/20260908213500_findtag_visible_sync.sql',import.meta.url),'utf8');
+const incompleteSchema=readFileSync(new URL('../supabase/migrations/20260908220000_findtag_incomplete_visible_rows.sql',import.meta.url),'utf8');
 assert.doesNotMatch(schema.replace(/--[^\r\n]*/g,''),/\bdrop\s+table\b|\bdelete\s+from\b|\btruncate\s+(?!on\b)/i);
 const db=new PGlite();
 const token='a'.repeat(64), other='b'.repeat(64);
@@ -11,6 +12,7 @@ const rpc=async(name,args)=> (await db.query(`select ${name}(${args.map((_,i)=>'
 const cooldown=()=>db.exec(`reset role; update findtag_collectors set last_contact_at=null; set role anon`);
 try{
   await db.exec(fixture); await db.exec(safeSchema); await db.exec(schema); await db.exec(schema);
+  await db.exec(incompleteSchema);await db.exec(incompleteSchema);
   await db.exec(`set role authenticated; select set_config('test.admin','no',false)`);
   await assert.rejects(rpc('findtag_create_pairing',['合成桌機']),/只有/);
   await db.exec(`select set_config('test.admin','yes',false)`);
@@ -57,6 +59,15 @@ try{
   await db.exec(`select set_config('test.access','yes',false)`);
   assert.equal((await db.query('select count(*)::int as n from findtag_visible_snapshots')).rows[0].n,2);
   await assert.rejects(db.exec('select * from findtag_collector_credentials'),/permission denied/);
+  await cooldown();
+  const incomplete=[...rows,{device_label:rows[0].device_label,address_text:null,source_time_text:null}];
+  const incompleteResult=await rpc('findtag_ingest',[token,new Date(Date.now()+5000),JSON.stringify(incomplete),'readable']);
+  await db.exec('reset role');
+  const saved=(await db.query('select observations from findtag_visible_snapshots where snapshot_id=$1',[incompleteResult.snapshot_id])).rows[0].observations;
+  assert.equal(saved.length,2);assert.equal(saved.filter(row=>row.address_text===null).length,1);
+  await cooldown();
+  await assert.rejects(rpc('findtag_ingest',[token,new Date(),JSON.stringify([{device_label:'合成',address_text:null,source_time_text:'2026-09-08 12:00:00'}]),'readable']),/完整配對/);
+  await db.exec('set role authenticated');
   await rpc('findtag_disable_collector',[pair.collector_id]);
   await db.exec('set role anon');
   await assert.rejects(rpc('findtag_ingest',[token,new Date(),JSON.stringify(rows),'readable']),/已停用/);

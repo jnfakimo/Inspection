@@ -169,7 +169,7 @@ def status_file(directory, state, status):
 def cycle(directory, state, execute, send=rpc):
     read_ok = False
     try:
-        snapshot = probe.collect(execute)
+        snapshot = probe.collect(execute, allow_incomplete=True)
         enqueue(state, payload(snapshot))
         read_ok = True
     except (probe.ProbeError,SyncError):

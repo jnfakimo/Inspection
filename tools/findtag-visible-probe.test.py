@@ -38,6 +38,21 @@ def fixture(rows=None, extra=False):
     return ET.tostring(root, encoding="utf-8")
 
 
+class IncompleteVisibleRowsTests(unittest.TestCase):
+    def test_incomplete_row_is_explicit_not_merged_by_name(self):
+        raw=fixture([('同名','合成地點-2026-09-08 12:00:00'),('同名',None)])
+        with self.assertRaises(probe.ProbeError):probe.parse_visible_rows(raw)
+        rows=probe.parse_visible_rows(raw,allow_incomplete=True)
+        self.assertEqual(len(rows),2)
+        incomplete=[r for r in rows if r['address_text'] is None]
+        self.assertEqual(len(incomplete),1)
+        self.assertIsNone(incomplete[0]['source_time_text'])
+        self.assertIsNone(incomplete[0]['external_device_id'])
+        self.assertIsNone(incomplete[0]['latitude'])
+    def test_incomplete_mode_does_not_pair_or_guess_invalid_values(self):
+        for raw in [fixture([(None,'合成地點-2026-09-08 12:00:00')]),fixture([('標籤','錯誤時間')])]:
+            with self.assertRaises(probe.ProbeError):probe.parse_visible_rows(raw,allow_incomplete=True)
+
 class FakeAdb:
     def __init__(self, raw=None, focus=FOCUS, version=VERSION, fail=None):
         self.raw = raw if raw is not None else fixture()

@@ -11,6 +11,7 @@ BlueStacks 已登入的 FindTag 可見清單 → Windows 收集器 → 限權 Su
 - 已授權桌機上的 BlueStacks 與 FindTag 1.2.27／47 保持執行，底部設備清單開啟。
 - ADB 僅使用已啟用的 `127.0.0.1:5555`。程式不會變更 BlueStacks 安全設定、登入、切頁或點擊。
 - 每次讀取完成後間隔 60 秒；網路錯誤退避至最長 300 秒。非白名單畫面時回報不可讀，不讀取其他 App。
+- 同步模式保留有名稱但未顯示完整地址／時間的可見列，兩欄同時為空並標示待確認；不把同名列合併成同一設備。單次探測工具預設仍採嚴格完整列檢查。
 - Windows 登入後排程才會啟動；沒有承諾登出後執行、手機自動採集、App 關閉仍取數或遠端喚醒。
 
 ## 管理與安裝
@@ -39,7 +40,7 @@ BlueStacks 已登入的 FindTag 可見清單 → Windows 收集器 → 限權 Su
 
 ## 部署與驗證
 
-先套用 `20260908212000_vehicle_tracking_safe_bootstrap.sql`，再套用 `20260908213500_findtag_visible_sync.sql`。使用既有受限 migration 工作流程，不修改禁止實體刪除防護。兩份皆為新表安全部署；未知的既有不相容 schema 必須先盤查。
+先套用 `20260908212000_vehicle_tracking_safe_bootstrap.sql`，再套用 `20260908213500_findtag_visible_sync.sql` 與 `20260908220000_findtag_incomplete_visible_rows.sql`。使用既有受限 migration 工作流程，不修改禁止實體刪除防護。前兩份為新表安全部署，第三份擴充空欄位驗證；未知的既有不相容 schema 必須先盤查。
 
 ```powershell
 node tools/findtag-sync-schema.test.mjs

@@ -135,7 +135,7 @@ def _text(node: ET.Element, limit: int) -> str:
     return value
 
 
-def parse_visible_rows(raw: bytes) -> list[dict]:
+def parse_visible_rows(raw: bytes, allow_incomplete: bool = False) -> list[dict]:
     if len(raw) > MAX_XML_BYTES:
         raise ProbeError("畫面結構超過安全大小限制。")
     # Decode strictly and reject DTD, including entity-expansion XML payloads.
@@ -167,11 +167,23 @@ def parse_visible_rows(raw: bytes) -> list[dict]:
         infos = [n for n in row.iter() if n.get("resource-id") == PACKAGE + ":id/tv_localInfo"]
         if not labels and not infos:
             continue
-        if len(labels) != 1 or len(infos) != 1 or not _safe_tree(row):
+        incomplete = allow_incomplete and len(labels) == 1 and len(infos) == 0
+        if len(labels) != 1 or (len(infos) != 1 and not incomplete) or not _safe_tree(row):
             raise ProbeError("設備列結構不明，已停止以避免錯配設備。")
         if any(n.get("package") != PACKAGE or not n.get("class", "").endswith("TextView") for n in labels + infos):
             raise ProbeError("設備文字欄位不符合白名單，已停止讀取。")
         label = _text(labels[0], 256)
+        if incomplete:
+            rows.append({
+                "device_label": label, "external_device_id": None,
+                "address_text": None, "source_time_text": None,
+                "source_timezone": "unknown", "source_recorded_at": None,
+                "latitude": None, "longitude": None, "accuracy_m": None,
+                "verification_status": "incomplete_visible_text",
+            })
+            if len(rows) > MAX_ROWS:
+                raise ProbeError("設備列超過單次讀取上限。")
+            continue
         info = _text(infos[0], 1536)
         match = TIME_SUFFIX.fullmatch(info)
         if not match or not match[1].strip():
@@ -199,7 +211,7 @@ def parse_visible_rows(raw: bytes) -> list[dict]:
     return [unique[key] for key in sorted(unique)]
 
 
-def collect(execute) -> dict:
+def collect(execute, allow_incomplete: bool = False) -> dict:
     execute(["connect", ENDPOINT])
     if execute(["-s", ENDPOINT, "get-state"]).strip() != b"device":
         raise ProbeError("本機模擬器尚未授權或未連線。")
@@ -216,7 +228,7 @@ def collect(execute) -> dict:
         # Refuse a snapshot if the user changed applications while it was captured.
         check_foreground(execute(["-s", ENDPOINT, "shell", "dumpsys", "window", "windows"]))
         raw = execute(["-s", ENDPOINT, "shell", "cat", remote])
-        rows = parse_visible_rows(raw)
+        rows = parse_visible_rows(raw, allow_incomplete=allow_incomplete)
     except Exception as error:
         failure = error
     finally:

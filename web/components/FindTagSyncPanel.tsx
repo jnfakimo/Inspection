@@ -5,7 +5,7 @@ import { getSupabase } from '@/lib/supabase';
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 import { fmtTime } from '@/components/admin/shared';
 
-type Observation = { device_label: string; address_text: string; source_time_text: string };
+type Observation = { device_label: string; address_text: string | null; source_time_text: string | null };
 type Collector = { collector_id: string; name: string; active: boolean; paired_at: string | null;
   last_contact_at: string | null; last_read_at: string | null; last_received_at: string | null;
   last_status: string; latest_snapshot_id: string | null };
@@ -112,7 +112,7 @@ export function FindTagSyncPanel({ isAdmin }: { isAdmin: boolean }) {
         <p>最後聯絡：{source.last_contact_at ? fmtTime(source.last_contact_at) : '尚無'}　｜　最後讀取：{source.last_read_at ? fmtTime(source.last_read_at) : '尚無'}</p>
         {view ? <><p>目前可見 {view.observations.length} 列　｜　這份內容首次收件：{fmtTime(view.received_at)}</p>
           <div className="responsive-table"><table><thead><tr><th>設備顯示名稱</th><th>FindTag 顯示地址</th><th>FindTag 原始時間（時區未確認）</th><th>資料品質</th></tr></thead>
-            <tbody>{view.observations.map((row, index) => <tr key={`${view.snapshot_id}-${index}`}><td>{row.device_label}</td><td>{row.address_text}</td><td>{row.source_time_text}</td><td>畫面文字／尚無座標</td></tr>)}</tbody>
+            <tbody>{view.observations.map((row, index) => <tr key={`${view.snapshot_id}-${index}`}><td>{row.device_label}</td><td>{row.address_text || '尚未取得完整地址'}</td><td>{row.source_time_text || '畫面未顯示時間'}</td><td>{row.address_text ? '畫面文字／尚無座標' : '資料未完整顯示／尚待確認'}</td></tr>)}</tbody>
           </table></div></> : <p>尚未收到可見清單；不以零座標或假資料代替。</p>}
         {isAdmin && source.active && (disabling === source.collector_id
           ? <div className="findtag-actions"><span>確定停用此桌機？既有觀測資料會保留。</span><button className="secondary-btn compact" onClick={() => setDisabling(null)}>取消</button><button className="danger-btn compact" disabled={saving} onClick={() => void disable(source.collector_id)}>確認停用</button></div>
