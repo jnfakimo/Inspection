@@ -1,0 +1,61 @@
+.vehicle-tracking-page{display:grid;gap:16px}
+.tracking-filter{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;padding:16px}
+.tracking-filter>label{display:grid;gap:7px;min-width:220px;color:var(--dim);font-size:.86rem}
+.tracking-filter select,.tracking-filter input{min-height:42px}
+.tracking-periods{display:flex;gap:7px;flex-wrap:wrap;flex:1}
+.tracking-periods button{min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--text);font-weight:700;cursor:pointer}
+.tracking-periods button:hover,.tracking-periods button.is-active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,var(--panel));color:var(--cyan)}
+.tracking-date-range{display:flex;align-items:flex-end;gap:8px;width:100%}
+.tracking-date-range label{display:grid;gap:6px;min-width:190px;color:var(--dim);font-size:.82rem}
+.tracking-date-range>span{padding-bottom:12px;color:var(--dim)}
+.tracking-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tracking-metrics article{padding:15px 17px;border:1px solid var(--line);border-top:3px solid var(--cyan);border-radius:12px;background:var(--panel);box-shadow:var(--shadow)}
+.tracking-metrics span{display:block;color:var(--dim);font-size:.8rem}
+.tracking-metrics strong{display:block;margin-top:6px;color:var(--text);font-size:1.55rem}
+.tracking-metrics strong small{display:inline;color:var(--dim);font-size:.72rem;font-weight:700}
+.tracking-map-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;min-height:590px;overflow:hidden}
+.vehicle-tracking-map{min-height:590px;background:var(--panel2)}
+.tracking-vehicle-list{display:flex;flex-direction:column;gap:8px;padding:16px;border-left:1px solid var(--line);background:var(--panel);overflow:auto}
+.tracking-vehicle-list h2{margin:0 0 7px;font-size:1.05rem;color:var(--text)}
+.tracking-vehicle-list>button{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--text);text-align:left;cursor:pointer}
+.tracking-vehicle-list>button:hover,.tracking-vehicle-list>button.is-selected{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 9%,var(--panel))}
+.tracking-vehicle-list b,.tracking-vehicle-list small{display:block}
+.tracking-vehicle-list small{margin-top:3px;color:var(--dim);font-size:.72rem}
+.tracking-vehicle-list em{font-size:.75rem;color:var(--dim);font-style:normal;white-space:nowrap}
+.tracking-dot{width:10px;height:10px;border-radius:50%;background:var(--dim);box-shadow:0 0 0 4px color-mix(in srgb,var(--dim) 15%,transparent)}
+.tracking-dot.online{background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
+.tracking-dot.stale{background:var(--amber);box-shadow:0 0 0 4px color-mix(in srgb,var(--amber) 14%,transparent)}
+.tracking-dot.offline{background:var(--red);box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 14%,transparent)}
+.tracking-table-panel{padding:16px}
+.tracking-table-panel table{min-width:920px}
+.tracking-table-panel td small{display:block;margin-top:4px;color:var(--dim)}
+.tracking-severity{display:inline-flex;padding:4px 9px;border:1px solid var(--line);border-radius:999px;font-size:.75rem;font-weight:800}
+.tracking-severity.info{color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+.tracking-severity.warning{color:var(--amber);background:color-mix(in srgb,var(--amber) 10%,transparent)}
+.tracking-severity.critical{color:var(--red);background:color-mix(in srgb,var(--red) 10%,transparent)}
+.tracking-form-hint{margin:14px 0 0;padding:12px 14px;border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber) 9%,var(--panel));color:var(--dim)}
+.maplibregl-map{font:inherit}
+.maplibregl-ctrl-group{border:1px solid color-mix(in srgb,var(--text) 16%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--text) 12%,transparent)}
+
+@media(max-width:1000px){
+  .tracking-map-layout{grid-template-columns:1fr}
+  .tracking-vehicle-list{max-height:280px;border-left:0;border-top:1px solid var(--line)}
+  .vehicle-tracking-map{min-height:480px}
+  .tracking-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media(max-width:600px){
+  .tracking-filter{align-items:stretch;padding:12px}
+  .tracking-filter>label{width:100%;min-width:0}
+  .tracking-periods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .tracking-periods button{padding:0 8px}
+  .tracking-date-range{display:grid;grid-template-columns:1fr;align-items:end}
+  .tracking-date-range label{min-width:0}
+  .tracking-date-range>span{display:none}
+  .tracking-metrics{gap:8px}
+  .tracking-metrics article{padding:12px}
+  .tracking-metrics strong{font-size:1.25rem}
+  .tracking-map-layout{min-height:0}
+  .vehicle-tracking-map{min-height:430px}
+  .tracking-vehicle-list{padding:12px}
+}

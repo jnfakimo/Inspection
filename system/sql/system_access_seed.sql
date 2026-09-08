@@ -23,7 +23,8 @@ cross join (values
   ('sys_officialdocs'),
   ('sys_marketanalytics'),
   ('sys_dashboard'),
-  ('sys_marketboard')
+  ('sys_marketboard'),
+  ('sys_vehicletracking')
 ) as p(perm)
 on conflict (role_id, perm) do nothing;
 

@@ -56,6 +56,10 @@ const nodeAppApiOrigin = configuredHttpsOrigin(
   process.env.NEXT_PUBLIC_APP_API_URL,
   'NEXT_PUBLIC_APP_API_URL',
 );
+const vehicleTrackingMapOrigin = configuredHttpsOrigin(
+  process.env.NEXT_PUBLIC_VEHICLE_TRACKING_MAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty',
+  'NEXT_PUBLIC_VEHICLE_TRACKING_MAP_STYLE_URL',
+);
 
 const runtimeSystemDirectories = ['assets', 'icons', 'plans', 'vendor'];
 const runtimeSystemExtensions = new Set([
@@ -162,6 +166,7 @@ const v2ConnectSources = [
   'https://qztffronusdhgxhjjubt.supabase.co',
   'wss://qztffronusdhgxhjjubt.supabase.co',
   ...(nodeAppApiOrigin ? [nodeAppApiOrigin] : []),
+  ...(vehicleTrackingMapOrigin ? [vehicleTrackingMapOrigin] : []),
 ].join(' ');
 const v2ContentSecurityPolicy = [
   "default-src 'self'",
@@ -170,7 +175,7 @@ const v2ContentSecurityPolicy = [
   "font-src 'self' data: https://fonts.gstatic.com",
   // data: 供 QR 標籤、blob: 供 3D 貼圖，圖片外部來源僅限 Storage 公開桶。
   // V1 用的是 https:（等於任何 HTTPS 網域），那會留下把資料塞進網址外傳的管道。
-  "img-src 'self' data: blob: https://qztffronusdhgxhjjubt.supabase.co",
+  `img-src 'self' data: blob: https://qztffronusdhgxhjjubt.supabase.co${vehicleTrackingMapOrigin ? ` ${vehicleTrackingMapOrigin}` : ''}`,
   `connect-src ${v2ConnectSources}`,
   "worker-src 'self' blob:",
   "object-src 'none'",

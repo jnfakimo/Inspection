@@ -1,0 +1,59 @@
+name: Vehicle tracking maintenance
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+    # 臺灣時間每日 03:17 執行 90 天原始定位保存政策。
+    - cron: "17 19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vehicle-tracking-maintenance
+  cancel-in-progress: false
+
+jobs:
+  stale-check:
+    # 資料庫遷移與函式驗證完成後，由管理者開啟此變數。
+    if: vars.VEHICLE_TRACKING_MAINTENANCE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Check vehicles with stale locations
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --retry 2 --retry-all-errors --max-time 45 \
+            -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/vehicle-tracking-maintenance
+
+  retention:
+    if: vars.VEHICLE_TRACKING_MAINTENANCE_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '17 19 * * *')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Remove raw points older than 90 days
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --retry 2 --retry-all-errors --max-time 90 \
+            -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"scheduled":true,"retention":true}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/vehicle-tracking-maintenance

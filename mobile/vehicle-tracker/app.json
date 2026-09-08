@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "北農公務車定位",
+    "slug": "beinong-vehicle-tracker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "beinongtracker",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "tw.com.tapmc.vehicletracker",
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "bluetooth-central"]
+      }
+    },
+    "android": {
+      "package": "tw.com.tapmc.vehicletracker",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "允許北農公務車定位在勤務期間取得位置，以便回傳車輛行駛軌跡。",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["central"],
+          "neverForLocation": false,
+          "bluetoothAlwaysPermission": "允許北農公務車定位搜尋車內藍牙標籤，以確認目前使用的車輛。"
+        }
+      ]
+    ],
+    "extra": {
+      "supabaseUrl": "https://qztffronusdhgxhjjubt.supabase.co"
+    }
+  }
+}

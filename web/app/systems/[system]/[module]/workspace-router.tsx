@@ -70,6 +70,10 @@ const MarketBoardWorkspace = dynamic<WorkspaceProps>(
   () => import('./market-board-workspace').then((mod) => mod.MarketBoardWorkspace),
   { ssr: false, loading: moduleLoading },
 );
+const VehicleTrackingWorkspace = dynamic<WorkspaceProps>(
+  () => import('./vehicle-tracking-workspace').then((mod) => mod.VehicleTrackingWorkspace),
+  { ssr: false, loading: moduleLoading },
+);
 const AdminWorkspace = dynamic<{ profile: import('@/types/app').Profile; module: ModuleDefinition }>(
   () => import('@/components/AdminWorkspace').then((mod) => mod.AdminWorkspace),
   { ssr: false, loading: moduleLoading },
@@ -114,6 +118,9 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
       return <MarketInteractiveDashboardWorkspace system={system} module={module} />;
     }
     return <MarketAnalyticsWorkspace system={system} module={module} />;
+  }
+  if (system.key === 'vehicletracking') {
+    return <VehicleTrackingWorkspace system={system} module={module} />;
   }
   return <ModuleWorkspace system={system} module={module} />;
 }
