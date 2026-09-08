@@ -52,6 +52,8 @@ export default function App() {
   const [nearby, setNearby] = useState<NearbyBleDevice[]>([]),
     [matchedBleId, setMatchedBleId] = useState("");
   const [active, setActive] = useState<ActiveTrackingSession | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [lastScanAt, setLastScanAt] = useState(0);
   const [queued, setQueued] = useState(0),
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
@@ -123,17 +125,26 @@ export default function App() {
   }
 
   useEffect(() => {
+    let disposed = false;
+    let authTimer: ReturnType<typeof setTimeout> | undefined;
     void loadAccount().catch((error) =>
       setNotice(zhError(error, "讀取帳號失敗")),
     );
     void refreshQueueCount();
     const listener = supabase.auth.onAuthStateChange(
-      () =>
-        void loadAccount().catch((error) =>
-          setNotice(zhError(error, "讀取帳號失敗")),
-        ),
+      () => {
+        // Leave the auth callback before calling Supabase again (avoid its session lock).
+        clearTimeout(authTimer);
+        authTimer = setTimeout(() => {
+          if (!disposed) void loadAccount().catch((error) =>
+            setNotice(zhError(error, "讀取帳號失敗")),
+          );
+        }, 0);
+      },
     );
     return () => {
+      disposed = true;
+      clearTimeout(authTimer);
       listener.data.subscription.unsubscribe();
       stopBleManager();
     };
@@ -171,25 +182,30 @@ export default function App() {
   }
 
   async function scan() {
-    if (!selectedDevice) throw new Error("請先選擇公務車及已登錄的藍牙設備。");
     setNearby([]);
     setMatchedBleId("");
+    setLastScanAt(0);
+    setScanning(true);
     setNotice("正在掃描附近藍牙設備，約需 10 秒。");
-    await scanNearbyDevices((devicesFound) => {
-      setNearby(devicesFound);
-      const match = devicesFound.find((device) =>
-        matchesRegisteredDevice(device, selectedDevice),
-      );
-      if (match) {
-        setMatchedBleId(match.id);
-        setNotice(`已確認車內藍牙標籤：${match.name}`);
-      }
-    }, selectedDevice.service_uuid);
+    try {
+      // Foreground discovery must not hide FT because an unverified service filter is wrong.
+      const found = await scanNearbyDevices(setNearby);
+      const match = selectedDevice && found.find(device => matchesRegisteredDevice(device, selectedDevice));
+      setLastScanAt(Date.now());
+      setMatchedBleId(match?.id || "");
+      setNotice(match ? `掃描完成，已找到先前綁定的標籤：${match.name}`
+        : found.length ? `掃描到 ${found.length} 個設備。掃描結果不代表已綁定；請確認實物後選取綁定。`
+        : "未掃描到設備。請確認標籤電量與廣播狀態；若僅 FindTag 找得到，仍需確認原廠藍牙協定是否支援。");
+    } finally {
+      setScanning(false);
+    }
   }
 
   async function bindNearbyDevice(nearbyDevice: NearbyBleDevice) {
     if (!selectedDevice) throw new Error("請先選擇要綁定的公務車藍牙設備。");
-    const serviceUuid = nearbyDevice.serviceUuids[0] || null;
+    if (Date.now() - lastScanAt > 60_000) throw new Error("掃描結果已逾一分鐘，請重新掃描再綁定。");
+    // An arbitrary advertised service is not necessarily the background identification service.
+    const serviceUuid = selectedDevice.service_uuid || null;
     const { error } = await supabase.rpc("bind_vehicle_tracking_ble_device", {
       p_device_id: selectedDevice.device_id,
       p_platform: Platform.OS,
@@ -234,7 +250,7 @@ export default function App() {
   async function beginDuty() {
     if (!profile || !vehicleId || !selectedDevice)
       throw new Error("請先選擇公務車及藍牙設備。");
-    if (!bleVerified)
+    if (!bleVerified || Date.now() - lastScanAt > 60_000)
       throw new Error("尚未在附近確認指定藍牙標籤，請先執行掃描。");
     const { data, error } = await supabase
       .from("vehicle_tracking_sessions")
@@ -300,10 +316,30 @@ export default function App() {
     setNotice("勤務已結束。");
   }
 
+  const scanResults = nearby.length ? (
+    <View style={styles.scanList}>
+      {nearby.map((device) => {
+        const bound = Boolean(selectedDevice && matchesRegisteredDevice(device, selectedDevice));
+        return <View key={device.id} style={styles.scanRow}>
+          <View style={styles.scanDetails}>
+            <Text style={bound ? styles.match : styles.scanText}>{device.name}｜{device.rssi == null ? "訊號未知" : `${device.rssi} dBm`}</Text>
+            <Text style={styles.scanIdentifier} selectable>本機識別碼：{device.id}</Text>
+            <Text style={styles.scanIdentifier} selectable>廣播服務：{device.serviceUuids.join("、") || "未提供；背景相容性尚未確認"}</Text>
+          </View>
+          {profile && selectedDevice ? <Pressable
+            style={[styles.bindButton, bound && styles.bindButtonMatched]}
+            disabled={busy || Boolean(active) || bound}
+            onPress={() => void run(() => bindNearbyDevice(device))}
+          ><Text style={styles.bindButtonText}>{bound ? "已綁定" : "綁定"}</Text></Pressable> : null}
+        </View>;
+      })}
+    </View>
+  ) : null;
+
   if (!profile)
     return (
       <SafeAreaView style={styles.screen}>
-        <View style={styles.loginCard}>
+        <ScrollView contentContainerStyle={styles.loginCard}>
           <Text style={styles.brand}>北農公務車定位</Text>
           <Text style={styles.subtitle}>使用公司帳號登入</Text>
           <TextInput
@@ -329,7 +365,12 @@ export default function App() {
             <Text style={styles.primaryText}>{busy ? "登入中…" : "登入"}</Text>
           </Pressable>
           {notice ? <Text style={styles.error}>{notice}</Text> : null}
-        </View>
+          <Pressable style={styles.secondary} disabled={busy} onPress={() => void run(scan)}>
+            <Text style={styles.secondaryText}>{scanning ? "正在掃描…" : "免登入藍牙檢測"}</Text>
+          </Pressable>
+          <Text style={styles.disclaimer}>檢測只讀取附近藍牙廣播，不綁定車輛、不取得或上傳位置。iPhone 的本機識別碼可能不同於 FindTag 顯示的位址。</Text>
+          {scanResults}
+        </ScrollView>
       </SafeAreaView>
     );
 
@@ -360,7 +401,7 @@ export default function App() {
           {vehicles.map((vehicle) => (
             <Pressable
               key={vehicle.vehicle_id}
-              disabled={Boolean(active)}
+              disabled={busy || Boolean(active)}
               style={[
                 styles.choice,
                 vehicleId === vehicle.vehicle_id && styles.choiceActive,
@@ -379,7 +420,7 @@ export default function App() {
           {vehicleDevices.map((device) => (
             <Pressable
               key={device.device_id}
-              disabled={Boolean(active)}
+              disabled={busy || Boolean(active)}
               style={[
                 styles.choice,
                 deviceId === device.device_id && styles.choiceActive,
@@ -407,35 +448,10 @@ export default function App() {
           onPress={() => void run(scan)}
         >
           <Text style={styles.secondaryText}>
-            {bleVerified ? "已確認藍牙標籤" : "掃描附近藍牙設備"}
+            {scanning ? "正在掃描…" : "重新掃描附近藍牙設備"}
           </Text>
         </Pressable>
-        {nearby.length ? (
-          <View style={styles.scanList}>
-            {nearby.slice(0, 8).map((device) => {
-              const matched = device.id === matchedBleId;
-              return (
-                <View key={device.id} style={styles.scanRow}>
-                  <View style={styles.scanDetails}>
-                    <Text style={matched ? styles.match : styles.scanText}>
-                      {device.name}｜訊號 {device.rssi ?? "未知"}
-                    </Text>
-                    <Text style={styles.scanIdentifier} numberOfLines={1}>
-                      識別碼：{device.id}
-                    </Text>
-                  </View>
-                  <Pressable
-                    style={[styles.bindButton, matched && styles.bindButtonMatched]}
-                    disabled={busy || Boolean(active) || matched}
-                    onPress={() => void run(() => bindNearbyDevice(device))}
-                  >
-                    <Text style={styles.bindButtonText}>{matched ? "已綁定" : "綁定"}</Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-        ) : null}
+        {scanResults}
         <Text style={styles.section}>3. 定位勤務</Text>
         <View style={styles.statusCard}>
           <Text style={styles.statusTitle}>

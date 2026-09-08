@@ -500,6 +500,14 @@ function TrackingDataShell({ system, module, profile }: Props) {
       </>}
 
       {module.key === 'devices' && <section className="panel tracking-table-panel">
+        <h2>手機藍牙綁定說明</h2>
+        <p>本頁是設備管理後台，不會掃描手機藍牙。iPhone 請使用已安裝的「北農公務車定位」原生 App；Safari 網頁無法代替原生 App 掃描。FindTag 的掃描結果不會自動匯入本系統。</p>
+        <ol>
+          <li>先在原生 App 使用「免登入藍牙檢測」確認是否找得到實物標籤。</li>
+          <li>管理員新增設備並指定車輛；登入原生 App，選擇該車與設備，再掃描並點選「綁定」。</li>
+          <li>只有綁定儲存成功才顯示「已綁定」。設備名稱相同不代表同一顆標籤，iPhone 識別碼也可能不同於 FindTag 顯示的位址。</li>
+        </ol>
+        <p>原生 App 尚需完成簽章、安裝及實機相容性驗證；更新本網站不會自動安裝 App。掃描到標籤也不代表已完成連線、尋鈴或背景定位驗證。</p>
         <div className="responsive-table"><table><thead><tr><th>設備名稱</th><th>綁定車輛</th><th>藍牙識別</th><th>硬體驗證</th><th>電量</th><th>最後出現</th><th>狀態</th>{canManageFleet && <th>操作</th>}</tr></thead>
           <tbody>{devices.map(device => { const vehicle = relatedVehicle(device.official_vehicles); return <tr key={device.device_id}>
             <td><strong>{device.display_name}</strong><small>{device.advertised_name || '尚未記錄廣播名稱'}</small></td>
@@ -508,7 +516,7 @@ function TrackingDataShell({ system, module, profile }: Props) {
             <td>{device.last_seen_at ? fmtTime(device.last_seen_at) : '尚無紀錄'}</td><td>{DEVICE_STATUS[device.status] || '未知狀態'}</td>
             {canManageFleet && <td><button className="secondary-btn compact" onClick={() => setDeviceEditor(device)}>編輯</button></td>}
           </tr>; })}</tbody></table></div>
-        {!devices.length && <p className="empty">尚未建立藍牙設備，請先使用手機掃描測試後登錄識別資料。</p>}
+        {!devices.length && <p className="empty">目前沒有可顯示的設備；若上方顯示資料載入失敗，需先完成資料庫設定或權限檢查。</p>}
       </section>}
 
       {module.key === 'geofences' && <section className="panel tracking-table-panel">

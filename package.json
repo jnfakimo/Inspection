@@ -37,7 +37,7 @@
     "test:market-stock-signal": "node tools/market-stock-signal-check.mjs",
     "test:market-command-center": "node tools/market-command-center-check.mjs",
     "test:market-interactive-dashboard": "node tools/market-interactive-dashboard-check.mjs",
-    "test:vehicle-tracking": "node tools/vehicle-tracking-schema-check.mjs",
+    "test:vehicle-tracking": "node tools/vehicle-tracking-schema-check.mjs && node --test tools/vehicle-tracking-ble.test.mjs",
     "test:backup": "node --test tools/backup-request.test.mjs tools/backup-storage-integrity.test.mjs tools/database-restore.test.mjs && node tools/database-backup-consistency-check.mjs",
     "backup:db": "node tools/database-backup.mjs",
     "backup:verify": "node tools/database-backup-verify.mjs",
