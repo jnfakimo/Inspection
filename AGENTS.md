@@ -83,8 +83,8 @@ deactivate only: never reset the database, truncate tables, or physically delete
 RLS is enforced in production. Bootstrap `allow_all_for_now` policies apply only to
 `authenticated`; the commercial hardening migrations replace them with row-scoped
 rules. Storage buckets: `floorplans`, `repair-files`, `handover-attachments`,
-`vehicle-dispatch-files` (all private), plus `inspection-photos`, which is **public**
-and currently empty — anything uploaded there is anonymously readable.
+`vehicle-dispatch-files`, `inspection-photos` (all private; signed URL access
+only for authenticated active users).
 
 **Backups** (verified 2026-09-06): the cloud organization now shows Pro and the
 Dashboard lists seven daily physical backups; PITR is not enabled. Platform
