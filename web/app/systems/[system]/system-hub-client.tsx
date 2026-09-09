@@ -68,8 +68,6 @@ function VehicleHub({ system, profile }: { system: SystemDefinition; profile: Pr
 }
 
 function OperationsHub({ system, profile }: { system: SystemDefinition; profile: Profile }) {
-  // 交接簿的系統入口直接顯示交接紀錄模組（system.modules[0] 即 records）。
-  if (system.key === 'handover') return <HandoverModules system={system} module={system.modules[0]} profile={profile} />;
   const handover = system.key === 'handover';
   if (system.key === 'vehicle') return <VehicleHub system={system} profile={profile} />;
   if (system.key === 'meetingroom') {
@@ -100,7 +98,7 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     </AppShell>;
   }
   const cards = handover ? [
-    ['records', '新增交接／交接記錄', '填寫班別、異常、待辦與備註，送出後由接班人接收。', 'handover-icon.png', 'HANDOVER 01'],
+    ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01'],
     ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 02'],
     ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 03'],
   ] : [
@@ -111,8 +109,8 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   ];
   return <AppShell profile={profile} title={system.title}
     heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
-    <div className="operations-portal-note">駐衛警巡檢流程 · 點選圖卡進入功能系統</div>
-    <section className="operations-portal-grid patrol">{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section>
+    <div className="operations-portal-note">{handover ? '電子交接簿流程' : '駐衛警巡檢流程'} · 點選圖卡進入功能系統</div>
+    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? '進入系統　→' : key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section>
   </AppShell>;
 }
 
