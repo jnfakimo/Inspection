@@ -57,7 +57,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       client.from('mechanical_handover_entries').select('*').eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
       client.from('mechanical_handover_signatures').select('*').eq('work_date', date),
       client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
-      client.from('departments').select('dept_id,name,parent_id,status').eq('name', '機電課').eq('status', 'active').limit(20),
+      client.from('departments').select('dept_id,name,parent_id,status,level').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
     ]);
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
     const scopedPeople = (people.data || []).filter(person => mechanicalDeptIds.has(String(person.dept_id)));
