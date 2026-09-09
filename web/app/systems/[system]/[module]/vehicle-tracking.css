@@ -46,7 +46,8 @@
 .tracking-severity.info{color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
 .tracking-severity.warning{color:var(--amber);background:color-mix(in srgb,var(--amber) 10%,transparent)}
 .tracking-severity.critical{color:var(--red);background:color-mix(in srgb,var(--red) 10%,transparent)}
-.tracking-form-hint{margin:14px 0 0;padding:12px 14px;border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber) 9%,var(--panel));color:var(--dim)}
+.tracking-form-hint{margin:14px 0 0;padding:12px 14px;border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber) 9%,var(--panel));color:var(--text)}
+:root[data-theme="light"] .findtag-sync .danger-btn{color:color-mix(in srgb,var(--red) 78%,var(--text))}
 .maplibregl-map{font:inherit}
 .maplibregl-ctrl-group{border:1px solid color-mix(in srgb,var(--text) 16%,transparent);box-shadow:0 4px 14px color-mix(in srgb,var(--text) 12%,transparent)}
 

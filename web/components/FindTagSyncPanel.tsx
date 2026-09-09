@@ -110,7 +110,7 @@ export function FindTagSyncPanel({ isAdmin }: { isAdmin: boolean }) {
       return <article className="findtag-source" key={source.collector_id}>
         <div className="findtag-sync-heading"><h3>{source.name}</h3><span>{state}</span></div>
         <p>最後聯絡：{source.last_contact_at ? fmtTime(source.last_contact_at) : '尚無'}　｜　最後讀取：{source.last_read_at ? fmtTime(source.last_read_at) : '尚無'}</p>
-        {view ? <><p>目前可見 {view.observations.length} 列　｜　這份內容首次收件：{fmtTime(view.received_at)}</p>
+        {view ? <><p>不同可見內容 {view.observations.length} 列（不等於設備台數）　｜　這份內容首次收件：{fmtTime(view.received_at)}</p>
           <div className="responsive-table"><table><thead><tr><th>設備顯示名稱</th><th>FindTag 顯示地址</th><th>FindTag 原始時間（時區未確認）</th><th>資料品質</th></tr></thead>
             <tbody>{view.observations.map((row, index) => <tr key={`${view.snapshot_id}-${index}`}><td>{row.device_label}</td><td>{row.address_text || '尚未取得完整地址'}</td><td>{row.source_time_text || '畫面未顯示時間'}</td><td>{row.address_text ? '畫面文字／尚無座標' : '資料未完整顯示／尚待確認'}</td></tr>)}</tbody>
           </table></div></> : <p>尚未收到可見清單；不以零座標或假資料代替。</p>}
