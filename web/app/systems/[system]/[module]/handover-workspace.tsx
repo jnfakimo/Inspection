@@ -33,6 +33,7 @@ import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, 
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import { MechanicalHandover } from './mechanical-handover';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 type Shift = { id: string; label: string; start: string; end: string };
@@ -96,6 +97,7 @@ function Pill({ value, labels, tones }: { value: unknown; labels: Record<string,
 }
 
 export function HandoverModules({ system, module, profile }: Props) {
+  if (module.key === 'mechanical') return <MechanicalHandover system={system} module={module} profile={profile} />;
   if (module.key === 'open-items') return <CasesModule system={system} module={module} profile={profile} />;
   if (module.key === 'equipment') return <EquipmentOverview system={system} module={module} profile={profile} />;
   return <RecordsModule system={system} module={module} profile={profile} />;

@@ -99,8 +99,9 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   }
   const cards = handover ? [
     ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01'],
-    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 02'],
-    ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 03'],
+    ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'equipment-icon.png', 'HANDOVER 02'],
+    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 03'],
+    ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 04'],
   ] : [
     ['checkins', '駐衛警巡檢表', '查詢各樓層與巡檢點的打卡狀態，即時掌握待巡與逾期項目。', 'guardpatrol-list-icon.png', 'MODULE 01'],
     ['map3d', '3D 駐警巡檢雲台', '以立體場域視角查看巡檢點位與打卡狀態，快速定位異常區域。', 'guardpatrol-3d-icon.png', 'MODULE 02'],

@@ -176,7 +176,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   do not create a second, page-specific user/status/clock format. The component must
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
-- **Shared header actions**: V2 一般內容頁（共 13 大系統的 63 個子系統）頂列只保留三個
+- **Shared header actions**: V2 一般內容頁（共 13 大系統的 64 個子系統）頂列只保留三個
   帳號／入口動作：首頁、個人資料、登出；移除戰情儀表板、維修／派完工、駐衛警巡檢、
   電子交接簿與後台等跨系統按鈕，系統切換改由入口頁、系統頁與後台側欄承擔。
   首頁使用 `assets/system-icons/home-nav-icon.png`，個人資料使用
@@ -216,7 +216,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 
 ## V2 系統子頁標題規範（2026-08-27 訂）
 
-- 13 大系統、63 個子系統的一般內容頁一律由 `AppShell` 自動插入
+- 13 大系統、64 個子系統的一般內容頁一律由 `AppShell` 自動插入
   `components/SystemPageHeader.tsx`，不得在工作區再手寫另一個系統級 `<h1>`。
 - 標題頂端距共用頂列底部固定 **22px**；桌面版由 `.content.v1-content` 的 20px
   上內距加標題元件 2px 上內距構成，手機版則為 14px + 8px。不要用負 margin 或頁面
@@ -240,10 +240,10 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   縮放時四張桌面功能圖卡固定為 **269px × 200px** 並置中。瀏覽器縮放造成可用 CSS
   寬度改變時必須自動響應：寬版 4 欄、1100px 以下 2 欄並恢復滿寬、600px 以下 1 欄，
   禁止水平溢出。
-- 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 13／63、
+- 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 13／64、
   正式 Logo、標題 token，以及 59 個一般頁首與 4 個全螢幕頁首的覆蓋關係。
 
-- **63 個子系統圖卡（2026-09-08 更新）**：一般 `.module-grid` 與交接／駐衛警入口
+- **64 個子系統圖卡（2026-09-09 更新）**：一般 `.module-grid` 與交接／駐衛警入口
   的子系統圖卡，桌面瀏覽器 100% 統一為 **269×200px**；標題沿用共用頁首規格（距頂列
   22px、26px、淺藍 `rgb(2, 132, 199)`、Logo 左側 24px、標題左側 80px、Logo 42×42px）。
   1100px 以下改兩欄、600px 以下改單欄，並恢復彈性寬度避免水平溢出。

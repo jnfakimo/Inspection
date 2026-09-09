@@ -3117,6 +3117,47 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: true });
       }
 
+      if (kind === 'mechanical_entry') {
+        const workDate = text(body.work_date, 10), shiftCode = text(body.shift_code, 10);
+        if (!validISODate(workDate)) return reply(req, { ok: false, message: '工作日期格式無效' }, 400);
+        if (!['01-09', '09-17', '17-01'].includes(shiftCode)) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
+        const category = text(body.category, 80), workItem = text(body.work_item, 300);
+        const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
+        if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
+        if (technicianIds.length > 20) return reply(req, { ok: false, message: '單筆工作最多選擇 20 位維修人員' }, 400);
+        const { data: people, error: peopleError } = await userDb.from('users').select('user_id').in('user_id', technicianIds).eq('status', 'active');
+        if (peopleError) throw peopleError;
+        if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員名單包含無效或停用帳號' }, 400);
+        const payload = {
+          work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
+          details: text(body.details, 3000) || null, technician_ids: technicianIds,
+          result: text(body.result, 80) || '正常', notes: text(body.notes, 1000) || null,
+          created_by: profile.user_id,
+        };
+        const { data, error } = await userDb.from('mechanical_handover_entries').insert(payload).select('entry_id').single();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', data.entry_id, 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'mechanical_sign') {
+        const workDate = text(body.work_date, 10), shiftCode = text(body.shift_code, 10);
+        if (!validISODate(workDate)) return reply(req, { ok: false, message: '簽名日期格式無效' }, 400);
+        if (!['01-09', '09-17', '17-01'].includes(shiftCode)) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
+        const signerId = body.signer_id ? id(body.signer_id) : null;
+        if (body.signer_id && !signerId) return reply(req, { ok: false, message: '值班人員資料無效' }, 400);
+        if (signerId) {
+          const { data: signer, error: signerError } = await userDb.from('users').select('user_id').eq('user_id', signerId).eq('status', 'active').maybeSingle();
+          if (signerError) throw signerError;
+          if (!signer) return reply(req, { ok: false, message: '找不到有效的值班人員' }, 400);
+        }
+        const payload = { work_date: workDate, shift_code: shiftCode, signer_id: signerId, signed_at: signerId ? new Date().toISOString() : null, updated_by: profile.user_id, updated_at: new Date().toISOString() };
+        const { data, error } = await userDb.from('mechanical_handover_signatures').upsert(payload, { onConflict: 'work_date,shift_code' }).select('signature_id').single();
+        if (error) throw error;
+        await writeAudit(userDb, profile.user_id, 'mechanical_handover_signatures', data.signature_id, 'update', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
       if (kind === 'create_case') {
         const caseNo = text(body.case_no, 40), title = text(body.title, 300), shiftType = text(body.shift_type, 20);
         const anomalyCategory = text(body.anomaly_category, 100);

@@ -4,7 +4,7 @@ import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
 assert.equal(systems.length, 13, '系統標題稽核必須涵蓋 13 大系統');
-assert.equal(moduleCount, 63, '系統標題稽核必須涵蓋 63 個子系統');
+assert.equal(moduleCount, 64, '系統標題稽核必須涵蓋 64 個子系統');
 
 for (const system of systems) {
   const iconPath = `.${system.icon.replace('/Inspection', '')}`;
