@@ -7,3 +7,14 @@
   @page{size:A4 portrait;margin:9mm}
   body *{visibility:hidden!important}.mechanical-report,.mechanical-report *{visibility:visible!important}.mechanical-report{position:absolute;inset:0;width:100%;box-sizing:border-box;background:#fff!important;color:#000!important;border:0;padding:0;font-family:"Noto Sans TC",sans-serif}.mechanical-report>header h2{color:#000!important;font-size:16pt}.mechanical-report>header p{font-size:11pt}.mechanical-report th,.mechanical-report td{border-color:#000!important;color:#000!important;padding:5px;font-size:9.5pt}.mechanical-report thead th{background:#fff!important}.mechanical-report tbody>tr>th{height:185px}.mechanical-report li,.mechanical-report td p{margin-bottom:4px}.mechanical-report .no-print,.mechanical-report select{display:none!important}.mechanical-signatures{border-color:#000!important;grid-template-columns:25mm repeat(3,1fr)}.mechanical-signatures label{border-color:#000!important}.mechanical-signatures label b{display:block!important;min-height:24px;margin-top:8px;font-size:11pt}.mechanical-signatures>strong{font-size:10pt}
 }
+
+@media print{
+  .mechanical-report,.mechanical-report table,.mechanical-signatures{width:100%!important;max-width:100%!important;min-width:0!important}
+  .mechanical-report{overflow:visible!important;padding:0!important}
+  .mechanical-report table{table-layout:fixed!important}
+  .mechanical-report .shift-column{width:18%!important}.mechanical-report .people-column{width:20%!important}.mechanical-report .result-column{width:13%!important}.mechanical-report .note-column{width:15%!important}
+  .mechanical-report>header h2{font-size:13pt!important}.mechanical-report>header p{font-size:9pt!important;margin:2px 0!important}
+  .mechanical-report tbody>tr>th{height:150px!important}
+  .mechanical-report th,.mechanical-report td{padding:3px!important;font-size:8.5pt!important;overflow-wrap:anywhere;word-break:break-word}
+  .mechanical-signatures label b{font-size:9pt!important;min-height:20px;margin-top:5px}
+}

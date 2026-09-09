@@ -53,23 +53,22 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
-    const [work, signs, people] = await Promise.all([
+    const [work, signs, people, departments] = await Promise.all([
       client.from('mechanical_handover_entries').select('*').eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
       client.from('mechanical_handover_signatures').select('*').eq('work_date', date),
       client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
+      client.from('departments').select('dept_id,name,parent_id,status').eq('name', '機電課').eq('status', 'active').limit(20),
     ]);
-    const failure = work.error || signs.error || people.error;
+    const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
+    const scopedPeople = (people.data || []).filter(person => mechanicalDeptIds.has(String(person.dept_id)));
+    const failure = work.error || signs.error || people.error || departments.error;
     if (failure) setNote(`失敗：${errorMessage(failure, '機電交接資料載入失敗')}`);
-    setEntries(work.data || []); setSignatures(signs.data || []); setUsers(people.data || []); setBusy(false);
+    setEntries(work.data || []); setSignatures(signs.data || []); setUsers(scopedPeople); setBusy(false);
   }, [date]);
   useEffect(() => { void load(); }, [load]);
 
   const userName = useCallback((id: unknown) => users.find(user => String(user.user_id) === String(id))?.name || '—', [users]);
-  const mechanicalUsers = useMemo(() => [...users].sort((a, b) => {
-    const am = String(a.department || '').includes('機電') ? 0 : 1;
-    const bm = String(b.department || '').includes('機電') ? 0 : 1;
-    return am - bm || String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW');
-  }), [users]);
+  const mechanicalUsers = useMemo(() => [...users].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW')), [users]);
   const byShift = (code: string) => entries.filter(entry => entry.shift_code === code);
   const signFor = (code: string) => signatures.find(sign => sign.shift_code === code);
 
