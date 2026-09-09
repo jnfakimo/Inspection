@@ -102,10 +102,10 @@ export function MechanicalHandover({ system, module, profile }: Props) {
             const rows = byShift(shift.code);
             return <tr key={shift.code} className={`shift-row shift-${shift.code.replace('-', '')}`}>
               <th><span>{shift.label}</span><small>工作紀錄 · {rows.length} 筆</small><button className="secondary-btn compact no-print" onClick={() => setEditingShift(shift.code)}>新增工作</button></th>
-              <td>{rows.length ? <ol>{rows.map(row => <li key={String(row.entry_id)}><b>{String(row.work_item || '')}</b>{row.details ? <span>－{String(row.details)}</span> : null}</li>)}</ol> : <p className="empty-row">尚無工作紀錄</p>}</td>
-              <td>{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{(Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—'}</p>) : '—'}</td>
-              <td>{rows.length ? rows.map(row => { const result = String(row.result || '—'); return <p key={String(row.entry_id)}><span className={`result-badge result-${RESULT_TONES[result] || 'neutral'}`}>{result}</span></p>; }) : '—'}</td>
-              <td>{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{String(row.notes || '—')}</p>) : '—'}</td>
+              <td data-label="維修養護工作內容">{rows.length ? <ol>{rows.map(row => <li key={String(row.entry_id)}><b>{String(row.work_item || '')}</b>{row.details ? <span>－{String(row.details)}</span> : null}</li>)}</ol> : <p className="empty-row">尚無工作紀錄</p>}</td>
+              <td data-label="維修人員">{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{(Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—'}</p>) : '—'}</td>
+              <td data-label="處理結果">{rows.length ? rows.map(row => { const result = String(row.result || '—'); return <p key={String(row.entry_id)}><span className={`result-badge result-${RESULT_TONES[result] || 'neutral'}`}>{result}</span></p>; }) : '—'}</td>
+              <td data-label="備註">{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{String(row.notes || '—')}</p>) : '—'}</td>
             </tr>;
           })}</tbody>
           <tfoot><tr><th>其他</th><td colSpan={4}>{entries.filter(row => row.category === '其他').map(row => String(row.details || row.work_item)).join('；') || '—'}</td></tr></tfoot>
