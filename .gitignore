@@ -57,3 +57,11 @@ restore-workspace/
 *.tar.gz.gpg
 inspection-backup-*
 .floorplan-build/
+
+# 本機資料抓取與代理暫存產物。amis_downloads/ 是 AMIS 農產行情原始檔，單一 CSV 就
+# 247MB（超過 GitHub 100MB 單檔上限），全目錄約 1GB；其餘三個是各代理的暫存／輸出區。
+# 本 repo 是 public，這些原始資料與中間產物都不該公開，且誤 add 會直接讓推送失敗。
+amis_downloads/
+.codex_tmp/
+outputs/
+scratch/

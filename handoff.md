@@ -157,4 +157,4 @@ powershell -ExecutionPolicy Bypass -File <repo>\tools\selfhosted-restore-login.p
   anon key 不是原因），確認真正卡點是 edge_runtime 沒跑 ＋ IIS 把 `/functions`、`/storage`
   轉到雲端；新增一鍵修復腳本 `tools/selfhosted-restore-login.ps1`（預設空跑，`-Apply` 才動手），
   修正 IIS 反代範本的 http→https。**未對伺服器做任何變更**（開發機無遠端執行權限）。
-· Git push：待推
+· Git push：✅ 已推（`60accdefe`、`260ec9d43`；2026-09-08 由 Claude Opus 5 核對版控後回填）
