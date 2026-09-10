@@ -41,6 +41,26 @@ export function currentMechanicalShift(now = new Date()) {
   return { workDate, shiftCode };
 }
 
+export function taipeiISODate(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now);
+}
+
+export function mechanicalApprovalOpensOn(workDate: string) {
+  const value = new Date(`${workDate}T12:00:00+08:00`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(workDate) || Number.isNaN(value.getTime())) return '';
+  value.setDate(value.getDate() + 1);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(value);
+}
+
+export function canApproveMechanicalDay(workDate: string, now = new Date()) {
+  const opensOn = mechanicalApprovalOpensOn(workDate);
+  return Boolean(opensOn) && taipeiISODate(now) >= opensOn;
+}
+
 export function outstandingMechanicalEntries(rows: HandoverRow[]) {
   const continued = new Set(rows.map(row => String(row.carry_source_id || '')).filter(Boolean));
   return rows.filter(row => {

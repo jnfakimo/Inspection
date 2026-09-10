@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { carryTargetShift, currentMechanicalShift, outstandingMechanicalEntries, shiftSlot } from './mechanical-handover-flow.ts';
+import { canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, outstandingMechanicalEntries, shiftSlot } from './mechanical-handover-flow.ts';
 
 test('recognizes Taipei business shift including midnight carry', () => {
   assert.deepEqual(currentMechanicalShift(new Date('2026-09-10T03:52:00Z')), { workDate: '2026-09-10', shiftCode: '09-17' });
@@ -21,4 +21,11 @@ test('places overdue work in the active shift and future work in its next shift'
   assert.equal(carryTargetShift({ work_date: '2026-09-09', shift_code: '17-01' }, '2026-09-10', atNoon), '09-17');
   assert.equal(carryTargetShift({ work_date: '2026-09-10', shift_code: '09-17' }, '2026-09-10', atNoon), '17-01');
   assert.ok(shiftSlot('2026-09-10', '01-09') < shiftSlot('2026-09-10', '09-17'));
+});
+
+test('daily approval opens only on the following Taipei calendar day', () => {
+  assert.equal(mechanicalApprovalOpensOn('2026-09-10'), '2026-09-11');
+  assert.equal(canApproveMechanicalDay('2026-09-10', new Date('2026-09-10T15:59:59Z')), false);
+  assert.equal(canApproveMechanicalDay('2026-09-10', new Date('2026-09-10T16:00:00Z')), true);
+  assert.equal(canApproveMechanicalDay('not-a-date', new Date('2026-09-11T00:00:00Z')), false);
 });

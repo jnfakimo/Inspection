@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { repairCostCents, repairCostTotal, formatRepairCost } from '@/lib/mechanical-cost';
-import { carryTargetShift, currentMechanicalShift, outstandingMechanicalEntries } from '@/lib/mechanical-handover-flow';
+import { canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, outstandingMechanicalEntries } from '@/lib/mechanical-handover-flow';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
@@ -148,7 +148,10 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const approval = approvals[0];
   const activeShift = currentMechanicalShift(now);
   const role = String(profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[profile.role] || profile.role || '');
-  const canApprove = role === 'sysadmin' || (role === 'unit_supervisor' && users.some(user => String(user.user_id) === profile.user_id));
+  const hasApprovalRole = role === 'sysadmin' || (role === 'unit_supervisor' && users.some(user => String(user.user_id) === profile.user_id));
+  const approvalOpen = canApproveMechanicalDay(date, now);
+  const approvalOpenDate = mechanicalApprovalOpensOn(date);
+  const canApprove = hasApprovalRole && approvalOpen;
   const carryByShift = useMemo(() => {
     const grouped = new Map<string, Row[]>();
     outstandingMechanicalEntries(carryHistory).forEach(row => {
@@ -166,6 +169,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
   const approveDaily = async () => {
+    if (!canApproveMechanicalDay(date, new Date())) { setNote('本日交接簿須於隔日起由課長簽核'); return; }
     setBusy(true); setNote('');
     try {
       await invokeAppApi('handover_save', { kind: 'mechanical_approve', work_date: date });
@@ -247,8 +251,8 @@ export function MechanicalHandover({ system, module, profile }: Props) {
           </section>;
         })}
         <section className={`mechanical-approval${approval ? ' is-approved' : ''}`} aria-label="每日課長簽核">
-          <div><small>每日課長簽核</small><h3>{approval ? '本日已完成簽核' : '本日待課長簽核'}</h3><p>{approval ? `${userName(approval.approver_id)} · ${new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at)))}` : '三班工作紀錄完成後，由機電課課長確認當日交接內容。'}</p></div>
-          {approval ? <b className="mechanical-approval-seal">核准</b> : canApprove ? <button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button> : <span className="mechanical-approval-pending">等待課長簽核</span>}
+          <div><small>每日課長簽核</small><h3>{approval ? '本日已完成簽核' : '本日待課長簽核'}</h3><p>{approval ? `${userName(approval.approver_id)} · ${new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at)))}` : approvalOpen ? '已開放機電課課長確認當日交接內容。' : `當日不可簽核，最早於 ${approvalOpenDate.replaceAll('-', '/')} 起由機電課課長確認。`}</p></div>
+          {approval ? <b className="mechanical-approval-seal">核准</b> : canApprove ? <button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button> : <span className="mechanical-approval-pending">{approvalOpen ? '等待課長簽核' : '隔日開放簽核'}</span>}
         </section>
       </section>
 

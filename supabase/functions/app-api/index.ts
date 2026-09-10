@@ -3214,6 +3214,8 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'mechanical_approve') {
         const workDate = text(body.work_date, 10);
         if (!validISODate(workDate)) return reply(req, { ok: false, message: '簽核日期格式無效' }, 400);
+        const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+        if (workDate >= todayInTaipei) return reply(req, { ok: false, message: '每日交接簿須於隔日起由課長簽核' }, 409);
         const normalizedRole = departmentRole(profile);
         if (!['unit_supervisor', 'sysadmin'].includes(normalizedRole)) {
           return reply(req, { ok: false, message: '每日簽核僅限機電課課長或系統管理員' }, 403);
@@ -3231,6 +3233,7 @@ export async function handleAppApiRequest(req: Request) {
         const { data, error } = await userDb.from('mechanical_handover_daily_approvals').insert(payload).select('approval_id,approved_at').single();
         if (error) {
           if (String(error.code || '') === '23505') return reply(req, { ok: false, message: '本日交接簿已完成課長簽核' }, 409);
+          if (String(error.code || '') === '23514') return reply(req, { ok: false, message: '每日交接簿須於隔日起由課長簽核' }, 409);
           throw error;
         }
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_daily_approvals', data.approval_id, 'insert', null, payload);
