@@ -315,7 +315,7 @@ export function PrintSheet({ date, entries, signatures, approval, userName }: { 
     </table>
     <div className="mechanical-print-total"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(entries))}</strong><span>費用未填 {entries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
     <div className="mechanical-print-signatures"><b>值班簽名</b>{SHIFTS.map(shift => <span key={shift.code}>{shift.label}<strong>{userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id)}</strong></span>)}</div>
-    <div className="mechanical-print-approval"><b>課長簽核</b><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong><span className="mechanical-print-approval-detail">{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}{approval && <b className="mechanical-print-approval-seal">核可</b>}</span></div>
+    <div className="mechanical-print-approval"><b>課長簽核</b><span className="mechanical-print-approval-detail"><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong>{approval && <b className="mechanical-print-approval-seal">核可</b>}</span><span>{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}</span></div>
   </div></article>;
 }
 
