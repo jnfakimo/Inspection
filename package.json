@@ -20,7 +20,7 @@
     "test:security-audit": "node --test web/lib/security-audit-sanitize.test.ts",
     "test:app-navigation": "node --test web/lib/app-navigation.test.ts",
     "test:password-policy": "node --test web/lib/password-policy.test.ts",
-    "test:mechanical-cost": "node --experimental-strip-types --test web/lib/mechanical-cost.test.ts",
+    "test:mechanical-cost": "node --experimental-strip-types --test web/lib/mechanical-cost.test.ts web/lib/mechanical-handover-flow.test.ts",
     "test:auth-consistency": "node tools/auth-consistency-check.mjs",
     "test:perspective-fit": "node --test web/lib/perspective-fit.test.ts",
     "test:floor-consistency": "node tools/floor-consistency-check.mjs",

@@ -74,6 +74,15 @@ function validISODate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
+const MECHANICAL_SHIFT_CODES = ['01-09', '09-17', '17-01'] as const;
+const MECHANICAL_UNFINISHED_RESULTS = new Set(['處理中', '待料', '待廠商', '交下班續辦', '無法處理']);
+
+function mechanicalShiftSlot(workDate: string, shiftCode: string) {
+  const day = Math.floor(new Date(`${workDate}T12:00:00+08:00`).getTime() / 86_400_000);
+  const shift = MECHANICAL_SHIFT_CODES.indexOf(shiftCode as (typeof MECHANICAL_SHIFT_CODES)[number]);
+  return shift < 0 || !Number.isFinite(day) ? Number.NaN : day * MECHANICAL_SHIFT_CODES.length + shift;
+}
+
 // 將常見 PostgreSQL 錯誤碼轉成使用者看得懂的中文訊息，避免把內部表名/約束名洩漏給前端。
 function dbMessage(error: { code?: string; message?: string } | null, fallback: string) {
   const code = String(error?.code || '');
@@ -3121,7 +3130,11 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'mechanical_entry') {
         const workDate = text(body.work_date, 10), shiftCode = text(body.shift_code, 10);
         if (!validISODate(workDate)) return reply(req, { ok: false, message: '工作日期格式無效' }, 400);
-        if (!['01-09', '09-17', '17-01'].includes(shiftCode)) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
+        if (!MECHANICAL_SHIFT_CODES.includes(shiftCode as (typeof MECHANICAL_SHIFT_CODES)[number])) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
+        const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
+          .select('approval_id').eq('work_date', workDate).maybeSingle();
+        if (approvalReadError) throw approvalReadError;
+        if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再新增工作' }, 409);
         const category = text(body.category, 80), workItem = text(body.work_item, 300);
         const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
         if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
@@ -3137,15 +3150,35 @@ export async function handleAppApiRequest(req: Request) {
           .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
         if (peopleError) throw peopleError;
         if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
+        const carrySourceId = body.carry_source_id ? id(body.carry_source_id) : null;
+        if (body.carry_source_id && !carrySourceId) return reply(req, { ok: false, message: '續辦來源資料無效' }, 400);
+        if (carrySourceId) {
+          const { data: source, error: sourceError } = await userDb.from('mechanical_handover_entries')
+            .select('entry_id,work_date,shift_code,result').eq('entry_id', carrySourceId).maybeSingle();
+          if (sourceError) throw sourceError;
+          if (!source) return reply(req, { ok: false, message: '找不到續辦來源工作' }, 404);
+          if (!MECHANICAL_UNFINISHED_RESULTS.has(String(source.result || ''))) return reply(req, { ok: false, message: '原工作已完成，不需要帶入下一班' }, 409);
+          if (mechanicalShiftSlot(workDate, shiftCode) <= mechanicalShiftSlot(String(source.work_date), String(source.shift_code))) {
+            return reply(req, { ok: false, message: '續辦紀錄必須建立在原工作之後的班次' }, 400);
+          }
+          const { data: existingCarry, error: carryReadError } = await userDb.from('mechanical_handover_entries')
+            .select('entry_id').eq('carry_source_id', carrySourceId).maybeSingle();
+          if (carryReadError) throw carryReadError;
+          if (existingCarry) return reply(req, { ok: false, message: '這筆工作已由其他班次接續，請重新載入' }, 409);
+        }
         const payload = {
           work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
           details: text(body.details, 3000) || null, technician_ids: technicianIds,
           result: text(body.result, 80) || '正常', notes: text(body.notes, 1000) || null,
           repair_cost: costCents === null ? null : costCents / 100,
+          carry_source_id: carrySourceId,
           created_by: profile.user_id,
         };
         const { data, error } = await userDb.from('mechanical_handover_entries').insert(payload).select('entry_id').single();
-        if (error) throw error;
+        if (error) {
+          if (String(error.code || '') === '23505' && carrySourceId) return reply(req, { ok: false, message: '這筆工作已由其他班次接續，請重新載入' }, 409);
+          throw error;
+        }
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', data.entry_id, 'insert', null, payload);
         return reply(req, { ok: true, data });
       }
@@ -3153,7 +3186,11 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'mechanical_sign') {
         const workDate = text(body.work_date, 10), shiftCode = text(body.shift_code, 10);
         if (!validISODate(workDate)) return reply(req, { ok: false, message: '簽名日期格式無效' }, 400);
-        if (!['01-09', '09-17', '17-01'].includes(shiftCode)) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
+        if (!MECHANICAL_SHIFT_CODES.includes(shiftCode as (typeof MECHANICAL_SHIFT_CODES)[number])) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
+        const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
+          .select('approval_id').eq('work_date', workDate).maybeSingle();
+        if (approvalReadError) throw approvalReadError;
+        if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再變更值班簽名' }, 409);
         const signerId = body.signer_id ? id(body.signer_id) : null;
         if (body.signer_id && !signerId) return reply(req, { ok: false, message: '值班人員資料無效' }, 400);
         if (signerId) {
@@ -3171,6 +3208,32 @@ export async function handleAppApiRequest(req: Request) {
         const { data, error } = await userDb.from('mechanical_handover_signatures').upsert(payload, { onConflict: 'work_date,shift_code' }).select('signature_id').single();
         if (error) throw error;
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_signatures', data.signature_id, 'update', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'mechanical_approve') {
+        const workDate = text(body.work_date, 10);
+        if (!validISODate(workDate)) return reply(req, { ok: false, message: '簽核日期格式無效' }, 400);
+        const normalizedRole = departmentRole(profile);
+        if (!['unit_supervisor', 'sysadmin'].includes(normalizedRole)) {
+          return reply(req, { ok: false, message: '每日簽核僅限機電課課長或系統管理員' }, 403);
+        }
+        if (normalizedRole !== 'sysadmin') {
+          const { data: mechanicalDepartment, error: departmentError } = await userDb.from('departments')
+            .select('dept_id').eq('dept_id', profile.dept_id).eq('name', '機電課').eq('level', 2).eq('status', 'active').maybeSingle();
+          if (departmentError) throw departmentError;
+          if (!mechanicalDepartment) return reply(req, { ok: false, message: '每日簽核僅限第二階機電課課長' }, 403);
+        }
+        const payload = {
+          work_date: workDate, approver_id: profile.user_id,
+          approved_at: new Date().toISOString(), note: text(body.note, 1000) || null,
+        };
+        const { data, error } = await userDb.from('mechanical_handover_daily_approvals').insert(payload).select('approval_id,approved_at').single();
+        if (error) {
+          if (String(error.code || '') === '23505') return reply(req, { ok: false, message: '本日交接簿已完成課長簽核' }, 409);
+          throw error;
+        }
+        await writeAudit(userDb, profile.user_id, 'mechanical_handover_daily_approvals', data.approval_id, 'insert', null, payload);
         return reply(req, { ok: true, data });
       }
 
