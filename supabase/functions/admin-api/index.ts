@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
-import { passwordPolicyMessage } from '../_shared/password-policy.ts';
+import { passwordPolicyMessage, temporaryNumericPassword } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
 import { BOARD_NOTICE_ACTIONS, handleBoardNotices } from './board-notices.ts';
 
@@ -452,7 +452,7 @@ export async function handleAdminApiRequest(req: Request) {
 
       // 帳號核准時先建立一組測試用 8 位數臨時密碼，使用者仍可透過啟用連結
       // 設定正式密碼。以密碼學亂數取樣，避免批次核准時重複。
-      const temporaryPassword = Array.from(crypto.getRandomValues(new Uint8Array(8)), value => String(value % 10)).join('');
+      const temporaryPassword = temporaryNumericPassword();
       const { data: created, error: createError } = await admin.auth.admin.createUser({
         email: application.email, password: temporaryPassword, email_confirm: true,
         user_metadata: { name: application.name, username: application.username },

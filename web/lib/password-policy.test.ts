@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { passwordPolicyMessage as cloudBackendMessage } from '../../supabase/functions/_shared/password-policy.ts';
+import { passwordPolicyMessage as cloudBackendMessage, temporaryNumericPassword } from '../../supabase/functions/_shared/password-policy.ts';
 import { usesLocalBackendOrigin } from './backend-origin.ts';
 import { LOCAL_PASSWORD_POLICY, PASSWORD_POLICY, passwordInputProps, passwordPolicyForEndpoint, passwordPolicyMessage, temporaryPassword } from './password-policy.ts';
 
@@ -25,14 +25,14 @@ test('local validation matches reviewed production policy and HTML constraints',
   }
 });
 
-test('cloud keeps the actual backend rules and permits mixed characters in HTML', () => {
+test('cloud and local forms both require exactly 8 ASCII digits', () => {
   const inputs = passwordInputProps(PASSWORD_POLICY);
-  assert.equal(inputs.pattern, undefined);
-  assert.equal(inputs.inputMode, 'text');
-  const values = ['', '12345678', 'Abcd1234', 'abcd1234', 'Abcd!234', 'Abc 1234', 'Abcd\t1234', 'A'.repeat(198) + 'a1', 'A'.repeat(199) + 'a1'];
+  assert.equal(inputs.pattern, '[0-9]{8}');
+  assert.equal(inputs.inputMode, 'numeric');
+  const values = ['', '1234567', '12345678', '00000000', '123456789', 'Abcd1234', '1234 678', '１２３４５６７８'];
   for (const value of values) assert.equal(passwordPolicyMessage(value), cloudBackendMessage(value));
-  assert.equal(passwordPolicyMessage('Abcd1234'), '');
-  assert.notEqual(passwordPolicyMessage('12345678'), '');
+  assert.equal(passwordPolicyMessage('12345678'), '');
+  assert.notEqual(passwordPolicyMessage('Abcd1234'), '');
 });
 
 test('blank XLSX passwords generate values accepted by the corresponding policy', () => {
@@ -41,8 +41,13 @@ test('blank XLSX passwords generate values accepted by the corresponding policy'
       const value = temporaryPassword(policy);
       assert.equal(value.length, policy.numericOnly ? 8 : 16);
       assert.equal(passwordPolicyMessage(value, policy), '');
-      if (!policy.numericOnly) assert.equal(cloudBackendMessage(value), '');
+      assert.equal(cloudBackendMessage(value), '');
     }
+  }
+  for (let i = 0; i < 100; i++) {
+    const value = temporaryNumericPassword();
+    assert.match(value, /^\d{8}$/);
+    assert.equal(cloudBackendMessage(value), '');
   }
 });
 

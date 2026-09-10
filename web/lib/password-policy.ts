@@ -10,10 +10,10 @@ export type PasswordPolicy = {
 
 export const PASSWORD_POLICY: PasswordPolicy = {
   minLength: 8,
-  maxLength: 200,
-  requiredCharacterClasses: 3,
-  numericOnly: false,
-  hint: '8～200 個字元，不含空白，需含大寫、小寫、數字、特殊字元中的至少 3 類',
+  maxLength: 8,
+  requiredCharacterClasses: 1,
+  numericOnly: true,
+  hint: '8 位數字',
 } as const;
 
 export const LOCAL_PASSWORD_POLICY: PasswordPolicy = {
@@ -30,7 +30,7 @@ export function passwordPolicyForEndpoint(endpoint: string): PasswordPolicy {
 export function passwordInputProps(policy: PasswordPolicy) {
   return {
     minLength: policy.minLength, maxLength: policy.maxLength,
-    pattern: policy.numericOnly ? '[0-9]{8}' : undefined,
+    pattern: policy.numericOnly ? `[0-9]{${policy.minLength}}` : undefined,
     inputMode: policy.numericOnly ? 'numeric' as const : 'text' as const,
   };
 }
@@ -38,7 +38,7 @@ export function passwordInputProps(policy: PasswordPolicy) {
 export function passwordPolicyMessage(password: string, policy: PasswordPolicy = PASSWORD_POLICY) {
   if (policy.numericOnly) {
     if (password.length !== policy.minLength) return `密碼必須是 ${policy.minLength} 位數字`;
-    return /^\d{8}$/.test(password) ? '' : '密碼只能包含數字';
+    return new RegExp(`^\\d{${policy.minLength}}$`).test(password) ? '' : '密碼只能包含數字';
   }
   if (password.length < policy.minLength) return `密碼至少需要 ${policy.minLength} 個字元`;
   if (password.length > policy.maxLength) return `密碼不可超過 ${policy.maxLength} 個字元`;

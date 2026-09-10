@@ -6,6 +6,7 @@ import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
 import { passwordInputProps, passwordPolicyMessage, temporaryPassword } from '@/lib/password-policy';
 import { usePasswordPolicy } from '@/lib/use-password-policy';
+import { visibleManagedUsers } from '@/lib/user-visibility';
 import { AdminHeader, AdminModal, type AdminAction, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, roleLabel, type Row, StatusPill, userRole } from './shared';
 
 const ACCOUNT_EXPORT_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -87,7 +88,11 @@ export function UsersAdmin({ profile, module }: AdminProps) {
         invokeAdminApi<{ data?: Row[] }>('admin_list_account_applications'),
       ]);
       const failures: string[] = [];
-      if (u.status === 'fulfilled' && !u.value.error) { setUsers(u.value.data || []); setUsersLoaded(true); }
+      if (u.status === 'fulfilled' && !u.value.error) {
+        // 去識別化資料保留在後端供稽核追溯，不再出現在帳號管理、搜尋、頁數與匯出清單。
+        setUsers(visibleManagedUsers(u.value.data || []));
+        setUsersLoaded(true);
+      }
       else failures.push(`人員：${errorMessage(u.status === 'rejected' ? u.reason : u.value.error, '載入失敗')}`);
       if (r.status === 'fulfilled' && !r.value.error) setRoles((r.value.data || []).filter(row => row.role_id !== 'mgmt_supervisor'));
       else failures.push(`角色：${errorMessage(r.status === 'rejected' ? r.reason : r.value.error, '載入失敗')}`);
