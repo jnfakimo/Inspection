@@ -3,6 +3,7 @@ import { enforceDurableRateLimit, recordRateLimitDenial } from '../_shared/secur
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
 import { clientIpFromRequest } from '../_shared/client-ip.ts';
+import { repairCostCents } from '../_shared/mechanical-cost.ts';
 import { readMarketBoardNotices } from './market-board-notices.ts';
 
 type PortableRuntime = {
@@ -3125,13 +3126,22 @@ export async function handleAppApiRequest(req: Request) {
         const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
         if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
         if (technicianIds.length > 20) return reply(req, { ok: false, message: '單筆工作最多選擇 20 位維修人員' }, 400);
-        const { data: people, error: peopleError } = await userDb.from('users').select('user_id').in('user_id', technicianIds).eq('status', 'active');
+        const costCents = repairCostCents(body.repair_cost);
+        if (costCents === undefined) return reply(req, { ok: false, message: '維修費用格式無效，最多可輸入兩位小數' }, 400);
+        const { data: mechanicalDepartments, error: departmentError } = await userDb.from('departments')
+          .select('dept_id').eq('name', '機電課').eq('level', 2).eq('status', 'active');
+        if (departmentError) throw departmentError;
+        const mechanicalDeptIds = (mechanicalDepartments || []).map(department => department.dept_id);
+        if (!mechanicalDeptIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
+        const { data: people, error: peopleError } = await userDb.from('users').select('user_id')
+          .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
         if (peopleError) throw peopleError;
-        if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員名單包含無效或停用帳號' }, 400);
+        if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
         const payload = {
           work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
           details: text(body.details, 3000) || null, technician_ids: technicianIds,
           result: text(body.result, 80) || '正常', notes: text(body.notes, 1000) || null,
+          repair_cost: costCents === null ? null : costCents / 100,
           created_by: profile.user_id,
         };
         const { data, error } = await userDb.from('mechanical_handover_entries').insert(payload).select('entry_id').single();
@@ -3147,9 +3157,15 @@ export async function handleAppApiRequest(req: Request) {
         const signerId = body.signer_id ? id(body.signer_id) : null;
         if (body.signer_id && !signerId) return reply(req, { ok: false, message: '值班人員資料無效' }, 400);
         if (signerId) {
-          const { data: signer, error: signerError } = await userDb.from('users').select('user_id').eq('user_id', signerId).eq('status', 'active').maybeSingle();
+          const { data: mechanicalDepartments, error: departmentError } = await userDb.from('departments')
+            .select('dept_id').eq('name', '機電課').eq('level', 2).eq('status', 'active');
+          if (departmentError) throw departmentError;
+          const mechanicalDeptIds = (mechanicalDepartments || []).map(department => department.dept_id);
+          if (!mechanicalDeptIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
+          const { data: signer, error: signerError } = await userDb.from('users').select('user_id')
+            .eq('user_id', signerId).in('dept_id', mechanicalDeptIds).eq('status', 'active').maybeSingle();
           if (signerError) throw signerError;
-          if (!signer) return reply(req, { ok: false, message: '找不到有效的值班人員' }, 400);
+          if (!signer) return reply(req, { ok: false, message: '值班簽名僅限第二階機電課的在職同仁' }, 400);
         }
         const payload = { work_date: workDate, shift_code: shiftCode, signer_id: signerId, signed_at: signerId ? new Date().toISOString() : null, updated_by: profile.user_id, updated_at: new Date().toISOString() };
         const { data, error } = await userDb.from('mechanical_handover_signatures').upsert(payload, { onConflict: 'work_date,shift_code' }).select('signature_id').single();
