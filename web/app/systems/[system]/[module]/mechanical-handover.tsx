@@ -134,24 +134,6 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         {SHIFTS.map((shift, index) => { const rows = byShift(shift.code); return <section className={`mechanical-shift mechanical-shift-${index + 1}`} key={shift.code}><div className="mechanical-shift-head"><div className="mechanical-shift-title"><strong>{['一', '二', '三'][index]}</strong><span><b>{['早班', '中班', '晚班'][index]}</b><small>{shift.label}　{rows.length} 筆</small></span></div><button className="primary-btn compact" onClick={() => setEditingShift(shift.code)}>＋ 新增工作</button></div><div className="mechanical-entry-list">{rows.length ? rows.map(row => <article className="mechanical-entry-card" key={String(row.entry_id)}><div className="mechanical-entry-main"><small>{String(row.category || '其他')}</small><h3>{String(row.work_item || '')}</h3>{row.details && <p>{String(row.details)}</p>}</div><div className="mechanical-entry-people"><small>維修人員</small><p>{(Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—'}</p>{row.notes && <p className="mechanical-entry-note">備註：{String(row.notes)}</p>}</div><div className="mechanical-entry-result"><small>處理結果</small><b className={`result-badge result-${RESULT_TONES[String(row.result || '')] || 'neutral'}`}>{String(row.result || '—')}</b></div></article>) : <p className="mechanical-empty">本班尚無工作紀錄，請按「新增工作」建立。</p>}</div><div className="mechanical-shift-sign"><span>值班簽名</span><select aria-label={`${shift.label}值班人員`} value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{mechanicalUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{user.department ? `（${user.department}）` : ''}</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}</b></div></section>; })}
       </section>
 
-      <section className="mechanical-report" aria-label="機電設備養護紀錄表">
-        <header><h2>臺北農產運銷股份有限公司第二批發市場機電設備養護紀錄表</h2><p>{rocDate(date)}</p></header>
-        <table>
-          <thead><tr><th className="shift-column">項目</th><th>維修養護工作內容</th><th className="people-column">維修人員</th><th className="result-column">處理結果</th><th className="note-column">備註</th></tr></thead>
-          <tbody>{SHIFTS.map(shift => {
-            const rows = byShift(shift.code);
-            return <tr key={shift.code} className={`shift-row shift-${shift.code.replace('-', '')}`}>
-              <th><span>{shift.label}</span><small>工作紀錄 · {rows.length} 筆</small><button className="secondary-btn compact no-print" onClick={() => setEditingShift(shift.code)}>新增工作</button></th>
-              <td data-label="維修養護工作內容">{rows.length ? <ol>{rows.map(row => <li key={String(row.entry_id)}><b>{String(row.work_item || '')}</b>{row.details ? <span>－{String(row.details)}</span> : null}</li>)}</ol> : <p className="empty-row">尚無工作紀錄</p>}</td>
-              <td data-label="維修人員">{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{(Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—'}</p>) : '—'}</td>
-              <td data-label="處理結果">{rows.length ? rows.map(row => { const result = String(row.result || '—'); return <p key={String(row.entry_id)}><span className={`result-badge result-${RESULT_TONES[result] || 'neutral'}`}>{result}</span></p>; }) : '—'}</td>
-              <td data-label="備註">{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{String(row.notes || '—')}</p>) : '—'}</td>
-            </tr>;
-          })}</tbody>
-          <tfoot><tr><th>其他</th><td colSpan={4}>{entries.filter(row => row.category === '其他').map(row => String(row.details || row.work_item)).join('；') || '—'}</td></tr></tfoot>
-        </table>
-        <div className="mechanical-signatures"><strong>值班簽名</strong>{SHIFTS.map(shift => <label key={shift.code}><span>{shift.label}</span><select value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{mechanicalUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{user.department ? `（${user.department}）` : ''}</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}</b></label>)}</div>
-      </section>
       {printData && <section className="mechanical-print-preview" aria-hidden="true">{dateRange(printFrom, printTo).map(printDate => <PrintSheet key={printDate} date={printDate} entries={printData.entries.filter(row => String(row.work_date) === printDate)} signatures={printData.signatures.filter(row => String(row.work_date) === printDate)} userName={userName} />)}</section>}
     </div>
     {printOpen && <PrintRangeModal from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
