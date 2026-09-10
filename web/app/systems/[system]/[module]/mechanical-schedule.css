@@ -45,7 +45,7 @@
 .mechanical-schedule-checks p span{color:var(--dim)}
 .mechanical-schedule-checks p.error{box-shadow:inset 3px 0 0 var(--red)}
 .mechanical-schedule-checks p.warning{box-shadow:inset 3px 0 0 var(--amber)}
-.mechanical-day-editor{padding:0;overflow:hidden;border-top:4px solid var(--violet)}
+.mechanical-day-editor{position:sticky;top:62px;z-index:20;padding:0;overflow:hidden;border-top:4px solid var(--violet);box-shadow:0 10px 28px color-mix(in srgb,var(--bg) 18%,transparent)}
 .mechanical-day-editor>header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 18px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--violet) 6%,var(--panel))}
 .mechanical-day-editor>header small{color:var(--violet);font-weight:800}
 .mechanical-day-editor>header h2{margin:3px 0;font-size:21px}
@@ -61,11 +61,11 @@
 .mechanical-shift-editor-grid>article.duty-09-17{box-shadow:inset 0 4px 0 var(--green)}
 .mechanical-shift-editor-grid>article.duty-17-01{box-shadow:inset 0 4px 0 var(--amber)}
 .mechanical-shift-editor-grid label{display:grid;gap:5px;color:var(--dim);font-size:11px}
-.mechanical-shift-editor-grid select{min-width:0;width:100%;height:40px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:var(--panel2);color:var(--text)}
+.mechanical-shift-editor-grid select{min-width:0;width:100%;height:42px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:var(--panel2);color:var(--text);font-size:13.75px}
 .mechanical-assigned-people{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:32px}
 .mechanical-assigned-people>span{display:flex;align-items:center;gap:5px;padding:5px 5px 5px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
 .mechanical-assigned-people>span.is-invalid{border-color:var(--red);color:var(--red)}
-.mechanical-assigned-people b{font-size:12px}
+.mechanical-assigned-people b{font-size:15px}
 .mechanical-assigned-people button{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;background:color-mix(in srgb,var(--text) 7%,var(--panel2));color:var(--dim);cursor:pointer}
 .mechanical-assigned-people em{color:var(--dim);font-size:12px;font-style:normal}
 .mechanical-calendar-screen{min-width:0;padding:0;overflow:hidden}
@@ -91,15 +91,17 @@
 .mechanical-calendar-shifts{display:grid;gap:5px;min-width:0}
 .mechanical-calendar-shifts>span{display:grid;grid-template-columns:23px minmax(0,1fr);align-items:start;gap:5px;padding:5px 6px;border-radius:5px;background:var(--panel2)}
 .mechanical-calendar-shifts b{font-size:10px;text-align:center}
-.mechanical-calendar-shifts em{overflow:hidden;color:var(--dim);font-size:10px;font-style:normal;line-height:1.4;white-space:normal}
+.mechanical-calendar-shifts em{overflow:hidden;color:var(--dim);font-size:12.5px;font-style:normal;line-height:1.4;white-space:normal}
 .mechanical-calendar-shifts .duty-01-09{border-left:3px solid var(--cyan)}
 .mechanical-calendar-shifts .duty-09-17{border-left:3px solid var(--green)}
 .mechanical-calendar-shifts .duty-17-01{border-left:3px solid var(--amber)}
 .mechanical-schedule-sheet{display:none}
 
+@media(min-width:761px) and (max-width:1380px){.mechanical-day-editor{top:104px}}
 @media(max-width:1000px){.mechanical-schedule-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.mechanical-schedule-checks>div{grid-template-columns:1fr}.mechanical-calendar-day{min-height:182px;padding:7px}.mechanical-calendar-shifts>span{grid-template-columns:20px minmax(0,1fr);padding:5px 4px}}
 @media(max-width:800px){.mechanical-schedule-toolbar{align-items:stretch;flex-direction:column}.mechanical-schedule-month{flex-wrap:wrap}.mechanical-schedule-month>div{flex:1;min-width:140px}.mechanical-market-tabs{width:100%}.mechanical-market-tabs button{flex:1}.mechanical-staff-market-grid{grid-template-columns:1fr}.mechanical-legal-rules{grid-template-columns:1fr}.mechanical-legal-rules>div{border-right:0;border-bottom:1px solid var(--line)}.mechanical-day-editor>header{align-items:flex-start}.mechanical-shift-editor-grid{grid-template-columns:1fr}.mechanical-shift-editor-grid>article{padding:14px}.mechanical-calendar-weekdays{display:none}.mechanical-calendar-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px;background:var(--panel2)}.mechanical-calendar-day{min-height:158px;border:1px solid var(--line);border-radius:7px}.mechanical-calendar-day.is-outside{display:none}.mechanical-calendar-screen>header{align-items:flex-start;flex-direction:column}.mechanical-calendar-screen>header p{margin-top:-10px}}
-@media(max-width:520px){.mechanical-schedule-summary{grid-template-columns:1fr 1fr;gap:8px}.mechanical-schedule-summary article{padding:11px}.mechanical-schedule-summary strong{font-size:22px}.mechanical-staff-market-scope>summary{align-items:flex-start;flex-direction:column;gap:5px}.mechanical-staff-market-grid>label{align-items:stretch;flex-direction:column}.mechanical-staff-market-grid select{flex:none;width:100%;min-width:0}.mechanical-schedule-checks p{grid-template-columns:1fr;gap:2px}.mechanical-day-editor>header{flex-direction:column;gap:8px}.mechanical-day-editor>header h2{font-size:18px}.mechanical-day-editor>header>span{align-self:flex-start}.mechanical-calendar-grid{grid-template-columns:1fr}.mechanical-calendar-day{min-height:0}.mechanical-calendar-shifts em{font-size:11px}.mechanical-schedule-month>.secondary-btn:last-child{flex-basis:100%}}
+@media(max-width:760px){.mechanical-day-editor{position:relative;top:auto;z-index:auto;box-shadow:none}}
+@media(max-width:520px){.mechanical-schedule-summary{grid-template-columns:1fr 1fr;gap:8px}.mechanical-schedule-summary article{padding:11px}.mechanical-schedule-summary strong{font-size:22px}.mechanical-staff-market-scope>summary{align-items:flex-start;flex-direction:column;gap:5px}.mechanical-staff-market-grid>label{align-items:stretch;flex-direction:column}.mechanical-staff-market-grid select{flex:none;width:100%;min-width:0}.mechanical-schedule-checks p{grid-template-columns:1fr;gap:2px}.mechanical-day-editor>header{flex-direction:column;gap:8px}.mechanical-day-editor>header h2{font-size:18px}.mechanical-day-editor>header>span{align-self:flex-start}.mechanical-calendar-grid{grid-template-columns:1fr}.mechanical-calendar-day{min-height:0}.mechanical-calendar-shifts em{font-size:13.75px}.mechanical-schedule-month>.secondary-btn:last-child{flex-basis:100%}}
 
 @media print{
   @page{size:A4 landscape;margin:6mm}
