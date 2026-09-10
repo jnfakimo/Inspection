@@ -47,11 +47,13 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
   const [month, setMonth] = useState(todayMonth());
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [market, setMarket] = useState<MarketCode>('market_1');
-  const [users, setUsers] = useState<Row[]>([]);
+  const [allUsers, setAllUsers] = useState<Row[]>([]);
+  const [marketScopes, setMarketScopes] = useState<Row[]>([]);
   const [persisted, setPersisted] = useState<Row[]>([]);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingScope, setSavingScope] = useState('');
   const [note, setNote] = useState('');
 
   const dates = useMemo(() => scheduleMonthDates(month), [month]);
@@ -67,12 +69,13 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     setBusy(true); setNote('');
     const rangeStart = scheduleDateOffset(monthStart, -7), rangeEnd = scheduleDateOffset(monthEnd, 8);
     const client = getSupabase();
-    const [people, departments, schedule] = await Promise.all([
+    const [people, departments, schedule, scopes] = await Promise.all([
       client.from('users').select('user_id,name,dept_id,status').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,name,level,status').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
       client.from('mechanical_schedule_assignments').select('*').gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).order('duty_date').limit(5000),
+      client.from('mechanical_staff_market_scopes').select('user_id,market_code,is_active,updated_at').eq('is_active', true).limit(1000),
     ]);
-    const failure = people.error || departments.error || schedule.error;
+    const failure = people.error || departments.error || schedule.error || scopes.error;
     if (failure) { setNote(`失敗：${failure.message || '機電課排班資料載入失敗'}`); setBusy(false); return; }
     const departmentIds = new Set((departments.data || []).map(row => String(row.dept_id)));
     const staff = (people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
@@ -81,7 +84,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     const nextDraft: Record<string, string> = {};
     rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`) && isMechanicalWorkCode(row.duty_code))
       .forEach(row => { nextDraft[keyOf(row.user_id, String(row.duty_date))] = String(row.duty_code || ''); });
-    setUsers(staff); setPersisted(rows); setDraft(nextDraft); setBusy(false);
+    setAllUsers(staff); setMarketScopes(scopes.data || []); setPersisted(rows); setDraft(nextDraft); setBusy(false);
   }, [market, month, monthEnd, monthStart]);
 
   useEffect(() => { void load(); }, [load]);
@@ -90,6 +93,12 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     window.addEventListener('afterprint', clear);
     return () => { window.removeEventListener('afterprint', clear); clear(); };
   }, []);
+
+  const scopeByUser = useMemo(() => new Map(marketScopes.map(row => [String(row.user_id), String(row.market_code)])), [marketScopes]);
+  const users = useMemo(() => allUsers.filter(user => scopeByUser.get(String(user.user_id)) === market), [allUsers, market, scopeByUser]);
+  const marketOneCount = allUsers.filter(user => scopeByUser.get(String(user.user_id)) === 'market_1').length;
+  const marketTwoCount = allUsers.filter(user => scopeByUser.get(String(user.user_id)) === 'market_2').length;
+  const unassignedCount = allUsers.length - marketOneCount - marketTwoCount;
 
   const candidateRows = useMemo(() => users.flatMap(user => dates.flatMap(date => {
     const dutyCode = draft[keyOf(user.user_id, date)];
@@ -129,6 +138,21 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     if (!date.startsWith(`${month}-`)) setMonth(date.slice(0, 7));
     setSelectedDate(date);
   };
+  const saveMarketScope = async (user: Row, nextMarket: string) => {
+    const userId = String(user.user_id || '');
+    const currentMarket = scopeByUser.get(userId) || '';
+    if (!userId || nextMarket === currentMarket) return;
+    const nextLabel = nextMarket ? MARKET_LABELS[nextMarket as MarketCode] : '待分配';
+    const confirmed = window.confirm(`確定將「${String(user.name || '此人員')}」設定為${nextLabel}？\n今日起不符合新市場歸屬的既有班次會停用並保留異動紀錄。`);
+    if (!confirmed) return;
+    setSavingScope(userId); setNote('');
+    try {
+      await invokeAppApi('handover_save', { kind: 'mechanical_staff_market_save', user_id: userId, market_code: nextMarket || null });
+      await load();
+      setNote(`${String(user.name || '機電課人員')}已設定為${nextLabel}，一市與二市名單保持分離。`);
+    } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
+    finally { setSavingScope(''); }
+  };
   const save = async () => {
     if (errors.length) { setNote('班表有紅色違規項目，修正後才能儲存。'); return; }
     setSaving(true); setNote('');
@@ -153,8 +177,17 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
         <div className="mechanical-market-tabs" role="group" aria-label="市場別"><button className={market === 'market_1' ? 'is-active' : ''} aria-pressed={market === 'market_1'} onClick={() => setMarket('market_1')}>一市</button><button className={market === 'market_2' ? 'is-active' : ''} aria-pressed={market === 'market_2'} onClick={() => setMarket('market_2')}>二市</button></div>
       </section>
 
+      <details className="panel mechanical-staff-market-scope" open={unassignedCount > 0}>
+        <summary><span><small>人員市場歸屬</small><b>一市 {marketOneCount} 人・二市 {marketTwoCount} 人・待分配 {unassignedCount} 人</b></span><strong>{unassignedCount ? '請先完成名單分流' : '展開設定'}</strong></summary>
+        <p>每位機電課同仁只能歸屬一個市場；改派後不會同時出現在另一市場的排班或交接簿。</p>
+        <div className="mechanical-staff-market-grid">{allUsers.map(user => {
+          const userId = String(user.user_id);
+          return <label key={userId}><span><b>{String(user.name || '未命名')}</b><small>{scopeByUser.get(userId) ? MARKET_LABELS[scopeByUser.get(userId) as MarketCode] : '尚未分配市場'}</small></span><select aria-label={`${String(user.name || '機電課人員')}市場歸屬`} disabled={busy || Boolean(savingScope)} value={scopeByUser.get(userId) || ''} onChange={event => void saveMarketScope(user, event.target.value)}><option value="">待分配</option><option value="market_1">第一果菜批發市場</option><option value="market_2">第二果菜批發市場</option></select></label>;
+        })}</div>
+      </details>
+
       <section className="mechanical-schedule-summary" aria-label="排班摘要">
-        <article><small>機電課人員</small><strong>{users.length}</strong><span>可依日期隨機排班</span></article>
+        <article><small>{market === 'market_1' ? '一市' : '二市'}機電課人員</small><strong>{users.length}</strong><span>僅顯示本市場名單</span></article>
         <article><small>已排班次</small><strong>{assignedShiftCount}</strong><span>共 {candidateRows.length * 8} 人時</span></article>
         <article><small>尚未排班別</small><strong>{openShiftCount}</strong><span>{openShiftCount ? '可先儲存草稿' : '三班皆已安排'}</span></article>
         <article className={errors.length ? 'is-danger' : 'is-safe'}><small>勞基法卡控</small><strong>{errors.length}</strong><span>{errors.length ? '項必須修正' : '目前無違規'}</span></article>

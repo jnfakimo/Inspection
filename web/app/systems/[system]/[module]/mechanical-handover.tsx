@@ -141,7 +141,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     setBusy(true); setNote('');
     const client = getSupabase();
     const historyFrom = shiftDate(date, -90);
-    const [work, signs, approvalRows, people, departments, history, carryRows, scheduled] = await Promise.all([
+    const [work, signs, approvalRows, people, departments, history, carryRows, scheduled, marketScopes] = await Promise.all([
       client.from('mechanical_handover_entries').select('*').eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
       client.from('mechanical_handover_signatures').select('*').eq('work_date', date),
       client.from('mechanical_handover_daily_approvals').select('*').eq('work_date', date),
@@ -150,10 +150,13 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       client.from('mechanical_handover_entries').select('work_item').eq('created_by', profile.user_id).eq('is_deleted', false).limit(1000),
       client.from('mechanical_handover_entries').select('*').gte('work_date', historyFrom).lte('work_date', date).order('work_date').order('created_at').limit(5000),
       client.from('mechanical_schedule_assignments').select('user_id,duty_code,market_code,duty_date').eq('duty_date', date).eq('market_code', 'market_2').eq('is_active', true).in('duty_code', SHIFTS.map(shift => shift.code)),
+      client.from('mechanical_staff_market_scopes').select('user_id').eq('market_code', 'market_2').eq('is_active', true).limit(1000),
     ]);
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
-    const scopedPeople = (people.data || []).filter(person => person.status === 'active' && mechanicalDeptIds.has(String(person.dept_id)));
-    const failures = [work.error, signs.error, approvalRows.error, people.error, departments.error, history.error, carryRows.error, scheduled.error].filter(Boolean);
+    const secondMarketUserIds = new Set((marketScopes.data || []).map(row => String(row.user_id)));
+    const scopedPeople = (people.data || []).filter(person => person.status === 'active' && mechanicalDeptIds.has(String(person.dept_id)) && secondMarketUserIds.has(String(person.user_id)));
+    const scopedScheduleRows = (scheduled.data || []).filter(row => secondMarketUserIds.has(String(row.user_id)));
+    const failures = [work.error, signs.error, approvalRows.error, people.error, departments.error, history.error, carryRows.error, scheduled.error, marketScopes.error].filter(Boolean);
     const failure = failures[0];
     if (failure) {
       const localOrigin = typeof window !== 'undefined' && /^(?:localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})$/.test(window.location.hostname);
@@ -163,7 +166,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     }
     const itemCounts = new Map<string, number>();
     (history.data || []).forEach(row => { const item = String(row.work_item || ''); if (item) itemCounts.set(item, (itemCounts.get(item) || 0) + 1); });
-    setEntries(work.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setCarryHistory(carryRows.data || []); setScheduleRows(scheduled.data || []);
+    setEntries(work.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setCarryHistory(carryRows.data || []); setScheduleRows(scopedScheduleRows);
     setHistoryItems([...itemCounts.entries()].filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).map(([item]) => item)); setBusy(false);
   }, [date, profile.user_id]);
   useEffect(() => { void load(); }, [load]);

@@ -3130,6 +3130,20 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: true });
       }
 
+      if (kind === 'mechanical_staff_market_save') {
+        const userId = id(body.user_id);
+        const marketCode = body.market_code == null || body.market_code === '' ? null : text(body.market_code, 20);
+        if (!userId) return reply(req, { ok: false, message: '機電課人員識別碼無效' }, 400);
+        if (marketCode !== null && !['market_1', 'market_2'].includes(marketCode)) {
+          return reply(req, { ok: false, message: '人員市場歸屬無效' }, 400);
+        }
+        const { data, error } = await admin.rpc('save_mechanical_staff_market_scope', {
+          p_actor_id: profile.user_id, p_user_id: userId, p_market_code: marketCode,
+        }).single();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '機電課人員市場歸屬儲存失敗') }, String(error.code || '') === '42501' ? 403 : 409);
+        return reply(req, { ok: true, data });
+      }
+
       if (kind === 'mechanical_schedule_save') {
         const yearMonth = text(body.year_month, 7);
         const marketCode = text(body.market_code, 20);
@@ -3163,6 +3177,12 @@ export async function handleAppApiRequest(req: Request) {
             .in('user_id', scheduledUserIds).in('dept_id', departmentIds).eq('status', 'active');
           if (staffError) throw staffError;
           if ((staff || []).length !== scheduledUserIds.length) return reply(req, { ok: false, message: '排班人員僅限第二階機電課的在職同仁' }, 400);
+          const { data: marketStaff, error: marketStaffError } = await admin.from('mechanical_staff_market_scopes')
+            .select('user_id').in('user_id', scheduledUserIds).eq('market_code', marketCode).eq('is_active', true);
+          if (marketStaffError) throw marketStaffError;
+          if ((marketStaff || []).length !== scheduledUserIds.length) {
+            return reply(req, { ok: false, message: '排班人員必須歸屬目前市場，一市與二市人員不可混用' }, 400);
+          }
         }
 
         const monthStart = `${yearMonth}-01`;
