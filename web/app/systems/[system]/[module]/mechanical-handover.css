@@ -41,3 +41,23 @@
 .mechanical-print-approval>*:last-child{border-right:0}
 @media(max-width:800px){.mechanical-shift{padding:12px 12px 0}.mechanical-carry-heading{align-items:flex-start;flex-direction:column;gap:2px}.mechanical-approval{align-items:flex-start}}
 @media(max-width:520px){.mechanical-shift{margin-inline:-4px;padding:10px 9px 0}.mechanical-shift-title span b{align-items:flex-start;flex-direction:column;gap:3px}.mechanical-carry-card{align-items:stretch;flex-direction:column}.mechanical-carry-card button{align-self:flex-end}.mechanical-approval{align-items:stretch;flex-direction:column}.mechanical-approval button,.mechanical-approval-pending{align-self:flex-end}.mechanical-approval-seal{align-self:flex-end;width:58px;height:58px}.mechanical-carry-source{margin:12px 12px 4px}}
+
+/* 現場操作細修：縮短簽名欄、區隔課長簽核，並強化新增工作視窗層次。 */
+.mechanical-shift-sign{grid-template-columns:auto minmax(190px,235px) auto;justify-content:start}
+.mechanical-approval{border-left-color:var(--violet);background:color-mix(in srgb,var(--violet) 8%,var(--panel2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--violet) 8%,transparent)}
+.mechanical-approval:not(.is-approved) h3{color:var(--violet)}
+.mechanical-approval-pending{border-color:var(--violet);background:color-mix(in srgb,var(--violet) 8%,var(--panel));color:var(--violet)}
+.mechanical-approval.is-approved{border-left-color:var(--green);background:color-mix(in srgb,var(--green) 8%,var(--panel2));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--green) 8%,transparent)}
+.mechanical-work-modal{border-top-width:4px;border-radius:10px;box-shadow:0 24px 68px color-mix(in srgb,var(--text) 24%,transparent)}
+.mechanical-work-modal>header{background:linear-gradient(90deg,color-mix(in srgb,var(--cyan) 10%,var(--panel)),var(--panel))}
+.mechanical-work-modal>header h2{font-size:1.25rem;letter-spacing:.01em}
+.mechanical-work-modal .mechanical-form{padding-top:18px;background:color-mix(in srgb,var(--cyan) 2%,var(--panel))}
+.mechanical-work-modal .mechanical-form>label{gap:7px;font-weight:600}
+.mechanical-work-modal .mechanical-form select,.mechanical-work-modal .mechanical-form input,.mechanical-work-modal .mechanical-form textarea{background:var(--panel2)}
+.mechanical-work-modal .mechanical-form select:focus,.mechanical-work-modal .mechanical-form input:focus,.mechanical-work-modal .mechanical-form textarea:focus{border-color:var(--cyan);outline:2px solid color-mix(in srgb,var(--cyan) 24%,transparent);outline-offset:1px}
+.mechanical-work-modal .mechanical-form fieldset{background:color-mix(in srgb,var(--cyan) 3%,var(--panel2))}
+.mechanical-work-modal .mechanical-person-grid label{transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.mechanical-work-modal .mechanical-person-grid label:hover{border-color:color-mix(in srgb,var(--cyan) 60%,var(--line));background:color-mix(in srgb,var(--cyan) 6%,var(--panel2))}
+.mechanical-work-modal .mechanical-person-grid label:has(input:checked){border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,var(--panel2));box-shadow:inset 3px 0 0 var(--cyan)}
+.mechanical-work-modal>footer{position:sticky;bottom:0;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(8px)}
+@media(max-width:520px){.mechanical-shift-sign{grid-template-columns:1fr;justify-content:stretch}.mechanical-work-modal .mechanical-form{padding:14px}.mechanical-work-modal>header,.mechanical-work-modal>footer{padding-inline:14px}}
