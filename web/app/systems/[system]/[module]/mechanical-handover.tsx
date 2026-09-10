@@ -278,9 +278,9 @@ export function MechanicalHandover({ system, module, profile }: Props) {
 export function PrintRangeModal({ error, from, to, busy, onFrom, onTo, onClose, onPrint }: { error?: string; from: string; to: string; busy: boolean; onFrom: (value: string) => void; onTo: (value: string) => void; onClose: () => void; onPrint: () => void }) {
   const pages = from && to && from <= to ? dateRange(from, to).length : 0;
   return <AdminModal className="mechanical-modal mechanical-print-modal" title="列印機電交接報表" onClose={onClose}>
-    <div className="mechanical-print-range"><label>開始日期<LocalizedDateInput aria-label="列印開始日期" value={from} onChange={event => onFrom(event.target.value)} /></label><label>結束日期<LocalizedDateInput aria-label="列印結束日期" value={to} onChange={event => onTo(event.target.value)} /></label></div>
+    <div className="mechanical-print-range"><label>開始日期<LocalizedDateInput aria-label="列印開始日期" value={from} onChange={event => onFrom(event.target.value)} /></label><span className="mechanical-print-range-arrow" aria-hidden="true">→</span><label>結束日期<LocalizedDateInput aria-label="列印結束日期" value={to} onChange={event => onTo(event.target.value)} /></label></div>
     {error && <p role="alert" className="mechanical-modal-message">{error}</p>}
-    <p className="mechanical-print-hint">每一天會產生一頁 A4 報表，最多可列印 31 天（目前 {pages} 頁）。</p>
+    <p className="mechanical-print-hint">每一天會產生一頁 A4 報表，最多可列印 31 天（目前 <strong>{pages}</strong> 頁）。</p>
     {(!pages || pages > 31) && <p className="inline-message danger">請確認日期順序，且列印區間不可超過 31 天。</p>}
     <footer><button className="secondary-btn" onClick={onClose}>取消</button><button className="primary-btn compact" disabled={busy || !pages || pages > 31} onClick={onPrint}>{busy ? '準備中…' : '開始列印'}</button></footer>
   </AdminModal>;

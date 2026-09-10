@@ -64,7 +64,15 @@
 .mechanical-work-modal>footer{position:sticky;bottom:0;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(8px)}
 @media(max-width:520px){.mechanical-shift-sign{grid-template-columns:1fr;justify-content:stretch}.mechanical-work-modal .mechanical-form{padding:14px}.mechanical-work-modal>header,.mechanical-work-modal>footer{padding-inline:14px}}
 
-/* 列印日期欄桌機固定 280px；窄版維持單欄且不溢出。 */
-.mechanical-print-range{grid-template-columns:repeat(2,minmax(0,280px));justify-content:start}
-@media(max-width:640px){.mechanical-print-range{grid-template-columns:minmax(0,280px)}}
-@media(max-width:520px){.mechanical-print-range{grid-template-columns:1fr}}
+/* 列印視窗細修：日期欄縮短、建立區間關係，手機再轉為單欄。 */
+.admin-modal.mechanical-print-modal{width:min(580px,calc(100vw - 32px));overflow:hidden}
+.admin-modal.mechanical-print-modal>header{background:color-mix(in srgb,var(--cyan) 5%,var(--panel))}
+.mechanical-print-range{grid-template-columns:220px 28px 220px;align-items:end;justify-content:start;gap:8px;margin:18px 20px 0;padding:16px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--cyan) 4%,var(--panel2))}
+.mechanical-print-range label{gap:7px;font-size:14px;letter-spacing:.04em}
+.mechanical-print-range .localized-date-input{width:220px}
+.mechanical-print-range-arrow{display:grid;height:44px;place-items:center;color:var(--cyan);font-size:20px;font-weight:700}
+.mechanical-print-hint{margin:14px 20px 0;padding:11px 13px;border-left:4px solid var(--cyan);border-radius:5px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel2));line-height:1.55}
+.mechanical-print-hint strong{color:var(--cyan);font-size:1.08em}
+.admin-modal.mechanical-print-modal>footer{margin-top:18px;background:var(--panel2)}
+@media(max-width:640px){.admin-modal.mechanical-print-modal{width:min(520px,calc(100vw - 16px))}.mechanical-print-range{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.mechanical-print-range .localized-date-input{width:100%}.mechanical-print-range-arrow{display:none}}
+@media(max-width:520px){.admin-modal.mechanical-print-modal{width:100%}.mechanical-print-range{grid-template-columns:1fr;margin:14px 14px 0;padding:12px}.mechanical-print-hint{margin-inline:14px}.admin-modal.mechanical-print-modal>footer{margin-top:14px}}
