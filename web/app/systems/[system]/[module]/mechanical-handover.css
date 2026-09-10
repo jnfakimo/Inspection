@@ -64,6 +64,30 @@
 .mechanical-work-modal>footer{position:sticky;bottom:0;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(8px)}
 @media(max-width:520px){.mechanical-shift-sign{grid-template-columns:1fr;justify-content:stretch}.mechanical-work-modal .mechanical-form{padding:14px}.mechanical-work-modal>header,.mechanical-work-modal>footer{padding-inline:14px}}
 
+/* 工作紀錄 CRUD 與異動軌跡：整張可點擊，軟刪除後仍保留可讀。 */
+.mechanical-entry-card{cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease,transform .15s ease}
+.mechanical-entry-card:hover{background:color-mix(in srgb,var(--cyan) 5%,transparent);box-shadow:inset 3px 0 0 color-mix(in srgb,var(--cyan) 72%,transparent)}
+.mechanical-entry-card:focus-visible{border-radius:5px;outline:2px solid var(--cyan);outline-offset:2px}
+.mechanical-entry-card:active{transform:translateY(1px)}
+.mechanical-entry-audit{display:flex;grid-column:1/-1;align-items:center;gap:5px 14px;flex-wrap:wrap;margin-top:-4px;padding-top:9px;border-top:1px dashed var(--line);color:var(--dim);font-size:11px}
+.mechanical-entry-audit b{margin-left:auto;color:var(--cyan);font-size:12px;white-space:nowrap}
+.mechanical-entry-audit .is-delete-event,.mechanical-deleted-count{color:var(--red)}
+.mechanical-entry-card.is-deleted{background:color-mix(in srgb,var(--red) 5%,var(--panel));box-shadow:inset 3px 0 0 color-mix(in srgb,var(--red) 62%,transparent)}
+.mechanical-entry-card.is-deleted .mechanical-entry-main,.mechanical-entry-card.is-deleted .mechanical-entry-people,.mechanical-entry-card.is-deleted .mechanical-entry-result{opacity:.7}
+.mechanical-entry-card.is-deleted .mechanical-entry-main h3,.mechanical-entry-card.is-deleted .mechanical-entry-main p,.mechanical-entry-card.is-deleted .mechanical-entry-people p,.mechanical-entry-card.is-deleted .mechanical-entry-result strong{text-decoration:line-through;text-decoration-thickness:1.5px}
+.result-deleted{border-color:var(--red);background:color-mix(in srgb,var(--red) 10%,var(--panel));color:var(--red);text-decoration:line-through}
+.mechanical-shift-sign>b{display:grid;gap:2px}
+.mechanical-shift-sign>b small{color:var(--dim);font-size:10px;font-weight:400;white-space:nowrap}
+.mechanical-edit-history{display:flex;align-items:center;gap:6px 16px;flex-wrap:wrap;margin:14px 20px 0;padding:11px 13px;border-left:4px solid var(--cyan);border-radius:5px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel2));color:var(--dim);font-size:12px}
+.mechanical-edit-history b{flex-basis:100%;color:var(--cyan);font-size:14px}
+.mechanical-edit-history.is-deleted{border-left-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--panel2))}
+.mechanical-edit-history.is-deleted b{color:var(--red)}
+.mechanical-work-modal>footer .danger-btn{margin-left:auto}
+.mechanical-work-modal>footer .danger-btn+.primary-btn{margin-left:0}
+@media(max-width:800px){.mechanical-entry-audit b{flex-basis:100%;margin-left:0}}
+@media(max-width:520px){.mechanical-entry-audit{margin-top:10px}.mechanical-edit-history{margin:12px 14px 0}.mechanical-work-modal>footer{gap:8px}.mechanical-work-modal>footer .danger-btn{margin-left:0}}
+@media print{.mechanical-print-shift tr.is-deleted td{text-decoration:line-through;color:#555}.mechanical-print-delete-time{display:block;margin-top:1mm;font-size:7.5pt}.mechanical-print-shift tr.is-deleted td:nth-last-child(2){text-decoration:none}}
+
 /* 列印視窗細修：日期欄縮短、建立區間關係，手機再轉為單欄。 */
 .admin-modal.mechanical-print-modal{width:min(580px,calc(100vw - 32px));overflow:hidden}
 .admin-modal.mechanical-print-modal>header{background:color-mix(in srgb,var(--cyan) 5%,var(--panel))}

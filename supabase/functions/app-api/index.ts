@@ -75,7 +75,9 @@ function validISODate(value: string) {
 }
 
 const MECHANICAL_SHIFT_CODES = ['01-09', '09-17', '17-01'] as const;
-const MECHANICAL_UNFINISHED_RESULTS = new Set(['處理中', '待料', '待廠商', '交下班續辦', '無法處理']);
+const MECHANICAL_RESULTS = ['正常', '已完成', '處理中', '待料', '待廠商', '交下班續辦', '無法處理'] as const;
+const MECHANICAL_RESULT_SET = new Set<string>(MECHANICAL_RESULTS);
+const MECHANICAL_UNFINISHED_RESULTS = new Set<string>(['處理中', '待料', '待廠商', '交下班續辦', '無法處理']);
 
 function mechanicalShiftSlot(workDate: string, shiftCode: string) {
   const day = Math.floor(new Date(`${workDate}T12:00:00+08:00`).getTime() / 86_400_000);
@@ -3139,6 +3141,8 @@ export async function handleAppApiRequest(req: Request) {
         const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
         if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
         if (technicianIds.length > 20) return reply(req, { ok: false, message: '單筆工作最多選擇 20 位維修人員' }, 400);
+        const result = text(body.result, 80) || '正常';
+        if (!MECHANICAL_RESULT_SET.has(result)) return reply(req, { ok: false, message: '處理結果狀態無效' }, 400);
         const costCents = repairCostCents(body.repair_cost);
         if (costCents === undefined) return reply(req, { ok: false, message: '維修費用格式無效，最多可輸入兩位小數' }, 400);
         const { data: mechanicalDepartments, error: departmentError } = await userDb.from('departments')
@@ -3154,22 +3158,22 @@ export async function handleAppApiRequest(req: Request) {
         if (body.carry_source_id && !carrySourceId) return reply(req, { ok: false, message: '續辦來源資料無效' }, 400);
         if (carrySourceId) {
           const { data: source, error: sourceError } = await userDb.from('mechanical_handover_entries')
-            .select('entry_id,work_date,shift_code,result').eq('entry_id', carrySourceId).maybeSingle();
+            .select('entry_id,work_date,shift_code,result,is_deleted').eq('entry_id', carrySourceId).maybeSingle();
           if (sourceError) throw sourceError;
-          if (!source) return reply(req, { ok: false, message: '找不到續辦來源工作' }, 404);
+          if (!source || source.is_deleted) return reply(req, { ok: false, message: '找不到可接續的來源工作' }, 404);
           if (!MECHANICAL_UNFINISHED_RESULTS.has(String(source.result || ''))) return reply(req, { ok: false, message: '原工作已完成，不需要帶入下一班' }, 409);
           if (mechanicalShiftSlot(workDate, shiftCode) <= mechanicalShiftSlot(String(source.work_date), String(source.shift_code))) {
             return reply(req, { ok: false, message: '續辦紀錄必須建立在原工作之後的班次' }, 400);
           }
           const { data: existingCarry, error: carryReadError } = await userDb.from('mechanical_handover_entries')
-            .select('entry_id').eq('carry_source_id', carrySourceId).maybeSingle();
+            .select('entry_id').eq('carry_source_id', carrySourceId).eq('is_deleted', false).maybeSingle();
           if (carryReadError) throw carryReadError;
           if (existingCarry) return reply(req, { ok: false, message: '這筆工作已由其他班次接續，請重新載入' }, 409);
         }
         const payload = {
           work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
           details: text(body.details, 3000) || null, technician_ids: technicianIds,
-          result: text(body.result, 80) || '正常', notes: text(body.notes, 1000) || null,
+          result, notes: text(body.notes, 1000) || null,
           repair_cost: costCents === null ? null : costCents / 100,
           carry_source_id: carrySourceId,
           created_by: profile.user_id,
@@ -3181,6 +3185,77 @@ export async function handleAppApiRequest(req: Request) {
         }
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', data.entry_id, 'insert', null, payload);
         return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'mechanical_entry_update') {
+        const entryId = id(body.entry_id);
+        if (!entryId) return reply(req, { ok: false, message: '工作紀錄識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('mechanical_handover_entries')
+          .select('*').eq('entry_id', entryId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的工作紀錄' }, 404);
+        if (before.is_deleted) return reply(req, { ok: false, message: '已刪除的工作紀錄不可再修改' }, 409);
+        const workDate = String(before.work_date || '');
+        const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
+          .select('approval_id').eq('work_date', workDate).maybeSingle();
+        if (approvalReadError) throw approvalReadError;
+        if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再修改工作' }, 409);
+
+        const category = text(body.category, 80), workItem = text(body.work_item, 300);
+        const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
+        if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
+        if (technicianIds.length > 20) return reply(req, { ok: false, message: '單筆工作最多選擇 20 位維修人員' }, 400);
+        const result = text(body.result, 80) || '正常';
+        if (!MECHANICAL_RESULT_SET.has(result)) return reply(req, { ok: false, message: '處理結果狀態無效' }, 400);
+        const costCents = repairCostCents(body.repair_cost);
+        if (costCents === undefined) return reply(req, { ok: false, message: '維修費用格式無效，最多可輸入兩位小數' }, 400);
+
+        const { data: mechanicalDepartments, error: departmentError } = await userDb.from('departments')
+          .select('dept_id').eq('name', '機電課').eq('level', 2).eq('status', 'active');
+        if (departmentError) throw departmentError;
+        const mechanicalDeptIds = (mechanicalDepartments || []).map(department => department.dept_id);
+        if (!mechanicalDeptIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
+        const { data: people, error: peopleError } = await userDb.from('users').select('user_id')
+          .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
+        if (peopleError) throw peopleError;
+        if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
+
+        const payload = {
+          category, work_item: workItem, details: text(body.details, 3000) || null,
+          technician_ids: technicianIds, result, notes: text(body.notes, 1000) || null,
+          repair_cost: costCents === null ? null : costCents / 100,
+          updated_by: profile.user_id, updated_at: new Date().toISOString(),
+        };
+        const { data: updated, error } = await userDb.from('mechanical_handover_entries')
+          .update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '工作紀錄修改失敗') }, String(error.code || '') === '42501' ? 403 : 409);
+        if (!updated) return reply(req, { ok: false, message: '這筆工作已被其他人異動，請重新載入' }, 409);
+        await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', entryId, 'update', before, updated);
+        return reply(req, { ok: true, data: updated });
+      }
+
+      if (kind === 'mechanical_entry_delete') {
+        const entryId = id(body.entry_id);
+        if (!entryId) return reply(req, { ok: false, message: '工作紀錄識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('mechanical_handover_entries')
+          .select('*').eq('entry_id', entryId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的工作紀錄' }, 404);
+        if (before.is_deleted) return reply(req, { ok: false, message: '這筆工作紀錄已標記刪除' }, 409);
+        const workDate = String(before.work_date || '');
+        const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
+          .select('approval_id').eq('work_date', workDate).maybeSingle();
+        if (approvalReadError) throw approvalReadError;
+        if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再刪除工作' }, 409);
+
+        const deletedAt = new Date().toISOString();
+        const payload = { is_deleted: true, deleted_at: deletedAt, deleted_by: profile.user_id, updated_by: profile.user_id, updated_at: deletedAt };
+        const { data: updated, error } = await userDb.from('mechanical_handover_entries')
+          .update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '工作紀錄刪除失敗') }, String(error.code || '') === '42501' ? 403 : 409);
+        if (!updated) return reply(req, { ok: false, message: '這筆工作已被其他人異動，請重新載入' }, 409);
+        await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', entryId, 'status_change', before, updated);
+        return reply(req, { ok: true, data: updated });
       }
 
       if (kind === 'mechanical_sign') {

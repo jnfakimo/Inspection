@@ -12,8 +12,17 @@ test('keeps only unresolved lineage leaves', () => {
     { entry_id: 'a', result: '待料' },
     { entry_id: 'b', carry_source_id: 'a', result: '處理中' },
     { entry_id: 'c', result: '已完成' },
+    { entry_id: 'd', result: '待廠商', is_deleted: true },
   ];
   assert.deepEqual(outstandingMechanicalEntries(rows).map(row => row.entry_id), ['b']);
+});
+
+test('allows a source to return to the queue when its continuation was soft-deleted', () => {
+  const rows = [
+    { entry_id: 'source', result: '待料' },
+    { entry_id: 'deleted-child', carry_source_id: 'source', result: '處理中', is_deleted: true },
+  ];
+  assert.deepEqual(outstandingMechanicalEntries(rows).map(row => row.entry_id), ['source']);
 });
 
 test('places overdue work in the active shift and future work in its next shift', () => {

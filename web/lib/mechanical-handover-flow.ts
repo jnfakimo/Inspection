@@ -11,6 +11,7 @@ type HandoverRow = {
   work_date?: unknown;
   shift_code?: unknown;
   result?: unknown;
+  is_deleted?: unknown;
 };
 
 export function isUnfinishedMechanicalResult(result: unknown) {
@@ -62,8 +63,9 @@ export function canApproveMechanicalDay(workDate: string, now = new Date()) {
 }
 
 export function outstandingMechanicalEntries(rows: HandoverRow[]) {
-  const continued = new Set(rows.map(row => String(row.carry_source_id || '')).filter(Boolean));
-  return rows.filter(row => {
+  const activeRows = rows.filter(row => row.is_deleted !== true);
+  const continued = new Set(activeRows.map(row => String(row.carry_source_id || '')).filter(Boolean));
+  return activeRows.filter(row => {
     const id = String(row.entry_id || '');
     return id && !continued.has(id) && isUnfinishedMechanicalResult(row.result);
   });
