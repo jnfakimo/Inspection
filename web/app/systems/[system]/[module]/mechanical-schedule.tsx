@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { AdminHeader, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import {
-  isMechanicalWorkCode, scheduleCalendarDates, scheduleDateOffset, scheduleMonthDates,
+  copyPreviousMonthDraft, isMechanicalWorkCode, scheduleCalendarDates, scheduleDateOffset, scheduleMonthDates,
   shiftScheduleMonth, validateMechanicalSchedule,
 } from '@/lib/mechanical-schedule';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -53,6 +53,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [copying, setCopying] = useState(false);
   const [savingScope, setSavingScope] = useState('');
   const [note, setNote] = useState('');
 
@@ -153,6 +154,26 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     finally { setSavingScope(''); }
   };
+  const copyPreviousMonth = async () => {
+    const sourceMonth = shiftScheduleMonth(month, -1);
+    if (!users.length) { setNote(`${MARKET_LABELS[market]}尚未分配機電課人員，無法複製班表。`); return; }
+    const confirmed = window.confirm(`確定將${monthTitle(sourceMonth)}的${MARKET_LABELS[market]}班表複製到${monthTitle(month)}？\n將依相同日期複製（1 日對應 1 日），取代目前畫面中的本月草稿；確認儲存前不會寫入資料庫。`);
+    if (!confirmed) return;
+    setCopying(true); setNote('');
+    try {
+      const client = getSupabase();
+      const { data, error } = await client.from('mechanical_schedule_assignments').select('user_id,duty_date,duty_code,market_code,is_active')
+        .eq('market_code', market).eq('is_active', true).gte('duty_date', `${sourceMonth}-01`).lt('duty_date', `${month}-01`).order('duty_date').limit(5000);
+      if (error) throw error;
+      const copiedDraft = copyPreviousMonthDraft(data || [], month, market, users.map(user => user.user_id));
+      const copiedCount = Object.keys(copiedDraft).length;
+      if (!copiedCount) { setNote(`${MARKET_LABELS[market]} ${monthTitle(sourceMonth)}尚無可複製的班表。`); return; }
+      setDraft(copiedDraft);
+      setSelectedDate(monthStart);
+      setNote(`已將${monthTitle(sourceMonth)}的 ${copiedCount} 筆排班複製為本月草稿；請確認勞基法檢核後再儲存。`);
+    } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
+    finally { setCopying(false); }
+  };
   const save = async () => {
     if (errors.length) { setNote('班表有紅色違規項目，修正後才能儲存。'); return; }
     setSaving(true); setNote('');
@@ -170,7 +191,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="mechanical-schedule-page">
-      <AdminHeader module={module} busy={busy} note={note} onReload={() => void load()} action={<><button className="secondary-btn compact" disabled={busy} onClick={print}>列印本月班表</button><button className="primary-btn compact" disabled={busy || saving || errors.length > 0} onClick={() => void save()}>{saving ? '儲存中…' : openShiftCount ? '儲存草稿' : '儲存班表'}</button></>} />
+      <AdminHeader module={module} busy={busy} note={note} onReload={() => void load()} action={<><button className="secondary-btn compact" disabled={busy || saving || copying} onClick={() => void copyPreviousMonth()}>{copying ? '複製中…' : '複製上月班表'}</button><button className="secondary-btn compact" disabled={busy} onClick={print}>列印本月班表</button><button className="primary-btn compact" disabled={busy || saving || copying || errors.length > 0} onClick={() => void save()}>{saving ? '儲存中…' : openShiftCount ? '儲存草稿' : '儲存班表'}</button></>} />
 
       <section className="panel mechanical-schedule-toolbar">
         <div className="mechanical-schedule-month"><button className="secondary-btn compact" aria-label="前一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, -1))}>‹</button><div><small>萬年曆月份</small><b>{monthTitle(month)}</b></div><button className="secondary-btn compact" aria-label="後一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, 1))}>›</button><button className="secondary-btn compact" onClick={() => { setMonth(todayMonth()); setSelectedDate(todayISO()); }}>本月</button></div>

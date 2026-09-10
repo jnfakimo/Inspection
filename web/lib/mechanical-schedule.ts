@@ -92,6 +92,28 @@ export function scheduleDateOffset(value: string, offset: number) {
   return isoDate(dayNumber(value) + offset);
 }
 
+export function copyPreviousMonthDraft(
+  rows: MechanicalScheduleRow[],
+  targetMonth: string,
+  marketCode: string,
+  allowedUserIds: Iterable<unknown>,
+) {
+  const sourceMonth = shiftScheduleMonth(targetMonth, -1);
+  const targetDates = new Set(scheduleMonthDates(targetMonth));
+  const allowedUsers = new Set(Array.from(allowedUserIds, value => String(value)));
+  const draft: Record<string, string> = {};
+  rows.forEach(row => {
+    const userId = String(row.user_id || '');
+    const sourceDate = String(row.duty_date || '');
+    const dutyCode = String(row.duty_code || '');
+    if (!userId || !allowedUsers.has(userId) || row.is_active === false || String(row.market_code || '') !== marketCode
+      || !sourceDate.startsWith(`${sourceMonth}-`) || !isMechanicalWorkCode(dutyCode)) return;
+    const targetDate = `${targetMonth}-${sourceDate.slice(-2)}`;
+    if (targetDates.has(targetDate)) draft[`${userId}|${targetDate}`] = dutyCode;
+  });
+  return draft;
+}
+
 export function isMechanicalWorkCode(value: unknown): value is '01-09' | '09-17' | '17-01' {
   return WORK_CODES.has(String(value) as MechanicalScheduleCode);
 }

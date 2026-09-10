@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleCalendarDates, validateMechanicalSchedule } from './mechanical-schedule.ts';
+import { copyPreviousMonthDraft, scheduleCalendarDates, validateMechanicalSchedule } from './mechanical-schedule.ts';
 
 const id = '00000000-0000-4000-8000-000000000001';
 const row = (date: string, code: string, market = 'market_1') => ({ user_id: id, duty_date: date, duty_code: code, market_code: market });
@@ -43,4 +43,25 @@ test('perpetual calendar always spans six complete weeks and leap day', () => {
   assert.equal(dates[0], '2028-01-30');
   assert.ok(dates.includes('2028-02-29'));
   assert.equal(dates.at(-1), '2028-03-11');
+});
+
+test('copies only the selected market and current roster by matching day of month', () => {
+  const anotherId = '00000000-0000-4000-8000-000000000002';
+  const draft = copyPreviousMonthDraft([
+    row('2026-08-01', '01-09'),
+    row('2026-08-31', '17-01'),
+    row('2026-08-02', '09-17', 'market_2'),
+    { user_id: anotherId, duty_date: '2026-08-03', duty_code: '09-17', market_code: 'market_1' },
+    { ...row('2026-08-04', '17-01'), is_active: false },
+  ], '2026-09', 'market_1', [id]);
+  assert.deepEqual(draft, {
+    [`${id}|2026-09-01`]: '01-09',
+  });
+});
+
+test('drops source dates that do not exist in the shorter target month', () => {
+  const draft = copyPreviousMonthDraft([
+    row('2027-01-28', '01-09'), row('2027-01-29', '09-17'), row('2027-01-31', '17-01'),
+  ], '2027-02', 'market_1', [id]);
+  assert.deepEqual(draft, { [`${id}|2027-02-28`]: '01-09' });
 });
