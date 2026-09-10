@@ -83,6 +83,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [signatures, setSignatures] = useState<Row[]>([]);
   const [approvals, setApprovals] = useState<Row[]>([]);
   const [carryHistory, setCarryHistory] = useState<Row[]>([]);
+  const [scheduleRows, setScheduleRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
   const [directoryUsers, setDirectoryUsers] = useState<Row[]>([]);
   const [historyItems, setHistoryItems] = useState<string[]>([]);
@@ -140,7 +141,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     setBusy(true); setNote('');
     const client = getSupabase();
     const historyFrom = shiftDate(date, -90);
-    const [work, signs, approvalRows, people, departments, history, carryRows] = await Promise.all([
+    const [work, signs, approvalRows, people, departments, history, carryRows, scheduled] = await Promise.all([
       client.from('mechanical_handover_entries').select('*').eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
       client.from('mechanical_handover_signatures').select('*').eq('work_date', date),
       client.from('mechanical_handover_daily_approvals').select('*').eq('work_date', date),
@@ -148,10 +149,11 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       client.from('departments').select('dept_id,name,parent_id,status,level').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
       client.from('mechanical_handover_entries').select('work_item').eq('created_by', profile.user_id).eq('is_deleted', false).limit(1000),
       client.from('mechanical_handover_entries').select('*').gte('work_date', historyFrom).lte('work_date', date).order('work_date').order('created_at').limit(5000),
+      client.from('mechanical_schedule_assignments').select('user_id,duty_code,market_code,duty_date').eq('duty_date', date).eq('market_code', 'market_2').eq('is_active', true).in('duty_code', SHIFTS.map(shift => shift.code)),
     ]);
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
     const scopedPeople = (people.data || []).filter(person => person.status === 'active' && mechanicalDeptIds.has(String(person.dept_id)));
-    const failures = [work.error, signs.error, approvalRows.error, people.error, departments.error, history.error, carryRows.error].filter(Boolean);
+    const failures = [work.error, signs.error, approvalRows.error, people.error, departments.error, history.error, carryRows.error, scheduled.error].filter(Boolean);
     const failure = failures[0];
     if (failure) {
       const localOrigin = typeof window !== 'undefined' && /^(?:localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})$/.test(window.location.hostname);
@@ -161,13 +163,14 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     }
     const itemCounts = new Map<string, number>();
     (history.data || []).forEach(row => { const item = String(row.work_item || ''); if (item) itemCounts.set(item, (itemCounts.get(item) || 0) + 1); });
-    setEntries(work.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setCarryHistory(carryRows.data || []);
+    setEntries(work.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setCarryHistory(carryRows.data || []); setScheduleRows(scheduled.data || []);
     setHistoryItems([...itemCounts.entries()].filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).map(([item]) => item)); setBusy(false);
   }, [date, profile.user_id]);
   useEffect(() => { void load(); }, [load]);
 
   const userName = useCallback((id: unknown) => directoryUsers.find(user => String(user.user_id) === String(id))?.name || '—', [directoryUsers]);
   const mechanicalUsers = useMemo(() => [...users].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW')), [users]);
+  const scheduledIdsFor = useCallback((shiftCode: string) => scheduleRows.filter(row => row.duty_code === shiftCode).map(row => String(row.user_id)), [scheduleRows]);
   const frequentItems = useMemo(() => historyItems.filter(item => Object.prototype.hasOwnProperty.call(WORK_ITEMS, item) || Object.values(WORK_ITEMS).some(items => items.includes(item))), [historyItems]);
   const byShift = (code: string) => entries.filter(entry => entry.shift_code === code);
   const signFor = (code: string) => signatures.find(sign => sign.shift_code === code);
@@ -262,11 +265,15 @@ export function MechanicalHandover({ system, module, profile }: Props) {
           const deletedRows = rows.length - activeRows.length;
           const carryRows = carryByShift.get(shift.code) || [];
           const isCurrent = date === activeShift.workDate && shift.code === activeShift.shiftCode;
+          const scheduledIds = scheduledIdsFor(shift.code);
+          const scheduledNames = scheduledIds.map(userName).filter(name => name !== '—');
+          const signatureUsers = [...mechanicalUsers].sort((a, b) => Number(scheduledIds.includes(String(b.user_id))) - Number(scheduledIds.includes(String(a.user_id))) || String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
           return <section className={`mechanical-shift mechanical-shift-${index + 1}${isCurrent ? ' is-current' : ''}`} key={shift.code}>
             <div className="mechanical-shift-head">
               <div className="mechanical-shift-title"><strong>{['一', '二', '三'][index]}</strong><span><b>{['早班', '中班', '晚班'][index]}{isCurrent && <em>目前當班</em>}</b><small>{shift.label} · {activeRows.length} 件{deletedRows ? `（刪除 ${deletedRows}）` : ''} · 費用 {formatRepairCost(repairCostTotal(activeRows))}</small></span></div>
               <button className="primary-btn compact" disabled={busy || Boolean(approval)} onClick={() => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shift.code); }}>＋ 新增工作</button>
             </div>
+            <div className={`mechanical-scheduled-roster${scheduledNames.length ? '' : ' is-empty'}`}><span>二市排班表</span><b>{scheduledNames.length ? scheduledNames.join('、') : '本班尚未排定人員'}</b><a href="/Inspection/v2/systems/handover/mechanical-schedule/">開啟排班表</a></div>
             {carryRows.length > 0 && <div className="mechanical-carry-list" aria-label={`${shift.label}上班續辦工作`}>
               <div className="mechanical-carry-heading"><b>上班未完成 · 待續辦 {carryRows.length} 件</b><small>原紀錄保留；接續處理後會建立本班的新紀錄。</small></div>
               {carryRows.map(row => <article className="mechanical-carry-card" key={String(row.entry_id)}>
@@ -282,7 +289,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
                 <div className="mechanical-entry-audit"><span>建立 {activityTime(row.created_at)} · {userName(row.created_by)}</span>{hasLaterUpdate(row) && <span>修改 {activityTime(row.updated_at)} · {userName(row.updated_by)}</span>}{isDeleted(row) && <span className="is-delete-event">刪除 {activityTime(row.deleted_at)} · {userName(row.deleted_by)}</span>}<b>{approval ? '已簽核鎖定' : isDeleted(row) ? '保留刪除紀錄' : '點擊修改'}</b></div>
               </article>
             ) : <p className="mechanical-empty">本班尚無工作紀錄，請按「新增工作」建立。</p>}</div>
-            <div className="mechanical-shift-sign"><span>值班簽名</span><select disabled={busy || Boolean(approval)} aria-label={`${shift.label}值班人員`} value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{mechanicalUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}（機電課）</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}{signFor(shift.code)?.updated_at && <small>{activityTime(signFor(shift.code)?.updated_at)}</small>}</b></div>
+            <div className="mechanical-shift-sign"><span>值班簽名</span><select disabled={busy || Boolean(approval)} aria-label={`${shift.label}值班人員`} value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{signatureUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{scheduledIds.includes(String(user.user_id)) ? '（本班排班）' : '（機電課）'}</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}{signFor(shift.code)?.updated_at && <small>{activityTime(signFor(shift.code)?.updated_at)}</small>}</b></div>
           </section>;
         })}
         <section className={`mechanical-approval${approval ? ' is-approved' : ''}`} aria-label="每日課長簽核">
@@ -300,7 +307,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       </section>, document.body)}
     </div>
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
-    {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
+    {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
   </AppShell>;
 }
 
@@ -351,14 +358,14 @@ export function PrintSheet({ date, entries, signatures, approval, userName }: { 
   </div></article>;
 }
 
-export function WorkEntryModal({ date, shiftCode, users, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { date: string; shiftCode: string; users: Row[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted') => void }) {
+export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { date: string; shiftCode: string; users: Row[]; scheduledUserIds: string[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted') => void }) {
   const sourceRow = entry || carrySource;
   const sourceItem = String(sourceRow?.work_item || presetItem || '');
   const initialCategory = String(sourceRow?.category || Object.keys(WORK_ITEMS).find(category => WORK_ITEMS[category].includes(sourceItem)) || Object.keys(WORK_ITEMS)[0]);
   const [category, setCategory] = useState(initialCategory);
   const [item, setItem] = useState(sourceItem || WORK_ITEMS[initialCategory]?.[0] || '');
   const [details, setDetails] = useState(String(sourceRow?.details || ''));
-  const [technicians, setTechnicians] = useState<string[]>(Array.isArray(sourceRow?.technician_ids) ? sourceRow.technician_ids.map(String) : []);
+  const [technicians, setTechnicians] = useState<string[]>(Array.isArray(sourceRow?.technician_ids) ? sourceRow.technician_ids.map(String) : scheduledUserIds);
   const [result, setResult] = useState(entry ? String(entry.result || '正常') : carrySource ? '處理中' : '正常');
   const [notes, setNotes] = useState(String(sourceRow?.notes || ''));
   const [repairCost, setRepairCost] = useState(entry?.repair_cost == null ? '' : String(entry.repair_cost));
@@ -386,6 +393,7 @@ export function WorkEntryModal({ date, shiftCode, users, entry, presetItem = '',
     } catch (error) { setMessage(errorMessage(error)); setBusy(false); }
   };
   const itemOptions = WORK_ITEMS[category]?.includes(item) ? WORK_ITEMS[category] : [item, ...(WORK_ITEMS[category] || [])].filter(Boolean);
+  const sortedUsers = [...users].sort((a, b) => Number(scheduledUserIds.includes(String(b.user_id))) - Number(scheduledUserIds.includes(String(a.user_id))) || String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
   const title = entry ? locked ? '查看機電工作' : '修改機電工作' : carrySource ? '接續處理' : '新增機電工作';
   return <AdminModal className="mechanical-modal mechanical-work-modal" title={`${title}｜${SHIFTS.find(shift => shift.code === shiftCode)?.label}`} onClose={onClose}>
     {carrySource && <div className="mechanical-carry-source"><b>上班續辦</b><span>{String(carrySource.work_date)} · {SHIFTS.find(shift => shift.code === carrySource.shift_code)?.label}</span><strong>{String(carrySource.work_item || '')}</strong><small>原紀錄不會被修改，本次儲存會建立新的續辦紀錄。</small></div>}
@@ -394,7 +402,7 @@ export function WorkEntryModal({ date, shiftCode, users, entry, presetItem = '',
       <label>工作分類<select disabled={locked} value={category} onChange={event => changeCategory(event.target.value)}>{Object.keys(WORK_ITEMS).map(value => <option key={value}>{value}</option>)}</select></label>
       <label>常用工作項目<select disabled={locked} value={item} onChange={event => setItem(event.target.value)}>{itemOptions.map(value => <option key={value}>{value}</option>)}</select></label>
       <label className="wide">工作補充說明<textarea disabled={locked} rows={3} value={details} onChange={event => setDetails(event.target.value)} placeholder="例如：設備位置、異常狀況或實際處理內容" /></label>
-      <fieldset className="wide" disabled={locked}><legend>維修人員（可複選） · 已選 {technicians.length} 人</legend><div className="mechanical-person-grid">{users.map(user => <label key={String(user.user_id)}><input type="checkbox" checked={technicians.includes(String(user.user_id))} onChange={() => toggleTechnician(String(user.user_id))} /><span>{user.name}</span><small>機電課</small></label>)}</div></fieldset>
+      <fieldset className="wide" disabled={locked}><legend>維修人員（可複選） · 已選 {technicians.length} 人</legend><p className={`mechanical-roster-hint${scheduledUserIds.length ? '' : ' is-empty'}`}>{scheduledUserIds.length ? `已由二市排班表帶入本班 ${scheduledUserIds.length} 人，可依實際支援情形增減。` : '二市排班表尚未安排本班人員，請手動選擇或先完成排班。'}</p><div className="mechanical-person-grid">{sortedUsers.map(user => <label className={scheduledUserIds.includes(String(user.user_id)) ? 'is-scheduled' : ''} key={String(user.user_id)}><input type="checkbox" checked={technicians.includes(String(user.user_id))} onChange={() => toggleTechnician(String(user.user_id))} /><span>{user.name}</span><small>{scheduledUserIds.includes(String(user.user_id)) ? '本班排班' : '機電課'}</small></label>)}</div></fieldset>
       <label>處理結果<select disabled={locked} value={result} onChange={event => setResult(event.target.value)}>{RESULT_OPTIONS.map(value => <option key={value}>{value}</option>)}</select></label>
       <label>維修費用（新臺幣元）<input disabled={locked} aria-label="維修費用（新臺幣元）" inputMode="decimal" value={repairCost} onChange={event => setRepairCost(event.target.value)} placeholder="未填可留白，無費用填 0" /></label>
       <label className="wide">備註<input disabled={locked} value={notes} onChange={event => setNotes(event.target.value)} placeholder="待辦、交班或其他說明" /></label>

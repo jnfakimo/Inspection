@@ -75,18 +75,14 @@ export function validateMechanicalScheduleRows(rows: MechanicalScheduleInput[], 
       if (length > 6) add({ rule: 'consecutive_days', user_id: userId, duty_date: iso(dates[first + 6]), message: `連續工作 ${length} 日，超過 6 日上限。` });
       first = index;
     }
-  }
-
-  const users = [...new Set(normalized.map(row => row.user_id))];
-  for (const userId of users) {
-    for (let start = monday(dayNo(focusStart)); start <= monday(dayNo(focusEnd)); start += 7) {
-      const dates = Array.from({ length: 7 }, (_, index) => iso(start + index));
-      if (dates[6] < focusStart || dates[0] > focusEnd) continue;
-      const values = dates.map(date => userDate.get(`${userId}|${date}`) || []);
-      if (values.some(dayRows => dayRows.length === 0)) continue;
-      const weeklyOff = values.some(dayRows => dayRows.some(row => row.duty_code === 'weekly_off') && !dayRows.some(row => WORK.has(row.duty_code)));
-      const restDay = values.some(dayRows => dayRows.some(row => row.duty_code === 'rest_day') && !dayRows.some(row => WORK.has(row.duty_code)));
-      if (!weeklyOff || !restDay) add({ rule: 'weekly_rest', user_id: userId, duty_date: dates[0], message: `完整七日排班缺少${!weeklyOff && !restDay ? '例假與休息日' : !weeklyOff ? '例假' : '休息日'}。` });
+    const workDaySet = new Set(dates);
+    for (const currentDay of dates) {
+      const sevenDayWorkCount = Array.from({ length: 7 }, (_, index) => currentDay - 6 + index)
+        .filter(day => workDaySet.has(day)).length;
+      const currentDate = iso(currentDay);
+      if (sevenDayWorkCount > 5 && currentDate >= focusStart && currentDate <= focusEnd) {
+        add({ rule: 'weekly_rest', user_id: userId, duty_date: currentDate, message: `截至本日的連續 7 日內已工作 ${sevenDayWorkCount} 日，未保留例假與休息日共 2 日。` });
+      }
     }
   }
   return errors.sort((a, b) => a.duty_date.localeCompare(b.duty_date) || a.user_id.localeCompare(b.user_id));

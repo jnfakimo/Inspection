@@ -1,18 +1,93 @@
 .mechanical-schedule-page{display:grid;gap:16px;min-width:0}
 .mechanical-schedule-toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 18px}
-.mechanical-schedule-month{display:flex;align-items:center;gap:10px}.mechanical-schedule-month>div{display:grid;min-width:170px}.mechanical-schedule-month small{color:var(--dim);font-size:11px}.mechanical-schedule-month b{font-size:19px}
-.mechanical-market-tabs{display:flex;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.mechanical-market-tabs button{min-width:108px;border:0;border-radius:6px;padding:9px 16px;background:transparent;color:var(--dim);font-weight:800;cursor:pointer}.mechanical-market-tabs button.is-active{background:var(--cyan);color:var(--bg);box-shadow:0 4px 14px color-mix(in srgb,var(--cyan) 24%,transparent)}
-.mechanical-schedule-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.mechanical-schedule-summary article{display:grid;gap:2px;padding:14px 16px;border:1px solid var(--line);border-top:4px solid var(--cyan);border-radius:8px;background:var(--panel)}.mechanical-schedule-summary small,.mechanical-schedule-summary span{color:var(--dim)}.mechanical-schedule-summary strong{font-size:26px;color:var(--text)}.mechanical-schedule-summary article.is-danger{border-top-color:var(--red);background:color-mix(in srgb,var(--red) 6%,var(--panel))}.mechanical-schedule-summary article.is-danger strong{color:var(--red)}.mechanical-schedule-summary article.is-safe{border-top-color:var(--green)}.mechanical-schedule-summary article.is-safe strong{color:var(--green)}
-.mechanical-legal-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:0;overflow:hidden}.mechanical-legal-rules>div{display:grid;gap:4px;padding:14px 18px;border-right:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 4%,var(--panel))}.mechanical-legal-rules>div:last-of-type{border-right:0}.mechanical-legal-rules b{color:var(--cyan);font-size:18px}.mechanical-legal-rules span{font-size:12px}.mechanical-legal-rules p{grid-column:1/-1;margin:0;padding:10px 18px;border-top:1px solid var(--line);color:var(--dim);font-size:11px}.mechanical-legal-rules a{margin-left:8px;color:var(--cyan);font-weight:700}
-.mechanical-schedule-checks{padding:0;overflow:hidden;border-left:5px solid var(--amber)}.mechanical-schedule-checks.has-errors{border-left-color:var(--red)}.mechanical-schedule-checks>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--amber) 6%,var(--panel))}.mechanical-schedule-checks.has-errors>header{background:color-mix(in srgb,var(--red) 6%,var(--panel))}.mechanical-schedule-checks header small{color:var(--dim)}.mechanical-schedule-checks h3{margin:2px 0 0;font-size:16px}.mechanical-schedule-checks header>span{color:var(--dim);font-size:12px}.mechanical-schedule-checks>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line)}.mechanical-schedule-checks p{display:grid;grid-template-columns:100px 1fr;gap:10px;margin:0;padding:9px 14px;background:var(--panel);font-size:12px}.mechanical-schedule-checks p b{color:var(--text)}.mechanical-schedule-checks p span{color:var(--dim)}.mechanical-schedule-checks p.error{box-shadow:inset 3px 0 0 var(--red)}.mechanical-schedule-checks p.warning{box-shadow:inset 3px 0 0 var(--amber)}.mechanical-schedule-checks>small{display:block;padding:8px 14px;color:var(--dim)}
-.mechanical-schedule-sheet{min-width:0;border:1px solid var(--line);border-top:7px solid var(--cyan);border-radius:7px;background:var(--panel);overflow:hidden}.mechanical-schedule-sheet>header{display:flex;align-items:end;justify-content:space-between;gap:20px;padding:18px 20px 14px}.mechanical-schedule-sheet>header small{color:var(--dim);letter-spacing:.15em}.mechanical-schedule-sheet>header h2{margin:4px 0 0;font-size:24px}.mechanical-schedule-sheet>header>div:last-child{display:grid;text-align:right}.mechanical-schedule-sheet>header>div:last-child b{font-size:18px}.mechanical-schedule-sheet>header>div:last-child span{color:var(--cyan);font-weight:800}
-.mechanical-schedule-legend{display:flex;align-items:center;gap:8px 15px;flex-wrap:wrap;padding:9px 20px;border-block:1px solid var(--line);background:var(--panel2)}.mechanical-schedule-legend span{display:flex;align-items:center;gap:5px;color:var(--dim);font-size:10px}.mechanical-schedule-legend i{width:11px;height:11px;border:1px solid currentColor;border-radius:3px;background:color-mix(in srgb,currentColor 15%,var(--panel))}
-.mechanical-schedule-table-wrap{max-width:100%;overflow:auto;overscroll-behavior-inline:contain}.mechanical-schedule-sheet table{width:100%;min-width:920px;border-collapse:separate;border-spacing:0;table-layout:fixed}.mechanical-schedule-sheet th,.mechanical-schedule-sheet td{height:37px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px;text-align:center}.mechanical-schedule-sheet thead th{position:sticky;top:0;z-index:3;height:48px;background:var(--panel2);color:var(--text);font-size:12px}.mechanical-schedule-sheet thead th:first-child,.mechanical-schedule-sheet tbody th:first-child{left:0;z-index:4;width:45px}.mechanical-schedule-sheet thead th:nth-child(2),.mechanical-schedule-sheet tbody th:nth-child(2){left:45px;z-index:4;width:45px}.mechanical-schedule-sheet tbody th{position:sticky;background:var(--panel);color:var(--dim);font-size:12px}.mechanical-schedule-sheet tr.is-weekend th{color:var(--red);background:color-mix(in srgb,var(--red) 5%,var(--panel))}.mechanical-schedule-sheet td select{width:100%;height:29px;border:1px solid transparent;border-radius:5px;padding:2px 3px;background:transparent;color:var(--text);font-size:11px;text-align:center;cursor:pointer}.mechanical-schedule-sheet td select:focus{border-color:var(--cyan);outline:2px solid color-mix(in srgb,var(--cyan) 24%,transparent)}.mechanical-schedule-sheet td.is-invalid{box-shadow:inset 0 0 0 2px var(--red)}.mechanical-schedule-sheet td.is-invalid select{color:var(--red);font-weight:800}.mechanical-print-duty{display:none}
-.mechanical-schedule-sheet .duty-01-09{background:color-mix(in srgb,var(--cyan) 10%,var(--panel));color:var(--cyan)}.mechanical-schedule-sheet .duty-09-17{background:color-mix(in srgb,var(--green) 10%,var(--panel));color:var(--green)}.mechanical-schedule-sheet .duty-17-01{background:color-mix(in srgb,var(--amber) 12%,var(--panel));color:var(--amber)}.mechanical-schedule-sheet .duty-weekly_off,.mechanical-schedule-sheet .duty-rest_day{background:color-mix(in srgb,var(--violet) 12%,var(--panel));color:var(--violet)}.mechanical-schedule-sheet .duty-rotation_off,.mechanical-schedule-sheet .duty-annual_leave{background:color-mix(in srgb,var(--cyan) 5%,var(--panel));color:var(--dim)}.mechanical-schedule-sheet .duty-official_leave,.mechanical-schedule-sheet .duty-sick_leave,.mechanical-schedule-sheet .duty-personal_leave{background:color-mix(in srgb,var(--red) 7%,var(--panel));color:var(--red)}
-.mechanical-schedule-sheet>footer{display:flex;justify-content:space-between;gap:20px;padding:10px 16px;color:var(--dim);font-size:10px}.mechanical-schedule-loading{padding:40px;text-align:center;color:var(--dim)}.mechanical-schedule-mobile{display:none}
-@media(max-width:1000px){.mechanical-schedule-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.mechanical-schedule-checks>div{grid-template-columns:1fr}}
-@media(max-width:800px){.mechanical-schedule-toolbar{align-items:stretch;flex-direction:column}.mechanical-schedule-month{flex-wrap:wrap}.mechanical-schedule-month>div{flex:1;min-width:140px}.mechanical-market-tabs{width:100%}.mechanical-market-tabs button{flex:1}.mechanical-legal-rules{grid-template-columns:1fr}.mechanical-legal-rules>div{border-right:0;border-bottom:1px solid var(--line)}.mechanical-schedule-table-wrap{display:none}.mechanical-schedule-mobile{display:grid;gap:10px;padding:12px}.mechanical-schedule-mobile article{border:1px solid var(--line);border-radius:7px;overflow:hidden}.mechanical-schedule-mobile article>header{display:flex;justify-content:space-between;padding:9px 12px;background:var(--panel2)}.mechanical-schedule-mobile article.is-weekend>header{background:color-mix(in srgb,var(--red) 6%,var(--panel));color:var(--red)}.mechanical-schedule-mobile article>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line)}.mechanical-schedule-mobile label{display:grid;grid-template-columns:minmax(62px,1fr) minmax(92px,1.2fr);align-items:center;gap:8px;padding:8px 9px;background:var(--panel)}.mechanical-schedule-mobile label.is-invalid{box-shadow:inset 3px 0 0 var(--red)}.mechanical-schedule-mobile label>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.mechanical-schedule-mobile select{min-width:0;width:100%;height:34px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);color:var(--text)}.mechanical-schedule-sheet>header{align-items:start;padding:14px}.mechanical-schedule-sheet>header h2{font-size:19px}.mechanical-schedule-sheet>header>div:last-child b{font-size:14px}.mechanical-schedule-sheet>footer{flex-direction:column;gap:4px}.mechanical-schedule-legend{padding-inline:14px}}
-@media(max-width:520px){.mechanical-schedule-summary{grid-template-columns:1fr 1fr;gap:8px}.mechanical-schedule-summary article{padding:11px}.mechanical-schedule-summary strong{font-size:22px}.mechanical-schedule-checks p{grid-template-columns:1fr;gap:2px}.mechanical-schedule-mobile article>div{grid-template-columns:1fr}.mechanical-schedule-sheet>header{display:grid}.mechanical-schedule-sheet>header>div:last-child{text-align:left}.mechanical-schedule-month>.secondary-btn:last-child{flex-basis:100%}}
+.mechanical-schedule-month{display:flex;align-items:center;gap:10px}
+.mechanical-schedule-month>div{display:grid;min-width:170px}
+.mechanical-schedule-month small{color:var(--dim);font-size:11px}
+.mechanical-schedule-month b{font-size:19px}
+.mechanical-market-tabs{display:flex;padding:4px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
+.mechanical-market-tabs button{min-width:108px;border:0;border-radius:6px;padding:9px 16px;background:transparent;color:var(--dim);font-weight:800;cursor:pointer}
+.mechanical-market-tabs button.is-active{background:var(--cyan);color:var(--bg);box-shadow:0 4px 14px color-mix(in srgb,var(--cyan) 24%,transparent)}
+.mechanical-schedule-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.mechanical-schedule-summary article{display:grid;gap:2px;padding:14px 16px;border:1px solid var(--line);border-top:4px solid var(--cyan);border-radius:8px;background:var(--panel)}
+.mechanical-schedule-summary small,.mechanical-schedule-summary span{color:var(--dim)}
+.mechanical-schedule-summary strong{font-size:26px;color:var(--text)}
+.mechanical-schedule-summary article.is-danger{border-top-color:var(--red);background:color-mix(in srgb,var(--red) 6%,var(--panel))}
+.mechanical-schedule-summary article.is-danger strong{color:var(--red)}
+.mechanical-schedule-summary article.is-safe{border-top-color:var(--green)}
+.mechanical-schedule-summary article.is-safe strong{color:var(--green)}
+.mechanical-legal-rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;padding:0;overflow:hidden}
+.mechanical-legal-rules>div{display:grid;gap:4px;padding:14px 18px;border-right:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 4%,var(--panel))}
+.mechanical-legal-rules>div:last-of-type{border-right:0}
+.mechanical-legal-rules b{color:var(--cyan);font-size:18px}
+.mechanical-legal-rules span{font-size:12px}
+.mechanical-legal-rules p{grid-column:1/-1;margin:0;padding:10px 18px;border-top:1px solid var(--line);color:var(--dim);font-size:11px}
+.mechanical-legal-rules a{margin-left:8px;color:var(--cyan);font-weight:700}
+.mechanical-schedule-checks{padding:0;overflow:hidden;border-left:5px solid var(--amber)}
+.mechanical-schedule-checks.has-errors{border-left-color:var(--red)}
+.mechanical-schedule-checks>header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--amber) 6%,var(--panel))}
+.mechanical-schedule-checks.has-errors>header{background:color-mix(in srgb,var(--red) 6%,var(--panel))}
+.mechanical-schedule-checks header small,.mechanical-schedule-checks header>span{color:var(--dim)}
+.mechanical-schedule-checks h3{margin:2px 0 0;font-size:16px}
+.mechanical-schedule-checks>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line)}
+.mechanical-schedule-checks p{display:grid;grid-template-columns:100px 1fr;gap:10px;margin:0;padding:9px 14px;background:var(--panel);font-size:12px}
+.mechanical-schedule-checks p span{color:var(--dim)}
+.mechanical-schedule-checks p.error{box-shadow:inset 3px 0 0 var(--red)}
+.mechanical-schedule-checks p.warning{box-shadow:inset 3px 0 0 var(--amber)}
+.mechanical-day-editor{padding:0;overflow:hidden;border-top:4px solid var(--violet)}
+.mechanical-day-editor>header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 18px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--violet) 6%,var(--panel))}
+.mechanical-day-editor>header small{color:var(--violet);font-weight:800}
+.mechanical-day-editor>header h2{margin:3px 0;font-size:21px}
+.mechanical-day-editor>header p{margin:0;color:var(--dim);font-size:12px}
+.mechanical-day-editor>header>span{padding:6px 10px;border:1px solid var(--green);border-radius:999px;color:var(--green);font-size:12px;font-weight:800;white-space:nowrap}
+.mechanical-day-editor>header>span.is-danger{border-color:var(--red);color:var(--red)}
+.mechanical-shift-editor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line)}
+.mechanical-shift-editor-grid>article{display:grid;align-content:start;gap:11px;padding:15px;background:var(--panel)}
+.mechanical-shift-editor-grid>article>div:first-child{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.mechanical-shift-editor-grid>article>div:first-child b{font-size:18px}
+.mechanical-shift-editor-grid>article>div:first-child span{color:var(--dim);font-size:12px}
+.mechanical-shift-editor-grid>article.duty-01-09{box-shadow:inset 0 4px 0 var(--cyan)}
+.mechanical-shift-editor-grid>article.duty-09-17{box-shadow:inset 0 4px 0 var(--green)}
+.mechanical-shift-editor-grid>article.duty-17-01{box-shadow:inset 0 4px 0 var(--amber)}
+.mechanical-shift-editor-grid label{display:grid;gap:5px;color:var(--dim);font-size:11px}
+.mechanical-shift-editor-grid select{min-width:0;width:100%;height:40px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:var(--panel2);color:var(--text)}
+.mechanical-assigned-people{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:32px}
+.mechanical-assigned-people>span{display:flex;align-items:center;gap:5px;padding:5px 5px 5px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
+.mechanical-assigned-people>span.is-invalid{border-color:var(--red);color:var(--red)}
+.mechanical-assigned-people b{font-size:12px}
+.mechanical-assigned-people button{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;background:color-mix(in srgb,var(--text) 7%,var(--panel2));color:var(--dim);cursor:pointer}
+.mechanical-assigned-people em{color:var(--dim);font-size:12px;font-style:normal}
+.mechanical-calendar-screen{min-width:0;padding:0;overflow:hidden}
+.mechanical-calendar-screen>header{display:flex;align-items:end;justify-content:space-between;gap:18px;padding:17px 18px}
+.mechanical-calendar-screen>header small{color:var(--cyan);font-weight:800}
+.mechanical-calendar-screen>header h2{margin:3px 0 0;font-size:22px}
+.mechanical-calendar-screen>header p{margin:0;color:var(--dim);font-size:12px}
+.mechanical-calendar-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-block:1px solid var(--line);background:var(--panel2)}
+.mechanical-calendar-weekdays span{padding:8px;border-right:1px solid var(--line);color:var(--dim);font-size:11px;text-align:center}
+.mechanical-calendar-weekdays span:first-child,.mechanical-calendar-weekdays span:last-child{color:var(--red)}
+.mechanical-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--line)}
+.mechanical-calendar-day{display:grid;align-content:start;gap:7px;min-width:0;min-height:164px;border:0;padding:9px;background:var(--panel);color:var(--text);text-align:left;cursor:pointer}
+.mechanical-calendar-day:hover{background:color-mix(in srgb,var(--cyan) 5%,var(--panel))}
+.mechanical-calendar-day.is-selected{box-shadow:inset 0 0 0 3px var(--violet);z-index:1}
+.mechanical-calendar-day.is-outside{opacity:.42}
+.mechanical-calendar-day.is-weekend{background:color-mix(in srgb,var(--red) 3%,var(--panel))}
+.mechanical-calendar-day.is-today .mechanical-calendar-date>b{background:var(--cyan);color:var(--bg)}
+.mechanical-calendar-day.has-errors{box-shadow:inset 0 0 0 2px var(--red)}
+.mechanical-calendar-date{display:flex;align-items:center;gap:5px;min-width:0}
+.mechanical-calendar-date>b{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;font-size:13px}
+.mechanical-calendar-date em{color:var(--cyan);font-size:10px;font-style:normal}
+.mechanical-calendar-date strong{display:grid;place-items:center;margin-left:auto;width:20px;height:20px;border-radius:50%;background:var(--red);color:var(--panel);font-size:10px}
+.mechanical-calendar-shifts{display:grid;gap:5px;min-width:0}
+.mechanical-calendar-shifts>span{display:grid;grid-template-columns:23px minmax(0,1fr);align-items:start;gap:5px;padding:5px 6px;border-radius:5px;background:var(--panel2)}
+.mechanical-calendar-shifts b{font-size:10px;text-align:center}
+.mechanical-calendar-shifts em{overflow:hidden;color:var(--dim);font-size:10px;font-style:normal;line-height:1.4;white-space:normal}
+.mechanical-calendar-shifts .duty-01-09{border-left:3px solid var(--cyan)}
+.mechanical-calendar-shifts .duty-09-17{border-left:3px solid var(--green)}
+.mechanical-calendar-shifts .duty-17-01{border-left:3px solid var(--amber)}
+.mechanical-schedule-sheet{display:none}
+
+@media(max-width:1000px){.mechanical-schedule-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.mechanical-schedule-checks>div{grid-template-columns:1fr}.mechanical-calendar-day{min-height:182px;padding:7px}.mechanical-calendar-shifts>span{grid-template-columns:20px minmax(0,1fr);padding:5px 4px}}
+@media(max-width:800px){.mechanical-schedule-toolbar{align-items:stretch;flex-direction:column}.mechanical-schedule-month{flex-wrap:wrap}.mechanical-schedule-month>div{flex:1;min-width:140px}.mechanical-market-tabs{width:100%}.mechanical-market-tabs button{flex:1}.mechanical-legal-rules{grid-template-columns:1fr}.mechanical-legal-rules>div{border-right:0;border-bottom:1px solid var(--line)}.mechanical-day-editor>header{align-items:flex-start}.mechanical-shift-editor-grid{grid-template-columns:1fr}.mechanical-shift-editor-grid>article{padding:14px}.mechanical-calendar-weekdays{display:none}.mechanical-calendar-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px;gap:8px;background:var(--panel2)}.mechanical-calendar-day{min-height:158px;border:1px solid var(--line);border-radius:7px}.mechanical-calendar-day.is-outside{display:none}.mechanical-calendar-screen>header{align-items:flex-start;flex-direction:column}.mechanical-calendar-screen>header p{margin-top:-10px}}
+@media(max-width:520px){.mechanical-schedule-summary{grid-template-columns:1fr 1fr;gap:8px}.mechanical-schedule-summary article{padding:11px}.mechanical-schedule-summary strong{font-size:22px}.mechanical-schedule-checks p{grid-template-columns:1fr;gap:2px}.mechanical-day-editor>header{flex-direction:column;gap:8px}.mechanical-day-editor>header h2{font-size:18px}.mechanical-day-editor>header>span{align-self:flex-start}.mechanical-calendar-grid{grid-template-columns:1fr}.mechanical-calendar-day{min-height:0}.mechanical-calendar-shifts em{font-size:11px}.mechanical-schedule-month>.secondary-btn:last-child{flex-basis:100%}}
 
 @media print{
   @page{size:A4 landscape;margin:6mm}
@@ -21,24 +96,20 @@
   body.mechanical-schedule-printing .content.v1-content{max-width:none!important;margin:0!important;padding:0!important}
   body.mechanical-schedule-printing .mechanical-schedule-page{display:block!important}
   body.mechanical-schedule-printing .mechanical-schedule-page>:not(.mechanical-schedule-sheet){display:none!important}
-  body.mechanical-schedule-printing *{visibility:hidden!important}
+  body.mechanical-schedule-printing .mechanical-schedule-sheet{display:block!important;width:285mm;border:1px solid #111;border-top:2mm solid #087fb4;background:#fff!important;color:#111!important}
   body.mechanical-schedule-printing .mechanical-schedule-sheet,body.mechanical-schedule-printing .mechanical-schedule-sheet *{visibility:visible!important}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet{position:static;width:285mm;height:auto;border:1px solid #111;border-top:2mm solid #087fb4;border-radius:0;background:#fff!important;color:#111!important;overflow:visible}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet>header{padding:3mm 4mm 2mm}
+  body.mechanical-schedule-printing .mechanical-schedule-sheet>header{display:flex;align-items:end;justify-content:space-between;padding:3mm 4mm 2mm}
   body.mechanical-schedule-printing .mechanical-schedule-sheet>header h2{margin:1mm 0 0;font-size:15pt}
+  body.mechanical-schedule-printing .mechanical-schedule-sheet>header>div:last-child{display:grid;text-align:right}
   body.mechanical-schedule-printing .mechanical-schedule-sheet>header small,body.mechanical-schedule-printing .mechanical-schedule-sheet>header span{color:#333!important}
-  body.mechanical-schedule-printing .mechanical-schedule-legend{gap:2mm 4mm;padding:1.5mm 4mm;border-color:#777;background:#f4f6f8!important}
-  body.mechanical-schedule-printing .mechanical-schedule-legend span{color:#222!important;font-size:6.5pt}
-  body.mechanical-schedule-printing .mechanical-schedule-table-wrap{display:block;overflow:visible}
-  body.mechanical-schedule-printing .mechanical-schedule-mobile{display:none}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet table{min-width:0;table-layout:fixed}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet th,body.mechanical-schedule-printing .mechanical-schedule-sheet td{position:static;height:4.7mm;padding:.3mm;border-color:#555;background:#fff!important;color:#111!important;font-size:6.8pt}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet thead th{height:7mm;background:#eef3f6!important;font-size:7.2pt}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet thead th:first-child,body.mechanical-schedule-printing .mechanical-schedule-sheet tbody th:first-child{width:8mm}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet thead th:nth-child(2),body.mechanical-schedule-printing .mechanical-schedule-sheet tbody th:nth-child(2){width:8mm}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet tr.is-weekend th{color:#b42318!important}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet td select{display:none}
-  body.mechanical-schedule-printing .mechanical-print-duty{display:block;color:#111!important;font-size:6.8pt;font-weight:700;white-space:nowrap}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet td.is-invalid{box-shadow:none}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet>footer{padding:1.5mm 4mm;color:#333!important;font-size:6.5pt}
+  body.mechanical-schedule-printing .mechanical-schedule-legend{display:flex;gap:2mm 4mm;padding:1.5mm 4mm;border-block:1px solid #777;background:#f4f6f8!important}
+  body.mechanical-schedule-printing .mechanical-schedule-legend span{display:flex;align-items:center;gap:1mm;color:#222!important;font-size:6.5pt}
+  body.mechanical-schedule-printing .mechanical-schedule-legend i{width:3mm;height:3mm;border:1px solid currentColor;border-radius:1mm}
+  body.mechanical-schedule-printing .mechanical-schedule-table-wrap{display:block}
+  body.mechanical-schedule-printing table{width:100%;border-collapse:collapse;table-layout:fixed}
+  body.mechanical-schedule-printing th,body.mechanical-schedule-printing td{height:4.7mm;padding:.3mm;border:1px solid #555;color:#111!important;background:#fff!important;font-size:6.8pt;text-align:center}
+  body.mechanical-schedule-printing thead th{height:7mm;background:#eef3f6!important;font-size:7.2pt}
+  body.mechanical-schedule-printing thead th:first-child,body.mechanical-schedule-printing tbody th:first-child,body.mechanical-schedule-printing thead th:nth-child(2),body.mechanical-schedule-printing tbody th:nth-child(2){width:8mm}
+  body.mechanical-schedule-printing tr.is-weekend th{color:#b42318!important}
+  body.mechanical-schedule-printing .mechanical-schedule-sheet>footer{display:flex;justify-content:space-between;padding:1.5mm 4mm;color:#333!important;font-size:6.5pt}
 }

@@ -5,9 +5,8 @@ import { AppShell } from '@/components/AppShell';
 import { AdminHeader, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import {
-  MECHANICAL_SCHEDULE_CODES, MECHANICAL_SCHEDULE_LABELS, isMechanicalWorkCode,
-  scheduleDateOffset, scheduleMonthDates, shiftScheduleMonth, validateMechanicalSchedule,
-  type MechanicalScheduleCode,
+  isMechanicalWorkCode, scheduleCalendarDates, scheduleDateOffset, scheduleMonthDates,
+  shiftScheduleMonth, validateMechanicalSchedule,
 } from '@/lib/mechanical-schedule';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -15,34 +14,38 @@ import './mechanical-schedule.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 type MarketCode = 'market_1' | 'market_2';
+type WorkCode = '01-09' | '09-17' | '17-01';
 
 const MARKET_LABELS: Record<MarketCode, string> = { market_1: '第一果菜批發市場', market_2: '第二果菜批發市場' };
-const SHORT_LABELS: Record<MechanicalScheduleCode, string> = {
-  '01-09': '01-09', '09-17': '09-17', '17-01': '17-01', weekly_off: '例假', rest_day: '休息日',
-  rotation_off: '輪休', annual_leave: '特休', official_leave: '公假', sick_leave: '病假', personal_leave: '事假',
-};
+const WORK_SHIFTS: Array<{ code: WorkCode; name: string; time: string; short: string }> = [
+  { code: '01-09', name: '早班', time: '01:00–09:00', short: '早' },
+  { code: '09-17', name: '中班', time: '09:00–17:00', short: '中' },
+  { code: '17-01', name: '晚班', time: '17:00–翌日 01:00', short: '晚' },
+];
 const ROC_WEEKDAY = ['日', '一', '二', '三', '四', '五', '六'];
 
-function todayMonth() {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit' }).format(new Date());
+function todayISO() {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
+function todayMonth() { return todayISO().slice(0, 7); }
 function monthTitle(month: string) {
   const [year, value] = month.split('-').map(Number);
   return `民國 ${year - 1911} 年 ${value} 月`;
 }
-function weekday(date: string) {
-  return ROC_WEEKDAY[new Date(`${date}T00:00:00Z`).getUTCDay()];
-}
+function weekday(date: string) { return ROC_WEEKDAY[new Date(`${date}T00:00:00Z`).getUTCDay()]; }
 function isWeekend(date: string) {
   const day = new Date(`${date}T00:00:00Z`).getUTCDay();
   return day === 0 || day === 6;
 }
-function keyOf(userId: unknown, date: string) {
-  return `${String(userId)}|${date}`;
+function rocDay(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return `民國 ${year - 1911} 年 ${month} 月 ${day} 日（星期${weekday(date)}）`;
 }
+function keyOf(userId: unknown, date: string) { return `${String(userId)}|${date}`; }
 
 export function MechanicalSchedule({ system, module, profile }: Props) {
   const [month, setMonth] = useState(todayMonth());
+  const [selectedDate, setSelectedDate] = useState(todayISO());
   const [market, setMarket] = useState<MarketCode>('market_1');
   const [users, setUsers] = useState<Row[]>([]);
   const [persisted, setPersisted] = useState<Row[]>([]);
@@ -52,8 +55,13 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
   const [note, setNote] = useState('');
 
   const dates = useMemo(() => scheduleMonthDates(month), [month]);
+  const calendarDates = useMemo(() => scheduleCalendarDates(month), [month]);
   const monthStart = dates[0] || `${month}-01`;
   const monthEnd = dates.at(-1) || monthStart;
+
+  useEffect(() => {
+    if (!selectedDate.startsWith(`${month}-`)) setSelectedDate(monthStart);
+  }, [month, monthStart, selectedDate]);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -71,7 +79,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
     const rows = schedule.data || [];
     const nextDraft: Record<string, string> = {};
-    rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`))
+    rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`) && isMechanicalWorkCode(row.duty_code))
       .forEach(row => { nextDraft[keyOf(row.user_id, String(row.duty_date))] = String(row.duty_code || ''); });
     setUsers(staff); setPersisted(rows); setDraft(nextDraft); setBusy(false);
   }, [market, month, monthEnd, monthStart]);
@@ -85,7 +93,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
 
   const candidateRows = useMemo(() => users.flatMap(user => dates.flatMap(date => {
     const dutyCode = draft[keyOf(user.user_id, date)];
-    return dutyCode ? [{ user_id: String(user.user_id), duty_date: date, duty_code: dutyCode, market_code: market }] : [];
+    return isMechanicalWorkCode(dutyCode) ? [{ user_id: String(user.user_id), duty_date: date, duty_code: dutyCode, market_code: market }] : [];
   })), [dates, draft, market, users]);
   const combinedRows = useMemo(() => persisted
     .filter(row => !(row.market_code === market && String(row.duty_date).startsWith(`${month}-`)))
@@ -94,15 +102,32 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
   const errors = violations.filter(item => item.severity === 'error');
   const warnings = violations.filter(item => item.severity === 'warning');
   const invalidCells = useMemo(() => new Set(errors.map(item => keyOf(item.userId, item.date))), [errors]);
-  const workCount = candidateRows.filter(row => isMechanicalWorkCode(row.duty_code)).length;
-  const unfilled = Math.max(0, users.length * dates.length - candidateRows.length);
+  const names = useMemo(() => new Map(users.map(user => [String(user.user_id), String(user.name || '未命名')])), [users]);
   const currentRows = persisted.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`));
   const latest = [...currentRows].sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))[0];
-  const names = new Map(users.map(user => [String(user.user_id), String(user.name || '未命名')]));
 
-  const setDuty = (userId: unknown, date: string, dutyCode: string) => {
-    setDraft(current => ({ ...current, [keyOf(userId, date)]: dutyCode }));
+  const dutyFor = useCallback((userId: unknown, date: string) => {
+    if (date.startsWith(`${month}-`)) return draft[keyOf(userId, date)] || '';
+    const row = persisted.find(item => item.market_code === market && String(item.user_id) === String(userId)
+      && String(item.duty_date) === date && item.is_active !== false && isMechanicalWorkCode(item.duty_code));
+    return String(row?.duty_code || '');
+  }, [draft, market, month, persisted]);
+  const assignedUsers = useCallback((date: string, code: WorkCode) => users.filter(user => dutyFor(user.user_id, date) === code), [dutyFor, users]);
+  const assignedShiftCount = dates.reduce((total, date) => total + WORK_SHIFTS.filter(shift => assignedUsers(date, shift.code).length > 0).length, 0);
+  const openShiftCount = Math.max(0, dates.length * WORK_SHIFTS.length - assignedShiftCount);
+
+  const assignUser = (date: string, code: WorkCode, userId: string) => {
+    if (!userId || !date.startsWith(`${month}-`)) return;
+    setDraft(current => ({ ...current, [keyOf(userId, date)]: code }));
     setNote('');
+  };
+  const removeUser = (date: string, userId: unknown) => {
+    setDraft(current => ({ ...current, [keyOf(userId, date)]: '' }));
+    setNote('');
+  };
+  const openDate = (date: string) => {
+    if (!date.startsWith(`${month}-`)) setMonth(date.slice(0, 7));
+    setSelectedDate(date);
   };
   const save = async () => {
     if (errors.length) { setNote('班表有紅色違規項目，修正後才能儲存。'); return; }
@@ -110,7 +135,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     try {
       await invokeAppApi('handover_save', { kind: 'mechanical_schedule_save', year_month: month, market_code: market, assignments: candidateRows });
       await load();
-      setNote(`${MARKET_LABELS[market]} ${monthTitle(month)}班表已儲存，異動時間已寫入稽核紀錄。`);
+      setNote(`${MARKET_LABELS[market]} ${monthTitle(month)}班表已儲存，並已提供機電交接簿讀取。`);
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     finally { setSaving(false); }
   };
@@ -121,49 +146,68 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="mechanical-schedule-page">
-      <AdminHeader module={module} busy={busy} note={note} onReload={() => void load()} action={<><button className="secondary-btn compact" disabled={busy} onClick={print}>列印本月班表</button><button className="primary-btn compact" disabled={busy || saving || errors.length > 0} onClick={() => void save()}>{saving ? '儲存中…' : unfilled ? '儲存草稿' : '儲存班表'}</button></>} />
+      <AdminHeader module={module} busy={busy} note={note} onReload={() => void load()} action={<><button className="secondary-btn compact" disabled={busy} onClick={print}>列印本月班表</button><button className="primary-btn compact" disabled={busy || saving || errors.length > 0} onClick={() => void save()}>{saving ? '儲存中…' : openShiftCount ? '儲存草稿' : '儲存班表'}</button></>} />
 
       <section className="panel mechanical-schedule-toolbar">
-        <div className="mechanical-schedule-month"><button className="secondary-btn compact" aria-label="前一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, -1))}>‹</button><div><small>排班月份</small><b>{monthTitle(month)}</b></div><button className="secondary-btn compact" aria-label="後一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, 1))}>›</button><button className="secondary-btn compact" onClick={() => setMonth(todayMonth())}>本月</button></div>
+        <div className="mechanical-schedule-month"><button className="secondary-btn compact" aria-label="前一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, -1))}>‹</button><div><small>萬年曆月份</small><b>{monthTitle(month)}</b></div><button className="secondary-btn compact" aria-label="後一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, 1))}>›</button><button className="secondary-btn compact" onClick={() => { setMonth(todayMonth()); setSelectedDate(todayISO()); }}>本月</button></div>
         <div className="mechanical-market-tabs" role="group" aria-label="市場別"><button className={market === 'market_1' ? 'is-active' : ''} aria-pressed={market === 'market_1'} onClick={() => setMarket('market_1')}>一市</button><button className={market === 'market_2' ? 'is-active' : ''} aria-pressed={market === 'market_2'} onClick={() => setMarket('market_2')}>二市</button></div>
       </section>
 
       <section className="mechanical-schedule-summary" aria-label="排班摘要">
-        <article><small>排班人員</small><strong>{users.length}</strong><span>機電課同仁</span></article>
-        <article><small>已排工作</small><strong>{workCount}</strong><span>共 {workCount * 8} 小時</span></article>
-        <article><small>尚未排定</small><strong>{unfilled}</strong><span>{unfilled ? '可先儲存草稿' : '本月已填滿'}</span></article>
-        <article className={errors.length ? 'is-danger' : 'is-safe'}><small>工時卡控</small><strong>{errors.length}</strong><span>{errors.length ? '項必須修正' : '目前無違規'}</span></article>
+        <article><small>機電課人員</small><strong>{users.length}</strong><span>可依日期隨機排班</span></article>
+        <article><small>已排班次</small><strong>{assignedShiftCount}</strong><span>共 {candidateRows.length * 8} 人時</span></article>
+        <article><small>尚未排班別</small><strong>{openShiftCount}</strong><span>{openShiftCount ? '可先儲存草稿' : '三班皆已安排'}</span></article>
+        <article className={errors.length ? 'is-danger' : 'is-safe'}><small>勞基法卡控</small><strong>{errors.length}</strong><span>{errors.length ? '項必須修正' : '目前無違規'}</span></article>
       </section>
 
       <section className="panel mechanical-legal-rules">
         <div><b>11 小時</b><span>更換班次前，至少連續休息 11 小時。</span></div>
-        <div><b>8／40 小時</b><span>一般工時每日最多 8 小時、每週最多 40 小時。</span></div>
-        <div><b>例假＋休息日</b><span>完整七日須各有一日，且不得連續工作超過 6 日。</span></div>
-        <p>目前採「一般工時」嚴格卡控；變形工時例外未啟用。若公司已依法完成工會或勞資會議同意及必要備查，應另由管理制度確認後再調整。<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001" target="_blank" rel="noreferrer">查看勞動基準法</a></p>
+        <div><b>8／40 小時</b><span>每天最多一班 8 小時，每週正常工時最多 40 小時。</span></div>
+        <div><b>7 日保留 2 日</b><span>任一連續 7 日最多工作 5 日，不得連續工作超過 6 日。</span></div>
+        <p>一市、二市分開排班，但同一人的工時會跨市場合併檢查。變形工時例外未啟用。<a href="https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=N0030001" target="_blank" rel="noreferrer">查看勞動基準法</a></p>
       </section>
 
       {(errors.length > 0 || warnings.length > 0) && <section className={`panel mechanical-schedule-checks${errors.length ? ' has-errors' : ''}`}>
-        <header><div><small>自動檢核</small><h3>{errors.length ? `發現 ${errors.length} 項違規，已禁止儲存` : '尚有未排定日期'}</h3></div><span>{warnings.length} 項提醒</span></header>
+        <header><div><small>即時自動檢核</small><h3>{errors.length ? `發現 ${errors.length} 項違規，已禁止儲存` : '尚有排班提醒'}</h3></div><span>{warnings.length} 項提醒</span></header>
         <div>{[...errors, ...warnings].slice(0, 16).map((item, index) => <p className={item.severity} key={`${item.rule}-${item.userId}-${item.date}-${index}`}><b>{names.get(item.userId) || '機電課同仁'}</b><span>{item.date}｜{item.message}</span></p>)}</div>
-        {errors.length + warnings.length > 16 && <small>另有 {errors.length + warnings.length - 16} 項，請依紅色日期儲存格逐一修正。</small>}
       </section>}
 
-      <section className="mechanical-schedule-sheet" aria-label={`${MARKET_LABELS[market]}月排班表`}>
+      <section className="panel mechanical-day-editor" aria-label="單日三班排班">
+        <header><div><small>{MARKET_LABELS[market]}</small><h2>{rocDay(selectedDate)}</h2><p>一天固定早、中、晚三班；從下拉選單加入當班人員，同一班可安排多人。</p></div><span className={errors.some(item => item.date === selectedDate) ? 'is-danger' : ''}>{errors.filter(item => item.date === selectedDate).length ? `${errors.filter(item => item.date === selectedDate).length} 項違規` : '即時檢核中'}</span></header>
+        <div className="mechanical-shift-editor-grid">{WORK_SHIFTS.map(shift => {
+          const assigned = assignedUsers(selectedDate, shift.code);
+          return <article className={`duty-${shift.code}`} key={shift.code}><div><b>{shift.name}</b><span>{shift.time}</span></div><label>加入當班人員<select value="" disabled={busy} onChange={event => { assignUser(selectedDate, shift.code, event.target.value); event.target.value = ''; }}><option value="">— 選擇機電課人員 —</option>{users.map(user => {
+            const currentDuty = dutyFor(user.user_id, selectedDate);
+            const currentShift = WORK_SHIFTS.find(item => item.code === currentDuty);
+            return <option value={String(user.user_id)} key={String(user.user_id)}>{String(user.name || '')}{currentShift ? `（目前${currentShift.name}）` : ''}</option>;
+          })}</select></label><div className="mechanical-assigned-people">{assigned.length ? assigned.map(user => <span className={invalidCells.has(keyOf(user.user_id, selectedDate)) ? 'is-invalid' : ''} key={String(user.user_id)}><b>{String(user.name || '')}</b><button type="button" aria-label={`移除 ${String(user.name || '')}`} onClick={() => removeUser(selectedDate, user.user_id)}>×</button></span>) : <em>本班尚未安排人員</em>}</div></article>;
+        })}</div>
+      </section>
+
+      <section className="panel mechanical-calendar-screen" aria-label={`${MARKET_LABELS[market]}萬年曆排班`}>
+        <header><div><small>整月排班總覽</small><h2>{monthTitle(month)}・{MARKET_LABELS[market]}</h2></div><p>點選日期後，在上方三個班別加入或調整人員。</p></header>
+        <div className="mechanical-calendar-weekdays">{ROC_WEEKDAY.map(day => <span key={day}>星期{day}</span>)}</div>
+        <div className="mechanical-calendar-grid">{calendarDates.map(date => {
+          const outside = !date.startsWith(`${month}-`), today = date === todayISO();
+          const dateErrors = errors.filter(item => item.date === date).length;
+          return <button type="button" className={`mechanical-calendar-day${outside ? ' is-outside' : ''}${isWeekend(date) ? ' is-weekend' : ''}${selectedDate === date ? ' is-selected' : ''}${today ? ' is-today' : ''}${dateErrors ? ' has-errors' : ''}`} onClick={() => openDate(date)} key={date}>
+            <span className="mechanical-calendar-date"><b>{Number(date.slice(-2))}</b>{today && <em>今天</em>}{dateErrors > 0 && <strong>{dateErrors}</strong>}</span>
+            <span className="mechanical-calendar-shifts">{WORK_SHIFTS.map(shift => {
+              const assigned = assignedUsers(date, shift.code);
+              return <span className={`duty-${shift.code}`} key={shift.code}><b>{shift.short}</b><em>{assigned.length ? assigned.map(user => String(user.name || '')).join('、') : '未排'}</em></span>;
+            })}</span>
+          </button>;
+        })}</div>
+      </section>
+
+      <section className="mechanical-schedule-sheet" aria-label={`${MARKET_LABELS[market]}列印月排班表`}>
         <header><div><small>臺北農產運銷股份有限公司</small><h2>管理部機電課輪值人員月排班表</h2></div><div><b>{monthTitle(month)}</b><span>{MARKET_LABELS[market]}</span></div></header>
-        <div className="mechanical-schedule-legend">{MECHANICAL_SCHEDULE_CODES.map(code => <span className={`duty-${code}`} key={code}><i />{MECHANICAL_SCHEDULE_LABELS[code]}</span>)}</div>
-        {busy ? <p className="mechanical-schedule-loading">排班資料載入中…</p> : users.length === 0 ? <p className="mechanical-schedule-loading">找不到第二階機電課的在職人員。</p> : <>
-          <div className="mechanical-schedule-table-wrap">
-            <table><thead><tr><th>日期</th><th>星期</th>{users.map(user => <th key={String(user.user_id)}>{String(user.name || '')}</th>)}</tr></thead><tbody>{dates.map(date => <tr className={isWeekend(date) ? 'is-weekend' : ''} key={date}><th>{Number(date.slice(-2))}</th><th>{weekday(date)}</th>{users.map(user => {
-              const cellKey = keyOf(user.user_id, date), value = draft[cellKey] || '';
-              return <td className={`${value ? `duty-${value}` : 'duty-empty'}${invalidCells.has(cellKey) ? ' is-invalid' : ''}`} key={String(user.user_id)}><select aria-label={`${date} ${String(user.name)} 排班`} value={value} onChange={event => setDuty(user.user_id, date, event.target.value)}><option value="">未排</option>{MECHANICAL_SCHEDULE_CODES.map(code => <option value={code} key={code}>{SHORT_LABELS[code]}</option>)}</select><span className="mechanical-print-duty">{value ? SHORT_LABELS[value as MechanicalScheduleCode] : '—'}</span></td>;
-            })}</tr>)}</tbody></table>
-          </div>
-          <div className="mechanical-schedule-mobile">{dates.map(date => <article className={isWeekend(date) ? 'is-weekend' : ''} key={date}><header><b>{Number(date.slice(-2))} 日</b><span>星期{weekday(date)}</span></header><div>{users.map(user => {
-            const cellKey = keyOf(user.user_id, date), value = draft[cellKey] || '';
-            return <label className={invalidCells.has(cellKey) ? 'is-invalid' : ''} key={String(user.user_id)}><span>{String(user.name || '')}</span><select className={value ? `duty-${value}` : ''} value={value} onChange={event => setDuty(user.user_id, date, event.target.value)}><option value="">未排</option>{MECHANICAL_SCHEDULE_CODES.map(code => <option value={code} key={code}>{SHORT_LABELS[code]}</option>)}</select></label>;
-          })}</div></article>)}</div>
-        </>}
-        <footer><span>班次均以 8 小時計；未排定欄位不代表休假，例假與休息日請分別明確標示。</span><span>最後異動：{latest?.updated_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(latest.updated_at))) : '尚無紀錄'}</span></footer>
+        <div className="mechanical-schedule-legend">{WORK_SHIFTS.map(shift => <span className={`duty-${shift.code}`} key={shift.code}><i />{shift.name} {shift.time}</span>)}</div>
+        <div className="mechanical-schedule-table-wrap"><table><thead><tr><th>日期</th><th>星期</th>{users.map(user => <th key={String(user.user_id)}>{String(user.name || '')}</th>)}</tr></thead><tbody>{dates.map(date => <tr className={isWeekend(date) ? 'is-weekend' : ''} key={date}><th>{Number(date.slice(-2))}</th><th>{weekday(date)}</th>{users.map(user => {
+          const value = dutyFor(user.user_id, date), shift = WORK_SHIFTS.find(item => item.code === value);
+          return <td className={shift ? `duty-${shift.code}` : ''} key={String(user.user_id)}>{shift ? shift.name : '—'}</td>;
+        })}</tr>)}</tbody></table></div>
+        <footer><span>每班 8 小時；空白表示未排班。系統另依跨市場班表檢查休息間隔與法定工時。</span><span>最後異動：{latest?.updated_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(latest.updated_at))) : '尚無紀錄'}</span></footer>
       </section>
     </div>
   </AppShell>;

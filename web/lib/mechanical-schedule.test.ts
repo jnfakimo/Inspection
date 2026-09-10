@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateMechanicalSchedule } from './mechanical-schedule.ts';
+import { scheduleCalendarDates, validateMechanicalSchedule } from './mechanical-schedule.ts';
 
 const id = '00000000-0000-4000-8000-000000000001';
 const row = (date: string, code: string, market = 'market_1') => ({ user_id: id, duty_date: date, duty_code: code, market_code: market });
@@ -22,20 +22,25 @@ test('blocks more than forty hours and more than six consecutive work days', () 
   assert.ok(violations.some(item => item.rule === 'consecutive_days'));
 });
 
-test('requires one weekly holiday and one rest day after a week is fully planned', () => {
-  const rows = [
-    row('2026-09-07', '09-17'), row('2026-09-08', '09-17'), row('2026-09-09', '09-17'),
-    row('2026-09-10', '09-17'), row('2026-09-11', '09-17'), row('2026-09-12', 'rotation_off'), row('2026-09-13', 'annual_leave'),
-  ];
+test('blocks six work days in a rolling seven-day window', () => {
+  const rows = Array.from({ length: 6 }, (_, index) => row(`2026-09-${String(index + 7).padStart(2, '0')}`, '09-17'));
   const violations = validateMechanicalSchedule(rows, { start: '2026-09-07', end: '2026-09-13' });
   assert.ok(violations.some(item => item.rule === 'weekly_rest'));
 });
 
-test('accepts a complete forty-hour week with statutory rest labels', () => {
+test('accepts five irregular work days with two unscheduled rest days', () => {
   const rows = [
-    row('2026-09-07', '09-17'), row('2026-09-08', '09-17'), row('2026-09-09', '09-17'),
-    row('2026-09-10', '09-17'), row('2026-09-11', '09-17'), row('2026-09-12', 'rest_day'), row('2026-09-13', 'weekly_off'),
+    row('2026-09-07', '01-09'), row('2026-09-08', '09-17'), row('2026-09-10', '17-01'),
+    row('2026-09-12', '09-17'), row('2026-09-13', '17-01'),
   ];
   const violations = validateMechanicalSchedule(rows, { start: '2026-09-07', end: '2026-09-13' });
   assert.deepEqual(violations, []);
+});
+
+test('perpetual calendar always spans six complete weeks and leap day', () => {
+  const dates = scheduleCalendarDates('2028-02');
+  assert.equal(dates.length, 42);
+  assert.equal(dates[0], '2028-01-30');
+  assert.ok(dates.includes('2028-02-29'));
+  assert.equal(dates.at(-1), '2028-03-11');
 });
