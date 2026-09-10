@@ -131,8 +131,14 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     ]);
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
     const scopedPeople = (people.data || []).filter(person => person.status === 'active' && mechanicalDeptIds.has(String(person.dept_id)));
-    const failure = work.error || signs.error || approvalRows.error || people.error || departments.error || history.error || carryRows.error;
-    if (failure) setNote(`失敗：${errorMessage(failure, '機電交接資料載入失敗')}`);
+    const failures = [work.error, signs.error, approvalRows.error, people.error, departments.error, history.error, carryRows.error].filter(Boolean);
+    const failure = failures[0];
+    if (failure) {
+      const localOrigin = typeof window !== 'undefined' && /^(?:localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})$/.test(window.location.hostname);
+      setNote(localOrigin && failures.length >= 3
+        ? '失敗：地端資料服務連線設定異常，請通知系統管理員'
+        : `失敗：${errorMessage(failure, '機電交接資料載入失敗')}`);
+    }
     const itemCounts = new Map<string, number>();
     (history.data || []).forEach(row => { const item = String(row.work_item || ''); if (item) itemCounts.set(item, (itemCounts.get(item) || 0) + 1); });
     setEntries(work.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setCarryHistory(carryRows.data || []);
@@ -309,7 +315,7 @@ export function PrintSheet({ date, entries, signatures, approval, userName }: { 
     </table>
     <div className="mechanical-print-total"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(entries))}</strong><span>費用未填 {entries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
     <div className="mechanical-print-signatures"><b>值班簽名</b>{SHIFTS.map(shift => <span key={shift.code}>{shift.label}<strong>{userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id)}</strong></span>)}</div>
-    <div className="mechanical-print-approval"><b>課長簽核</b><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong><span>{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}</span></div>
+    <div className="mechanical-print-approval"><b>課長簽核</b><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong><span className="mechanical-print-approval-detail">{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}{approval && <b className="mechanical-print-approval-seal">核可</b>}</span></div>
   </div></article>;
 }
 
