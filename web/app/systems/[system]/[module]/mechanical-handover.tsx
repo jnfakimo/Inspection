@@ -48,6 +48,12 @@ function shiftDate(date: string, days: number) {
   value.setDate(value.getDate() + days);
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
 }
+function dateRange(from: string, to: string) {
+  const result: string[] = [];
+  let cursor = from;
+  for (let i = 0; i < 62 && cursor <= to; i += 1) { result.push(cursor); cursor = shiftDate(cursor, 1); }
+  return result;
+}
 
 export function MechanicalHandover({ system, module, profile }: Props) {
   const [date, setDate] = useState(todayTaipei());
@@ -59,6 +65,11 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [presetItem, setPresetItem] = useState('');
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printFrom, setPrintFrom] = useState(date);
+  const [printTo, setPrintTo] = useState(date);
+  const [printData, setPrintData] = useState<{ entries: Row[]; signatures: Row[] } | null>(null);
+  const [printBusy, setPrintBusy] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -94,11 +105,22 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       await load(); setNote(userId ? '值班人員已簽名' : '已清除值班簽名');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
+  const preparePrint = async () => {
+    if (!printFrom || !printTo || printFrom > printTo || dateRange(printFrom, printTo).length > 31) return;
+    setPrintBusy(true);
+    const client = getSupabase();
+    const [work, signs] = await Promise.all([
+      client.from('mechanical_handover_entries').select('*').gte('work_date', printFrom).lte('work_date', printTo).order('work_date').order('shift_code').order('sort_order').order('created_at'),
+      client.from('mechanical_handover_signatures').select('*').gte('work_date', printFrom).lte('work_date', printTo),
+    ]);
+    setPrintData({ entries: work.data || [], signatures: signs.data || [] }); setPrintBusy(false); setPrintOpen(false);
+    setTimeout(() => window.print(), 120);
+  };
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="mechanical-page">
       <AdminHeader module={module} busy={busy} note={note} onReload={load}
-        action={<button className="primary-btn compact mechanical-print-button" onClick={() => window.print()}>列印每日報表</button>} />
+        action={<button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintOpen(true); }}>列印每日報表</button>} />
       <section className="panel mechanical-toolbar">
         <div className="mechanical-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
         <span>{rocDate(date)}</span>
@@ -125,9 +147,25 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         </table>
         <div className="mechanical-signatures"><strong>值班簽名</strong>{SHIFTS.map(shift => <label key={shift.code}><span>{shift.label}</span><select value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{mechanicalUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{user.department ? `（${user.department}）` : ''}</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}</b></label>)}</div>
       </section>
+      {printData && <section className="mechanical-print-preview" aria-hidden="true">{dateRange(printFrom, printTo).map(printDate => <PrintSheet key={printDate} date={printDate} entries={printData.entries.filter(row => String(row.work_date) === printDate)} signatures={printData.signatures.filter(row => String(row.work_date) === printDate)} userName={userName} />)}</section>}
     </div>
+    {printOpen && <PrintRangeModal from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} profile={profile} presetItem={presetItem} onClose={() => { setEditingShift(null); setPresetItem(''); }} onDone={async () => { setEditingShift(null); setPresetItem(''); await load(); setNote('維修養護工作已新增'); }} />}
   </AppShell>;
+}
+
+function PrintRangeModal({ from, to, busy, onFrom, onTo, onClose, onPrint }: { from: string; to: string; busy: boolean; onFrom: (value: string) => void; onTo: (value: string) => void; onClose: () => void; onPrint: () => void }) {
+  const pages = from && to && from <= to ? dateRange(from, to).length : 0;
+  return <AdminModal title="列印機電交接報表" onClose={onClose}>
+    <div className="mechanical-print-range"><label>開始日期<LocalizedDateInput aria-label="列印開始日期" value={from} onChange={event => onFrom(event.target.value)} /></label><label>結束日期<LocalizedDateInput aria-label="列印結束日期" value={to} onChange={event => onTo(event.target.value)} /></label></div>
+    <p className="mechanical-print-hint">每一天會產生一頁 A4 報表，最多可列印 31 天（目前 {pages} 頁）。</p>
+    {(!pages || pages > 31) && <p className="inline-message danger">請確認日期順序，且列印區間不可超過 31 天。</p>}
+    <footer><button className="secondary-btn" onClick={onClose}>取消</button><button className="primary-btn compact" disabled={busy || !pages || pages > 31} onClick={onPrint}>{busy ? '準備中…' : '開始列印'}</button></footer>
+  </AdminModal>;
+}
+
+function PrintSheet({ date, entries, signatures, userName }: { date: string; entries: Row[]; signatures: Row[]; userName: (id: unknown) => string }) {
+  return <article className="mechanical-print-sheet"><header><h2>臺北農產運銷股份有限公司第二批發市場機電設備養護紀錄表</h2><p>{rocDate(date)}</p></header><table><thead><tr><th>班別</th><th>維修養護工作內容</th><th>維修人員</th><th>處理結果</th><th>備註</th></tr></thead><tbody>{SHIFTS.map(shift => { const rows = entries.filter(row => row.shift_code === shift.code); return <tr key={shift.code}><th>{shift.label}</th><td>{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{String(row.work_item || '')}{row.details ? `－${String(row.details)}` : ''}</p>) : '—'}</td><td>{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{(Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—'}</p>) : '—'}</td><td>{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{String(row.result || '—')}</p>) : '—'}</td><td>{rows.length ? rows.map(row => <p key={String(row.entry_id)}>{String(row.notes || '—')}</p>) : '—'}</td></tr>; })}</tbody></table><div className="mechanical-print-signatures"><b>值班簽名</b>{SHIFTS.map(shift => <span key={shift.code}>{shift.label}：{userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id)}</span>)}</div></article>;
 }
 
 function WorkEntryModal({ date, shiftCode, users, profile: _profile, presetItem = '', onClose, onDone }: { date: string; shiftCode: string; users: Row[]; profile: Profile; presetItem?: string; onClose: () => void; onDone: () => void }) {
