@@ -4,6 +4,7 @@ import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
 import { clientIpFromRequest } from '../_shared/client-ip.ts';
 import { repairCostCents } from '../_shared/mechanical-cost.ts';
+import { MECHANICAL_SCHEDULE_DUTY_CODES, validateMechanicalScheduleRows, type MechanicalScheduleInput } from '../_shared/mechanical-schedule.ts';
 import { readMarketBoardNotices } from './market-board-notices.ts';
 
 type PortableRuntime = {
@@ -3127,6 +3128,69 @@ export async function handleAppApiRequest(req: Request) {
         await writeAudit(userDb, profile.user_id, 'handover_records', recordId, 'update',
           { status: 'confirmed' }, { status: 'confirmed', confirmed_by: profile.user_id, confirmed_at: updated.confirmed_at });
         return reply(req, { ok: true });
+      }
+
+      if (kind === 'mechanical_schedule_save') {
+        const yearMonth = text(body.year_month, 7);
+        const marketCode = text(body.market_code, 20);
+        if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(yearMonth)) return reply(req, { ok: false, message: '排班月份格式無效' }, 400);
+        if (!['market_1', 'market_2'].includes(marketCode)) return reply(req, { ok: false, message: '市場別無效' }, 400);
+        if (!Array.isArray(body.assignments) || body.assignments.length > 1000) return reply(req, { ok: false, message: '班表資料格式無效' }, 400);
+        const dutyCodes = new Set<string>(MECHANICAL_SCHEDULE_DUTY_CODES);
+        const assignments: MechanicalScheduleInput[] = [];
+        const rowKeys = new Set<string>();
+        for (const raw of body.assignments) {
+          if (!raw || typeof raw !== 'object') return reply(req, { ok: false, message: '班表包含無效資料' }, 400);
+          const value = raw as Record<string, unknown>;
+          const userId = id(value.user_id), dutyDate = text(value.duty_date, 10), dutyCode = text(value.duty_code, 30);
+          if (!userId || !validISODate(dutyDate) || !dutyDate.startsWith(`${yearMonth}-`) || !dutyCodes.has(dutyCode)) {
+            return reply(req, { ok: false, message: '班表包含無效的人員、日期或班別' }, 400);
+          }
+          const key = `${userId}|${dutyDate}`;
+          if (rowKeys.has(key)) return reply(req, { ok: false, message: '同一人同一天的班表資料重複' }, 400);
+          rowKeys.add(key);
+          assignments.push({ user_id: userId, duty_date: dutyDate, duty_code: dutyCode, market_code: marketCode });
+        }
+
+        const scheduledUserIds = [...new Set(assignments.map(row => row.user_id))];
+        if (scheduledUserIds.length) {
+          const { data: mechanicalDepartments, error: departmentError } = await admin.from('departments')
+            .select('dept_id').eq('name', '機電課').eq('level', 2).eq('status', 'active');
+          if (departmentError) throw departmentError;
+          const departmentIds = (mechanicalDepartments || []).map(row => row.dept_id);
+          if (!departmentIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
+          const { data: staff, error: staffError } = await admin.from('users').select('user_id')
+            .in('user_id', scheduledUserIds).in('dept_id', departmentIds).eq('status', 'active');
+          if (staffError) throw staffError;
+          if ((staff || []).length !== scheduledUserIds.length) return reply(req, { ok: false, message: '排班人員僅限第二階機電課的在職同仁' }, 400);
+        }
+
+        const monthStart = `${yearMonth}-01`;
+        const nextMonthDate = new Date(`${monthStart}T00:00:00Z`);
+        nextMonthDate.setUTCMonth(nextMonthDate.getUTCMonth() + 1);
+        const nextMonth = nextMonthDate.toISOString().slice(0, 10);
+        const rangeStartDate = new Date(`${monthStart}T00:00:00Z`);
+        rangeStartDate.setUTCDate(rangeStartDate.getUTCDate() - 7);
+        const rangeEndDate = new Date(`${nextMonth}T00:00:00Z`);
+        rangeEndDate.setUTCDate(rangeEndDate.getUTCDate() + 7);
+        const rangeStart = rangeStartDate.toISOString().slice(0, 10);
+        const rangeEnd = rangeEndDate.toISOString().slice(0, 10);
+        const { data: persisted, error: scheduleReadError } = await admin.from('mechanical_schedule_assignments')
+          .select('user_id,duty_date,duty_code,market_code,is_active')
+          .gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).limit(5000);
+        if (scheduleReadError) throw scheduleReadError;
+        const combined = ((persisted || []) as MechanicalScheduleInput[])
+          .filter(row => !(row.market_code === marketCode && row.duty_date >= monthStart && row.duty_date < nextMonth))
+          .concat(assignments);
+        const violations = validateMechanicalScheduleRows(combined, monthStart, new Date(nextMonthDate.getTime() - 86_400_000).toISOString().slice(0, 10));
+        if (violations.length) return reply(req, { ok: false, message: `班表未通過法定工時卡控：${violations[0].message}`, violations: violations.slice(0, 30) }, 409);
+
+        const { data, error } = await admin.rpc('save_mechanical_schedule_month', {
+          p_actor_id: profile.user_id, p_year_month: monthStart, p_market_code: marketCode,
+          p_assignments: assignments.map(row => ({ user_id: row.user_id, duty_date: row.duty_date, duty_code: row.duty_code, note: null })),
+        }).single();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '機電課班表儲存失敗') }, String(error.code || '') === '42501' ? 403 : 409);
+        return reply(req, { ok: true, data });
       }
 
       if (kind === 'mechanical_entry') {

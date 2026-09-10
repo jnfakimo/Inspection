@@ -43,8 +43,8 @@ if (fs.existsSync(modulesFile)) {
   const systemCount = (registry.match(/code:'SYS-\d+'/g) || []).length;
   const moduleCount = (registry.match(/\bm\(/g) || []).length;
   console.log(`V2 模組盤點：${systemCount} 大系統、${moduleCount} 個子系統`);
-  if (systemCount !== 13 || moduleCount !== 64) {
-    findings.push({ severity: 'error', file: 'web/lib/modules.ts', rule: '系統拓撲數量', message: 'V2 必須維持 13 大系統、64 個已登錄路由，請同步更新專案設計與權限盤點。' });
+  if (systemCount !== 13 || moduleCount !== 65) {
+    findings.push({ severity: 'error', file: 'web/lib/modules.ts', rule: '系統拓撲數量', message: 'V2 必須維持 13 大系統、65 個已登錄路由，請同步更新專案設計與權限盤點。' });
   }
 }
 for (const file of walk(path.join(root, 'web'))) {
