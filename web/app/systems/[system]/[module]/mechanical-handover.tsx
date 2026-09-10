@@ -43,35 +43,47 @@ function rocDate(date: string) {
   const [year, month, day] = date.split('-').map(Number);
   return year ? `${year - 1911} 年 ${month} 月 ${day} 日（${weekday(date)}）` : '';
 }
+function shiftDate(date: string, days: number) {
+  const value = new Date(`${date}T12:00:00+08:00`);
+  value.setDate(value.getDate() + days);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(value);
+}
 
 export function MechanicalHandover({ system, module, profile }: Props) {
   const [date, setDate] = useState(todayTaipei());
   const [entries, setEntries] = useState<Row[]>([]);
   const [signatures, setSignatures] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
+  const [historyItems, setHistoryItems] = useState<string[]>([]);
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
+  const [presetItem, setPresetItem] = useState('');
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
-    const [work, signs, people, departments] = await Promise.all([
+    const [work, signs, people, departments, history] = await Promise.all([
       client.from('mechanical_handover_entries').select('*').eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
       client.from('mechanical_handover_signatures').select('*').eq('work_date', date),
       client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,name,parent_id,status,level').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
+      client.from('mechanical_handover_entries').select('work_item').eq('created_by', profile.user_id).limit(1000),
     ]);
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
     const scopedPeople = (people.data || []).filter(person => mechanicalDeptIds.has(String(person.dept_id)));
-    const failure = work.error || signs.error || people.error || departments.error;
+    const failure = work.error || signs.error || people.error || departments.error || history.error;
     if (failure) setNote(`失敗：${errorMessage(failure, '機電交接資料載入失敗')}`);
-    setEntries(work.data || []); setSignatures(signs.data || []); setUsers(scopedPeople); setBusy(false);
-  }, [date]);
+    const itemCounts = new Map<string, number>();
+    (history.data || []).forEach(row => { const item = String(row.work_item || ''); if (item) itemCounts.set(item, (itemCounts.get(item) || 0) + 1); });
+    setEntries(work.data || []); setSignatures(signs.data || []); setUsers(scopedPeople);
+    setHistoryItems([...itemCounts.entries()].filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).map(([item]) => item)); setBusy(false);
+  }, [date, profile.user_id]);
   useEffect(() => { void load(); }, [load]);
 
   const userName = useCallback((id: unknown) => users.find(user => String(user.user_id) === String(id))?.name || '—', [users]);
   const mechanicalUsers = useMemo(() => [...users].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW')), [users]);
+  const frequentItems = useMemo(() => historyItems.filter(item => Object.prototype.hasOwnProperty.call(WORK_ITEMS, item) || Object.values(WORK_ITEMS).some(items => items.includes(item))), [historyItems]);
   const byShift = (code: string) => entries.filter(entry => entry.shift_code === code);
   const signFor = (code: string) => signatures.find(sign => sign.shift_code === code);
 
@@ -88,11 +100,12 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       <AdminHeader module={module} busy={busy} note={note} onReload={load}
         action={<button className="primary-btn compact mechanical-print-button" onClick={() => window.print()}>列印每日報表</button>} />
       <section className="panel mechanical-toolbar">
-        <label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label>
+        <div className="mechanical-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
         <span>{rocDate(date)}</span>
         <button className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
         <div className="mechanical-legend" aria-label="班別色彩說明"><b>班別</b><span className="legend-chip shift-0109">早班 01–09</span><span className="legend-chip shift-0917">中班 09–17</span><span className="legend-chip shift-1701">晚班 17–01</span></div>
       </section>
+      {frequentItems.length > 0 && <section className="panel mechanical-frequent"><div><b>我的常用工作項目</b><small>依個人紀錄累計 3 次以上</small></div><div className="mechanical-frequent-list">{frequentItems.slice(0, 6).map(item => <button key={item} className="secondary-btn compact" onClick={() => { setPresetItem(item); setEditingShift('01-09'); }}>{item}</button>)}</div></section>}
 
       <section className="mechanical-report" aria-label="機電設備養護紀錄表">
         <header><h2>臺北農產運銷股份有限公司第二批發市場機電設備養護紀錄表</h2><p>{rocDate(date)}</p></header>
@@ -113,13 +126,14 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         <div className="mechanical-signatures"><strong>值班簽名</strong>{SHIFTS.map(shift => <label key={shift.code}><span>{shift.label}</span><select value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{mechanicalUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{user.department ? `（${user.department}）` : ''}</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}</b></label>)}</div>
       </section>
     </div>
-    {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} profile={profile} onClose={() => setEditingShift(null)} onDone={async () => { setEditingShift(null); await load(); setNote('維修養護工作已新增'); }} />}
+    {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} profile={profile} presetItem={presetItem} onClose={() => { setEditingShift(null); setPresetItem(''); }} onDone={async () => { setEditingShift(null); setPresetItem(''); await load(); setNote('維修養護工作已新增'); }} />}
   </AppShell>;
 }
 
-function WorkEntryModal({ date, shiftCode, users, profile: _profile, onClose, onDone }: { date: string; shiftCode: string; users: Row[]; profile: Profile; onClose: () => void; onDone: () => void }) {
-  const [category, setCategory] = useState(Object.keys(WORK_ITEMS)[0]);
-  const [item, setItem] = useState(WORK_ITEMS[Object.keys(WORK_ITEMS)[0]][0]);
+function WorkEntryModal({ date, shiftCode, users, profile: _profile, presetItem = '', onClose, onDone }: { date: string; shiftCode: string; users: Row[]; profile: Profile; presetItem?: string; onClose: () => void; onDone: () => void }) {
+  const initialCategory = Object.keys(WORK_ITEMS).find(category => WORK_ITEMS[category].includes(presetItem)) || Object.keys(WORK_ITEMS)[0];
+  const [category, setCategory] = useState(initialCategory);
+  const [item, setItem] = useState(presetItem || WORK_ITEMS[initialCategory][0]);
   const [details, setDetails] = useState('');
   const [technicians, setTechnicians] = useState<string[]>([]);
   const [result, setResult] = useState('正常');
