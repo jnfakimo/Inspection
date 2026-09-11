@@ -232,6 +232,13 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - 主管簽核權限是子系統 `handover/guard-approve`，**必須在權限頁明確設為「允許」**：三層授權的子系統
   預設「沿用」大系統權限，但簽核是特權，`app-api` 的 `canGuardApprove` 只認明確允許（系統管理員自動具備）。
   頁面路由也要放行只有簽核權限的主管。駐警隊目前沒有任何 `unit_supervisor`，不可改回「依單位課長判斷」。
+- **異常事件附件**（私有桶 `guard-handover-files`，2026-09-11）：格式不限、單檔 50 MB、每件事件 10 個；
+  影片一律先在瀏覽器以 `web/lib/video-compress.ts`（canvas＋MediaRecorder，約 1 Mbps、長邊 1280px）
+  壓縮再上傳，壓縮時間約等於影片長度。上傳只用 `guard_attach_prepare` 簽發的一次性上傳網址、讀取只用
+  `guard_attachment_url` 的 10 分鐘限時網址，桶上**沒有**任何 authenticated 的 storage 政策；
+  html／svg／xml／js 等可在瀏覽器執行的型別一律改存 `application/octet-stream`，預覽只開放圖片／影片／
+  音訊／PDF。交班簽名或主管簽核後附件即鎖定；儲存交接時會把已移除事件的附件軟刪除。影片預覽依賴 CSP 的
+  `media-src`（`tools/build-hardened-pages.mjs`）。畫面元件在 `guard-handover-view.tsx`，可單獨渲染檢查版面。
 
 ## V2 系統子頁標題規範（2026-08-27 訂）
 

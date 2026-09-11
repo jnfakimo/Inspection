@@ -176,6 +176,8 @@ const v2ContentSecurityPolicy = [
   // data: 供 QR 標籤、blob: 供 3D 貼圖，圖片外部來源僅限 Storage 公開桶。
   // V1 用的是 https:（等於任何 HTTPS 網域），那會留下把資料塞進網址外傳的管道。
   `img-src 'self' data: blob: https://qztffronusdhgxhjjubt.supabase.co${vehicleTrackingMapOrigin ? ` ${vehicleTrackingMapOrigin}` : ''}`,
+  // 駐衛警交接附件的影片／音訊預覽走 Storage 限時網址；來源收斂原則同 img-src。
+  "media-src 'self' blob: https://qztffronusdhgxhjjubt.supabase.co",
   `connect-src ${v2ConnectSources}`,
   "worker-src 'self' blob:",
   "object-src 'none'",

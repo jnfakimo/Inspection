@@ -100,7 +100,21 @@ const BUSINESS_HANDOVER_CATEGORIES = new Set(['事務事項', '維修', '其他'
 // 駐衛警交接簿：前端 guard-handover.tsx 的選項必須與這裡逐字一致。
 const GUARD_INCIDENT_CATEGORIES = new Set(['門禁管制', '可疑人車', '竊盜', '火警／煙霧', '設備故障', '漏水／停電', '交通事故', '民眾糾紛', '急救傷病', '其他']);
 const GUARD_ITEM_CONDITIONS = new Set(['正常', '短少', '損壞', '遺失']);
-type GuardIncident = { time: string; location: string; category: string; description: string; action: string; reported_to: string };
+const GUARD_ATTACHMENT_BUCKET = 'guard-handover-files';
+const GUARD_ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
+const GUARD_ATTACHMENTS_PER_INCIDENT = 10;
+// 可在瀏覽器執行的內容一律改存為下載用型別，避免在 Storage 網域被當成網頁或指令碼開啟。
+const GUARD_UNSAFE_CONTENT_TYPES = /^(text\/html|application\/xhtml\+xml|image\/svg\+xml|text\/xml|application\/xml|text\/javascript|application\/(x-)?javascript|application\/ecmascript|text\/ecmascript)$/i;
+function guardContentType(value: unknown) {
+  const type = String(value || '').trim().toLowerCase().slice(0, 100);
+  if (!/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/.test(type) || GUARD_UNSAFE_CONTENT_TYPES.test(type)) return 'application/octet-stream';
+  return type;
+}
+function guardFileExtension(name: string) {
+  const match = name.toLowerCase().match(/\.([a-z0-9]{1,10})$/);
+  return match ? `.${match[1]}` : '';
+}
+type GuardIncident = { id: string; time: string; location: string; category: string; description: string; action: string; reported_to: string };
 type GuardItem = { name: string; qty: number; condition: string; note: string };
 
 function mechanicalShiftSlot(workDate: string, shiftCode: string) {
@@ -3286,13 +3300,26 @@ export async function handleAppApiRequest(req: Request) {
     const guardIncidents = (value: unknown): GuardIncident[] | null => {
       if (!Array.isArray(value) || value.length > 50) return null;
       const rows: GuardIncident[] = [];
+      const seenIncidentIds = new Set<string>();
       for (const raw of value) {
         const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
         const time = text(row.time, 16), category = text(row.category, 20), description = text(row.description, 2000);
         if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !GUARD_INCIDENT_CATEGORIES.has(category) || !description) return null;
-        rows.push({ time, location: text(row.location, 100), category, description, action: text(row.action, 2000), reported_to: text(row.reported_to, 100) });
+        // 事件識別碼是附件的掛點；缺漏或重複時由伺服器補發，不信任前端的重複值。
+        let incidentId = id(row.id) || crypto.randomUUID();
+        if (seenIncidentIds.has(incidentId)) incidentId = crypto.randomUUID();
+        seenIncidentIds.add(incidentId);
+        rows.push({ id: incidentId, time, location: text(row.location, 100), category, description, action: text(row.action, 2000), reported_to: text(row.reported_to, 100) });
       }
       return rows;
+    };
+    // 事件在交接內容中被移除時，它的附件一併軟刪除，不留下無主的附件。
+    const guardPruneAttachments = async (dutyDate: string, shiftName: string, incidentIds: string[]) => {
+      let query = admin.from('guard_handover_attachments').update({ is_deleted: true, deleted_by: profile.user_id, deleted_at: new Date().toISOString() })
+        .eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('is_deleted', false);
+      if (incidentIds.length) query = query.not('incident_id', 'in', `(${incidentIds.join(',')})`);
+      const { error } = await query;
+      if (error) console.error('guard attachment prune failed:', error.message);
     };
     const guardItems = (value: unknown): GuardItem[] | null => {
       if (!Array.isArray(value) || value.length > 40) return null;
@@ -3310,7 +3337,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐衛警電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
-      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult] = await Promise.all([
+      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult] = await Promise.all([
         guardShiftContext(dutyDate),
         admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).order('shift_order'),
         admin.from('guard_handover_daily_approvals').select('*').eq('duty_date', dutyDate).maybeSingle(),
@@ -3318,8 +3345,10 @@ export async function handleAppApiRequest(req: Request) {
           .order('duty_date', { ascending: false }).order('shift_order', { ascending: false }).limit(1).maybeSingle(),
         admin.from('users').select('user_id,name,dept_id,department,status').limit(5000),
         admin.from('departments').select('dept_id,name').limit(2000),
+        admin.from('guard_handover_attachments').select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at')
+          .eq('duty_date', dutyDate).eq('is_deleted', false).order('uploaded_at'),
       ]);
-      const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error;
+      const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error || attachmentResult.error;
       if (failure) throw failure;
       // 可勾選的實際值勤人員：單位名稱含「駐警／駐衛」者（以 dept_id 為準，users.department 後備）。
       const patrolDepts = new Set((deptResult.data || []).filter(row => /駐警|駐衛/.test(String(row.name || ''))).map(row => String(row.dept_id)));
@@ -3337,6 +3366,7 @@ export async function handleAppApiRequest(req: Request) {
         }
       }
       if (approval?.approver_id) referenced.add(String(approval.approver_id));
+      for (const file of attachmentResult.data || []) if (file.uploaded_by) referenced.add(String(file.uploaded_by));
       const people: Record<string, string> = {};
       for (const user of users) if (referenced.has(String(user.user_id))) people[String(user.user_id)] = String(user.name || '');
       const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
@@ -3347,8 +3377,26 @@ export async function handleAppApiRequest(req: Request) {
           previous_items: Array.isArray(previousResult.data?.items) ? previousResult.data.items : [],
           can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(),
           approval_open: dutyDate < todayInTaipei,
+          attachments: attachmentResult.data || [],
+          limits: { file_bytes: GUARD_ATTACHMENT_MAX_BYTES, files_per_incident: GUARD_ATTACHMENTS_PER_INCIDENT },
         },
       });
+    }
+
+    if (action === 'guard_attachment_url') {
+      if (!canHandoverModule('guard') && !canHandoverModule('guard-approve')) return reply(req, { ok: false, message: '目前帳號未開放駐衛警電子交接簿' }, 403);
+      const attachmentId = id(body.attachment_id);
+      if (!attachmentId) return reply(req, { ok: false, message: '附件識別碼無效' }, 400);
+      const { data: row, error } = await admin.from('guard_handover_attachments').select('storage_path,file_name,content_type,is_deleted').eq('attachment_id', attachmentId).maybeSingle();
+      if (error) throw error;
+      if (!row || row.is_deleted) return reply(req, { ok: false, message: '找不到這個附件' }, 404);
+      const bucket = admin.storage.from(GUARD_ATTACHMENT_BUCKET);
+      const [preview, download] = await Promise.all([
+        bucket.createSignedUrl(String(row.storage_path), 600),
+        bucket.createSignedUrl(String(row.storage_path), 600, { download: String(row.file_name) }),
+      ]);
+      if (preview.error || download.error || !preview.data || !download.data) return reply(req, { ok: false, message: '無法產生附件網址，請稍後再試' }, 500);
+      return reply(req, { ok: true, data: { url: preview.data.signedUrl, download_url: download.data.signedUrl, content_type: row.content_type, file_name: row.file_name } });
     }
 
     if (action === 'handover_save') {
@@ -3768,13 +3816,88 @@ export async function handleAppApiRequest(req: Request) {
         if (!before) {
           const { data, error } = await admin.from('guard_handover_logs').insert({ duty_date: dutyDate, shift_name: shiftName, ...content, created_by: profile.user_id }).select('*').single();
           if (error) return reply(req, { ok: false, message: String(error.code || '') === '23505' ? '這班交接剛由其他人建立，請重新載入' : dbMessage(error, '交接建立失敗') }, 409);
+          await guardPruneAttachments(dutyDate, shiftName, incidents.map(incident => incident.id));
           await writeAudit(admin, profile.user_id, 'guard_handover_logs', data.log_id, 'insert', null, data);
           return reply(req, { ok: true, data });
         }
         const { data, error } = await admin.from('guard_handover_logs').update(content).eq('log_id', before.log_id).eq('status', 'draft').select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接儲存失敗') }, 409);
         if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
+        await guardPruneAttachments(dutyDate, shiftName, incidents.map(incident => incident.id));
         await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'update', before, data);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'guard_attach_prepare' || kind === 'guard_attach_commit') {
+        const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40), incidentId = id(body.incident_id);
+        const fileName = text(body.file_name, 200).replace(/[\\/]/g, '_'), fileSize = Number(body.file_size);
+        if (!validISODate(dutyDate) || !shiftName || !incidentId) return reply(req, { ok: false, message: '附件所屬的交接班別或異常事件無效' }, 400);
+        if (!fileName) return reply(req, { ok: false, message: '檔案名稱無效' }, 400);
+        if (!Number.isInteger(fileSize) || fileSize < 1 || fileSize > GUARD_ATTACHMENT_MAX_BYTES) {
+          return reply(req, { ok: false, message: `單一附件上限 ${GUARD_ATTACHMENT_MAX_BYTES / 1048576} MB` }, 400);
+        }
+        const [approvalCheck, logCheck, countCheck, shiftCheck] = await Promise.all([
+          admin.from('guard_handover_daily_approvals').select('approval_id').eq('duty_date', dutyDate).maybeSingle(),
+          admin.from('guard_handover_logs').select('status').eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle(),
+          admin.from('guard_handover_attachments').select('attachment_id', { count: 'exact', head: true })
+            .eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('incident_id', incidentId).eq('is_deleted', false),
+          admin.from('patrol_shift_template').select('name').neq('status', 'inactive').eq('name', shiftName).limit(1),
+        ]);
+        const failure = approvalCheck.error || logCheck.error || countCheck.error || shiftCheck.error;
+        if (failure) throw failure;
+        if (approvalCheck.data) return reply(req, { ok: false, message: '本日交接已由主管簽核，不可再變更附件' }, 409);
+        if (logCheck.data && logCheck.data.status !== 'draft') return reply(req, { ok: false, message: '這班已交班簽名，附件已鎖定' }, 409);
+        if (!(shiftCheck.data || []).length) return reply(req, { ok: false, message: '巡檢排班找不到這個班別，請重新載入' }, 404);
+        if ((countCheck.count || 0) >= GUARD_ATTACHMENTS_PER_INCIDENT) return reply(req, { ok: false, message: `每件異常事件最多 ${GUARD_ATTACHMENTS_PER_INCIDENT} 個附件` }, 409);
+        const contentType = guardContentType(body.content_type);
+        if (kind === 'guard_attach_prepare') {
+          // 路徑由伺服器決定：只用值班日、事件識別碼與隨機檔名，原始檔名只存在索引表。
+          const path = `${dutyDate}/${incidentId}/${crypto.randomUUID()}${guardFileExtension(fileName)}`;
+          const { data, error } = await admin.storage.from(GUARD_ATTACHMENT_BUCKET).createSignedUploadUrl(path);
+          if (error || !data) return reply(req, { ok: false, message: `無法建立上傳網址：${error?.message || '未知錯誤'}` }, 500);
+          return reply(req, { ok: true, data: { path: data.path || path, token: data.token, content_type: contentType } });
+        }
+        const path = text(body.path, 300), folder = `${dutyDate}/${incidentId}`;
+        if (!new RegExp(`^${folder}/[0-9a-f-]{36}(\\.[a-z0-9]{1,10})?$`).test(path)) return reply(req, { ok: false, message: '附件路徑無效' }, 400);
+        const objectName = path.slice(folder.length + 1);
+        const { data: listed, error: listError } = await admin.storage.from(GUARD_ATTACHMENT_BUCKET).list(folder, { search: objectName, limit: 5 });
+        if (listError) throw listError;
+        const stored = (listed || []).find(item => item.name === objectName);
+        const storedSize = Number((stored?.metadata as Record<string, unknown> | undefined)?.size || 0);
+        if (!stored || !storedSize) return reply(req, { ok: false, message: '找不到已上傳的檔案，請重新上傳' }, 409);
+        if (storedSize > GUARD_ATTACHMENT_MAX_BYTES) {
+          await admin.storage.from(GUARD_ATTACHMENT_BUCKET).remove([path]);
+          return reply(req, { ok: false, message: `單一附件上限 ${GUARD_ATTACHMENT_MAX_BYTES / 1048576} MB` }, 400);
+        }
+        const originalSize = Number(body.original_size);
+        const payload = {
+          duty_date: dutyDate, shift_name: shiftName, incident_id: incidentId, file_name: fileName, content_type: contentType,
+          file_size: storedSize, original_size: Number.isInteger(originalSize) && originalSize > 0 ? originalSize : null,
+          compressed: body.compressed === true, storage_path: path, uploaded_by: profile.user_id,
+        };
+        const { data, error } = await admin.from('guard_handover_attachments').insert(payload)
+          .select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at').single();
+        if (error || !data) {
+          // 沒有索引的物件不會被任何人讀到（桶上沒有讀取政策），直接清掉以免佔用空間。
+          await admin.storage.from(GUARD_ATTACHMENT_BUCKET).remove([path]);
+          return reply(req, { ok: false, message: dbMessage(error, '附件登錄失敗') }, 409);
+        }
+        await writeAudit(admin, profile.user_id, 'guard_handover_attachments', data.attachment_id, 'insert', null, data);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'guard_detach') {
+        const attachmentId = id(body.attachment_id);
+        if (!attachmentId) return reply(req, { ok: false, message: '附件識別碼無效' }, 400);
+        const { data: before, error: readError } = await admin.from('guard_handover_attachments').select('*').eq('attachment_id', attachmentId).maybeSingle();
+        if (readError) throw readError;
+        if (!before || before.is_deleted) return reply(req, { ok: false, message: '找不到這個附件' }, 404);
+        const { data, error } = await admin.from('guard_handover_attachments')
+          .update({ is_deleted: true, deleted_by: profile.user_id, deleted_at: new Date().toISOString() })
+          .eq('attachment_id', attachmentId).eq('is_deleted', false).select('attachment_id').maybeSingle();
+        if (error) return reply(req, { ok: false, message: String(error.code || '') === '23514' ? '這班已交班簽名或當日已主管簽核，附件不可移除' : dbMessage(error, '附件移除失敗') }, 409);
+        if (!data) return reply(req, { ok: false, message: '這個附件剛被其他人異動，請重新載入' }, 409);
+        await writeAudit(admin, profile.user_id, 'guard_handover_attachments', attachmentId, 'status_change', before, { ...before, is_deleted: true });
         return reply(req, { ok: true, data });
       }
 
