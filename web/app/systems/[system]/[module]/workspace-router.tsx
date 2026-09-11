@@ -89,6 +89,15 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
       : <AppShell profile={profile} title={module.title}><section className="panel admin-access-denied"><h2>未開放此子系統</h2><p>目前帳號沒有使用「{module.title}」的權限，請洽系統管理員調整。</p></section></AppShell>}
     </AuthGate>;
   }
+  const marketAnalyticsWorkspace = () => {
+    if (module.key === 'command-center') {
+      return <MarketCommandCenterWorkspace system={system} module={module} />;
+    }
+    if (module.key === 'interactive-dashboard') {
+      return <MarketInteractiveDashboardWorkspace system={system} module={module} />;
+    }
+    return <MarketAnalyticsWorkspace system={system} module={module} />;
+  };
   let workspace: ReactNode;
   if (system.key === 'handover' || system.key === 'guardpatrol') {
     workspace = <OperationsWorkspace system={system} module={module} />;
@@ -109,13 +118,7 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   } else if (system.key === 'marketboard') {
     workspace = <MarketBoardWorkspace system={system} module={module} />;
   } else if (system.key === 'marketanalytics') {
-    if (module.key === 'command-center') {
-      workspace = <MarketCommandCenterWorkspace system={system} module={module} />;
-    } else if (module.key === 'interactive-dashboard') {
-      workspace = <MarketInteractiveDashboardWorkspace system={system} module={module} />;
-    } else {
-      workspace = <MarketAnalyticsWorkspace system={system} module={module} />;
-    }
+    workspace = marketAnalyticsWorkspace();
   } else if (system.key === 'vehicletracking') {
     workspace = <VehicleTrackingWorkspace system={system} module={module} />;
   } else {
