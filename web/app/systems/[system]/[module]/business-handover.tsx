@@ -545,8 +545,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
     const client = getSupabase();
     const [entryResult, userResult, approvalResult] = await Promise.all([
       client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
-      client.from('users').select('user_id,name,role,rbac_role,department,title,status').eq('status', 'active').order('name').limit(1000),
-      client.from('business_handover_approvals').select('*').eq('handover_date', date).order('created_at'),
+      client.from('users').select('user_id,name,role,rbac_role,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
+      client.from('business_handover_approvals').select('*').eq('handover_date', date).order('created_at').then(res => res, () => ({ data: null, error: null })),
     ]);
 
     if (entryResult.error || userResult.error) {
@@ -558,7 +558,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
     setUsers(userResult.data || []);
 
     // 載入批核資料（若後端表尚未備妥則自動從 LocalStorage 備援）
-    let loadedApprovals: BusinessApproval[] = (approvalResult.data as BusinessApproval[]) || [];
+    let loadedApprovals: BusinessApproval[] = (approvalResult?.data as BusinessApproval[]) || [];
     if (loadedApprovals.length === 0 && typeof window !== 'undefined') {
       try {
         const local = localStorage.getItem(`${APPROVAL_STORAGE_PREFIX}${date}`);
