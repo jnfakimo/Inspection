@@ -1,29 +1,17 @@
+/* SYS-04 業管組電子交接簿樣式。色彩一律取主題變數；班別強調色（--shift）用於邊框、圖示與低比例底色。風格與駐衛警交接簿統一。 */
 .business-page{display:grid;gap:16px}
+.business-icon{display:block;flex:none}
 .business-header-actions{display:flex;align-items:center;gap:8px}
-.business-toolbar{display:flex;align-items:center;gap:10px;padding:14px 16px;flex-wrap:wrap}
-.business-toolbar label{display:flex;align-items:center;gap:10px;font-weight:700}
-.business-toolbar label>span{width:180px}
-.business-stats-badge{display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);font-size:13px;margin-left:12px}
-.business-stats-badge b{color:var(--cyan);font-size:14px}
-.business-percent{color:var(--green);font-weight:700}
-.business-progress-bar{width:70px;height:8px;border-radius:4px;background:color-mix(in srgb,var(--line) 70%,transparent);overflow:hidden;margin-left:4px}
-.business-progress-fill{height:100%;background:var(--green);transition:width .25s ease}
-.business-date-summary{margin-left:auto;color:var(--muted);font-size:13px}
 
-.business-tab-bar{display:flex;gap:8px;padding:4px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow-x:auto}
-.business-tab-btn{display:flex;align-items:center;gap:6px;padding:8px 16px;border:none;border-radius:8px;background:transparent;color:var(--ink);font-size:14px;font-weight:600;cursor:pointer;transition:all .18s ease;white-space:nowrap}
-.business-tab-btn:hover{background:color-mix(in srgb,var(--cyan) 12%,transparent)}
-.business-tab-btn.active{background:var(--panel);color:var(--cyan);box-shadow:var(--shadow)}
-
-.business-slot-filter-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow-x:auto}
-.business-filter-label{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap}
-.business-slot-chip{padding:5px 12px;border:1px solid var(--line);border-radius:20px;background:var(--panel2);color:var(--ink);font-size:12px;cursor:pointer;transition:all .15s ease;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-.business-slot-chip:hover{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
-.business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:#fff;font-weight:700}
-.business-slot-chip.is-done{border-color:var(--green);color:var(--green)}
-.business-slot-chip.active.is-done{background:var(--green);color:#fff}
-.business-slot-chip.is-live-slot{border-color:#059669;background:color-mix(in srgb,#059669 14%,var(--panel2));color:var(--ink);box-shadow:0 0 8px color-mix(in srgb,#059669 30%,transparent)}
-.business-live-text{background:#059669;color:#fff;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
+/* 工具列（比照駐衛警交接簿頂欄） */
+.panel.business-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 7%,var(--panel)),var(--panel) 60%)}
+.business-date-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.business-date-nav label{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700}
+.business-date-nav label>span{width:180px}
+.business-toolbar-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+.business-toolbar-live-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid color-mix(in srgb,var(--green) 40%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--green) 12%,var(--panel));color:var(--ink);font-size:13px;font-weight:700;box-shadow:0 0 12px color-mix(in srgb,var(--green) 20%,transparent)}
+.business-toolbar-summary{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid color-mix(in srgb,var(--cyan) 30%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--cyan) 9%,var(--panel));color:var(--ink);font-size:13px;font-weight:600}
+.business-toolbar-summary .business-icon{color:var(--cyan)}
 
 /* 呼吸微光燈 */
 .business-pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 0 rgba(16,185,129,.7);animation:businessPulse 1.8s infinite}
@@ -33,40 +21,66 @@
   100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(16,185,129,0)}
 }
 
-.business-sheet{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow)}
-.business-sheet>header{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:22px 26px;border-top:6px solid var(--violet);border-bottom:1px solid var(--line)}
-.business-sheet>header small{color:var(--muted)}
-.business-sheet>header h2{margin:5px 0 0;font-size:26px}
-.business-header-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.business-header-meta>b{font-size:17px}
-.business-completion-pill{padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--green) 15%,var(--panel));color:var(--green);font-size:12px;font-weight:700}
+/* 交接紀錄表外框、表頭與今日指標 (比照駐衛警風格) */
+.business-sheet{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow,0 12px 32px rgba(15,23,42,.08))}
+.business-sheet-head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:24px 26px 20px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--violet) 13%,var(--panel)) 0%,color-mix(in srgb,var(--cyan) 9%,var(--panel)) 55%,var(--panel) 100%)}
+.business-sheet-head::before{content:'';position:absolute;inset:0 0 auto;height:5px;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--green))}
+.business-sheet-title{display:flex;align-items:center;gap:16px}
+.business-sheet-emblem{display:grid;place-items:center;flex:none;width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,var(--violet),var(--cyan));color:#fff;box-shadow:0 10px 22px color-mix(in srgb,var(--violet) 28%,transparent)}
+.business-sheet-title small{color:var(--muted);letter-spacing:.06em}
+.business-sheet-title h2{margin:4px 0 0;color:var(--ink);font-size:28px;letter-spacing:.08em}
+.business-date-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid color-mix(in srgb,var(--violet) 32%,var(--line));border-radius:999px;background:var(--panel);color:var(--ink);font-size:16px;white-space:nowrap;box-shadow:0 2px 8px color-mix(in srgb,var(--violet) 12%,transparent)}
+.business-date-chip .business-icon{color:var(--violet)}
 
-.business-shift{--shift:#0284c7;border-left:7px solid var(--shift);background:color-mix(in srgb,var(--shift) 5%,var(--panel));transition:all .2s ease}
-.business-shift.is-active-shift{border-left-width:10px;border-left-color:#10b981;box-shadow:0 0 16px color-mix(in srgb,#10b981 18%,transparent)}
-.business-shift-2{--shift:#059669}
-.business-shift-3{--shift:#b45309}
-.business-shift+.business-shift{border-top:14px solid var(--bg)}
-.business-shift-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:3px solid color-mix(in srgb,var(--shift) 35%,var(--line))}
-.business-shift-head>div{display:flex;align-items:center;gap:12px}
-.business-shift-head strong{display:grid;place-items:center;width:46px;height:46px;border-radius:10px;background:color-mix(in srgb,var(--shift) 12%,var(--panel));color:var(--shift);font-size:22px}
-.business-shift.is-active-shift .business-shift-head strong{background:color-mix(in srgb,#10b981 20%,var(--panel));color:#10b981}
-.business-shift-head span{display:grid}
-.business-shift-title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.business-shift-head span>b{font-size:20px}
-.business-shift-head small{color:var(--muted)}
-.business-active-shift-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,#10b981 18%,var(--panel));color:#10b981;font-size:12px;font-weight:700;border:1px solid color-mix(in srgb,#10b981 40%,transparent)}
+/* 今日核心指標卡片 (KPIs) */
+.business-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel2) 55%,var(--panel))}
+.business-kpi{--tone:var(--cyan);position:relative;display:flex;align-items:center;gap:12px;overflow:hidden;padding:12px 14px;border:1px solid color-mix(in srgb,var(--tone) 30%,var(--line));border-radius:14px;background:var(--panel)}
+.business-kpi::after{content:'';position:absolute;inset:auto 0 0;height:3px;background:var(--tone);opacity:.75}
+.business-kpi.is-green{--tone:var(--green)}
+.business-kpi.is-amber{--tone:var(--amber)}
+.business-kpi.is-red{--tone:var(--red)}
+.business-kpi.is-violet{--tone:var(--violet)}
+.business-kpi.is-cyan{--tone:var(--cyan)}
+.business-kpi-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb,var(--tone) 15%,var(--panel));color:var(--tone)}
+.business-kpi b{display:block;color:var(--ink);font-size:22px;line-height:1.15}
+.business-kpi small{color:var(--muted);font-size:12px}
 
-.business-duty-container{display:grid;gap:14px;padding:18px 20px}
-.business-section-title{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px}
-.business-section-title h4{margin:0;font-size:17px;font-weight:700;color:var(--ink)}
-.business-badge-sub{font-size:12px;color:var(--muted)}
+/* 崗位勤務時段點檢表：收折式手風琴 */
+.business-checklist-accordion{border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel2) 30%,var(--panel));transition:all .25s ease}
+.business-checklist-accordion.is-expanded{background:color-mix(in srgb,var(--panel2) 40%,var(--panel))}
+.business-checklist-toggle-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;cursor:pointer;user-select:none;transition:background .18s ease}
+.business-checklist-toggle-bar:hover{background:color-mix(in srgb,var(--cyan) 6%,var(--panel))}
+.business-checklist-toggle-title{display:flex;align-items:center;gap:12px}
+.business-toggle-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:color-mix(in srgb,var(--cyan) 14%,var(--panel));color:var(--cyan)}
+.business-checklist-toggle-title strong{font-size:16px;color:var(--ink);display:block}
+.business-checklist-toggle-title span{font-size:13px;color:var(--muted);display:block;margin-top:2px}
+.business-checklist-toggle-title span b{color:var(--cyan)}
+.business-checklist-toggle-btn-wrap{display:flex;align-items:center;gap:10px}
+.business-accordion-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border:1px solid color-mix(in srgb,var(--cyan) 30%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--cyan) 10%,var(--panel));color:var(--cyan);font-size:12.5px;font-weight:700}
+.business-accordion-pill.is-all-done{border-color:color-mix(in srgb,var(--green) 40%,var(--line));background:color-mix(in srgb,var(--green) 14%,var(--panel));color:var(--green)}
+.business-expand-btn{pointer-events:none}
 
-.business-slot-card{border:1px solid color-mix(in srgb,var(--shift) 25%,var(--line));border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .2s ease}
+.business-checklist-content{padding:16px 20px;border-top:1px dashed var(--line);display:grid;gap:14px;background:var(--panel)}
+
+/* 時段過濾快捷列 */
+.business-slot-filter-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);overflow-x:auto}
+.business-filter-label{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap}
+.business-slot-chip{padding:5px 12px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);font-size:12.5px;cursor:pointer;transition:all .15s ease;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.business-slot-chip:hover{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
+.business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:#fff;font-weight:700}
+.business-slot-chip.is-done{border-color:color-mix(in srgb,var(--green) 45%,var(--line));color:var(--green)}
+.business-slot-chip.active.is-done{background:var(--green);color:#fff}
+.business-slot-chip.is-live-slot{border-color:#10b981;background:color-mix(in srgb,#10b981 14%,var(--panel));color:var(--ink);box-shadow:0 0 8px color-mix(in srgb,#10b981 30%,transparent)}
+.business-live-text{background:#10b981;color:#fff;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
+
+/* 時段點檢卡片清單 */
+.business-slots-grid{display:grid;gap:14px}
+.business-slot-card{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .2s ease}
 .business-slot-card.is-active-slot-card{border:2px solid #10b981;box-shadow:0 4px 18px color-mix(in srgb,#10b981 20%,transparent)}
-.business-slot-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:color-mix(in srgb,var(--shift) 10%,var(--panel));border-bottom:1px solid color-mix(in srgb,var(--shift) 20%,var(--line));flex-wrap:wrap}
+.business-slot-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:color-mix(in srgb,var(--panel2) 70%,var(--panel));border-bottom:1px solid var(--line);flex-wrap:wrap}
 .business-slot-card.is-active-slot-card .business-slot-head{background:color-mix(in srgb,#10b981 12%,var(--panel));border-bottom-color:color-mix(in srgb,#10b981 35%,var(--line))}
 .business-slot-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.business-slot-badge{display:inline-block;padding:3px 9px;border-radius:6px;background:color-mix(in srgb,var(--shift) 18%,var(--panel));color:var(--shift);font-size:13px;font-weight:700}
+.business-slot-badge{display:inline-block;padding:3px 9px;border-radius:6px;background:color-mix(in srgb,var(--cyan) 15%,var(--panel));color:var(--cyan);font-size:13px;font-weight:700}
 .business-slot-badge.is-live{background:#10b981;color:#fff}
 .business-active-now-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#10b981;color:#fff;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(16,185,129,.35)}
 .business-slot-stat{font-size:13px;color:var(--muted)}
@@ -86,10 +100,9 @@
 .business-duty-row:hover{background:color-mix(in srgb,var(--cyan) 4%,var(--panel))}
 .business-duty-row.is-completed{background:color-mix(in srgb,var(--green) 4%,var(--panel))}
 .cell-index{text-align:center;color:var(--muted);font-weight:700}
-.cell-slot{color:var(--ink);font-size:13px}
+.cell-slot{color:var(--ink);font-size:13px;white-space:nowrap}
 .business-duty-text{margin:0;font-size:14px;line-height:1.55;color:var(--ink);font-weight:500}
 .business-duty-meta{display:block;margin-top:4px;font-size:11px;color:var(--muted)}
-
 
 .business-check-toggle-group{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel2);box-shadow:0 1px 2px rgba(0,0,0,.03)}
 .business-check-btn{padding:7px 14px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;white-space:nowrap}
@@ -97,27 +110,68 @@
 .business-check-btn.complete-btn.active{background:#059669;color:#fff;font-weight:700}
 .business-check-btn.uncomplete-btn.active{background:#64748b;color:#fff;font-weight:700}
 
-.business-custom-section{padding:18px 20px;border-top:1px dashed color-mix(in srgb,var(--shift) 35%,var(--line))}
-.business-entry-list{display:grid}
-.business-entry{display:grid;grid-template-columns:minmax(0,1fr) 220px 280px;gap:20px;padding:16px 20px;border:1px solid var(--line);border-radius:10px;background:var(--panel);margin-bottom:10px;cursor:pointer;transition:background .18s ease}
-.business-entry:hover,.business-entry:focus-visible{background:color-mix(in srgb,var(--shift) 9%,var(--panel));outline:none}
-.business-entry.is-deleted{text-decoration:line-through;opacity:.62}
-.business-entry-main small{display:flex;gap:10px;color:var(--muted)}
-.business-entry-main small b{padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--shift) 12%,var(--panel));color:var(--shift)}
-.business-entry-main p{margin:8px 0 0;white-space:pre-line;font-size:15px;line-height:1.6}
-.business-attendance{display:flex;align-items:flex-start;gap:8px}
-.business-attendance span{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);white-space:nowrap;font-size:13px}
-.business-audit{display:grid;align-content:start;gap:4px;color:var(--muted);font-size:12px}
-.business-audit>b{color:var(--cyan)}
-.business-empty{margin:0;padding:18px;color:var(--muted);font-size:14px;text-align:center;background:var(--panel2);border-radius:8px}
+/* 三班交接卡片（比照駐衛警風格） */
+.business-shifts{display:grid;gap:16px;padding:18px}
+.business-shift{--shift:#0284c7;overflow:hidden;border:1px solid color-mix(in srgb,var(--shift) 28%,var(--line));border-radius:16px;background:var(--panel);box-shadow:0 1px 0 color-mix(in srgb,var(--shift) 20%,transparent);transition:box-shadow .2s ease,border .2s ease}
+.business-shift:hover{box-shadow:0 12px 28px color-mix(in srgb,var(--shift) 14%,transparent)}
+.business-shift.is-active-shift{border:2px solid #10b981;box-shadow:0 0 20px color-mix(in srgb,#10b981 22%,transparent)}
+.business-shift-1{--shift:#0284c7}
+.business-shift-2{--shift:#059669}
+.business-shift-3{--shift:#b45309}
 
+.business-shift-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid color-mix(in srgb,var(--shift) 22%,var(--line));background:linear-gradient(90deg,color-mix(in srgb,var(--shift) 12%,var(--panel)),var(--panel) 72%)}
+.business-shift.is-active-shift .business-shift-head{background:linear-gradient(90deg,color-mix(in srgb,#10b981 16%,var(--panel)),var(--panel) 72%);border-bottom-color:color-mix(in srgb,#10b981 30%,var(--line))}
+.business-shift-title{display:flex;align-items:center;gap:14px}
+.business-shift-no{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:var(--shift);color:#fff;font-size:22px;box-shadow:0 8px 16px color-mix(in srgb,var(--shift) 32%,transparent)}
+.business-shift.is-active-shift .business-shift-no{background:#10b981;box-shadow:0 8px 16px color-mix(in srgb,#10b981 35%,transparent)}
+.business-shift-name{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.business-shift-name b{color:var(--ink);font-size:21px}
+.business-state{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700}
+.business-state.is-active{background:color-mix(in srgb,var(--green) 15%,var(--panel));color:var(--ink)}
+.business-shift-times{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.business-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid color-mix(in srgb,var(--shift) 26%,var(--line));border-radius:999px;background:var(--panel);color:var(--ink);font-size:12.5px}
+.business-chip .business-icon{color:var(--shift)}
+.business-shift.is-active-shift .business-chip{border-color:color-mix(in srgb,#10b981 30%,var(--line))}
+.business-shift.is-active-shift .business-chip .business-icon{color:#10b981}
+.business-shift-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.business-pill{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--muted);font-size:12.5px;font-weight:700;white-space:nowrap}
+.business-pill.is-count{border-color:color-mix(in srgb,var(--shift) 35%,var(--line));background:color-mix(in srgb,var(--shift) 10%,var(--panel));color:var(--ink)}
+.business-shift.is-active-shift .business-pill.is-count{border-color:color-mix(in srgb,#10b981 40%,var(--line));background:color-mix(in srgb,#10b981 12%,var(--panel))}
+
+.business-shift-body{padding:16px 18px}
+.business-entry-list{display:grid;gap:12px}
+.business-entry{display:grid;grid-template-columns:minmax(0,1.3fr) 200px 260px;gap:16px;align-items:center;padding:14px 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;transition:all .18s ease}
+.business-entry:hover,.business-entry:focus-visible{background:color-mix(in srgb,var(--shift) 8%,var(--panel));border-color:color-mix(in srgb,var(--shift) 40%,var(--line));outline:none;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.04)}
+.business-shift.is-active-shift .business-entry:hover{background:color-mix(in srgb,#10b981 8%,var(--panel));border-color:color-mix(in srgb,#10b981 40%,var(--line))}
+.business-entry.is-deleted{text-decoration:line-through;opacity:.55;background:var(--panel2)}
+.business-entry-main{display:grid;gap:6px}
+.business-entry-category{display:flex;align-items:center;gap:8px}
+.business-category-tag{padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700}
+.business-category-tag.is-repair{background:color-mix(in srgb,var(--red) 14%,var(--panel));color:var(--red);border:1px solid color-mix(in srgb,var(--red) 30%,transparent)}
+.business-category-tag.is-affair{background:color-mix(in srgb,var(--cyan) 14%,var(--panel));color:var(--cyan);border:1px solid color-mix(in srgb,var(--cyan) 30%,transparent)}
+.business-category-tag.is-other{background:color-mix(in srgb,var(--amber) 14%,var(--panel));color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 30%,transparent)}
+.business-entry-category small{color:var(--muted);font-size:12px}
+.business-entry-main p{margin:0;white-space:pre-line;font-size:14.5px;line-height:1.6;color:var(--ink)}
+
+.business-attendance{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.business-attendance span{padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);white-space:nowrap;font-size:12.5px;color:var(--ink)}
+.business-attendance span b{color:var(--cyan)}
+
+.business-audit{display:grid;align-content:start;gap:3px;color:var(--muted);font-size:12px}
+.business-audit>b{color:var(--cyan);font-weight:600}
+.business-empty-shift{display:flex;align-items:center;gap:12px;padding:18px;border:1px dashed color-mix(in srgb,var(--shift) 35%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--shift) 4%,var(--panel))}
+.business-empty-shift p{margin:0;color:var(--muted);font-size:14px}
+
+/* 建立與編輯交接彈窗 */
 .business-modal{width:min(760px,calc(100vw - 28px))}
-.business-form{padding:20px}
+.business-form{display:grid;gap:14px;padding:20px}
+.business-form fieldset{display:grid;gap:10px;margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panel2) 40%,var(--panel))}
+.business-form legend{display:inline-flex;align-items:center;gap:7px;padding:0 8px;color:var(--ink);font-weight:700}
 .business-attendance-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .business-form label small{color:var(--muted);font-weight:400}
-.business-history{display:flex;flex-wrap:wrap;gap:8px 18px;margin:16px 20px 0;padding:12px 14px;border-left:4px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 8%,var(--panel));font-size:13px}
+.business-history{display:flex;flex-wrap:wrap;gap:8px 18px;margin:16px 20px 0;padding:12px 14px;border-left:4px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 8%,var(--panel));font-size:13px;border-radius:0 8px 8px 0}
 .business-history.is-deleted{border-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--panel))}
-.business-history>b{width:100%}
+.business-history>b{width:100%;color:var(--ink)}
 
 /* 螢幕預覽 A4 報表彈窗 */
 .business-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.75);backdrop-filter:blur(3px)}
@@ -127,10 +181,10 @@
 .business-report-preview-bar span{color:var(--muted);font-size:13px}
 .business-report-preview-actions{display:flex;align-items:center;gap:8px}
 .business-report-preview-scroll{min-width:0;overflow:auto;padding:24px 16px;display:flex;justify-content:center}
-.business-report-preview-page{width:210mm;min-height:297mm;background:#fff;color:#111;padding:12mm 14mm;box-shadow:0 10px 30px rgba(0,0,0,.35);border-radius:2px;font-family:"Noto Sans TC",sans-serif;box-sizing:border-box}
+.business-report-preview-page{box-sizing:border-box;width:210mm;max-width:100%;min-height:297mm;background:#fff;color:#111;padding:12mm 14mm;box-shadow:0 12px 32px rgba(0,0,0,.35);border-radius:2px;font-family:"Noto Sans TC",sans-serif}
 
-/* 報表通用樣式 (預覽與列印共用) */
-.business-print-content{color:#111;font-family:"Noto Sans TC",sans-serif}
+/* 報表通用樣式 (預覽與列印共用，固定白底黑字) */
+.business-print-content{color:#111;font-family:"Noto Sans TC",sans-serif;font-size:9pt}
 .business-print-content header{text-align:center;margin-bottom:6mm}
 .business-print-content header h2{margin:0;font-size:15pt;line-height:1.45;color:#111}
 .business-print-content header p{margin:3mm 0 0;font-size:10.5pt;color:#333}
@@ -144,13 +198,18 @@
 .business-print-sheet{display:none}
 .business-print-h3{margin:18px 0 8px;font-size:12pt;border-left:4px solid #111;padding-left:8px;color:#111;font-weight:700}
 
+@media(max-width:1100px){
+  .business-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 @media(max-width:900px){
-  .business-toolbar{flex-wrap:wrap}
-  .business-toolbar label{order:-1;width:100%}
-  .business-toolbar label>span{width:100%}
-  .business-date-summary{width:100%;margin-left:0;margin-top:6px}
-  .business-sheet>header{flex-direction:column;align-items:flex-start;padding:18px}
-  .business-header-meta{align-items:flex-start}
+  .business-toolbar{align-items:stretch}
+  .business-date-nav label{order:-1;width:100%}
+  .business-date-nav label>span{width:100%}
+  .business-toolbar-status{width:100%;justify-content:flex-start}
+  .business-sheet-head{padding:20px 16px 16px}
+  .business-sheet-title h2{font-size:22px}
+  .business-sheet-emblem{width:48px;height:48px}
   .business-entry{grid-template-columns:1fr;padding:14px;gap:10px}
   .business-attendance{flex-wrap:wrap}
   .business-audit{padding-top:10px;border-top:1px dashed var(--line)}
@@ -159,6 +218,11 @@
   .business-attendance-fields{grid-template-columns:1fr}
   .business-duty-table th:nth-child(2),.business-duty-table td:nth-child(2){display:none}
   .business-report-preview-page{width:100%;min-height:auto;padding:12px 10px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .business-pulse-dot{animation:none}
+  .business-shift{transition:none}
 }
 
 @media print{
@@ -170,4 +234,3 @@
   .business-print-sheet,.business-print-sheet *{visibility:visible!important}
   .business-print-sheet{display:block;color:#111;background:#fff;font-family:"Noto Sans TC",sans-serif}
 }
-

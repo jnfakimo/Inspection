@@ -1,16 +1,139 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+// SYS-04 業管組電子交接簿。
+// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表與每日列印／預覽報表。
+// 風格與駐衛警交接簿統一，支援當班時段光暈閃爍提示與點檢表預設收合展開。
+
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './business-handover.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
+
+export type IconName =
+  | 'building'
+  | 'shield'
+  | 'clock'
+  | 'calendar'
+  | 'check'
+  | 'users'
+  | 'note'
+  | 'flag'
+  | 'alert'
+  | 'tool'
+  | 'clipboard'
+  | 'chevron-down'
+  | 'chevron-up'
+  | 'list'
+  | 'printer'
+  | 'eye'
+  | 'save';
+
+const ICON_PATHS: Record<IconName, ReactNode> = {
+  building: (
+    <>
+      <path d="M3 21h18M5 21V7l8-4v18M13 3l6 3v15M9 9h1M9 13h1M9 17h1M17 9h1M17 13h1M17 17h1" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+    </>
+  ),
+  check: <path d="M5 12.5l4.5 4.5L19 7" />,
+  users: (
+    <>
+      <circle cx="9.5" cy="7.5" r="3.5" />
+      <path d="M3 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1" />
+      <path d="M16 4.3a3.5 3.5 0 0 1 0 6.4" />
+      <path d="M21 20v-1a4.5 4.5 0 0 0-3-4.2" />
+    </>
+  ),
+  note: (
+    <>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3" />
+    </>
+  ),
+  flag: <path d="M5 21V4M5 4h11l-2 4 2 4H5" />,
+  alert: (
+    <>
+      <path d="M12 3.5l9 16H3l9-16zM12 10v4M12 17h.01" />
+    </>
+  ),
+  tool: (
+    <>
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </>
+  ),
+  clipboard: (
+    <>
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
+  'chevron-down': <path d="M6 9l6 6 6-6" />,
+  'chevron-up': <path d="M18 15l-6-6-6 6" />,
+  list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+  printer: (
+    <>
+      <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <path d="M6 14h12v8H6z" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  save: (
+    <>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <polyline points="17 21 17 13 7 13 7 21" />
+      <polyline points="7 3 7 8 15 8" />
+    </>
+  ),
+};
+
+export function BusinessIcon({ name, size = 16 }: { name: IconName; size?: number }) {
+  return (
+    <svg
+      className="business-icon"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
 
 export type DutyCheckItem = {
   id: string;
@@ -360,9 +483,11 @@ export function BusinessHandover({ system, module, profile }: Props) {
   // 點檢狀態管理
   const [checks, setChecks] = useState<DutyCheckMap>({});
   const [selectedSlotFilter, setSelectedSlotFilter] = useState<string>('all');
-  const [activeTab, setActiveTab] = useState<'checklist' | 'custom' | 'all'>('all');
   const [savingChecks, setSavingChecks] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // 點檢表收折控制：剛進入時預設為「收起來」
+  const [checklistOpen, setChecklistOpen] = useState<boolean>(false);
 
   // 載入資料庫與點檢表
   const load = useCallback(async () => {
@@ -371,14 +496,14 @@ export function BusinessHandover({ system, module, profile }: Props) {
     const client = getSupabase();
     const [entryResult, userResult] = await Promise.all([
       client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
-      client.from('users').select('user_id,name,username,email,status').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name').eq('status', 'active').order('name').limit(1000),
     ]);
     if (entryResult.error || userResult.error) {
       setNote(`失敗：${errorMessage(entryResult.error || userResult.error, '業管組交接資料載入失敗')}`);
     }
     const rawEntries = entryResult.data || [];
     setEntries(rawEntries);
-    setUsers(selectableActiveUsers(userResult.data || []));
+    setUsers(userResult.data || []);
 
     // 嘗試從資料庫中的點檢紀錄條目或 LocalStorage 載入點檢表狀態
     let loadedChecks: DutyCheckMap = {};
@@ -429,6 +554,17 @@ export function BusinessHandover({ system, module, profile }: Props) {
     [validEntries]
   );
 
+  // 出勤總計
+  const attendanceTotal = useMemo(() => {
+    let expected = 0;
+    let absent = 0;
+    for (const row of customEntries) {
+      expected += Number(row.expected_attendance || 0);
+      absent += Number(row.absent_attendance || 0);
+    }
+    return { expected, absent };
+  }, [customEntries]);
+
   // 統計點檢完成數
   const checkStats = useMemo(() => {
     let completed = 0;
@@ -468,6 +604,12 @@ export function BusinessHandover({ system, module, profile }: Props) {
     [checks]
   );
 
+  // 當前活耀大班別代碼
+  const currentActiveShift = useMemo(() => {
+    if (!isToday) return null;
+    return SHIFTS.find(s => isCurrentMajorShift(s.code, isToday, nowTime.hour)) || null;
+  }, [isToday, nowTime.hour]);
+
   // 切換單項點檢狀態
   const handleToggleCheck = useCallback(
     (id: string, targetStatus?: CheckStatus) => {
@@ -483,7 +625,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
             updatedBy: profile.name,
           },
         };
-        // 保存至本機快照
         if (typeof window !== 'undefined') {
           localStorage.setItem(`${CHECKLIST_STORAGE_PREFIX}${date}`, JSON.stringify(nextState));
         }
@@ -521,7 +662,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
     setSavingChecks(true);
     setNote('');
     try {
-      // 找出既有的點檢條目
       const existing = entries.find(r => !isDeleted(r) && String(r.description || '').includes(CHECKLIST_TAG));
       const summaryText = `${CHECKLIST_TAG}\n${JSON.stringify(checks)}`;
 
@@ -574,6 +714,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 onClick={() => setPreviewOpen(true)}
                 title="在畫面上預覽 A4 直式報表"
               >
+                <BusinessIcon name="eye" size={14} />
                 預覽本日報表
               </button>
               <button
@@ -583,297 +724,363 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 disabled={savingChecks}
                 title="將當前點檢狀態儲存同步至雲端資料庫"
               >
+                <BusinessIcon name="save" size={14} />
                 {savingChecks ? '儲存中…' : '儲存點檢表'}
               </button>
               <button type="button" className="primary-btn compact business-print-button" onClick={print}>
+                <BusinessIcon name="printer" size={14} />
                 列印本日報表
               </button>
             </div>
           }
         />
 
-        {/* 頂部日期與進度工具列 */}
+        {/* 頂部日期導覽與當班工具列（風格與駐衛警交接簿統一） */}
         <section className="panel business-toolbar">
-          <button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => moveDate(current, -1))}>
-            ‹
-          </button>
-          <label>
-            交接日期
-            <LocalizedDateInput aria-label="交接日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} />
-          </label>
-          <button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => moveDate(current, 1))}>
-            ›
-          </button>
-          <button className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>
-            回到今天
-          </button>
-
-          <div className="business-stats-badge">
-            <span>點檢進度：</span>
-            <b>
-              {checkStats.completed} / {checkStats.total}
-            </b>
-            <span className="business-percent">({checkStats.percent}%)</span>
-            <div className="business-progress-bar">
-              <div className="business-progress-fill" style={{ width: `${checkStats.percent}%` }} />
-            </div>
+          <div className="business-date-nav">
+            <button
+              type="button"
+              className="secondary-btn compact"
+              aria-label="前一天"
+              onClick={() => setDate(current => moveDate(current, -1))}
+            >
+              ‹
+            </button>
+            <label>
+              交接日期
+              <LocalizedDateInput aria-label="交接日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} />
+            </label>
+            <button
+              type="button"
+              className="secondary-btn compact"
+              aria-label="後一天"
+              onClick={() => setDate(current => moveDate(current, 1))}
+            >
+              ›
+            </button>
+            <button type="button" className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>
+              回到今天
+            </button>
           </div>
 
-          <span className="business-date-summary">{rocDate(date)} · 本日共 {customEntries.length} 筆自訂交接</span>
+          <div className="business-toolbar-status">
+            {currentActiveShift && (
+              <span className="business-toolbar-live-badge">
+                <span className="business-pulse-dot" />
+                目前當班：{currentActiveShift.name}（{currentActiveShift.label}）
+              </span>
+            )}
+            <span className="business-toolbar-summary">
+              <BusinessIcon name="calendar" size={15} />
+              {rocDate(date)} · 3 個班別 · 共 {customEntries.length} 筆交接
+            </span>
+          </div>
         </section>
 
-        {/* 點檢與交接切換標籤 */}
-        <div className="business-tab-bar">
-          <button
-            className={`business-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
-          >
-            📋 完整總覽 (點檢表 + 交接事項)
-          </button>
-          <button
-            className={`business-tab-btn ${activeTab === 'checklist' ? 'active' : ''}`}
-            onClick={() => setActiveTab('checklist')}
-          >
-            ✓ 崗位時段點檢表 ({checkStats.completed}/{checkStats.total})
-          </button>
-          <button
-            className={`business-tab-btn ${activeTab === 'custom' ? 'active' : ''}`}
-            onClick={() => setActiveTab('custom')}
-          >
-            📝 交接事項與出勤 ({customEntries.length} 筆)
-          </button>
-        </div>
-
-        {/* 時段過濾快捷列 */}
-        {(activeTab === 'all' || activeTab === 'checklist') && (
-          <div className="business-slot-filter-bar">
-            <span className="business-filter-label">時段篩選：</span>
-            <button
-              className={`business-slot-chip ${selectedSlotFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setSelectedSlotFilter('all')}
-            >
-              全部時段 ({BUSINESS_DUTY_CHECKLIST.length})
-            </button>
-            {TIME_SLOTS.map(slot => {
-              const stats = getSlotStats(slot.code);
-              const isAllDone = stats.completed === stats.total && stats.total > 0;
-              const isSlotLive = isCurrentTimeSlot(slot.code, isToday, nowTime.timeNum);
-              return (
-                <button
-                  key={slot.code}
-                  className={`business-slot-chip ${selectedSlotFilter === slot.code ? 'active' : ''} ${isAllDone ? 'is-done' : ''} ${isSlotLive ? 'is-live-slot' : ''}`}
-                  onClick={() => setSelectedSlotFilter(slot.code)}
-                >
-                  {isSlotLive && <span className="business-pulse-dot" title="目前進行中時段" />}
-                  {slot.label} ({stats.completed}/{stats.total})
-                  {isSlotLive && <span className="business-live-text">當班</span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 主要工作區 */}
+        {/* 主要交接紀錄外框 */}
         <section className="business-sheet" aria-label="業管組電子交接簿">
-          <header>
-            <div>
-              <small>臺北農產運銷股份有限公司　第一果菜市場</small>
-              <h2>業管組崗位勤務點檢與交接紀錄表</h2>
-            </div>
-            <div className="business-header-meta">
-              <b>{rocDate(date)}</b>
-              <span className="business-completion-pill">
-                總點檢率 {checkStats.percent}% ({checkStats.completed}/{checkStats.total})
+          {/* 表頭裝飾與標題（比照駐警交接簿漸層與徽章風格） */}
+          <header className="business-sheet-head">
+            <div className="business-sheet-title">
+              <span className="business-sheet-emblem">
+                <BusinessIcon name="building" size={28} />
               </span>
+              <div>
+                <small>臺北農產運銷股份有限公司　第一果菜市場</small>
+                <h2>業管組交接紀錄表</h2>
+              </div>
             </div>
+            <b className="business-date-chip">
+              <BusinessIcon name="calendar" size={17} />
+              {rocDate(date)}
+            </b>
           </header>
 
-          {/* 依大班別與時段區隔 */}
-          {SHIFTS.map((shift, shiftIndex) => {
-            const shiftDutyItems = BUSINESS_DUTY_CHECKLIST.filter(i => i.shiftGroup === shift.code);
-            const shiftSlots = TIME_SLOTS.filter(s => s.shiftCode === shift.code);
-            const shiftCustomRows = entries.filter(
-              row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
-            );
-            const activeCustomRows = shiftCustomRows.filter(row => !isDeleted(row));
-            const shiftStats = getShiftGroupStats(shift.code);
-            const isShiftActive = isCurrentMajorShift(shift.code, isToday, nowTime.hour);
+          {/* 今日核心指標卡片 (KPIs) */}
+          <div className="business-kpis">
+            <div className="business-kpi is-cyan">
+              <span className="business-kpi-icon">
+                <BusinessIcon name="clock" size={20} />
+              </span>
+              <div>
+                <b>3 個班別</b>
+                <small>早班・中班・晚班</small>
+              </div>
+            </div>
 
-            // 判斷是否被時段篩選過濾
-            const matchingSlots = selectedSlotFilter === 'all'
-              ? shiftSlots
-              : shiftSlots.filter(s => s.code === selectedSlotFilter);
+            <div className="business-kpi is-violet">
+              <span className="business-kpi-icon">
+                <BusinessIcon name="note" size={20} />
+              </span>
+              <div>
+                <b>{customEntries.length} 筆交接</b>
+                <small>事務・維修・交辦</small>
+              </div>
+            </div>
 
-            if (selectedSlotFilter !== 'all' && matchingSlots.length === 0 && activeTab === 'checklist') {
-              return null;
-            }
+            <div className="business-kpi is-amber">
+              <span className="business-kpi-icon">
+                <BusinessIcon name="users" size={20} />
+              </span>
+              <div>
+                <b>{attendanceTotal.expected} 人</b>
+                <small>未出勤 {attendanceTotal.absent} 人</small>
+              </div>
+            </div>
 
-            return (
-              <section className={`business-shift business-shift-${shiftIndex + 1}${isShiftActive ? ' is-active-shift' : ''}`} key={shift.code}>
-                {/* 班別主標題 */}
-                <div className="business-shift-head">
-                  <div>
-                    <strong>{['一', '二', '三'][shiftIndex]}</strong>
-                    <span>
-                      <span className="business-shift-title-row">
-                        <b>
-                          {shift.name} ({shift.label})
-                        </b>
-                        {isShiftActive && (
-                          <span className="business-active-shift-badge">
-                            <span className="business-pulse-dot" />
-                            目前當班（值勤中）
-                          </span>
-                        )}
-                      </span>
-                      <small>
-                        {shift.subLabel} · 點檢完成 {shiftStats.completed}/{shiftStats.total} 項 · 自訂交接 {activeCustomRows.length} 件
-                      </small>
-                    </span>
-                  </div>
-                  <div className="business-shift-actions">
-                    <button
-                      className="primary-btn compact"
-                      onClick={() => {
-                        setEditingEntry(null);
-                        setEditingShift(shift.code);
-                      }}
-                    >
-                      ＋ 新增交接事項
-                    </button>
-                  </div>
+            <div className={`business-kpi ${checkStats.percent === 100 ? 'is-green' : 'is-cyan'}`}>
+              <span className="business-kpi-icon">
+                <BusinessIcon name="clipboard" size={20} />
+              </span>
+              <div>
+                <b>{checkStats.completed} / {checkStats.total}</b>
+                <small>崗位點檢率 {checkStats.percent}%</small>
+              </div>
+            </div>
+          </div>
+
+          {/* 崗位勤務時段點檢表：收折式設計（剛進入時預設收合） */}
+          <div className={`business-checklist-accordion ${checklistOpen ? 'is-expanded' : 'is-collapsed'}`}>
+            <div
+              className="business-checklist-toggle-bar"
+              role="button"
+              tabIndex={0}
+              onClick={() => setChecklistOpen(prev => !prev)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setChecklistOpen(prev => !prev);
+                }
+              }}
+            >
+              <div className="business-checklist-toggle-title">
+                <span className="business-toggle-icon">
+                  <BusinessIcon name="clipboard" size={18} />
+                </span>
+                <div>
+                  <strong>📋 崗位勤務時段點檢表</strong>
+                  <span>涵蓋 7 大時段、25 項崗位職責 · 目前點檢進度：<b>{checkStats.completed} / {checkStats.total}</b>（{checkStats.percent}%）</span>
+                </div>
+              </div>
+              <div className="business-checklist-toggle-btn-wrap">
+                <span className={`business-accordion-pill ${checkStats.percent === 100 ? 'is-all-done' : ''}`}>
+                  {checkStats.percent === 100 ? '✓ 全部點檢完成' : `${checkStats.completed}/${checkStats.total} 完成`}
+                </span>
+                <button type="button" className="secondary-btn compact business-expand-btn">
+                  <BusinessIcon name={checklistOpen ? 'chevron-up' : 'chevron-down'} size={14} />
+                  {checklistOpen ? '收合點檢表' : '展開點檢表'}
+                </button>
+              </div>
+            </div>
+
+            {/* 展開後的點檢內容 */}
+            {checklistOpen && (
+              <div className="business-checklist-content">
+                {/* 時段過濾快捷列 */}
+                <div className="business-slot-filter-bar">
+                  <span className="business-filter-label">時段過濾：</span>
+                  <button
+                    type="button"
+                    className={`business-slot-chip ${selectedSlotFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedSlotFilter('all')}
+                  >
+                    全部時段 ({BUSINESS_DUTY_CHECKLIST.length})
+                  </button>
+                  {TIME_SLOTS.map(slot => {
+                    const stats = getSlotStats(slot.code);
+                    const isAllDone = stats.completed === stats.total && stats.total > 0;
+                    const isSlotLive = isCurrentTimeSlot(slot.code, isToday, nowTime.timeNum);
+                    return (
+                      <button
+                        type="button"
+                        key={slot.code}
+                        className={`business-slot-chip ${selectedSlotFilter === slot.code ? 'active' : ''} ${isAllDone ? 'is-done' : ''} ${isSlotLive ? 'is-live-slot' : ''}`}
+                        onClick={() => setSelectedSlotFilter(slot.code)}
+                      >
+                        {isSlotLive && <span className="business-pulse-dot" title="目前進行中時段" />}
+                        {slot.label} ({stats.completed}/{stats.total})
+                        {isSlotLive && <span className="business-live-text">當班</span>}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* 1. 崗位勤務時段點檢表區塊 */}
-                {(activeTab === 'all' || activeTab === 'checklist') && matchingSlots.length > 0 && (
-                  <div className="business-duty-container">
-                    <div className="business-section-title">
-                      <h4>📌 崗位勤務時段點檢表</h4>
-                      <span className="business-badge-sub">
-                        依時間區段分配，請逐項檢查並標記「點檢完成」或「未點檢」
-                      </span>
-                    </div>
+                {/* 7 個時段點檢卡片清單 */}
+                <div className="business-slots-grid">
+                  {TIME_SLOTS.filter(s => selectedSlotFilter === 'all' || s.code === selectedSlotFilter).map(slot => {
+                    const itemsInSlot = BUSINESS_DUTY_CHECKLIST.filter(i => i.timeSlot === slot.code);
+                    if (itemsInSlot.length === 0) return null;
+                    const slotStats = getSlotStats(slot.code);
+                    const isSlotActive = isCurrentTimeSlot(slot.code, isToday, nowTime.timeNum);
 
-                    {matchingSlots.map(slot => {
-                      const itemsInSlot = shiftDutyItems.filter(i => i.timeSlot === slot.code);
-                      if (itemsInSlot.length === 0) return null;
-                      const slotStats = getSlotStats(slot.code);
-                      const isSlotActive = isCurrentTimeSlot(slot.code, isToday, nowTime.timeNum);
-
-                      return (
-                        <div className={`business-slot-card${isSlotActive ? ' is-active-slot-card' : ''}`} key={slot.code}>
-                          <div className="business-slot-head">
-                            <div className="business-slot-title">
-                              <span className={`business-slot-badge${isSlotActive ? ' is-live' : ''}`}>
-                                ⏰ 時段 {slot.label}
+                    return (
+                      <div className={`business-slot-card${isSlotActive ? ' is-active-slot-card' : ''}`} key={slot.code}>
+                        <div className="business-slot-head">
+                          <div className="business-slot-title">
+                            <span className={`business-slot-badge${isSlotActive ? ' is-live' : ''}`}>
+                              ⏰ 時段 {slot.label}
+                            </span>
+                            {isSlotActive && (
+                              <span className="business-active-now-badge">
+                                <span className="business-pulse-dot" />
+                                當前執行時段
                               </span>
-                              {isSlotActive && (
-                                <span className="business-active-now-badge">
-                                  <span className="business-pulse-dot" />
-                                  當前執行時段
-                                </span>
-                              )}
-                              <span className="business-slot-stat">
-                                已完成 <b>{slotStats.completed}</b> / {slotStats.total} 項
-                              </span>
-                            </div>
-                            <div className="business-slot-quick-actions">
-                              <button
-                                type="button"
-                                className="business-quick-btn done"
-                                onClick={() => handleBatchSetSlot(slot.code, 'completed')}
-                                title="將此時段所有項目標記為點檢完成"
-                              >
-                                ✓ 此時段全選完成
-                              </button>
-                              <button
-                                type="button"
-                                className="business-quick-btn reset"
-                                onClick={() => handleBatchSetSlot(slot.code, 'uncompleted')}
-                                title="將此時段所有項目重設為未點檢"
-                              >
-                                ✕ 重設為未點檢
-                              </button>
-                            </div>
+                            )}
+                            <span className="business-slot-stat">
+                              已完成 <b>{slotStats.completed}</b> / {slotStats.total} 項
+                            </span>
                           </div>
-
-                          <div className="business-duty-table-wrap">
-                            <table className="business-duty-table">
-                              <thead>
-                                <tr>
-                                  <th style={{ width: '60px' }}>項次</th>
-                                  <th style={{ width: '130px' }}>時間區段</th>
-                                  <th>點檢項目與崗位職責</th>
-                                  <th style={{ width: '230px', textAlign: 'center' }}>點檢結果</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {itemsInSlot.map((item, itemIdx) => {
-                                  const itemState = checks[item.id] || { status: 'uncompleted' };
-                                  const isDone = itemState.status === 'completed';
-
-                                  return (
-                                    <tr
-                                      key={item.id}
-                                      className={`business-duty-row ${isDone ? 'is-completed' : 'is-uncompleted'}`}
-                                    >
-                                      <td className="cell-index">{itemIdx + 1}</td>
-                                      <td className="cell-slot">
-                                        <b>{item.timeSlotLabel}</b>
-                                      </td>
-                                      <td className="cell-title">
-                                        <p className="business-duty-text">{item.title}</p>
-                                        {itemState.updatedBy && (
-                                          <span className="business-duty-meta">
-                                            最後更新：{itemState.updatedBy} · {activityTime(itemState.updatedAt)}
-                                          </span>
-                                        )}
-                                      </td>
-                                      <td className="cell-action">
-                                        <div className="business-check-toggle-group">
-                                          <button
-                                            type="button"
-                                            className={`business-check-btn complete-btn ${isDone ? 'active' : ''}`}
-                                            onClick={() => handleToggleCheck(item.id, 'completed')}
-                                            aria-label={`${item.title} 標記為點檢完成`}
-                                          >
-                                            ✓ 點檢完成
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={`business-check-btn uncomplete-btn ${!isDone ? 'active' : ''}`}
-                                            onClick={() => handleToggleCheck(item.id, 'uncompleted')}
-                                            aria-label={`${item.title} 標記為未點檢`}
-                                          >
-                                            ✕ 未點檢
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                          <div className="business-slot-quick-actions">
+                            <button
+                              type="button"
+                              className="business-quick-btn done"
+                              onClick={() => handleBatchSetSlot(slot.code, 'completed')}
+                              title="將此時段所有項目標記為點檢完成"
+                            >
+                              ✓ 此時段全選完成
+                            </button>
+                            <button
+                              type="button"
+                              className="business-quick-btn reset"
+                              onClick={() => handleBatchSetSlot(slot.code, 'uncompleted')}
+                              title="將此時段所有項目重設為未點檢"
+                            >
+                              ✕ 重設為未點檢
+                            </button>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
 
-                {/* 2. 交接事項紀錄清單區塊 */}
-                {(activeTab === 'all' || activeTab === 'custom') && (
-                  <div className="business-custom-section">
-                    <div className="business-section-title">
-                      <h4>📝 班別交接事項與出勤紀錄</h4>
-                      <span className="business-badge-sub">
-                        記錄本日事務事項、維修狀況、各組出勤與臨時交辦
-                      </span>
+                        <div className="business-duty-table-wrap">
+                          <table className="business-duty-table">
+                            <thead>
+                              <tr>
+                                <th style={{ width: '50px', textAlign: 'center' }}>項次</th>
+                                <th style={{ width: '130px' }}>時間區段</th>
+                                <th>點檢項目與崗位職責</th>
+                                <th style={{ width: '220px', textAlign: 'center' }}>點檢結果</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {itemsInSlot.map((item, itemIdx) => {
+                                const itemState = checks[item.id] || { status: 'uncompleted' };
+                                const isDone = itemState.status === 'completed';
+
+                                return (
+                                  <tr
+                                    key={item.id}
+                                    className={`business-duty-row ${isDone ? 'is-completed' : 'is-uncompleted'}`}
+                                  >
+                                    <td className="cell-index">{itemIdx + 1}</td>
+                                    <td className="cell-slot">
+                                      <b>{item.timeSlotLabel}</b>
+                                    </td>
+                                    <td className="cell-title">
+                                      <p className="business-duty-text">{item.title}</p>
+                                      {itemState.updatedBy && (
+                                        <span className="business-duty-meta">
+                                          最後更新：{itemState.updatedBy} · {activityTime(itemState.updatedAt)}
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="cell-action">
+                                      <div className="business-check-toggle-group">
+                                        <button
+                                          type="button"
+                                          className={`business-check-btn complete-btn ${isDone ? 'active' : ''}`}
+                                          onClick={() => handleToggleCheck(item.id, 'completed')}
+                                          aria-label={`${item.title} 標記為點檢完成`}
+                                        >
+                                          ✓ 點檢完成
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className={`business-check-btn uncomplete-btn ${!isDone ? 'active' : ''}`}
+                                          onClick={() => handleToggleCheck(item.id, 'uncompleted')}
+                                          aria-label={`${item.title} 標記為未點檢`}
+                                        >
+                                          ✕ 未點檢
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 三班交接清單卡片（比照駐警交接簿卡片化佈局） */}
+          <div className="business-shifts">
+            {SHIFTS.map((shift, shiftIndex) => {
+              const shiftCustomRows = entries.filter(
+                row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
+              );
+              const activeCustomRows = shiftCustomRows.filter(row => !isDeleted(row));
+              const isShiftActive = isCurrentMajorShift(shift.code, isToday, nowTime.hour);
+
+              return (
+                <section
+                  className={`business-shift business-shift-${shiftIndex + 1}${isShiftActive ? ' is-active-shift' : ''}`}
+                  key={shift.code}
+                >
+                  {/* 班別主標題列 */}
+                  <div className="business-shift-head">
+                    <div className="business-shift-title">
+                      <strong className="business-shift-no">{shiftIndex + 1}</strong>
+                      <div>
+                        <div className="business-shift-name">
+                          <b>{shift.name}</b>
+                          {isShiftActive ? (
+                            <span className="business-state is-active">
+                              <span className="business-pulse-dot" />
+                              當班中
+                            </span>
+                          ) : (
+                            <span className="business-state is-normal">班別時段</span>
+                          )}
+                        </div>
+                        <div className="business-shift-times">
+                          <span className="business-chip">
+                            <BusinessIcon name="clock" size={14} />
+                            時段 {shift.label}
+                          </span>
+                          <span className="business-chip">
+                            <BusinessIcon name="list" size={14} />
+                            {shift.subLabel}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="business-entry-list">
-                      {shiftCustomRows.length ? (
-                        shiftCustomRows.map((row, itemIndex) => (
+                    <div className="business-shift-actions">
+                      <span className="business-pill is-count">
+                        共 {activeCustomRows.length} 筆交接
+                      </span>
+                      <button
+                        type="button"
+                        className="primary-btn compact"
+                        onClick={() => {
+                          setEditingEntry(null);
+                          setEditingShift(shift.code);
+                        }}
+                      >
+                        ＋ 新增交接
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 班別內容清單 */}
+                  <div className="business-shift-body">
+                    {shiftCustomRows.length ? (
+                      <div className="business-entry-list">
+                        {shiftCustomRows.map((row, itemIndex) => (
                           <article
                             className={`business-entry${isDeleted(row) ? ' is-deleted' : ''}`}
                             key={String(row.entry_id)}
@@ -892,12 +1099,15 @@ export function BusinessHandover({ system, module, profile }: Props) {
                             }}
                           >
                             <div className="business-entry-main">
-                              <small>
-                                <b>第 {itemIndex + 1} 件</b>
-                                {String(row.category || '其他')}
-                              </small>
+                              <div className="business-entry-category">
+                                <span className={`business-category-tag ${row.category === '維修' ? 'is-repair' : row.category === '事務事項' ? 'is-affair' : 'is-other'}`}>
+                                  {String(row.category || '其他')}
+                                </span>
+                                <small>第 {itemIndex + 1} 件</small>
+                              </div>
                               <p>{String(row.description || '—')}</p>
                             </div>
+
                             <div className="business-attendance">
                               <span>
                                 應出勤 <b>{Number(row.expected_attendance || 0)}</b> 人
@@ -906,6 +1116,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                                 未出勤 <b>{Number(row.absent_attendance || 0)}</b> 人
                               </span>
                             </div>
+
                             <div className="business-audit">
                               <span>
                                 建立 {activityTime(row.created_at)} · {userName(row.created_by)}
@@ -925,16 +1136,19 @@ export function BusinessHandover({ system, module, profile }: Props) {
                               <b>{isDeleted(row) ? '已刪除，保留紀錄' : '點擊修改'}</b>
                             </div>
                           </article>
-                        ))
-                      ) : (
-                        <p className="business-empty">本班尚無自訂交接紀錄，請按「新增交接事項」建立。</p>
-                      )}
-                    </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="business-empty-shift">
+                        <BusinessIcon name="note" size={18} />
+                        <p>本班尚無交接紀錄，請點擊右上角「＋ 新增交接」建立。</p>
+                      </div>
+                    )}
                   </div>
-                )}
-              </section>
-            );
-          })}
+                </section>
+              );
+            })}
+          </div>
         </section>
 
         {/* 列印專用報表區 (A4 格式化排版) */}
@@ -970,6 +1184,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                   setTimeout(() => window.print(), 100);
                 }}
               >
+                <BusinessIcon name="printer" size={14} />
                 列印本日報表
               </button>
               <button
