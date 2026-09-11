@@ -91,8 +91,8 @@ export function AdminModal({ title, children, onClose, className = '' }: { title
 export function AdminHeader({ module, busy, note, onReload, action }: { module: ModuleDefinition; busy: boolean; note: string; onReload: () => void; action?: ReactNode }) {
   return <div className="page-actions admin-page-actions"><div><p>{module.description}</p>{note && <span className={`inline-message ${note.startsWith('失敗') ? 'danger' : ''}`}>{note}</span>}</div><div>{action}<button className="secondary-btn" disabled={busy} onClick={onReload}>{busy ? '載入中…' : '重新載入'}</button></div></div>;
 }
-export function Pager({ page, total, onPage }: { page: number; total: number; onPage: (page: number) => void }) {
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+export function Pager({ page, total, onPage, pageSize = PAGE_SIZE }: { page: number; total: number; onPage: (page: number) => void; pageSize?: number }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
   const shown = Array.from({ length: pages }, (_, i) => i + 1).filter(value => value === 1 || value === pages || Math.abs(value - page) <= 2);
-  return <nav className="admin-pager"><span>每頁 {PAGE_SIZE} 筆，第 {page}／{pages} 頁，共 {total} 筆</span><div><button disabled={page <= 1} onClick={() => onPage(page - 1)}>‹</button>{shown.map((value, index) => <span key={value}>{index > 0 && value - shown[index - 1] > 1 && <i>…</i>}<button className={value === page ? 'active' : ''} onClick={() => onPage(value)}>{value}</button></span>)}<button disabled={page >= pages} onClick={() => onPage(page + 1)}>›</button></div></nav>;
+  return <nav className="admin-pager"><span>每頁 {pageSize} 筆，第 {page}／{pages} 頁，共 {total} 筆</span><div><button disabled={page <= 1} onClick={() => onPage(page - 1)}>‹</button>{shown.map((value, index) => <span key={value}>{index > 0 && value - shown[index - 1] > 1 && <i>…</i>}<button className={value === page ? 'active' : ''} onClick={() => onPage(value)}>{value}</button></span>)}<button disabled={page >= pages} onClick={() => onPage(page + 1)}>›</button></div></nav>;
 }

@@ -323,5 +323,22 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
   min-width:118px;
   text-align:center;
 }
+.handover-access-table{
+  max-height:640px;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:5px;
+}
+.handover-access-table table{margin:0}
+.handover-access-table thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:var(--surface);
+  box-shadow:0 1px 0 var(--line);
+}
 .handover-access-table td>small{display:block;margin-top:4px}
 .handover-access-table input[type="checkbox"]{width:20px;height:20px;accent-color:var(--cyan)}
+@media (max-width:800px){
+  .handover-access-table{max-height:68dvh}
+}
