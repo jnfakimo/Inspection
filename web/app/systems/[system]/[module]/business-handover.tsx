@@ -300,6 +300,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const [selectedSlotFilter, setSelectedSlotFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'checklist' | 'custom' | 'all'>('all');
   const [savingChecks, setSavingChecks] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // 載入資料庫與點檢表
   const load = useCallback(async () => {
@@ -506,6 +507,15 @@ export function BusinessHandover({ system, module, profile }: Props) {
           action={
             <div className="business-header-actions">
               <button
+                type="button"
+                className="secondary-btn compact"
+                onClick={() => setPreviewOpen(true)}
+                title="在畫面上預覽 A4 直式報表"
+              >
+                預覽本日報表
+              </button>
+              <button
+                type="button"
                 className="secondary-btn compact"
                 onClick={() => void saveChecklistToDb()}
                 disabled={savingChecks}
@@ -513,7 +523,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
               >
                 {savingChecks ? '儲存中…' : '儲存點檢表'}
               </button>
-              <button className="primary-btn compact business-print-button" onClick={print}>
+              <button type="button" className="primary-btn compact business-print-button" onClick={print}>
                 列印本日報表
               </button>
             </div>
@@ -674,7 +684,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
                       const itemsInSlot = shiftDutyItems.filter(i => i.timeSlot === slot.code);
                       if (itemsInSlot.length === 0) return null;
                       const slotStats = getSlotStats(slot.code);
-                      const isSlotAllDone = slotStats.completed === slotStats.total && slotStats.total > 0;
 
                       return (
                         <div className="business-slot-card" key={slot.code}>
@@ -847,92 +856,65 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
         {/* 列印專用報表區 (A4 格式化排版) */}
         <section className="business-print-sheet" aria-label="業管組每日列印報表">
-          <header>
-            <h2>
-              臺北農產運銷股份有限公司第一果菜市場
-              <br />
-              業管組崗位勤務點檢與交接紀錄表
-            </h2>
-            <p>
-              {rocDate(date)}　·　點檢總體完成率：{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）
-            </p>
-          </header>
-
-          {/* 1. 列印點檢項目表 */}
-          <h3 className="business-print-h3">一、崗位勤務時段點檢紀錄</h3>
-          <table className="business-print-duty-table">
-            <thead>
-              <tr>
-                <th style={{ width: '12%' }}>班別時段</th>
-                <th style={{ width: '14%' }}>時間區段</th>
-                <th>點檢項目與崗位職責</th>
-                <th style={{ width: '14%', textAlign: 'center' }}>點檢結果</th>
-              </tr>
-            </thead>
-            <tbody>
-              {BUSINESS_DUTY_CHECKLIST.map((item, idx) => {
-                const itemState = checks[item.id] || { status: 'uncompleted' };
-                const isDone = itemState.status === 'completed';
-                const shiftInfo = SHIFTS.find(s => s.code === item.shiftGroup);
-
-                return (
-                  <tr key={item.id}>
-                    <td>
-                      {shiftInfo?.name}
-                      <br />
-                      <small>{shiftInfo?.label}</small>
-                    </td>
-                    <td>{item.timeSlotLabel}</td>
-                    <td>{item.title}</td>
-                    <td style={{ textAlign: 'center', fontWeight: 'bold', color: isDone ? '#059669' : '#b45309' }}>
-                      {isDone ? '✓ 點檢完成' : '✕ 未點檢'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* 2. 列印交接事項表 */}
-          <h3 className="business-print-h3" style={{ marginTop: '6mm' }}>二、班別交接與出勤紀錄</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>班別</th>
-                <th>交接分類</th>
-                <th>交接說明</th>
-                <th>應出勤</th>
-                <th>未出勤</th>
-              </tr>
-            </thead>
-            <tbody>
-              {SHIFTS.flatMap(shift => {
-                const rows = entries.filter(
-                  row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
-                );
-                return (rows.length ? rows : [null]).map((row, index) => (
-                  <tr
-                    className={row && isDeleted(row) ? 'is-deleted' : ''}
-                    key={row ? String(row.entry_id) : `${shift.code}-empty`}
-                  >
-                    {index === 0 && (
-                      <th rowSpan={Math.max(rows.length, 1)}>
-                        {shift.name}
-                        <br />
-                        {shift.label}
-                      </th>
-                    )}
-                    <td>{row ? String(row.category || '—') : '—'}</td>
-                    <td>{row ? String(row.description || '—') : '尚無交接紀錄'}</td>
-                    <td>{row ? `${Number(row.expected_attendance || 0)} 人` : '—'}</td>
-                    <td>{row ? `${Number(row.absent_attendance || 0)} 人` : '—'}</td>
-                  </tr>
-                ));
-              })}
-            </tbody>
-          </table>
+          <BusinessReportContent
+            date={date}
+            checkStats={checkStats}
+            checks={checks}
+            entries={entries}
+          />
         </section>
       </div>
+
+      {/* 螢幕上預覽本日報表彈窗 */}
+      {previewOpen && (
+        <div
+          className="business-report-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-label="業管組交接本日報表預覽"
+        >
+          <div className="business-report-preview-bar">
+            <div>
+              <strong>本日報表預覽</strong>
+              <span>{rocDate(date)} · A4 直式，與紙本列印內容完全一致</span>
+            </div>
+            <div className="business-report-preview-actions">
+              <button
+                type="button"
+                className="primary-btn compact"
+                onClick={() => {
+                  setPreviewOpen(false);
+                  setTimeout(() => window.print(), 100);
+                }}
+              >
+                列印本日報表
+              </button>
+              <button
+                type="button"
+                className="secondary-btn compact"
+                onClick={() => setPreviewOpen(false)}
+              >
+                關閉預覽
+              </button>
+            </div>
+          </div>
+          <div
+            className="business-report-preview-scroll"
+            onClick={e => {
+              if (e.target === e.currentTarget) setPreviewOpen(false);
+            }}
+          >
+            <div className="business-report-preview-page">
+              <BusinessReportContent
+                date={date}
+                checkStats={checkStats}
+                checks={checks}
+                entries={entries}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 編輯交接彈窗 */}
       {editingShift && (
@@ -960,6 +942,116 @@ export function BusinessHandover({ system, module, profile }: Props) {
         />
       )}
     </AppShell>
+  );
+}
+
+// 供列印與螢幕預覽共用的 A4 報表內容元件
+function BusinessReportContent({
+  date,
+  checkStats,
+  checks,
+  entries,
+}: {
+  date: string;
+  checkStats: { completed: number; total: number; percent: number };
+  checks: DutyCheckMap;
+  entries: Row[];
+}) {
+  return (
+    <div className="business-print-content">
+      <header>
+        <h2>
+          臺北農產運銷股份有限公司第一果菜市場
+          <br />
+          業管組崗位勤務點檢與交接紀錄表
+        </h2>
+        <p>
+          {rocDate(date)}　·　點檢總體完成率：{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）
+        </p>
+      </header>
+
+      {/* 1. 列印點檢項目表 */}
+      <h3 className="business-print-h3">一、崗位勤務時段點檢紀錄</h3>
+      <table className="business-print-duty-table">
+        <thead>
+          <tr>
+            <th style={{ width: '13%' }}>班別時段</th>
+            <th style={{ width: '15%' }}>時間區段</th>
+            <th>點檢項目與崗位職責</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>點檢結果</th>
+          </tr>
+        </thead>
+        <tbody>
+          {BUSINESS_DUTY_CHECKLIST.map(item => {
+            const itemState = checks[item.id] || { status: 'uncompleted' };
+            const isDone = itemState.status === 'completed';
+            const shiftInfo = SHIFTS.find(s => s.code === item.shiftGroup);
+
+            return (
+              <tr key={item.id}>
+                <td>
+                  {shiftInfo?.name}
+                  <br />
+                  <small>{shiftInfo?.label}</small>
+                </td>
+                <td>{item.timeSlotLabel}</td>
+                <td>{item.title}</td>
+                <td
+                  style={{
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    color: isDone ? '#059669' : '#b45309',
+                  }}
+                >
+                  {isDone ? '✓ 點檢完成' : '✕ 未點檢'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* 2. 列印交接事項表 */}
+      <h3 className="business-print-h3" style={{ marginTop: '6mm' }}>
+        二、班別交接與出勤紀錄
+      </h3>
+      <table>
+        <thead>
+          <tr>
+            <th style={{ width: '18%' }}>班別</th>
+            <th style={{ width: '18%' }}>交接分類</th>
+            <th>交接說明</th>
+            <th style={{ width: '13%' }}>應出勤</th>
+            <th style={{ width: '13%' }}>未出勤</th>
+          </tr>
+        </thead>
+        <tbody>
+          {SHIFTS.flatMap(shift => {
+            const rows = entries.filter(
+              row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
+            );
+            return (rows.length ? rows : [null]).map((row, index) => (
+              <tr
+                className={row && isDeleted(row) ? 'is-deleted' : ''}
+                key={row ? String(row.entry_id) : `${shift.code}-empty`}
+              >
+                {index === 0 && (
+                  <th rowSpan={Math.max(rows.length, 1)}>
+                    {shift.name}
+                    <br />
+                    {shift.label}
+                  </th>
+                )}
+                <td>{row ? String(row.category || '—') : '—'}</td>
+                <td>{row ? String(row.description || '—') : '尚無交接紀錄'}</td>
+                <td>{row ? `${Number(row.expected_attendance || 0)} 人` : '—'}</td>
+                <td>{row ? `${Number(row.absent_attendance || 0)} 人` : '—'}</td>
+              </tr>
+            ));
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

@@ -100,8 +100,30 @@
 .business-history.is-deleted{border-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--panel))}
 .business-history>b{width:100%}
 
+/* 螢幕預覽 A4 報表彈窗 */
+.business-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.75);backdrop-filter:blur(3px)}
+.business-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.business-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.business-report-preview-bar strong{font-size:17px;color:var(--ink)}
+.business-report-preview-bar span{color:var(--muted);font-size:13px}
+.business-report-preview-actions{display:flex;align-items:center;gap:8px}
+.business-report-preview-scroll{min-width:0;overflow:auto;padding:24px 16px;display:flex;justify-content:center}
+.business-report-preview-page{width:210mm;min-height:297mm;background:#fff;color:#111;padding:12mm 14mm;box-shadow:0 10px 30px rgba(0,0,0,.35);border-radius:2px;font-family:"Noto Sans TC",sans-serif;box-sizing:border-box}
+
+/* 報表通用樣式 (預覽與列印共用) */
+.business-print-content{color:#111;font-family:"Noto Sans TC",sans-serif}
+.business-print-content header{text-align:center;margin-bottom:6mm}
+.business-print-content header h2{margin:0;font-size:15pt;line-height:1.45;color:#111}
+.business-print-content header p{margin:3mm 0 0;font-size:10.5pt;color:#333}
+.business-print-content table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9pt;margin-bottom:5mm}
+.business-print-content th,.business-print-content td{border:1px solid #222;padding:2.5mm;vertical-align:middle;white-space:pre-line;overflow-wrap:anywhere;color:#111}
+.business-print-duty-table th{background:#f3f4f6;font-weight:700}
+.business-print-content th:first-child{width:22mm}
+.business-print-content tr{break-inside:avoid}
+.business-print-content tr.is-deleted{text-decoration:line-through;color:#666}
+
 .business-print-sheet{display:none}
-.business-print-h3{margin:18px 0 8px;font-size:13pt;border-left:4px solid #111;padding-left:8px}
+.business-print-h3{margin:18px 0 8px;font-size:12pt;border-left:4px solid #111;padding-left:8px;color:#111;font-weight:700}
 
 @media(max-width:900px){
   .business-toolbar{flex-wrap:wrap}
@@ -117,24 +139,16 @@
   .business-shift-head strong{width:40px;height:40px}
   .business-attendance-fields{grid-template-columns:1fr}
   .business-duty-table th:nth-child(2),.business-duty-table td:nth-child(2){display:none}
+  .business-report-preview-page{width:100%;min-height:auto;padding:12px 10px}
 }
 
 @media print{
   @page{size:A4 portrait;margin:8mm}
   body{background:#fff!important}
-  .v1-navbar,.system-page-header,.admin-page-actions,.business-toolbar,.business-tab-bar,.business-slot-filter-bar,.business-sheet,.theme-toggle{display:none!important}
+  .v1-navbar,.system-page-header,.admin-page-actions,.business-toolbar,.business-tab-bar,.business-slot-filter-bar,.business-sheet,.business-report-preview,.theme-toggle{display:none!important}
   .content.v1-content{padding:0!important;margin:0!important;max-width:none!important}
   .business-page{display:block}
   .business-print-sheet,.business-print-sheet *{visibility:visible!important}
   .business-print-sheet{display:block;color:#111;background:#fff;font-family:"Noto Sans TC",sans-serif}
-  .business-print-sheet header{text-align:center;margin-bottom:6mm}
-  .business-print-sheet header h2{margin:0;font-size:15pt;line-height:1.45}
-  .business-print-sheet header p{margin:3mm 0 0;font-size:10.5pt;color:#333}
-  .business-print-sheet table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9pt;margin-bottom:5mm}
-  .business-print-sheet th,.business-print-sheet td{border:1px solid #222;padding:2.5mm;vertical-align:middle;white-space:pre-line;overflow-wrap:anywhere}
-  .business-print-duty-table th{background:#f3f4f6}
-  .business-print-sheet th:first-child{width:22mm}
-  .business-print-sheet tr{break-inside:avoid}
-  .business-print-sheet tr.is-deleted{text-decoration:line-through;color:#666}
 }
 
