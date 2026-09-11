@@ -7,6 +7,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
+    - cron: '0 21 * * *' # 臺灣時間每日 05:00（UTC 21:00）自動執行 CI 檢查
     - cron: '0 0 * * 0' # weekly run for dependency checks
 
 concurrency:

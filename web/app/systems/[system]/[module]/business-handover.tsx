@@ -9,6 +9,7 @@ import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './business-handover.css';
@@ -555,7 +556,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
     const rawEntries = entryResult.data || [];
     setEntries(rawEntries);
-    setUsers(userResult.data || []);
+    setUsers(selectableActiveUsers(userResult.data || []));
 
     // 載入批核資料（若後端表尚未備妥則自動從 LocalStorage 備援）
     let loadedApprovals: BusinessApproval[] = (approvalResult?.data as BusinessApproval[]) || [];
