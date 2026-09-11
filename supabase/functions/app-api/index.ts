@@ -3607,7 +3607,7 @@ export async function handleAppApiRequest(req: Request) {
         } catch (error) {
           const code = String((error as { code?: unknown })?.code || '');
           if (code === '23505') return reply(req, { ok: false, message: '相同名稱的工作選項已存在' }, 409);
-          return reply(req, { ok: false, message: dbMessage(error, '工作選項儲存失敗') }, code === '42501' ? 403 : 400);
+          return reply(req, { ok: false, message: dbMessage(error as { code?: string; message?: string }, '工作選項儲存失敗') }, code === '42501' ? 403 : 400);
         }
       }
 
