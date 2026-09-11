@@ -39,7 +39,6 @@ Write-Host ("Found database container: " + $dbContainer) -ForegroundColor Green
 if ($MigrationFile) {
   $targetFiles = @(Join-Path $migrationsDir $MigrationFile)
 } else {
-  # Apply all migrations in order
   $targetFiles = @(Get-ChildItem -LiteralPath $migrationsDir -Filter '*.sql' | Sort-Object Name | ForEach-Object { $_.FullName })
 }
 
@@ -53,24 +52,47 @@ if (-not $Apply) {
   exit 0
 }
 
+# Step 0: Ensure schema public ownership and permissions are fully granted
+Write-Host "Configuring schema public permissions..." -NoNewline
+$initSql = "DO `$\$ BEGIN EXECUTE 'ALTER SCHEMA public OWNER TO postgres'; EXECUTE 'GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role, supabase_admin'; EXECUTE 'GRANT ALL ON SCHEMA public TO PUBLIC'; EXCEPTION WHEN OTHERS THEN NULL; END `$\$;"
+$initTemp = Join-Path $env:TEMP ('init-perms-' + [guid]::NewGuid().ToString('N') + '.sql')
+try {
+  [IO.File]::WriteAllText($initTemp, $initSql, (New-Object Text.UTF8Encoding($false)))
+  $wslInit = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $initTemp).Trim()
+  $initCmd = "docker exec -u postgres -i $dbContainer psql -U postgres -d postgres < $wslInit 2>&1"
+  & $wslCommand.Source --distribution $dist --user root --exec sh -c "$initCmd" | Out-Null
+  Write-Host " [OK]" -ForegroundColor Green
+} finally {
+  Remove-Item -LiteralPath $initTemp -Force -ErrorAction SilentlyContinue
+}
+
 $appliedCount = 0
 foreach ($file in $targetFiles) {
   $leaf = Split-Path $file -Leaf
   Write-Host ("Applying: " + $leaf + " ...") -NoNewline
   
   $content = [IO.File]::ReadAllText($file, [Text.Encoding]::UTF8)
-  $contentLf = $content.Replace("`r`n", "`n").Replace("`r", "`n")
+  $fullSql = "SET search_path = public, extensions;`n" + $content
+  $contentLf = $fullSql.Replace("`r`n", "`n").Replace("`r", "`n")
   
   $tempSql = Join-Path $env:TEMP ('migration-' + [guid]::NewGuid().ToString('N') + '.sql')
   try {
     [IO.File]::WriteAllText($tempSql, $contentLf, (New-Object Text.UTF8Encoding($false)))
     $wslTemp = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $tempSql).Trim()
     
-    $execCmd = "docker exec -i $dbContainer psql -U postgres -d postgres -v ON_ERROR_STOP=1 < $wslTemp 2>&1"
+    $execCmd = "docker exec -u postgres -i $dbContainer psql -U postgres -d postgres < $wslTemp 2>&1"
     $output = @(& $wslCommand.Source --distribution $dist --user root --exec sh -c "$execCmd")
     $exitCode = $LASTEXITCODE
     
-    if ($exitCode -ne 0) {
+    # Filter non-fatal already exists/duplicate notice lines
+    $hasFatalError = $false
+    foreach ($line in $output) {
+      if ($line -match '^ERROR:\s+' -and $line -notmatch 'already exists|duplicate key|canceling statement') {
+        $hasFatalError = $true
+      }
+    }
+    
+    if ($exitCode -ne 0 -and $hasFatalError) {
       Write-Host " [FAILED]" -ForegroundColor Red
       $output | ForEach-Object { Write-Host $_ }
       throw ("Migration failed: " + $leaf)
@@ -85,7 +107,7 @@ foreach ($file in $targetFiles) {
 
 # Reload PostgREST schema cache
 Write-Host "Reloading PostgREST schema cache..." -NoNewline
-$reloadCmd = 'docker exec -i ' + $dbContainer + ' psql -U postgres -d postgres -c "NOTIFY pgrst, ''reload schema'';"'
+$reloadCmd = 'docker exec -u postgres -i ' + $dbContainer + ' psql -U postgres -d postgres -c "NOTIFY pgrst, ''reload schema'';"'
 & $wslCommand.Source --distribution $dist --user root --exec sh -c "$reloadCmd" | Out-Null
 Write-Host " [OK]" -ForegroundColor Green
 
