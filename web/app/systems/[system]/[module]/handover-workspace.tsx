@@ -23,6 +23,7 @@
 // handover_cases_party_update 等價的授權判斷，並在同一交易寫 handover_case_logs）。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
@@ -132,12 +133,12 @@ function RecordsModule({ system, module, profile }: Props) {
     // 直接查表才拿得到 record_id／takeover_by／confirmed_at，接收流程才可能成立。
     const [r, u, d, s] = await Promise.all([
       client.from('handover_records').select('*').order('shift_date', { ascending: false }).order('created_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
       client.from('system_settings').select('value').eq('key', 'shifts').maybeSingle(),
     ]);
     if (r.error || u.error) setNote(`失敗：${errorMessage(r.error || u.error, '交接資料載入失敗')}`);
-    setRows(r.data || []); setUsers(u.data || []); setDepartments(d.data || []);
+    setRows(r.data || []); setUsers(selectableActiveUsers(u.data || [])); setDepartments(d.data || []);
     // system_settings 為管理者專屬，讀不到就沿用與資料庫 handover_shift_end_at 相同的預設三班制。
     try {
       const parsed = s.data?.value ? JSON.parse(String(s.data.value)) : null;
@@ -475,11 +476,11 @@ function CasesModule({ module, profile }: Props) {
     const client = getSupabase();
     const [c, u, d] = await Promise.all([
       client.from('handover_cases').select('*').order('created_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name,department,dept_id').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
     ]);
     if (c.error || u.error) setNote(`失敗：${errorMessage(c.error || u.error, '案件資料載入失敗')}`);
-    setRows(c.data || []); setUsers(u.data || []); setDepartments(d.data || []); setBusy(false);
+    setRows(c.data || []); setUsers(selectableActiveUsers(u.data || [])); setDepartments(d.data || []); setBusy(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, status, category, from, to]);

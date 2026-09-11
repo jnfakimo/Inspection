@@ -164,6 +164,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   `TimeSelect` emits 24-hour `HH:mm`, matching the tables and the DB `time` columns, and
   keeps an off-step legacy value as an extra option so editing another field can't erase it.
 - **Table Filters / Dropdowns**: Whenever creating a filter dropdown in a table header, use a combobox design (`<input list="..."><datalist>`) rather than a native `<select>`. This allows users to type to filter while providing a dropdown list. Ensure the `<option>` values in the datalist use the localized display labels (e.g. `緊急` instead of `urgent`), and update the filtering logic to match against labels so the UI shows Traditional Chinese properly.
+- **可留白的資料下拉選單**：資料輸入欄位若允許空值，第一列必須是 `BlankSelectOption` 產生的真正空白值，不得自動代選第一筆，也不得用「請選擇」文字冒充空值。狀態切換、必要動作或表格篩選等本來就不允許空值的控制項不套用此規則。人員指派／排班／簽名清單一律先經 `selectableActiveUsers()`，不可只依 `status='active'`，以免已離職去識別化帳號重新出現。
 - **Floor naming differs between systems**: area/material data may use `B1F`,
   while plan/3D use `B1`. Reconcile with a `canonicalFloor()` (B1≈B1F, 1F≈1, RF≈頂樓).
 - **New/changed DB columns**: `create table if not exists` won't alter an existing

@@ -20,6 +20,7 @@ import { TimeSelect } from '@/components/TimeSelect';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { escHtml } from '@/lib/html-escape';
 import { useFleetRole } from '@/lib/fleet-role';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -1057,10 +1058,10 @@ function RosterModule({ module, profile }: Props) {
     const client = getSupabase();
     const [r, u] = await Promise.all([
       client.from(table).select(`user_id,active,assigned_at,updated_at,users!${table}_user_id_fkey(name,username,department,status)`).order('updated_at', { ascending: false }),
-      client.from('users').select('user_id,name,username,department,status').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,department,status').eq('status', 'active').order('name').limit(1000),
     ]);
     if (r.error || u.error) setNote(`失敗：${errorMessage(r.error || u.error, '名單載入失敗')}`);
-    setRows(r.data || []); setCandidates(u.data || []); setBusy(false);
+    setRows(r.data || []); setCandidates(selectableActiveUsers(u.data || [])); setBusy(false);
   }, [table]);
   useEffect(() => { void load(); }, [load]);
 

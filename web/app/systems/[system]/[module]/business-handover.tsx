@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './business-handover.css';
@@ -309,14 +310,14 @@ export function BusinessHandover({ system, module, profile }: Props) {
     const client = getSupabase();
     const [entryResult, userResult] = await Promise.all([
       client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
-      client.from('users').select('user_id,name').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,status').eq('status', 'active').order('name').limit(1000),
     ]);
     if (entryResult.error || userResult.error) {
       setNote(`失敗：${errorMessage(entryResult.error || userResult.error, '業管組交接資料載入失敗')}`);
     }
     const rawEntries = entryResult.data || [];
     setEntries(rawEntries);
-    setUsers(userResult.data || []);
+    setUsers(selectableActiveUsers(userResult.data || []));
 
     // 嘗試從資料庫中的點檢紀錄條目或 LocalStorage 載入點檢表狀態
     let loadedChecks: DutyCheckMap = {};

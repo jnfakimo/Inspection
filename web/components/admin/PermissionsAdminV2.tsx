@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { systems } from '@/lib/modules';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
+import { visibleManagedUsers } from '@/lib/user-visibility';
 import {
   AdminHeader, AdminModal, type AdminProps, errorMessage, Pager, PERMISSIONS,
   roleLabel, type Row, StatusPill, SYSTEM_PERMISSIONS, userRole,
@@ -55,7 +56,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
       const failure = rolesResult.error || permissionResult.error || usersResult.error || systemResult.error || moduleResult.error;
       if (failure) setNote(`失敗：${errorMessage(failure, '角色與個人權限載入失敗')}`);
       setRoles((rolesResult.data || []).filter(row => row.role_id !== 'mgmt_supervisor'));
-      setPermissions(permissionResult.data || []); setUsers(usersResult.data || []);
+      setPermissions(permissionResult.data || []); setUsers(visibleManagedUsers(usersResult.data || []));
       setSystemAccess(systemResult.data || []); setModuleAccess(moduleResult.data || []);
     } catch (error) { setNote(`失敗：${errorMessage(error, '角色與個人權限載入失敗')}`); }
     finally { setBusy(false); }

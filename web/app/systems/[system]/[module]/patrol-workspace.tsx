@@ -29,6 +29,7 @@ import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, 
 import { TimeSelect } from '@/components/TimeSelect';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { locationOptions, type LocationLike } from '@/lib/locations';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import { PatrolMap3DModule } from './patrol-map3d';
 import { PointListModule } from './patrol-pointlist';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -190,7 +191,7 @@ function ShiftsModule({ module, profile }: Props) {
     const [s, t, u, c, d] = await Promise.all([
       client.from('patrol_shifts').select('*').in('shift_date', [date, overnightStorageDate]).order('sort_order').order('start_time'),
       client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
-      client.from('users').select('user_id,name,username,department,dept_id').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
       client.from('departments').select('dept_id,name').limit(1000),
     ]);
@@ -211,7 +212,7 @@ function ShiftsModule({ module, profile }: Props) {
         return { ...row, __storageDate: legacyNightDate ? overnightStorageDate : String(row.shift_date), __configDate: legacyNightDate ? date : String(row.shift_date), __dutyDate: date };
       }));
     setTemplates(t.data || []); 
-    setUsers(u.data || []);
+    setUsers(selectableActiveUsers(u.data || []));
     setDepartments(d.data || []);
     // system_settings 為 admin-only，非管理者讀不到；此時通報時段留白即可，不擋畫面。
     try { setConfig(c.data?.value ? JSON.parse(String(c.data.value)) : null); } catch { setConfig(null); }

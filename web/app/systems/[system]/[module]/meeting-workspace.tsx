@@ -22,6 +22,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { canonicalFloor } from '@/lib/floor';
 import { invokeGoogleCalendar, openPersonalProfile, type GoogleCalendarStatus } from '@/lib/google-calendar';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -177,7 +178,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       client.from('meeting_booking_change_requests')
         .select('*,meeting_bookings!target_booking_id(booking_no,booking_date,start_time,end_time,status,user_id,purpose,meeting_rooms(name)),users!requester_id(name,department)')
         .order('created_at', { ascending: false }).limit(100),
-      client.from('users').select('user_id,name,department').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,department,status').eq('status', 'active').order('name').limit(1000),
       client.from('users').select('phone').eq('user_id', profile.user_id).maybeSingle(),
     ]);
     if (r.error || w.error) setNote(`失敗：${errorMessage(r.error || w.error, '會議室資料載入失敗')}`);
@@ -187,7 +188,7 @@ function MeetingRoomPage({ module, profile }: Props) {
       const room = Array.isArray(row.meeting_rooms) ? row.meeting_rooms[0] : row.meeting_rooms;
       return room && typeof room === 'object' ? { ...row, meeting_rooms: { ...room, floor: canonicalFloor((room as Row).floor) } } : row;
     }));
-    setRequests(req.data || []); setUsers(u.data || []);
+    setRequests(req.data || []); setUsers(selectableActiveUsers(u.data || []));
     setMyPhone(String((me.data as Row)?.phone || ''));
     setBusy(false);
   }, [days, profile.user_id]);

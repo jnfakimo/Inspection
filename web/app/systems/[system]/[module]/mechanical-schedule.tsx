@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { AdminHeader, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import {
   copyPreviousMonthDraft, isMechanicalWorkCode, scheduleCalendarDates, scheduleDateOffset, scheduleMonthDates,
   shiftScheduleMonth, validateMechanicalSchedule,
@@ -71,7 +72,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     const rangeStart = scheduleDateOffset(monthStart, -7), rangeEnd = scheduleDateOffset(monthEnd, 8);
     const client = getSupabase();
     const [people, departments, schedule, scopes] = await Promise.all([
-      client.from('users').select('user_id,name,dept_id,status').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,username,email,dept_id,status').eq('status', 'active').order('name').limit(1000),
       client.from('departments').select('dept_id,name,level,status').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
       client.from('mechanical_schedule_assignments').select('*').gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).order('duty_date').limit(5000),
       client.from('mechanical_staff_market_scopes').select('user_id,market_code,is_active,updated_at').eq('is_active', true).limit(1000),
@@ -79,7 +80,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     const failure = people.error || departments.error || schedule.error || scopes.error;
     if (failure) { setNote(`失敗：${failure.message || '機電課排班資料載入失敗'}`); setBusy(false); return; }
     const departmentIds = new Set((departments.data || []).map(row => String(row.dept_id)));
-    const staff = (people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
+    const staff = selectableActiveUsers(people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
     const rows = schedule.data || [];
     const nextDraft: Record<string, string> = {};

@@ -840,6 +840,13 @@ function departmentRole(value: { role?: unknown; rbac_role?: unknown } | null | 
   return text(value?.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[String(value?.role || '')] || value?.role, 40);
 }
 
+function isDeidentifiedAccount(value: { username?: unknown; email?: unknown; name?: unknown } | null | undefined) {
+  const username = text(value?.username, 200).toLowerCase();
+  const email = text(value?.email, 300).toLowerCase();
+  const name = text(value?.name, 200);
+  return username.startsWith('deidentified-') || email.startsWith('deidentified-') || name.startsWith('已離職人員-');
+}
+
 function namedDepartment(unit: { code?: unknown; name?: unknown } | null | undefined, codes: Set<string>, names: Set<string>) {
   const code = text(unit?.code, 40).toUpperCase();
   const name = text(unit?.name, 100).replace(/\s+/g, '');
@@ -2529,7 +2536,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
       if (!canAnyModule(['workorder', 'requests'], ['workorder', 'dispatch'], ['workorder', 'orders'])) return reply(req, { ok: false, message: '目前帳號未開放維修作業子系統' }, 403);
       const [people, equipment, departments, contact, locations] = await Promise.all([
-        userDb.from('users').select('user_id,name,department,dept_id,role,rbac_role').eq('status', 'active').order('name').limit(500),
+        userDb.from('users').select('user_id,name,username,email,department,dept_id,role,rbac_role,status').eq('status', 'active').order('name').limit(500),
         userDb.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
         userDb.from('departments').select('dept_id,parent_id,name').eq('status', 'active').order('sort_order').limit(200),
         userDb.from('users').select('phone,department').eq('user_id', profile.user_id).maybeSingle(),
@@ -2545,7 +2552,7 @@ export async function handleAppApiRequest(req: Request) {
       const departmentPaths = buildDepartmentPaths((departments.data || []) as DepartmentNode[]);
       const technicians = (people.data || []).filter(row => {
         const role = text(row.rbac_role || row.role, 40);
-        return role === 'technician' || role === 'maintenance';
+        return !isDeidentifiedAccount(row) && (role === 'technician' || role === 'maintenance');
       }).map(row => ({
         user_id: String(row.user_id),
         name: text(row.name, 100),
@@ -3343,7 +3350,7 @@ export async function handleAppApiRequest(req: Request) {
         admin.from('guard_handover_daily_approvals').select('*').eq('duty_date', dutyDate).maybeSingle(),
         admin.from('guard_handover_logs').select('items').lt('duty_date', dutyDate).neq('status', 'draft')
           .order('duty_date', { ascending: false }).order('shift_order', { ascending: false }).limit(1).maybeSingle(),
-        admin.from('users').select('user_id,name,dept_id,department,status').limit(5000),
+        admin.from('users').select('user_id,name,username,email,dept_id,department,status').limit(5000),
         admin.from('departments').select('dept_id,name').limit(2000),
         admin.from('guard_handover_attachments').select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at')
           .eq('duty_date', dutyDate).eq('is_deleted', false).order('uploaded_at'),
@@ -3353,7 +3360,7 @@ export async function handleAppApiRequest(req: Request) {
       // 可勾選的實際值勤人員：單位名稱含「駐警／駐衛」者（以 dept_id 為準，users.department 後備）。
       const patrolDepts = new Set((deptResult.data || []).filter(row => /駐警|駐衛/.test(String(row.name || ''))).map(row => String(row.dept_id)));
       const users = userResult.data || [];
-      const staff = users.filter(user => user.status === 'active' && (patrolDepts.has(String(user.dept_id)) || /駐警|駐衛/.test(String(user.department || ''))))
+      const staff = users.filter(user => user.status === 'active' && !isDeidentifiedAccount(user) && (patrolDepts.has(String(user.dept_id)) || /駐警|駐衛/.test(String(user.department || ''))))
         .map(user => ({ user_id: String(user.user_id), name: String(user.name || '') })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
       const logs = logResult.data || [];
       const approval = approvalResult.data || null;
@@ -3468,6 +3475,12 @@ export async function handleAppApiRequest(req: Request) {
         if (marketCode !== null && !['market_1', 'market_2'].includes(marketCode)) {
           return reply(req, { ok: false, message: '人員市場歸屬無效' }, 400);
         }
+        const { data: staffAccount, error: staffAccountError } = await admin.from('users')
+          .select('user_id,name,username,email,status').eq('user_id', userId).maybeSingle();
+        if (staffAccountError) throw staffAccountError;
+        if (!staffAccount || staffAccount.status !== 'active' || isDeidentifiedAccount(staffAccount)) {
+          return reply(req, { ok: false, message: '已離職或去識別化帳號不可設定市場歸屬' }, 400);
+        }
         const { data, error } = await admin.rpc('save_mechanical_staff_market_scope', {
           p_actor_id: profile.user_id, p_user_id: userId, p_market_code: marketCode,
         }).single();
@@ -3504,10 +3517,10 @@ export async function handleAppApiRequest(req: Request) {
           if (departmentError) throw departmentError;
           const departmentIds = (mechanicalDepartments || []).map(row => row.dept_id);
           if (!departmentIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
-          const { data: staff, error: staffError } = await admin.from('users').select('user_id')
+          const { data: staff, error: staffError } = await admin.from('users').select('user_id,name,username,email,status')
             .in('user_id', scheduledUserIds).in('dept_id', departmentIds).eq('status', 'active');
           if (staffError) throw staffError;
-          if ((staff || []).length !== scheduledUserIds.length) return reply(req, { ok: false, message: '排班人員僅限第二階機電課的在職同仁' }, 400);
+          if ((staff || []).length !== scheduledUserIds.length || (staff || []).some(isDeidentifiedAccount)) return reply(req, { ok: false, message: '排班人員僅限第二階機電課的在職同仁' }, 400);
           const { data: marketStaff, error: marketStaffError } = await admin.from('mechanical_staff_market_scopes')
             .select('user_id').in('user_id', scheduledUserIds).eq('market_code', marketCode).eq('is_active', true);
           if (marketStaffError) throw marketStaffError;
@@ -3544,6 +3557,60 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: true, data });
       }
 
+      if (kind === 'mechanical_work_option') {
+        const normalizedRole = departmentRole(profile);
+        if (!['unit_supervisor', 'sysadmin'].includes(normalizedRole)) {
+          return reply(req, { ok: false, message: '工作選項僅限機電課主管或系統管理員維護' }, 403);
+        }
+        if (normalizedRole !== 'sysadmin') {
+          const { data: department, error: departmentError } = await userDb.from('departments')
+            .select('dept_id').eq('dept_id', profile.dept_id).eq('name', '機電課').eq('level', 2).eq('status', 'active').maybeSingle();
+          if (departmentError) throw departmentError;
+          if (!department) return reply(req, { ok: false, message: '工作選項僅限第二階機電課主管維護' }, 403);
+        }
+        const entity = text(body.entity, 20), operation = text(body.operation, 20);
+        const isCategory = entity === 'category';
+        if (!isCategory && entity !== 'item') return reply(req, { ok: false, message: '工作選項類型無效' }, 400);
+        if (!['create', 'update', 'deactivate', 'activate'].includes(operation)) return reply(req, { ok: false, message: '工作選項操作無效' }, 400);
+        const table = isCategory ? 'mechanical_work_categories' : 'mechanical_work_items';
+        const idField = isCategory ? 'category_id' : 'item_id';
+        const name = text(body.name, isCategory ? 80 : 300);
+        if ((operation === 'create' || operation === 'update') && !name) return reply(req, { ok: false, message: '請填寫選項名稱' }, 400);
+        const categoryId = isCategory ? null : id(body.category_id);
+        if (!isCategory && !categoryId) return reply(req, { ok: false, message: '請選擇工作分類' }, 400);
+        try {
+          if (operation === 'create') {
+            const { data: tail } = await userDb.from(table).select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
+            const payload: Record<string, unknown> = { name, sort_order: Number(tail?.sort_order || 0) + 10, is_active: true, created_by: profile.user_id, updated_by: profile.user_id };
+            if (!isCategory) payload.category_id = categoryId;
+            const { data, error } = await userDb.from(table).insert(payload).select('*').single();
+            if (error) throw error;
+            await writeAudit(userDb, profile.user_id, table, String(data[idField]), 'insert', null, data);
+            return reply(req, { ok: true, data });
+          }
+          const optionId = id(body.option_id);
+          if (!optionId) return reply(req, { ok: false, message: '工作選項識別碼無效' }, 400);
+          const { data: before, error: readError } = await userDb.from(table).select('*').eq(idField, optionId).maybeSingle();
+          if (readError) throw readError;
+          if (!before) return reply(req, { ok: false, message: '找不到指定的工作選項' }, 404);
+          const payload: Record<string, unknown> = { updated_by: profile.user_id, updated_at: new Date().toISOString() };
+          if (operation === 'update') payload.name = name;
+          else payload.is_active = operation === 'activate';
+          const { data, error } = await userDb.from(table).update(payload).eq(idField, optionId).select('*').single();
+          if (error) throw error;
+          if (isCategory && operation === 'deactivate') {
+            const childUpdate = await userDb.from('mechanical_work_items').update({ is_active: false, updated_by: profile.user_id, updated_at: new Date().toISOString() }).eq('category_id', optionId).eq('is_active', true);
+            if (childUpdate.error) throw childUpdate.error;
+          }
+          await writeAudit(userDb, profile.user_id, table, optionId, operation === 'update' ? 'update' : 'status_change', before, data);
+          return reply(req, { ok: true, data });
+        } catch (error) {
+          const code = String((error as { code?: unknown })?.code || '');
+          if (code === '23505') return reply(req, { ok: false, message: '相同名稱的工作選項已存在' }, 409);
+          return reply(req, { ok: false, message: dbMessage(error, '工作選項儲存失敗') }, code === '42501' ? 403 : 400);
+        }
+      }
+
       if (kind === 'mechanical_entry') {
         const workDate = text(body.work_date, 10), shiftCode = text(body.shift_code, 10);
         if (!validISODate(workDate)) return reply(req, { ok: false, message: '工作日期格式無效' }, 400);
@@ -3552,9 +3619,9 @@ export async function handleAppApiRequest(req: Request) {
           .select('approval_id').eq('work_date', workDate).maybeSingle();
         if (approvalReadError) throw approvalReadError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再新增工作' }, 409);
-        const category = text(body.category, 80), workItem = text(body.work_item, 300);
+        const category = text(body.category, 80), workItem = text(body.work_item, 300), details = text(body.details, 3000);
         const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
-        if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
+        if ((!workItem && !details) || !technicianIds.length) return reply(req, { ok: false, message: '請選擇常用工作項目或填寫工作補充說明，並至少選擇一位維修人員' }, 400);
         if (technicianIds.length > 20) return reply(req, { ok: false, message: '單筆工作最多選擇 20 位維修人員' }, 400);
         const result = text(body.result, 80) || '正常';
         if (!MECHANICAL_RESULT_SET.has(result)) return reply(req, { ok: false, message: '處理結果狀態無效' }, 400);
@@ -3565,10 +3632,10 @@ export async function handleAppApiRequest(req: Request) {
         if (departmentError) throw departmentError;
         const mechanicalDeptIds = (mechanicalDepartments || []).map(department => department.dept_id);
         if (!mechanicalDeptIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
-        const { data: people, error: peopleError } = await userDb.from('users').select('user_id')
+        const { data: people, error: peopleError } = await userDb.from('users').select('user_id,name,username,email,status')
           .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
         if (peopleError) throw peopleError;
-        if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
+        if ((people || []).length !== technicianIds.length || (people || []).some(isDeidentifiedAccount)) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
         const carrySourceId = body.carry_source_id ? id(body.carry_source_id) : null;
         if (body.carry_source_id && !carrySourceId) return reply(req, { ok: false, message: '續辦來源資料無效' }, 400);
         if (carrySourceId) {
@@ -3587,7 +3654,7 @@ export async function handleAppApiRequest(req: Request) {
         }
         const payload = {
           work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
-          details: text(body.details, 3000) || null, technician_ids: technicianIds,
+          details: details || null, technician_ids: technicianIds,
           result, notes: text(body.notes, 1000) || null,
           repair_cost: costCents === null ? null : costCents / 100,
           carry_source_id: carrySourceId,
@@ -3616,9 +3683,9 @@ export async function handleAppApiRequest(req: Request) {
         if (approvalReadError) throw approvalReadError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再修改工作' }, 409);
 
-        const category = text(body.category, 80), workItem = text(body.work_item, 300);
+        const category = text(body.category, 80), workItem = text(body.work_item, 300), details = text(body.details, 3000);
         const technicianIds = [...new Set((Array.isArray(body.technician_ids) ? body.technician_ids : []).map((value: unknown) => id(value)).filter(Boolean))];
-        if (!category || !workItem || !technicianIds.length) return reply(req, { ok: false, message: '請選擇工作項目及至少一位維修人員' }, 400);
+        if ((!workItem && !details) || !technicianIds.length) return reply(req, { ok: false, message: '請選擇常用工作項目或填寫工作補充說明，並至少選擇一位維修人員' }, 400);
         if (technicianIds.length > 20) return reply(req, { ok: false, message: '單筆工作最多選擇 20 位維修人員' }, 400);
         const result = text(body.result, 80) || '正常';
         if (!MECHANICAL_RESULT_SET.has(result)) return reply(req, { ok: false, message: '處理結果狀態無效' }, 400);
@@ -3630,13 +3697,13 @@ export async function handleAppApiRequest(req: Request) {
         if (departmentError) throw departmentError;
         const mechanicalDeptIds = (mechanicalDepartments || []).map(department => department.dept_id);
         if (!mechanicalDeptIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
-        const { data: people, error: peopleError } = await userDb.from('users').select('user_id')
+        const { data: people, error: peopleError } = await userDb.from('users').select('user_id,name,username,email,status')
           .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
         if (peopleError) throw peopleError;
-        if ((people || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
+        if ((people || []).length !== technicianIds.length || (people || []).some(isDeidentifiedAccount)) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
 
         const payload = {
-          category, work_item: workItem, details: text(body.details, 3000) || null,
+          category, work_item: workItem, details: details || null,
           technician_ids: technicianIds, result, notes: text(body.notes, 1000) || null,
           repair_cost: costCents === null ? null : costCents / 100,
           updated_by: profile.user_id, updated_at: new Date().toISOString(),
@@ -3689,10 +3756,10 @@ export async function handleAppApiRequest(req: Request) {
           if (departmentError) throw departmentError;
           const mechanicalDeptIds = (mechanicalDepartments || []).map(department => department.dept_id);
           if (!mechanicalDeptIds.length) return reply(req, { ok: false, message: '找不到有效的第二階機電課單位' }, 409);
-          const { data: signer, error: signerError } = await userDb.from('users').select('user_id')
+          const { data: signer, error: signerError } = await userDb.from('users').select('user_id,name,username,email,status')
             .eq('user_id', signerId).in('dept_id', mechanicalDeptIds).eq('status', 'active').maybeSingle();
           if (signerError) throw signerError;
-          if (!signer) return reply(req, { ok: false, message: '值班簽名僅限第二階機電課的在職同仁' }, 400);
+          if (!signer || isDeidentifiedAccount(signer)) return reply(req, { ok: false, message: '值班簽名僅限第二階機電課的在職同仁' }, 400);
         }
         const payload = { work_date: workDate, shift_code: shiftCode, signer_id: signerId, signed_at: signerId ? new Date().toISOString() : null, updated_by: profile.user_id, updated_at: new Date().toISOString() };
         const { data, error } = await userDb.from('mechanical_handover_signatures').upsert(payload, { onConflict: 'work_date,shift_code' }).select('signature_id').single();
