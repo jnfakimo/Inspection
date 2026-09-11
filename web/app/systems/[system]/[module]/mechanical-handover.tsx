@@ -101,6 +101,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [mounted, setMounted] = useState(false);
   const [printRequested, setPrintRequested] = useState(false);
   const [printBusy, setPrintBusy] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => { setMounted(true); }, []);
@@ -136,6 +137,24 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     }));
     return () => { cancelled = true; };
   }, [printRequested, printData]);
+  useEffect(() => {
+    if (!previewOpen) return;
+    let frame = 0;
+    const refresh = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(fitMechanicalReportPreview);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreviewOpen(false); };
+    refresh();
+    void document.fonts.ready.then(refresh);
+    window.addEventListener('resize', refresh);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', refresh);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [approvals, date, entries, previewOpen, signatures]);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -245,7 +264,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="mechanical-page">
       <AdminHeader module={module} busy={busy} note={note} onReload={load}
-        action={<button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button>} />
+        action={<><button className="secondary-btn compact" disabled={busy} onClick={() => { setPrintData(null); setPrintRequested(false); setPreviewOpen(true); }}>預覽本日報表</button><button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button></>} />
       <section className="panel mechanical-toolbar">
         <div className="mechanical-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value); }} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
         <span>{rocDate(date)}</span>
@@ -308,6 +327,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
           approval={(printData?.approvals || approvals).find(row => String(row.work_date) === printDate)}
           userName={userName} />)}
       </section>, document.body)}
+      {mounted && previewOpen && createPortal(<DailyReportPreview date={date} entries={entries} signatures={signatures} approval={approval} userName={userName} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} />, document.body)}
     </div>
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
@@ -331,9 +351,33 @@ export function fitMechanicalPrint() {
     if (!content) return;
     content.style.removeProperty('--mechanical-print-scale');
     if (!sheet.clientHeight || !content.scrollHeight) return;
-    const ratio = Math.min(1, (sheet.clientHeight - 2) / content.scrollHeight);
+    const style = window.getComputedStyle(sheet);
+    const verticalPadding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
+    const ratio = Math.min(1, (sheet.clientHeight - verticalPadding - 2) / content.scrollHeight);
     content.style.setProperty('--mechanical-print-scale', String(ratio));
   });
+}
+
+export function fitMechanicalReportPreview() {
+  const preview = document.querySelector<HTMLElement>('.mechanical-report-preview');
+  const scroll = preview?.querySelector<HTMLElement>('.mechanical-report-preview-scroll');
+  const frame = preview?.querySelector<HTMLElement>('.mechanical-report-preview-page');
+  const sheet = frame?.querySelector<HTMLElement>('.mechanical-print-sheet');
+  if (!scroll || !frame || !sheet) return;
+  fitMechanicalPrint();
+  sheet.style.removeProperty('transform');
+  const availableWidth = Math.max(240, scroll.clientWidth - 32);
+  const scale = Math.min(1, availableWidth / sheet.offsetWidth);
+  sheet.style.transform = `scale(${scale})`;
+  frame.style.width = `${sheet.offsetWidth * scale}px`;
+  frame.style.height = `${sheet.offsetHeight * scale}px`;
+}
+
+export function DailyReportPreview({ date, entries, signatures, approval, userName, onClose, onPrint }: { date: string; entries: Row[]; signatures: Row[]; approval?: Row; userName: (id: unknown) => string; onClose: () => void; onPrint: () => void }) {
+  return <div className="mechanical-report-preview" role="dialog" aria-modal="true" aria-label="機電交接本日報表預覽">
+    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · A4 直式一頁，內容過多時自動等比例縮小</span></div><div><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
+    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} approval={approval} userName={userName} /></div></div>
+  </div>;
 }
 
 export function PrintSheet({ date, entries, signatures, approval, userName }: { date: string; entries: Row[]; signatures: Row[]; approval?: Row; userName: (id: unknown) => string }) {

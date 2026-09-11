@@ -114,3 +114,32 @@
 .mechanical-work-modal .mechanical-person-grid label.is-scheduled small{color:var(--green);font-weight:700}
 @media(max-width:520px){.mechanical-scheduled-roster{align-items:flex-start;flex-direction:column}.mechanical-scheduled-roster>a{margin-left:0}}
 @media print{.mechanical-scheduled-roster{display:none!important}}
+
+/* 本日報表預覽：使用與列印相同的 A4 元件，縮放外框只影響畫面、不改變列印尺寸。 */
+.mechanical-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
+.mechanical-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.22)}
+.mechanical-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mechanical-report-preview-bar strong{font-size:17px}
+.mechanical-report-preview-bar span{color:var(--dim);font-size:13px}
+.mechanical-report-preview-scroll{min-width:0;overflow:auto;padding:24px 16px}
+.mechanical-report-preview-page{position:relative;width:210mm;height:297mm;margin:0 auto;flex:0 0 auto}
+.mechanical-report-preview .mechanical-print-sheet{position:absolute;inset:0;box-sizing:border-box;width:210mm;height:297mm;overflow:hidden;padding:9mm;background:#fff;color:#000;font-family:"Noto Sans TC",sans-serif;transform-origin:top left;box-shadow:0 14px 40px rgba(0,0,0,.38)}
+.mechanical-report-preview .mechanical-print-content{width:100%;transform:scale(var(--mechanical-print-scale,1));transform-origin:top left}
+.mechanical-report-preview .mechanical-print-sheet header{text-align:center;margin-bottom:5mm}
+.mechanical-report-preview .mechanical-print-sheet h2{margin:0;color:#000;font-size:14pt;line-height:1.35}
+.mechanical-report-preview .mechanical-print-sheet header p{margin:2mm 0 0;color:#000;font-size:10pt;font-weight:700}
+.mechanical-report-preview .mechanical-print-sheet table{width:100%;border-collapse:collapse;table-layout:fixed}
+.mechanical-report-preview .mechanical-print-sheet th,.mechanical-report-preview .mechanical-print-sheet td{padding:2.2mm;border:1px solid #000;color:#000;font-size:8.5pt;line-height:1.35;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
+.mechanical-report-preview .mechanical-print-sheet thead th{text-align:center}
+.mechanical-report-preview .mechanical-print-sheet tbody>tr>th{vertical-align:middle;text-align:center}
+.mechanical-report-preview .mechanical-print-sheet td p{margin:1mm 0 0}
+.mechanical-report-preview .print-shift{width:17mm}.mechanical-report-preview .print-work{width:70mm}.mechanical-report-preview .print-people{width:34mm}.mechanical-report-preview .print-result{width:22mm}.mechanical-report-preview .print-notes{width:27mm}.mechanical-report-preview .print-cost{width:22mm}
+.mechanical-report-preview .mechanical-print-total{display:flex;justify-content:space-between;gap:6mm;padding:2.5mm;border:1px solid #000;border-top:0;color:#000;font-size:9pt}
+.mechanical-report-preview .mechanical-print-signatures{display:grid;grid-template-columns:22mm repeat(3,1fr);border:1px solid #000;border-top:0;color:#000;font-size:9pt}
+.mechanical-report-preview .mechanical-print-signatures>b,.mechanical-report-preview .mechanical-print-signatures>span{padding:3mm;border-right:1px solid #000;color:#000}
+.mechanical-report-preview .mechanical-print-signatures>span:last-child{border-right:0}
+.mechanical-report-preview .mechanical-print-signatures strong{display:block;min-height:7mm;margin-top:2mm;color:#000}
+.mechanical-report-preview .mechanical-print-approval{color:#000}
+.mechanical-report-preview .result-badge{border-color:#000!important;background:#fff!important;color:#000!important}
+@media(max-width:700px){.mechanical-report-preview-bar{align-items:flex-start;flex-direction:column;padding:10px 12px}.mechanical-report-preview-bar>div:last-child{align-self:flex-end}.mechanical-report-preview-scroll{padding:12px 8px}}
+@media print{.mechanical-report-preview{display:none!important}}
