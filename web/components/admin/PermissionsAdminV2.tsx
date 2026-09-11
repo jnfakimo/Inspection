@@ -39,6 +39,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [expandedSystem, setExpandedSystem] = useState('');
+  const [showUnauthorized, setShowUnauthorized] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -107,6 +108,9 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const currentPage = Math.min(page, pages);
   const pagedUsers = filteredUsers.slice((currentPage - 1) * ACCESS_PAGE_SIZE, currentPage * ACCESS_PAGE_SIZE);
   const selectedUser = users.find(user => String(user.user_id) === selectedUserId && user.status === 'active') || pagedUsers[0];
+  const visibleSystems = selectedUser
+    ? systems.filter(system => showUnauthorized || effectiveSystemAccess(selectedUser, system.key))
+    : [];
 
   const firstPagedUserId = String(pagedUsers[0]?.user_id || '');
   useEffect(() => {
@@ -121,7 +125,9 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
     })}</tr>)}</tbody>
   </table></div>;
 
-  const selectTab = (next: PermissionTab) => { setTab(next); setQuery(''); setPage(1); };
+  const selectTab = (next: PermissionTab) => {
+    setTab(next); setQuery(''); setPage(1); setExpandedSystem(''); setShowUnauthorized(false);
+  };
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load} action={<button className="primary-btn compact" onClick={() => setEditor({ is_edit: false })}>＋ 新增角色</button>}/>
@@ -136,26 +142,31 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
       {tab === 'actions' && <><p className="permission-tab-note">設定各角色預設可執行的新增、修改、簽核、匯出等功能；個人仍受大系統與子系統權限限制。</p>{permissionMatrix(PERMISSIONS)}</>}
       {tab === 'role-systems' && <><p className="permission-tab-note">這裡是角色預設值，不是整批強制全開。可再到「人員精細授權」對同角色的不同主管個別開放或拒絕。</p>{permissionMatrix(SYSTEM_PERMISSIONS)}</>}
       {tab === 'people' && <>
-        <div className="admin-toolbar permission-people-toolbar"><input value={query} onChange={event => { setQuery(event.target.value); setPage(1); setSelectedUserId(''); }} placeholder="搜尋姓名、帳號、單位或角色"/><span>啟用帳號共 {filteredUsers.length} 人，每頁固定 {ACCESS_PAGE_SIZE} 筆。</span></div>
+        <div className="admin-toolbar permission-people-toolbar"><input value={query} onChange={event => { setQuery(event.target.value); setPage(1); setSelectedUserId(''); setExpandedSystem(''); setShowUnauthorized(false); }} placeholder="搜尋姓名、帳號、單位或角色"/><span>啟用帳號共 {filteredUsers.length} 人，每頁固定 {ACCESS_PAGE_SIZE} 筆。</span></div>
         <div className="permission-user-layout">
           <aside className="permission-user-list" aria-label="選擇授權人員">
             {pagedUsers.map(user => {
               const openSystems = systems.filter(system => effectiveSystemAccess(user, system.key)).length;
-              return <button type="button" key={user.user_id} className={String(selectedUser?.user_id) === String(user.user_id) ? 'is-selected' : ''} onClick={() => { setSelectedUserId(String(user.user_id)); setExpandedSystem(''); }}><span><strong>{user.name}</strong><small>{user.department || '未設定單位'}</small></span><span><b>{roleLabel(userRole(user), roles)}</b><small>{openSystems}／{systems.length} 系統</small></span></button>;
+              return <button type="button" key={user.user_id} className={String(selectedUser?.user_id) === String(user.user_id) ? 'is-selected' : ''} onClick={() => { setSelectedUserId(String(user.user_id)); setExpandedSystem(''); setShowUnauthorized(false); }}><span><strong>{user.name}</strong><small>{user.department || '未設定單位'}</small></span><span><b>{roleLabel(userRole(user), roles)}</b><small>{openSystems}／{systems.length} 系統</small></span></button>;
             })}
             {!busy && pagedUsers.length === 0 && <p className="empty">沒有符合條件的啟用帳號。</p>}
             {filteredUsers.length > 0 && <Pager
               page={currentPage}
               total={filteredUsers.length}
-              onPage={next => { setPage(next); setSelectedUserId(''); setExpandedSystem(''); }}
+              onPage={next => { setPage(next); setSelectedUserId(''); setExpandedSystem(''); setShowUnauthorized(false); }}
               pageSize={ACCESS_PAGE_SIZE}
             />}
           </aside>
           <section className="permission-detail" aria-label="個人系統與子系統權限">
             {selectedUser ? <>
               <header className="permission-person-header"><div><span>目前設定人員</span><h2>{selectedUser.name}</h2><p>{selectedUser.department || '未設定單位'} · {roleLabel(userRole(selectedUser), roles)}</p></div><div><b>{systems.filter(system => effectiveSystemAccess(selectedUser, system.key)).length}</b><span>已開放大系統</span></div></header>
-              <div className="permission-legend"><span className="access-pill inherited">跟隨角色</span><span className="access-pill allowed">個別開放</span><span className="access-pill denied">個別拒絕</span></div>
-              <div className="granular-system-list">{systems.map(system => {
+              <div className="permission-legend">
+                <span className="permission-visibility-note">{showUnauthorized ? '設定模式：顯示全部項目' : '僅顯示目前已授權項目'}</span>
+                <span className="access-pill inherited">跟隨角色</span><span className="access-pill allowed">個別開放</span>
+                {showUnauthorized && <span className="access-pill denied">個別拒絕</span>}
+                <button type="button" className="secondary-btn compact" aria-pressed={showUnauthorized} onClick={() => { setShowUnauthorized(value => !value); setExpandedSystem(''); }}>{showUnauthorized ? '只顯示已授權' : '調整未授權項目'}</button>
+              </div>
+              <div className="granular-system-list">{visibleSystems.map(system => {
                 const systemMode = personalSystemMode(selectedUser.user_id, system.key);
                 const systemAllowed = effectiveSystemAccess(selectedUser, system.key);
                 const roleDefault = roleAllowed(userRole(selectedUser), `sys_${system.key}`);
@@ -163,19 +174,22 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
                 const sysadmin = userRole(selectedUser) === 'sysadmin';
                 const childModules = permissionModules(system.key);
                 const moduleCount = childModules.filter(item => effectiveModuleAccess(selectedUser, system.key, item.key)).length;
+                const visibleChildModules = childModules.filter(item => showUnauthorized || effectiveModuleAccess(selectedUser, system.key, item.key));
                 return <article key={system.key} className={`granular-system-card ${systemAllowed ? 'is-allowed' : 'is-denied'}`}>
                   <div className="granular-system-row">
-                    <button type="button" className="granular-system-title" onClick={() => setExpandedSystem(expanded ? '' : system.key)} aria-expanded={expanded} disabled={childModules.length === 0}><img src={system.icon} alt=""/><span><small>{system.code}</small><strong>{system.title}</strong><em>角色預設：{roleDefault ? '開放' : '未開放'}{childModules.length ? ` · 子系統 ${moduleCount}／${childModules.length}` : ''}</em></span>{childModules.length > 0 && <b>{expanded ? '收合' : '設定子系統'}⌄</b>}</button>
+                    <button type="button" className="granular-system-title" onClick={() => setExpandedSystem(expanded ? '' : system.key)} aria-expanded={expanded} disabled={visibleChildModules.length === 0}><img src={system.icon} alt=""/><span><small>{system.code}</small><strong>{system.title}</strong><em>角色預設：{roleDefault ? '開放' : '未開放'}{childModules.length ? ` · 子系統 ${moduleCount}／${childModules.length}` : ''}</em></span>{visibleChildModules.length > 0 && <b>{expanded ? '收合' : '設定子系統'}⌄</b>}</button>
                     <label>個人例外<select value={sysadmin ? 'allow' : systemMode} disabled={busy || sysadmin || system.key === 'admin'} onChange={event => void run('admin_set_user_system_access', { user_id: selectedUser.user_id, system_key: system.key, mode: event.target.value }, `${selectedUser.name}的大系統權限已更新`)}>{sysadmin ? <option value="allow">系統管理員全開</option> : <><option value="inherit">{accessModeLabel.inherit}</option><option value="allow">{accessModeLabel.allow}</option><option value="deny">{accessModeLabel.deny}</option></>}</select></label>
                     <span className={`effective-access ${systemAllowed ? 'allowed' : 'denied'}`}>{systemAllowed ? '有效：可進入' : '有效：不可進入'}</span>
                   </div>
-                  {expanded && childModules.length > 0 && <div className="granular-module-grid">{childModules.map(item => {
+                  {expanded && visibleChildModules.length > 0 && <div className="granular-module-grid">{visibleChildModules.map(item => {
                     const itemMode = personalModuleMode(selectedUser.user_id, system.key, item.key);
                     const itemAllowed = effectiveModuleAccess(selectedUser, system.key, item.key);
                     return <label key={item.key} className={itemAllowed ? 'is-allowed' : 'is-denied'}><span><strong>{item.title}</strong><small>{item.description}</small></span><select aria-label={`${selectedUser.name} ${system.title} ${item.title}`} value={sysadmin ? 'allow' : itemMode} disabled={busy || sysadmin || system.key === 'admin'} onChange={event => void run('admin_set_user_module_access', { user_id: selectedUser.user_id, system_key: system.key, module_key: item.key, mode: event.target.value }, `${selectedUser.name}的子系統權限已更新`)}>{sysadmin ? <option value="allow">系統管理員全開</option> : <><option value="inherit">跟隨大系統</option><option value="allow">個別開放</option><option value="deny">個別拒絕</option></>}</select><b>{itemAllowed ? '可使用' : systemAllowed ? '已拒絕' : '大系統未開放'}</b></label>;
                   })}</div>}
                 </article>;
-              })}</div>
+              })}
+              {!showUnauthorized && visibleSystems.length === 0 && <div className="permission-empty-access"><strong>此帳號目前沒有已授權的系統</strong><span>未授權項目已隱藏；如需開放權限，請進入調整模式。</span><button type="button" className="secondary-btn compact" onClick={() => setShowUnauthorized(true)}>調整未授權項目</button></div>}
+              </div>
             </> : <p className="empty">請先選擇要設定的人員。</p>}
           </section>
         </div>
