@@ -88,15 +88,15 @@ export function AdminSidebar({
       tabIndex={open ? 0 : -1}
       onClick={onClose}
     />
-    <aside id="admin-v2-sidebar" className={`admin-sidebar${open ? ' is-open' : ''}`} aria-label="後台管理側邊導覽">
+    <aside id="admin-v2-sidebar" className={`admin-sidebar${open ? ' is-open' : ''}`} aria-label={administrator ? '後台管理側邊導覽' : '系統功能導覽'}>
       <div className="admin-sidebar-brand">
-        <Link href="/systems/admin/" onClick={onClose}>
+        <Link href={administrator ? '/systems/admin/' : '/systems/'} onClick={onClose}>
           <img src="/Inspection/assets/system-icons-v20260901/admin-icon.png" alt="" />
-          <strong>後台管理系統</strong>
+          <strong>{administrator ? '後台管理系統' : '系統功能選單'}</strong>
         </Link>
-        <button type="button" className="admin-sidebar-close" aria-label="關閉後台選單" onClick={onClose}>×</button>
+        <button type="button" className="admin-sidebar-close" aria-label="關閉選單" onClick={onClose}>×</button>
       </div>
-      <nav className="admin-sidebar-nav" aria-label="V2 後台功能切換">
+      <nav className="admin-sidebar-nav" aria-label="功能切換">
         {items.map(item => {
           const current = item.href === activeHref;
           return <Link
