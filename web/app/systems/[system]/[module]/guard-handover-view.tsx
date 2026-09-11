@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import {
-  SHIFT_STATE_LABELS, STATUS_LABELS, activityTime, fileSizeLabel, hhmm, incidentTime, itemLine, previewKind, rocDate,
+  SHIFT_STATE_LABELS, STATUS_LABELS, activityTime, fileSizeLabel, hhmm, incidentTime, itemLine, liveState, previewKind, rocDate,
   type Approval, type Attachment, type GuardLog, type GuardShift,
 } from './guard-handover-shared';
 
@@ -60,7 +60,7 @@ function Block({ icon, title, meta, tone, children }: { icon: IconName; title: s
 }
 
 function conditionTone(condition: string) {
-  return condition === '正常' ? 'is-ok' : condition === '短少' ? 'is-warn' : 'is-bad';
+  return condition === '正常' ? 'is-ok' : condition === '損壞' || condition === '遺失' ? 'is-bad' : 'is-warn';
 }
 
 export function AttachmentChips({ files, onPreview, onRemove }: {
@@ -81,28 +81,34 @@ export function AttachmentChips({ files, onPreview, onRemove }: {
   })}</div>;
 }
 
-export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, canEdit, attachmentsFor, onPreview }: {
+export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, canEdit, attachmentsFor, onPreview, now }: {
   index: number; shift: GuardShift; log: GuardLog | null; nameOf: (id: unknown) => string; namesOf: (ids: string[] | null | undefined) => string;
   actions: ReactNode; canEdit: boolean; attachmentsFor: (shiftName: string, incidentId: string) => Attachment[]; onPreview: (file: Attachment) => void;
+  now?: number;
 }) {
   const frozen = Boolean(log && log.status !== 'draft');
   const times = frozen && log ? log : shift;
   const scheduled = frozen && log ? log.scheduled_user_ids : shift.scheduled_user_ids;
   const patrol = frozen && log?.patrol_snapshot ? log.patrol_snapshot : shift.patrol;
   const snapshot = Boolean(frozen && log?.patrol_snapshot);
-  const notStarted = shift.state === 'upcoming' && !snapshot;
+  const state = liveState(now, shift.work_from, shift.work_to, shift.state) ?? shift.state;
+  const patrolNow = liveState(now, shift.patrol_from, shift.patrol_to) === 'active';
+  const current = state === 'active';
+  const notStarted = state === 'upcoming' && !snapshot;
   const rateTone = patrol.rate >= 100 ? 'is-ok' : patrol.rate >= 60 ? 'is-warn' : 'is-bad';
   const incidents = log?.incidents || [];
 
-  return <section className={`guard-shift guard-shift-${(index % 4) + 1}`}>
+  return <section className={`guard-shift guard-shift-${(index % 4) + 1}${current ? ' is-current' : ''}`} aria-current={current ? 'time' : undefined}>
     <div className="guard-shift-head">
       <div className="guard-shift-title">
         <strong className="guard-shift-no">{index + 1}</strong>
         <div>
-          <div className="guard-shift-name"><b>{shift.name}</b><span className={`guard-state is-${shift.state}`}>{SHIFT_STATE_LABELS[shift.state] || shift.state}</span></div>
+          <div className="guard-shift-name"><b>{shift.name}</b>{current
+            ? <span className="guard-current-badge"><i className="guard-pulse-dot" aria-hidden="true" />當班中</span>
+            : <span className={`guard-state is-${state}`}>{SHIFT_STATE_LABELS[state] || state}</span>}</div>
           <div className="guard-shift-times">
-            <span className="guard-chip"><GuardIcon name="clock" size={14} />班別 {hhmm(times.shift_start)}–{hhmm(times.shift_end)}</span>
-            <span className="guard-chip"><GuardIcon name="route" size={14} />預定巡檢 {hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}</span>
+            <span className={`guard-chip${current ? ' is-now' : ''}`}><GuardIcon name="clock" size={14} />班別 {hhmm(times.shift_start)}–{hhmm(times.shift_end)}</span>
+            <span className={`guard-chip${patrolNow ? ' is-now' : ''}`}><GuardIcon name="route" size={14} />預定巡檢 {hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}{patrolNow ? '・巡檢進行中' : ''}</span>
           </div>
         </div>
       </div>

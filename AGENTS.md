@@ -240,6 +240,15 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   html／svg／xml／js 等可在瀏覽器執行的型別一律改存 `application/octet-stream`，預覽只開放圖片／影片／
   音訊／PDF。交班簽名或主管簽核後附件即鎖定；儲存交接時會把已移除事件的附件軟刪除。影片預覽依賴 CSP 的
   `media-src`（`tools/build-hardened-pages.mjs`）。畫面元件在 `guard-handover-view.tsx`，可單獨渲染檢查版面。
+- **下拉選單**（`guard_handover_options`，2026-09-11）：異常事件類別、物品狀態、物品名稱、事件地點、通報對象
+  都用 `guard-handover-controls.tsx` 的 `GuardCombo`：展開後第一列是空白輸入框，可填清單以外的內容，所以
+  後端不再以固定清單驗證類別與狀態（類別 ≤40 字、狀態 ≤20 字）；數量可直接輸入 0–999。清單由主管簽核權限者
+  （同 `canGuardApprove`，須明確允許）與系統管理員在「管理下拉選單」增修刪與排序，刪除為停用，改名與刪除都
+  不回頭改已存檔的交接紀錄。主管簽核與清單維護的 app-api 動作**不經過** `handover/guard` 子系統檢查，
+  各自檢查 `canGuardApprove`——否則只有簽核權限的主管會在門口被擋掉。
+- **當班標示**：與業管組交接簿一致，綠色 `#10b981` 專指「目前當班」（外框、光暈、「當班中」脈動標籤；白字底用
+  `#047857` 以維持對比），因此班別配色不使用綠色。當班與「巡檢進行中」由前端每 30 秒依 `work_from/work_to`、
+  `patrol_from/patrol_to`（app-api 提供的絕對時間）判斷，班別交替時不必重新載入。
 
 ## V2 系統子頁標題規範（2026-08-27 訂）
 

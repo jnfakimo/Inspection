@@ -16,6 +16,7 @@ export type PatrolSummary = {
 export type GuardShift = {
   name: string; sort_order: number; shift_start: string; shift_end: string; patrol_start: string; patrol_end: string;
   scheduled_user_ids: string[]; state: 'upcoming' | 'active' | 'ended'; patrol: PatrolSummary;
+  work_from?: string; work_to?: string; patrol_from?: string; patrol_to?: string;
 };
 export type GuardLog = {
   log_id: string; duty_date: string; shift_name: string; shift_start: string; shift_end: string; patrol_start: string; patrol_end: string;
@@ -29,6 +30,7 @@ export type GuardContext = {
   duty_date: string; shifts: GuardShift[]; logs: GuardLog[]; approval: Approval | null; attachments: Attachment[];
   staff: { user_id: string; name: string }[]; people: Record<string, string>; previous_items: Item[];
   can_edit: boolean; can_approve: boolean; approval_open: boolean;
+  options: GuardOption[]; options_available?: boolean; can_manage_options: boolean;
 };
 
 // 附件限制必須與 app-api 的 GUARD_ATTACHMENT_* 及 migration 的 bucket 設定一致。
@@ -38,6 +40,18 @@ export const MAX_ATTACHMENTS_PER_INCIDENT = 10;
 
 export const INCIDENT_CATEGORIES = ['門禁管制', '可疑人車', '竊盜', '火警／煙霧', '設備故障', '漏水／停電', '交通事故', '民眾糾紛', '急救傷病', '其他'] as const;
 export const ITEM_CONDITIONS = ['正常', '短少', '損壞', '遺失'] as const;
+export type GuardOptionList = 'incident_category' | 'item_condition' | 'item_name' | 'location' | 'reported_to';
+export type GuardOption = { option_id: string; list_key: GuardOptionList; label: string; sort_order: number };
+export const OPTION_LISTS: GuardOptionList[] = ['incident_category', 'item_condition', 'item_name', 'location', 'reported_to'];
+export const OPTION_LIST_LABELS: Record<GuardOptionList, string> = {
+  incident_category: '異常事件類別', item_condition: '物品狀態', item_name: '物品名稱', location: '事件地點', reported_to: '通報對象',
+};
+// 選單資料表尚未建立（migration 未套用）時的退回清單；正式清單以 guard_handover_options 為準。
+export const DEFAULT_OPTION_LABELS: Record<GuardOptionList, string[]> = {
+  incident_category: [...INCIDENT_CATEGORIES], item_condition: [...ITEM_CONDITIONS],
+  item_name: ['無線電對講機', '手電筒', '警棍', '鑰匙（串）', '門禁磁卡'], location: [], reported_to: ['指揮台', '總務課', '機電課', '業管組', '110', '119'],
+};
+export const QTY_PRESETS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
 // 第一次使用、前面也沒有任何交接時的起始清單；之後一律沿用上一班的點交結果。
 export const DEFAULT_ITEMS: Item[] = [
   { name: '無線電對講機', qty: 1, condition: '正常', note: '' },
@@ -69,6 +83,14 @@ export function activityTime(value: unknown) {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(parsed);
 }
 export function hhmm(value: unknown) { return String(value || '').slice(0, 5) || '—'; }
+export type LiveState = 'upcoming' | 'active' | 'ended';
+/** 依伺服器給的絕對時間判斷此刻是否在時窗內；缺時間時退回伺服器載入當下算好的狀態。 */
+export function liveState(now: number | undefined, from?: string, to?: string, fallback?: LiveState): LiveState | undefined {
+  const start = from ? Date.parse(from) : Number.NaN;
+  const end = to ? Date.parse(to) : Number.NaN;
+  if (now === undefined || Number.isNaN(start) || Number.isNaN(end)) return fallback;
+  return now < start ? 'upcoming' : now < end ? 'active' : 'ended';
+}
 export function incidentTime(value: string) { return value ? value.replace('T', ' ') : '—'; }
 export function itemLine(item: Item) { return `${item.name}×${item.qty}（${item.condition}${item.note ? `，${item.note}` : ''}）`; }
 

@@ -97,9 +97,9 @@ const SYSTEM_MODULE_KEYS: Record<string, readonly string[]> = {
 };
 const SYSTEM_KEYS = Object.keys(SYSTEM_MODULE_KEYS);
 const BUSINESS_HANDOVER_CATEGORIES = new Set(['事務事項', '維修', '其他']);
-// 駐衛警交接簿：前端 guard-handover.tsx 的選項必須與這裡逐字一致。
-const GUARD_INCIDENT_CATEGORIES = new Set(['門禁管制', '可疑人車', '竊盜', '火警／煙霧', '設備故障', '漏水／停電', '交通事故', '民眾糾紛', '急救傷病', '其他']);
-const GUARD_ITEM_CONDITIONS = new Set(['正常', '短少', '損壞', '遺失']);
+// 駐衛警交接簿下拉選單的清單鍵。清單內容在 guard_handover_options，由主管維護；
+// 填寫時一律可自行輸入清單以外的文字，所以類別與物品狀態不再以固定清單驗證。
+const GUARD_OPTION_LISTS = new Set(['incident_category', 'item_condition', 'item_name', 'location', 'reported_to']);
 const GUARD_ATTACHMENT_BUCKET = 'guard-handover-files';
 const GUARD_ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
 const GUARD_ATTACHMENTS_PER_INCIDENT = 10;
@@ -3277,7 +3277,9 @@ export async function handleAppApiRequest(req: Request) {
         // 打卡計算區間 = 班別時段與預定巡檢時段的聯集，與巡邏打卡頁的 checkinRange 相同。
         const window = { from: new Date(Math.min(work.from.getTime(), patrol.from.getTime())), to: new Date(Math.max(work.to.getTime(), patrol.to.getTime())) };
         const state = now < work.from.getTime() ? 'upcoming' : now < work.to.getTime() ? 'active' : 'ended';
-        return { name, sort_order: Number(template.sort_order || 0), shift_start: shiftStart, shift_end: shiftEnd, patrol_start: patrolStart, patrol_end: patrolEnd, scheduled_user_ids: [...new Set(scheduled)], state, window };
+        // 絕對時間讓前端每 30 秒自行判斷「當班」，班別交替時不必重新載入頁面。
+        return { name, sort_order: Number(template.sort_order || 0), shift_start: shiftStart, shift_end: shiftEnd, patrol_start: patrolStart, patrol_end: patrolEnd, scheduled_user_ids: [...new Set(scheduled)], state, window,
+          work_from: work.from.toISOString(), work_to: work.to.toISOString(), patrol_from: patrol.from.toISOString(), patrol_to: patrol.to.toISOString() };
       });
       const floorOf = new Map((markerResult.data || []).map(marker => [String(marker.marker_id), canonicalFloor(marker.floor_id) || '未設定'] as const));
       // 每班各查一次，避免整天合併查詢撞到 PostgREST 單次 1000 列的上限。
@@ -3310,8 +3312,8 @@ export async function handleAppApiRequest(req: Request) {
       const seenIncidentIds = new Set<string>();
       for (const raw of value) {
         const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-        const time = text(row.time, 16), category = text(row.category, 20), description = text(row.description, 2000);
-        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !GUARD_INCIDENT_CATEGORIES.has(category) || !description) return null;
+        const time = text(row.time, 16), category = text(row.category, 40), description = text(row.description, 2000);
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !category || !description) return null;
         // 事件識別碼是附件的掛點；缺漏或重複時由伺服器補發，不信任前端的重複值。
         let incidentId = id(row.id) || crypto.randomUUID();
         if (seenIncidentIds.has(incidentId)) incidentId = crypto.randomUUID();
@@ -3333,8 +3335,8 @@ export async function handleAppApiRequest(req: Request) {
       const rows: GuardItem[] = [];
       for (const raw of value) {
         const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-        const name = text(row.name, 50), qty = Number(row.qty), condition = text(row.condition, 10);
-        if (!name || !Number.isInteger(qty) || qty < 0 || qty > 999 || !GUARD_ITEM_CONDITIONS.has(condition)) return null;
+        const name = text(row.name, 50), qty = Number(row.qty), condition = text(row.condition, 20);
+        if (!name || !Number.isInteger(qty) || qty < 0 || qty > 999 || !condition) return null;
         rows.push({ name, qty, condition, note: text(row.note, 200) });
       }
       return rows;
@@ -3344,7 +3346,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐衛警電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
-      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult] = await Promise.all([
+      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult] = await Promise.all([
         guardShiftContext(dutyDate),
         admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).order('shift_order'),
         admin.from('guard_handover_daily_approvals').select('*').eq('duty_date', dutyDate).maybeSingle(),
@@ -3354,6 +3356,7 @@ export async function handleAppApiRequest(req: Request) {
         admin.from('departments').select('dept_id,name').limit(2000),
         admin.from('guard_handover_attachments').select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at')
           .eq('duty_date', dutyDate).eq('is_deleted', false).order('uploaded_at'),
+        admin.from('guard_handover_options').select('option_id,list_key,label,sort_order').eq('is_active', true).order('sort_order').order('label'),
       ]);
       const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error || attachmentResult.error;
       if (failure) throw failure;
@@ -3372,6 +3375,8 @@ export async function handleAppApiRequest(req: Request) {
           if (userId) referenced.add(String(userId));
         }
       }
+      // 選單資料表尚未建立（migration 未套用）時不讓整頁失敗，前端改用內建預設清單。
+      if (optionResult.error) console.error('guard handover options lookup failed:', optionResult.error.message);
       if (approval?.approver_id) referenced.add(String(approval.approver_id));
       for (const file of attachmentResult.data || []) if (file.uploaded_by) referenced.add(String(file.uploaded_by));
       const people: Record<string, string> = {};
@@ -3386,6 +3391,9 @@ export async function handleAppApiRequest(req: Request) {
           approval_open: dutyDate < todayInTaipei,
           attachments: attachmentResult.data || [],
           limits: { file_bytes: GUARD_ATTACHMENT_MAX_BYTES, files_per_incident: GUARD_ATTACHMENTS_PER_INCIDENT },
+          options: optionResult.error ? [] : optionResult.data || [],
+          options_available: !optionResult.error,
+          can_manage_options: canGuardApprove(),
         },
       });
     }
@@ -3412,6 +3420,7 @@ export async function handleAppApiRequest(req: Request) {
       const requiredModule = kind === 'record' || kind === 'receive' ? 'records'
         : kind === 'mechanical_staff_market_save' || kind === 'mechanical_schedule_save' ? 'mechanical-schedule'
           : kind.startsWith('mechanical_') ? 'mechanical'
+            : kind === 'guard_approve' || kind.startsWith('guard_option_') ? ''
             : kind.startsWith('guard_') ? 'guard'
             : kind.startsWith('business_') ? 'business'
               : kind === 'create_case' || kind === 'add_attachment' ? 'open-items' : '';
@@ -3893,6 +3902,64 @@ export async function handleAppApiRequest(req: Request) {
         await guardPruneAttachments(dutyDate, shiftName, incidents.map(incident => incident.id));
         await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'update', before, data);
         return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'guard_option_save' || kind === 'guard_option_delete' || kind === 'guard_option_move') {
+        // 清單維護權限與主管簽核相同：必須明確開通 handover/guard-approve，或是系統管理員。
+        if (!canGuardApprove()) return reply(req, { ok: false, message: '下拉選單只能由主管或系統管理員維護' }, 403);
+        const optionColumns = 'option_id,list_key,label,sort_order';
+        if (kind === 'guard_option_save') {
+          const listKey = text(body.list_key, 30), label = text(body.label, 40);
+          const optionId = body.option_id ? id(body.option_id) : null;
+          if (!GUARD_OPTION_LISTS.has(listKey)) return reply(req, { ok: false, message: '下拉選單類型無效' }, 400);
+          if (!label) return reply(req, { ok: false, message: '請輸入選項內容' }, 400);
+          if (body.option_id && !optionId) return reply(req, { ok: false, message: '選項識別碼無效' }, 400);
+          if (!optionId) {
+            const { data: last, error: lastError } = await admin.from('guard_handover_options').select('sort_order')
+              .eq('list_key', listKey).eq('is_active', true).order('sort_order', { ascending: false }).limit(1).maybeSingle();
+            if (lastError) throw lastError;
+            const payload = { list_key: listKey, label, sort_order: Number(last?.sort_order || 0) + 10, created_by: profile.user_id, updated_by: profile.user_id };
+            const { data, error } = await admin.from('guard_handover_options').insert(payload).select(optionColumns).single();
+            if (error || !data) return reply(req, { ok: false, message: String(error?.code || '') === '23505' ? '清單中已有相同的選項' : dbMessage(error, '選項新增失敗') }, 409);
+            await writeAudit(admin, profile.user_id, 'guard_handover_options', data.option_id, 'insert', null, data);
+            return reply(req, { ok: true, data });
+          }
+          const { data: before, error: readError } = await admin.from('guard_handover_options').select('*').eq('option_id', optionId).eq('is_active', true).maybeSingle();
+          if (readError) throw readError;
+          if (!before || before.list_key !== listKey) return reply(req, { ok: false, message: '找不到這個選項，請重新載入' }, 404);
+          const { data, error } = await admin.from('guard_handover_options').update({ label, updated_by: profile.user_id })
+            .eq('option_id', optionId).eq('is_active', true).select(optionColumns).maybeSingle();
+          if (error) return reply(req, { ok: false, message: String(error.code || '') === '23505' ? '清單中已有相同的選項' : dbMessage(error, '選項修改失敗') }, 409);
+          if (!data) return reply(req, { ok: false, message: '這個選項剛被其他人異動，請重新載入' }, 409);
+          await writeAudit(admin, profile.user_id, 'guard_handover_options', optionId, 'update', before, data);
+          return reply(req, { ok: true, data });
+        }
+        const optionId = id(body.option_id);
+        if (!optionId) return reply(req, { ok: false, message: '選項識別碼無效' }, 400);
+        const { data: before, error: readError } = await admin.from('guard_handover_options').select('*').eq('option_id', optionId).eq('is_active', true).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到這個選項，請重新載入' }, 404);
+        if (kind === 'guard_option_delete') {
+          const { data, error } = await admin.from('guard_handover_options').update({ is_active: false, updated_by: profile.user_id })
+            .eq('option_id', optionId).eq('is_active', true).select(optionColumns).maybeSingle();
+          if (error) return reply(req, { ok: false, message: dbMessage(error, '選項刪除失敗') }, 409);
+          if (!data) return reply(req, { ok: false, message: '這個選項剛被其他人異動，請重新載入' }, 409);
+          await writeAudit(admin, profile.user_id, 'guard_handover_options', optionId, 'status_change', before, { ...before, is_active: false });
+          return reply(req, { ok: true, data });
+        }
+        const direction = body.direction === 'up' ? 'up' : 'down';
+        let neighborQuery = admin.from('guard_handover_options').select('option_id,sort_order').eq('list_key', before.list_key).eq('is_active', true);
+        neighborQuery = direction === 'up' ? neighborQuery.lt('sort_order', before.sort_order) : neighborQuery.gt('sort_order', before.sort_order);
+        const { data: neighbor, error: neighborError } = await neighborQuery.order('sort_order', { ascending: direction !== 'up' }).limit(1).maybeSingle();
+        if (neighborError) throw neighborError;
+        if (!neighbor) return reply(req, { ok: true, data: before });
+        const [first, second] = await Promise.all([
+          admin.from('guard_handover_options').update({ sort_order: neighbor.sort_order, updated_by: profile.user_id }).eq('option_id', optionId),
+          admin.from('guard_handover_options').update({ sort_order: before.sort_order, updated_by: profile.user_id }).eq('option_id', neighbor.option_id),
+        ]);
+        if (first.error || second.error) return reply(req, { ok: false, message: dbMessage(first.error || second.error, '選項排序失敗') }, 409);
+        await writeAudit(admin, profile.user_id, 'guard_handover_options', optionId, 'update', before, { ...before, sort_order: neighbor.sort_order });
+        return reply(req, { ok: true, data: { option_id: optionId } });
       }
 
       if (kind === 'guard_attach_prepare' || kind === 'guard_attach_commit') {

@@ -38,7 +38,7 @@
 .guard-shifts{display:grid;gap:16px;padding:18px}
 .guard-shift{--shift:#0284c7;overflow:hidden;border:1px solid color-mix(in srgb,var(--shift) 28%,var(--line));border-radius:16px;background:var(--panel);box-shadow:0 1px 0 color-mix(in srgb,var(--shift) 20%,transparent);transition:box-shadow .2s ease}
 .guard-shift:hover{box-shadow:0 12px 28px color-mix(in srgb,var(--shift) 14%,transparent)}
-.guard-shift-2{--shift:#059669}.guard-shift-3{--shift:#b45309}.guard-shift-4{--shift:#7c3aed}
+.guard-shift-2{--shift:#7c3aed}.guard-shift-3{--shift:#b45309}.guard-shift-4{--shift:#db2777}
 .guard-shift-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid color-mix(in srgb,var(--shift) 22%,var(--line));background:linear-gradient(90deg,color-mix(in srgb,var(--shift) 12%,var(--panel)),var(--panel) 72%)}
 .guard-shift-title{display:flex;align-items:center;gap:14px}
 .guard-shift-no{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:var(--shift);color:#fff;font-size:22px;box-shadow:0 8px 16px color-mix(in srgb,var(--shift) 32%,transparent)}
@@ -172,4 +172,53 @@
 @media(max-width:1000px){.guard-shift-body{grid-template-columns:1fr}}
 @media(max-width:800px){.panel.guard-toolbar{align-items:stretch}.guard-date-nav label{order:-1;width:100%}.guard-date-nav label>span{width:100%}.guard-toolbar-summary{justify-content:center;width:100%}.guard-approval{display:grid}.guard-approval-actions{justify-content:flex-start}.guard-approval-actions input{width:100%;min-width:0}.guard-sheet-head{padding:20px 16px 16px}.guard-sheet-title h2{font-size:22px}.guard-sheet-emblem{width:48px;height:48px}.guard-kpis{gap:8px;padding:12px}.guard-shifts{gap:12px;padding:12px}.guard-shift-head{display:grid}.guard-shift-actions{justify-content:flex-start}.guard-shift-body{padding:12px}.guard-patrol-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-signs{grid-template-columns:1fr}.guard-form fieldset>label{grid-template-columns:1fr}.guard-form fieldset>label>small{grid-column:auto}.guard-item-row,.guard-incident-row{grid-template-columns:1fr}.guard-incident-row .wide{grid-column:auto}.guard-preview-bar{flex-direction:column;align-items:flex-start}.guard-preview-scroll{padding:12px 8px}.guard-preview-paper{min-height:0;padding:4mm}}
 @media(prefers-reduced-motion:reduce){.guard-state.is-active::before,.guard-progress.is-indeterminate>span{animation:none}.guard-shift{transition:none}}
+/* 可選可填的下拉選單：展開後第一列是空白輸入框，可填清單以外的內容；下方選項會隨輸入篩選。 */
+.guard-row-editor .guard-field{display:grid;gap:4px;min-width:0;font-size:13px}
+.guard-incident-row .guard-field.wide{grid-column:1/-2}
+.guard-combo{position:relative;min-width:0}
+.guard-combo-field{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:38px;margin:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface,var(--panel));color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.guard-combo-field:hover,.guard-combo.is-open .guard-combo-field{border-color:color-mix(in srgb,var(--cyan) 55%,var(--line))}
+.guard-combo-field:focus-visible{outline:2px solid color-mix(in srgb,var(--cyan) 60%,transparent);outline-offset:1px}
+.guard-combo-field>span:first-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.guard-combo-field .is-placeholder{color:var(--muted)}
+.guard-combo-caret{flex:none;color:var(--muted);transition:transform .15s ease}.guard-combo.is-open .guard-combo-caret{transform:rotate(180deg)}
+.guard-combo-panel{position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;min-width:240px;overflow:hidden;border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--line));border-radius:10px;background:var(--panel);box-shadow:0 14px 34px rgba(15,23,42,.18)}
+.guard-combo-custom{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 6%,var(--panel))}
+.guard-row-editor .guard-combo-custom input,.guard-combo-custom input{flex:1;width:auto;min-width:0}
+.guard-combo-list{max-height:220px;overflow:auto;margin:0;padding:4px;list-style:none}
+.guard-combo-list button{display:block;width:100%;min-height:0;margin:0;padding:7px 10px;border:0;border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.guard-combo-list button:hover,.guard-combo-list button:focus-visible{background:color-mix(in srgb,var(--cyan) 10%,var(--panel));outline:none}
+.guard-combo-list button.is-selected{background:color-mix(in srgb,var(--cyan) 16%,var(--panel));font-weight:700}
+.guard-combo-empty{padding:8px 10px;color:var(--muted);font-size:12.5px}
+.guard-combo-manage{display:block;width:100%;min-height:0;margin:0;padding:8px 12px;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--panel2);color:var(--ink);font:inherit;font-size:13px;font-weight:700;text-align:left;cursor:pointer}
+.guard-combo-manage:hover,.guard-combo-manage:focus-visible{background:color-mix(in srgb,var(--cyan) 12%,var(--panel));outline:none}
+/* 下拉選單管理 */
+.guard-options-modal{width:min(760px,calc(100vw - 28px))}
+.guard-options{display:grid;gap:14px;padding:18px 20px}
+.guard-options-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.guard-options-tabs button{display:inline-flex;align-items:center;gap:6px;min-height:0;margin:0;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.guard-options-tabs button small{padding:0 7px;border-radius:999px;background:var(--panel2);color:var(--muted);font-size:11.5px}
+.guard-options-tabs button.is-active{border-color:color-mix(in srgb,var(--cyan) 55%,var(--line));background:color-mix(in srgb,var(--cyan) 12%,var(--panel))}
+.guard-options-hint{margin:0;padding:10px 12px;border-left:4px solid var(--cyan);border-radius:6px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel));color:var(--ink);font-size:13px;line-height:1.6}
+.guard-options-add{display:flex;gap:8px}.guard-options-add input{flex:1;min-width:0}
+.guard-options-list{display:grid;gap:6px;max-height:48vh;overflow:auto;margin:0;padding:0;list-style:none}
+.guard-options-list li{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.guard-options-list li>input{flex:1;min-width:0}
+.guard-options-order{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:8px;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700}
+.guard-options-label{flex:1;min-width:0;color:var(--ink);overflow-wrap:anywhere}
+.guard-options-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.guard-options-empty{margin:0;padding:18px;color:var(--muted);text-align:center}
+@media(max-width:800px){.guard-incident-row .guard-field.wide{grid-column:auto}.guard-options-list li{flex-wrap:wrap}.guard-options-actions{justify-content:flex-start;width:100%}}
+/* 當班標示：與業管組交接簿一致，綠色（#10b981）＝目前當班；班別配色因此不用綠色。
+   白字底色用較深的 #047857，對比度才夠；外框與光暈用 #10b981。 */
+.guard-shift.is-current{--shift:#10b981;border:2px solid #10b981;box-shadow:0 0 0 4px color-mix(in srgb,#10b981 16%,transparent),0 14px 30px color-mix(in srgb,#10b981 20%,transparent)}
+.guard-shift.is-current .guard-shift-head{background:linear-gradient(90deg,color-mix(in srgb,#10b981 22%,var(--panel)),color-mix(in srgb,#10b981 6%,var(--panel)) 80%)}
+.guard-shift.is-current .guard-shift-no{background:#047857}
+.guard-current-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;background:#047857;color:#fff;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px color-mix(in srgb,#10b981 40%,transparent)}
+.guard-pulse-dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:#34d399;animation:guard-live 1.8s infinite}
+@keyframes guard-live{0%{box-shadow:0 0 0 0 rgba(16,185,129,.65)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+.guard-chip.is-now{border-color:#10b981;background:color-mix(in srgb,#10b981 16%,var(--panel));font-weight:700}.guard-chip.is-now .guard-icon{color:#10b981}
+.guard-toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.guard-current-now{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid #10b981;border-radius:999px;background:color-mix(in srgb,#10b981 14%,var(--panel));color:var(--ink);font-size:13px;font-weight:700}
+@media(max-width:800px){.guard-toolbar-right{width:100%}.guard-current-now{justify-content:center;width:100%}}
+@media(prefers-reduced-motion:reduce){.guard-pulse-dot{animation:none}}
 @media print{@page{size:A4 portrait;margin:7mm}body{background:#fff!important}.v1-navbar,.system-page-header,.admin-page-actions,.guard-toolbar,.guard-approval,.guard-sheet,.guard-preview,.guard-page~.admin-modal-backdrop,.theme-toggle{display:none!important}.content.v1-content{padding:0!important;margin:0!important;max-width:none!important}.guard-page{display:block}.guard-print-sheet,.guard-print-sheet *{visibility:visible!important}.guard-print-sheet{display:block}}

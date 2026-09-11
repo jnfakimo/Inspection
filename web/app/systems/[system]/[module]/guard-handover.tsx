@@ -21,11 +21,12 @@ import { canCompressVideo, compressVideo, isVideoFile } from '@/lib/video-compre
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import {
-  DEFAULT_ITEMS, GUARD_ATTACHMENT_BUCKET, INCIDENT_CATEGORIES, ITEM_CONDITIONS, MAX_ATTACHMENTS_PER_INCIDENT, MAX_ATTACHMENT_BYTES,
-  activityTime, fileSizeLabel, hhmm, moveDate, newIncidentId, previewKind, rocDate, todayTaipei,
-  type Attachment, type GuardContext, type GuardLog, type GuardShift, type Incident, type Item,
+  DEFAULT_ITEMS, DEFAULT_OPTION_LABELS, GUARD_ATTACHMENT_BUCKET, MAX_ATTACHMENTS_PER_INCIDENT, MAX_ATTACHMENT_BYTES, QTY_PRESETS,
+  activityTime, fileSizeLabel, hhmm, liveState, moveDate, newIncidentId, previewKind, rocDate, todayTaipei,
+  type Attachment, type GuardContext, type GuardLog, type GuardOptionList, type GuardShift, type Incident, type Item,
 } from './guard-handover-shared';
 import { AttachmentChips, GuardDailyReport, GuardIcon, GuardShiftCard, GuardSheetHeader, type GuardKpi } from './guard-handover-view';
+import { GuardCombo, GuardOptionsPanel } from './guard-handover-controls';
 import './guard-handover.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
@@ -47,6 +48,10 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [approvalNote, setApprovalNote] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [filePreview, setFilePreview] = useState<Attachment | null>(null);
+  const [optionsList, setOptionsList] = useState<GuardOptionList | null>(null);
+  // 每 30 秒重算一次「當班」，班別交替時畫面自動換色，不必重新載入。
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -75,6 +80,13 @@ export function GuardHandover({ system, module, profile }: Props) {
     return context?.people[key] || (key === profile.user_id ? profile.name : '—');
   }, [context, profile.name, profile.user_id]);
   const namesOf = (ids: string[] | null | undefined) => (ids || []).length ? (ids || []).map(nameOf).join('、') : '—';
+  const optionsFor = useCallback((list: GuardOptionList) => {
+    if (context && context.options_available === false) return DEFAULT_OPTION_LABELS[list];
+    return (context?.options || []).filter(option => option.list_key === list).map(option => option.label);
+  }, [context]);
+  const canManageOptions = Boolean(context?.can_manage_options);
+  const currentShift = shifts.find(shift => (liveState(now, shift.work_from, shift.work_to, shift.state) ?? shift.state) === 'active') || null;
+  const optionAction = async (payload: Record<string, unknown>) => { await invokeAppApi('handover_save', payload); await load(); };
 
   const receivedCount = shifts.filter(shift => logFor(shift.name)?.status === 'received').length;
   const pendingCount = logs.filter(log => log.status !== 'received').length;
@@ -138,7 +150,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   return <AppShell profile={profile} title={system.title} heading={{ system, module }}>
     <div className="guard-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
-        action={<><button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
+        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
       <section className="panel guard-toolbar">
         <div className="guard-date-nav">
           <button type="button" className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => moveDate(current, -1))}>‹</button>
@@ -146,7 +158,10 @@ export function GuardHandover({ system, module, profile }: Props) {
           <button type="button" className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => moveDate(current, 1))}>›</button>
           <button type="button" className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
         </div>
-        <span className="guard-toolbar-summary"><GuardIcon name="calendar" size={15} />{rocDate(date)} · {shifts.length} 個班別 · 已接班 {receivedCount} 班</span>
+        <div className="guard-toolbar-right">
+          {currentShift && <span className="guard-current-now"><i className="guard-pulse-dot" aria-hidden="true" />目前當班：{currentShift.name}（{hhmm(currentShift.shift_start)}–{hhmm(currentShift.shift_end)}）</span>}
+          <span className="guard-toolbar-summary"><GuardIcon name="calendar" size={15} />{rocDate(date)} · {shifts.length} 個班別 · 已接班 {receivedCount} 班</span>
+        </div>
       </section>
 
       {context && <section className={`guard-approval${approval ? ' is-approved' : canApproveNow ? ' is-ready' : ''}`} aria-label="主管簽核">
@@ -173,7 +188,7 @@ export function GuardHandover({ system, module, profile }: Props) {
               : shifts.map((shift, index) => {
                 const log = logFor(shift.name);
                 return <GuardShiftCard key={shift.name} index={index} shift={shift} log={log} nameOf={nameOf} namesOf={namesOf}
-                  actions={actionsFor(shift, log)} canEdit={canEdit} attachmentsFor={attachmentsFor} onPreview={setFilePreview} />;
+                  actions={actionsFor(shift, log)} canEdit={canEdit} attachmentsFor={attachmentsFor} onPreview={setFilePreview} now={now} />;
               })}
         </div>
       </section>
@@ -190,10 +205,18 @@ export function GuardHandover({ system, module, profile }: Props) {
     </div>
     {editing && context && <GuardLogModal date={date} shift={editing} log={logFor(editing.name)} staff={context.staff} people={context.people}
       defaultItems={defaultItemsFor(editing)} shiftAttachments={attachments.filter(file => file.shift_name === editing.name)}
+      optionsFor={optionsFor} onManage={canManageOptions ? setOptionsList : undefined}
       onPreview={setFilePreview}
       onClose={() => { setEditing(null); void load(); }}
       onSaved={async () => { const name = editing.name; setEditing(null); await load(); setNote(`${name}交接內容已儲存`); }} />}
     {filePreview && <GuardFilePreview file={filePreview} onClose={() => setFilePreview(null)} />}
+    {optionsList && context && <AdminModal className="guard-options-modal" title="管理下拉選單" onClose={() => setOptionsList(null)}>
+      <GuardOptionsPanel options={context.options || []} list={optionsList} onListChange={setOptionsList} busy={busy}
+        onAdd={(list, label) => optionAction({ kind: 'guard_option_save', list_key: list, label })}
+        onRename={(option, label) => optionAction({ kind: 'guard_option_save', list_key: option.list_key, option_id: option.option_id, label })}
+        onDelete={option => optionAction({ kind: 'guard_option_delete', option_id: option.option_id })}
+        onMove={(option, direction) => optionAction({ kind: 'guard_option_move', option_id: option.option_id, direction })} />
+    </AdminModal>}
   </AppShell>;
 }
 
@@ -238,9 +261,10 @@ function GuardFilePreview({ file, onClose }: { file: Attachment; onClose: () => 
 
 type UploadTask = { key: string; incidentId: string; name: string; stage: string; progress: number | null; error?: string };
 
-function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAttachments, onPreview, onClose, onSaved }: {
+function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAttachments, optionsFor, onManage, onPreview, onClose, onSaved }: {
   date: string; shift: GuardShift; log: GuardLog | null; staff: { user_id: string; name: string }[]; people: Record<string, string>;
-  defaultItems: Item[]; shiftAttachments: Attachment[]; onPreview: (file: Attachment) => void; onClose: () => void; onSaved: () => Promise<void>;
+  defaultItems: Item[]; shiftAttachments: Attachment[]; optionsFor: (list: GuardOptionList) => string[]; onManage?: (list: GuardOptionList) => void;
+  onPreview: (file: Attachment) => void; onClose: () => void; onSaved: () => Promise<void>;
 }) {
   const [actual, setActual] = useState<string[]>(log?.actual_user_ids?.length ? log.actual_user_ids : shift.scheduled_user_ids);
   const [substitute, setSubstitute] = useState(log?.substitute_note || '');
@@ -314,7 +338,7 @@ function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAtt
     if (uploading) return setMessage('附件仍在壓縮或上傳中，請稍候再儲存');
     if (!actual.length) return setMessage('請至少勾選一位實際值勤人員');
     if (differs && !substitute.trim()) return setMessage('實際值勤人員與巡檢排班不同，請填寫代班說明');
-    if (items.some(item => !item.name.trim())) return setMessage('物品點交有尚未填寫名稱的項目');
+    if (items.some(item => !item.name.trim() || !item.condition.trim())) return setMessage('物品點交有尚未填寫名稱或狀態的項目');
     if (incidents.some(incident => !incident.time || !incident.category || !incident.description.trim())) return setMessage('異常事件請填寫發生時間、類別與事件經過');
     setBusy(true); setMessage('');
     try {
@@ -345,12 +369,15 @@ function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAtt
           const incidentTasks = tasks.filter(task => task.incidentId === incident.id);
           return <div className="guard-incident-row" key={incident.id}>
             <label>發生時間<LocalizedDateTimeInput value={incident.time} onChange={value => updateIncident(index, { time: value })} ariaLabel={`第 ${index + 1} 件異常事件發生時間`} stepMinutes={5} /></label>
-            <label>地點<input value={incident.location} maxLength={100} onChange={event => updateIncident(index, { location: event.target.value })} placeholder="例：B1 卸貨區" /></label>
-            <label>類別<select value={incident.category} onChange={event => updateIncident(index, { category: event.target.value })}><option value="">— 請選擇 —</option>{INCIDENT_CATEGORIES.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+            <div className="guard-field"><span>地點</span><GuardCombo value={incident.location} onChange={value => updateIncident(index, { location: value })} options={optionsFor('location')}
+              ariaLabel={`第 ${index + 1} 件異常事件地點`} placeholder="例：B1 卸貨區" maxLength={100} onManage={onManage && (() => onManage('location'))} manageLabel="管理地點清單" /></div>
+            <div className="guard-field"><span>類別</span><GuardCombo value={incident.category} onChange={value => updateIncident(index, { category: value })} options={optionsFor('incident_category')}
+              ariaLabel={`第 ${index + 1} 件異常事件類別`} placeholder="請選擇或輸入類別" maxLength={40} onManage={onManage && (() => onManage('incident_category'))} manageLabel="管理事件類別清單" /></div>
             <button type="button" className="danger-btn compact" onClick={() => removeIncident(index)}>移除</button>
             <label className="wide">事件經過<textarea rows={2} value={incident.description} maxLength={2000} onChange={event => updateIncident(index, { description: event.target.value })} /></label>
             <label className="wide">處理情形<textarea rows={2} value={incident.action} maxLength={2000} onChange={event => updateIncident(index, { action: event.target.value })} /></label>
-            <label className="wide">通報對象<input value={incident.reported_to} maxLength={100} onChange={event => updateIncident(index, { reported_to: event.target.value })} placeholder="例：指揮台、總務課、110" /></label>
+            <div className="guard-field wide"><span>通報對象</span><GuardCombo value={incident.reported_to} onChange={value => updateIncident(index, { reported_to: value })} options={optionsFor('reported_to')}
+              ariaLabel={`第 ${index + 1} 件異常事件通報對象`} placeholder="例：指揮台" maxLength={100} onManage={onManage && (() => onManage('reported_to'))} manageLabel="管理通報對象清單" /></div>
             <div className="guard-incident-files">
               <div className="guard-incident-files-head">
                 <span><GuardIcon name="clip" size={15} />附件（{incidentFiles.length}／{MAX_ATTACHMENTS_PER_INCIDENT}）</span>
@@ -374,9 +401,12 @@ function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAtt
       </fieldset>
       <fieldset><legend><GuardIcon name="box" size={16} />物品點交（{items.length} 項）</legend>
         <div className="guard-row-editor">{items.map((item, index) => <div className="guard-item-row" key={index}>
-          <label>物品<input value={item.name} maxLength={50} onChange={event => updateItem(index, { name: event.target.value })} /></label>
-          <label>數量<select value={item.qty} onChange={event => updateItem(index, { qty: Number(event.target.value) })}>{Array.from({ length: 51 }, (_, value) => <option key={value} value={value}>{value}</option>)}</select></label>
-          <label>狀態<select value={item.condition} onChange={event => updateItem(index, { condition: event.target.value })}>{ITEM_CONDITIONS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+          <div className="guard-field"><span>物品</span><GuardCombo value={item.name} onChange={value => updateItem(index, { name: value })} options={optionsFor('item_name')}
+            ariaLabel={`第 ${index + 1} 項點交物品`} placeholder="請選擇或輸入物品" maxLength={50} onManage={onManage && (() => onManage('item_name'))} manageLabel="管理物品清單" /></div>
+          <div className="guard-field"><span>數量</span><GuardCombo value={String(item.qty)} options={QTY_PRESETS.map(String)} ariaLabel={`第 ${index + 1} 項點交物品數量`} inputMode="numeric" maxLength={3}
+            onChange={value => { const qty = Number(value); if (value !== '' && Number.isInteger(qty) && qty >= 0 && qty <= 999) updateItem(index, { qty }); else setMessage('數量請輸入 0 至 999 的整數'); }} /></div>
+          <div className="guard-field"><span>狀態</span><GuardCombo value={item.condition} onChange={value => updateItem(index, { condition: value })} options={optionsFor('item_condition')}
+            ariaLabel={`第 ${index + 1} 項點交物品狀態`} maxLength={20} onManage={onManage && (() => onManage('item_condition'))} manageLabel="管理物品狀態清單" /></div>
           <label>備註<input value={item.note} maxLength={200} onChange={event => updateItem(index, { note: event.target.value })} /></label>
           <button type="button" className="danger-btn compact" onClick={() => setItems(current => current.filter((_, cursor) => cursor !== index))}>移除</button>
         </div>)}</div>
