@@ -93,6 +93,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [note, setNote] = useState('');
   const [editing, setEditing] = useState<GuardShift | null>(null);
   const [approvalNote, setApprovalNote] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
@@ -102,6 +103,12 @@ export function GuardHandover({ system, module, profile }: Props) {
   }, [date]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setApprovalNote(''); }, [date]);
+  useEffect(() => {
+    if (!previewOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreviewOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [previewOpen]);
 
   const shifts = useMemo(() => context?.shifts || [], [context]);
   const logs = useMemo(() => context?.logs || [], [context]);
@@ -139,10 +146,12 @@ export function GuardHandover({ system, module, profile }: Props) {
     return context?.previous_items?.length ? context.previous_items : DEFAULT_ITEMS;
   };
 
+  const report = { date, shifts, approval, logFor, nameOf, namesOf };
+
   return <AppShell profile={profile} title={system.title} heading={{ system, module }}>
     <div className="guard-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
-        action={<button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button>} />
+        action={<><button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
       <section className="panel guard-toolbar">
         <button type="button" className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => moveDate(current, -1))}>‹</button>
         <label>值班日期<LocalizedDateInput aria-label="值班日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label>
@@ -242,35 +251,50 @@ export function GuardHandover({ system, module, profile }: Props) {
             })}
       </section>
 
-      {context && <section className="guard-print-sheet" aria-label="駐衛警交接每日列印報表">
-        <header><h2>臺北農產運銷股份有限公司第一果菜市場<br />駐衛警交接紀錄表</h2><p>{rocDate(date)}</p></header>
-        {shifts.map(shift => {
-          const log = logFor(shift.name);
-          const frozen = Boolean(log && log.status !== 'draft');
-          const times = frozen && log ? log : shift;
-          const patrol = frozen && log?.patrol_snapshot ? log.patrol_snapshot : shift.patrol;
-          const scheduled = frozen && log ? log.scheduled_user_ids : shift.scheduled_user_ids;
-          return <table className="guard-print-shift" key={shift.name}><tbody>
-            <tr><th className="guard-print-label">班別</th><td>{shift.name}（{hhmm(times.shift_start)}–{hhmm(times.shift_end)}）</td><th className="guard-print-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}　狀態：{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
-            <tr><th>排定人員</th><td>{namesOf(scheduled)}</td><th>實際值勤</th><td>{log ? namesOf(log.actual_user_ids) : '—'}{log?.substitute_note ? `\n代班：${log.substitute_note}` : ''}</td></tr>
-            <tr><th>勤務概況</th><td colSpan={3}>{log?.duty_summary || '—'}</td></tr>
-            <tr><th>重要交辦</th><td colSpan={3}>{log?.important_notes || '—'}</td></tr>
-            <tr><th>異常事件</th><td colSpan={3}>{log?.incidents.length ? log.incidents.map(incident => `${incidentTime(incident.time)}　${incident.location || '—'}　${incident.category}：${incident.description}${incident.action ? `；處理：${incident.action}` : ''}${incident.reported_to ? `；通報：${incident.reported_to}` : ''}`).join('\n') : '無'}</td></tr>
-            <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>
-            <tr><th>巡邏打卡</th><td colSpan={3}>{`應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%`}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
-            <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}` : ''}</td></tr>
-          </tbody></table>;
-        })}
-        <footer>
-          <div><b>主管簽核</b><br />{approval ? `${nameOf(approval.approver_id)}　${activityTime(approval.approved_at)}${approval.note ? `\n說明：${approval.note}` : ''}` : ''}</div>
-          <div><b>列印時間</b><br />{activityTime(new Date().toISOString())}</div>
-        </footer>
-      </section>}
+      {/* 預覽與列印共用同一個報表元件：畫面上看到的就是印出來的內容。 */}
+      {context && <div className="guard-print-sheet"><GuardDailyReport {...report} /></div>}
+      {previewOpen && context && <div className="guard-preview" role="dialog" aria-modal="true" aria-label="駐衛警交接日報表預覽">
+        <div className="guard-preview-bar">
+          <div><strong>日報表預覽</strong><span>{rocDate(date)} · A4 直式，與列印內容相同</span></div>
+          <div><button type="button" className="primary-btn compact" onClick={() => window.print()}>列印</button><button type="button" className="secondary-btn compact" onClick={() => setPreviewOpen(false)}>關閉預覽</button></div>
+        </div>
+        <div className="guard-preview-scroll"><div className="guard-preview-paper"><GuardDailyReport {...report} /></div></div>
+      </div>}
     </div>
     {editing && context && <GuardLogModal date={date} shift={editing} log={logFor(editing.name)} staff={context.staff} people={context.people}
       defaultItems={defaultItemsFor(editing)} onClose={() => setEditing(null)}
       onSaved={async () => { const name = editing.name; setEditing(null); await load(); setNote(`${name}交接內容已儲存`); }} />}
   </AppShell>;
+}
+
+function GuardDailyReport({ date, shifts, approval, logFor, nameOf, namesOf }: {
+  date: string; shifts: GuardShift[]; approval: Approval | null; logFor: (name: string) => GuardLog | null;
+  nameOf: (id: unknown) => string; namesOf: (ids: string[] | null | undefined) => string;
+}) {
+  return <section className="guard-report">
+    <header><h2>臺北農產運銷股份有限公司第一果菜市場<br />駐衛警交接紀錄表</h2><p>{rocDate(date)}</p></header>
+    {shifts.length ? shifts.map(shift => {
+      const log = logFor(shift.name);
+      const frozen = Boolean(log && log.status !== 'draft');
+      const times = frozen && log ? log : shift;
+      const patrol = frozen && log?.patrol_snapshot ? log.patrol_snapshot : shift.patrol;
+      const scheduled = frozen && log ? log.scheduled_user_ids : shift.scheduled_user_ids;
+      return <table className="guard-report-shift" key={shift.name}><tbody>
+        <tr><th className="guard-report-label">班別</th><td>{shift.name}（{hhmm(times.shift_start)}–{hhmm(times.shift_end)}）</td><th className="guard-report-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}　狀態：{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
+        <tr><th>排定人員</th><td>{namesOf(scheduled)}</td><th>實際值勤</th><td>{log ? namesOf(log.actual_user_ids) : '—'}{log?.substitute_note ? `\n代班：${log.substitute_note}` : ''}</td></tr>
+        <tr><th>勤務概況</th><td colSpan={3}>{log?.duty_summary || '—'}</td></tr>
+        <tr><th>重要交辦</th><td colSpan={3}>{log?.important_notes || '—'}</td></tr>
+        <tr><th>異常事件</th><td colSpan={3}>{log?.incidents.length ? log.incidents.map(incident => `${incidentTime(incident.time)}　${incident.location || '—'}　${incident.category}：${incident.description}${incident.action ? `；處理：${incident.action}` : ''}${incident.reported_to ? `；通報：${incident.reported_to}` : ''}`).join('\n') : '無'}</td></tr>
+        <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>
+        <tr><th>巡邏打卡</th><td colSpan={3}>{`應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%`}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
+        <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}` : ''}</td></tr>
+      </tbody></table>;
+    }) : <p className="guard-report-empty">巡檢排班沒有任何啟用中的班別。</p>}
+    <footer>
+      <div><b>主管簽核</b><br />{approval ? `${nameOf(approval.approver_id)}　${activityTime(approval.approved_at)}${approval.note ? `\n說明：${approval.note}` : ''}` : '尚未簽核'}</div>
+      <div><b>產製時間</b><br />{activityTime(new Date().toISOString())}</div>
+    </footer>
+  </section>;
 }
 
 function GuardLogModal({ date, shift, log, staff, people, defaultItems, onClose, onSaved }: {
