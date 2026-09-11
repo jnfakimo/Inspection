@@ -69,6 +69,7 @@ function VehicleHub({ system, profile }: { system: SystemDefinition; profile: Pr
 
 function OperationsHub({ system, profile }: { system: SystemDefinition; profile: Profile }) {
   const handover = system.key === 'handover';
+  const visibleHandoverModules = profile.allowed_handover_modules || [];
   if (system.key === 'vehicle') return <VehicleHub system={system} profile={profile} />;
   if (system.key === 'meetingroom') {
     const meetingCards = [
@@ -100,9 +101,10 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   const cards = handover ? [
     ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01'],
     ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'equipment-icon.png', 'HANDOVER 02'],
-    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 03'],
-    ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 04'],
-    ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'guardpatrol-schedule-icon.png', 'HANDOVER 05'],
+    ['business', '業管組電子交接簿', '登錄三班交接事項與出勤摘要，並保留建立、修改及刪除時間。', 'handover-icon.png', 'HANDOVER 03'],
+    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 04'],
+    ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 05'],
+    ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'guardpatrol-schedule-icon.png', 'HANDOVER 06'],
   ] : [
     ['checkins', '駐衛警巡檢表', '查詢各樓層與巡檢點的打卡狀態，即時掌握待巡與逾期項目。', 'guardpatrol-list-icon.png', 'MODULE 01'],
     ['map3d', '3D 駐警巡檢雲台', '以立體場域視角查看巡檢點位與打卡狀態，快速定位異常區域。', 'guardpatrol-3d-icon.png', 'MODULE 02'],
@@ -112,7 +114,8 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   return <AppShell profile={profile} title={system.title}
     heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
     <div className="operations-portal-note">{handover ? '電子交接簿流程' : '駐衛警巡檢流程'} · 點選圖卡進入功能系統</div>
-    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? '進入系統　→' : key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section>
+    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.filter(([key]) => !handover || visibleHandoverModules.includes('*') || visibleHandoverModules.includes(key)).map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? '進入系統　→' : key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section>
+    {handover && !visibleHandoverModules.includes('*') && !cards.some(([key]) => visibleHandoverModules.includes(key)) && <div className="notice danger">目前帳號尚未指派任何電子交接簿子系統，請洽系統管理員設定。</div>}
   </AppShell>;
 }
 

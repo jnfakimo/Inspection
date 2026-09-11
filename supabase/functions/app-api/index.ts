@@ -79,6 +79,8 @@ const MECHANICAL_SHIFT_CODES = ['01-09', '09-17', '17-01'] as const;
 const MECHANICAL_RESULTS = ['正常', '已完成', '處理中', '待料', '待廠商', '交下班續辦', '無法處理'] as const;
 const MECHANICAL_RESULT_SET = new Set<string>(MECHANICAL_RESULTS);
 const MECHANICAL_UNFINISHED_RESULTS = new Set<string>(['處理中', '待料', '待廠商', '交下班續辦', '無法處理']);
+const HANDOVER_MODULE_KEYS = ['records', 'mechanical', 'business', 'open-items', 'equipment', 'mechanical-schedule'] as const;
+const BUSINESS_HANDOVER_CATEGORIES = new Set(['事務事項', '維修', '其他']);
 
 function mechanicalShiftSlot(workDate: string, shiftCode: string) {
   const day = Math.floor(new Date(`${workDate}T12:00:00+08:00`).getTime() / 86_400_000);
@@ -1064,7 +1066,12 @@ export async function handleAppApiRequest(req: Request) {
     const isSysadmin = roleId === 'sysadmin' || profile.role === 'admin';
     const { data: permissions } = await admin.from('role_permissions').select('perm,allowed').eq('role_id', roleId).eq('allowed', true);
     const allowedSystems = new Set((permissions || []).filter(row => String(row.perm).startsWith('sys_')).map(row => String(row.perm).replace(/^sys_/, '')));
+    const { data: handoverModuleRows, error: handoverModuleError } = await admin.from('user_handover_module_access')
+      .select('module_key').eq('user_id', profile.user_id).eq('allowed', true);
+    if (handoverModuleError) console.error('handover module access lookup failed:', handoverModuleError.message);
+    const allowedHandoverModules = new Set((handoverModuleRows || []).map(row => String(row.module_key)).filter(value => HANDOVER_MODULE_KEYS.includes(value as (typeof HANDOVER_MODULE_KEYS)[number])));
     const can = (system: string) => isSysadmin || allowedSystems.has(system);
+    const canHandoverModule = (moduleKey: string) => isSysadmin || (can('handover') && allowedHandoverModules.has(moduleKey));
     const isAdmin = profile.role === 'admin' || ['admin', 'sysadmin'].includes(String(profile.rbac_role || ''));
     const roleCanManageMarket = (permissions || []).some(row => String(row.perm) === 'marketanalytics_manage');
 
@@ -1146,7 +1153,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'profile') {
-      return reply(req, { ok: true, data: { ...profile, email: profile.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
+      return reply(req, { ok: true, data: { ...profile, email: profile.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems], allowed_handover_modules: isSysadmin ? ['*'] : [...allowedHandoverModules] } });
     }
 
     if (action === 'update_personal_profile') {
@@ -1161,7 +1168,7 @@ export async function handleAppApiRequest(req: Request) {
         .select('user_id,username,email,name,phone,department,role,rbac_role,status').single();
       if (error || !updated) return reply(req, { ok: false, message: '個人資料更新失敗' }, 500);
       await writeAudit(admin, profile.user_id, 'users', profile.user_id, 'update', before, { name: updated.name, phone: updated.phone });
-      return reply(req, { ok: true, data: { ...updated, email: updated.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems] } });
+      return reply(req, { ok: true, data: { ...updated, email: updated.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems], allowed_handover_modules: isSysadmin ? ['*'] : [...allowedHandoverModules] } });
     }
 
     if (action === 'change_password') {
@@ -2317,6 +2324,7 @@ export async function handleAppApiRequest(req: Request) {
       const config=MODULE_SOURCES[`${systemKey}/${moduleKey}`];
       if(!config)return reply(req,{ok:false,message:'找不到指定的 V2 子系統'},404);
       if(!can(config.permission))return reply(req,{ok:false,message:'目前角色沒有此系統權限'},403);
+      if(systemKey==='handover'&&!canHandoverModule(moduleKey))return reply(req,{ok:false,message:'目前帳號未開放此交接簿子系統'},403);
       const selectColumns=config.columns.map(column=>column[0]);
       if(systemKey==='guardpatrol'&&moduleKey==='records'){
         selectColumns.push('equipment(name)','users!inspection_records_inspector_id_fkey(name)');
@@ -3078,6 +3086,12 @@ export async function handleAppApiRequest(req: Request) {
     if (action === 'handover_save') {
       if (!can('handover')) return reply(req, { ok: false, message: '目前角色沒有電子交接簿權限' }, 403);
       const kind = text(body.kind, 30);
+      const requiredModule = kind === 'record' || kind === 'receive' ? 'records'
+        : kind === 'mechanical_staff_market_save' || kind === 'mechanical_schedule_save' ? 'mechanical-schedule'
+          : kind.startsWith('mechanical_') ? 'mechanical'
+            : kind.startsWith('business_') ? 'business'
+              : kind === 'create_case' || kind === 'add_attachment' ? 'open-items' : '';
+      if (requiredModule && !canHandoverModule(requiredModule)) return reply(req, { ok: false, message: '目前帳號未開放此交接簿子系統' }, 403);
 
       if (kind === 'record') {
         const shiftDate = text(body.shift_date, 10), shiftType = text(body.shift_type, 20);
@@ -3397,6 +3411,58 @@ export async function handleAppApiRequest(req: Request) {
         }
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_daily_approvals', data.approval_id, 'insert', null, payload);
         return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'business_entry') {
+        const handoverDate = text(body.handover_date, 10), shiftCode = text(body.shift_code, 10);
+        const category = text(body.category, 20), description = text(body.description, 5000);
+        const expectedAttendance = Number(body.expected_attendance), absentAttendance = Number(body.absent_attendance);
+        if (!validISODate(handoverDate)) return reply(req, { ok: false, message: '交接日期格式無效' }, 400);
+        if (!MECHANICAL_SHIFT_CODES.includes(shiftCode as (typeof MECHANICAL_SHIFT_CODES)[number])) return reply(req, { ok: false, message: '交接班別無效' }, 400);
+        if (!BUSINESS_HANDOVER_CATEGORIES.has(category)) return reply(req, { ok: false, message: '請選擇有效的交接分類' }, 400);
+        if (!description) return reply(req, { ok: false, message: '請填寫交接說明' }, 400);
+        if (!Number.isInteger(expectedAttendance) || expectedAttendance < 0 || expectedAttendance > 50 || !Number.isInteger(absentAttendance) || absentAttendance < 0 || absentAttendance > expectedAttendance) {
+          return reply(req, { ok: false, message: '出勤人數必須為 0 至 50，且未出勤人數不可超過應出勤人數' }, 400);
+        }
+        const payload = { handover_date: handoverDate, shift_code: shiftCode, category, description, expected_attendance: expectedAttendance, absent_attendance: absentAttendance, created_by: profile.user_id, updated_by: profile.user_id };
+        const { data, error } = await userDb.from('business_handover_entries').insert(payload).select('entry_id').single();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '交接紀錄新增失敗') }, String(error.code || '') === '42501' ? 403 : 400);
+        await writeAudit(userDb, profile.user_id, 'business_handover_entries', data.entry_id, 'insert', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'business_entry_update') {
+        const entryId = id(body.entry_id), category = text(body.category, 20), description = text(body.description, 5000);
+        const expectedAttendance = Number(body.expected_attendance), absentAttendance = Number(body.absent_attendance);
+        if (!entryId) return reply(req, { ok: false, message: '交接紀錄識別碼無效' }, 400);
+        if (!BUSINESS_HANDOVER_CATEGORIES.has(category) || !description) return reply(req, { ok: false, message: '請完整填寫交接分類與交接說明' }, 400);
+        if (!Number.isInteger(expectedAttendance) || expectedAttendance < 0 || expectedAttendance > 50 || !Number.isInteger(absentAttendance) || absentAttendance < 0 || absentAttendance > expectedAttendance) return reply(req, { ok: false, message: '出勤人數設定無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('business_handover_entries').select('*').eq('entry_id', entryId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的交接紀錄' }, 404);
+        if (before.is_deleted) return reply(req, { ok: false, message: '已刪除的交接紀錄不可再修改' }, 409);
+        const payload = { category, description, expected_attendance: expectedAttendance, absent_attendance: absentAttendance, updated_by: profile.user_id, updated_at: new Date().toISOString() };
+        const { data: updated, error } = await userDb.from('business_handover_entries').update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '交接紀錄修改失敗') }, String(error.code || '') === '42501' ? 403 : 409);
+        if (!updated) return reply(req, { ok: false, message: '這筆交接紀錄已被其他人異動，請重新載入' }, 409);
+        await writeAudit(userDb, profile.user_id, 'business_handover_entries', entryId, 'update', before, updated);
+        return reply(req, { ok: true, data: updated });
+      }
+
+      if (kind === 'business_entry_delete') {
+        const entryId = id(body.entry_id);
+        if (!entryId) return reply(req, { ok: false, message: '交接紀錄識別碼無效' }, 400);
+        const { data: before, error: readError } = await userDb.from('business_handover_entries').select('*').eq('entry_id', entryId).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '找不到指定的交接紀錄' }, 404);
+        if (before.is_deleted) return reply(req, { ok: false, message: '這筆交接紀錄已標記刪除' }, 409);
+        const now = new Date().toISOString();
+        const payload = { is_deleted: true, deleted_at: now, deleted_by: profile.user_id, updated_by: profile.user_id, updated_at: now };
+        const { data: updated, error } = await userDb.from('business_handover_entries').update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '交接紀錄刪除失敗') }, String(error.code || '') === '42501' ? 403 : 409);
+        if (!updated) return reply(req, { ok: false, message: '這筆交接紀錄已被其他人異動，請重新載入' }, 409);
+        await writeAudit(userDb, profile.user_id, 'business_handover_entries', entryId, 'status_change', before, updated);
+        return reply(req, { ok: true, data: updated });
       }
 
       if (kind === 'create_case') {

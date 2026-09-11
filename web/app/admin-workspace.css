@@ -318,3 +318,10 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
   .users-batch-toolbar{align-items:stretch;flex-direction:column;gap:10px}
   .users-batch-actions{justify-content:flex-end}
 }
+.handover-access-table th:not(:first-child):not(:nth-child(2)),
+.handover-access-table td:not(:first-child):not(:nth-child(2)){
+  min-width:118px;
+  text-align:center;
+}
+.handover-access-table td>small{display:block;margin-top:4px}
+.handover-access-table input[type="checkbox"]{width:20px;height:20px;accent-color:var(--cyan)}

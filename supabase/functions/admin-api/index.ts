@@ -28,6 +28,7 @@ const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_sup
 // 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
 const ADMIN_CONTRACT_VERSION = 2;
 const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'sys_dashboard', 'sys_marketboard', 'sys_vehicletracking', 'marketanalytics_manage']);
+const HANDOVER_MODULES = new Set(['records', 'mechanical', 'business', 'open-items', 'equipment', 'mechanical-schedule']);
 const SAFE_SETTING_KEYS = new Set([
   'org_name', 'site_name', 'shifts', 'line_group_id', 'line_notify_anomaly', 'line_notify_repair',
   'line_notify_case', 'line_notify_security', 'line_notify_security_alerts', 'line_notify_error_threshold',
@@ -693,6 +694,30 @@ export async function handleAdminApiRequest(req: Request) {
       const { error: inheritError } = await admin.from('users').update({ permissions: {} }).eq('rbac_role', rbacRole);
       if (inheritError) return reply(req, { ok: false, message: `角色權限已更新，但使用者繼承同步失敗：${inheritError.message}` }, 500);
       await audit('role_permissions', `${rbacRole}:${permission}`, 'update', { before: before?.allowed, after: allowed });
+      return reply(req, { ok: true });
+    }
+
+    if (action === 'admin_set_handover_module_access') {
+      const userId = id(body.user_id), moduleKey = clean(body.module_key, 50);
+      const allowed = body.allowed === true || body.allowed === 'true';
+      if (!userId || !HANDOVER_MODULES.has(moduleKey)) return reply(req, { ok: false, message: '使用者或交接簿子系統無效' }, 400);
+      const { data: target, error: targetError } = await admin.from('users')
+        .select('user_id,name,role,rbac_role,status').eq('user_id', userId).maybeSingle();
+      if (targetError || !target) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
+      if (target.status !== 'active') return reply(req, { ok: false, message: '只能指派啟用中帳號' }, 409);
+      const targetRole = target.rbac_role || (target.role === 'admin' ? 'sysadmin' : target.role);
+      if (allowed && targetRole !== 'sysadmin') {
+        const { data: parentAccess } = await admin.from('role_permissions')
+          .select('allowed').eq('role_id', targetRole).eq('perm', 'sys_handover').eq('allowed', true).maybeSingle();
+        if (!parentAccess) return reply(req, { ok: false, message: '請先替此使用者的角色開放電子交接簿大系統權限' }, 409);
+      }
+      const { data: before } = await admin.from('user_handover_module_access')
+        .select('allowed').eq('user_id', userId).eq('module_key', moduleKey).maybeSingle();
+      const { error } = await admin.from('user_handover_module_access').upsert({
+        user_id: userId, module_key: moduleKey, allowed, granted_by: profile.user_id, updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,module_key' });
+      if (error) return reply(req, { ok: false, message: `交接簿子系統權限更新失敗：${error.message}` }, 400);
+      await audit('user_handover_module_access', `${userId}:${moduleKey}`, 'update', { target_name: target.name, before: before?.allowed ?? false, after: allowed });
       return reply(req, { ok: true });
     }
 

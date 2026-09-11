@@ -35,6 +35,7 @@ import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import { MechanicalHandover } from './mechanical-handover';
 import { MechanicalSchedule } from './mechanical-schedule';
+import { BusinessHandover } from './business-handover';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 type Shift = { id: string; label: string; start: string; end: string };
@@ -98,7 +99,11 @@ function Pill({ value, labels, tones }: { value: unknown; labels: Record<string,
 }
 
 export function HandoverModules({ system, module, profile }: Props) {
+  const allowedModules = profile.allowed_handover_modules || [];
+  const allowed = allowedModules.includes('*') || allowedModules.includes(module.key);
+  if (!allowed) return <AppShell profile={profile} title={system.title} heading={{ system, module }}><section className="panel notice danger"><h2>未開放此交接子系統</h2><p>目前帳號已有電子交接簿大系統入口，但尚未被指派「{module.title}」權限，請洽系統管理員設定。</p></section></AppShell>;
   if (module.key === 'mechanical') return <MechanicalHandover system={system} module={module} profile={profile} />;
+  if (module.key === 'business') return <BusinessHandover system={system} module={module} profile={profile} />;
   if (module.key === 'mechanical-schedule') return <MechanicalSchedule system={system} module={module} profile={profile} />;
   if (module.key === 'open-items') return <CasesModule system={system} module={module} profile={profile} />;
   if (module.key === 'equipment') return <EquipmentOverview system={system} module={module} profile={profile} />;

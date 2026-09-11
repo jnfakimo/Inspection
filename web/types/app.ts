@@ -13,6 +13,7 @@ export type Profile = {
   auth_id?: string | null;
   permissions?: Record<string, boolean> | null;
   allowed_systems: string[];
+  allowed_handover_modules?: string[];
 };
 
 export type DashboardData = {

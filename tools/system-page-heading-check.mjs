@@ -4,7 +4,7 @@ import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
 assert.equal(systems.length, 13, '系統標題稽核必須涵蓋 13 大系統');
-assert.equal(moduleCount, 65, '系統標題稽核必須涵蓋 65 個子系統');
+assert.equal(moduleCount, 66, '系統標題稽核必須涵蓋 66 個子系統');
 
 for (const system of systems) {
   const iconPath = `.${system.icon.replace('/Inspection', '')}`;
@@ -88,4 +88,4 @@ for (const [route, file] of compactPages) {
   assert.match(source, /data-system-page-logo/, `${route} 缺少對應系統 Logo`);
 }
 
-console.log(`系統頁標題一致性檢查通過：${systems.length} 大系統、${moduleCount} 個子系統；60 個標準頁首、4 個全螢幕緊湊頁首。`);
+console.log(`系統頁標題一致性檢查通過：${systems.length} 大系統、${moduleCount} 個子系統；61 個標準頁首、4 個全螢幕緊湊頁首。`);

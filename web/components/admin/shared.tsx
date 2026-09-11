@@ -27,6 +27,11 @@ export const SYSTEM_PERMISSIONS = [
   ['sys_handover', '電子交接簿'], ['sys_equipment', '設備建置'], ['sys_structuremap', '設備圖臺'],
   ['sys_equipment_manage', '設備與圖臺管理'], ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'], ['sys_officialdocs', '公文傳送'], ['sys_marketanalytics', '市場營運分析'], ['sys_dashboard', '戰情儀表板'], ['sys_marketboard', '市場公開看板'], ['sys_vehicletracking', '公務車定位追蹤'],
 ] as const;
+export const HANDOVER_MODULE_PERMISSIONS = [
+  ['records', '指揮台電子交接簿'], ['mechanical', '機電課電子交接簿'],
+  ['business', '業管組電子交接簿'], ['open-items', '未結事項'],
+  ['equipment', '設備概況'], ['mechanical-schedule', '機電課排班表'],
+] as const;
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
   const raw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error) ? String((error as Record<string, unknown>).message) : String(error || '');
