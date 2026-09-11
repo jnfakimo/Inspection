@@ -176,7 +176,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   do not create a second, page-specific user/status/clock format. The component must
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
-- **Shared header actions**: V2 一般內容頁（共 13 大系統的 66 個子系統）頂列只保留三個
+- **Shared header actions**: V2 一般內容頁（共 13 大系統的 67 個子系統）頂列只保留三個
   帳號／入口動作：首頁、個人資料、登出；移除戰情儀表板、維修／派完工、駐衛警巡檢、
   電子交接簿與後台等跨系統按鈕，系統切換改由入口頁、系統頁與後台側欄承擔。
   首頁使用 `assets/system-icons/home-nav-icon.png`，個人資料使用
@@ -214,9 +214,28 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
     不是誤把 V2 頁面當成 V1 的 `floor3d.html`——**請勿再以「全螢幕工具頁不掛導覽」
     為由還原**。V1 的 `floor3d.html` 不在此例外內，維持不掛。
 
+## 駐衛警電子交接簿（SYS-04 `guard`，2026-09-11 訂）
+
+- **巡檢排班是唯一來源**：班別、班別時段、預定巡檢時段（通報時段）與排定人員一律由
+  `app-api` 的 `handover_guard_context` 解析，規則與 `web/lib/patrol-status.ts` 的
+  `getPatrolShiftsForDate` 相同（班別名稱來自啟用中的 `patrol_shift_template`、每日時段來自
+  `patrol_shifts`、夜班資料列存隔日、`patrol_shift_staff.workTimes` 優先於班別時段）。改一邊
+  就要改另一邊。交接簿不能改排班，只能另記「實際值勤人員／代班說明」，兩者並列保留。
+- 交接使用者不一定有 `sys_guardpatrol`，讀不到排班與打卡表，所以介接一律走伺服器端，
+  前端不要直接查 `patrol_shifts`／`checkin_logs`／`patrol_shift_staff`。
+- **寫入只走 app-api（service role）**：`guard_handover_logs` 對 authenticated 只開 SELECT。
+  排班快照若允許前端權杖直寫，任何有交接權限的人都能偽造「排定人員」。
+- 流程 `draft → submitted（交班簽名，快照當班巡邏打卡摘要）→ received（接班簽名，不得與交班人
+  同一人）`；接班前交班人可撤回。狀態機同時由 `protect_guard_handover_log` trigger 把關。
+- 主管每日簽核（`guard_handover_daily_approvals`）限隔日起、且當日已建立的交接全部完成接班；
+  有班別未建立交接時必須填寫說明。簽核後當日全部鎖定。
+- 主管簽核權限是子系統 `handover/guard-approve`，**必須在權限頁明確設為「允許」**：三層授權的子系統
+  預設「沿用」大系統權限，但簽核是特權，`app-api` 的 `canGuardApprove` 只認明確允許（系統管理員自動具備）。
+  頁面路由也要放行只有簽核權限的主管。駐警隊目前沒有任何 `unit_supervisor`，不可改回「依單位課長判斷」。
+
 ## V2 系統子頁標題規範（2026-08-27 訂）
 
-- 13 大系統、66 個子系統的一般內容頁一律由 `AppShell` 自動插入
+- 13 大系統、67 個子系統的一般內容頁一律由 `AppShell` 自動插入
   `components/SystemPageHeader.tsx`，不得在工作區再手寫另一個系統級 `<h1>`。
 - 標題頂端距共用頂列底部固定 **22px**；桌面版由 `.content.v1-content` 的 20px
   上內距加標題元件 2px 上內距構成，手機版則為 14px + 8px。不要用負 margin 或頁面
@@ -240,10 +259,10 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   縮放時四張桌面功能圖卡固定為 **269px × 200px** 並置中。瀏覽器縮放造成可用 CSS
   寬度改變時必須自動響應：寬版 4 欄、1100px 以下 2 欄並恢復滿寬、600px 以下 1 欄，
   禁止水平溢出。
-- 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 13／66、
-  正式 Logo、標題 token，以及 61 個一般頁首與 4 個全螢幕頁首的覆蓋關係。
+- 新增／修改系統子頁後必須執行 `npm run test:page-headings`；此檢查固定盤點 13／67、
+  正式 Logo、標題 token，以及 62 個一般頁首與 4 個全螢幕頁首的覆蓋關係。
 
-- **66 個子系統圖卡（2026-09-11 更新）**：一般 `.module-grid` 與交接／駐衛警入口
+- **67 個子系統圖卡（2026-09-11 更新）**：一般 `.module-grid` 與交接／駐衛警入口
   的子系統圖卡，桌面瀏覽器 100% 統一為 **269×200px**；標題沿用共用頁首規格（距頂列
   22px、26px、淺藍 `rgb(2, 132, 199)`、Logo 左側 24px、標題左側 80px、Logo 42×42px）。
   1100px 以下改兩欄、600px 以下改單欄，並恢復彈性寬度避免水平溢出。

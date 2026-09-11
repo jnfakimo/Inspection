@@ -30,7 +30,8 @@ export const SYSTEM_PERMISSIONS = [
 ] as const;
 export const HANDOVER_MODULE_PERMISSIONS = [
   ['records', '指揮台電子交接簿'], ['mechanical', '機電課電子交接簿'],
-  ['business', '業管組電子交接簿'], ['open-items', '未結事項'],
+  ['business', '業管組電子交接簿'], ['guard', '駐衛警電子交接簿'],
+  ['guard-approve', '駐衛警交接主管簽核'], ['open-items', '未結事項'],
   ['equipment', '設備概況'], ['mechanical-schedule', '機電課排班表'],
 ] as const;
 

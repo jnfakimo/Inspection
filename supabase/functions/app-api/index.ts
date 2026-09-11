@@ -97,6 +97,11 @@ const SYSTEM_MODULE_KEYS: Record<string, readonly string[]> = {
 };
 const SYSTEM_KEYS = Object.keys(SYSTEM_MODULE_KEYS);
 const BUSINESS_HANDOVER_CATEGORIES = new Set(['事務事項', '維修', '其他']);
+// 駐衛警交接簿：前端 guard-handover.tsx 的選項必須與這裡逐字一致。
+const GUARD_INCIDENT_CATEGORIES = new Set(['門禁管制', '可疑人車', '竊盜', '火警／煙霧', '設備故障', '漏水／停電', '交通事故', '民眾糾紛', '急救傷病', '其他']);
+const GUARD_ITEM_CONDITIONS = new Set(['正常', '短少', '損壞', '遺失']);
+type GuardIncident = { time: string; location: string; category: string; description: string; action: string; reported_to: string };
+type GuardItem = { name: string; qty: number; condition: string; note: string };
 
 function mechanicalShiftSlot(workDate: string, shiftCode: string) {
   const day = Math.floor(new Date(`${workDate}T12:00:00+08:00`).getTime() / 86_400_000);
@@ -3183,12 +3188,176 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, { ok: false, message: '刪除範圍無效' }, 400);
     }
 
+    // ── 駐衛警交接簿：班別、時段、排定人員與巡邏打卡摘要 ──────────────────────────────
+    // 規則與 web/lib/patrol-status.ts 的 getPatrolShiftsForDate 相同，改一邊就要改另一邊：
+    // 班別名稱來自啟用中的 patrol_shift_template；每日時段來自 patrol_shifts（夜班存隔日，
+    // 相容 2026-08-26 以前存於值班日的舊資料）；預定巡檢時段以 patrol_shift_staff.workTimes
+    // 為優先。一律以 service role 讀取——交接簿使用者不一定有 sys_guardpatrol。
+    const guardDateOffset = (date: string, days: number) => {
+      const value = new Date(`${date}T12:00:00+08:00`);
+      value.setUTCDate(value.getUTCDate() + days);
+      return value.toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+    };
+    const guardIsNight = (name: unknown) => /夜班|night/i.test(String(name ?? '').replace(/\s+/g, ''));
+    const guardHHMM = (value: unknown) => String(value ?? '').slice(0, 5);
+    const guardRange = (baseDate: string, start: string, end: string) => {
+      const from = new Date(`${baseDate}T${start}:00+08:00`);
+      let to = new Date(`${baseDate}T${end}:00+08:00`);
+      if (to.getTime() <= from.getTime()) to = new Date(to.getTime() + 86_400_000);
+      return { from, to };
+    };
+    // 主管簽核是特權：三層授權的子系統預設「沿用」大系統權限，但簽核必須在權限頁明確設為允許。
+    // user_module_access 尚未建立（新 migration 未套用）時退回舊白名單。
+    const canGuardApprove = () => isSysadmin || (can('handover') && (moduleAccessResult.error
+      ? allowedHandoverModules.has('guard-approve')
+      : moduleModes.get('handover/guard-approve') === 'allow'));
+    const guardIdList = (value: unknown) => Array.isArray(value) ? value.map(item => String(item || '')).filter(Boolean) : [];
+    type GuardWork = { start?: string; end?: string };
+    const guardShiftContext = async (dutyDate: string) => {
+      const nextDate = guardDateOffset(dutyDate, 1);
+      const [templateResult, dailyResult, staffResult, ruleResult, markerResult] = await Promise.all([
+        admin.from('patrol_shift_template').select('template_id,name,start_time,end_time,sort_order,assigned_user_ids').neq('status', 'inactive').order('sort_order'),
+        admin.from('patrol_shifts').select('shift_id,shift_date,name,start_time,end_time,assigned_user_ids').in('shift_date', [dutyDate, nextDate]),
+        admin.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
+        admin.from('system_settings').select('value').eq('key', 'patrol_timeout_rules').maybeSingle(),
+        admin.from('plan_markers').select('marker_id,floor_id').eq('kind', 'patrol').eq('status', 'active'),
+      ]);
+      const failure = templateResult.error || dailyResult.error || staffResult.error || ruleResult.error || markerResult.error;
+      if (failure) throw failure;
+      let staffConfig: {
+        templates?: Record<string, unknown>; dates?: Record<string, Record<string, unknown>>;
+        workTimes?: { templates?: Record<string, GuardWork>; dates?: Record<string, Record<string, GuardWork>> };
+      } = {};
+      try { staffConfig = JSON.parse(String(staffResult.data?.value || '{}')) || {}; } catch { staffConfig = {}; }
+      let rules: Array<{ label?: string; start?: string; end?: string }> = [];
+      try { const parsed = JSON.parse(String(ruleResult.data?.value || '[]')); if (Array.isArray(parsed)) rules = parsed; } catch { rules = []; }
+      const ruleName = (value: unknown) => String(value || '').trim().replace(/\s*巡邏\s*$/u, '');
+      const noWork: GuardWork = {};
+      const daily = (dailyResult.data || []).filter(row => !String(row.name || '').startsWith('[已刪除]'));
+      const dailyByKey = new Map(daily.map(row => [`${row.shift_date}:${row.name}`, row] as const));
+      const now = Date.now();
+      const resolved = (templateResult.data || []).map(template => {
+        const name = String(template.name || '');
+        const storageDate = guardIsNight(name) ? nextDate : dutyDate;
+        const legacy = guardIsNight(name) && !dailyByKey.has(`${storageDate}:${name}`) ? dailyByKey.get(`${dutyDate}:${name}`) : undefined;
+        const override = dailyByKey.get(`${storageDate}:${name}`) || legacy;
+        const configDate = legacy ? dutyDate : storageDate;
+        const templateWork = staffConfig.workTimes?.templates?.[name] || noWork;
+        const dateWork = staffConfig.workTimes?.dates?.[configDate]?.[name] || noWork;
+        const rule = rules.find(item => ruleName(item.label) === ruleName(name)) || noWork;
+        const shiftStart = guardHHMM(override ? override.start_time : template.start_time);
+        const shiftEnd = guardHHMM(override ? override.end_time : template.end_time);
+        const patrolStart = guardHHMM(dateWork.start || templateWork.start || rule.start || shiftStart);
+        const patrolEnd = guardHHMM(dateWork.end || templateWork.end || rule.end || shiftEnd);
+        const scheduled = [guardIdList(override?.assigned_user_ids), guardIdList(staffConfig.dates?.[configDate]?.[name]),
+          guardIdList(template.assigned_user_ids), guardIdList(staffConfig.templates?.[name])].find(list => list.length) || [];
+        const work = guardRange(storageDate, shiftStart, shiftEnd);
+        const patrol = guardRange(storageDate, patrolStart, patrolEnd);
+        // 打卡計算區間 = 班別時段與預定巡檢時段的聯集，與巡邏打卡頁的 checkinRange 相同。
+        const window = { from: new Date(Math.min(work.from.getTime(), patrol.from.getTime())), to: new Date(Math.max(work.to.getTime(), patrol.to.getTime())) };
+        const state = now < work.from.getTime() ? 'upcoming' : now < work.to.getTime() ? 'active' : 'ended';
+        return { name, sort_order: Number(template.sort_order || 0), shift_start: shiftStart, shift_end: shiftEnd, patrol_start: patrolStart, patrol_end: patrolEnd, scheduled_user_ids: [...new Set(scheduled)], state, window };
+      });
+      const floorOf = new Map((markerResult.data || []).map(marker => [String(marker.marker_id), canonicalFloor(marker.floor_id) || '未設定'] as const));
+      // 每班各查一次，避免整天合併查詢撞到 PostgREST 單次 1000 列的上限。
+      const checkins = await Promise.all(resolved.map(shift => admin.from('checkin_logs').select('target_id,user_name,checkin_at')
+        .eq('target_type', 'marker').gte('checkin_at', shift.window.from.toISOString()).lte('checkin_at', shift.window.to.toISOString()).limit(1000)));
+      const checkinError = checkins.find(result => result.error)?.error;
+      if (checkinError) throw checkinError;
+      const computedAt = new Date().toISOString();
+      return resolved.map(({ window: _window, ...shift }, index) => {
+        const rows = checkins[index].data || [];
+        const checkedIds = new Set(rows.map(row => String(row.target_id)).filter(markerId => floorOf.has(markerId)));
+        const uncheckedFloors = new Map<string, number>();
+        for (const [markerId, floor] of floorOf) if (!checkedIds.has(markerId)) uncheckedFloors.set(floor, (uncheckedFloors.get(floor) || 0) + 1);
+        const expected = floorOf.size, checked = checkedIds.size;
+        return {
+          ...shift,
+          patrol: {
+            expected, checked, unchecked: expected - checked,
+            rate: expected ? Math.round((checked / expected) * 1000) / 10 : 100,
+            unchecked_floors: [...uncheckedFloors].map(([floor, count]) => ({ floor, count })).sort((a, b) => a.floor.localeCompare(b.floor, 'zh-Hant')),
+            checkers: [...new Set(rows.map(row => String(row.user_name || '')).filter(Boolean))],
+            window_start: shift.patrol_start, window_end: shift.patrol_end, computed_at: computedAt,
+          },
+        };
+      });
+    };
+    const guardIncidents = (value: unknown): GuardIncident[] | null => {
+      if (!Array.isArray(value) || value.length > 50) return null;
+      const rows: GuardIncident[] = [];
+      for (const raw of value) {
+        const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+        const time = text(row.time, 16), category = text(row.category, 20), description = text(row.description, 2000);
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !GUARD_INCIDENT_CATEGORIES.has(category) || !description) return null;
+        rows.push({ time, location: text(row.location, 100), category, description, action: text(row.action, 2000), reported_to: text(row.reported_to, 100) });
+      }
+      return rows;
+    };
+    const guardItems = (value: unknown): GuardItem[] | null => {
+      if (!Array.isArray(value) || value.length > 40) return null;
+      const rows: GuardItem[] = [];
+      for (const raw of value) {
+        const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+        const name = text(row.name, 50), qty = Number(row.qty), condition = text(row.condition, 10);
+        if (!name || !Number.isInteger(qty) || qty < 0 || qty > 999 || !GUARD_ITEM_CONDITIONS.has(condition)) return null;
+        rows.push({ name, qty, condition, note: text(row.note, 200) });
+      }
+      return rows;
+    };
+
+    if (action === 'handover_guard_context') {
+      if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐衛警電子交接簿' }, 403);
+      const dutyDate = text(body.duty_date, 10);
+      if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
+      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult] = await Promise.all([
+        guardShiftContext(dutyDate),
+        admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).order('shift_order'),
+        admin.from('guard_handover_daily_approvals').select('*').eq('duty_date', dutyDate).maybeSingle(),
+        admin.from('guard_handover_logs').select('items').lt('duty_date', dutyDate).neq('status', 'draft')
+          .order('duty_date', { ascending: false }).order('shift_order', { ascending: false }).limit(1).maybeSingle(),
+        admin.from('users').select('user_id,name,dept_id,department,status').limit(5000),
+        admin.from('departments').select('dept_id,name').limit(2000),
+      ]);
+      const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error;
+      if (failure) throw failure;
+      // 可勾選的實際值勤人員：單位名稱含「駐警／駐衛」者（以 dept_id 為準，users.department 後備）。
+      const patrolDepts = new Set((deptResult.data || []).filter(row => /駐警|駐衛/.test(String(row.name || ''))).map(row => String(row.dept_id)));
+      const users = userResult.data || [];
+      const staff = users.filter(user => user.status === 'active' && (patrolDepts.has(String(user.dept_id)) || /駐警|駐衛/.test(String(user.department || ''))))
+        .map(user => ({ user_id: String(user.user_id), name: String(user.name || '') })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
+      const logs = logResult.data || [];
+      const approval = approvalResult.data || null;
+      // 只回傳畫面上會出現的人名，不整批輸出人員名冊。
+      const referenced = new Set<string>(staff.map(person => person.user_id));
+      for (const shift of shifts) shift.scheduled_user_ids.forEach(userId => referenced.add(userId));
+      for (const log of logs) {
+        for (const userId of [...guardIdList(log.scheduled_user_ids), ...guardIdList(log.actual_user_ids), log.handover_by, log.takeover_by, log.created_by, log.updated_by]) {
+          if (userId) referenced.add(String(userId));
+        }
+      }
+      if (approval?.approver_id) referenced.add(String(approval.approver_id));
+      const people: Record<string, string> = {};
+      for (const user of users) if (referenced.has(String(user.user_id))) people[String(user.user_id)] = String(user.name || '');
+      const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+      return reply(req, {
+        ok: true,
+        data: {
+          duty_date: dutyDate, shifts, logs, approval, staff, people,
+          previous_items: Array.isArray(previousResult.data?.items) ? previousResult.data.items : [],
+          can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(),
+          approval_open: dutyDate < todayInTaipei,
+        },
+      });
+    }
+
     if (action === 'handover_save') {
       if (!can('handover')) return reply(req, { ok: false, message: '目前角色沒有電子交接簿權限' }, 403);
       const kind = text(body.kind, 30);
       const requiredModule = kind === 'record' || kind === 'receive' ? 'records'
         : kind === 'mechanical_staff_market_save' || kind === 'mechanical_schedule_save' ? 'mechanical-schedule'
           : kind.startsWith('mechanical_') ? 'mechanical'
+            : kind.startsWith('guard_') ? 'guard'
             : kind.startsWith('business_') ? 'business'
               : kind === 'create_case' || kind === 'add_attachment' ? 'open-items' : '';
       if (requiredModule && !canHandoverModule(requiredModule)) return reply(req, { ok: false, message: '目前帳號未開放此交接簿子系統' }, 403);
@@ -3563,6 +3732,112 @@ export async function handleAppApiRequest(req: Request) {
         if (!updated) return reply(req, { ok: false, message: '這筆交接紀錄已被其他人異動，請重新載入' }, 409);
         await writeAudit(userDb, profile.user_id, 'business_handover_entries', entryId, 'status_change', before, updated);
         return reply(req, { ok: true, data: updated });
+      }
+
+      if (kind === 'guard_save') {
+        const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
+        if (!validISODate(dutyDate) || !shiftName) return reply(req, { ok: false, message: '交接班別資料無效' }, 400);
+        const { data: dayApproval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id').eq('duty_date', dutyDate).maybeSingle();
+        if (approvalError) throw approvalError;
+        if (dayApproval) return reply(req, { ok: false, message: '本日交接已由主管簽核，不可再修改' }, 409);
+        const shift = (await guardShiftContext(dutyDate)).find(row => row.name === shiftName);
+        if (!shift) return reply(req, { ok: false, message: '巡檢排班找不到這個班別，請重新載入' }, 404);
+        const incidents = guardIncidents(body.incidents), items = guardItems(body.items);
+        if (!incidents) return reply(req, { ok: false, message: '異常事件資料不完整：請填寫發生時間、類別與事件經過' }, 400);
+        if (!items) return reply(req, { ok: false, message: '物品點交資料無效：請確認名稱、數量與狀態' }, 400);
+        const rawActualIds: unknown[] = Array.isArray(body.actual_user_ids) ? body.actual_user_ids : [];
+        const actualIds = [...new Set(rawActualIds.map(value => id(value)).filter((value): value is string => Boolean(value)))];
+        if (!actualIds.length || actualIds.length > 20) return reply(req, { ok: false, message: '請勾選 1 至 20 位實際值勤人員' }, 400);
+        const { data: actualUsers, error: actualError } = await admin.from('users').select('user_id').in('user_id', actualIds).eq('status', 'active');
+        if (actualError) throw actualError;
+        if ((actualUsers || []).length !== actualIds.length) return reply(req, { ok: false, message: '實際值勤人員包含停用或不存在的帳號' }, 400);
+        const substituteNote = text(body.substitute_note, 500);
+        const differs = actualIds.length !== shift.scheduled_user_ids.length || actualIds.some(value => !shift.scheduled_user_ids.includes(value));
+        if (differs && !substituteNote) return reply(req, { ok: false, message: '實際值勤人員與巡檢排班不同，請填寫代班說明' }, 400);
+        // 草稿每次儲存都以最新排班重新快照；交班簽名後即凍結。
+        const content = {
+          shift_order: shift.sort_order, shift_start: shift.shift_start, shift_end: shift.shift_end,
+          patrol_start: shift.patrol_start, patrol_end: shift.patrol_end, scheduled_user_ids: shift.scheduled_user_ids,
+          actual_user_ids: actualIds, substitute_note: substituteNote,
+          duty_summary: text(body.duty_summary, 4000), important_notes: text(body.important_notes, 4000),
+          incidents, items, updated_by: profile.user_id,
+        };
+        const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
+        if (readError) throw readError;
+        if (before && before.status !== 'draft') return reply(req, { ok: false, message: '這班已交班簽名，內容已鎖定；如需修改請先由交班人撤回' }, 409);
+        if (!before) {
+          const { data, error } = await admin.from('guard_handover_logs').insert({ duty_date: dutyDate, shift_name: shiftName, ...content, created_by: profile.user_id }).select('*').single();
+          if (error) return reply(req, { ok: false, message: String(error.code || '') === '23505' ? '這班交接剛由其他人建立，請重新載入' : dbMessage(error, '交接建立失敗') }, 409);
+          await writeAudit(admin, profile.user_id, 'guard_handover_logs', data.log_id, 'insert', null, data);
+          return reply(req, { ok: true, data });
+        }
+        const { data, error } = await admin.from('guard_handover_logs').update(content).eq('log_id', before.log_id).eq('status', 'draft').select('*').maybeSingle();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '交接儲存失敗') }, 409);
+        if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
+        await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'update', before, data);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'guard_submit' || kind === 'guard_withdraw' || kind === 'guard_receive') {
+        const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
+        if (!validISODate(dutyDate) || !shiftName) return reply(req, { ok: false, message: '交接班別資料無效' }, 400);
+        const { data: dayApproval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id').eq('duty_date', dutyDate).maybeSingle();
+        if (approvalError) throw approvalError;
+        if (dayApproval) return reply(req, { ok: false, message: '本日交接已由主管簽核，不可再變更' }, 409);
+        const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
+        if (readError) throw readError;
+        if (!before) return reply(req, { ok: false, message: '這班尚未建立交接' }, 404);
+        let patch: Record<string, unknown>;
+        if (kind === 'guard_submit') {
+          if (before.status !== 'draft') return reply(req, { ok: false, message: '這班已經交班簽名' }, 409);
+          if (!String(before.duty_summary || '').trim()) return reply(req, { ok: false, message: '交班前請先填寫勤務概況' }, 400);
+          if (!isSysadmin && !guardIdList(before.actual_user_ids).includes(profile.user_id)) {
+            return reply(req, { ok: false, message: '交班簽名限本班實際值勤人員；請先在交接內容勾選自己' }, 403);
+          }
+          const shift = (await guardShiftContext(dutyDate)).find(row => row.name === shiftName);
+          patch = { status: 'submitted', handover_by: profile.user_id, updated_by: profile.user_id, patrol_snapshot: shift ? shift.patrol : null };
+        } else if (kind === 'guard_withdraw') {
+          if (before.status !== 'submitted') return reply(req, { ok: false, message: '只有已交班、尚未接班的交接可以撤回' }, 409);
+          if (String(before.handover_by) !== profile.user_id) return reply(req, { ok: false, message: '只有交班簽名人可以撤回' }, 403);
+          patch = { status: 'draft', handover_by: null, handover_at: null, patrol_snapshot: null, updated_by: profile.user_id };
+        } else {
+          if (before.status !== 'submitted') return reply(req, { ok: false, message: '這班尚未交班簽名，無法接班' }, 409);
+          if (String(before.handover_by) === profile.user_id) return reply(req, { ok: false, message: '交班人與接班人不可為同一人' }, 409);
+          patch = { status: 'received', takeover_by: profile.user_id, updated_by: profile.user_id };
+        }
+        const { data, error } = await admin.from('guard_handover_logs').update(patch).eq('log_id', before.log_id).eq('status', String(before.status)).select('*').maybeSingle();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '交接狀態更新失敗') }, 409);
+        if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
+        await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'status_change', before, data);
+        return reply(req, { ok: true, data });
+      }
+
+      if (kind === 'guard_approve') {
+        if (!canGuardApprove()) return reply(req, { ok: false, message: '主管簽核須由系統管理員在權限頁明確開通「駐衛警交接主管簽核」' }, 403);
+        const dutyDate = text(body.duty_date, 10), note = text(body.note, 500);
+        if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '簽核日期格式無效' }, 400);
+        const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+        if (dutyDate >= todayInTaipei) return reply(req, { ok: false, message: '主管簽核須於值班日隔日起進行' }, 409);
+        const [shifts, logResult] = await Promise.all([
+          guardShiftContext(dutyDate),
+          admin.from('guard_handover_logs').select('shift_name,status').eq('duty_date', dutyDate),
+        ]);
+        if (logResult.error) throw logResult.error;
+        const rows = logResult.data || [];
+        const pending = rows.filter(row => row.status !== 'received').length;
+        if (pending) return reply(req, { ok: false, message: `尚有 ${pending} 班未完成接班，全部接班後才可簽核` }, 409);
+        const created = new Set(rows.map(row => String(row.shift_name)));
+        const missing = shifts.filter(shift => !created.has(shift.name)).length;
+        if (missing && !note) return reply(req, { ok: false, message: `有 ${missing} 班未建立交接，請填寫簽核說明` }, 400);
+        const payload = { duty_date: dutyDate, approver_id: profile.user_id, note, shift_count: shifts.length, received_count: rows.length };
+        const { data, error } = await admin.from('guard_handover_daily_approvals').insert(payload).select('*').single();
+        if (error) {
+          if (String(error.code || '') === '23505') return reply(req, { ok: false, message: '本日交接已完成主管簽核' }, 409);
+          if (String(error.code || '') === '23514') return reply(req, { ok: false, message: '簽核條件未滿足：須隔日起、且當日交接全部完成接班' }, 409);
+          throw error;
+        }
+        await writeAudit(admin, profile.user_id, 'guard_handover_daily_approvals', data.approval_id, 'insert', null, data);
+        return reply(req, { ok: true, data });
       }
 
       if (kind === 'create_case') {

@@ -124,7 +124,10 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   } else {
     workspace = <ModuleWorkspace system={system} module={module} />;
   }
-  return <AuthGate>{profile => hasModuleAccess(profile, system.key, module.key)
+  // 主管簽核（guard-approve）不是獨立頁面，簽核主管要能進駐衛警交接簿才簽得到。
+  const moduleAllowed = (profile: Parameters<typeof hasModuleAccess>[0]) => hasModuleAccess(profile, system.key, module.key)
+    || (system.key === 'handover' && module.key === 'guard' && hasModuleAccess(profile, 'handover', 'guard-approve'));
+  return <AuthGate>{profile => moduleAllowed(profile)
     ? workspace
     : <AppShell profile={profile} title={module.title}><section className="panel admin-access-denied"><h2>未開放此子系統</h2><p>目前帳號沒有使用「{module.title}」的權限，請洽系統管理員調整。</p></section></AppShell>}
   </AuthGate>;
