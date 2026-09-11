@@ -17,11 +17,21 @@
 
 .business-slot-filter-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow-x:auto}
 .business-filter-label{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap}
-.business-slot-chip{padding:5px 12px;border:1px solid var(--line);border-radius:20px;background:var(--panel2);color:var(--ink);font-size:12px;cursor:pointer;transition:all .15s ease;white-space:nowrap}
+.business-slot-chip{padding:5px 12px;border:1px solid var(--line);border-radius:20px;background:var(--panel2);color:var(--ink);font-size:12px;cursor:pointer;transition:all .15s ease;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
 .business-slot-chip:hover{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
 .business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:#fff;font-weight:700}
 .business-slot-chip.is-done{border-color:var(--green);color:var(--green)}
 .business-slot-chip.active.is-done{background:var(--green);color:#fff}
+.business-slot-chip.is-live-slot{border-color:#059669;background:color-mix(in srgb,#059669 14%,var(--panel2));color:var(--ink);box-shadow:0 0 8px color-mix(in srgb,#059669 30%,transparent)}
+.business-live-text{background:#059669;color:#fff;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
+
+/* 呼吸微光燈 */
+.business-pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 0 rgba(16,185,129,.7);animation:businessPulse 1.8s infinite}
+@keyframes businessPulse{
+  0%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(16,185,129,.7)}
+  70%{transform:scale(1.1);box-shadow:0 0 0 7px rgba(16,185,129,0)}
+  100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(16,185,129,0)}
+}
 
 .business-sheet{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--shadow)}
 .business-sheet>header{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:22px 26px;border-top:6px solid var(--violet);border-bottom:1px solid var(--line)}
@@ -31,26 +41,34 @@
 .business-header-meta>b{font-size:17px}
 .business-completion-pill{padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--green) 15%,var(--panel));color:var(--green);font-size:12px;font-weight:700}
 
-.business-shift{--shift:#0284c7;border-left:7px solid var(--shift);background:color-mix(in srgb,var(--shift) 5%,var(--panel))}
+.business-shift{--shift:#0284c7;border-left:7px solid var(--shift);background:color-mix(in srgb,var(--shift) 5%,var(--panel));transition:all .2s ease}
+.business-shift.is-active-shift{border-left-width:10px;border-left-color:#10b981;box-shadow:0 0 16px color-mix(in srgb,#10b981 18%,transparent)}
 .business-shift-2{--shift:#059669}
 .business-shift-3{--shift:#b45309}
 .business-shift+.business-shift{border-top:14px solid var(--bg)}
 .business-shift-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 20px;border-bottom:3px solid color-mix(in srgb,var(--shift) 35%,var(--line))}
 .business-shift-head>div{display:flex;align-items:center;gap:12px}
 .business-shift-head strong{display:grid;place-items:center;width:46px;height:46px;border-radius:10px;background:color-mix(in srgb,var(--shift) 12%,var(--panel));color:var(--shift);font-size:22px}
+.business-shift.is-active-shift .business-shift-head strong{background:color-mix(in srgb,#10b981 20%,var(--panel));color:#10b981}
 .business-shift-head span{display:grid}
+.business-shift-title-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .business-shift-head span>b{font-size:20px}
 .business-shift-head small{color:var(--muted)}
+.business-active-shift-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,#10b981 18%,var(--panel));color:#10b981;font-size:12px;font-weight:700;border:1px solid color-mix(in srgb,#10b981 40%,transparent)}
 
 .business-duty-container{display:grid;gap:14px;padding:18px 20px}
 .business-section-title{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px}
 .business-section-title h4{margin:0;font-size:17px;font-weight:700;color:var(--ink)}
 .business-badge-sub{font-size:12px;color:var(--muted)}
 
-.business-slot-card{border:1px solid color-mix(in srgb,var(--shift) 25%,var(--line));border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.business-slot-card{border:1px solid color-mix(in srgb,var(--shift) 25%,var(--line));border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .2s ease}
+.business-slot-card.is-active-slot-card{border:2px solid #10b981;box-shadow:0 4px 18px color-mix(in srgb,#10b981 20%,transparent)}
 .business-slot-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:color-mix(in srgb,var(--shift) 10%,var(--panel));border-bottom:1px solid color-mix(in srgb,var(--shift) 20%,var(--line));flex-wrap:wrap}
-.business-slot-title{display:flex;align-items:center;gap:10px}
+.business-slot-card.is-active-slot-card .business-slot-head{background:color-mix(in srgb,#10b981 12%,var(--panel));border-bottom-color:color-mix(in srgb,#10b981 35%,var(--line))}
+.business-slot-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .business-slot-badge{display:inline-block;padding:3px 9px;border-radius:6px;background:color-mix(in srgb,var(--shift) 18%,var(--panel));color:var(--shift);font-size:13px;font-weight:700}
+.business-slot-badge.is-live{background:#10b981;color:#fff}
+.business-active-now-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#10b981;color:#fff;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(16,185,129,.35)}
 .business-slot-stat{font-size:13px;color:var(--muted)}
 .business-slot-stat b{color:var(--green)}
 .business-slot-quick-actions{display:flex;align-items:center;gap:6px}
@@ -71,6 +89,7 @@
 .cell-slot{color:var(--ink);font-size:13px}
 .business-duty-text{margin:0;font-size:14px;line-height:1.55;color:var(--ink);font-weight:500}
 .business-duty-meta{display:block;margin-top:4px;font-size:11px;color:var(--muted)}
+
 
 .business-check-toggle-group{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel2);box-shadow:0 1px 2px rgba(0,0,0,.03)}
 .business-check-btn{padding:7px 14px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;white-space:nowrap}

@@ -244,6 +244,58 @@ function todayTaipei() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
+function getTaipeiTime() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date()).reduce<Record<string, string>>((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value;
+    return acc;
+  }, {});
+  const hour = Number(parts.hour);
+  const minute = Number(parts.minute);
+  const timeNum = hour * 100 + minute;
+  const today = `${parts.year}-${parts.month}-${parts.day}`;
+  return { today, hour, minute, timeNum };
+}
+
+// 判定大班別是否為當前值勤班別 (早班 01-09, 中班 09-17, 晚班 17-01)
+function isCurrentMajorShift(shiftCode: string, isToday: boolean, hour: number) {
+  if (!isToday) return false;
+  if (shiftCode === '09-17') return hour >= 9 && hour < 17;
+  if (shiftCode === '17-01') return hour >= 17 || hour < 1;
+  if (shiftCode === '01-09') return hour >= 1 && hour < 9;
+  return false;
+}
+
+// 判定特定細分時段是否為當前執行時段
+function isCurrentTimeSlot(slotCode: string, isToday: boolean, timeNum: number) {
+  if (!isToday) return false;
+  switch (slotCode) {
+    case '00-08':
+      return timeNum >= 0 && timeNum < 800;
+    case '01-09':
+      return timeNum >= 100 && timeNum < 900;
+    case '02-10':
+      return timeNum >= 200 && timeNum < 1000;
+    case '03-11':
+      return timeNum >= 300 && timeNum < 1100;
+    case '08-17':
+      return timeNum >= 800 && timeNum < 1700;
+    case '09-17':
+      return timeNum >= 900 && timeNum < 1700;
+    case '17-01':
+      return timeNum >= 1700 || timeNum < 100;
+    default:
+      return false;
+  }
+}
+
 function moveDate(date: string, days: number) {
   const value = new Date(`${date}T12:00:00+08:00`);
   value.setDate(value.getDate() + days);
@@ -295,6 +347,15 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
+
+  // 當前台北時間（定時更新以即時標示當班時段）
+  const [nowTime, setNowTime] = useState(getTaipeiTime());
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(getTaipeiTime()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isToday = date === nowTime.today;
 
   // 點檢狀態管理
   const [checks, setChecks] = useState<DutyCheckMap>({});
@@ -596,13 +657,16 @@ export function BusinessHandover({ system, module, profile }: Props) {
             {TIME_SLOTS.map(slot => {
               const stats = getSlotStats(slot.code);
               const isAllDone = stats.completed === stats.total && stats.total > 0;
+              const isSlotLive = isCurrentTimeSlot(slot.code, isToday, nowTime.timeNum);
               return (
                 <button
                   key={slot.code}
-                  className={`business-slot-chip ${selectedSlotFilter === slot.code ? 'active' : ''} ${isAllDone ? 'is-done' : ''}`}
+                  className={`business-slot-chip ${selectedSlotFilter === slot.code ? 'active' : ''} ${isAllDone ? 'is-done' : ''} ${isSlotLive ? 'is-live-slot' : ''}`}
                   onClick={() => setSelectedSlotFilter(slot.code)}
                 >
+                  {isSlotLive && <span className="business-pulse-dot" title="目前進行中時段" />}
                   {slot.label} ({stats.completed}/{stats.total})
+                  {isSlotLive && <span className="business-live-text">當班</span>}
                 </button>
               );
             })}
@@ -633,6 +697,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
             );
             const activeCustomRows = shiftCustomRows.filter(row => !isDeleted(row));
             const shiftStats = getShiftGroupStats(shift.code);
+            const isShiftActive = isCurrentMajorShift(shift.code, isToday, nowTime.hour);
 
             // 判斷是否被時段篩選過濾
             const matchingSlots = selectedSlotFilter === 'all'
@@ -644,15 +709,23 @@ export function BusinessHandover({ system, module, profile }: Props) {
             }
 
             return (
-              <section className={`business-shift business-shift-${shiftIndex + 1}`} key={shift.code}>
+              <section className={`business-shift business-shift-${shiftIndex + 1}${isShiftActive ? ' is-active-shift' : ''}`} key={shift.code}>
                 {/* 班別主標題 */}
                 <div className="business-shift-head">
                   <div>
                     <strong>{['一', '二', '三'][shiftIndex]}</strong>
                     <span>
-                      <b>
-                        {shift.name} ({shift.label})
-                      </b>
+                      <span className="business-shift-title-row">
+                        <b>
+                          {shift.name} ({shift.label})
+                        </b>
+                        {isShiftActive && (
+                          <span className="business-active-shift-badge">
+                            <span className="business-pulse-dot" />
+                            目前當班（值勤中）
+                          </span>
+                        )}
+                      </span>
                       <small>
                         {shift.subLabel} · 點檢完成 {shiftStats.completed}/{shiftStats.total} 項 · 自訂交接 {activeCustomRows.length} 件
                       </small>
@@ -685,12 +758,21 @@ export function BusinessHandover({ system, module, profile }: Props) {
                       const itemsInSlot = shiftDutyItems.filter(i => i.timeSlot === slot.code);
                       if (itemsInSlot.length === 0) return null;
                       const slotStats = getSlotStats(slot.code);
+                      const isSlotActive = isCurrentTimeSlot(slot.code, isToday, nowTime.timeNum);
 
                       return (
-                        <div className="business-slot-card" key={slot.code}>
+                        <div className={`business-slot-card${isSlotActive ? ' is-active-slot-card' : ''}`} key={slot.code}>
                           <div className="business-slot-head">
                             <div className="business-slot-title">
-                              <span className="business-slot-badge">⏰ 時段 {slot.label}</span>
+                              <span className={`business-slot-badge${isSlotActive ? ' is-live' : ''}`}>
+                                ⏰ 時段 {slot.label}
+                              </span>
+                              {isSlotActive && (
+                                <span className="business-active-now-badge">
+                                  <span className="business-pulse-dot" />
+                                  當前執行時段
+                                </span>
+                              )}
                               <span className="business-slot-stat">
                                 已完成 <b>{slotStats.completed}</b> / {slotStats.total} 項
                               </span>
