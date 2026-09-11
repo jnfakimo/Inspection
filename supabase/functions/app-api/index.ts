@@ -3858,6 +3858,38 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: true, data: updated });
       }
 
+      if (kind === 'business_approve') {
+        const handoverDate = text(body.handover_date, 10);
+        const stage = text(body.stage, 30);
+        const noteText = text(body.note, 1000) || null;
+        if (!validISODate(handoverDate)) return reply(req, { ok: false, message: '交接日期格式無效' }, 400);
+        if (!['director', 'deputy_manager', 'manager'].includes(stage)) {
+          return reply(req, { ok: false, message: '批核階段無效' }, 400);
+        }
+        const stageLabels: Record<string, string> = {
+          director: '一市場主任',
+          deputy_manager: '營業部副理',
+          manager: '營業部經理',
+        };
+        const stageLabel = stageLabels[stage] || stage;
+        const payload = {
+          handover_date: handoverDate,
+          stage,
+          stage_label: stageLabel,
+          approver_id: profile.user_id,
+          approved_at: new Date().toISOString(),
+          note: noteText,
+          updated_at: new Date().toISOString(),
+        };
+        const { data, error } = await userDb.from('business_handover_approvals')
+          .upsert(payload, { onConflict: 'handover_date,stage' })
+          .select('*')
+          .single();
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '批核儲存失敗') }, String(error.code || '') === '42501' ? 403 : 400);
+        await writeAudit(userDb, profile.user_id, 'business_handover_approvals', data.approval_id, 'update', null, payload);
+        return reply(req, { ok: true, data });
+      }
+
       if (kind === 'guard_save') {
         const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
         if (!validISODate(dutyDate) || !shiftName) return reply(req, { ok: false, message: '交接班別資料無效' }, 400);

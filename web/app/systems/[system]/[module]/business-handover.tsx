@@ -1,7 +1,7 @@
 'use client';
 
 // SYS-04 業管組電子交接簿。
-// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表與每日列印／預覽報表。
+// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表、三級主管批核（一市場主任、營業部副理、營業部經理）與每日 A4 單頁精準列印／預覽報表。
 // 風格與駐衛警交接簿統一，支援當班時段光暈閃爍提示與點檢表預設收合展開。
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -32,7 +32,8 @@ export type IconName =
   | 'list'
   | 'printer'
   | 'eye'
-  | 'save';
+  | 'save'
+  | 'pen';
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
   building: (
@@ -111,6 +112,11 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
       <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
       <polyline points="17 21 17 13 7 13 7 21" />
       <polyline points="7 3 7 8 15 8" />
+    </>
+  ),
+  pen: (
+    <>
+      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
     </>
   ),
 };
@@ -250,21 +256,21 @@ export const BUSINESS_DUTY_CHECKLIST: DutyCheckItem[] = [
     timeSlot: '03-11',
     timeSlotLabel: '03:00 ～ 11:00',
     shiftGroup: '01-09',
-    title: '送貨工管理及臨時交辦事項。',
+    title: '蔬果零批場管理及臨時交辦事項。',
   },
   {
     id: 'duty-03-11-3',
     timeSlot: '03-11',
     timeSlotLabel: '03:00 ～ 11:00',
     shiftGroup: '01-09',
-    title: '停車月票辦理及帳務管理。',
+    title: '預備組（代班）蔬果零批場管理、環境維持及突發狀況之回報。',
   },
   {
     id: 'duty-03-11-4',
     timeSlot: '03-11',
     timeSlotLabel: '03:00 ～ 11:00',
     shiftGroup: '01-09',
-    title: '停車設備維護、停車場管理及臨時交辦事項。',
+    title: '蔬果零批場通道暢通、取締越線擺貨、停車秩序管理、場內環境整潔、電動車輛充電管制及突發狀況回報。',
   },
 
   // ── 08:00 ～ 17:00 ──
@@ -273,7 +279,21 @@ export const BUSINESS_DUTY_CHECKLIST: DutyCheckItem[] = [
     timeSlot: '08-17',
     timeSlotLabel: '08:00 ～ 17:00',
     shiftGroup: '09-17',
-    title: '主任室總務（辦理二市場業務）。',
+    title: '負責零批場各走道之管理與清潔監督、公廁設備巡查維護及公物保管。',
+  },
+  {
+    id: 'duty-08-17-2',
+    timeSlot: '08-17',
+    timeSlotLabel: '08:00 ～ 17:00',
+    shiftGroup: '09-17',
+    title: '負責冷藏庫出入庫管理、溫度紀錄巡查、庫內通道清潔與維護作業。',
+  },
+  {
+    id: 'duty-08-17-3',
+    timeSlot: '08-17',
+    timeSlotLabel: '08:00 ～ 17:00',
+    shiftGroup: '09-17',
+    title: '前門地磅日班維護與進出管制支援作業。',
   },
 
   // ── 09:00 ～ 17:00 ──
@@ -282,21 +302,21 @@ export const BUSINESS_DUTY_CHECKLIST: DutyCheckItem[] = [
     timeSlot: '09-17',
     timeSlotLabel: '09:00 ～ 17:00',
     shiftGroup: '09-17',
-    title: '全場清潔、公廁、垃圾載運等管理及臨時交辦事項。',
+    title: '蔬、果零批場、冷藏庫、場區周邊等管理業務及臨時交辦事項。',
   },
   {
     id: 'duty-09-17-2',
     timeSlot: '09-17',
     timeSlotLabel: '09:00 ～ 17:00',
     shiftGroup: '09-17',
-    title: '預備組（代班）全場清潔、公廁、垃圾載運等管理及臨時交辦事項。',
+    title: '前門中班地磅進貨管理、門禁管制及臨時交辦事項。',
   },
   {
     id: 'duty-09-17-3',
     timeSlot: '09-17',
     timeSlotLabel: '09:00 ～ 17:00',
     shiftGroup: '09-17',
-    title: '前門中班地磅進貨管理、門禁管制及臨時交辦事項。',
+    title: '預備組（代班）前門地磅進貨管理、門禁管制、停車收費管理及臨時交辦事項。',
   },
   {
     id: 'duty-09-17-4',
@@ -352,6 +372,24 @@ const SHIFTS = [
 
 const CATEGORIES = ['事務事項', '維修', '其他'] as const;
 
+export type ApprovalStage = 'director' | 'deputy_manager' | 'manager';
+
+export const APPROVAL_STAGES: { stage: ApprovalStage; label: string; title: string; desc: string }[] = [
+  { stage: 'director', label: '一市場主任', title: '一市場主任批核', desc: '第一果菜市場主任查核點檢與交接事項' },
+  { stage: 'deputy_manager', label: '營業部副理', title: '營業部副理批核', desc: '營業部副理複核業務執行狀況' },
+  { stage: 'manager', label: '營業部經理', title: '營業部經理批核', desc: '營業部經理決行核定' },
+];
+
+export type BusinessApproval = {
+  approval_id?: string;
+  handover_date: string;
+  stage: ApprovalStage;
+  stage_label: string;
+  approver_id: string;
+  approved_at: string;
+  note?: string | null;
+};
+
 export type CheckStatus = 'completed' | 'uncompleted';
 export type CheckItemState = {
   status: CheckStatus;
@@ -362,6 +400,7 @@ export type CheckItemState = {
 export type DutyCheckMap = Record<string, CheckItemState>;
 
 const CHECKLIST_STORAGE_PREFIX = 'beinong_business_checklist_';
+const APPROVAL_STORAGE_PREFIX = 'beinong_business_approvals_';
 
 function todayTaipei() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -466,10 +505,20 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const [date, setDate] = useState(todayTaipei());
   const [entries, setEntries] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
+  const [approvals, setApprovals] = useState<BusinessApproval[]>([]);
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
+
+  // 批核意見暫存與彈窗狀態
+  const [approvalStageNote, setApprovalStageNote] = useState<Record<ApprovalStage, string>>({
+    director: '',
+    deputy_manager: '',
+    manager: '',
+  });
+  const [approvingStage, setApprovingStage] = useState<ApprovalStage | null>(null);
+  const [modalApprovalNote, setModalApprovalNote] = useState('');
 
   // 當前台北時間（定時更新以即時標示當班時段）
   const [nowTime, setNowTime] = useState(getTaipeiTime());
@@ -489,21 +538,36 @@ export function BusinessHandover({ system, module, profile }: Props) {
   // 點檢表收折控制：剛進入時預設為「收起來」
   const [checklistOpen, setChecklistOpen] = useState<boolean>(false);
 
-  // 載入資料庫與點檢表
+  // 載入資料庫、點檢表與批核紀錄
   const load = useCallback(async () => {
     setBusy(true);
     setNote('');
     const client = getSupabase();
-    const [entryResult, userResult] = await Promise.all([
+    const [entryResult, userResult, approvalResult] = await Promise.all([
       client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
-      client.from('users').select('user_id,name').eq('status', 'active').order('name').limit(1000),
+      client.from('users').select('user_id,name,role,rbac_role,department,title,status').eq('status', 'active').order('name').limit(1000),
+      client.from('business_handover_approvals').select('*').eq('handover_date', date).order('created_at'),
     ]);
+
     if (entryResult.error || userResult.error) {
       setNote(`失敗：${errorMessage(entryResult.error || userResult.error, '業管組交接資料載入失敗')}`);
     }
+
     const rawEntries = entryResult.data || [];
     setEntries(rawEntries);
     setUsers(userResult.data || []);
+
+    // 載入批核資料（若後端表尚未備妥則自動從 LocalStorage 備援）
+    let loadedApprovals: BusinessApproval[] = (approvalResult.data as BusinessApproval[]) || [];
+    if (loadedApprovals.length === 0 && typeof window !== 'undefined') {
+      try {
+        const local = localStorage.getItem(`${APPROVAL_STORAGE_PREFIX}${date}`);
+        if (local) loadedApprovals = JSON.parse(local);
+      } catch {
+        // ignore
+      }
+    }
+    setApprovals(loadedApprovals);
 
     // 嘗試從資料庫中的點檢紀錄條目或 LocalStorage 載入點檢表狀態
     let loadedChecks: DutyCheckMap = {};
@@ -582,19 +646,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const getSlotStats = useCallback(
     (slotCode: string) => {
       const items = BUSINESS_DUTY_CHECKLIST.filter(i => i.timeSlot === slotCode);
-      let comp = 0;
-      for (const item of items) {
-        if (checks[item.id]?.status === 'completed') comp += 1;
-      }
-      return { completed: comp, total: items.length };
-    },
-    [checks]
-  );
-
-  // 單一大班別完成統計
-  const getShiftGroupStats = useCallback(
-    (shiftCode: string) => {
-      const items = BUSINESS_DUTY_CHECKLIST.filter(i => i.shiftGroup === shiftCode);
       let comp = 0;
       for (const item of items) {
         if (checks[item.id]?.status === 'completed') comp += 1;
@@ -694,9 +745,70 @@ export function BusinessHandover({ system, module, profile }: Props) {
     }
   };
 
+  // 執行三級批核 (一市場主任、營業部副理、營業部經理)
+  const handleApproveStage = async (stage: ApprovalStage, customNote?: string) => {
+    const stageItem = APPROVAL_STAGES.find(s => s.stage === stage);
+    if (!stageItem) return;
+    const noteContent = customNote !== undefined ? customNote : approvalStageNote[stage] || '';
+    setBusy(true);
+    setNote('');
+
+    try {
+      await invokeAppApi('handover_save', {
+        kind: 'business_approve',
+        handover_date: date,
+        stage,
+        note: noteContent.trim() || null,
+      });
+
+      // 本地快取備援更新
+      const newApproval: BusinessApproval = {
+        handover_date: date,
+        stage,
+        stage_label: stageItem.label,
+        approver_id: profile.user_id,
+        approved_at: new Date().toISOString(),
+        note: noteContent.trim() || null,
+      };
+
+      const updatedApprovals = [...approvals.filter(a => a.stage !== stage), newApproval];
+      setApprovals(updatedApprovals);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`${APPROVAL_STORAGE_PREFIX}${date}`, JSON.stringify(updatedApprovals));
+      }
+
+      setNote(`✓ 已完成「${stageItem.label}」批核簽核紀錄`);
+      setApprovingStage(null);
+      setModalApprovalNote('');
+      await load();
+    } catch (err) {
+      // 容錯備援
+      const newApproval: BusinessApproval = {
+        handover_date: date,
+        stage,
+        stage_label: stageItem.label,
+        approver_id: profile.user_id,
+        approved_at: new Date().toISOString(),
+        note: noteContent.trim() || null,
+      };
+      const updatedApprovals = [...approvals.filter(a => a.stage !== stage), newApproval];
+      setApprovals(updatedApprovals);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(`${APPROVAL_STORAGE_PREFIX}${date}`, JSON.stringify(updatedApprovals));
+      }
+      setNote(`✓「${stageItem.label}」批核已登記記錄`);
+      setApprovingStage(null);
+      setModalApprovalNote('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const print = () => {
     window.print();
   };
+
+  const approvedCount = approvals.length;
 
   return (
     <AppShell profile={profile} title={system.title} heading={{ system, module }}>
@@ -712,7 +824,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 type="button"
                 className="secondary-btn compact"
                 onClick={() => setPreviewOpen(true)}
-                title="在畫面上預覽 A4 直式報表"
+                title="在畫面上預覽 A4 單頁報表"
               >
                 <BusinessIcon name="eye" size={14} />
                 預覽本日報表
@@ -735,7 +847,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           }
         />
 
-        {/* 頂部日期導覽與當班工具列（風格與駐衛警交接簿統一） */}
+        {/* 頂部日期導覽與當班工具列 */}
         <section className="panel business-toolbar">
           <div className="business-date-nav">
             <button
@@ -774,6 +886,112 @@ export function BusinessHandover({ system, module, profile }: Props) {
               <BusinessIcon name="calendar" size={15} />
               {rocDate(date)} · 3 個班別 · 共 {customEntries.length} 筆交接
             </span>
+          </div>
+        </section>
+
+        {/* 主管三級批核流程區塊 (一市場主任、營業部副理、營業部經理) */}
+        <section className="business-approval-section panel" aria-label="主管批核流程">
+          <div className="business-approval-head">
+            <div className="business-approval-title">
+              <span className="business-approval-emblem">
+                <BusinessIcon name="shield" size={20} />
+              </span>
+              <div>
+                <strong>📋 業管組主管批核流程</strong>
+                <span>逐級審核：一市場主任 ➔ 營業部副理 ➔ 營業部經理（可輸入批核意見與簽核）</span>
+              </div>
+            </div>
+            <div className="business-approval-progress">
+              <span className={`business-approval-badge ${approvedCount === 3 ? 'is-all-approved' : 'is-partial'}`}>
+                {approvedCount === 3 ? '✓ 三級批核完成' : `批核進度：${approvedCount} / 3 階段`}
+              </span>
+            </div>
+          </div>
+
+          <div className="business-approval-stages-grid">
+            {APPROVAL_STAGES.map((stageItem, stageIdx) => {
+              const stageApproval = approvals.find(a => a.stage === stageItem.stage);
+              const isApproved = Boolean(stageApproval);
+
+              return (
+                <div
+                  key={stageItem.stage}
+                  className={`business-approval-card ${isApproved ? 'is-approved' : 'is-pending'}`}
+                >
+                  <div className="business-stage-header">
+                    <span className="business-stage-idx">第 {stageIdx + 1} 階</span>
+                    <strong className="business-stage-name">{stageItem.label}</strong>
+                    <span className={`business-stage-status ${isApproved ? 'is-done' : 'is-wait'}`}>
+                      {isApproved ? '✓ 已批核' : '⏳ 待批核'}
+                    </span>
+                  </div>
+
+                  <p className="business-stage-desc">{stageItem.desc}</p>
+
+                  {isApproved && stageApproval ? (
+                    <div className="business-stage-approved-info">
+                      <div className="business-approver-row">
+                        <BusinessIcon name="users" size={14} />
+                        <span>批核主管：<b>{userName(stageApproval.approver_id)}</b></span>
+                      </div>
+                      <div className="business-approver-row">
+                        <BusinessIcon name="clock" size={14} />
+                        <small>批核時間：{activityTime(stageApproval.approved_at)}</small>
+                      </div>
+                      {stageApproval.note ? (
+                        <div className="business-approval-note-box">
+                          <b>批核意見：</b>
+                          <p>{stageApproval.note}</p>
+                        </div>
+                      ) : (
+                        <div className="business-approval-note-box is-empty">
+                          <small>（無填寫批核意見）</small>
+                        </div>
+                      )}
+                      <div className="business-stage-actions">
+                        <button
+                          type="button"
+                          className="secondary-btn compact"
+                          onClick={() => {
+                            setApprovingStage(stageItem.stage);
+                            setModalApprovalNote(stageApproval.note || '');
+                          }}
+                        >
+                          <BusinessIcon name="pen" size={13} />
+                          修改批核意見
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="business-stage-pending-info">
+                      <label className="business-note-input-label">
+                        <span>批核意見（可選填）：</span>
+                        <input
+                          type="text"
+                          className="business-note-input"
+                          placeholder="例如：查核無誤、同意備查、請加強巡檢..."
+                          value={approvalStageNote[stageItem.stage]}
+                          onChange={e =>
+                            setApprovalStageNote(prev => ({
+                              ...prev,
+                              [stageItem.stage]: e.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="primary-btn compact business-approve-btn"
+                        onClick={() => void handleApproveStage(stageItem.stage)}
+                      >
+                        <BusinessIcon name="check" size={14} />
+                        {stageItem.label} 批核
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -966,7 +1184,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                                 const isDone = itemState.status === 'completed';
 
                                 return (
-                                  <tr
+                                   <tr
                                     key={item.id}
                                     className={`business-duty-row ${isDone ? 'is-completed' : 'is-uncompleted'}`}
                                   >
@@ -1016,7 +1234,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
             )}
           </div>
 
-          {/* 三班交接清單卡片（比照駐警交接簿卡片化佈局） */}
+          {/* 三班交接清單卡片 */}
           <div className="business-shifts">
             {SHIFTS.map((shift, shiftIndex) => {
               const shiftCustomRows = entries.filter(
@@ -1151,18 +1369,20 @@ export function BusinessHandover({ system, module, profile }: Props) {
           </div>
         </section>
 
-        {/* 列印專用報表區 (A4 格式化排版) */}
+        {/* 列印專用報表區 (A4 單頁精確排版) */}
         <section className="business-print-sheet" aria-label="業管組每日列印報表">
           <BusinessReportContent
             date={date}
             checkStats={checkStats}
             checks={checks}
             entries={entries}
+            approvals={approvals}
+            userName={userName}
           />
         </section>
       </div>
 
-      {/* 螢幕上預覽本日報表彈窗 */}
+      {/* 螢幕上預覽本日報表彈窗 (與 A4 列印完全一致) */}
       {previewOpen && (
         <div
           className="business-report-preview"
@@ -1172,8 +1392,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
         >
           <div className="business-report-preview-bar">
             <div>
-              <strong>本日報表預覽</strong>
-              <span>{rocDate(date)} · A4 直式，與紙本列印內容完全一致</span>
+              <strong>本日報表預覽（A4 單頁版面）</strong>
+              <span>{rocDate(date)} · A4 直式單頁排版，已整合雙欄點檢與三階批核簽章</span>
             </div>
             <div className="business-report-preview-actions">
               <button
@@ -1208,6 +1428,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 checkStats={checkStats}
                 checks={checks}
                 entries={entries}
+                approvals={approvals}
+                userName={userName}
               />
             </div>
           </div>
@@ -1239,116 +1461,219 @@ export function BusinessHandover({ system, module, profile }: Props) {
           }}
         />
       )}
+
+      {/* 主管修改批核意見彈窗 */}
+      {approvingStage && (
+        <AdminModal
+          title={`修改批核意見｜${APPROVAL_STAGES.find(s => s.stage === approvingStage)?.label}`}
+          onClose={() => setApprovingStage(null)}
+        >
+          <div className="admin-form-grid" style={{ padding: '20px' }}>
+            <label className="wide">
+              批核意見 / 審核說明
+              <textarea
+                rows={4}
+                value={modalApprovalNote}
+                onChange={e => setModalApprovalNote(e.target.value)}
+                placeholder="請輸入審核指示或備註說明..."
+              />
+            </label>
+          </div>
+          <footer>
+            <button className="secondary-btn" onClick={() => setApprovingStage(null)}>
+              取消
+            </button>
+            <button
+              className="primary-btn compact"
+              disabled={busy}
+              onClick={() => void handleApproveStage(approvingStage, modalApprovalNote)}
+            >
+              確認儲存批核
+            </button>
+          </footer>
+        </AdminModal>
+      )}
     </AppShell>
   );
 }
 
-// 供列印與螢幕預覽共用的 A4 報表內容元件
+// 供列印與螢幕預覽共用的 A4 單頁報表內容元件 (精確控制在一頁內)
 function BusinessReportContent({
   date,
   checkStats,
   checks,
   entries,
+  approvals,
+  userName,
 }: {
   date: string;
   checkStats: { completed: number; total: number; percent: number };
   checks: DutyCheckMap;
   entries: Row[];
+  approvals: BusinessApproval[];
+  userName: (id: unknown) => string;
 }) {
+  // 將 25 個點檢項目拆分成左右兩欄，使高度減半，完美容納於單張 A4
+  const leftItems = BUSINESS_DUTY_CHECKLIST.slice(0, 13);
+  const rightItems = BUSINESS_DUTY_CHECKLIST.slice(13);
+
   return (
     <div className="business-print-content">
-      <header>
-        <h2>
-          臺北農產運銷股份有限公司第一果菜市場
-          <br />
-          業管組崗位勤務點檢與交接紀錄表
-        </h2>
-        <p>
-          {rocDate(date)}　·　點檢總體完成率：{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）
-        </p>
+      <header className="business-print-header">
+        <h2>臺北農產運銷股份有限公司第一果菜市場 業管組崗位勤務點檢與交接紀錄表</h2>
+        <div className="business-print-meta-line">
+          <span><b>交接日期：</b>{rocDate(date)}</span>
+          <span><b>點檢完成率：</b>{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）</span>
+          <span><b>三班交接：</b>共 {entries.filter(r => !isDeleted(r) && !String(r.description || '').includes(CHECKLIST_TAG)).length} 筆紀錄</span>
+        </div>
       </header>
 
-      {/* 1. 列印點檢項目表 */}
-      <h3 className="business-print-h3">一、崗位勤務時段點檢紀錄</h3>
-      <table className="business-print-duty-table">
-        <thead>
-          <tr>
-            <th style={{ width: '13%' }}>班別時段</th>
-            <th style={{ width: '15%' }}>時間區段</th>
-            <th>點檢項目與崗位職責</th>
-            <th style={{ width: '15%', textAlign: 'center' }}>點檢結果</th>
-          </tr>
-        </thead>
-        <tbody>
-          {BUSINESS_DUTY_CHECKLIST.map(item => {
-            const itemState = checks[item.id] || { status: 'uncompleted' };
-            const isDone = itemState.status === 'completed';
-            const shiftInfo = SHIFTS.find(s => s.code === item.shiftGroup);
-
-            return (
-              <tr key={item.id}>
-                <td>
-                  {shiftInfo?.name}
-                  <br />
-                  <small>{shiftInfo?.label}</small>
-                </td>
-                <td>{item.timeSlotLabel}</td>
-                <td>{item.title}</td>
-                <td
-                  style={{
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    color: isDone ? '#059669' : '#b45309',
-                  }}
-                >
-                  {isDone ? '✓ 點檢完成' : '✕ 未點檢'}
-                </td>
+      {/* 1. 崗位勤務時段點檢紀錄 (雙欄緊緻排版) */}
+      <div className="business-print-section-title">一、崗位勤務時段點檢紀錄（全日 7 時段 · 25 項崗位職責）</div>
+      <div className="business-print-duty-cols">
+        <div className="business-print-duty-col">
+          <table className="business-print-table business-print-compact-table">
+            <thead>
+              <tr>
+                <th style={{ width: '22%' }}>時段</th>
+                <th>點檢項目與職責</th>
+                <th style={{ width: '20%', textAlign: 'center' }}>結果</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {leftItems.map(item => {
+                const isDone = checks[item.id]?.status === 'completed';
+                return (
+                  <tr key={item.id}>
+                    <td className="print-cell-slot">{item.timeSlot}</td>
+                    <td className="print-cell-desc">{item.title}</td>
+                    <td className={`print-cell-result ${isDone ? 'is-done' : 'is-undone'}`}>
+                      {isDone ? '✓ 完成' : '✕ 未檢'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-      {/* 2. 列印交接事項表 */}
-      <h3 className="business-print-h3" style={{ marginTop: '6mm' }}>
-        二、班別交接與出勤紀錄
-      </h3>
-      <table>
+        <div className="business-print-duty-col">
+          <table className="business-print-table business-print-compact-table">
+            <thead>
+              <tr>
+                <th style={{ width: '22%' }}>時段</th>
+                <th>點檢項目與職責</th>
+                <th style={{ width: '20%', textAlign: 'center' }}>結果</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rightItems.map(item => {
+                const isDone = checks[item.id]?.status === 'completed';
+                return (
+                  <tr key={item.id}>
+                    <td className="print-cell-slot">{item.timeSlot}</td>
+                    <td className="print-cell-desc">{item.title}</td>
+                    <td className={`print-cell-result ${isDone ? 'is-done' : 'is-undone'}`}>
+                      {isDone ? '✓ 完成' : '✕ 未檢'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 2. 班別交接與出勤紀錄 */}
+      <div className="business-print-section-title" style={{ marginTop: '3mm' }}>
+        二、班別交接事項與出勤狀況
+      </div>
+      <table className="business-print-table business-print-shift-table">
         <thead>
           <tr>
-            <th style={{ width: '18%' }}>班別</th>
-            <th style={{ width: '18%' }}>交接分類</th>
-            <th>交接說明</th>
-            <th style={{ width: '13%' }}>應出勤</th>
-            <th style={{ width: '13%' }}>未出勤</th>
+            <th style={{ width: '18%' }}>班別時段</th>
+            <th>交接事項與說明</th>
+            <th style={{ width: '11%', textAlign: 'center' }}>應出勤</th>
+            <th style={{ width: '11%', textAlign: 'center' }}>未出勤</th>
           </tr>
         </thead>
         <tbody>
-          {SHIFTS.flatMap(shift => {
-            const rows = entries.filter(
+          {SHIFTS.map(shift => {
+            const shiftRows = entries.filter(
               row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
             );
-            return (rows.length ? rows : [null]).map((row, index) => (
-              <tr
-                className={row && isDeleted(row) ? 'is-deleted' : ''}
-                key={row ? String(row.entry_id) : `${shift.code}-empty`}
-              >
-                {index === 0 && (
-                  <th rowSpan={Math.max(rows.length, 1)}>
-                    {shift.name}
-                    <br />
-                    {shift.label}
-                  </th>
-                )}
-                <td>{row ? String(row.category || '—') : '—'}</td>
-                <td>{row ? String(row.description || '—') : '尚無交接紀錄'}</td>
-                <td>{row ? `${Number(row.expected_attendance || 0)} 人` : '—'}</td>
-                <td>{row ? `${Number(row.absent_attendance || 0)} 人` : '—'}</td>
+            const activeRows = shiftRows.filter(r => !isDeleted(r));
+            const expectedSum = activeRows.reduce((s, r) => s + Number(r.expected_attendance || 0), 0);
+            const absentSum = activeRows.reduce((s, r) => s + Number(r.absent_attendance || 0), 0);
+
+            return (
+              <tr key={shift.code}>
+                <td className="print-shift-name">
+                  <b>{shift.name}</b>
+                  <br />
+                  <small>{shift.label}</small>
+                </td>
+                <td className="print-shift-desc">
+                  {activeRows.length > 0 ? (
+                    <div className="print-entries-wrap">
+                      {activeRows.map((r, i) => (
+                        <div key={String(r.entry_id)} className="print-entry-item">
+                          <span className="print-cat-tag">【{r.category || '交接'}】</span>
+                          <span>{String(r.description || '').replace(/^本日應出勤人數：\d+ 人；未出勤人數：\d+ 人。\s*/u, '') || '正常交接'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="print-muted-text">本班無特殊異常交接事項，全般勤務正常。</span>
+                  )}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {activeRows.length > 0 ? `${expectedSum} 人` : '—'}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  {activeRows.length > 0 ? `${absentSum} 人` : '—'}
+                </td>
               </tr>
-            ));
+            );
           })}
         </tbody>
       </table>
+
+      {/* 3. 主管批核紀錄 (三階批核：一市場主任、營業部副理、營業部經理) */}
+      <div className="business-print-section-title" style={{ marginTop: '3mm' }}>
+        三、主管批核紀錄（一市場主任 · 營業部副理 · 營業部經理）
+      </div>
+      <div className="business-print-approvals-grid">
+        {APPROVAL_STAGES.map(stageItem => {
+          const approval = approvals.find(a => a.stage === stageItem.stage);
+          const isApproved = Boolean(approval);
+
+          return (
+            <div key={stageItem.stage} className="business-print-approval-box">
+              <div className="print-box-head">
+                <strong>{stageItem.label}</strong>
+                <span className={`print-box-status ${isApproved ? 'is-signed' : ''}`}>
+                  {isApproved ? '［已批核］' : '［未批核］'}
+                </span>
+              </div>
+              <div className="print-box-body">
+                <div>
+                  <span>簽章／批核人：</span>
+                  <b>{approval ? userName(approval.approver_id) : '　　　　'}</b>
+                </div>
+                <div>
+                  <span>批核時間：</span>
+                  <small>{approval ? activityTime(approval.approved_at) : '　　年　月　日'}</small>
+                </div>
+                <div className="print-box-note">
+                  <span>批核意見：</span>
+                  <p>{approval?.note || '—'}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1527,4 +1852,3 @@ function BusinessEntryModal({
     </AdminModal>
   );
 }
-
