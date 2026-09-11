@@ -1,7 +1,10 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import type { ReactNode } from 'react';
+import { AppShell } from '@/components/AppShell';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
+import { hasModuleAccess } from '@/lib/modules';
 import { AuthGate } from '@/components/AuthGate';
 
 type WorkspaceProps = {
@@ -81,46 +84,45 @@ const AdminWorkspace = dynamic<{ profile: import('@/types/app').Profile; module:
 
 export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   if (system.key === 'admin') {
-    return <AuthGate>{profile => <AdminWorkspace profile={profile} module={module} />}</AuthGate>;
+    return <AuthGate>{profile => hasModuleAccess(profile, system.key, module.key)
+      ? <AdminWorkspace profile={profile} module={module} />
+      : <AppShell profile={profile} title={module.title}><section className="panel admin-access-denied"><h2>未開放此子系統</h2><p>目前帳號沒有使用「{module.title}」的權限，請洽系統管理員調整。</p></section></AppShell>}
+    </AuthGate>;
   }
+  let workspace: ReactNode;
   if (system.key === 'handover' || system.key === 'guardpatrol') {
-    return <OperationsWorkspace system={system} module={module} />;
-  }
-  if (system.key === 'vehicle') {
-    return <VehicleWorkspace system={system} module={module} />;
-  }
-  if (system.key === 'meetingroom') {
-    return <MeetingWorkspace system={system} module={module} />;
-  }
-  if (system.key === 'equipment') {
-    return <EquipmentWorkspace system={system} module={module} />;
-  }
-  if (system.key === 'workorder' && (module.key === 'attachments' || module.key === 'analytics')) {
-    return <WorkorderExtras system={system} module={module} />;
-  }
-  if (system.key === 'workorder' && module.key === 'repairmap3d') {
-    return <AuthGate>{profile => <RepairMap3DModule system={system} module={module} profile={profile} />}</AuthGate>;
-  }
-  if (system.key === 'structuremap') {
-    return <StructureMapModules system={system} module={module} />;
-  }
-  if (system.key === 'officialdocs') {
-    return <OfficialDocsWorkspace system={system} module={module} />;
-  }
-  if (system.key === 'marketboard') {
-    return <MarketBoardWorkspace system={system} module={module} />;
-  }
-  if (system.key === 'marketanalytics') {
+    workspace = <OperationsWorkspace system={system} module={module} />;
+  } else if (system.key === 'vehicle') {
+    workspace = <VehicleWorkspace system={system} module={module} />;
+  } else if (system.key === 'meetingroom') {
+    workspace = <MeetingWorkspace system={system} module={module} />;
+  } else if (system.key === 'equipment') {
+    workspace = <EquipmentWorkspace system={system} module={module} />;
+  } else if (system.key === 'workorder' && (module.key === 'attachments' || module.key === 'analytics')) {
+    workspace = <WorkorderExtras system={system} module={module} />;
+  } else if (system.key === 'workorder' && module.key === 'repairmap3d') {
+    workspace = <AuthGate>{profile => <RepairMap3DModule system={system} module={module} profile={profile} />}</AuthGate>;
+  } else if (system.key === 'structuremap') {
+    workspace = <StructureMapModules system={system} module={module} />;
+  } else if (system.key === 'officialdocs') {
+    workspace = <OfficialDocsWorkspace system={system} module={module} />;
+  } else if (system.key === 'marketboard') {
+    workspace = <MarketBoardWorkspace system={system} module={module} />;
+  } else if (system.key === 'marketanalytics') {
     if (module.key === 'command-center') {
-      return <MarketCommandCenterWorkspace system={system} module={module} />;
+      workspace = <MarketCommandCenterWorkspace system={system} module={module} />;
+    } else if (module.key === 'interactive-dashboard') {
+      workspace = <MarketInteractiveDashboardWorkspace system={system} module={module} />;
+    } else {
+      workspace = <MarketAnalyticsWorkspace system={system} module={module} />;
     }
-    if (module.key === 'interactive-dashboard') {
-      return <MarketInteractiveDashboardWorkspace system={system} module={module} />;
-    }
-    return <MarketAnalyticsWorkspace system={system} module={module} />;
+  } else if (system.key === 'vehicletracking') {
+    workspace = <VehicleTrackingWorkspace system={system} module={module} />;
+  } else {
+    workspace = <ModuleWorkspace system={system} module={module} />;
   }
-  if (system.key === 'vehicletracking') {
-    return <VehicleTrackingWorkspace system={system} module={module} />;
-  }
-  return <ModuleWorkspace system={system} module={module} />;
+  return <AuthGate>{profile => hasModuleAccess(profile, system.key, module.key)
+    ? workspace
+    : <AppShell profile={profile} title={module.title}><section className="panel admin-access-denied"><h2>未開放此子系統</h2><p>目前帳號沒有使用「{module.title}」的權限，請洽系統管理員調整。</p></section></AppShell>}
+  </AuthGate>;
 }

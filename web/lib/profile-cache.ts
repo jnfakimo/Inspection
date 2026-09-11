@@ -5,7 +5,7 @@ export const PROFILE_STORAGE_KEY = 'inspectionSystemUserProfile';
 
 const PROFILE_FIELDS = [
   'user_id', 'username', 'email', 'name', 'role', 'rbac_role', 'dept_id',
-  'department', 'phone', 'status', 'auth_id', 'allowed_systems', 'allowed_handover_modules', 'permissions',
+  'department', 'phone', 'status', 'auth_id', 'allowed_systems', 'allowed_modules', 'allowed_handover_modules', 'permissions',
 ] as const;
 
 type CacheProfile = Partial<Profile> & {

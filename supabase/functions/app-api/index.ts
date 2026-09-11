@@ -79,7 +79,23 @@ const MECHANICAL_SHIFT_CODES = ['01-09', '09-17', '17-01'] as const;
 const MECHANICAL_RESULTS = ['正常', '已完成', '處理中', '待料', '待廠商', '交下班續辦', '無法處理'] as const;
 const MECHANICAL_RESULT_SET = new Set<string>(MECHANICAL_RESULTS);
 const MECHANICAL_UNFINISHED_RESULTS = new Set<string>(['處理中', '待料', '待廠商', '交下班續辦', '無法處理']);
-const HANDOVER_MODULE_KEYS = ['records', 'mechanical', 'business', 'open-items', 'equipment', 'mechanical-schedule'] as const;
+const HANDOVER_MODULE_KEYS = ['records', 'mechanical', 'business', 'guard', 'guard-approve', 'open-items', 'equipment', 'mechanical-schedule'] as const;
+const SYSTEM_MODULE_KEYS: Record<string, readonly string[]> = {
+  admin: ['users', 'permissions', 'locations', 'audit', 'alerts', 'notices', 'layouts', 'cycles', 'costs', 'locanalysis', 'health'],
+  workorder: ['requests', 'dispatch', 'orders', 'attachments', 'analytics', 'repairmap3d'],
+  guardpatrol: ['checkins', 'points', 'shifts', 'notifications', 'records', 'map3d'],
+  handover: HANDOVER_MODULE_KEYS,
+  equipment: ['assets', 'plans', 'records', 'contracts', 'documents', 'costs', 'monitoring', 'materials'],
+  structuremap: ['areas', 'markers', 'floor2d', 'floor3d', 'models', 'relations'],
+  vehicle: ['requests', 'vehicles', 'drivers', 'managers', 'logs'],
+  meetingroom: ['bookings', 'changes', 'notifications', 'rooms'],
+  officialdocs: ['routing'],
+  marketanalytics: ['command-center', 'interactive-dashboard', 'overview', 'sources', 'templates', 'comparison'],
+  dashboard: [],
+  marketboard: ['executive', 'ticker'],
+  vehicletracking: ['live', 'history', 'devices', 'geofences', 'alerts'],
+};
+const SYSTEM_KEYS = Object.keys(SYSTEM_MODULE_KEYS);
 const BUSINESS_HANDOVER_CATEGORIES = new Set(['事務事項', '維修', '其他']);
 
 function mechanicalShiftSlot(workDate: string, shiftCode: string) {
@@ -1065,13 +1081,56 @@ export async function handleAppApiRequest(req: Request) {
     const roleId = profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor', maintenance: 'technician', inspector: 'reporter' } as Record<string, string>)[profile.role] || profile.role;
     const isSysadmin = roleId === 'sysadmin' || profile.role === 'admin';
     const { data: permissions } = await admin.from('role_permissions').select('perm,allowed').eq('role_id', roleId).eq('allowed', true);
-    const allowedSystems = new Set((permissions || []).filter(row => String(row.perm).startsWith('sys_')).map(row => String(row.perm).replace(/^sys_/, '')));
-    const { data: handoverModuleRows, error: handoverModuleError } = await admin.from('user_handover_module_access')
-      .select('module_key').eq('user_id', profile.user_id).eq('allowed', true);
+    const roleSystems = new Set((permissions || []).filter(row => String(row.perm).startsWith('sys_')).map(row => String(row.perm).replace(/^sys_/, '')));
+    const [systemAccessResult, moduleAccessResult, handoverModuleResult] = await Promise.all([
+      admin.from('user_system_access').select('system_key,mode').eq('user_id', profile.user_id),
+      admin.from('user_module_access').select('system_key,module_key,mode').eq('user_id', profile.user_id),
+      admin.from('user_handover_module_access').select('module_key').eq('user_id', profile.user_id).eq('allowed', true),
+    ]);
+    if (systemAccessResult.error) console.error('user system access lookup failed:', systemAccessResult.error.message);
+    if (moduleAccessResult.error) console.error('user module access lookup failed:', moduleAccessResult.error.message);
+    const systemModes = new Map((systemAccessResult.data || []).map(row => [String(row.system_key), String(row.mode)]));
+    const moduleModes = new Map((moduleAccessResult.data || []).map(row => [`${row.system_key}/${row.module_key}`, String(row.mode)]));
+    const allowedSystems = new Set<string>();
+    for (const systemKey of SYSTEM_KEYS) {
+      if (systemKey === 'admin' && !isSysadmin) continue;
+      const mode = systemModes.get(systemKey) || 'inherit';
+      if (mode === 'allow' || (mode === 'inherit' && roleSystems.has(systemKey))) allowedSystems.add(systemKey);
+    }
+    const { data: handoverModuleRows, error: handoverModuleError } = handoverModuleResult;
     if (handoverModuleError) console.error('handover module access lookup failed:', handoverModuleError.message);
-    const allowedHandoverModules = new Set((handoverModuleRows || []).map(row => String(row.module_key)).filter(value => HANDOVER_MODULE_KEYS.includes(value as (typeof HANDOVER_MODULE_KEYS)[number])));
+    const allowedModules = new Set<string>();
+    for (const [systemKey, moduleKeys] of Object.entries(SYSTEM_MODULE_KEYS)) {
+      if (!allowedSystems.has(systemKey)) continue;
+      for (const moduleKey of moduleKeys) {
+        if (!moduleAccessResult.error) {
+          if ((moduleModes.get(`${systemKey}/${moduleKey}`) || 'inherit') !== 'deny') allowedModules.add(`${systemKey}/${moduleKey}`);
+          continue;
+        }
+        // 新 migration 尚未套用時，非交接簿模組先沿用父系統權限；交接簿仍採舊白名單，
+        // 避免部署前後的短暫版本差異把既有權限放大或把整頁誤判為沒有任何子系統。
+        if (systemKey !== 'handover') allowedModules.add(`${systemKey}/${moduleKey}`);
+      }
+    }
+    const allowedHandoverModules = new Set<string>();
+    if (!moduleAccessResult.error) {
+      for (const moduleKey of HANDOVER_MODULE_KEYS) if (allowedModules.has(`handover/${moduleKey}`)) allowedHandoverModules.add(moduleKey);
+    } else {
+      for (const row of handoverModuleRows || []) {
+        const moduleKey = String(row.module_key);
+        if (HANDOVER_MODULE_KEYS.includes(moduleKey as (typeof HANDOVER_MODULE_KEYS)[number])) {
+          allowedHandoverModules.add(moduleKey);
+          allowedModules.add(`handover/${moduleKey}`);
+        }
+      }
+    }
     const can = (system: string) => isSysadmin || allowedSystems.has(system);
     const canHandoverModule = (moduleKey: string) => isSysadmin || (can('handover') && allowedHandoverModules.has(moduleKey));
+    const canModule = (systemKey: string, moduleKey: string) => isSysadmin || (can(systemKey)
+      && (moduleAccessResult.error && systemKey === 'handover'
+        ? allowedHandoverModules.has(moduleKey)
+        : moduleAccessResult.error || allowedModules.has(`${systemKey}/${moduleKey}`)));
+    const canAnyModule = (...requirements: Array<readonly [string, string]>) => requirements.some(([systemKey, moduleKey]) => canModule(systemKey, moduleKey));
     const isAdmin = profile.role === 'admin' || ['admin', 'sysadmin'].includes(String(profile.rbac_role || ''));
     const roleCanManageMarket = (permissions || []).some(row => String(row.perm) === 'marketanalytics_manage');
 
@@ -1153,7 +1212,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'profile') {
-      return reply(req, { ok: true, data: { ...profile, email: profile.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems], allowed_handover_modules: isSysadmin ? ['*'] : [...allowedHandoverModules] } });
+      return reply(req, { ok: true, data: { ...profile, email: profile.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems], allowed_modules: isSysadmin ? ['*'] : [...allowedModules], allowed_handover_modules: isSysadmin ? ['*'] : [...allowedHandoverModules] } });
     }
 
     if (action === 'update_personal_profile') {
@@ -1168,7 +1227,7 @@ export async function handleAppApiRequest(req: Request) {
         .select('user_id,username,email,name,phone,department,role,rbac_role,status').single();
       if (error || !updated) return reply(req, { ok: false, message: '個人資料更新失敗' }, 500);
       await writeAudit(admin, profile.user_id, 'users', profile.user_id, 'update', before, { name: updated.name, phone: updated.phone });
-      return reply(req, { ok: true, data: { ...updated, email: updated.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems], allowed_handover_modules: isSysadmin ? ['*'] : [...allowedHandoverModules] } });
+      return reply(req, { ok: true, data: { ...updated, email: updated.email || authData.user.email || '', allowed_systems: isSysadmin ? ['*'] : [...allowedSystems], allowed_modules: isSysadmin ? ['*'] : [...allowedModules], allowed_handover_modules: isSysadmin ? ['*'] : [...allowedHandoverModules] } });
     }
 
     if (action === 'change_password') {
@@ -1187,6 +1246,7 @@ export async function handleAppApiRequest(req: Request) {
     // 目前節點、部室與角色，並以狀態條件更新避免兩個視窗同時收文／簽收。
     if (action === 'official_documents') {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      if (!canModule('officialdocs', 'routing')) return reply(req, { ok: false, message: '目前帳號未開放公文傳送子系統' }, 403);
       const lookup = text(body.lookup, 200).toLocaleLowerCase();
       const [documentResult, departmentResult, peopleResult] = await Promise.all([
         admin.from('official_documents').select('document_id,document_no,document_type,subject,originator_id,originator_dept_id,responsible_dept_id,responsible_user_id,status,current_step_id,barcode_value,created_at,updated_at,closed_at').order('updated_at', { ascending: false }).limit(500),
@@ -1312,6 +1372,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'official_document_create') {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      if (!canModule('officialdocs', 'routing')) return reply(req, { ok: false, message: '目前帳號未開放公文傳送子系統' }, 403);
       const createActor = { ...profile, role: roleId } as OfficialDocumentActor;
       const subject = text(body.subject, 300);
       if (!subject) return reply(req, { ok: false, message: '公文主旨不可空白' }, 400);
@@ -1371,6 +1432,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'official_document_action') {
       if (!can('officialdocs')) return reply(req, { ok: false, message: '目前角色沒有公文傳送系統權限' }, 403);
+      if (!canModule('officialdocs', 'routing')) return reply(req, { ok: false, message: '目前帳號未開放公文傳送子系統' }, 403);
       const documentId = id(body.document_id);
       const documentAction = text(body.document_action, 40);
       const note = text(body.note, 1000) || null;
@@ -1863,6 +1925,11 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'market_catalog') {
       if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      if (!canAnyModule(
+        ['marketanalytics', 'command-center'], ['marketanalytics', 'interactive-dashboard'],
+        ['marketanalytics', 'overview'], ['marketanalytics', 'sources'],
+        ['marketanalytics', 'templates'], ['marketanalytics', 'comparison'],
+      )) return reply(req, { ok: false, message: '目前帳號未開放市場營運分析子系統' }, 403);
       const [sourceResult, templateResult, rangeResult] = await Promise.all([
         admin.from('market_data_sources').select('source_id,source_code,source_name,source_type,endpoint_url,field_definitions,config,status,updated_at').eq('status', 'active').order('source_name').limit(200),
         admin.from('market_analysis_templates').select('template_id,template_code,template_name,description,source_id,dimensions,measures,chart_type,default_config,status,updated_at').eq('status', 'active').order('template_name').limit(200),
@@ -1891,6 +1958,11 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'market_dimension_catalog') {
       if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      if (!canAnyModule(
+        ['marketanalytics', 'command-center'], ['marketanalytics', 'interactive-dashboard'],
+        ['marketanalytics', 'overview'], ['marketanalytics', 'sources'],
+        ['marketanalytics', 'templates'], ['marketanalytics', 'comparison'],
+      )) return reply(req, { ok: false, message: '目前帳號未開放市場營運分析子系統' }, 403);
       const sourceId = id(body.source_id);
       const sourceResult = await admin.from('market_data_sources').select('source_id,field_definitions,config').eq('source_id', sourceId).eq('status', 'active').maybeSingle();
       if (sourceResult.error || !sourceResult.data) return reply(req, { ok: false, message: '找不到可用的市場行情資料來源' }, 404);
@@ -1929,6 +2001,10 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'market_analysis') {
       if (!can('marketanalytics')) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
+      if (!canAnyModule(
+        ['marketanalytics', 'command-center'], ['marketanalytics', 'interactive-dashboard'],
+        ['marketanalytics', 'overview'], ['marketanalytics', 'comparison'],
+      )) return reply(req, { ok: false, message: '目前帳號未開放市場分析檢視子系統' }, 403);
       const sourceId = id(body.source_id);
       let sourceResult;
       if (sourceId) {
@@ -2144,6 +2220,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'market_simulation_list') {
+      if (!canModule('marketanalytics', 'comparison')) return reply(req, { ok: false, message: '目前帳號未開放模擬比較子系統' }, 403);
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
       const sourceResult = await admin.from('market_data_sources').select('source_id,source_code,config').eq('status', 'active');
@@ -2164,6 +2241,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'market_simulation_save') {
+      if (!canModule('marketanalytics', 'comparison')) return reply(req, { ok: false, message: '目前帳號未開放模擬比較子系統' }, 403);
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!can('marketanalytics') && !canManageMarket) return reply(req, { ok: false, message: '目前角色沒有市場營運分析系統權限' }, 403);
       const name = text(body.name, 120);
@@ -2197,6 +2275,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'market_source_save') {
+      if (!canModule('marketanalytics', 'sources')) return reply(req, { ok: false, message: '目前帳號未開放資料來源子系統' }, 403);
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以修改資料來源' }, 403);
       const sourceId = id(body.source_id);
@@ -2239,6 +2318,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'market_template_save') {
+      if (!canModule('marketanalytics', 'templates')) return reply(req, { ok: false, message: '目前帳號未開放分析模板子系統' }, 403);
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以修改分析模板' }, 403);
       const templateId = id(body.template_id);
@@ -2268,6 +2348,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'market_import_rows') {
+      if (!canModule('marketanalytics', 'sources')) return reply(req, { ok: false, message: '目前帳號未開放資料來源子系統' }, 403);
       const canManageMarket = isSysadmin || roleCanManageMarket || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.marketanalytics_manage) || marketPermissionEnabled((profile.permissions as Record<string, unknown> | null)?.admin);
       if (!canManageMarket) return reply(req, { ok: false, message: '只有市場分析管理者可以匯入行情資料' }, 403);
       const sourceId = id(body.source_id);
@@ -2324,7 +2405,7 @@ export async function handleAppApiRequest(req: Request) {
       const config=MODULE_SOURCES[`${systemKey}/${moduleKey}`];
       if(!config)return reply(req,{ok:false,message:'找不到指定的 V2 子系統'},404);
       if(!can(config.permission))return reply(req,{ok:false,message:'目前角色沒有此系統權限'},403);
-      if(systemKey==='handover'&&!canHandoverModule(moduleKey))return reply(req,{ok:false,message:'目前帳號未開放此交接簿子系統'},403);
+      if(!canModule(systemKey,moduleKey))return reply(req,{ok:false,message:'目前帳號未開放此子系統'},403);
       const selectColumns=config.columns.map(column=>column[0]);
       if(systemKey==='guardpatrol'&&moduleKey==='records'){
         selectColumns.push('equipment(name)','users!inspection_records_inspector_id_fkey(name)');
@@ -2362,6 +2443,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!['requests', 'dispatch', 'orders'].includes(moduleKey)) {
         return reply(req, { ok: false, message: '維修子系統參數無效' }, 400);
       }
+      if (!canModule('workorder', moduleKey)) return reply(req, { ok: false, message: '目前帳號未開放此維修子系統' }, 403);
       const requests = await userDb.from('repair_requests').select('*')
         .order('updated_at', { ascending: false }).limit(500);
       if (requests.error) throw requests.error;
@@ -2426,6 +2508,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'workorder_options') {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      if (!canAnyModule(['workorder', 'requests'], ['workorder', 'dispatch'], ['workorder', 'orders'])) return reply(req, { ok: false, message: '目前帳號未開放維修作業子系統' }, 403);
       const [people, equipment, departments, contact, locations] = await Promise.all([
         userDb.from('users').select('user_id,name,department,dept_id,role,rbac_role').eq('status', 'active').order('name').limit(500),
         userDb.from('equipment').select('equipment_id,name,asset_code,location,category').neq('status', 'retired').order('name').limit(500),
@@ -2467,6 +2550,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'workorder_detail') {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      if (!canAnyModule(['workorder', 'requests'], ['workorder', 'dispatch'], ['workorder', 'orders'])) return reply(req, { ok: false, message: '目前帳號未開放維修作業子系統' }, 403);
       const requestId = text(body.request_id, 80);
       const requestNo = text(body.req_no, 80);
       if (requestId && !/^[0-9a-f-]{36}$/i.test(requestId)) return reply(req, { ok: false, message: '報修案件識別碼無效' }, 400);
@@ -2525,6 +2609,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'workorder_prepare_upload') {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      if (!canModule('workorder', 'requests')) return reply(req, { ok: false, message: '目前帳號未開放報修案件子系統' }, 403);
       const reqBody = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
       const requestPayload = reqBody.request && typeof reqBody.request === 'object' && !Array.isArray(reqBody.request)
         ? reqBody.request as Record<string, unknown>
@@ -2605,6 +2690,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'workorder_create_request') {
       if (!can('workorder')) return reply(req, { ok: false, message: '目前角色沒有維修系統權限' }, 403);
+      if (!canModule('workorder', 'requests')) return reply(req, { ok: false, message: '目前帳號未開放報修案件子系統' }, 403);
       const reqBody = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
       const requestData = reqBody.request && typeof reqBody.request === 'object' && !Array.isArray(reqBody.request)
         ? reqBody.request as Record<string, unknown>
@@ -2715,6 +2801,8 @@ export async function handleAppApiRequest(req: Request) {
       const allowedActions = new Set(['dispatch', 'engineer_accept', 'engineer_start', 'engineer_complete', 'reporter_accept', 'supervisor_accept', 'cancel']);
       if (!/^[0-9a-f-]{36}$/i.test(requestId)) return reply(req, { ok: false, message: '報修案件識別碼無效' }, 400);
       if (!allowedActions.has(workflowAction)) return reply(req, { ok: false, message: '維修流程動作無效' }, 400);
+      const workflowModule = workflowAction === 'dispatch' ? 'dispatch' : 'orders';
+      if (!canModule('workorder', workflowModule)) return reply(req, { ok: false, message: '目前帳號未開放此維修流程子系統' }, 403);
       const rawPayload = body.payload && typeof body.payload === 'object' && !Array.isArray(body.payload)
         ? body.payload as Record<string, unknown>
         : {};
@@ -2817,6 +2905,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'inspections') {
       if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有巡檢系統權限' }, 403);
+      if (!canModule('guardpatrol', 'records')) return reply(req, { ok: false, message: '目前帳號未開放設備巡檢子系統' }, 403);
       const [records, equipment, locations] = await Promise.all([
         userDb.from('inspection_records').select('record_id,inspect_time,run_status,light_status,abnormal_note,location_point,equipment(name,asset_code,floor),users!inspection_records_inspector_id_fkey(name)').order('inspect_time', { ascending: false }).limit(200),
         userDb.from('equipment').select('equipment_id,name,asset_code,floor').neq('status', 'retired').order('name').limit(1000),
@@ -2845,6 +2934,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'create_inspection') {
       if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有新增巡檢權限' }, 403);
+      if (!canModule('guardpatrol', 'records')) return reply(req, { ok: false, message: '目前帳號未開放設備巡檢子系統' }, 403);
       const equipmentId = text(body.equipment_id, 80);
       const runStatus = body.run_status === 'abnormal' ? 'abnormal' : 'normal';
       if (!/^[0-9a-f-]{36}$/i.test(equipmentId)) return reply(req, { ok: false, message: '請選擇有效設備' }, 400);
@@ -2865,6 +2955,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'guardpatrol_checkin') {
       if (!can('guardpatrol')) return reply(req, { ok: false, message: '目前角色沒有巡邏系統權限' }, 403);
+      if (!canModule('guardpatrol', 'checkins')) return reply(req, { ok: false, message: '目前帳號未開放巡邏打卡子系統' }, 403);
 
       const targetType = text(body.target_type, 20);
       const targetId = text(body.target_id, 80);
@@ -2922,6 +3013,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'open_inspection_cycle') {
       if (!isAdmin || !can('guardpatrol')) return reply(req, { ok: false, message: '只有巡檢系統管理者可以開啟週期' }, 403);
+      if (!canModule('admin', 'cycles')) return reply(req, { ok: false, message: '目前帳號未開放巡檢週期管理' }, 403);
       const cycleType = text(body.cycle_type, 20);
       if (!['daily', 'shift', 'weekly'].includes(cycleType)) return reply(req, { ok: false, message: '週期類型無效' }, 400);
       const { data, error } = await userDb.rpc('open_inspection_cycle', { p_cycle_type: cycleType });
@@ -2933,6 +3025,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('workorder') || !isAdmin) {
         return reply(req, { ok: false, message: '目前角色沒有新增費用權限' }, 403);
       }
+      if (!canModule('admin', 'costs')) return reply(req, { ok: false, message: '目前帳號未開放費用統計管理' }, 403);
       const equipmentId = text(body.equipment_id, 80);
       const costType = text(body.cost_type, 20);
       const vendor = text(body.vendor, 200) || null;
@@ -2953,6 +3046,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'save_official_vehicle') {
       if (!can('vehicle')) return reply(req, { ok: false, message: '目前角色沒有車輛主檔權限' }, 403);
+      if (!canModule('vehicle', 'vehicles')) return reply(req, { ok: false, message: '目前帳號未開放公務車輛子系統' }, 403);
       const isFleetManager = isAdmin || (await userDb.from('vehicle_dispatch_managers').select('user_id').eq('user_id', profile.user_id).eq('active', true).maybeSingle()).data;
       if (!isFleetManager) return reply(req, { ok: false, message: '只有派車管理者可以維護車輛主檔' }, 403);
       const vehicleId = text(body.vehicle_id, 80);
@@ -2982,6 +3076,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'vehicle_create_request') {
       if (!can('vehicle')) return reply(req, { ok: false, message: '目前角色沒有派車系統權限' }, 403);
+      if (!canModule('vehicle', 'requests')) return reply(req, { ok: false, message: '目前帳號未開放派車申請子系統' }, 403);
       const tripDate = text(body.trip_date, 10);
       const departure = text(body.planned_departure_time, 5), returnTime = text(body.planned_return_time, 5);
       const origin = text(body.origin_location, 200), destination = text(body.destination_location, 200);
@@ -3015,6 +3110,8 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('vehicle') || !isAdmin) return reply(req, { ok: false, message: '只有管理者可以維護派車名單' }, 403);
       const rosterTable = text(body.table, 60);
       if (rosterTable !== 'vehicle_dispatch_drivers' && rosterTable !== 'vehicle_dispatch_managers') return reply(req, { ok: false, message: '名單類型無效' }, 400);
+      const rosterModule = rosterTable === 'vehicle_dispatch_drivers' ? 'drivers' : 'managers';
+      if (!canModule('vehicle', rosterModule)) return reply(req, { ok: false, message: '目前帳號未開放此派車名單子系統' }, 403);
       const targetUser = text(body.user_id, 80);
       if (!/^[0-9a-f-]{36}$/i.test(targetUser)) return reply(req, { ok: false, message: '人員識別碼無效' }, 400);
       const remove = body.remove === true;
@@ -3034,6 +3131,8 @@ export async function handleAppApiRequest(req: Request) {
       if (!can('vehicle') || !isAdmin) return reply(req, { ok: false, message: '只有管理者可以維護派車名單' }, 403);
       const rosterTable = text(body.table, 60);
       if (rosterTable !== 'vehicle_dispatch_drivers' && rosterTable !== 'vehicle_dispatch_managers') return reply(req, { ok: false, message: '名單類型無效' }, 400);
+      const rosterModule = rosterTable === 'vehicle_dispatch_drivers' ? 'drivers' : 'managers';
+      if (!canModule('vehicle', rosterModule)) return reply(req, { ok: false, message: '目前帳號未開放此派車名單子系統' }, 403);
       const { data: before, error: readError } = await userDb.from(rosterTable)
         .select('user_id,active,assigned_by').eq('active', true);
       if (readError) throw readError;
@@ -3051,6 +3150,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'patrol_shift_delete') {
       if (!can('guardpatrol') || !isAdmin) return reply(req, { ok: false, message: '只有巡邏系統管理者可以刪除班別' }, 403);
+      if (!canModule('guardpatrol', 'shifts')) return reply(req, { ok: false, message: '目前帳號未開放巡檢排班子系統' }, 403);
       const scope = text(body.scope, 20);
       if (scope === 'template') {
         const templateId = text(body.template_id, 80);
@@ -3517,6 +3617,7 @@ export async function handleAppApiRequest(req: Request) {
       const kind = text(body.kind, 30);
 
       if (kind === 'ack_event') {
+        if (!canModule('equipment', 'monitoring')) return reply(req, { ok: false, message: '目前帳號未開放中央監控子系統' }, 403);
         const eventId = id(body.event_id);
         if (!eventId) return reply(req, { ok: false, message: '事件識別碼無效' }, 400);
         const { data: before, error: readError } = await userDb.from('equipment_monitor_events').select('event_id,event_state,title').eq('event_id', eventId).maybeSingle();
@@ -3536,6 +3637,16 @@ export async function handleAppApiRequest(req: Request) {
         const table = text(body.table, 60);
         const tableConfig = EQUIPMENT_TABLES[table];
         if (!tableConfig) return reply(req, { ok: false, message: '設備資料表無效' }, 400);
+        const moduleKey = ({
+          equipment: 'assets',
+          equipment_maintenance_plans: 'plans',
+          equipment_maintenance_records: 'records',
+          equipment_contracts: 'contracts',
+          equipment_documents: 'documents',
+          equipment_annual_costs: 'costs',
+          materials: 'materials',
+        } as Record<string, string>)[table];
+        if (!moduleKey || !canModule('equipment', moduleKey)) return reply(req, { ok: false, message: '目前帳號未開放此設備子系統' }, 403);
         const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
         const payload: Record<string, unknown> = {};
         for (const [key, field] of Object.entries(tableConfig.fields)) {
@@ -3579,6 +3690,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'field_pilot_save') {
       if (!can('handover')) return reply(req, { ok: false, message: '目前角色沒有交接系統權限' }, 403);
+      if (!canModule('handover', 'records')) return reply(req, { ok: false, message: '目前帳號未開放指揮台電子交接簿' }, 403);
       const raw = body.payload && typeof body.payload === 'object' ? body.payload as Record<string, unknown> : {};
       const payload: Record<string, unknown> = {};
       for (const key of ['record_date', 'shift_code', 'shift_start', 'shift_end', 'handover_by', 'instruction', 'notes', 'updated_at']) {
@@ -3628,6 +3740,10 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'equipment_map') {
       if (!can('structuremap') && !can('equipment')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
+      if (!canAnyModule(
+        ['structuremap', 'markers'], ['structuremap', 'floor2d'], ['structuremap', 'floor3d'],
+        ['equipment', 'assets'],
+      )) return reply(req, { ok: false, message: '目前帳號未開放設備圖臺相關子系統' }, 403);
       const [equipment, markers, locations] = await Promise.all([
         userDb.from('equipment').select('equipment_id,name,asset_code,category,status,floor,location,location_id').order('floor').order('name').limit(2000),
         userDb.from('plan_markers').select('marker_id,equipment_id,floor_id,x,y,label').limit(5000),
@@ -3652,6 +3768,7 @@ if (equipment.error) throw equipment.error;
 
     if (action === 'save_floor_model') {
       if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
+      if (!canModule('structuremap', 'models')) return reply(req, { ok: false, message: '目前帳號未開放圖資專案設定' }, 403);
       const floorId = canonicalFloor(text(body.floor_id, 20));
       const name = text(body.name, 100);
       const imagePath = text(body.image_path, 100);
@@ -3679,6 +3796,7 @@ if (equipment.error) throw equipment.error;
 
     if (action === 'area_save') {
       if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有場域結構圖權限' }, 403);
+      if (!canModule('structuremap', 'areas')) return reply(req, { ok: false, message: '目前帳號未開放區域位置表' }, 403);
       const kind = text(body.kind, 30);
 
       if (kind === 'deactivate') {
@@ -3795,6 +3913,7 @@ if (equipment.error) throw equipment.error;
 
     if (action === 'marker_save') {
       if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有場域結構圖權限' }, 403);
+      if (!canModule('structuremap', 'markers')) return reply(req, { ok: false, message: '目前帳號未開放整合標記系統' }, 403);
       const kind = text(body.kind, 30);
 
       if (kind === 'deactivate') {
@@ -3846,6 +3965,7 @@ if (equipment.error) throw equipment.error;
 
     if (action === 'move_structuremap_marker') {
       if (!can('structuremap')) return reply(req, { ok: false, message: '目前角色沒有設備圖臺權限' }, 403);
+      if (!canModule('structuremap', 'markers')) return reply(req, { ok: false, message: '目前帳號未開放整合標記系統' }, 403);
       const markerId = text(body.marker_id, 80);
       const x = Number(body.x), y = Number(body.y);
       if (!/^[0-9a-f-]{36}$/i.test(markerId)) return reply(req, { ok: false, message: '標記識別碼無效' }, 400);
@@ -3868,6 +3988,7 @@ if (equipment.error) throw equipment.error;
     // profile 查詢已限定 status='active'，故此處不必再判斷。
     if (action === 'meeting_check_in') {
       if (!can('meetingroom')) return reply(req, { ok: false, message: '目前角色沒有會議室系統權限' }, 403);
+      if (!canModule('meetingroom', 'bookings')) return reply(req, { ok: false, message: '目前帳號未開放會議預約子系統' }, 403);
       const bookingId = text(body.booking_id, 80);
       if (!/^[0-9a-f-]{36}$/i.test(bookingId)) return reply(req, { ok: false, message: '預約識別碼無效' }, 400);
 
@@ -3899,6 +4020,7 @@ if (equipment.error) throw equipment.error;
 
     if (action === 'meeting_save_room') {
       if (!can('meetingroom')) return reply(req, { ok: false, message: '目前角色沒有會議室系統權限' }, 403);
+      if (!canModule('meetingroom', 'rooms')) return reply(req, { ok: false, message: '目前帳號未開放會議室管理子系統' }, 403);
       if (!isAdmin) return reply(req, { ok: false, message: '只有管理者可以維護會議室主檔' }, 403);
 
       const name = text(body.name, 120);

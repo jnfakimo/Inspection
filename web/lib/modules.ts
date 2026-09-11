@@ -2,7 +2,7 @@ export type ModuleDefinition={key:string;title:string;description:string;legacy?
 export type SystemDefinition={key:string;code:string;title:string;description:string;icon:string;tone:string;modules:ModuleDefinition[]};
 const m=(key:string,title:string,description:string,legacy?:string):ModuleDefinition=>({key,title,description,legacy});
 export const systems:SystemDefinition[]=[
- {key:'admin',code:'SYS-01',title:'後台管理系統',description:'人員、權限、場域、通知、稽核與版面設定。',icon:'/Inspection/assets/system-icons-v20260901/admin-icon.png',tone:'cyan',modules:[m('users','人員帳號','啟用中與停用帳號、單位及角色。','admin.html#users'),m('permissions','角色權限','角色與各系統存取權限。','rbac.html'),m('locations','場域位置','市場、樓層、區域與巡檢位置。','locations.html'),m('audit','操作稽核','系統操作、資料存取與登入紀錄。','admin.html#audit'),m('alerts','資安告警','異常讀取、拒絕存取與安全事件。','admin.html#security'),m('notices','通知中心','系統通知與處理狀態。','notices.html'),m('layouts','戰情版面','戰情儀表板版面與元件版本。','dashboard-builder.html'),m('cycles','巡檢週期','巡檢週期開啟、重置與週期歷史。','admin.html#cycles'),m('costs','費用統計','設備生命週期費用記錄與排名。','admin.html#costs'),m('locanalysis','位置分析','場域下鑽的巡檢異常與報修樞紐統計。','admin.html#locanalysis'),m('health','系統健康','前端程式錯誤與系統介接異常紀錄。','admin.html#syshealth')]},
+ {key:'admin',code:'SYS-01',title:'後台管理系統',description:'人員、權限、場域、通知、稽核與版面設定。',icon:'/Inspection/assets/system-icons-v20260901/admin-icon.png',tone:'cyan',modules:[m('users','人員帳號','啟用中與停用帳號、單位及角色。','admin.html#users'),m('permissions','角色權限','角色範本、個人大系統與子系統存取權限。','rbac.html'),m('locations','場域位置','市場、樓層、區域與巡檢位置。','locations.html'),m('audit','操作稽核','系統操作、資料存取與登入紀錄。','admin.html#audit'),m('alerts','資安告警','異常讀取、拒絕存取與安全事件。','admin.html#security'),m('notices','通知中心','系統通知與處理狀態。','notices.html'),m('layouts','戰情版面','戰情儀表板版面與元件版本。','dashboard-builder.html'),m('cycles','巡檢週期','巡檢週期開啟、重置與週期歷史。','admin.html#cycles'),m('costs','費用統計','設備生命週期費用記錄與排名。','admin.html#costs'),m('locanalysis','位置分析','場域下鑽的巡檢異常與報修樞紐統計。','admin.html#locanalysis'),m('health','系統健康','前端程式錯誤與系統介接異常紀錄。','admin.html#syshealth')]},
  {key:'workorder',code:'SYS-02',title:'報修／派工／完工',description:'報修、派工、進度、附件、完工與分析。',icon:'/Inspection/assets/system-icons-v20260901/maintenance-icon.png',tone:'amber',modules:[m('requests','報修案件','所有報修來源、故障描述與處理狀態。','workorder.html'),m('dispatch','派工作業','維修人員指派與進度追蹤。','dispatch.html'),m('orders','維修工單','工單生命週期與完工驗收。','admin.html#repairs'),m('attachments','維修附件','照片與報修附件索引。','workorder.html'),m('analytics','維修分析','案件趨勢、處理量與狀態分布。','analytics.html'),m('repairmap3d','報修3D平面圖','共用 3D 雲台圖資，查看報修點與空間位置。')]},
  {key:'guardpatrol',code:'SYS-03',title:'駐衛警巡檢系統',description:'巡邏點、打卡、排班、逾時通知與立體巡檢。',icon:'/Inspection/assets/system-icons-v20260901/guardpatrol-icon.png',tone:'green',modules:[m('checkins','巡邏打卡','巡邏點簽到、座標與現場狀況。','patrolcheckin.html'),m('points','巡邏點清單','QR／NFC 巡邏點與樓層位置。','patrollist.html'),m('shifts','巡檢排班','班別、人員與預定巡檢時段。','patrolshifts.html'),m('notifications','逾時推播','即時通訊與行動推播結果及失敗原因。','patrol-notifications.html'),m('records','設備巡檢','設備運轉狀態與異常紀錄。','guardpatrol.html'),m('map3d','立體巡檢雲臺','巡檢點與立體樓層關聯。','guardpatrol3d.html')]},
  {key:'handover',code:'SYS-04',title:'電子交接簿',description:'班別交接、設備概況、異常與待辦。',icon:'/Inspection/assets/system-icons-v20260901/handover-icon.png',tone:'violet',modules:[m('records','指揮台電子交接簿','各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。','handover.html'),m('mechanical','機電課電子交接簿','機電三班維修養護工作、處理結果、備註與每日列印報表。'),m('business','業管組電子交接簿','業管組三班交接事項、出勤摘要、異動時間與每日列印報表。'),m('open-items','未結事項','跨班延續的異常與待辦。','handover.html#open'),m('equipment','設備概況','交接時的設備運轉摘要。','handover.html#equipment'),m('mechanical-schedule','機電課排班表','分別編排一市與二市整月班表，自動卡控休息間隔、正常工時及例休規則。')]},
@@ -19,3 +19,14 @@ export const systems:SystemDefinition[]=[
 export function findSystem(key:string){return systems.find(system=>system.key===key)}
 export function findModule(systemKey:string,moduleKey:string){return findSystem(systemKey)?.modules.find(module=>module.key===moduleKey)}
 export const allModuleParams=systems.flatMap(system=>system.modules.map(module=>({system:system.key,module:module.key})));
+export function hasSystemAccess(profile:{allowed_systems?:string[]},systemKey:string){
+ const allowed=profile.allowed_systems||[];
+ return allowed.includes('*')||allowed.includes(systemKey);
+}
+export function hasModuleAccess(profile:{allowed_systems?:string[];allowed_modules?:string[];allowed_handover_modules?:string[]},systemKey:string,moduleKey:string){
+ if(!hasSystemAccess(profile,systemKey))return false;
+ const allowed=profile.allowed_modules;
+ if(Array.isArray(allowed))return allowed.includes('*')||allowed.includes(`${systemKey}/${moduleKey}`);
+ if(systemKey==='handover'&&Array.isArray(profile.allowed_handover_modules))return profile.allowed_handover_modules.includes('*')||profile.allowed_handover_modules.includes(moduleKey);
+ return true;
+}

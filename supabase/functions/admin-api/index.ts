@@ -28,7 +28,23 @@ const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_sup
 // 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
 const ADMIN_CONTRACT_VERSION = 2;
 const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'sys_dashboard', 'sys_marketboard', 'sys_vehicletracking', 'marketanalytics_manage']);
-const HANDOVER_MODULES = new Set(['records', 'mechanical', 'business', 'open-items', 'equipment', 'mechanical-schedule']);
+const HANDOVER_MODULES = new Set(['records', 'mechanical', 'business', 'guard', 'guard-approve', 'open-items', 'equipment', 'mechanical-schedule']);
+const SYSTEM_MODULES: Record<string, ReadonlySet<string>> = {
+  admin: new Set(['users', 'permissions', 'locations', 'audit', 'alerts', 'notices', 'layouts', 'cycles', 'costs', 'locanalysis', 'health']),
+  workorder: new Set(['requests', 'dispatch', 'orders', 'attachments', 'analytics', 'repairmap3d']),
+  guardpatrol: new Set(['checkins', 'points', 'shifts', 'notifications', 'records', 'map3d']),
+  handover: HANDOVER_MODULES,
+  equipment: new Set(['assets', 'plans', 'records', 'contracts', 'documents', 'costs', 'monitoring', 'materials']),
+  structuremap: new Set(['areas', 'markers', 'floor2d', 'floor3d', 'models', 'relations']),
+  vehicle: new Set(['requests', 'vehicles', 'drivers', 'managers', 'logs']),
+  meetingroom: new Set(['bookings', 'changes', 'notifications', 'rooms']),
+  officialdocs: new Set(['routing']),
+  marketanalytics: new Set(['command-center', 'interactive-dashboard', 'overview', 'sources', 'templates', 'comparison']),
+  dashboard: new Set(),
+  marketboard: new Set(['executive', 'ticker']),
+  vehicletracking: new Set(['live', 'history', 'devices', 'geofences', 'alerts']),
+};
+const ACCESS_MODES = new Set(['inherit', 'allow', 'deny']);
 const SAFE_SETTING_KEYS = new Set([
   'org_name', 'site_name', 'shifts', 'line_group_id', 'line_notify_anomaly', 'line_notify_repair',
   'line_notify_case', 'line_notify_security', 'line_notify_security_alerts', 'line_notify_error_threshold',
@@ -694,6 +710,47 @@ export async function handleAdminApiRequest(req: Request) {
       const { error: inheritError } = await admin.from('users').update({ permissions: {} }).eq('rbac_role', rbacRole);
       if (inheritError) return reply(req, { ok: false, message: `角色權限已更新，但使用者繼承同步失敗：${inheritError.message}` }, 500);
       await audit('role_permissions', `${rbacRole}:${permission}`, 'update', { before: before?.allowed, after: allowed });
+      return reply(req, { ok: true });
+    }
+
+    if (action === 'admin_set_user_system_access') {
+      const userId = id(body.user_id), systemKey = clean(body.system_key, 40), mode = clean(body.mode, 20);
+      if (!userId || !SYSTEM_MODULES[systemKey] || !ACCESS_MODES.has(mode)) return reply(req, { ok: false, message: '使用者、系統或授權模式無效' }, 400);
+      const { data: target, error: targetError } = await admin.from('users')
+        .select('user_id,name,role,rbac_role,status').eq('user_id', userId).maybeSingle();
+      if (targetError || !target) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
+      if (target.status !== 'active') return reply(req, { ok: false, message: '只能設定啟用中帳號' }, 409);
+      const targetRole = target.rbac_role || (target.role === 'admin' ? 'sysadmin' : target.role);
+      if (targetRole === 'sysadmin') return reply(req, { ok: false, message: '系統管理員固定為全部開放，不需設定個人例外' }, 409);
+      if (systemKey === 'admin' && mode === 'allow') return reply(req, { ok: false, message: '後台管理只保留給系統管理員，不可個別開放' }, 400);
+      const { data: before } = await admin.from('user_system_access')
+        .select('mode').eq('user_id', userId).eq('system_key', systemKey).maybeSingle();
+      const { error } = await admin.from('user_system_access').upsert({
+        user_id: userId, system_key: systemKey, mode, granted_by: profile.user_id, updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,system_key' });
+      if (error) return reply(req, { ok: false, message: `個人系統權限更新失敗：${error.message}` }, 400);
+      await audit('user_system_access', `${userId}:${systemKey}`, 'update', { target_name: target.name, before: before?.mode || 'inherit', after: mode });
+      return reply(req, { ok: true });
+    }
+
+    if (action === 'admin_set_user_module_access') {
+      const userId = id(body.user_id), systemKey = clean(body.system_key, 40), moduleKey = clean(body.module_key, 50), mode = clean(body.mode, 20);
+      if (!userId || !SYSTEM_MODULES[systemKey]?.has(moduleKey) || !ACCESS_MODES.has(mode)) return reply(req, { ok: false, message: '使用者、系統、子系統或授權模式無效' }, 400);
+      const { data: target, error: targetError } = await admin.from('users')
+        .select('user_id,name,role,rbac_role,status').eq('user_id', userId).maybeSingle();
+      if (targetError || !target) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
+      if (target.status !== 'active') return reply(req, { ok: false, message: '只能設定啟用中帳號' }, 409);
+      const targetRole = target.rbac_role || (target.role === 'admin' ? 'sysadmin' : target.role);
+      if (targetRole === 'sysadmin') return reply(req, { ok: false, message: '系統管理員固定為全部開放，不需設定個人例外' }, 409);
+      if (systemKey === 'admin' && mode === 'allow') return reply(req, { ok: false, message: '後台管理子系統只保留給系統管理員' }, 400);
+      const { data: before } = await admin.from('user_module_access')
+        .select('mode').eq('user_id', userId).eq('system_key', systemKey).eq('module_key', moduleKey).maybeSingle();
+      const { error } = await admin.from('user_module_access').upsert({
+        user_id: userId, system_key: systemKey, module_key: moduleKey, mode,
+        granted_by: profile.user_id, updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,system_key,module_key' });
+      if (error) return reply(req, { ok: false, message: `個人子系統權限更新失敗：${error.message}` }, 400);
+      await audit('user_module_access', `${userId}:${systemKey}:${moduleKey}`, 'update', { target_name: target.name, before: before?.mode || 'inherit', after: mode });
       return reply(req, { ok: true });
     }
 
