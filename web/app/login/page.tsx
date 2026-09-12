@@ -16,6 +16,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
 import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
+import { requestedPostLoginPath, resolvePostLoginDestination } from '@/lib/login-destination';
 import type { Profile } from '@/types/app';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
@@ -41,13 +42,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState(''), [password2, setPassword2] = useState('');
 
-  function nextPath() {
-    const requested = new URLSearchParams(window.location.search).get('next');
-    if (requested && (requested.startsWith('/Inspection/v2/') || requested.startsWith('/word-cloud/v2/'))
-      && !requested.startsWith('/Inspection/v2/login') && !requested.startsWith('/word-cloud/v2/login')) {
-      return requested;
-    }
-    return '/Inspection/v2/systems/';
+  function nextPath(profile: Profile) {
+    return resolvePostLoginDestination(requestedPostLoginPath(window.location.search), profile);
   }
   async function loadCaptcha() {
     setCaptcha(null);
@@ -87,7 +83,26 @@ export default function LoginPage() {
       void loadCaptcha();
       return;
     }
-    getSupabase().auth.getSession().then(({ data }) => { if (data.session) location.replace(nextPath()); else void loadCaptcha(); });
+    let active = true;
+    void getSupabase().auth.getSession().then(async ({ data }) => {
+      if (!active) return;
+      if (!data.session) { void loadCaptcha(); return; }
+      setBusy(true);
+      try {
+        const profile = await invokeAppApi<Profile>('profile');
+        if (!active) return;
+        saveProfile(profile);
+        location.replace(nextPath(profile));
+      } catch (profileError) {
+        clearProfile();
+        await getSupabase().auth.signOut({ scope: 'local' }).catch(() => {});
+        if (!active) return;
+        setMessage(friendlyError(profileError, '找不到啟用中的系統帳號，請聯絡管理員'));
+        setBusy(false);
+        void loadCaptcha();
+      }
+    });
+    return () => { active = false; };
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -101,9 +116,10 @@ export default function LoginPage() {
       if (error || !data?.access_token) { setMessage(data?.message || '帳號、密碼或驗證碼錯誤'); setBusy(false); await loadCaptcha(); return; }
       const result = await getSupabase().auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
       if (result.error) { setMessage('登入狀態建立失敗，請重新登入'); setBusy(false); return; }
+      let verifiedProfile: Profile;
       try {
-        const profile = await invokeAppApi<Profile>('profile');
-        saveProfile(profile);
+        verifiedProfile = await invokeAppApi<Profile>('profile');
+        saveProfile(verifiedProfile);
       } catch (profileError) {
         clearProfile();
         await getSupabase().auth.signOut({ scope: 'local' }).catch(() => {});
@@ -111,7 +127,7 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      location.replace(nextPath());
+      location.replace(nextPath(verifiedProfile));
     } catch { setMessage('登入服務暫時無法連線，請稍後重試'); setBusy(false); }
   }
 
