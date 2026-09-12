@@ -16,7 +16,9 @@ import subprocess
 import sys
 import tempfile
 import uuid
-import defusedxml.ElementTree as ET
+# 內建解析器即可：parse_visible_rows 解析前已拒絕 DOCTYPE／ENTITY 宣告並限制大小與節點數，
+# 內建 expat 也不會抓取外部實體。不引入 defusedxml，現場排程服務才不會因缺套件而靜默失敗。
+import xml.etree.ElementTree as ET  # nosec B405
 
 
 PACKAGE = "com.lq.position"
@@ -146,7 +148,7 @@ def parse_visible_rows(raw: bytes, allow_incomplete: bool = False) -> list[dict]
     if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
         raise ProbeError("畫面結構含不允許的宣告，未解析資料。")
     try:
-        root = ET.fromstring(text)
+        root = ET.fromstring(text)  # nosec B314 -- 上方已拒絕 DTD／實體宣告
     except ET.ParseError:
         raise ProbeError("畫面結構無法解析。") from None
     if sum(1 for _ in root.iter()) > 30000:
