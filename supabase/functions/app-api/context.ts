@@ -16,9 +16,7 @@ export type AppApiContext = {
   userDb: SupabaseClient;
   reply: (req: Request, body: unknown, status?: number) => Response;
   can: (system: string) => boolean;
-  // 注意：子系統權限表查詢失敗時，index.ts 的 canModule 會回傳錯誤物件（真值）而非 boolean，
-  // 效果是沿用大系統權限放行。這是四層授權導入時的過渡期降級行為，型別照實保留，不在拆檔時更動。
-  canModule: (systemKey: string, moduleKey: string) => boolean | { message: string };
+  canModule: (systemKey: string, moduleKey: string) => boolean;
   isAdmin: boolean;
   isSysadmin: boolean;
 };

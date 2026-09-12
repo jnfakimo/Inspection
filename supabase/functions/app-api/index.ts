@@ -1091,7 +1091,8 @@ export async function handleAppApiRequest(req: Request) {
     ]);
     if (systemAccessResult.error) console.error('user system access lookup failed:', systemAccessResult.error.message);
     if (moduleAccessResult.error) console.error('user module access lookup failed:', moduleAccessResult.error.message);
-    // 角色子系統範本是後加的資料表；migration 未套用時視為「全部沿用大系統」，維持舊行為。
+    // 子系統權限（個人例外與角色範本）查詢失敗時一律不放行：失敗即拒絕，符合 ISO 27001 預設拒絕原則。
+    // 錯誤仍寫入函式日誌供追查；使用者重新整理即可在資料庫恢復後取回權限。
     if (roleModuleResult.error) console.error('role module access lookup failed:', roleModuleResult.error.message);
     const systemModes = new Map((systemAccessResult.data || []).map(row => [String(row.system_key), String(row.mode)]));
     const moduleModes = new Map((moduleAccessResult.data || []).map(row => [`${row.system_key}/${row.module_key}`, String(row.mode)]));
@@ -1101,6 +1102,8 @@ export async function handleAppApiRequest(req: Request) {
       const personal = moduleModes.get(`${systemKey}/${moduleKey}`) || 'inherit';
       if (personal === 'allow') return true;
       if (personal === 'deny') return false;
+      // 角色範本查不到時無法確認這個子系統是否被角色關閉，比照失敗即拒絕。
+      if (roleModuleResult.error) return false;
       return (roleModuleModes.get(`${systemKey}/${moduleKey}`) || 'inherit') !== 'deny';
     };
     const allowedSystems = new Set<string>();
@@ -1119,9 +1122,7 @@ export async function handleAppApiRequest(req: Request) {
           if (moduleAllowedFor(systemKey, moduleKey)) allowedModules.add(`${systemKey}/${moduleKey}`);
           continue;
         }
-        // 新 migration 尚未套用時，非交接簿模組先沿用父系統權限；交接簿仍採舊白名單，
-        // 避免部署前後的短暫版本差異把既有權限放大或把整頁誤判為沒有任何子系統。
-        if (systemKey !== 'handover') allowedModules.add(`${systemKey}/${moduleKey}`);
+        // 個人子系統權限表查詢失敗：不放行任何子系統（交接簿由下方舊白名單另行判斷）。
       }
     }
     const allowedHandoverModules = new Set<string>();
@@ -1141,7 +1142,7 @@ export async function handleAppApiRequest(req: Request) {
     const canModule = (systemKey: string, moduleKey: string) => isSysadmin || (can(systemKey)
       && (moduleAccessResult.error && systemKey === 'handover'
         ? allowedHandoverModules.has(moduleKey)
-        : moduleAccessResult.error || allowedModules.has(`${systemKey}/${moduleKey}`)));
+        : allowedModules.has(`${systemKey}/${moduleKey}`)));
     const canAnyModule = (...requirements: Array<readonly [string, string]>) => requirements.some(([systemKey, moduleKey]) => canModule(systemKey, moduleKey));
     const isAdmin = profile.role === 'admin' || ['admin', 'sysadmin'].includes(String(profile.rbac_role || ''));
     const roleCanManageMarket = (permissions || []).some(row => String(row.perm) === 'marketanalytics_manage');
