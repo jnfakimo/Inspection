@@ -17,6 +17,7 @@ import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy
 import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import { requestedPostLoginPath, resolvePostLoginDestination } from '@/lib/login-destination';
+import { PATROL_IDLE_LOGOUT_MESSAGE_KEY, startPatrolSession } from '@/lib/patrol-session';
 import type { Profile } from '@/types/app';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
@@ -83,6 +84,13 @@ export default function LoginPage() {
       void loadCaptcha();
       return;
     }
+    try {
+      const idleMessage = window.sessionStorage.getItem(PATROL_IDLE_LOGOUT_MESSAGE_KEY);
+      if (idleMessage) {
+        window.sessionStorage.removeItem(PATROL_IDLE_LOGOUT_MESSAGE_KEY);
+        setMessage(idleMessage);
+      }
+    } catch { /* 儲存區可能被瀏覽器停用 */ }
     let active = true;
     void getSupabase().auth.getSession().then(async ({ data }) => {
       if (!active) return;
@@ -92,7 +100,9 @@ export default function LoginPage() {
         const profile = await invokeAppApi<Profile>('profile');
         if (!active) return;
         saveProfile(profile);
-        location.replace(nextPath(profile));
+        const destination = nextPath(profile);
+        startPatrolSession(data.session);
+        location.replace(destination);
       } catch (profileError) {
         clearProfile();
         await getSupabase().auth.signOut({ scope: 'local' }).catch(() => {});
@@ -127,7 +137,9 @@ export default function LoginPage() {
         setBusy(false);
         return;
       }
-      location.replace(nextPath(verifiedProfile));
+      const destination = nextPath(verifiedProfile);
+      if (result.data.session) startPatrolSession(result.data.session);
+      location.replace(destination);
     } catch { setMessage('登入服務暫時無法連線，請稍後重試'); setBusy(false); }
   }
 

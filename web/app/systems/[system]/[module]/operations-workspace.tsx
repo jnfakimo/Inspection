@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { AuthGate } from '@/components/AuthGate';
@@ -25,9 +25,19 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
   // 樓層清單以 3D 建模系統的 floor_models 為準：那邊新增或移除樓層，這裡跟著變。
   const [floorModels, setFloorModels] = useState<Array<{ floor_id: string; name?: string | null; level?: number | null }>>([]);
   const [expandedFloors, setExpandedFloors] = useState<Set<string>>(new Set());
-  const [rows, setRows] = useState<Row[]>([]); const [points, setPoints] = useState<Point[]>([]); const [schedules, setSchedules] = useState<PatrolSchedule[]>([]); const [selected, setSelected] = useState(''); const [exportFrom, setExportFrom] = useState(today()); const [exportTo, setExportTo] = useState(today()); const [date, setDate] = useState(today()); const [floor, setFloor] = useState(''); const [shift, setShift] = useState(''); const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false); const [note, setNote] = useState('');
-  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult, floorResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), getPatrolShiftsForDate(client, date), client.from('floor_models').select('floor_id,name,level').limit(200)]); setRows((data.rows || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setPoints((markerResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setFloorModels((floorResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setSchedules(scheduleResult.filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); } }, [client, date]);
+  const [rows, setRows] = useState<Row[]>([]); const [points, setPoints] = useState<Point[]>([]); const [schedules, setSchedules] = useState<PatrolSchedule[]>([]); const [selected, setSelected] = useState(''); const [exportFrom, setExportFrom] = useState(today()); const [exportTo, setExportTo] = useState(today()); const [date, setDate] = useState(today()); const [floor, setFloor] = useState(''); const [shift, setShift] = useState(''); const [status, setStatus] = useState(''); const [busy, setBusy] = useState(false); const [loaded, setLoaded] = useState(false); const [note, setNote] = useState('');
+  const [qrTarget, setQrTarget] = useState<{ markerId: string; source: 'qr' | 'nfc' } | null>(null);
+  const autoCheckinRef = useRef('');
+  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult, floorResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').order('floor_id').order('label').limit(1000), getPatrolShiftsForDate(client, date), client.from('floor_models').select('floor_id,name,level').limit(200)]); setRows((data.rows || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setPoints((markerResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setFloorModels((floorResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setSchedules(scheduleResult.filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); setLoaded(true); } }, [client, date]);
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const markerId = params.get('marker')?.trim() || '';
+    if (!markerId) return;
+    const source = params.get('source') === 'nfc' ? 'nfc' : 'qr';
+    setSelected(markerId);
+    setQrTarget({ markerId, source });
+  }, []);
   // 打卡明細表只有已打卡的記錄，狀態篩選（待打卡／逾期）是給下方巡檢點矩陣用的；
   // 若在此套用 status，選待打卡或逾期未打卡時明細表會恆空。
   // 值班日的打卡明細要涵蓋該日白天，以及隔日凌晨的夜班；不能只用
@@ -120,7 +130,24 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { setNote(error instanceof Error ? `匯出失敗：${error.message}` : '匯出失敗'); }
-  };  const checkin = async () => { const point = points.find(item => item.marker_id === selected); if (!point) { setNote('請先選擇巡檢點'); return; } setBusy(true); setNote(''); try { await invokeAppApi('guardpatrol_checkin', { target_type: 'marker', target_id: point.marker_id }); setNote(`已完成「${point.label || '巡檢點'}」打卡`); setSelected(''); await load(); } catch (error) { setNote(`打卡失敗：${error instanceof Error ? error.message : String(error)}`); } setBusy(false); };
+  };
+  const checkin = useCallback(async (markerId = selected, checkinSource: 'qr' | 'nfc' | 'v2-dashboard' = 'v2-dashboard') => {
+    const point = points.find(item => item.marker_id === markerId);
+    if (!point) { setNote(markerId ? '此巡邏點已停用或不存在' : '請先選擇巡檢點'); return; }
+    setBusy(true); setNote('');
+    try {
+      await invokeAppApi('guardpatrol_checkin', { target_type: 'marker', target_id: point.marker_id, checkin_source: checkinSource });
+      setNote(`已完成「${point.label || '巡檢點'}」打卡；持續掃描會延長 10 分鐘登入時間`);
+      setSelected('');
+      await load();
+    } catch (error) { setNote(`打卡失敗：${error instanceof Error ? error.message : String(error)}`); }
+    setBusy(false);
+  }, [load, points, selected]);
+  useEffect(() => {
+    if (!loaded || !qrTarget || autoCheckinRef.current === qrTarget.markerId) return;
+    autoCheckinRef.current = qrTarget.markerId;
+    void checkin(qrTarget.markerId, qrTarget.source);
+  }, [checkin, loaded, qrTarget]);
   return <AppShell profile={profile} title={system.title}><div className='operations-page'>{note && <p className='operations-note' role='status'>{note}</p>}<section className='operations-panel'><div className='operations-panel-title'><h2>{module.title}</h2><button onClick={() => void load()} disabled={busy}>重新載入</button></div><p className='operations-hint'>依「巡檢排班」的班別時段與通報時段記錄；夜班歸屬前一日的隔夜班。</p><div className='operations-tool-row'><div className='operations-datebar'><button onClick={() => setDate(current => { const value = new Date(current + 'T00:00:00'); value.setDate(value.getDate() - 1); return value.toISOString().slice(0, 10); })}>◀</button><LocalizedDateInput aria-label='巡檢日期（年/月/日）' value={date} onChange={e => setDate(e.target.value)} /><button onClick={() => setDate(current => { const value = new Date(current + 'T00:00:00'); value.setDate(value.getDate() + 1); return value.toISOString().slice(0, 10); })}>▶</button><button onClick={() => setDate(today())}>今天</button></div><div className='operations-filter-row'><label>樓層<ComboboxSelect value={floor} onChange={setFloor} options={[{value:'',label:'全部樓層'},...floors.map(value => ({value,label:value}))]} /></label><label>班別<ComboboxSelect value={shift} onChange={setShift} options={[{value:'',label:'全部班別'},...schedules.map(item => ({value:item.shift_id,label:`${item.name}${isNightShiftName(item.name) ? '（隔夜）' : ''} ${String(item.start_time).slice(0, 5)}–${String(item.end_time).slice(0, 5)}`}))]} /></label><label>打卡狀態<ComboboxSelect value={status} onChange={setStatus} options={[{value:'',label:'全部狀態'},{value:'ok',label:'已打卡'},{value:'pending',label:'待打卡'},{value:'overdue',label:'逾期未打卡'}]} /></label><label className='export-date'>匯出起日<LocalizedDateInput aria-label='匯出起日（年/月/日）' value={exportFrom} onChange={e => setExportFrom(e.target.value)} /></label><label className='export-date'>匯出迄日<LocalizedDateInput aria-label='匯出迄日（年/月/日）' value={exportTo} onChange={e => setExportTo(e.target.value)} /></label><button className='operations-export' onClick={() => void exportXlsx(visibleRows, `巡檢打卡_${date}.xlsx`)}>匯出值班日 XLSX</button><button className='operations-export' onClick={() => void exportXlsx(rows.filter(row => String(row.checkin_at || '').slice(0, 10) >= exportFrom && String(row.checkin_at || '').slice(0, 10) <= exportTo), `巡檢打卡_${exportFrom}_${exportTo}.xlsx`)}>匯出期間 XLSX</button></div></div><div className='operations-stat-row'><span><b>{activeSchedule ? `${activeSchedule.name}${isNightShiftName(activeSchedule.name) ? '（隔夜）' : ''} ${String(activeSchedule.start_time).slice(0, 5)}–${String(activeSchedule.end_time).slice(0, 5)}` : '目前無進行中班別'}</b></span><span className='stat-done'>已打卡 <b>{dutyCounts ? dutyCounts.ok : '—'}</b></span><span className='stat-pending'>待打卡 <b>{dutyCounts ? dutyCounts.pending : '—'}</b></span><span className='stat-overdue'>逾期未打卡 <b>{dutyCounts ? dutyCounts.overdue : '—'}</b></span><span>值班日打卡紀錄 <b>{visibleRows.length}</b></span></div><div className='operations-legend'><span className='ok'>● 已打卡</span><span className='pending'>● 待打卡（通報時段尚未結束）</span><span className='overdue'>● 逾期未打卡</span></div><div className='operations-table-wrap'><table className='operations-matrix'><thead><tr><th>樓層</th><th>巡檢點</th>{matrixSchedules.map(item => <th key={item.shift_id}><strong>{item.name}{isNightShiftName(item.name) ? '（隔夜）' : ''}</strong><small>班別 {String(item.start_time).slice(0, 5)}–{String(item.end_time).slice(0, 5)}</small><small>通報 {String(item.notify_start_time).slice(0, 5)}–{String(item.notify_end_time).slice(0, 5)}</small></th>)}</tr></thead><tbody>{matrixGroups.flatMap(group => {
               const open = expandedFloors.has(group.floor);
               const toggle = () => setExpandedFloors(current => { const next = new Set(current); if (next.has(group.floor)) next.delete(group.floor); else next.add(group.floor); return next; });

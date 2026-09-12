@@ -10,7 +10,10 @@ const savedFetch = globalThis.fetch;
 const savedWindow = globalThis.window;
 globalThis.window = { sessionStorage: {}, setTimeout, clearTimeout };
 globalThis.routingClient = {
-  auth: { getSession: async () => ({ data: { session: { access_token: 'synthetic-session' } } }) },
+  auth: {
+    getSession: async () => ({ data: { session: { access_token: 'synthetic-session' } } }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+  },
   functions: { invoke: async (...args) => {
     edgeCalls.push(args);
     return { data: { ok: true, data: 'local-result' }, error: edgeError };

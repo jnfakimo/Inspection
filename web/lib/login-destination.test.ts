@@ -8,6 +8,10 @@ const inspector = {
   allowed_modules: ['guardpatrol/records', 'handover/guard'],
 };
 const sysadmin = { role: 'admin', rbac_role: 'sysadmin', allowed_systems: ['*'], allowed_modules: ['*'] };
+const patrolOfficer = {
+  role: 'inspector', rbac_role: 'reporter',
+  allowed_systems: ['guardpatrol'], allowed_modules: ['guardpatrol/checkins'],
+};
 
 test('一般使用者首次登入不會被送進先前開啟的後台網址', () => {
   const requested = '/Inspection/v2/systems/admin/users/?v=a1238e9e3';
@@ -31,4 +35,9 @@ test('舊入口 redirect 可安全轉成 V2 網址，外部與登入網址一律
   assert.equal(resolvePostLoginDestination(requestedPostLoginPath('?redirect=%2Fsystems%2Fhandover%2F'), inspector), '/Inspection/v2/systems/handover/');
   assert.equal(resolvePostLoginDestination('https://example.com/Inspection/v2/systems/', sysadmin), '/Inspection/v2/systems/');
   assert.equal(resolvePostLoginDestination('/Inspection/v2/login/', sysadmin), '/Inspection/v2/systems/');
+});
+
+test('QR 登入完成後保留巡邏點與掃描方式參數', () => {
+  const target = '/Inspection/v2/systems/guardpatrol/checkins/?marker=11111111-1111-4111-8111-111111111111&source=qr';
+  assert.equal(resolvePostLoginDestination(target, patrolOfficer), target);
 });

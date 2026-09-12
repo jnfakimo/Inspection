@@ -6,6 +6,7 @@ import { usesLocalBackendOrigin } from './backend-origin';
 import { reportIfInfrastructureError } from './error-tracker';
 import { emitSecurityDataRead } from './security-audit-sink';
 import { cachedRequest, requestCacheKey } from './request-cache';
+import { markPatrolSessionExpired } from './patrol-session';
 
 let client: SupabaseClient | null = null;
 // The formal self-hosted site must keep writes on the same backend as its login.
@@ -49,6 +50,10 @@ export function getSupabase() {
       autoRefreshToken: true,
       detectSessionInUrl: false,
     },
+  });
+  client.auth.onAuthStateChange((event) => {
+    // 明確登出、帳號撤銷或安全機制中止 session 時，QR 跨分頁憑證也必須立即失效。
+    if (event === 'SIGNED_OUT') markPatrolSessionExpired();
   });
   return client;
 }

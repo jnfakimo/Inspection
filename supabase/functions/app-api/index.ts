@@ -2996,6 +2996,9 @@ export async function handleAppApiRequest(req: Request) {
 
       const targetType = text(body.target_type, 20);
       const targetId = text(body.target_id, 80);
+      const requestedSource = text(body.checkin_source, 20);
+      const checkinSource = requestedSource === 'qr' || requestedSource === 'nfc'
+        ? requestedSource : 'v2-dashboard';
       if (targetType !== 'marker' || !/^[0-9a-f-]{36}$/i.test(targetId)) {
         return reply(req, { ok: false, message: '巡邏點資料格式不正確' }, 400);
       }
@@ -3031,7 +3034,7 @@ export async function handleAppApiRequest(req: Request) {
         label: text(marker.label, 200) || '未命名巡檢點',
         user_id: profile.user_id,
         user_name: text(profile.name, 160) || text(profile.username, 160) || '巡檢人員',
-        checkin_source: 'v2-dashboard',
+        checkin_source: checkinSource,
         auth_level: 'server',
         verification_method: 'password_session',
         source_ip: extractClientIp(req),
