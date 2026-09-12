@@ -253,6 +253,10 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   `system_access_seed.sql` 與存取資料表的 `system_key` 檢查條件則由 `npm run test:schema-contract` 比對，
   漏改任何一份都會在測試擋下來。新增大系統時：改 `modules.ts` → 補兩支 Edge Function 的清單 → 補 seed →
   補一支放寬 `system_key` 檢查條件的 migration。
+- **圖面標記大小**：立體巡檢雲臺與平面圖都提供「打卡點大小」拉桿，刻度一律是 0.5〜3 倍、預設 1 倍，
+  兩張圖改一邊就要改另一邊，避免像 V1 的 floor3d.html 與 guardpatrol3d.html 那樣分岔。3D 走
+  `FloorStack3D` 的 `markerScale`（以 ref＋獨立 effect 調整既有圓點的 scale，不重建場景）；
+  平面圖走 CSS 變數 `--pin-scale`（OSD 會自行增刪覆蓋層節點，交給 CSS 才不必逐顆重算）。
 - **授權畫面只有一種版型**：「人員精細授權」與「角色系統範本」都用 `permission-access-list.tsx` 的
   `GranularAccessList` 渲染（大系統卡片＋子系統下鑽），差別只有傳進去的資料。要調整版面請改那一支，
   不要在任一分頁另外做一套。

@@ -34,6 +34,8 @@ const UNCHECKED_COLOR = '#ff3b3b';
 
 // 樓層間距沿用 3D 模型圖的刻度：1〜20 倍、預設 6 倍，換算成 FloorStack3D 的 gap。
 const GAP_MIN = 1, GAP_MAX = 20, GAP_STEP = 0.5, GAP_DEFAULT = 6;
+// 打卡點大小：0.5〜3 倍、預設 1 倍（＝原始大小）。平面圖用同一組刻度，兩張圖手感一致。
+const DOT_MIN = 0.5, DOT_MAX = 3, DOT_STEP = 0.1, DOT_DEFAULT = 1;
 const GAP_PER_STEP = 1.6 / GAP_DEFAULT;
 
 function taipeiToday() {
@@ -51,6 +53,7 @@ export function PatrolMap3DModule({ module, profile }: Props) {
   const [note, setNote] = useState('');
 
   const [explode, setExplode] = useState(GAP_DEFAULT);
+  const [dotScale, setDotScale] = useState(DOT_DEFAULT);
   const [showMarkers, setShowMarkers] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
   const [visibleFloors, setVisibleFloors] = useState<Record<string, boolean>>({});
@@ -150,6 +153,7 @@ export function PatrolMap3DModule({ module, profile }: Props) {
         showLabels={showLabels}
         visibleFloors={visibleFloors}
         gap={explode * GAP_PER_STEP}
+        markerScale={dotScale}
         apiRef={apiRef}
       />}
       {!busy && !models.length && <p className="f3-empty">
@@ -214,10 +218,15 @@ export function PatrolMap3DModule({ module, profile }: Props) {
       <input id="p3-gap" type="range" min={GAP_MIN} max={GAP_MAX} step={GAP_STEP}
         value={explode} onChange={event => setExplode(Number(event.target.value))} />
       <div className="h-r">放大倍率：<span>{explode % 1 ? explode.toFixed(1) : explode}×</span></div>
+      <label htmlFor="p3-dot">打卡點大小</label>
+      <input id="p3-dot" type="range" min={DOT_MIN} max={DOT_MAX} step={DOT_STEP}
+        value={dotScale} onChange={event => setDotScale(Number(event.target.value))} />
+      <div className="h-r">打卡點：<span>{dotScale.toFixed(1)}×</span></div>
       <div className="btnrow">
         <button className="mini" onClick={resetView}>⊡ 重置</button>
         <button className="mini" onClick={() => apiRef.current?.topView()}>⊤ 俯視</button>
         <button className="mini" onClick={() => setExplode(1)}>真實比例</button>
+        <button className="mini" onClick={() => setDotScale(DOT_DEFAULT)}>點原大小</button>
       </div>
       <p className="f2-note">
         巡檢點座標取自 plan_markers（kind=patrol），維護請至圖臺系統的「整合標記」。

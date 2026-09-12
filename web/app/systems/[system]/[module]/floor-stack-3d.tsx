@@ -65,17 +65,22 @@ function preparePlanTexture(THREE: typeof import('three'), texture: import('thre
 
 export { preparePlanCanvas, preparePlanObjectUrl } from '@/lib/floorplan-render';
 
-export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, apiRef }: {
+export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, markerScale = 1, apiRef }: {
   models: StackModel[]; markers: StackMarker[]; showMarkers?: boolean; gap?: number;
   xPan?: number; yPan?: number;
   visibleKinds?: Record<string, boolean>;
   showLabels?: boolean;
   visibleFloors?: Record<string, boolean>;
+  /** 標記圓點的放大倍率（1 為原始大小）。拉桿即時生效，不重建場景。 */
+  markerScale?: number;
   /** 可選。ref 物件的識別碼是穩定的，列入相依也不會多觸發場景重建。 */
   apiRef?: { current: FloorStackApi | null };
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
+  // 圓點大小用 ref＋獨立 effect 調整：拉桿每動一格都重建整個場景會嚴重卡頓。
+  const markerScaleRef = useRef(markerScale);
+  const dotsRef = useRef<Array<{ scale: { setScalar: (value: number) => void } }>>([]);
 
   // 主題會影響場景底色、樓層板顏色、邊線顏色與貼圖重畫，而這些全在建場景時就決定。
   // 必須跟著 data-theme 變動重建，否則切換主題後畫面停在舊主題直到重新整理——
@@ -88,6 +93,11 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    markerScaleRef.current = markerScale;
+    for (const dot of dotsRef.current) dot.scale.setScalar(markerScale);
+  }, [markerScale]);
 
   useEffect(() => {
     let disposed = false;
@@ -120,6 +130,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       dir.position.set(8, 14, 6);
       scene.add(dir);
 
+      // 圓點收集起來，讓大小拉桿可以直接改 scale，不必重建場景。
+      const dots: Array<import('three').Mesh> = [];
       // 標籤沿用 depthTest:false，會全部疊著畫；收集起來在每次算繪時做螢幕空間剔除。
       const labelSprites: Array<import('three').Sprite> = [];
       const leaderLines: Array<{ leader: import('three').Line; sprite: import('three').Sprite }> = [];
@@ -194,8 +206,11 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
             
             const dot = new THREE.Mesh(
               // 原點再縮 50%（0.045 → 0.0225）：密集區才看得出每一顆的位置。
+              // 實際大小再乘上使用者拉桿的倍率。
               new THREE.SphereGeometry(0.0225, 12, 12),
               new THREE.MeshBasicMaterial({ color: new THREE.Color(isLight ? darkenColor(marker.color) : marker.color) }));
+            dot.scale.setScalar(markerScaleRef.current);
+            dots.push(dot);
             // 標記的 x／y 為 0–1 相對座標，換算到平面尺寸並置中。
             dot.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.12, marker.y * PLANE_H - PLANE_H / 2);
             scene.add(dot);
@@ -335,6 +350,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
           },
         };
       }
+      dotsRef.current = dots;
+
       const onResize = () => {
         const w = host.clientWidth || width, h = host.clientHeight || height;
         camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
@@ -344,6 +361,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       cleanupRef.current = () => {
         if (apiRef) apiRef.current = null;
+        dotsRef.current = [];
         cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
         controls.removeEventListener('start', stopAutoFit);

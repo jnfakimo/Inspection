@@ -40,6 +40,8 @@ const MARKER_KIND: Record<string, string> = {
 const KIND_COLOR: Record<string, string> = {
   equipment: '#00d4ff', space: '#00d4ff', patrol: '#00ff9d', repair: '#ff3b3b', note: '#ffb300', other: '#b48aff',
 };
+// 標記大小：0.5〜3 倍、預設 1 倍，與立體巡檢雲臺同一組刻度。
+const DOT_MIN = 0.5, DOT_MAX = 3, DOT_STEP = 0.1, DOT_DEFAULT = 1;
 const CHECKED_COLOR = '#00ff9d';
 const UNCHECKED_COLOR = '#ff3b3b';
 const textureUrl = floorTextureUrl;
@@ -119,6 +121,7 @@ function Floor2DViewer({ system, module, profile }: Props) {
   });
   // 與 3D 模型圖同名同語意的開關：關閉時標籤只在滑過圖釘時浮現。
   const [showLabels, setShowLabels] = useState(false);
+  const [dotScale, setDotScale] = useState(DOT_DEFAULT);
   const [placing, setPlacing] = useState(false);
   const [selected, setSelected] = useState<Row | null>(null);
   const [saving, setSaving] = useState(false);
@@ -454,7 +457,8 @@ function Floor2DViewer({ system, module, profile }: Props) {
   const noteIsError = note.startsWith('失敗');
 
   // 平面圖沒有 3D 的「控制」面板，左欄少一顆按鈕；標記面板要跟右邊的樓層面板同高。
-  return <div className="f3-root f3-no-ctrl">
+  // 標記大小用 CSS 變數往下傳：OSD 會自行增刪覆蓋層節點，交給 CSS 才不必逐顆重算。
+  return <div className="f3-root f3-no-ctrl" style={{ '--pin-scale': dotScale } as React.CSSProperties}>
     {busy && <div className="f3-loading">
       <div className="ld-t">載入樓層平面圖…</div>
       <div className="ld-bar"><div className="ld-fill" style={{ width: '70%' }} /></div>
@@ -530,6 +534,11 @@ function Floor2DViewer({ system, module, profile }: Props) {
         <input type="checkbox" disabled={!showMarkers} checked={showLabels}
           onChange={event => setShowLabels(event.target.checked)} />文字標籤
       </label>
+      <label htmlFor="f2-dot">{patrolOnly ? '打卡點大小' : '標記大小'}</label>
+      <input id="f2-dot" type="range" min={DOT_MIN} max={DOT_MAX} step={DOT_STEP} disabled={!showMarkers}
+        value={dotScale} onChange={event => setDotScale(Number(event.target.value))} />
+      <div className="h-r">{patrolOnly ? '打卡點' : '標記'}：<span>{dotScale.toFixed(1)}×</span>
+        <button className="mini" onClick={() => setDotScale(DOT_DEFAULT)}>原大小</button></div>
       {patrolOnly ? <>
         <div className="chk kind legend" style={{ '--kind-color': CHECKED_COLOR } as React.CSSProperties}>
           <span className="legend-dot" />已打卡 {done}

@@ -329,25 +329,29 @@
   overflow: hidden auto;
 }
 
-.f3-panel label {
+.f3-panel label,
+.f3-mkpanel label:not(.chk) {
   display: block;
   margin: 8px 0 3px;
   color: var(--dim);
   font-size: 11px;
 }
 
-.f3-panel input[type='range'] {
+.f3-panel input[type='range'],
+.f3-mkpanel input[type='range'] {
   width: 100%;
   accent-color: var(--cyan);
 }
 
-.f3-panel .h-r {
+.f3-panel .h-r,
+.f3-mkpanel .h-r {
   margin-top: 4px;
   color: var(--dim);
   font-size: 11px;
 }
 
-.f3-panel .h-r span { color: var(--text); }
+.f3-panel .h-r span,
+.f3-mkpanel .h-r span { color: var(--text); }
 
 .f3-panel .btnrow {
   display: flex;
@@ -355,7 +359,8 @@
   margin-top: 8px;
 }
 
-.f3-panel .mini {
+.f3-panel .mini,
+.f3-mkpanel .mini {
   flex: 1;
   padding: 5px;
   border: 1px solid var(--line);
@@ -367,7 +372,8 @@
   transition: border-color .15s, background .15s;
 }
 
-.f3-panel .mini:hover {
+.f3-panel .mini:hover,
+.f3-mkpanel .mini:hover {
   border-color: var(--cyan);
   background: color-mix(in srgb, var(--cyan) 16%, transparent);
 }
@@ -650,3 +656,7 @@
   color: var(--dim);
   font-size: 11px;
 }
+
+/* 標記面板的大小拉桿：小按鈕跟在倍率後面，不像控制面板那樣整列平分。 */
+.f3-mkpanel .h-r { display: flex; align-items: center; gap: 6px; }
+.f3-mkpanel .h-r .mini { flex: 0 0 auto; margin-left: auto; padding: 3px 7px; }
