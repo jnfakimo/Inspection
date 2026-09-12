@@ -27,7 +27,7 @@
     "test:floor-consistency": "node tools/floor-consistency-check.mjs",
     "test:schema-contract": "node tools/schema-contract-check.mjs",
     "test:patrol-offline": "node tools/patrol-offline-consistency-check.mjs",
-    "test:patrol-session": "node --experimental-strip-types --test web/lib/patrol-session.test.ts",
+    "test:patrol-session": "node --experimental-strip-types --test web/lib/patrol-session.test.ts web/lib/patrol-checkin.test.ts",
     "test:page-headings": "node --experimental-strip-types tools/system-page-heading-check.mjs",
     "test:button-standard": "node tools/v2-button-standard-check.mjs",
     "test:input-select-standard": "node tools/input-select-standard-check.mjs",

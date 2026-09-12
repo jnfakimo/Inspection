@@ -12,6 +12,7 @@ import type { Profile } from '@/types/app';
 import { PatrolWorkspace } from './patrol-workspace';
 import { HandoverModules } from './handover-workspace';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
+import { formatTaipeiCheckinAt, patrolCheckinConfirmation, type PatrolCheckinResult } from '@/lib/patrol-checkin';
 
 type Row = Record<string, any>;
 type Point = { marker_id: string; floor_id?: string | null; label?: string | null; note?: string | null };
@@ -71,19 +72,22 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
   }, [floorModels, points]);
   const modelledFloors = useMemo(() => new Set(floorModels.map(item => String(item.floor_id))), [floorModels]);
   const floorGroups = useMemo(() => floors.map(value => ({ floor: value, points: points.filter(point => String(point.floor_id || '未分類') === value) })), [floors, points]);
+  const checkinFor = (point: Point, schedule: PatrolSchedule) => {
+    const accepted = checkinRange(schedule, new Date(`${schedule.base_date}T00:00:00`));
+    return rows.reduce<Row | null>((latest, row) => {
+      const samePoint = row.target_id
+        ? String(row.target_id) === point.marker_id
+        : String(row.floor_id || '未分類') === String(point.floor_id || '未分類') && String(row.label || '') === String(point.label || '');
+      if (!samePoint) return latest;
+      const shiftMatch = !row.shift_type || String(row.shift_type) === schedule.shift_id || String(row.shift_type) === schedule.name;
+      const checkinAt = new Date(String(row.checkin_at || ''));
+      if (!shiftMatch || Number.isNaN(checkinAt.getTime()) || checkinAt < accepted.start || checkinAt > accepted.end) return latest;
+      return !latest || checkinAt > new Date(String(latest.checkin_at || '')) ? row : latest;
+    }, null);
+  };
   const statusFor = (point: Point, schedule: PatrolSchedule) => {
     const day = new Date(`${schedule.base_date}T00:00:00`);
-    const accepted = checkinRange(schedule, day);
-    const checked = rows.some(row => {
-      if (String(row.floor_id || '未分類') !== String(point.floor_id || '未分類') || String(row.label || '') !== String(point.label || '')) return false;
-      const shiftMatch = !row.shift_type || String(row.shift_type) === schedule.shift_id || String(row.shift_type) === schedule.name;
-      if (!shiftMatch) return false;
-      // 夜班的實際打卡日期可能是 duty_date 的下一天，所有班別一律以實際
-      // 時間區間勾稽，避免跨日班被當成當日或誤套到另一班。
-      const checkinAt = new Date(String(row.checkin_at || ''));
-      return !Number.isNaN(checkinAt.getTime()) && checkinAt >= accepted.start && checkinAt <= accepted.end;
-    });
-    if (checked) return 'ok';
+    if (checkinFor(point, schedule)) return 'ok';
     const now = new Date();
     const notice = notificationRange(schedule, day);
     return now >= notice.end ? 'overdue' : 'pending';
@@ -136,8 +140,9 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
     if (!point) { setNote(markerId ? '此巡邏點已停用或不存在' : '請先選擇巡檢點'); return; }
     setBusy(true); setNote('');
     try {
-      await invokeAppApi('guardpatrol_checkin', { target_type: 'marker', target_id: point.marker_id, checkin_source: checkinSource });
-      setNote(`已完成「${point.label || '巡檢點'}」打卡；持續掃描會延長 10 分鐘登入時間`);
+      const result = await invokeAppApi<PatrolCheckinResult>('guardpatrol_checkin', { target_type: 'marker', target_id: point.marker_id, checkin_source: checkinSource });
+      setNote(`${patrolCheckinConfirmation(point.label || '巡檢點', result)}；持續掃描會延長 10 分鐘登入時間`);
+      setExpandedFloors(current => new Set(current).add(String(point.floor_id || '未分類')));
       setSelected('');
       await load();
     } catch (error) { setNote(`打卡失敗：${error instanceof Error ? error.message : String(error)}`); }
@@ -164,7 +169,7 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
                 ...(open ? group.points.map(point => <tr key={`${group.floor}-${point.marker_id}`} className='point-row'>
                   <td />
                   <td className='point-name'>{point.label || point.marker_id}</td>
-                  {matrixSchedules.map(item => { const state = statusFor(point, item); return <td key={item.shift_id}>{state === 'ok' ? <span className='operations-dot done'>✓</span> : state === 'overdue' ? <span className='operations-dot overdue'>✕</span> : <span className='operations-dot pending'>…</span>}</td>; })}
+                  {matrixSchedules.map(item => { const matched = checkinFor(point, item); const state = matched ? 'ok' : statusFor(point, item); return <td key={item.shift_id}>{state === 'ok' ? <span className='operations-checkin-stamp done'><b>✓ 已打卡</b><time dateTime={String(matched?.checkin_at || '')}>{formatTaipeiCheckinAt(matched?.checkin_at, false)}</time></span> : state === 'overdue' ? <span className='operations-dot overdue'>✕</span> : <span className='operations-dot pending'>…</span>}</td>; })}
                 </tr>) : []),
               ];
             })}</tbody></table></div><div className='operations-checkin-bar'><label>巡檢點<ComboboxSelect value={selected} onChange={setSelected} options={[{value:'',label:'— 選擇巡檢點 —'},...points.map(point => ({value:point.marker_id,label:`${point.floor_id || '未分類'}｜${point.label || point.marker_id}`}))]} /></label><button className='primary' disabled={busy} onClick={() => void checkin()}>✓ 完成打卡</button></div><div className='operations-table-wrap'><table className='operations-table'><thead><tr><th>打卡時間</th><th>巡檢人員</th><th>樓層</th><th>巡檢點</th><th>類型</th><th>狀態</th></tr></thead><tbody>{visibleRows.map((row, index) => <tr key={String(row.checkin_id || index)}><td>{text(row.checkin_at)}</td><td>{text(row.user_name)}</td><td>{text(row.floor_id)}</td><td>{text(row.label)}</td><td>{text(row.target_type)}</td><td><span className='operations-status done'>已打卡</span></td></tr>)}</tbody></table>{!visibleRows.length && <p className='operations-empty'>{busy ? '載入中…' : '目前沒有符合條件的巡檢資料。'}</p>}</div></section></div></AppShell>;

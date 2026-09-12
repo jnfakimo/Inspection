@@ -12,6 +12,8 @@ const checkinPage = read('system/patrolcheckin.html');
 const checkinApp = read('system/patrolcheckin-app.js');
 const serviceWorker = read('system/patrol-service-worker.js');
 const edgeCheckin = read('supabase/functions/patrol-checkin/index.ts');
+const appApi = read('supabase/functions/app-api/index.ts');
+const checkinWorkspace = read('web/app/systems/[system]/[module]/operations-workspace.tsx');
 const checkinSchema = read('supabase/migrations/20260820100000_audit_scan_fixes.sql');
 
 assert.match(checkinApp, /if\(!navigator\.onLine\)/, '離線時必須停止 QR 簽到');
@@ -23,6 +25,9 @@ assert.match(checkinPage, /caches\.keys\(\)/, '巡檢頁必須清理舊離線快
 assert.doesNotMatch(serviceWorker, /checkin_logs|addEventListener\(['"]sync['"]/, 'Service Worker 不可代送巡檢寫入');
 assert.match(edgeCheckin, /\.eq\("checkin_id", checkinId\)/, 'Edge Function 必須以 checkin_id 去重');
 assert.match(edgeCheckin, /duplicate_recent/, 'Edge Function 必須防止五分鐘內重複簽到');
+assert.match(appApi, /if \(recent\).*ok: true.*duplicate: true.*event: recent/, 'V2 五分鐘內重複掃描必須回傳原紀錄，不可誤報失敗');
+assert.match(checkinWorkspace, /operations-checkin-stamp done/, 'V2 巡檢點班別格必須顯示已打卡時間');
+assert.match(checkinWorkspace, /patrolCheckinConfirmation/, 'V2 掃碼完成訊息必須顯示打卡時間');
 assert.match(checkinSchema, /uq_checkin_dedup/, '資料庫必須保留併發重送的唯一性兜底');
 
 const storage = new Map();

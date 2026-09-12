@@ -3025,7 +3025,8 @@ export async function handleAppApiRequest(req: Request) {
         .limit(1)
         .maybeSingle();
       if (recentError) throw recentError;
-      if (recent) return reply(req, { ok: false, message: '本巡邏點五分鐘內已完成簽到', data: { duplicate: true, event: recent } }, 409);
+      // 五分鐘內的再次掃描屬於冪等成功：保留原紀錄與原時間，不可讓現場誤以為打卡失敗。
+      if (recent) return reply(req, { ok: true, data: { duplicate: true, event: recent } });
 
       const event = {
         target_type: targetType,
