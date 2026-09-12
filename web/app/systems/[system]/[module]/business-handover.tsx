@@ -691,7 +691,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const approvedCount = approvals.length;
 
   return (
-    <AppShell profile={profile} title={module.title} heading={{ system, module }}>
+    <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
       <div className="hs-page">
         <AdminHeader
           module={module}
