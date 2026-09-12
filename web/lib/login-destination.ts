@@ -44,7 +44,9 @@ export function resolvePostLoginDestination(requested: string | null | undefined
   if (systemKey === 'admin') {
     return canOpenAdminModule(profile, moduleKey) ? destination : DEFAULT_POST_LOGIN_PATH;
   }
-  if (!findSystem(systemKey) || !hasSystemAccess(profile, systemKey)) return DEFAULT_POST_LOGIN_PATH;
+  const allowedSystem = hasSystemAccess(profile, systemKey)
+    || (systemKey === 'structuremap' && moduleKey === 'floor2d' && (hasSystemAccess(profile, 'guardpatrol') || hasSystemAccess(profile, 'workorder')));
+  if (!findSystem(systemKey) || !allowedSystem) return DEFAULT_POST_LOGIN_PATH;
   if (moduleKey && (!findModule(systemKey, moduleKey) || !hasModuleAccess(profile, systemKey, moduleKey))) {
     return DEFAULT_POST_LOGIN_PATH;
   }

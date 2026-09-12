@@ -32,6 +32,21 @@ export function hasSystemAccess(profile:{allowed_systems?:string[]},systemKey:st
  return allowed.includes('*')||allowed.includes(systemKey);
 }
 export function hasModuleAccess(profile:{allowed_systems?:string[];allowed_modules?:string[];allowed_handover_modules?:string[]},systemKey:string,moduleKey:string){
+ if(systemKey==='structuremap'&&moduleKey==='floor2d'){
+  if(hasSystemAccess(profile,'structuremap')){
+   const allowed=profile.allowed_modules;
+   if(!Array.isArray(allowed)||allowed.includes('*')||allowed.includes('structuremap/floor2d'))return true;
+  }
+  if(hasSystemAccess(profile,'guardpatrol')){
+   const allowed=profile.allowed_modules;
+   if(!Array.isArray(allowed)||allowed.includes('*')||allowed.some(m=>m.startsWith('guardpatrol/')))return true;
+  }
+  if(hasSystemAccess(profile,'workorder')){
+   const allowed=profile.allowed_modules;
+   if(!Array.isArray(allowed)||allowed.includes('*')||allowed.some(m=>m.startsWith('workorder/')))return true;
+  }
+  return false;
+ }
  if(!hasSystemAccess(profile,systemKey))return false;
  const allowed=profile.allowed_modules;
  if(Array.isArray(allowed))return allowed.includes('*')||allowed.includes(`${systemKey}/${moduleKey}`);

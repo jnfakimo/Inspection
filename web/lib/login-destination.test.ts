@@ -28,6 +28,8 @@ test('一般系統與子系統都依正式 profile 權限決定登入目的頁',
   assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/guardpatrol/records/', inspector), '/Inspection/v2/systems/guardpatrol/records/');
   assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/guardpatrol/shifts/', inspector), '/Inspection/v2/systems/');
   assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/equipment/', inspector), '/Inspection/v2/systems/');
+  assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/structuremap/floor2d/?kind=patrol', inspector), '/Inspection/v2/systems/structuremap/floor2d/?kind=patrol');
+  assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/structuremap/models/', inspector), '/Inspection/v2/systems/');
 });
 
 test('舊入口 redirect 可安全轉成 V2 網址，外部與登入網址一律拒絕', () => {
