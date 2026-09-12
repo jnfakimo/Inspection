@@ -54,45 +54,196 @@
 
 /* ── 列印 ───────────────────────────────────────────────────────────── */
 
-/* 標籤區塊平常不佔版面；列印時才顯示，取代 V1 另開視窗的做法。 */
-.pointlist-print-sheet { display: none; }
+/* 先在頁內確認全部 QR 均已完成，再由使用者直接啟動瀏覽器的「另存為 PDF」。 */
+.pointlist-page .pointlist-print-dialog {
+  max-width: min(980px, calc(100vw - 32px));
+  overflow: hidden;
+}
+
+.pointlist-page .pointlist-print-controls p {
+  margin: 3px 0 0;
+  color: var(--dim);
+  font-size: .72rem;
+}
+
+.pointlist-page .pointlist-print-help {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--v1list-accent) 8%, var(--panel));
+  color: var(--dim);
+  font-size: .75rem;
+}
+
+.pointlist-page .pointlist-print-sheet {
+  max-height: min(64vh, 720px);
+  padding: 18px;
+  overflow: auto;
+  background: var(--surface);
+}
+
+.pointlist-page .pointlist-print-sheet .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.pointlist-page .pointlist-print-sheet .page + .page {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed var(--line);
+}
+
+.pointlist-page .pointlist-print-sheet .tag {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: center;
+}
+
+.pointlist-page .pointlist-print-sheet .tag img {
+  display: block;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto;
+  background: #fff;
+  image-rendering: pixelated;
+}
+
+.pointlist-page .pointlist-print-sheet .tag .n {
+  margin-top: 6px;
+  font-size: .82rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.pointlist-page .pointlist-print-sheet .tag .f {
+  margin-top: 2px;
+  color: var(--dim);
+  font-size: .7rem;
+}
+
+.pointlist-page .pointlist-print-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  color: var(--dim);
+  font-size: .72rem;
+}
+
+.pointlist-page .pointlist-print-actions > div {
+  display: flex;
+  gap: 8px;
+}
 
 @media print {
-  .pointlist-page > *:not(.pointlist-print-sheet):not(.v1list-modal-bg) { display: none !important; }
+  @page { size: A4 portrait; margin: 10mm; }
 
-  .pointlist-print-sheet {
-    display: block;
-    padding: 16px;
+  body:has(.pointlist-print-sheet) { background: #fff !important; }
+  body:has(.pointlist-print-sheet) * { visibility: hidden !important; }
+
+  body:has(.pointlist-print-sheet) .pointlist-print-preview,
+  body:has(.pointlist-print-sheet) .pointlist-print-dialog,
+  body:has(.pointlist-print-sheet) .pointlist-print-sheet,
+  body:has(.pointlist-print-sheet) .pointlist-print-sheet * {
+    visibility: visible !important;
   }
-  .pointlist-print-sheet .grid {
+
+  .pointlist-page .pointlist-print-preview {
+    position: absolute;
+    inset: 0 auto auto 0;
+    display: block;
+    width: 100%;
+    padding: 0;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .pointlist-page .pointlist-print-dialog {
+    width: 100%;
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .pointlist-page .pointlist-print-controls { display: none !important; }
+
+  .pointlist-page .pointlist-print-sheet {
+    display: block;
+    max-height: none;
+    padding: 0;
+    overflow: visible;
+    background: #fff;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .pointlist-page .pointlist-print-sheet .grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    gap: 4mm;
   }
-  .pointlist-print-sheet .tag {
-    padding: 12px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
+
+  .pointlist-page .pointlist-print-sheet .page {
+    min-height: 277mm;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .pointlist-page .pointlist-print-sheet .page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .pointlist-page .pointlist-print-sheet .page + .page {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .pointlist-page .pointlist-print-sheet .tag {
+    box-sizing: border-box;
+    height: 50mm;
+    padding: 2mm;
+    border: .3mm solid #777;
+    border-radius: 1.5mm;
+    background: #fff;
+    color: #000;
     text-align: center;
+    break-inside: avoid;
     page-break-inside: avoid;
   }
-  .pointlist-print-sheet .tag img {
-    width: 140px;
-    height: 140px;
+
+  .pointlist-page .pointlist-print-sheet .tag img {
+    width: 34mm;
+    height: 34mm;
     image-rendering: pixelated;
   }
-  .pointlist-print-sheet .tag .n {
-    margin-top: 6px;
-    font-size: 14px;
+
+  .pointlist-page .pointlist-print-sheet .tag .n {
+    margin-top: 1.5mm;
+    color: #000;
+    font-size: 10pt;
     font-weight: 700;
   }
-  .pointlist-print-sheet .tag .f {
-    font-size: 11px;
-    color: #666;
+
+  .pointlist-page .pointlist-print-sheet .tag .f {
+    margin-top: .5mm;
+    color: #444;
+    font-size: 8pt;
   }
 
   /* 單點 QR 視窗維持可列印，與 V1 視窗內的「列印」按鈕行為一致。 */
-  .pointlist-page .v1list-modal-bg {
+  .pointlist-page .v1list-modal-bg:not(.pointlist-print-preview) {
     position: static;
     padding: 0;
     background: none;
@@ -111,4 +262,21 @@
     row-gap: 4px;
   }
   .pointlist-page .v1list-row .mname { flex: 1 1 100%; }
+
+  .pointlist-page .pointlist-print-dialog { max-width: calc(100vw - 20px); }
+
+  .pointlist-page .pointlist-print-sheet .grid { grid-template-columns: 1fr 1fr; }
+
+  .pointlist-page .pointlist-print-sheet .tag img {
+    width: min(120px, 100%);
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .pointlist-page .pointlist-print-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pointlist-page .pointlist-print-actions > div { justify-content: flex-end; }
 }

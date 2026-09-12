@@ -5,9 +5,9 @@
 // 這一頁是唯讀彙總，巡邏點的新增與座標調整屬設備圖臺的整合標記模組。
 //
 // 與 V1 的差異兩處，都不是版面調整：
-// 1. 「列印全部 QR」改成頁內的列印區塊加 @media print，不再 window.open + document.write。
-//    資安稽核對文件字串輸出的建議就是改用 React 列印區塊；順帶免除彈出視窗被瀏覽器
-//    擋下的情況（V1 遇到就只能跳 alert 要使用者放行）。
+// 1. 「列印全部 QR」改成頁內的列印預覽加 @media print，不再 window.open + document.write。
+//    QR 全部產生並載入後，使用者由預覽直接按「列印／另存 PDF」；列印呼叫因此仍在
+//    使用者點擊事件內，不會被瀏覽器當成非互動式彈窗攔截。
 // 2. QR 改用 qrcode-generator 的動態 import，與站內其餘 QR 產生一致。
 //
 // 註：V2 先前的版本是一張帶「當日打卡」欄位與日期篩選的表格。那個視角在同系統的
@@ -89,6 +89,8 @@ export function PointListModule({ module, profile }: Props) {
 
   const [qr, setQr] = useState<{ label: string; floor: string; image: string; nfcUrl: string; nfcStatus: NfcStatus; nfcMessage: string } | null>(null);
   const [printTags, setPrintTags] = useState<PrintTag[] | null>(null);
+  const [printBusy, setPrintBusy] = useState(false);
+  const [printImagesReady, setPrintImagesReady] = useState(0);
 
   const load = useCallback(async (attempt = 0) => {
     setFailed(false);
@@ -206,12 +208,13 @@ export function PointListModule({ module, profile }: Props) {
   };
 
   /**
-   * 對應 V1 的 printAllQr。V1 另開視窗並以 document.write 組出標籤頁；這裡改成把標籤
-   * 渲染進本頁的列印區塊，再呼叫 window.print()，列印結果相同但不需要彈出視窗權限，
-   * 也不必手動跳脫任何字串。
+   * 對應 V1 的 printAllQr。V1 另開視窗並以 document.write 組出標籤頁；這裡先把標籤
+   * 渲染成預覽，待所有圖片就緒後再讓使用者直接啟動列印，不需要彈出視窗權限。
    */
   const printAll = async () => {
     if (!rows.length) { window.alert('目前沒有巡邏點可列印'); return; }
+    setPrintBusy(true);
+    setPrintImagesReady(0);
     try {
       const sorted = rows.slice().sort((a, b) =>
         (floorOrder(a.floor_id) - floorOrder(b.floor_id))
@@ -223,18 +226,24 @@ export function PointListModule({ module, profile }: Props) {
         image: await qrDataUrl(checkinUrl(point.marker_id), 6),
       })));
       setPrintTags(tags);
-    } catch (error) { window.alert(`QR 標籤產生失敗：${translateError(error)}`); }
+    } catch (error) {
+      setPrintTags(null);
+      window.alert(`QR 標籤產生失敗：${translateError(error)}`);
+    } finally {
+      setPrintBusy(false);
+    }
   };
 
-  // 標籤圖片掛上畫面後才呼叫列印，否則列印預覽會是空白。
-  useEffect(() => {
-    if (!printTags) return;
-    const timer = window.setTimeout(() => {
-      window.print();
-      setPrintTags(null);
-    }, 120);
-    return () => window.clearTimeout(timer);
-  }, [printTags]);
+  const closePrintPreview = () => {
+    setPrintTags(null);
+    setPrintImagesReady(0);
+  };
+
+  const printAllPdf = () => {
+    if (!printTags?.length || printImagesReady < printTags.length) return;
+    // 必須直接由按鈕點擊呼叫，避免 Edge／Chrome 封鎖失去使用者互動權杖的列印要求。
+    window.print();
+  };
 
   return <AppShell profile={profile} title={module.title}>
     <div className="v1list-page pointlist-page">
@@ -277,7 +286,9 @@ export function PointListModule({ module, profile }: Props) {
         <input value={query} onChange={event => setQuery(event.target.value)}
           placeholder="搜尋巡邏點名稱或說明…" aria-label="搜尋巡邏點" />
         <span className="v1list-space" />
-        <button className="mini" onClick={() => void printAll()}>🖶 列印全部 QR</button>
+        <button className="mini" disabled={printBusy} onClick={() => void printAll()}>
+          {printBusy ? '正在產生 QR…' : '🖶 列印全部 QR'}
+        </button>
       </div>
 
       {status && <div className="v1list-empty">
@@ -343,13 +354,41 @@ export function PointListModule({ module, profile }: Props) {
         </div>
       </div>}
 
-      {printTags && <div className="pointlist-print-sheet" aria-hidden="true">
-        <div className="grid">
-          {printTags.map(tag => <div className="tag" key={tag.markerId}>
-            <img src={tag.image} alt="" />
-            <div className="n">{tag.label}</div>
-            <div className="f">{tag.floor}</div>
-          </div>)}
+      {printTags && <div className="v1list-modal-bg pointlist-print-preview" role="dialog" aria-modal="true"
+        aria-label="全部巡邏點 QR 列印預覽">
+        <div className="v1list-modal pointlist-print-dialog">
+          <div className="v1list-modal-head pointlist-print-controls">
+            <div>
+              <span className="mt">全部巡邏點 QR</span>
+              <p>{printTags.length} 個標籤・A4 直式自動分頁</p>
+            </div>
+            <button className="x" onClick={closePrintPreview} aria-label="關閉列印預覽">✕</button>
+          </div>
+          <div className="pointlist-print-help pointlist-print-controls">
+            預覽完成後按「列印／另存 PDF」，再於列印視窗選擇「另存為 PDF」。
+          </div>
+          <div className="pointlist-print-sheet">
+            {Array.from({ length: Math.ceil(printTags.length / 15) }, (_, pageIndex) =>
+              <section className="page" key={pageIndex} aria-label={`第 ${pageIndex + 1} 頁`}>
+                <div className="grid">
+                  {printTags.slice(pageIndex * 15, pageIndex * 15 + 15).map(tag =>
+                    <div className="tag" key={tag.markerId}>
+                      <img src={tag.image} alt={`${tag.floor} ${tag.label} 的簽到 QR code`}
+                        onLoad={() => setPrintImagesReady(count => count + 1)} />
+                      <div className="n">{tag.label}</div>
+                      <div className="f">{tag.floor}</div>
+                    </div>)}
+                </div>
+              </section>)}
+          </div>
+          <div className="pointlist-print-actions pointlist-print-controls">
+            <span>{printImagesReady < printTags.length ? `正在載入 QR（${printImagesReady}/${printTags.length}）` : 'QR 已全部就緒'}</span>
+            <div>
+              <button className="secondary-btn compact" onClick={closePrintPreview}>取消</button>
+              <button className="primary-btn compact" disabled={printImagesReady < printTags.length}
+                onClick={printAllPdf}>列印／另存 PDF</button>
+            </div>
+          </div>
         </div>
       </div>}
     </div>
