@@ -246,6 +246,16 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   （同 `canGuardApprove`，須明確允許）與系統管理員在「管理下拉選單」增修刪與排序，刪除為停用，改名與刪除都
   不回頭改已存檔的交接紀錄。主管簽核與清單維護的 app-api 動作**不經過** `handover/guard` 子系統檢查，
   各自檢查 `canGuardApprove`——否則只有簽核權限的主管會在門口被擋掉。
+- **權限四層與系統清單的唯一正本**：授權順序是「角色×大系統 → 角色×子系統（`role_module_access`）→ 個人×大系統
+  → 個人×子系統」，個人設定優先於角色範本，`inherit` 表示沿用上一層。大系統與子系統清單的正本只有
+  `web/lib/modules.ts`：`m()` 是有頁面的子系統，`mp()` 是只有權限沒有頁面的項目（例如駐衛警主管簽核，
+  放在 `permissionExtras`，不會長進選單與路由）。後台權限頁的欄位由它推導，兩支 Edge Function 的白名單、
+  `system_access_seed.sql` 與存取資料表的 `system_key` 檢查條件則由 `npm run test:schema-contract` 比對，
+  漏改任何一份都會在測試擋下來。新增大系統時：改 `modules.ts` → 補兩支 Edge Function 的清單 → 補 seed →
+  補一支放寬 `system_key` 檢查條件的 migration。
+- **授權畫面只有一種版型**：「人員精細授權」與「角色系統範本」都用 `permission-access-list.tsx` 的
+  `GranularAccessList` 渲染（大系統卡片＋子系統下鑽），差別只有傳進去的資料。要調整版面請改那一支，
+  不要在任一分頁另外做一套。
 - **當班標示**：與業管組交接簿一致，綠色 `#10b981` 專指「目前當班」（外框、光暈、「當班中」脈動標籤；白字底用
   `#047857` 以維持對比），因此班別配色不使用綠色。當班與「巡檢進行中」由前端每 30 秒依 `work_from/work_to`、
   `patrol_from/patrol_to`（app-api 提供的絕對時間）判斷，班別交替時不必重新載入。

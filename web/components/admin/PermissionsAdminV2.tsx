@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { systems } from '@/lib/modules';
+import { permissionModules, systemPermissionKey, systems } from '@/lib/modules';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
 import { visibleManagedUsers } from '@/lib/user-visibility';
 import {
   AdminHeader, AdminModal, type AdminProps, errorMessage, Pager, PERMISSIONS,
-  roleLabel, type Row, StatusPill, SYSTEM_PERMISSIONS, userRole,
+  roleLabel, type Row, StatusPill, userRole,
 } from './shared';
+import { GranularAccessList, type AccessRow } from './permission-access-list';
 
 const ACCESS_PAGE_SIZE = 10;
 type AccessMode = 'inherit' | 'allow' | 'deny';
@@ -18,13 +19,6 @@ type PermissionTab = 'actions' | 'role-systems' | 'people' | 'roles';
 const accessModeLabel: Record<AccessMode, string> = {
   inherit: '跟隨角色範本', allow: '個別開放', deny: '個別拒絕',
 };
-const permissionModules = (systemKey: string) => {
-  const system = systems.find(item => item.key === systemKey);
-  const modules = system?.modules || [];
-  return systemKey === 'handover' && modules.some(item => item.key === 'guard')
-    ? [...modules, { key: 'guard-approve', title: '駐衛警交接主管簽核', description: '核可駐衛警每日交接內容；不另外建立入口頁。' }]
-    : modules;
-};
 
 export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [roles, setRoles] = useState<Row[]>([]);
@@ -32,6 +26,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [users, setUsers] = useState<Row[]>([]);
   const [systemAccess, setSystemAccess] = useState<Row[]>([]);
   const [moduleAccess, setModuleAccess] = useState<Row[]>([]);
+  const [roleModuleAccess, setRoleModuleAccess] = useState<Row[]>([]);
   const [editor, setEditor] = useState<Row | null>(null);
   const [tab, setTab] = useState<PermissionTab>('people');
   const [busy, setBusy] = useState(true);
@@ -39,6 +34,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedRoleId, setSelectedRoleId] = useState('');
   const [expandedSystem, setExpandedSystem] = useState('');
   const [showUnauthorized, setShowUnauthorized] = useState(false);
 
@@ -46,18 +42,22 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
     setBusy(true); setNote('');
     try {
       const client = getSupabase();
-      const [rolesResult, permissionResult, usersResult, systemResult, moduleResult] = await Promise.all([
+      const [rolesResult, permissionResult, usersResult, systemResult, moduleResult, roleModuleResult] = await Promise.all([
         client.from('roles').select('role_id,name,sort_order').order('sort_order'),
         client.from('role_permissions').select('role_id,permission:perm,allowed').limit(2000),
         client.from('users').select('user_id,name,username,email,department,role,rbac_role,status').order('name').limit(1000),
         client.from('user_system_access').select('user_id,system_key,mode,updated_at').limit(13000),
         client.from('user_module_access').select('user_id,system_key,module_key,mode,updated_at').limit(66000),
+        client.from('role_module_access').select('role_id,system_key,module_key,mode,updated_at').limit(5000),
       ]);
+      // 角色子系統範本是後加的資料表，migration 未套用時不讓整頁失敗，改當成「全部沿用大系統」。
+      if (roleModuleResult.error) console.error('role module access lookup failed:', roleModuleResult.error.message);
       const failure = rolesResult.error || permissionResult.error || usersResult.error || systemResult.error || moduleResult.error;
       if (failure) setNote(`失敗：${errorMessage(failure, '角色與個人權限載入失敗')}`);
       setRoles((rolesResult.data || []).filter(row => row.role_id !== 'mgmt_supervisor'));
       setPermissions(permissionResult.data || []); setUsers(visibleManagedUsers(usersResult.data || []));
       setSystemAccess(systemResult.data || []); setModuleAccess(moduleResult.data || []);
+      setRoleModuleAccess(roleModuleResult.data || []);
     } catch (error) { setNote(`失敗：${errorMessage(error, '角色與個人權限載入失敗')}`); }
     finally { setBusy(false); }
   }, []);
@@ -79,6 +79,13 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const effectiveModuleAccess = (user: Row, systemKey: string, moduleKey: string) =>
     effectiveSystemAccess(user, systemKey)
       && (userRole(user) === 'sysadmin' || personalModuleMode(user.user_id, systemKey, moduleKey) !== 'deny');
+
+  const roleModuleMode = (roleId: string, systemKey: string, moduleKey: string): AccessMode =>
+    (roleModuleAccess.find(row => row.role_id === roleId && row.system_key === systemKey && row.module_key === moduleKey)?.mode || 'inherit') as AccessMode;
+  const roleSystemAllowed = (roleId: string, systemKey: string) =>
+    roleId === 'sysadmin' || (systemKey !== 'admin' && roleAllowed(roleId, systemPermissionKey(systemKey)));
+  const roleModuleAllowed = (roleId: string, systemKey: string, moduleKey: string) =>
+    roleId === 'sysadmin' || (roleSystemAllowed(roleId, systemKey) && roleModuleMode(roleId, systemKey, moduleKey) !== 'deny');
 
   const run = async (action: string, payload: Row, success: string) => {
     setBusy(true); setNote('');
@@ -113,10 +120,106 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
     ? systems.filter(system => showUnauthorized || effectiveSystemAccess(selectedUser, system.key))
     : [];
 
+  const selectedRole = roles.find(role => String(role.role_id) === selectedRoleId) || roles[0];
+  const visibleRoleSystems = selectedRole
+    ? systems.filter(system => showUnauthorized || roleSystemAllowed(String(selectedRole.role_id), system.key))
+    : [];
+
   const firstPagedUserId = String(pagedUsers[0]?.user_id || '');
   useEffect(() => {
     if (!selectedUserId && firstPagedUserId) setSelectedUserId(firstPagedUserId);
   }, [firstPagedUserId, selectedUserId]);
+
+
+  // 兩個分頁共用同一份版型（GranularAccessList）；這裡只負責把「人」或「角色」換算成同樣的資料列。
+  const userAccessRows = (user: Row): AccessRow[] => {
+    const sysadmin = userRole(user) === 'sysadmin';
+    return visibleSystems.map(system => {
+      const children = permissionModules(system.key);
+      const systemAllowed = effectiveSystemAccess(user, system.key);
+      const roleDefault = roleAllowed(userRole(user), systemPermissionKey(system.key));
+      const openCount = children.filter(item => effectiveModuleAccess(user, system.key, item.key)).length;
+      const visibleChildren = children.filter(item => showUnauthorized || effectiveModuleAccess(user, system.key, item.key));
+      return {
+        key: system.key, title: system.title, code: system.code, icon: system.icon,
+        hint: `角色預設：${roleDefault ? '開放' : '未開放'}${children.length ? ` · 子系統 ${openCount}／${children.length}` : ''}`,
+        value: sysadmin ? 'allow' : personalSystemMode(user.user_id, system.key),
+        choices: sysadmin ? [{ value: 'allow', label: '系統管理員全開' }] : [{ value: 'inherit', label: accessModeLabel.inherit }, { value: 'allow', label: accessModeLabel.allow }, { value: 'deny', label: accessModeLabel.deny }],
+        disabled: sysadmin || system.key === 'admin',
+        effective: systemAllowed,
+        effectiveLabel: systemAllowed ? '有效：可進入' : '有效：不可進入',
+        ariaLabel: `${user.name} ${system.title}`,
+        children: visibleChildren.map(item => {
+          const itemAllowed = effectiveModuleAccess(user, system.key, item.key);
+          return {
+            key: item.key, title: item.title, description: item.description,
+            value: sysadmin ? 'allow' : personalModuleMode(user.user_id, system.key, item.key),
+            choices: sysadmin ? [{ value: 'allow', label: '系統管理員全開' }]
+              : [{ value: 'inherit', label: '跟隨角色範本' }, { value: 'allow', label: '個別開放' }, { value: 'deny', label: '個別拒絕' }],
+            disabled: sysadmin || system.key === 'admin',
+            effective: itemAllowed,
+            effectiveLabel: itemAllowed ? '可使用' : systemAllowed ? '已拒絕' : '大系統未開放',
+            ariaLabel: `${user.name} ${system.title} ${item.title}`,
+          };
+        }),
+      };
+    });
+  };
+
+  const roleAccessRows = (role: Row): AccessRow[] => {
+    const roleId = String(role.role_id);
+    const sysadmin = roleId === 'sysadmin';
+    return visibleRoleSystems.map(system => {
+      const children = permissionModules(system.key);
+      const systemAllowed = roleSystemAllowed(roleId, system.key);
+      const reservedAdmin = system.key === 'admin' && !sysadmin;
+      const openCount = children.filter(item => roleModuleAllowed(roleId, system.key, item.key)).length;
+      const visibleChildren = children.filter(item => showUnauthorized || roleModuleAllowed(roleId, system.key, item.key));
+      return {
+        key: system.key, title: system.title, code: system.code, icon: system.icon,
+        hint: children.length ? `子系統預設開放 ${openCount}／${children.length}` : '此系統沒有子系統',
+        value: systemAllowed ? 'allow' : 'deny',
+        choices: sysadmin ? [{ value: 'allow', label: '系統管理員全開' }]
+          : reservedAdmin ? [{ value: 'deny', label: '管理員專用' }]
+          : [{ value: 'allow', label: '預設開放' }, { value: 'deny', label: '預設不開放' }],
+        disabled: sysadmin || reservedAdmin,
+        effective: systemAllowed,
+        effectiveLabel: systemAllowed ? '預設：可進入' : '預設：不可進入',
+        ariaLabel: `${role.name} ${system.title}`,
+        children: visibleChildren.map(item => {
+          const itemAllowed = roleModuleAllowed(roleId, system.key, item.key);
+          return {
+            key: item.key, title: item.title, description: item.description,
+            value: sysadmin ? 'allow' : roleModuleMode(roleId, system.key, item.key),
+            choices: sysadmin ? [{ value: 'allow', label: '系統管理員全開' }]
+              : [{ value: 'inherit', label: '跟隨大系統' }, { value: 'allow', label: '預設開放' }, { value: 'deny', label: '預設關閉' }],
+            disabled: sysadmin || reservedAdmin,
+            effective: itemAllowed,
+            effectiveLabel: itemAllowed ? '預設可用' : systemAllowed ? '預設關閉' : '大系統未開放',
+            ariaLabel: `${role.name} ${system.title} ${item.title}`,
+          };
+        }),
+      };
+    });
+  };
+
+  const changeUserAccess = (row: AccessRow, value: string, parent?: AccessRow) => {
+    if (!selectedUser) return;
+    if (parent) {
+      void run('admin_set_user_module_access', { user_id: selectedUser.user_id, system_key: parent.key, module_key: row.key, mode: value }, `${selectedUser.name}的子系統權限已更新`);
+      return;
+    }
+    void run('admin_set_user_system_access', { user_id: selectedUser.user_id, system_key: row.key, mode: value }, `${selectedUser.name}的大系統權限已更新`);
+  };
+
+  const changeRoleAccess = (row: AccessRow, value: string, parent?: AccessRow) => {
+    if (!selectedRole) return;
+    if (parent) {
+      void run('admin_set_role_module_access', { role_id: selectedRole.role_id, system_key: parent.key, module_key: row.key, mode: value }, `${selectedRole.name}的子系統範本已更新`);
+      return;
+    }
+    void run('admin_set_permission', { role_id: selectedRole.role_id, permission: systemPermissionKey(row.key), allowed: value === 'allow' }, `${selectedRole.name}的大系統範本已更新`);
+  };
 
   const permissionMatrix = (items: ReadonlyArray<readonly [string, string]>) => <div className="responsive-table permission-matrix"><table>
     <thead><tr><th>角色範本</th>{items.map(item => <th key={item[0]}>{item[1]}</th>)}</tr></thead>
@@ -127,7 +230,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   </table></div>;
 
   const selectTab = (next: PermissionTab) => {
-    setTab(next); setQuery(''); setPage(1); setExpandedSystem(''); setShowUnauthorized(false);
+    setTab(next); setQuery(''); setPage(1); setExpandedSystem(''); setShowUnauthorized(false); setSelectedRoleId('');
   };
 
   return <AppShell profile={profile} title={module.title}>
@@ -141,7 +244,33 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
         <button className={tab === 'roles' ? 'active' : ''} onClick={() => selectTab('roles')}>使用者角色指派</button>
       </div>
       {tab === 'actions' && <><p className="permission-tab-note">設定各角色預設可執行的新增、修改、簽核、匯出等功能；個人仍受大系統與子系統權限限制。</p>{permissionMatrix(PERMISSIONS)}</>}
-      {tab === 'role-systems' && <><p className="permission-tab-note">這裡是角色預設值，不是整批強制全開。可再到「人員精細授權」對同角色的不同主管個別開放或拒絕。</p>{permissionMatrix(SYSTEM_PERMISSIONS)}</>}
+      {tab === 'role-systems' && <>
+        <p className="permission-tab-note">這裡是角色預設值，不是整批強制全開。可再到「人員精細授權」對同角色的不同主管個別開放或拒絕。</p>
+        <div className="permission-user-layout">
+          <aside className="permission-user-list" aria-label="選擇角色">
+            {roles.map(role => {
+              const openSystems = systems.filter(system => roleSystemAllowed(String(role.role_id), system.key)).length;
+              return <button type="button" key={role.role_id} className={String(selectedRole?.role_id) === String(role.role_id) ? 'is-selected' : ''} onClick={() => { setSelectedRoleId(String(role.role_id)); setExpandedSystem(''); setShowUnauthorized(false); }}><span><strong>{role.name}</strong><small>{role.role_id}</small></span><span><b>{role.role_id === 'sysadmin' ? '固定全開' : '角色範本'}</b><small>{openSystems}／{systems.length} 系統</small></span></button>;
+            })}
+            {!busy && roles.length === 0 && <p className="empty">尚未建立任何角色。</p>}
+          </aside>
+          <section className="permission-detail" aria-label="角色大系統與子系統範本">
+            {selectedRole ? <>
+              <header className="permission-person-header"><div><span>目前設定角色</span><h2>{selectedRole.name}</h2><p>角色代碼 {selectedRole.role_id}　<button type="button" className="secondary-btn compact" onClick={() => setEditor({ ...selectedRole, is_edit: true })}>編輯名稱</button></p></div><div><b>{systems.filter(system => roleSystemAllowed(String(selectedRole.role_id), system.key)).length}</b><span>預設開放大系統</span></div></header>
+              <div className="permission-legend">
+                <span className="permission-visibility-note">{showUnauthorized ? '設定模式：顯示全部項目' : '僅顯示目前已開放項目'}</span>
+                <span className="access-pill inherited">跟隨大系統</span><span className="access-pill allowed">預設開放</span>
+                {showUnauthorized && <span className="access-pill denied">預設關閉</span>}
+                <button type="button" className="secondary-btn compact" aria-pressed={showUnauthorized} onClick={() => { setShowUnauthorized(value => !value); setExpandedSystem(''); }}>{showUnauthorized ? '只顯示已開放' : '調整未開放項目'}</button>
+              </div>
+              <GranularAccessList rows={roleAccessRows(selectedRole)} expandedKey={expandedSystem} onExpand={setExpandedSystem}
+                onChange={changeRoleAccess} controlLabel="角色預設" busy={busy}
+                childControlLabel="子系統維持「跟隨大系統」時，開放大系統即可使用；要收斂就改成預設關閉，個人仍可個別開放。" />
+              {!showUnauthorized && visibleRoleSystems.length === 0 && <div className="permission-empty-access"><strong>這個角色目前沒有預設開放的系統</strong><span>未開放項目已隱藏；要調整請進入設定模式。</span><button type="button" className="secondary-btn compact" onClick={() => setShowUnauthorized(true)}>調整未開放項目</button></div>}
+            </> : <p className="empty">請先選擇要設定的角色。</p>}
+          </section>
+        </div>
+      </>}
       {tab === 'people' && <>
         <div className="admin-toolbar permission-people-toolbar"><input value={query} onChange={event => { setQuery(event.target.value); setPage(1); setSelectedUserId(''); setExpandedSystem(''); setShowUnauthorized(false); }} placeholder="搜尋姓名、帳號、單位或角色"/><span>啟用帳號共 {filteredUsers.length} 人，每頁固定 {ACCESS_PAGE_SIZE} 筆。</span></div>
         <div className="permission-user-layout">
@@ -167,30 +296,10 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
                 {showUnauthorized && <span className="access-pill denied">個別拒絕</span>}
                 <button type="button" className="secondary-btn compact" aria-pressed={showUnauthorized} onClick={() => { setShowUnauthorized(value => !value); setExpandedSystem(''); }}>{showUnauthorized ? '只顯示已授權' : '調整未授權項目'}</button>
               </div>
-              <div className="granular-system-list">{visibleSystems.map(system => {
-                const systemMode = personalSystemMode(selectedUser.user_id, system.key);
-                const systemAllowed = effectiveSystemAccess(selectedUser, system.key);
-                const roleDefault = roleAllowed(userRole(selectedUser), `sys_${system.key}`);
-                const expanded = expandedSystem === system.key;
-                const sysadmin = userRole(selectedUser) === 'sysadmin';
-                const childModules = permissionModules(system.key);
-                const moduleCount = childModules.filter(item => effectiveModuleAccess(selectedUser, system.key, item.key)).length;
-                const visibleChildModules = childModules.filter(item => showUnauthorized || effectiveModuleAccess(selectedUser, system.key, item.key));
-                return <article key={system.key} className={`granular-system-card ${systemAllowed ? 'is-allowed' : 'is-denied'}`}>
-                  <div className="granular-system-row">
-                    <button type="button" className="granular-system-title" onClick={() => setExpandedSystem(expanded ? '' : system.key)} aria-expanded={expanded} disabled={visibleChildModules.length === 0}><img src={system.icon} alt=""/><span><small>{system.code}</small><strong>{system.title}</strong><em>角色預設：{roleDefault ? '開放' : '未開放'}{childModules.length ? ` · 子系統 ${moduleCount}／${childModules.length}` : ''}</em></span>{visibleChildModules.length > 0 && <b>{expanded ? '收合' : '設定子系統'}⌄</b>}</button>
-                    <label>個人例外<select value={sysadmin ? 'allow' : systemMode} disabled={busy || sysadmin || system.key === 'admin'} onChange={event => void run('admin_set_user_system_access', { user_id: selectedUser.user_id, system_key: system.key, mode: event.target.value }, `${selectedUser.name}的大系統權限已更新`)}>{sysadmin ? <option value="allow">系統管理員全開</option> : <><option value="inherit">{accessModeLabel.inherit}</option><option value="allow">{accessModeLabel.allow}</option><option value="deny">{accessModeLabel.deny}</option></>}</select></label>
-                    <span className={`effective-access ${systemAllowed ? 'allowed' : 'denied'}`}>{systemAllowed ? '有效：可進入' : '有效：不可進入'}</span>
-                  </div>
-                  {expanded && visibleChildModules.length > 0 && <div className="granular-module-grid">{visibleChildModules.map(item => {
-                    const itemMode = personalModuleMode(selectedUser.user_id, system.key, item.key);
-                    const itemAllowed = effectiveModuleAccess(selectedUser, system.key, item.key);
-                    return <label key={item.key} className={itemAllowed ? 'is-allowed' : 'is-denied'}><span><strong>{item.title}</strong><small>{item.description}</small></span><select aria-label={`${selectedUser.name} ${system.title} ${item.title}`} value={sysadmin ? 'allow' : itemMode} disabled={busy || sysadmin || system.key === 'admin'} onChange={event => void run('admin_set_user_module_access', { user_id: selectedUser.user_id, system_key: system.key, module_key: item.key, mode: event.target.value }, `${selectedUser.name}的子系統權限已更新`)}>{sysadmin ? <option value="allow">系統管理員全開</option> : <><option value="inherit">跟隨大系統</option><option value="allow">個別開放</option><option value="deny">個別拒絕</option></>}</select><b>{itemAllowed ? '可使用' : systemAllowed ? '已拒絕' : '大系統未開放'}</b></label>;
-                  })}</div>}
-                </article>;
-              })}
+              <GranularAccessList rows={userAccessRows(selectedUser)} expandedKey={expandedSystem} onExpand={setExpandedSystem}
+                onChange={changeUserAccess} controlLabel="個人例外" busy={busy}
+                childControlLabel="子系統沒有特別設定時，跟隨角色範本與大系統權限。" />
               {!showUnauthorized && visibleSystems.length === 0 && <div className="permission-empty-access"><strong>此帳號目前沒有已授權的系統</strong><span>未授權項目已隱藏；如需開放權限，請進入調整模式。</span><button type="button" className="secondary-btn compact" onClick={() => setShowUnauthorized(true)}>調整未授權項目</button></div>}
-              </div>
             </> : <p className="empty">請先選擇要設定的人員。</p>}
           </section>
         </div>

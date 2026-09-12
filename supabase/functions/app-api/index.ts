@@ -1108,15 +1108,26 @@ export async function handleAppApiRequest(req: Request) {
     const isSysadmin = roleId === 'sysadmin' || profile.role === 'admin';
     const { data: permissions } = await admin.from('role_permissions').select('perm,allowed').eq('role_id', roleId).eq('allowed', true);
     const roleSystems = new Set((permissions || []).filter(row => String(row.perm).startsWith('sys_')).map(row => String(row.perm).replace(/^sys_/, '')));
-    const [systemAccessResult, moduleAccessResult, handoverModuleResult] = await Promise.all([
+    const [systemAccessResult, moduleAccessResult, roleModuleResult, handoverModuleResult] = await Promise.all([
       admin.from('user_system_access').select('system_key,mode').eq('user_id', profile.user_id),
       admin.from('user_module_access').select('system_key,module_key,mode').eq('user_id', profile.user_id),
+      admin.from('role_module_access').select('system_key,module_key,mode').eq('role_id', roleId),
       admin.from('user_handover_module_access').select('module_key').eq('user_id', profile.user_id).eq('allowed', true),
     ]);
     if (systemAccessResult.error) console.error('user system access lookup failed:', systemAccessResult.error.message);
     if (moduleAccessResult.error) console.error('user module access lookup failed:', moduleAccessResult.error.message);
+    // 角色子系統範本是後加的資料表；migration 未套用時視為「全部沿用大系統」，維持舊行為。
+    if (roleModuleResult.error) console.error('role module access lookup failed:', roleModuleResult.error.message);
     const systemModes = new Map((systemAccessResult.data || []).map(row => [String(row.system_key), String(row.mode)]));
     const moduleModes = new Map((moduleAccessResult.data || []).map(row => [`${row.system_key}/${row.module_key}`, String(row.mode)]));
+    const roleModuleModes = new Map((roleModuleResult.data || []).map(row => [`${row.system_key}/${row.module_key}`, String(row.mode)]));
+    // 四層授權的子系統判定：個人設定優先，其次角色範本，兩者都沒設才沿用大系統。
+    const moduleAllowedFor = (systemKey: string, moduleKey: string) => {
+      const personal = moduleModes.get(`${systemKey}/${moduleKey}`) || 'inherit';
+      if (personal === 'allow') return true;
+      if (personal === 'deny') return false;
+      return (roleModuleModes.get(`${systemKey}/${moduleKey}`) || 'inherit') !== 'deny';
+    };
     const allowedSystems = new Set<string>();
     for (const systemKey of SYSTEM_KEYS) {
       if (systemKey === 'admin' && !isSysadmin) continue;
@@ -1130,7 +1141,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!allowedSystems.has(systemKey)) continue;
       for (const moduleKey of moduleKeys) {
         if (!moduleAccessResult.error) {
-          if ((moduleModes.get(`${systemKey}/${moduleKey}`) || 'inherit') !== 'deny') allowedModules.add(`${systemKey}/${moduleKey}`);
+          if (moduleAllowedFor(systemKey, moduleKey)) allowedModules.add(`${systemKey}/${moduleKey}`);
           continue;
         }
         // 新 migration 尚未套用時，非交接簿模組先沿用父系統權限；交接簿仍採舊白名單，
@@ -3229,9 +3240,12 @@ export async function handleAppApiRequest(req: Request) {
     };
     // 主管簽核是特權：三層授權的子系統預設「沿用」大系統權限，但簽核必須在權限頁明確設為允許。
     // user_module_access 尚未建立（新 migration 未套用）時退回舊白名單。
+    // 個人明確開放，或角色範本明確開放（兩者都不是「沿用」）才算有簽核權。
     const canGuardApprove = () => isSysadmin || (can('handover') && (moduleAccessResult.error
       ? allowedHandoverModules.has('guard-approve')
-      : moduleModes.get('handover/guard-approve') === 'allow'));
+      : moduleModes.get('handover/guard-approve') === 'allow'
+        || (moduleModes.get('handover/guard-approve') !== 'deny'
+          && roleModuleModes.get('handover/guard-approve') === 'allow')));
     const guardIdList = (value: unknown) => Array.isArray(value) ? value.map(item => String(item || '')).filter(Boolean) : [];
     type GuardWork = { start?: string; end?: string };
     const guardShiftContext = async (dutyDate: string) => {

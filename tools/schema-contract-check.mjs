@@ -128,26 +128,83 @@ for (const contract of contracts) {
   if (contract.order && !columns.has(contract.order)) errors.push(`${contract.name}: 排序欄位 ${contract.table}.${contract.order} 不存在於 SQL schema`);
 }
 
-// 系統存取權限（sys_*）的清單散在三個地方，彼此沒有任何關聯：
-//   web/components/admin/shared.tsx     後台「系統存取權限」矩陣顯示的欄位
-//   supabase/functions/admin-api        admin_set_permission 的伺服器端白名單
-//   system/sql/system_access_seed.sql   新專案佈建時要建立的權限列
-// 只加前面沒加後面時，畫面上會出現一個勾得動、但伺服器一律回「權限代碼無效」的
-// 核取方塊——2026-08-31 加 sys_dashboard 就是這樣，看起來像「不能取消」。
+// 系統與子系統清單的唯一正本是 web/lib/modules.ts；其餘副本都必須跟著它：
+//   web/components/admin/shared.tsx     後台權限頁的欄位（已改為自動推導，這裡只確認沒有人又寫死回去）
+//   supabase/functions/admin-api        admin_set_permission／子系統白名單
+//   supabase/functions/app-api          登入後換算 allowed_systems／allowed_modules
+//   system/sql/system_access_seed.sql   新專案佈建要建立的權限列
+//   supabase/migrations                 存取資料表的 system_key 檢查條件
+// 只加正本沒加副本時，畫面上會出現勾得動、但伺服器一律回「權限代碼無效」的控制項
+// ——2026-08-31 加 sys_dashboard 就是這樣，看起來像「不能取消」。
 const sharedSource = fs.readFileSync(path.join(root, 'web/components/admin/shared.tsx'), 'utf8');
 const adminApiSource = fs.readFileSync(path.join(root, 'supabase/functions/admin-api/index.ts'), 'utf8');
+const appApiSource = fs.readFileSync(path.join(root, 'supabase/functions/app-api/index.ts'), 'utf8');
 const seedSource = fs.readFileSync(path.join(root, 'system/sql/system_access_seed.sql'), 'utf8');
+const modulesSource = fs.readFileSync(path.join(root, 'web/lib/modules.ts'), 'utf8');
 
-const uiSystemPerms = [...(sharedSource.match(/SYSTEM_PERMISSIONS[\s\S]*?\] as const;/) || [''])[0]
-  .matchAll(/'(sys_[a-z_]+)'/g)].map(match => match[1]);
+// 正本：每個大系統一行，m() 是有頁面的子系統，mp() 是只有權限的項目（例如主管簽核）。
+const registry = new Map();
+for (const line of modulesSource.split('\n')) {
+  const system = line.match(/\{key:'([a-z]+)',code:'SYS-\d+'/);
+  if (!system) continue;
+  registry.set(system[1], [...line.matchAll(/\bmp?\('([a-z0-9-]+)'/g)].map(match => match[1]));
+}
+if (registry.size === 0) errors.push('系統拓撲：讀不到 web/lib/modules.ts 的大系統清單');
+
+// shared.tsx 必須維持自動推導，不可再寫死一份系統清單。
+if (/SYSTEM_PERMISSIONS[^\n]*=\s*\[/.test(sharedSource)) {
+  errors.push('系統存取權限：shared.tsx 又寫死了 SYSTEM_PERMISSIONS，請改回由 modules.ts 推導');
+}
+
+const listFrom = (source, body) => {
+  const literal = body.match(/\[([^\]]*)\]/);
+  if (literal) return [...literal[1].matchAll(/'([a-z0-9-]+)'/g)].map(match => match[1]);
+  const alias = body.trim().match(/^[A-Z_][A-Z0-9_]*$/);
+  if (!alias) return [];
+  const declared = source.match(new RegExp(String.raw`const ${alias[0]}[^=]*=[^\[]*\[([^\]]*)\]`));
+  return declared ? [...declared[1].matchAll(/'([a-z0-9-]+)'/g)].map(match => match[1]) : [];
+};
+const mapFrom = (source, name, opener) => {
+  const block = source.match(new RegExp(String.raw`const ${name}[^=]*=\s*\{([\s\S]*?)\n\};`));
+  const found = new Map();
+  if (!block) return found;
+  for (const entry of block[1].matchAll(/(\w[\w-]*):\s*(new Set\([^)]*\)|\[[^\]]*\]|[A-Z_][A-Z0-9_]*)/g)) {
+    found.set(entry[1], listFrom(source, entry[2]));
+  }
+  return found;
+};
+
 const apiPerms = new Set([...(adminApiSource.match(/const PERMISSIONS = new Set\(\[[^\]]*\]/) || [''])[0]
   .matchAll(/'(sys_[a-z_]+)'/g)].map(match => match[1]));
 const seedPerms = new Set([...seedSource.matchAll(/\('(sys_[a-z_]+)'\)/g)].map(match => match[1]));
+const appApiModules = mapFrom(appApiSource, 'SYSTEM_MODULE_KEYS');
+const adminApiModules = mapFrom(adminApiSource, 'SYSTEM_MODULES');
 
-if (!uiSystemPerms.length) errors.push('系統存取權限：讀不到 shared.tsx 的 SYSTEM_PERMISSIONS');
-for (const perm of uiSystemPerms) {
+// 存取資料表的 system_key 檢查條件：以最後一次定義為準，新增大系統時必須補 migration。
+const migrationDir = path.join(root, 'supabase/migrations');
+const migrationText = fs.readdirSync(migrationDir).sort()
+  .map(name => fs.readFileSync(path.join(migrationDir, name), 'utf8')).join('\n');
+const constraintKeys = [...migrationText.matchAll(/_key_check[\s\S]{0,200}?check\(system_key in \(([^)]*)\)/g)]
+  .map(match => new Set([...match[1].matchAll(/'([a-z]+)'/g)].map(inner => inner[1])));
+const latestConstraint = constraintKeys[constraintKeys.length - 1];
+
+for (const [systemKey, moduleKeys] of registry) {
+  const perm = `sys_${systemKey}`;
   if (!apiPerms.has(perm)) errors.push(`系統存取權限：${perm} 不在 admin-api 的 PERMISSIONS 白名單，後台會勾不動`);
   if (!seedPerms.has(perm)) errors.push(`系統存取權限：${perm} 不在 system_access_seed.sql，新專案佈建會缺這一列`);
+  if (latestConstraint && !latestConstraint.has(systemKey)) {
+    errors.push(`系統存取權限：${systemKey} 不在存取資料表的 system_key 檢查條件，請補一支 migration 放寬條件`);
+  }
+  for (const [label, table] of [['app-api', appApiModules], ['admin-api', adminApiModules]]) {
+    const declared = table.get(systemKey);
+    if (!declared) { errors.push(`子系統白名單：${label} 缺少 ${systemKey} 這個大系統`); continue; }
+    for (const moduleKey of moduleKeys) {
+      if (!declared.includes(moduleKey)) errors.push(`子系統白名單：${label} 的 ${systemKey} 缺少 ${moduleKey}`);
+    }
+    for (const moduleKey of declared) {
+      if (!moduleKeys.includes(moduleKey)) errors.push(`子系統白名單：${label} 的 ${systemKey} 多出 ${moduleKey}，正本沒有這個子系統`);
+    }
+  }
 }
 
 if (errors.length) {
@@ -155,5 +212,6 @@ if (errors.length) {
   for (const error of unique(errors)) console.error(`- ${error}`);
   process.exitCode = 1;
 } else {
-  console.log(`資料表／前端欄位一致性檢查通過：${contracts.length} 組契約，涵蓋 ${schema.size} 張資料表。`);
+  console.log(`資料表／前端欄位一致性檢查通過：${contracts.length} 組契約，涵蓋 ${schema.size} 張資料表；`
+    + `系統拓撲 ${registry.size} 大系統、${[...registry.values()].reduce((total, list) => total + list.length, 0)} 個子系統與四份副本一致。`);
 }

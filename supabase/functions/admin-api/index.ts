@@ -754,6 +754,28 @@ export async function handleAdminApiRequest(req: Request) {
       return reply(req, { ok: true });
     }
 
+    // 角色子系統範本：角色×子系統的預設值。個人例外仍優先於這裡的設定。
+    if (action === 'admin_set_role_module_access') {
+      const roleId = clean(body.role_id, 40), systemKey = clean(body.system_key, 40);
+      const moduleKey = clean(body.module_key, 50), mode = clean(body.mode, 20);
+      if (!roleId || !SYSTEM_MODULES[systemKey]?.has(moduleKey) || !ACCESS_MODES.has(mode)) {
+        return reply(req, { ok: false, message: '角色、系統、子系統或授權模式無效' }, 400);
+      }
+      if (roleId === 'sysadmin') return reply(req, { ok: false, message: '系統管理員固定為全部開放，不需設定範本' }, 409);
+      if (systemKey === 'admin') return reply(req, { ok: false, message: '後台管理只保留給系統管理員，不可設為角色範本' }, 400);
+      const { data: role, error: roleError } = await admin.from('roles').select('role_id,name').eq('role_id', roleId).maybeSingle();
+      if (roleError || !role) return reply(req, { ok: false, message: '找不到指定角色' }, 404);
+      const { data: before } = await admin.from('role_module_access')
+        .select('mode').eq('role_id', roleId).eq('system_key', systemKey).eq('module_key', moduleKey).maybeSingle();
+      const { error } = await admin.from('role_module_access').upsert({
+        role_id: roleId, system_key: systemKey, module_key: moduleKey, mode,
+        updated_by: profile.user_id, updated_at: new Date().toISOString(),
+      }, { onConflict: 'role_id,system_key,module_key' });
+      if (error) return reply(req, { ok: false, message: `角色子系統範本更新失敗：${error.message}` }, 400);
+      await audit('role_module_access', `${roleId}:${systemKey}:${moduleKey}`, 'update', { role_name: role.name, before: before?.mode || 'inherit', after: mode });
+      return reply(req, { ok: true });
+    }
+
     if (action === 'admin_set_handover_module_access') {
       const userId = id(body.user_id), moduleKey = clean(body.module_key, 50);
       const allowed = body.allowed === true || body.allowed === 'true';

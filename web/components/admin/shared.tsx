@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { ModuleDefinition } from '@/lib/modules';
+import { permissionModules, systemPermissionKey, systems, type ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
 export type Row = Record<string, any>;
@@ -23,17 +23,12 @@ export const PERMISSIONS = [
   ['close', '結案'], ['sign', '簽核'], ['export', '匯出'], ['admin', '後台管理'], ['marketanalytics_manage', '市場分析資料管理'],
   ['sys_equipment_manage', '設備與圖臺管理'],
 ] as const;
-export const SYSTEM_PERMISSIONS = [
-  ['sys_admin', '後台管理'], ['sys_workorder', '報修／派工／完工'], ['sys_guardpatrol', '駐衛警巡檢'],
-  ['sys_handover', '電子交接簿'], ['sys_equipment', '設備建置'], ['sys_structuremap', '設備圖臺'],
-  ['sys_vehicle', '公務車派車'], ['sys_meetingroom', '會議室預約'], ['sys_officialdocs', '公文傳送'], ['sys_marketanalytics', '市場營運分析'], ['sys_dashboard', '戰情儀表板'], ['sys_marketboard', '市場公開看板'], ['sys_vehicletracking', '公務車定位追蹤'],
-] as const;
-export const HANDOVER_MODULE_PERMISSIONS = [
-  ['records', '指揮台電子交接簿'], ['mechanical', '機電課電子交接簿'],
-  ['business', '業管組電子交接簿'], ['guard', '駐衛警電子交接簿'],
-  ['guard-approve', '駐衛警交接主管簽核'], ['open-items', '未結事項'],
-  ['equipment', '設備概況'], ['mechanical-schedule', '機電課排班表'],
-] as const;
+// 大系統清單以 web/lib/modules.ts 為唯一正本；新增大系統只要改那一個檔案，
+// 這裡的欄位、人員精細授權與系統入口都會一起長出來（後端白名單由 schema-contract-check 把關）。
+export const SYSTEM_PERMISSIONS: ReadonlyArray<readonly [string, string]> =
+  systems.map(system => [systemPermissionKey(system.key), system.title.replace(/系統$/, '')] as const);
+export const HANDOVER_MODULE_PERMISSIONS: ReadonlyArray<readonly [string, string]> =
+  permissionModules('handover').map(module => [module.key, module.title] as const);
 
 export function errorMessage(error: unknown, fallback = '操作失敗，請稍後再試') {
   const raw = error instanceof Error ? error.message : (typeof error === 'object' && error !== null && 'message' in error) ? String((error as Record<string, unknown>).message) : String(error || '');
