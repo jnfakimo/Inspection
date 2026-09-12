@@ -27,6 +27,7 @@ import {
 } from './guard-handover-shared';
 import { AttachmentChips, GuardDailyReport, GuardIcon, GuardShiftCard, GuardSheetHeader, type GuardKpi } from './guard-handover-view';
 import { GuardCombo, GuardOptionsPanel } from './guard-handover-controls';
+import './handover-sheet.css';
 import './guard-handover.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
@@ -148,31 +149,31 @@ export function GuardHandover({ system, module, profile }: Props) {
   const report = { date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
 
   return <AppShell profile={profile} title={system.title} heading={{ system, module }}>
-    <div className="guard-page">
+    <div className="hs-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
         action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
-      <section className="panel guard-toolbar">
-        <div className="guard-date-nav">
+      <section className="panel hs-toolbar">
+        <div className="hs-date-nav">
           <button type="button" className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => moveDate(current, -1))}>‹</button>
           <label>值班日期<LocalizedDateInput aria-label="值班日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label>
           <button type="button" className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => moveDate(current, 1))}>›</button>
           <button type="button" className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
         </div>
-        <div className="guard-toolbar-right">
-          {currentShift && <span className="guard-current-now"><i className="guard-pulse-dot" aria-hidden="true" />目前當班：{currentShift.name}（{hhmm(currentShift.shift_start)}–{hhmm(currentShift.shift_end)}）</span>}
-          <span className="guard-toolbar-summary"><GuardIcon name="calendar" size={15} />{rocDate(date)} · {shifts.length} 個班別 · 已接班 {receivedCount} 班</span>
+        <div className="hs-toolbar-right">
+          {currentShift && <span className="hs-current-now"><i className="hs-pulse-dot" aria-hidden="true" />目前當班：{currentShift.name}（{hhmm(currentShift.shift_start)}–{hhmm(currentShift.shift_end)}）</span>}
+          <span className="hs-toolbar-summary"><GuardIcon name="calendar" size={15} />{rocDate(date)} · {shifts.length} 個班別 · 已接班 {receivedCount} 班</span>
         </div>
       </section>
 
-      {context && <section className={`guard-approval${approval ? ' is-approved' : canApproveNow ? ' is-ready' : ''}`} aria-label="主管簽核">
-        <div className="guard-approval-main">
-          <span className="guard-approval-icon"><GuardIcon name={approval ? 'check' : 'pen'} size={22} /></span>
+      {context && <section className={`hs-approval${approval ? ' is-approved' : canApproveNow ? ' is-ready' : ''}`} aria-label="主管簽核">
+        <div className="hs-approval-main">
+          <span className="hs-approval-icon"><GuardIcon name={approval ? 'check' : 'pen'} size={22} /></span>
           <div>
             <strong>{approval ? `主管已簽核：${nameOf(approval.approver_id)}` : '主管每日簽核'}</strong>
             <span>{approval ? `${activityTime(approval.approved_at)}${approval.note ? `・說明：${approval.note}` : ''}（簽核後本日交接全部鎖定）` : approvalHint}</span>
           </div>
         </div>
-        {!approval && context.can_approve && <div className="guard-approval-actions">
+        {!approval && context.can_approve && <div className="hs-approval-actions">
           {missingCount > 0 && <input value={approvalNote} maxLength={500} onChange={event => setApprovalNote(event.target.value)} placeholder={`有 ${missingCount} 班未建立交接，請填寫說明`} aria-label="簽核說明" />}
           <button type="button" className="primary-btn compact" disabled={acting || !canApproveNow}
             onClick={() => void run('guard_approve', { duty_date: date, note: approvalNote.trim() }, '主管簽核完成，本日交接已全部鎖定',
@@ -180,11 +181,11 @@ export function GuardHandover({ system, module, profile }: Props) {
         </div>}
       </section>}
 
-      <section className="guard-sheet" aria-label="駐衛警電子交接簿">
+      <section className="hs-sheet" aria-label="駐衛警電子交接簿">
         <GuardSheetHeader date={date} kpis={context ? kpis : []} />
-        <div className="guard-shifts">
-          {busy && !context ? <p className="guard-empty">載入中…</p>
-            : !shifts.length ? <p className="guard-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡檢系統 → 巡檢排班」設定班別。</p>
+        <div className="hs-shifts">
+          {busy && !context ? <p className="hs-empty">載入中…</p>
+            : !shifts.length ? <p className="hs-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡檢系統 → 巡檢排班」設定班別。</p>
               : shifts.map((shift, index) => {
                 const log = logFor(shift.name);
                 return <GuardShiftCard key={shift.name} index={index} shift={shift} log={log} nameOf={nameOf} namesOf={namesOf}
@@ -194,13 +195,13 @@ export function GuardHandover({ system, module, profile }: Props) {
       </section>
 
       {/* 預覽與列印共用同一個報表元件：畫面上看到的就是印出來的內容。 */}
-      {context && <div className="guard-print-sheet"><GuardDailyReport {...report} /></div>}
-      {previewOpen && context && <div className="guard-preview" role="dialog" aria-modal="true" aria-label="駐衛警交接日報表預覽">
-        <div className="guard-preview-bar">
+      {context && <div className="hs-print-sheet"><GuardDailyReport {...report} /></div>}
+      {previewOpen && context && <div className="hs-preview" role="dialog" aria-modal="true" aria-label="駐衛警交接日報表預覽">
+        <div className="hs-preview-bar">
           <div><strong>日報表預覽</strong><span>{rocDate(date)} · A4 直式，與列印內容相同</span></div>
           <div><button type="button" className="primary-btn compact" onClick={() => window.print()}>列印</button><button type="button" className="secondary-btn compact" onClick={() => setPreviewOpen(false)}>關閉預覽</button></div>
         </div>
-        <div className="guard-preview-scroll"><div className="guard-preview-paper"><GuardDailyReport {...report} /></div></div>
+        <div className="hs-preview-scroll"><div className="hs-preview-paper"><GuardDailyReport {...report} /></div></div>
       </div>}
     </div>
     {editing && context && <GuardLogModal date={date} shift={editing} log={logFor(editing.name)} staff={context.staff} people={context.people}

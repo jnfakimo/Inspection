@@ -12,135 +12,14 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import { HandoverIcon, HandoverSheetHeader, type IconName } from './handover-sheet';
+import './handover-sheet.css';
 import './business-handover.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
-export type IconName =
-  | 'building'
-  | 'shield'
-  | 'clock'
-  | 'calendar'
-  | 'check'
-  | 'users'
-  | 'note'
-  | 'flag'
-  | 'alert'
-  | 'tool'
-  | 'clipboard'
-  | 'chevron-down'
-  | 'chevron-up'
-  | 'list'
-  | 'printer'
-  | 'eye'
-  | 'save'
-  | 'pen';
-
-const ICON_PATHS: Record<IconName, ReactNode> = {
-  building: (
-    <>
-      <path d="M3 21h18M5 21V7l8-4v18M13 3l6 3v15M9 9h1M9 13h1M9 17h1M17 9h1M17 13h1M17 17h1" />
-    </>
-  ),
-  shield: (
-    <>
-      <path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z" />
-      <path d="M9 12l2 2 4-4" />
-    </>
-  ),
-  clock: (
-    <>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </>
-  ),
-  calendar: (
-    <>
-      <rect x="3" y="5" width="18" height="16" rx="2" />
-      <path d="M8 3v4M16 3v4M3 10h18" />
-    </>
-  ),
-  check: <path d="M5 12.5l4.5 4.5L19 7" />,
-  users: (
-    <>
-      <circle cx="9.5" cy="7.5" r="3.5" />
-      <path d="M3 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1" />
-      <path d="M16 4.3a3.5 3.5 0 0 1 0 6.4" />
-      <path d="M21 20v-1a4.5 4.5 0 0 0-3-4.2" />
-    </>
-  ),
-  note: (
-    <>
-      <rect x="5" y="4" width="14" height="17" rx="2" />
-      <path d="M9 4V3h6v1M9 10h6M9 14h6M9 18h3" />
-    </>
-  ),
-  flag: <path d="M5 21V4M5 4h11l-2 4 2 4H5" />,
-  alert: (
-    <>
-      <path d="M12 3.5l9 16H3l9-16zM12 10v4M12 17h.01" />
-    </>
-  ),
-  tool: (
-    <>
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-    </>
-  ),
-  clipboard: (
-    <>
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-      <path d="M9 12l2 2 4-4" />
-    </>
-  ),
-  'chevron-down': <path d="M6 9l6 6 6-6" />,
-  'chevron-up': <path d="M18 15l-6-6-6 6" />,
-  list: <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
-  printer: (
-    <>
-      <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-      <path d="M6 14h12v8H6z" />
-    </>
-  ),
-  eye: (
-    <>
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" />
-    </>
-  ),
-  save: (
-    <>
-      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-      <polyline points="17 21 17 13 7 13 7 21" />
-      <polyline points="7 3 7 8 15 8" />
-    </>
-  ),
-  pen: (
-    <>
-      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-    </>
-  ),
-};
-
-export function BusinessIcon({ name, size = 16 }: { name: IconName; size?: number }) {
-  return (
-    <svg
-      className="business-icon"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {ICON_PATHS[name]}
-    </svg>
-  );
-}
+// 圖示改用三本交接簿共用的 handover-sheet。
+const BusinessIcon = HandoverIcon;
 
 export type DutyCheckItem = {
   id: string;
@@ -813,14 +692,14 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
   return (
     <AppShell profile={profile} title={system.title} heading={{ system, module }}>
-      <div className="business-page">
+      <div className="hs-page">
         <AdminHeader
           module={module}
           busy={busy || savingChecks}
           note={note}
           onReload={load}
           action={
-            <div className="business-header-actions">
+            <div className="hs-header-actions">
               <button
                 type="button"
                 className="secondary-btn compact"
@@ -849,8 +728,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
         />
 
         {/* 頂部日期導覽與當班工具列 */}
-        <section className="panel business-toolbar">
-          <div className="business-date-nav">
+        <section className="panel hs-toolbar">
+          <div className="hs-date-nav">
             <button
               type="button"
               className="secondary-btn compact"
@@ -876,14 +755,14 @@ export function BusinessHandover({ system, module, profile }: Props) {
             </button>
           </div>
 
-          <div className="business-toolbar-status">
+          <div className="hs-toolbar-right">
             {currentActiveShift && (
-              <span className="business-toolbar-live-badge">
-                <span className="business-pulse-dot" />
+              <span className="hs-current-now">
+                <span className="hs-pulse-dot" />
                 目前當班：{currentActiveShift.name}（{currentActiveShift.label}）
               </span>
             )}
-            <span className="business-toolbar-summary">
+            <span className="hs-toolbar-summary">
               <BusinessIcon name="calendar" size={15} />
               {rocDate(date)} · 3 個班別 · 共 {customEntries.length} 筆交接
             </span>
@@ -997,66 +876,16 @@ export function BusinessHandover({ system, module, profile }: Props) {
         </section>
 
         {/* 主要交接紀錄外框 */}
-        <section className="business-sheet" aria-label="業管組電子交接簿">
-          {/* 表頭裝飾與標題（比照駐警交接簿漸層與徽章風格） */}
-          <header className="business-sheet-head">
-            <div className="business-sheet-title">
-              <span className="business-sheet-emblem">
-                <BusinessIcon name="building" size={28} />
-              </span>
-              <div>
-                <small>臺北農產運銷股份有限公司　第一果菜市場</small>
-                <h2>業管組交接紀錄表</h2>
-              </div>
-            </div>
-            <b className="business-date-chip">
-              <BusinessIcon name="calendar" size={17} />
-              {rocDate(date)}
-            </b>
-          </header>
-
-          {/* 今日核心指標卡片 (KPIs) */}
-          <div className="business-kpis">
-            <div className="business-kpi is-cyan">
-              <span className="business-kpi-icon">
-                <BusinessIcon name="clock" size={20} />
-              </span>
-              <div>
-                <b>3 個班別</b>
-                <small>早班・中班・晚班</small>
-              </div>
-            </div>
-
-            <div className="business-kpi is-violet">
-              <span className="business-kpi-icon">
-                <BusinessIcon name="note" size={20} />
-              </span>
-              <div>
-                <b>{customEntries.length} 筆交接</b>
-                <small>事務・維修・交辦</small>
-              </div>
-            </div>
-
-            <div className="business-kpi is-amber">
-              <span className="business-kpi-icon">
-                <BusinessIcon name="users" size={20} />
-              </span>
-              <div>
-                <b>{attendanceTotal.expected} 人</b>
-                <small>未出勤 {attendanceTotal.absent} 人</small>
-              </div>
-            </div>
-
-            <div className={`business-kpi ${checkStats.percent === 100 ? 'is-green' : 'is-cyan'}`}>
-              <span className="business-kpi-icon">
-                <BusinessIcon name="clipboard" size={20} />
-              </span>
-              <div>
-                <b>{checkStats.completed} / {checkStats.total}</b>
-                <small>崗位點檢率 {checkStats.percent}%</small>
-              </div>
-            </div>
-          </div>
+        <section className="hs-sheet" aria-label="業管組電子交接簿">
+          {/* 表頭與今日指標：三本交接簿共用同一支元件 */}
+          <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="業管組交接紀錄表"
+            dateLabel={rocDate(date)} emblem="building" kpis={[
+              { value: '3 個班別', label: '早班・中班・晚班', icon: 'clock', tone: 'cyan' },
+              { value: `${customEntries.length} 筆交接`, label: '事務・維修・交辦', icon: 'note', tone: 'violet' },
+              { value: `${attendanceTotal.expected} 人`, label: `未出勤 ${attendanceTotal.absent} 人`, icon: 'users', tone: 'amber' },
+              { value: `${checkStats.completed} / ${checkStats.total}`, label: `崗位點檢率 ${checkStats.percent}%`,
+                icon: 'clipboard', tone: checkStats.percent === 100 ? 'green' : 'cyan' },
+          ]} />
 
           {/* 崗位勤務時段點檢表：收折式設計（剛進入時預設收合） */}
           <div className={`business-checklist-accordion ${checklistOpen ? 'is-expanded' : 'is-collapsed'}`}>
@@ -1116,7 +945,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                         className={`business-slot-chip ${selectedSlotFilter === slot.code ? 'active' : ''} ${isAllDone ? 'is-done' : ''} ${isSlotLive ? 'is-live-slot' : ''}`}
                         onClick={() => setSelectedSlotFilter(slot.code)}
                       >
-                        {isSlotLive && <span className="business-pulse-dot" title="目前進行中時段" />}
+                        {isSlotLive && <span className="hs-pulse-dot" title="目前進行中時段" />}
                         {slot.label} ({stats.completed}/{stats.total})
                         {isSlotLive && <span className="business-live-text">當班</span>}
                       </button>
@@ -1141,7 +970,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                             </span>
                             {isSlotActive && (
                               <span className="business-active-now-badge">
-                                <span className="business-pulse-dot" />
+                                <span className="hs-pulse-dot" />
                                 當前執行時段
                               </span>
                             )}
@@ -1236,7 +1065,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           </div>
 
           {/* 三班交接清單卡片 */}
-          <div className="business-shifts">
+          <div className="hs-shifts">
             {SHIFTS.map((shift, shiftIndex) => {
               const shiftCustomRows = entries.filter(
                 row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
@@ -1246,31 +1075,31 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
               return (
                 <section
-                  className={`business-shift business-shift-${shiftIndex + 1}${isShiftActive ? ' is-active-shift' : ''}`}
+                  className={`hs-shift hs-shift-${shiftIndex + 1}${isShiftActive ? ' is-current' : ''}`}
                   key={shift.code}
                 >
                   {/* 班別主標題列 */}
-                  <div className="business-shift-head">
-                    <div className="business-shift-title">
-                      <strong className="business-shift-no">{shiftIndex + 1}</strong>
+                  <div className="hs-shift-head">
+                    <div className="hs-shift-title">
+                      <strong className="hs-shift-no">{shiftIndex + 1}</strong>
                       <div>
-                        <div className="business-shift-name">
+                        <div className="hs-shift-name">
                           <b>{shift.name}</b>
                           {isShiftActive ? (
-                            <span className="business-state is-active">
-                              <span className="business-pulse-dot" />
+                            <span className="hs-state is-active">
+                              <span className="hs-pulse-dot" />
                               當班中
                             </span>
                           ) : (
-                            <span className="business-state is-normal">班別時段</span>
+                            <span className="hs-state is-normal">班別時段</span>
                           )}
                         </div>
-                        <div className="business-shift-times">
-                          <span className="business-chip">
+                        <div className="hs-shift-times">
+                          <span className="hs-chip">
                             <BusinessIcon name="clock" size={14} />
                             時段 {shift.label}
                           </span>
-                          <span className="business-chip">
+                          <span className="hs-chip">
                             <BusinessIcon name="list" size={14} />
                             {shift.subLabel}
                           </span>
@@ -1278,8 +1107,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                       </div>
                     </div>
 
-                    <div className="business-shift-actions">
-                      <span className="business-pill is-count">
+                    <div className="hs-shift-actions">
+                      <span className="hs-pill is-count">
                         共 {activeCustomRows.length} 筆交接
                       </span>
                       <button
@@ -1296,7 +1125,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                   </div>
 
                   {/* 班別內容清單 */}
-                  <div className="business-shift-body">
+                  <div className="hs-shift-body is-single">
                     {shiftCustomRows.length ? (
                       <div className="business-entry-list">
                         {shiftCustomRows.map((row, itemIndex) => (
@@ -1358,7 +1187,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                         ))}
                       </div>
                     ) : (
-                      <div className="business-empty-shift">
+                      <div className="hs-empty-shift">
                         <BusinessIcon name="note" size={18} />
                         <p>本班尚無交接紀錄，請點擊右上角「＋ 新增交接」建立。</p>
                       </div>
@@ -1371,7 +1200,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
         </section>
 
         {/* 列印專用報表區 (A4 單頁精確排版) */}
-        <section className="business-print-sheet" aria-label="業管組每日列印報表">
+        <section className="hs-print-sheet" aria-label="業管組每日列印報表">
           <BusinessReportContent
             date={date}
             checkStats={checkStats}

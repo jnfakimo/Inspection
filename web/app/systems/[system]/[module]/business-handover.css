@@ -1,26 +1,5 @@
-/* SYS-04 業管組電子交接簿樣式。色彩一律取主題變數；風格與駐衛警交接簿統一。 */
-.business-page{display:grid;gap:16px}
-.business-icon{display:block;flex:none}
-.business-header-actions{display:flex;align-items:center;gap:8px}
-
-/* 工具列（比照駐衛警交接簿頂欄） */
-.panel.business-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 7%,var(--panel)),var(--panel) 60%)}
-.business-date-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.business-date-nav label{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700}
-.business-date-nav label>span{width:180px}
-.business-toolbar-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
-.business-toolbar-live-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid color-mix(in srgb,var(--green) 40%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--green) 12%,var(--panel));color:var(--ink);font-size:13px;font-weight:700;box-shadow:0 0 12px color-mix(in srgb,var(--green) 20%,transparent)}
-.business-toolbar-summary{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid color-mix(in srgb,var(--cyan) 30%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--cyan) 9%,var(--panel));color:var(--ink);font-size:13px;font-weight:600}
-.business-toolbar-summary .business-icon{color:var(--cyan)}
-
-/* 呼吸微光燈 */
-.business-pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 0 rgba(16,185,129,.7);animation:businessPulse 1.8s infinite}
-@keyframes businessPulse{
-  0%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(16,185,129,.7)}
-  70%{transform:scale(1.1);box-shadow:0 0 0 7px rgba(16,185,129,0)}
-  100%{transform:scale(0.95);box-shadow:0 0 0 0 rgba(16,185,129,0)}
-}
-
+/* SYS-04 業管組電子交接簿「本簿特有」的樣式：三級批核、時段點檢表、工作卡片與 A4 報表。
+   共同版型（工具列、表頭、指標、班別卡片、簽名、當班標示）一律在 handover-sheet.css。 */
 /* 主管三級批核流程區塊 (一市場主任、營業部副理、營業部經理) */
 .business-approval-section{display:grid;gap:14px;padding:16px 20px;border:1px solid color-mix(in srgb,var(--violet) 30%,var(--line));border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--violet) 8%,var(--panel)),var(--panel) 70%);box-shadow:0 4px 16px rgba(0,0,0,.04)}
 .business-approval-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px dashed color-mix(in srgb,var(--violet) 25%,var(--line));padding-bottom:12px}
@@ -61,30 +40,6 @@
 .business-note-input{width:100%;box-sizing:border-box;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font-size:12.5px}
 .business-note-input:focus{border-color:var(--cyan);outline:none}
 .business-approve-btn{width:100%;justify-content:center;margin-top:4px}
-
-/* 交接紀錄表外框、表頭與今日指標 */
-.business-sheet{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow,0 12px 32px rgba(15,23,42,.08))}
-.business-sheet-head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:24px 26px 20px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--violet) 13%,var(--panel)) 0%,color-mix(in srgb,var(--cyan) 9%,var(--panel)) 55%,var(--panel) 100%)}
-.business-sheet-head::before{content:'';position:absolute;inset:0 0 auto;height:5px;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--green))}
-.business-sheet-title{display:flex;align-items:center;gap:16px}
-.business-sheet-emblem{display:grid;place-items:center;flex:none;width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,var(--violet),var(--cyan));color:#fff;box-shadow:0 10px 22px color-mix(in srgb,var(--violet) 28%,transparent)}
-.business-sheet-title small{color:var(--muted);letter-spacing:.06em}
-.business-sheet-title h2{margin:4px 0 0;color:var(--ink);font-size:28px;letter-spacing:.08em}
-.business-date-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid color-mix(in srgb,var(--violet) 32%,var(--line));border-radius:999px;background:var(--panel);color:var(--ink);font-size:16px;white-space:nowrap;box-shadow:0 2px 8px color-mix(in srgb,var(--violet) 12%,transparent)}
-.business-date-chip .business-icon{color:var(--violet)}
-
-/* 今日核心指標卡片 (KPIs) */
-.business-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel2) 55%,var(--panel))}
-.business-kpi{--tone:var(--cyan);position:relative;display:flex;align-items:center;gap:12px;overflow:hidden;padding:12px 14px;border:1px solid color-mix(in srgb,var(--tone) 30%,var(--line));border-radius:14px;background:var(--panel)}
-.business-kpi::after{content:'';position:absolute;inset:auto 0 0;height:3px;background:var(--tone);opacity:.75}
-.business-kpi.is-green{--tone:var(--green)}
-.business-kpi.is-amber{--tone:var(--amber)}
-.business-kpi.is-red{--tone:var(--red)}
-.business-kpi.is-violet{--tone:var(--violet)}
-.business-kpi.is-cyan{--tone:var(--cyan)}
-.business-kpi-icon{display:grid;place-items:center;flex:none;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb,var(--tone) 15%,var(--panel));color:var(--tone)}
-.business-kpi b{display:block;color:var(--ink);font-size:22px;line-height:1.15}
-.business-kpi small{color:var(--muted);font-size:12px}
 
 /* 崗位勤務時段點檢表：收折式手風琴 */
 .business-checklist-accordion{border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel2) 30%,var(--panel));transition:all .25s ease}
@@ -151,39 +106,11 @@
 .business-check-btn.complete-btn.active{background:#059669;color:#fff;font-weight:700}
 .business-check-btn.uncomplete-btn.active{background:#64748b;color:#fff;font-weight:700}
 
-/* 三班交接卡片 */
-.business-shifts{display:grid;gap:16px;padding:18px}
-.business-shift{--shift:#0284c7;overflow:hidden;border:1px solid color-mix(in srgb,var(--shift) 28%,var(--line));border-radius:16px;background:var(--panel);box-shadow:0 1px 0 color-mix(in srgb,var(--shift) 20%,transparent);transition:box-shadow .2s ease,border .2s ease}
-.business-shift:hover{box-shadow:0 12px 28px color-mix(in srgb,var(--shift) 14%,transparent)}
-.business-shift.is-active-shift{border:2px solid #10b981;box-shadow:0 0 20px color-mix(in srgb,#10b981 22%,transparent)}
-.business-shift-1{--shift:#0284c7}
-.business-shift-2{--shift:#059669}
-.business-shift-3{--shift:#b45309}
-
-.business-shift-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid color-mix(in srgb,var(--shift) 22%,var(--line));background:linear-gradient(90deg,color-mix(in srgb,var(--shift) 12%,var(--panel)),var(--panel) 72%)}
-.business-shift.is-active-shift .business-shift-head{background:linear-gradient(90deg,color-mix(in srgb,#10b981 16%,var(--panel)),var(--panel) 72%);border-bottom-color:color-mix(in srgb,#10b981 30%,var(--line))}
-.business-shift-title{display:flex;align-items:center;gap:14px}
-.business-shift-no{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:var(--shift);color:#fff;font-size:22px;box-shadow:0 8px 16px color-mix(in srgb,var(--shift) 32%,transparent)}
-.business-shift.is-active-shift .business-shift-no{background:#10b981;box-shadow:0 8px 16px color-mix(in srgb,#10b981 35%,transparent)}
-.business-shift-name{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.business-shift-name b{color:var(--ink);font-size:21px}
-.business-state{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700}
-.business-state.is-active{background:color-mix(in srgb,var(--green) 15%,var(--panel));color:var(--ink)}
-.business-shift-times{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-.business-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border:1px solid color-mix(in srgb,var(--shift) 26%,var(--line));border-radius:999px;background:var(--panel);color:var(--ink);font-size:12.5px}
-.business-chip .business-icon{color:var(--shift)}
-.business-shift.is-active-shift .business-chip{border-color:color-mix(in srgb,#10b981 30%,var(--line))}
-.business-shift.is-active-shift .business-chip .business-icon{color:#10b981}
-.business-shift-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.business-pill{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--muted);font-size:12.5px;font-weight:700;white-space:nowrap}
-.business-pill.is-count{border-color:color-mix(in srgb,var(--shift) 35%,var(--line));background:color-mix(in srgb,var(--shift) 10%,var(--panel));color:var(--ink)}
-.business-shift.is-active-shift .business-pill.is-count{border-color:color-mix(in srgb,#10b981 40%,var(--line));background:color-mix(in srgb,#10b981 12%,var(--panel))}
-
-.business-shift-body{padding:16px 18px}
+.hs-pill.is-count{border-color:color-mix(in srgb,var(--shift) 35%,var(--line));background:color-mix(in srgb,var(--shift) 10%,var(--panel));color:var(--ink)}
 .business-entry-list{display:grid;gap:12px}
 .business-entry{display:grid;grid-template-columns:minmax(0,1.3fr) 200px 260px;gap:16px;align-items:center;padding:14px 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;transition:all .18s ease}
 .business-entry:hover,.business-entry:focus-visible{background:color-mix(in srgb,var(--shift) 8%,var(--panel));border-color:color-mix(in srgb,var(--shift) 40%,var(--line));outline:none;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.04)}
-.business-shift.is-active-shift .business-entry:hover{background:color-mix(in srgb,#10b981 8%,var(--panel));border-color:color-mix(in srgb,#10b981 40%,var(--line))}
+.hs-shift.is-current .business-entry:hover{background:color-mix(in srgb,#10b981 8%,var(--panel));border-color:color-mix(in srgb,#10b981 40%,var(--line))}
 .business-entry.is-deleted{text-decoration:line-through;opacity:.55;background:var(--panel2)}
 .business-entry-main{display:grid;gap:6px}
 .business-entry-category{display:flex;align-items:center;gap:8px}
@@ -200,9 +127,6 @@
 
 .business-audit{display:grid;align-content:start;gap:3px;color:var(--muted);font-size:12px}
 .business-audit>b{color:var(--cyan);font-weight:600}
-.business-empty-shift{display:flex;align-items:center;gap:12px;padding:18px;border:1px dashed color-mix(in srgb,var(--shift) 35%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--shift) 4%,var(--panel))}
-.business-empty-shift p{margin:0;color:var(--muted);font-size:14px}
-
 /* 建立與編輯交接彈窗 */
 .business-modal{width:min(760px,calc(100vw - 28px))}
 .business-form{display:grid;gap:14px;padding:20px}
@@ -275,34 +199,23 @@
 .print-box-note{border-top:0.4pt dashed #888;padding-top:1mm;margin-top:1mm}
 .print-box-note p{margin:0.5mm 0 0;color:#111;font-size:7.2pt;line-height:1.2;white-space:pre-line}
 
-.business-print-sheet{display:none}
+.hs-print-sheet{display:none}
 
 @media(max-width:1100px){
-  .business-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .business-approval-stages-grid{grid-template-columns:1fr}
 }
 
 @media(max-width:900px){
-  .business-toolbar{align-items:stretch}
-  .business-date-nav label{order:-1;width:100%}
-  .business-date-nav label>span{width:100%}
-  .business-toolbar-status{width:100%;justify-content:flex-start}
-  .business-sheet-head{padding:20px 16px 16px}
-  .business-sheet-title h2{font-size:22px}
-  .business-sheet-emblem{width:48px;height:48px}
   .business-entry{grid-template-columns:1fr;padding:14px;gap:10px}
   .business-attendance{flex-wrap:wrap}
   .business-audit{padding-top:10px;border-top:1px dashed var(--line)}
-  .business-shift-head{padding:14px}
-  .business-shift-head strong{width:40px;height:40px}
   .business-attendance-fields{grid-template-columns:1fr}
   .business-duty-table th:nth-child(2),.business-duty-table td:nth-child(2){display:none}
   .business-report-preview-page{width:100%;min-height:auto;padding:12px 10px}
 }
 
 @media(prefers-reduced-motion:reduce){
-  .business-pulse-dot{animation:none}
-  .business-shift{transition:none}
+  .hs-pulse-dot{animation:none}
 }
 
 /* ========================================================= */
@@ -311,11 +224,11 @@
 @media print{
   @page{size:A4 portrait;margin:6mm 8mm}
   body{background:#fff!important;margin:0!important;padding:0!important}
-  .v1-navbar,.system-page-header,.admin-page-actions,.business-toolbar,.business-approval-section,.business-tab-bar,.business-slot-filter-bar,.business-sheet,.business-report-preview,.theme-toggle{display:none!important}
+  .v1-navbar,.system-page-header,.admin-page-actions,.hs-toolbar,.business-approval-section,.business-tab-bar,.business-slot-filter-bar,.hs-sheet,.business-report-preview,.theme-toggle{display:none!important}
   .content.v1-content{padding:0!important;margin:0!important;max-width:none!important}
-  .business-page{display:block!important;padding:0!important;margin:0!important}
-  .business-print-sheet,.business-print-sheet *{visibility:visible!important}
-  .business-print-sheet{display:block!important;color:#111!important;background:#fff!important;font-family:"Noto Sans TC",sans-serif!important;page-break-inside:avoid!important;break-inside:avoid!important}
+  .hs-page{display:block!important;padding:0!important;margin:0!important}
+  .hs-print-sheet,.hs-print-sheet *{visibility:visible!important}
+  .hs-print-sheet{display:block!important;color:#111!important;background:#fff!important;font-family:"Noto Sans TC",sans-serif!important;page-break-inside:avoid!important;break-inside:avoid!important}
   .business-print-content{page-break-inside:avoid!important;break-inside:avoid!important}
   .business-print-duty-cols,.business-print-shift-table,.business-print-approvals-grid{page-break-inside:avoid!important;break-inside:avoid!important}
   tr{page-break-inside:avoid!important;break-inside:avoid!important}

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { repairCostCents, repairCostTotal, formatRepairCost } from '@/lib/mechanical-cost';
 import { canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, outstandingMechanicalEntries } from '@/lib/mechanical-handover-flow';
 import { AppShell } from '@/components/AppShell';
+import { HandoverIcon, HandoverSheetHeader, type HandoverKpi } from './handover-sheet';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { BlankSelectOption } from '@/components/BlankSelectOption';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
@@ -12,6 +13,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import './handover-sheet.css';
 import './mechanical-handover.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
@@ -272,27 +274,32 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     } finally { setPrintBusy(false); }
   };
 
+  // 今日指標：與另外兩本交接簿相同的四張卡片，數字才看得出輕重。
+  const kpis: HandoverKpi[] = [
+    { label: '本日有效工作', value: `${currentEntries.length} 件`, icon: 'clipboard', tone: 'cyan' },
+    { label: '維修費用合計', value: formatRepairCost(repairCostTotal(currentEntries)), icon: 'note', tone: 'violet' },
+    { label: '保留刪除紀錄', value: `${deletedEntryCount} 件`, icon: 'alert', tone: deletedEntryCount ? 'amber' : 'green' },
+    { label: '課長簽核', value: approval ? '已簽核' : approvalOpen ? '待簽核' : '隔日開放', icon: approval ? 'check' : 'pen', tone: approval ? 'green' : 'amber' },
+  ];
+
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
-    <div className="mechanical-page">
+    <div className="hs-page">
       <AdminHeader module={module} busy={busy} note={note} onReload={load}
         action={<>{canManageOptions && <button className="secondary-btn compact" disabled={busy} onClick={() => setOptionsOpen(true)}>管理工作選項</button>}<button className="secondary-btn compact" disabled={busy} onClick={() => { setPrintData(null); setPrintRequested(false); setPreviewOpen(true); }}>預覽本日報表</button><button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button></>} />
-      <section className="panel mechanical-toolbar">
-        <div className="mechanical-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value); }} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
+      <section className="panel hs-toolbar">
+        <div className="hs-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value); }} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
         <span>{rocDate(date)}</span>
         <button className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
         <div className="mechanical-legend" aria-label="班別色彩說明"><b>班別</b><span className="legend-chip shift-0109">早班 01–09</span><span className="legend-chip shift-0917">中班 09–17</span><span className="legend-chip shift-1701">晚班 17–01</span><span className="legend-chip shift-current">目前當班</span></div>
       </section>
       {frequentItems.length > 0 && <section className="panel mechanical-frequent"><div><b>我的常用工作項目</b><small>依個人紀錄累計 3 次以上</small></div><div className="mechanical-frequent-list">{frequentItems.slice(0, 6).map(item => <button key={item} className="secondary-btn compact" onClick={() => { setEditingEntry(null); setCarrySource(null); setPresetItem(item); setEditingShift('01-09'); }}>{item}</button>)}</div></section>}
 
-      <section className="mechanical-broadsheet" aria-label="機電設備交接紀錄">
-        <header className="mechanical-broadsheet-head"><div><span>臺北農產運銷公司　第二批發市場</span><h2>機電設備交接紀錄表</h2></div><div className="mechanical-broadsheet-date"><b>{rocDate(date)}</b><small>機電課　交接班紀錄</small></div></header>
-        <div className="mechanical-day-summary">
-          <span>本日 <b>{currentEntries.length}</b> 件有效工作</span>
-          {deletedEntryCount > 0 && <span className="mechanical-deleted-count">保留 {deletedEntryCount} 件刪除紀錄</span>}
-          <span>本日維修費用合計 <strong>{formatRepairCost(repairCostTotal(currentEntries))}</strong></span>
-          {currentEntries.some(row => row.repair_cost == null) && <small>含 {currentEntries.filter(row => row.repair_cost == null).length} 件費用未填，合計僅計入已填金額。</small>}
-        </div>
-        {SHIFTS.map((shift, index) => {
+      <section className="hs-sheet" aria-label="機電設備交接紀錄">
+        <HandoverSheetHeader org="臺北農產運銷股份有限公司　第二批發市場" title="機電設備交接紀錄表"
+          dateLabel={rocDate(date)} emblem="tool" kpis={kpis} />
+        {currentEntries.some(row => row.repair_cost == null) && <p className="mechanical-cost-note">
+          含 {currentEntries.filter(row => row.repair_cost == null).length} 件費用未填，合計僅計入已填金額。</p>}
+        <div className="hs-shifts">{SHIFTS.map((shift, index) => {
           const rows = byShift(shift.code);
           const activeRows = activeEntries(rows);
           const deletedRows = rows.length - activeRows.length;
@@ -301,11 +308,25 @@ export function MechanicalHandover({ system, module, profile }: Props) {
           const scheduledIds = scheduledIdsFor(shift.code);
           const scheduledNames = scheduledIds.map(userName).filter(name => name !== '—');
           const signatureUsers = [...mechanicalUsers].sort((a, b) => Number(scheduledIds.includes(String(b.user_id))) - Number(scheduledIds.includes(String(a.user_id))) || String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
-          return <section className={`mechanical-shift mechanical-shift-${index + 1}${isCurrent ? ' is-current' : ''}`} key={shift.code}>
-            <div className="mechanical-shift-head">
-              <div className="mechanical-shift-title"><strong>{['一', '二', '三'][index]}</strong><span><b>{['早班', '中班', '晚班'][index]}{isCurrent && <em>目前當班</em>}</b><small>{shift.label} · {activeRows.length} 件{deletedRows ? `（刪除 ${deletedRows}）` : ''} · 費用 {formatRepairCost(repairCostTotal(activeRows))}</small></span></div>
-              <button className="primary-btn compact" disabled={busy || Boolean(approval)} onClick={() => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shift.code); }}>＋ 新增工作</button>
+          return <section className={`hs-shift hs-shift-${index + 1}${isCurrent ? ' is-current' : ''}`} key={shift.code}>
+            <div className="hs-shift-head">
+              <div className="hs-shift-title">
+                <span className="hs-shift-no">{index + 1}</span>
+                <div>
+                  <div className="hs-shift-name"><b>{['早班', '中班', '晚班'][index]}</b>
+                    {isCurrent && <span className="hs-current-badge"><i className="hs-pulse-dot" aria-hidden="true" />當班中</span>}</div>
+                  <div className="hs-shift-times">
+                    <span className="hs-chip"><HandoverIcon name="clock" size={14} />{shift.label}</span>
+                    <span className="hs-chip"><HandoverIcon name="clipboard" size={14} />{activeRows.length} 件{deletedRows ? `（刪除 ${deletedRows}）` : ''}</span>
+                    <span className="hs-chip"><HandoverIcon name="note" size={14} />費用 {formatRepairCost(repairCostTotal(activeRows))}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="hs-shift-actions">
+                <button className="primary-btn compact" disabled={busy || Boolean(approval)} onClick={() => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shift.code); }}>＋ 新增工作</button>
+              </div>
             </div>
+            <div className="hs-shift-body is-single">
             <div className={`mechanical-scheduled-roster${scheduledNames.length ? '' : ' is-empty'}`}><span>二市排班表</span><b>{scheduledNames.length ? scheduledNames.join('、') : '本班尚未排定人員'}</b><a href="/Inspection/v2/systems/handover/mechanical-schedule/">開啟排班表</a></div>
             {carryRows.length > 0 && <div className="mechanical-carry-list" aria-label={`${shift.label}上班續辦工作`}>
               <div className="mechanical-carry-heading"><b>上班未完成 · 待續辦 {carryRows.length} 件</b><small>原紀錄保留；接續處理後會建立本班的新紀錄。</small></div>
@@ -321,13 +342,25 @@ export function MechanicalHandover({ system, module, profile }: Props) {
                 <div className="mechanical-entry-result"><small>處理結果</small><b className={`result-badge result-${isDeleted(row) ? 'deleted' : RESULT_TONES[String(row.result || '')] || 'neutral'}`}>{isDeleted(row) ? '已刪除' : String(row.result || '—')}</b><small>維修費用</small><strong>{isDeleted(row) ? '—' : row.repair_cost == null ? '未填' : formatRepairCost(repairCostCents(row.repair_cost) || 0)}</strong></div>
                 <div className="mechanical-entry-audit"><span>建立 {activityTime(row.created_at)} · {userName(row.created_by)}</span>{hasLaterUpdate(row) && <span>修改 {activityTime(row.updated_at)} · {userName(row.updated_by)}</span>}{isDeleted(row) && <span className="is-delete-event">刪除 {activityTime(row.deleted_at)} · {userName(row.deleted_by)}</span>}<b>{approval ? '已簽核鎖定' : isDeleted(row) ? '保留刪除紀錄' : '點擊修改'}</b></div>
               </article>
-            ) : <p className="mechanical-empty">本班尚無工作紀錄，請按「新增工作」建立。</p>}</div>
-            <div className="mechanical-shift-sign"><span>值班簽名</span><select disabled={busy || Boolean(approval)} aria-label={`${shift.label}值班人員`} value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{signatureUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{scheduledIds.includes(String(user.user_id)) ? '（本班排班）' : '（機電課）'}</option>)}</select><b>{userName(signFor(shift.code)?.signer_id)}{signFor(shift.code)?.updated_at && <small>{activityTime(signFor(shift.code)?.updated_at)}</small>}</b></div>
+            ) : <p className="hs-empty">本班尚無工作紀錄，請按「新增工作」建立。</p>}</div>
+            <div className="hs-signs"><div className={`hs-sign${signFor(shift.code)?.signer_id ? ' is-signed' : ''}`}>
+              <span className="hs-sign-icon"><HandoverIcon name="pen" size={16} /></span>
+              <div><span>值班簽名</span>
+                <select disabled={busy || Boolean(approval)} aria-label={`${shift.label}值班人員`} value={String(signFor(shift.code)?.signer_id || '')} onChange={event => void saveSignature(shift.code, event.target.value)}><option value="">— 選擇值班人員 —</option>{signatureUsers.map(user => <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}{scheduledIds.includes(String(user.user_id)) ? '（本班排班）' : '（機電課）'}</option>)}</select>
+                <b>{userName(signFor(shift.code)?.signer_id)}{signFor(shift.code)?.updated_at && <small>{activityTime(signFor(shift.code)?.updated_at)}</small>}</b>
+              </div>
+            </div></div>
+            </div>
           </section>;
-        })}
-        <section className={`mechanical-approval${approval ? ' is-approved' : ''}`} aria-label="每日課長簽核">
-          <div><small>每日課長簽核</small><h3>{approval ? '本日已完成簽核' : '本日待課長簽核'}</h3><p>{approval ? `${userName(approval.approver_id)} · ${activityTime(approval.approved_at)}` : approvalOpen ? '已開放機電課課長確認當日交接內容。' : `當日不可簽核，最早於 ${approvalOpenDate.replaceAll('-', '/')} 起由機電課課長確認。`}</p></div>
-          {approval ? <b className="mechanical-approval-seal">核准</b> : canApprove ? <button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button> : <span className="mechanical-approval-pending">{approvalOpen ? '等待課長簽核' : '隔日開放簽核'}</span>}
+        })}</div>
+        <section className={`hs-approval${approval ? ' is-approved' : canApprove ? ' is-ready' : ''}`} aria-label="每日課長簽核">
+          <div className="hs-approval-main">
+            <span className="hs-approval-icon"><HandoverIcon name={approval ? 'check' : 'pen'} size={22} /></span>
+            <div><span>每日課長簽核</span><strong>{approval ? '本日已完成簽核' : '本日待課長簽核'}</strong><span>{approval ? `${userName(approval.approver_id)} · ${activityTime(approval.approved_at)}` : approvalOpen ? '已開放機電課課長確認當日交接內容。' : `當日不可簽核，最早於 ${approvalOpenDate.replaceAll('-', '/')} 起由機電課課長確認。`}</span></div>
+          </div>
+          <div className="hs-approval-actions">
+            {approval ? <b className="hs-approval-seal">核准</b> : canApprove ? <button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button> : <span className="hs-muted">{approvalOpen ? '等待課長簽核' : '隔日開放簽核'}</span>}
+          </div>
         </section>
       </section>
 
