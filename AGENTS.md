@@ -259,6 +259,13 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   特有的區塊（駐警隊的巡邏打卡與附件、業管組的三級批核與點檢表、機電課的工作卡片與續辦），
   不得重新定義 `hs-*` 本身的外觀，也不得自備一份圖示表——`@media print` 內的紙本排版才可各自覆寫。
   `npm run test:handover-style` 會把這些規則擋下來。新增第四本交接簿時照同一套骨架接上即可。
+- **app-api 依業務拆檔（2026-09-13 起，分階段進行）**：`supabase/functions/app-api/index.ts` 只負責驗證身分、
+  計算權限與依序分派；業務 API 放 `handlers/<業務>.ts`，匯出 `handle<業務>Action(action, ctx)`，不屬於本業務時
+  回傳 `null`。每個請求共用的內容用 `context.ts` 的 `AppApiContext` 傳入（不要再依賴 index.ts 的閉包變數），
+  輸入清理放 `validate.ts`、稽核寫入用 `audit.ts`。每支 handler 附 `*.test.ts`，由
+  `npm run test:app-api-handlers` 以假資料庫連線單獨測試。**新增的 API 一律寫進 handlers，不要再加進 index.ts。**
+  搬移只能原樣剪貼，行為變更要另開 commit；新增 handler 檔時同步把它加入
+  `tools/sync-local-edge-functions.ps1` 的必要檔案清單。已拆：公務車。
 - **圖面標記大小**：立體巡檢雲臺與平面圖都提供「打卡點大小」拉桿，刻度一律是 0.5〜3 倍、預設 1 倍，
   兩張圖改一邊就要改另一邊，避免像 V1 的 floor3d.html 與 guardpatrol3d.html 那樣分岔。3D 走
   `FloorStack3D` 的 `markerScale`（以 ref＋獨立 effect 調整既有圓點的 scale，不重建場景）；
