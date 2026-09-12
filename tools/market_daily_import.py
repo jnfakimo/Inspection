@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import time
+import uuid
 
 from bs4 import BeautifulSoup
 import requests
@@ -162,13 +163,18 @@ def aggregate(rows, day, market, category):
                          'middle_price': float(round(middle / quantity, 4)) if quantity else None,
                          'low_price': float(min(r['values'][4] for r in group))},
             'external_key': 'market-import:' + hashlib.sha256(identity.encode()).hexdigest(),
-            'metadata': {'source_url': URL, 'query_type': 'full_transaction', 'item_codes': key,
-                         'item_key': key, 'item_code_count': len(group), 'estimated_total_value': True,
-                         'aggregation_level': '日期×市場×品類×品名', 'data_classification': '北農官網全場交易行情',
-                         'source_family': '北農官網每日排程', 'import_method': 'tapmc_daily',
-                         'fetched_at': datetime.now(TAIPEI).isoformat()},
+            # 批次共用的來源資訊（網址、抓取時間、匯入方式…）改存 market_import_batches，
+            # 由 import_sql 補上 import_batch_id；這裡只留逐筆才有意義的欄位。
+            'metadata': {'item_code_count': len(group)},
         })
     return result
+
+
+# 每一批匯入共用的來源說明，存進 market_import_batches.details（原本逐筆重複存在 metadata）。
+BATCH_DETAILS = {'query_type': 'full_transaction', 'aggregation_level': '日期×市場×品類×品名',
+                 'data_classification': '北農官網全場交易行情', 'source_family': '北農官網每日排程',
+                 'estimated_total_value': True}
+IMPORT_METHOD = 'tapmc_daily'
 
 
 def sql_literal(value):
@@ -179,10 +185,23 @@ def json_sql(value):
     return sql_literal(json.dumps(value, ensure_ascii=False, allow_nan=False)) + '::jsonb'
 
 
-def import_sql(points, summary, record_summary=True):
+def optional_sql(value, cast=''):
+    return 'null' if value in (None, '') else sql_literal(str(value)) + cast
+
+
+def import_sql(points, summary, record_summary=True, batch_id=None):
     # One transaction for all fetched dates, with cardinality and exact-value checks.
     # Reject changed code sets rather than appending a second aggregate for the same item.
     # 回補歷史（record_summary=False）不覆蓋 daily_import_last_run，保留每日排程的紀錄。
+    # 批次紀錄與行情資料在同一個交易內寫入：任何驗證失敗時兩者一起回滾，不會留下孤兒批次。
+    batch_id = str(uuid.UUID(batch_id)) if batch_id else str(uuid.uuid4())
+    fetched_at = summary.get('completed_at') or datetime.now(TAIPEI).isoformat()
+    batch_sql = f"""
+insert into public.market_import_batches(batch_id,source_id,import_method,mode,source_url,range_from,range_to,
+ row_count,workflow_run,details,fetched_at)
+values ('{batch_id}','{SOURCE_ID}',{sql_literal(IMPORT_METHOD)},{optional_sql(summary.get('mode'))},
+ {sql_literal(URL)},{optional_sql(summary.get('range_from'), '::date')},{optional_sql(summary.get('range_to'), '::date')},
+ {len(points)},{optional_sql(summary.get('workflow_run'))},{json_sql(BATCH_DETAILS)},{sql_literal(fetched_at)}::timestamptz);"""  # nosec B608
     summary_sql = f"""
 update public.market_data_sources set config=coalesce(config,'{{}}'::jsonb)
  ||jsonb_build_object('daily_import_last_run',{json_sql(summary)}),updated_at=now()
@@ -204,9 +223,10 @@ do $check$ begin
    and p.dimensions->>'category'=i.dimensions->>'category' and p.dimensions->>'item'=i.dimensions->>'item'
    where p.source_id='{SOURCE_ID}' and p.external_key is distinct from i.external_key) then
    raise exception '既有品項的代碼集合有變，需人工核對以避免重複計量'; end if;
-end $check$;
+end $check$;{batch_sql}
 insert into public.market_data_points(source_id,observed_on,dimensions,measures,metadata,external_key)
-select '{SOURCE_ID}',observed_on,dimensions,measures,metadata,external_key from incoming_market_daily
+select '{SOURCE_ID}',observed_on,dimensions,measures,
+ coalesce(metadata,'{{}}'::jsonb)||jsonb_build_object('import_batch_id','{batch_id}'),external_key from incoming_market_daily
 on conflict(source_id,external_key) where external_key is not null and external_key<>'' do update set
  measures=excluded.measures, dimensions=excluded.dimensions,
  metadata=coalesce(market_data_points.metadata,'{{}}'::jsonb)||excluded.metadata;
@@ -370,21 +390,22 @@ def main():
     total_points, all_scopes, chunk_reports = 0, [], []
     for first, last in chunks:
         points, scopes = fetch_days(first, last)
+        batch_id = str(uuid.uuid4())
         summary = {'completed_at': datetime.now(TAIPEI).isoformat(), 'requested_date': args.date.isoformat(),
                    'range_from': first.isoformat(), 'range_to': last.isoformat(),
                    'mode': mode, 'points': len(points), 'scopes': scopes,
-                   'workflow_run': os.environ.get('GITHUB_RUN_ID', '')}
+                   'workflow_run': os.environ.get('GITHUB_RUN_ID', ''), 'import_batch_id': batch_id}
         if points:
             try:
                 if args.execute:
-                    query(import_sql(points, summary, record_summary=not backfill))
+                    query(import_sql(points, summary, record_summary=not backfill, batch_id=batch_id))
                     if not backfill:
                         stored = query(f"select config->'daily_import_last_run' as result from public.market_data_sources where source_id='{SOURCE_ID}'", True)  # nosec B608
                         if len(stored) != 1 or stored[0]['result'] != summary:
                             raise RuntimeError('匯入完成紀錄讀回不符')
                 elif args.sql_output:
                     with args.sql_output.open('a', encoding='utf-8') as handle:
-                        handle.write(import_sql(points, summary, record_summary=not backfill))
+                        handle.write(import_sql(points, summary, record_summary=not backfill, batch_id=batch_id))
             except Exception as exc:
                 raise RuntimeError(f'批次 {first}～{last} 失敗：{exc}；之前批次已提交，請以 --from {first} 重跑') from exc
         total_points += len(points)

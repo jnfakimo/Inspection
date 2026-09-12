@@ -113,5 +113,35 @@ class MarketImportTests(unittest.TestCase):
         self.assertNotIn('truncate ', lowered)
 
 
+    def test_point_metadata_keeps_only_row_specific_fields(self):
+        # 批次共用的來源資訊不再逐筆重複存；item_codes／item_key 與 dimensions.item_key 重複，也不再存。
+        html = page([['FK41', '甜椒', '', '10', '100', '20', '10', '5'], ['FK42', '甜椒', '', '20', '300', '30', '20', '10']])
+        rows, _ = parse_page(html, DAY, '1', 'V')
+        point, = aggregate(rows, DAY, '1', 'V')
+        self.assertEqual(point['metadata'], {'item_code_count': 2})
+        self.assertEqual(point['dimensions']['item_key'], 'FK41|FK42')
+
+    def test_batch_record_is_written_in_the_same_transaction(self):
+        batch = '0b4a8f7e-2c5d-4e1a-9b3c-7d6e5f4a3b2c'
+        summary = {'mode': 'imported', 'range_from': '2026-09-01', 'range_to': '2026-09-02',
+                   'completed_at': '2026-09-02T05:00:00+08:00', 'workflow_run': '12345', 'import_batch_id': batch}
+        before = dict(summary)
+        sql = import_sql([{'observed_on': '2026-09-02'}], summary, batch_id=batch)
+        lowered = sql.lower()
+        self.assertLess(lowered.index('begin;'), lowered.index('insert into public.market_import_batches'))
+        self.assertLess(lowered.index('insert into public.market_import_batches'), lowered.index('insert into public.market_data_points'))
+        self.assertLess(lowered.index('insert into public.market_data_points'), lowered.index('commit;'))
+        self.assertIn(f"jsonb_build_object('import_batch_id','{batch}')", sql)
+        self.assertIn("'2026-09-01'::date", sql)
+        self.assertIn("'tapmc_daily'", sql)
+        # 匯入後會把 daily_import_last_run 讀回與 summary 逐項比對，import_sql 不得改動 summary。
+        self.assertEqual(summary, before)
+
+    def test_batch_id_must_be_a_uuid(self):
+        with self.assertRaises(ValueError):
+            import_sql([], {'mode': 'imported'}, batch_id="x'); drop table users; --")
+        self.assertIn('insert into public.market_import_batches', import_sql([], {'mode': 'imported'}).lower())
+
+
 if __name__ == '__main__':
     unittest.main()

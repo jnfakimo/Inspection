@@ -269,6 +269,10 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
 - **權限判斷失敗即拒絕（2026-09-13 訂）**：任何權限表查詢失敗時一律不放行，不得「沿用上一層」或回傳
   錯誤物件當真值。錯誤寫入函式日誌即可；使用者重新整理就能在資料庫恢復後取回權限。
   `npm run test:permission-fail-closed` 會擋住降級放行的寫法被加回來。
+- **行情匯入批次（2026-09-13 起）**：批次共用的來源資訊（網址、抓取時間、匯入方式、資料分類）存
+  `market_import_batches` 一筆，`market_data_points.metadata` 只留 `import_batch_id` 與逐筆才有意義的欄位；
+  不要再把批次共用資訊逐筆塞進 metadata（45 萬筆行情有一半空間就是這樣吃掉的）。批次紀錄只增不改，
+  必須與行情資料寫在同一個交易內。2026-09-13 以前的既有資料維持原樣，不回頭改寫。
 - **圖面標記大小**：立體巡檢雲臺與平面圖都提供「打卡點大小」拉桿，刻度一律是 0.5〜3 倍、預設 1 倍，
   兩張圖改一邊就要改另一邊，避免像 V1 的 floor3d.html 與 guardpatrol3d.html 那樣分岔。3D 走
   `FloorStack3D` 的 `markerScale`（以 ref＋獨立 effect 調整既有圓點的 scale，不重建場景）；
