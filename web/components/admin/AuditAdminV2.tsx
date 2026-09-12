@@ -18,6 +18,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   meeting_booking_change_requests: '預約變更申請', floor_spaces: '專案空間',
   plan_markers: '圖面標記', data_access: '資料讀取', file_access: '檔案存取',
   auth: '登入／登出', security_alerts: '資安告警', notifications: '系統通知',
+  request_rate_limits: '帳號申請流量限制',
   dashboard_layouts: '戰情版面',
   client_error_logs: '前端錯誤紀錄',
 };
@@ -25,8 +26,9 @@ const ACTION_LABELS: Record<string, string> = {
   page_view: '進入系統', function_use: '使用功能', data_read: '讀取資料',
   file_read: '讀取檔案', access_denied: '拒絕存取', insert: '新增',
   update: '修改', status_change: '狀態變更', login: '登入', logout: '登出',
+  account_application_rate_limit_released: '解除帳號申請限制',
 };
-const EVENT_ACTIONS = new Set(['page_view', 'function_use', 'data_read', 'file_read', 'access_denied']);
+const EVENT_ACTIONS = new Set(['page_view', 'function_use', 'data_read', 'file_read', 'access_denied', 'account_application_rate_limit_released']);
 const RESOURCES = Object.entries(RESOURCE_LABELS);
 const ACTIONS = Object.entries(ACTION_LABELS);
 
@@ -62,6 +64,10 @@ function contentOf(row: Row) {
   const resource = RESOURCE_LABELS[rawResource] || rawResource;
   if ((eventType === 'data_read' || eventType === 'file_read') && resource) {
     return `${ACTION_LABELS[eventType]}：${resource}`;
+  }
+  if (eventType === 'account_application_rate_limit_released') {
+    const previousCount = Number(changes.previous_request_count);
+    return `已解除帳號申請限制${Number.isFinite(previousCount) ? `（解除前 ${previousCount} 次）` : ''}`;
   }
   return changes.feature || detail.feature || detail.reason || detail.result || resource || page.url || changes.title || changes.message || '—';
 }

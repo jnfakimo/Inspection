@@ -8,6 +8,7 @@ import { invokeAdminApi } from '@/lib/admin-api';
 import { AdminHeader, type AdminProps, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row, StatusPill } from './shared';
 
 const POLL_INTERVAL_MS = 45_000;
+const ACCOUNT_APPLICATION_RATE_LIMIT_SCOPE = 'username-login:account_application';
 const SEVERITY: Record<string, string> = { critical: '嚴重', warning: '警告', high: '高', medium: '中', low: '低', info: '資訊' };
 const STATUS_FILTERS: Record<string, string> = { open: '未處理', acknowledged: '已處理' };
 const ALERT_TYPES: Record<string, string> = {
@@ -144,6 +145,7 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
   const [openCount, setOpenCount] = useState(0);
   const [updatedAt, setUpdatedAt] = useState('');
   const latestOpenSignal = useRef<string | null>(null);
+  const isSystemAdmin = profile.rbac_role === 'sysadmin' || profile.role === 'admin';
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);
@@ -192,7 +194,10 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
       }
       const rows = result.data || [];
       setAlerts(rows);
-      const ids = Array.from(new Set(rows.flatMap(row => [row.operator_id, row.acknowledged_by]).filter(Boolean).map(String)));
+      const ids = Array.from(new Set(rows.flatMap(row => {
+        const release = objectOf(objectOf(row.details).manual_unblock);
+        return [row.operator_id, row.acknowledged_by, release.released_by];
+      }).filter(Boolean).map(String)));
       if (ids.length) {
         const userResult = await getSupabase().from('users').select('user_id,name,username').in('user_id', ids);
         if (!userResult.error) {
@@ -252,6 +257,19 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
       setBusy(false);
     }
   };
+  const releaseAccountApplicationLimit = async (row: Row) => {
+    const sourceIp = String(row.ip_address || '').trim();
+    if (!sourceIp || !window.confirm(`確定解除來源 IP ${sourceIp} 的帳號申請限制？\n\n原告警、阻擋事件及本次操作紀錄都會保留。`)) return;
+    setBusy(true); setNote('');
+    try {
+      await invokeAdminApi('admin_release_account_application_rate_limit', { alert_id: row.alert_id });
+      await load();
+      setNote(`已解除來源 IP ${sourceIp} 的帳號申請限制；原告警、阻擋事件與操作者時間均已保留。`);
+    } catch (error) {
+      setNote(`失敗：${errorMessage(error)}`);
+      setBusy(false);
+    }
+  };
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={() => void load()} />
@@ -274,8 +292,15 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
         const details = objectOf(row.details);
         const delivery = lineDelivery(row);
         const enforcement = String(details.enforcement || details.action_taken || '');
+        const manualUnblock = objectOf(details.manual_unblock);
         const actor = users[String(row.operator_id || '')] || row.actor_identifier || row.operator_id;
         const handler = users[String(row.acknowledged_by || '')] || row.acknowledged_by;
+        const releasedBy = users[String(manualUnblock.released_by || '')] || manualUnblock.released_by;
+        const canReleaseAccountApplicationLimit = isSystemAdmin
+          && String(row.resource || '') === ACCOUNT_APPLICATION_RATE_LIMIT_SCOPE
+          && ['rate_limit', 'rate_limit_exceeded'].includes(String(row.alert_type || ''))
+          && Boolean(String(row.ip_address || '').trim())
+          && !manualUnblock.released_at;
         return <article className={`admin-alert severity-${row.severity || 'info'}`} key={row.alert_id}>
           <header><div><span className="severity">{SEVERITY[String(row.severity)] || fmt(row.severity)}</span><span className="alert-type">{alertTypeLabel(row.alert_type)}</span><h3>{row.title || '未命名告警'}</h3></div><StatusPill value={row.status} /></header>
           <p>{row.message || '—'}</p>
@@ -287,8 +312,12 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
             <div><dt>裝置</dt><dd className="alert-device" title={deviceText(row)}>{deviceText(row)}</dd></div><div><dt>系統處置</dt><dd>{ENFORCEMENT[enforcement] || enforcement || '已建立永久告警'}</dd></div>
             <div><dt>LINE 投遞</dt><dd>{delivery.label}{delivery.httpStatus ? `／HTTP ${delivery.httpStatus}` : ''}{delivery.time !== '—' && delivery.time ? `（${delivery.time}）` : ''}{delivery.hasTechnicalResponse ? <small>技術回應已記錄</small> : null}</dd></div>
             <div><dt>處理人員</dt><dd>{row.status === 'acknowledged' ? fmt(handler) : '尚未處理'}</dd></div>
+            {manualUnblock.released_at && <div><dt>帳號申請限制</dt><dd>已解除（{fmtTime(manualUnblock.released_at)}）<small>操作者：{fmt(releasedBy)}</small></dd></div>}
           </dl>
-          {row.status === 'open' && <button className="primary-btn compact" disabled={busy} onClick={() => void acknowledge(row)}>標記已處理</button>}
+          {(row.status === 'open' || canReleaseAccountApplicationLimit) && <div className="security-alert-actions">
+            {canReleaseAccountApplicationLimit && <button className="secondary-btn compact" disabled={busy} onClick={() => void releaseAccountApplicationLimit(row)}>解除此 IP 帳號申請限制</button>}
+            {row.status === 'open' && <button className="primary-btn compact" disabled={busy} onClick={() => void acknowledge(row)}>標記已處理</button>}
+          </div>}
           {row.status === 'acknowledged' && <small className="alert-acknowledged">處理時間：{fmtTime(row.acknowledged_at)}</small>}
         </article>;
       })}{!busy && alerts.length === 0 && (activeFilters

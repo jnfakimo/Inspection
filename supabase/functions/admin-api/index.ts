@@ -899,6 +899,17 @@ export async function handleAdminApiRequest(req: Request) {
       if (error) return reply(req, { ok: false, message: dbMessage(error, '告警處理失敗') }, 400); await audit('security_alerts', alertId, 'status_change', { before: before.status, after: 'acknowledged', title: before.title }); return reply(req, { ok: true });
     }
 
+    if (action === 'admin_release_account_application_rate_limit') {
+      const alertId = id(body.alert_id);
+      if (!alertId) return reply(req, { ok: false, message: '告警識別碼無效' }, 400);
+      const { data, error } = await admin.rpc('admin_release_account_application_rate_limit', {
+        p_alert_id: alertId,
+        p_operator_id: profile.user_id,
+      });
+      if (error) return reply(req, { ok: false, message: dbMessage(error, '帳號申請限制解除失敗') }, 400);
+      return reply(req, { ok: true, data });
+    }
+
     if (action === 'admin_mark_notice') {
       const rawNotifId = clean(body.notif_id, 80), notifId = id(rawNotifId);
       if (rawNotifId && !notifId) return reply(req, { ok: false, message: '通知識別碼無效' }, 400);
