@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
-import { passwordPolicyMessage, temporaryNumericPassword } from '../_shared/password-policy.ts';
+import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
 import { BOARD_NOTICE_ACTIONS, handleBoardNotices } from './board-notices.ts';
 
@@ -23,6 +23,7 @@ function requiredEnvironment(name: string) {
 const SUPABASE_URL = requiredEnvironment('SUPABASE_URL');
 const SERVICE_ROLE_KEY = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
 const ANON_KEY = requiredEnvironment('SUPABASE_ANON_KEY');
+const ACCOUNT_APPLICATION_INITIAL_PASSWORD = '12345678';
 const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_supervisor', 'sysadmin']);
 // Node.js 與 Edge Function 共用同一支處理器；前端會先檢查此版本，
 // 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
@@ -467,11 +468,10 @@ export async function handleAdminApiRequest(req: Request) {
         return reply(req, { ok: false, message: '登入帳號或電子郵件已存在，無法核准此申請' }, 409);
       }
 
-      // 帳號核准時先建立一組測試用 8 位數臨時密碼，使用者仍可透過啟用連結
-      // 設定正式密碼。以密碼學亂數取樣，避免批次核准時重複。
-      const temporaryPassword = temporaryNumericPassword();
+      // 使用者指定帳號申請核准後採固定 8 位數初始密碼；啟用連結仍會寄出，
+      // 讓使用者可立即改成自己的密碼。稽核紀錄不得保存密碼本文。
       const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: application.email, password: temporaryPassword, email_confirm: true,
+        email: application.email, password: ACCOUNT_APPLICATION_INITIAL_PASSWORD, email_confirm: true,
         user_metadata: { name: application.name, username: application.username },
       });
       if (createError || !created.user) return reply(req, { ok: false, message: `Auth 帳號建立失敗：${createError?.message || '未知錯誤'}` }, 400);
@@ -512,7 +512,7 @@ export async function handleAdminApiRequest(req: Request) {
         rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId,
         activation_email_sent: !mailError,
       });
-      return reply(req, { ok: true, data: { user_id: createdProfile.user_id, activation_email_sent: !mailError }, message: mailError ? '帳號已核准，但啟用郵件寄送失敗；請由帳號管理重設密碼' : '帳號已核准，啟用連結已寄出' });
+      return reply(req, { ok: true, data: { user_id: createdProfile.user_id, activation_email_sent: !mailError }, message: mailError ? '帳號已核准，初始密碼為 12345678；啟用郵件寄送失敗，請通知使用者登入後立即變更密碼' : '帳號已核准，初始密碼為 12345678；啟用連結已寄出' });
     }
 
     if (action === 'admin_reject_account_application') {
