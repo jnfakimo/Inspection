@@ -1,5 +1,80 @@
-/* 駐衛警電子交接簿「本簿特有」的樣式。共同版型（表頭、指標、班別卡片、區塊、簽名、
-   日報表紙張等）一律在 handover-sheet.css，不得在這裡重新定義 hs-*。 */
+/* 駐警隊電子交接簿「本簿特有」的樣式：巡邏打卡摘要、附件、交接彈窗與可選可填的下拉選單。
+   共同版型（表頭、指標、班別卡片、區塊、簽名、日報表紙張）一律在 handover-sheet.css，
+   不得在這裡重新定義 hs-*。 */
+/* 巡邏打卡 */
+.guard-patrol-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.guard-patrol-stats div{display:grid;gap:2px;padding:9px 6px;border:1px solid var(--line);border-radius:10px;background:var(--panel);text-align:center}
+.guard-patrol-stats b{color:var(--ink);font-size:21px;line-height:1.2}.guard-patrol-stats span{color:var(--muted);font-size:12px}.guard-patrol-stats .is-low b{color:var(--red)}
+.guard-progress{height:8px;margin-top:10px;overflow:hidden;border-radius:999px;background:color-mix(in srgb,var(--muted) 18%,var(--panel))}
+.guard-progress>span{display:block;height:100%;border-radius:inherit;background:var(--green);transition:width .4s ease}
+.guard-progress>span.is-warn{background:var(--amber)}.guard-progress>span.is-bad{background:var(--red)}
+.guard-progress.is-indeterminate>span{width:40%!important;animation:guard-slide 1.1s ease-in-out infinite}
+@keyframes guard-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+.hs-block p.guard-patrol-note{margin-top:8px;color:var(--muted);font-size:12.5px;line-height:1.6}
+/* 附件卡片 */
+.guard-files{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.guard-file-wrap{display:inline-flex;align-items:stretch;max-width:100%;overflow:hidden;border:1px solid color-mix(in srgb,var(--cyan) 32%,var(--line));border-radius:10px;background:var(--panel)}
+.guard-file{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:280px;min-height:0;margin:0;padding:6px 10px;border:0;border-radius:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.guard-file:hover,.guard-file:focus-visible{background:color-mix(in srgb,var(--cyan) 10%,var(--panel));outline:none}
+.guard-file-icon{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--cyan) 14%,var(--panel));color:var(--cyan)}
+.guard-file-icon.is-image{background:color-mix(in srgb,var(--green) 14%,var(--panel));color:var(--green)}
+.guard-file-icon.is-video{background:color-mix(in srgb,var(--violet) 14%,var(--panel));color:var(--violet)}
+.guard-file-icon.is-pdf{background:color-mix(in srgb,var(--red) 12%,var(--panel));color:var(--red)}
+.guard-file-text{display:grid;min-width:0}.guard-file-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.guard-file small{color:var(--muted);font-size:11.5px}
+.guard-file-remove{display:grid;place-items:center;width:32px;min-height:0;margin:0;padding:0;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;color:var(--muted);font-size:17px;cursor:pointer}
+.guard-file-remove:hover,.guard-file-remove:focus-visible{background:color-mix(in srgb,var(--red) 9%,var(--panel));color:var(--red);outline:none}
+/* 建立／編輯交接彈窗 */
+.guard-modal{width:min(980px,calc(100vw - 28px))}
+.guard-form{display:grid;gap:14px;padding:20px}
+.guard-form fieldset{display:grid;gap:10px;margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panel2) 40%,var(--panel))}
+.guard-form legend{display:inline-flex;align-items:center;gap:7px;padding:0 8px;color:var(--ink);font-weight:700}.guard-form legend .hs-icon{color:var(--cyan)}
+.guard-form small{color:var(--muted);font-weight:400}
+.guard-staff-picker{display:flex;flex-wrap:wrap;gap:8px}
+.guard-staff-picker label{display:inline-flex;flex-direction:row;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);font-weight:400;cursor:pointer}
+.guard-staff-picker label:has(input:checked){border-color:color-mix(in srgb,var(--cyan) 50%,var(--line));background:color-mix(in srgb,var(--cyan) 10%,var(--panel))}
+.guard-staff-picker input{width:18px;height:18px;min-height:0;accent-color:var(--cyan)}
+/* 表單：左側固定標籤欄，右側輸入框填滿版面寬度，說明文字放在輸入框下方。 */
+.guard-form fieldset>label{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:start;gap:6px 14px;color:var(--ink);font-weight:600}
+.guard-form fieldset>label>input,.guard-form fieldset>label>textarea{box-sizing:border-box;width:100%;min-width:0;font-weight:400}
+.guard-form fieldset>label>textarea{resize:vertical;line-height:1.6}.guard-form fieldset>label>small{grid-column:2}
+.guard-row-editor{display:grid;gap:10px}
+.guard-row-editor>div{display:grid;gap:8px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.guard-row-editor>.guard-incident-row{border-left:4px solid color-mix(in srgb,var(--red) 70%,var(--line))}
+.guard-item-row{grid-template-columns:minmax(0,1.6fr) 90px 120px minmax(0,1.4fr) auto}
+.guard-incident-row{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) auto}.guard-incident-row .wide{grid-column:1/-2}
+.guard-row-editor label{display:grid;gap:4px;font-size:13px}
+.guard-row-editor input,.guard-row-editor select,.guard-row-editor textarea{width:100%;min-width:0}
+.guard-incident-row .guard-incident-files{grid-column:1/-1}
+.guard-incident-files{display:grid;gap:8px;padding:10px 12px;border:1px dashed color-mix(in srgb,var(--cyan) 38%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--cyan) 4%,var(--panel))}
+.guard-incident-files-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--ink);font-size:13px;font-weight:700}
+.guard-incident-files-head>span{display:inline-flex;align-items:center;gap:6px}.guard-incident-files-head .hs-icon{color:var(--cyan)}
+.guard-row-editor label.guard-upload{position:relative;display:inline-flex;align-items:center;gap:6px;overflow:hidden;cursor:pointer}
+.guard-upload input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.guard-row-editor label.guard-upload.is-disabled{opacity:.5;pointer-events:none}
+.guard-upload-tasks{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-size:12.5px}
+.guard-upload-tasks li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink)}
+.guard-upload-tasks li.is-error{border-color:color-mix(in srgb,var(--red) 40%,var(--line));color:var(--red)}
+.guard-upload-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.guard-upload-tasks .guard-progress{grid-column:1/-1;height:6px;margin:0}
+
+/* 附件預覽：檢視區固定深色（背景與文字成對寫死），圖片與影片在兩種主題下都看得清楚。 */
+.guard-file-modal{width:min(980px,calc(100vw - 28px))}
+.guard-file-view{display:grid;gap:14px;padding:18px}
+.guard-file-stage{display:grid;place-items:center;min-height:260px;max-height:72vh;overflow:auto;padding:12px;border-radius:12px;background:#0b1220;color:#e2e8f0}
+.guard-file-stage img,.guard-file-stage video{display:block;max-width:100%;max-height:68vh;border-radius:8px}
+.guard-file-stage audio{width:min(560px,100%)}.guard-file-stage p{margin:0;text-align:center}
+.guard-file-fallback{display:grid;justify-items:center;gap:12px;padding:24px;text-align:center}
+.guard-file-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px}.guard-file-meta>div{display:flex;gap:8px;flex-wrap:wrap}
+/* 可選可填的下拉選單：展開後第一列是空白輸入框，可填清單以外的內容；下方選項會隨輸入篩選。 */
+.guard-row-editor .guard-field{display:grid;gap:4px;min-width:0;font-size:13px}
+.guard-incident-row .guard-field.wide{grid-column:1/-2}
+.guard-combo{position:relative;min-width:0}
+.guard-combo-field{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:38px;margin:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface,var(--panel));color:var(--ink);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.guard-combo-field:hover,.guard-combo.is-open .guard-combo-field{border-color:color-mix(in srgb,var(--cyan) 55%,var(--line))}
+.guard-combo-field:focus-visible{outline:2px solid color-mix(in srgb,var(--cyan) 60%,transparent);outline-offset:1px}
+.guard-combo-field>span:first-child{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.guard-combo-field .is-placeholder{color:var(--muted)}
+.guard-combo-caret{flex:none;color:var(--muted);transition:transform .15s ease}.guard-combo.is-open .guard-combo-caret{transform:rotate(180deg)}
+.guard-combo-panel{position:absolute;z-index:40;top:calc(100% + 4px);left:0;right:0;min-width:240px;overflow:hidden;border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--line));border-radius:10px;background:var(--panel);box-shadow:0 14px 34px rgba(15,23,42,.18)}
 .guard-combo-custom{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--cyan) 6%,var(--panel))}
 .guard-row-editor .guard-combo-custom input,.guard-combo-custom input{flex:1;width:auto;min-width:0}
 .guard-combo-list{max-height:220px;overflow:auto;margin:0;padding:4px;list-style:none}
@@ -10,7 +85,21 @@
 .guard-combo-manage{display:block;width:100%;min-height:0;margin:0;padding:8px 12px;border:0;border-top:1px solid var(--line);border-radius:0;background:var(--panel2);color:var(--ink);font:inherit;font-size:13px;font-weight:700;text-align:left;cursor:pointer}
 .guard-combo-manage:hover,.guard-combo-manage:focus-visible{background:color-mix(in srgb,var(--cyan) 12%,var(--panel));outline:none}
 /* 下拉選單管理 */
-
+.guard-options-modal{width:min(760px,calc(100vw - 28px))}
+.guard-options{display:grid;gap:14px;padding:18px 20px}
+.guard-options-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.guard-options-tabs button{display:inline-flex;align-items:center;gap:6px;min-height:0;margin:0;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.guard-options-tabs button small{padding:0 7px;border-radius:999px;background:var(--panel2);color:var(--muted);font-size:11.5px}
+.guard-options-tabs button.is-active{border-color:color-mix(in srgb,var(--cyan) 55%,var(--line));background:color-mix(in srgb,var(--cyan) 12%,var(--panel))}
+.guard-options-hint{margin:0;padding:10px 12px;border-left:4px solid var(--cyan);border-radius:6px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel));color:var(--ink);font-size:13px;line-height:1.6}
+.guard-options-add{display:flex;gap:8px}.guard-options-add input{flex:1;min-width:0}
+.guard-options-list{display:grid;gap:6px;max-height:48vh;overflow:auto;margin:0;padding:0;list-style:none}
+.guard-options-list li{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.guard-options-list li>input{flex:1;min-width:0}
+.guard-options-order{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:8px;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700}
+.guard-options-label{flex:1;min-width:0;color:var(--ink);overflow-wrap:anywhere}
+.guard-options-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.guard-options-empty{margin:0;padding:18px;color:var(--muted);text-align:center}
 @media(max-width:800px){
   .guard-patrol-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .guard-form fieldset>label{grid-template-columns:1fr}.guard-form fieldset>label>small{grid-column:auto}
