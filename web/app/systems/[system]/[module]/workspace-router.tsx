@@ -124,7 +124,7 @@ export function WorkspaceRouter({ system, module }: WorkspaceProps) {
   } else {
     workspace = <ModuleWorkspace system={system} module={module} />;
   }
-  // 主管簽核（guard-approve）不是獨立頁面，簽核主管要能進駐衛警交接簿才簽得到。
+  // 主管簽核（guard-approve）不是獨立頁面，簽核主管要能進駐警隊交接簿才簽得到。
   const moduleAllowed = (profile: Parameters<typeof hasModuleAccess>[0]) => hasModuleAccess(profile, system.key, module.key)
     || (system.key === 'handover' && module.key === 'guard' && hasModuleAccess(profile, 'handover', 'guard-approve'));
   return <AuthGate>{profile => moduleAllowed(profile)

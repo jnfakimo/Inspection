@@ -1,4 +1,4 @@
-// 駐衛警電子交接簿共用的型別、常數與純函式。
+// 駐警隊電子交接簿共用的型別、常數與純函式。
 // 資料容器（guard-handover.tsx）與畫面元件（guard-handover-view.tsx）共用；刻意不引用
 // Supabase、AppShell 等執行環境相依，畫面元件才能單獨渲染出來檢查版面。
 

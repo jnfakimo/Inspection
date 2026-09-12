@@ -24,8 +24,8 @@ const READ_ACTION_LABELS: Record<string, string> = {
   inspections: '讀取巡檢資料',
   equipment_map: '讀取設備地圖資料',
   official_documents: '讀取公文傳送資料',
-  handover_guard_context: '讀取駐衛警交接班別與巡邏摘要',
-  guard_attachment_url: '讀取駐衛警交接附件',
+  handover_guard_context: '讀取駐警隊交接班別與巡邏摘要',
+  guard_attachment_url: '讀取駐警隊交接附件',
 };
 
 // 公文流程動作固定走同源地端 app-api；名稱保留供既有路由相容。

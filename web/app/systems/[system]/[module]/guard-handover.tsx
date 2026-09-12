@@ -1,6 +1,6 @@
 'use client';
 
-// SYS-04 駐衛警電子交接簿。
+// SYS-04 駐警隊電子交接簿。
 //
 // 班別、班別時段、預定巡檢時段與排定人員一律來自「駐衛警巡檢系統／巡檢排班」，由
 // app-api 的 handover_guard_context 在伺服器端解析後提供——交接簿使用者不一定有
@@ -57,7 +57,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     try { setContext(await invokeAppApi<GuardContext>('handover_guard_context', { duty_date: date })); }
-    catch (error) { setContext(null); setNote(`失敗：${errorMessage(error, '駐衛警交接資料載入失敗')}`); }
+    catch (error) { setContext(null); setNote(`失敗：${errorMessage(error, '駐警隊交接資料載入失敗')}`); }
     setBusy(false);
   }, [date]);
   useEffect(() => { void load(); }, [load]);
@@ -148,7 +148,7 @@ export function GuardHandover({ system, module, profile }: Props) {
 
   const report = { date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
 
-  return <AppShell profile={profile} title={system.title} heading={{ system, module }}>
+  return <AppShell profile={profile} title={module.title} heading={{ system, module }}>
     <div className="hs-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
         action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
@@ -181,7 +181,7 @@ export function GuardHandover({ system, module, profile }: Props) {
         </div>}
       </section>}
 
-      <section className="hs-sheet" aria-label="駐衛警電子交接簿">
+      <section className="hs-sheet" aria-label="駐警隊電子交接簿">
         <GuardSheetHeader date={date} kpis={context ? kpis : []} />
         <div className="hs-shifts">
           {busy && !context ? <p className="hs-empty">載入中…</p>
@@ -196,7 +196,7 @@ export function GuardHandover({ system, module, profile }: Props) {
 
       {/* 預覽與列印共用同一個報表元件：畫面上看到的就是印出來的內容。 */}
       {context && <div className="hs-print-sheet"><GuardDailyReport {...report} /></div>}
-      {previewOpen && context && <div className="hs-preview" role="dialog" aria-modal="true" aria-label="駐衛警交接日報表預覽">
+      {previewOpen && context && <div className="hs-preview" role="dialog" aria-modal="true" aria-label="駐警隊交接日報表預覽">
         <div className="hs-preview-bar">
           <div><strong>日報表預覽</strong><span>{rocDate(date)} · A4 直式，與列印內容相同</span></div>
           <div><button type="button" className="primary-btn compact" onClick={() => window.print()}>列印</button><button type="button" className="secondary-btn compact" onClick={() => setPreviewOpen(false)}>關閉預覽</button></div>

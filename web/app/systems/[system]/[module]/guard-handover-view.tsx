@@ -1,4 +1,4 @@
-// 駐衛警電子交接簿的純畫面元件：只吃資料與回呼，不讀寫任何服務。
+// 駐警隊電子交接簿的純畫面元件：只吃資料與回呼，不讀寫任何服務。
 // 資料載入、權限與動作都在 guard-handover.tsx；這裡的元件也可以單獨渲染來檢查版面。
 
 import type { ReactNode } from 'react';
@@ -14,7 +14,7 @@ export type { IconName };
 export type GuardKpi = HandoverKpi;
 
 export function GuardSheetHeader({ date, kpis }: { date: string; kpis: GuardKpi[] }) {
-  return <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="駐衛警交接紀錄表"
+  return <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="駐警隊交接紀錄表"
     dateLabel={rocDate(date)} emblem="shield" kpis={kpis} />;
 }
 
@@ -149,7 +149,7 @@ export function GuardDailyReport({ date, shifts, approval, logFor, nameOf, names
   attachmentCount: (shiftName: string, incidentId: string) => number;
 }) {
   return <section className="hs-report">
-    <header><h2>臺北農產運銷股份有限公司第一果菜市場<br />駐衛警交接紀錄表</h2><p>{rocDate(date)}</p></header>
+    <header><h2>臺北農產運銷股份有限公司第一果菜市場<br />駐警隊交接紀錄表</h2><p>{rocDate(date)}</p></header>
     {shifts.length ? shifts.map(shift => {
       const log = logFor(shift.name);
       const frozen = Boolean(log && log.status !== 'draft');

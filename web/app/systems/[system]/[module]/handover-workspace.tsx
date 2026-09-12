@@ -102,7 +102,7 @@ function Pill({ value, labels, tones }: { value: unknown; labels: Record<string,
 
 export function HandoverModules({ system, module, profile }: Props) {
   const allowedModules = profile.allowed_handover_modules || [];
-  // 主管簽核（guard-approve）不是獨立頁面，簽核人要能進駐衛警交接簿才簽得到。
+  // 主管簽核（guard-approve）不是獨立頁面，簽核人要能進駐警隊交接簿才簽得到。
   const allowed = allowedModules.includes('*') || allowedModules.includes(module.key)
     || (module.key === 'guard' && allowedModules.includes('guard-approve'));
   if (!allowed) return <AppShell profile={profile} title={system.title} heading={{ system, module }}><section className="panel notice danger"><h2>未開放此交接子系統</h2><p>目前帳號已有電子交接簿大系統入口，但尚未被指派「{module.title}」權限，請洽系統管理員設定。</p></section></AppShell>;

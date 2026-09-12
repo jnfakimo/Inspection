@@ -215,7 +215,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
     不是誤把 V2 頁面當成 V1 的 `floor3d.html`——**請勿再以「全螢幕工具頁不掛導覽」
     為由還原**。V1 的 `floor3d.html` 不在此例外內，維持不掛。
 
-## 駐衛警電子交接簿（SYS-04 `guard`，2026-09-11 訂）
+## 駐警隊電子交接簿（SYS-04 `guard`，2026-09-11 訂）
 
 - **巡檢排班是唯一來源**：班別、班別時段、預定巡檢時段（通報時段）與排定人員一律由
   `app-api` 的 `handover_guard_context` 解析，規則與 `web/lib/patrol-status.ts` 的
@@ -248,15 +248,15 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   各自檢查 `canGuardApprove`——否則只有簽核權限的主管會在門口被擋掉。
 - **權限四層與系統清單的唯一正本**：授權順序是「角色×大系統 → 角色×子系統（`role_module_access`）→ 個人×大系統
   → 個人×子系統」，個人設定優先於角色範本，`inherit` 表示沿用上一層。大系統與子系統清單的正本只有
-  `web/lib/modules.ts`：`m()` 是有頁面的子系統，`mp()` 是只有權限沒有頁面的項目（例如駐衛警主管簽核，
+  `web/lib/modules.ts`：`m()` 是有頁面的子系統，`mp()` 是只有權限沒有頁面的項目（例如駐警隊主管簽核，
   放在 `permissionExtras`，不會長進選單與路由）。後台權限頁的欄位由它推導，兩支 Edge Function 的白名單、
   `system_access_seed.sql` 與存取資料表的 `system_key` 檢查條件則由 `npm run test:schema-contract` 比對，
   漏改任何一份都會在測試擋下來。新增大系統時：改 `modules.ts` → 補兩支 Edge Function 的清單 → 補 seed →
   補一支放寬 `system_key` 檢查條件的 migration。
-- **三本電子交接簿同一種版型**：機電課、業管組、駐衛警內容不同，但外觀必須一致。共同版型只放在
+- **三本電子交接簿同一種版型**：機電課、業管組、駐警隊內容不同，但外觀必須一致。共同版型只放在
   `handover-sheet.css`（`hs-*`：工具列、表頭、今日指標、班別卡片、內容區塊、簽名、主管簽核、當班標示、
   A4 紙張）與 `handover-sheet.tsx`（`HandoverIcon`、`HandoverSheetHeader`）。各本只在自己的 css 放本簿
-  特有的區塊（駐衛警的巡邏打卡與附件、業管組的三級批核與點檢表、機電課的工作卡片與續辦），
+  特有的區塊（駐警隊的巡邏打卡與附件、業管組的三級批核與點檢表、機電課的工作卡片與續辦），
   不得重新定義 `hs-*` 本身的外觀，也不得自備一份圖示表——`@media print` 內的紙本排版才可各自覆寫。
   `npm run test:handover-style` 會把這些規則擋下來。新增第四本交接簿時照同一套骨架接上即可。
 - **圖面標記大小**：立體巡檢雲臺與平面圖都提供「打卡點大小」拉桿，刻度一律是 0.5〜3 倍、預設 1 倍，

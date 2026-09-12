@@ -2,7 +2,7 @@
 
 // SYS-04 業管組電子交接簿。
 // 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表、三級主管批核（一市場主任、營業部副理、營業部經理）與每日 A4 單頁精準列印／預覽報表。
-// 風格與駐衛警交接簿統一，支援當班時段光暈閃爍提示與點檢表預設收合展開。
+// 風格與駐警隊交接簿統一，支援當班時段光暈閃爍提示與點檢表預設收合展開。
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppShell } from '@/components/AppShell';
@@ -691,7 +691,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const approvedCount = approvals.length;
 
   return (
-    <AppShell profile={profile} title={system.title} heading={{ system, module }}>
+    <AppShell profile={profile} title={module.title} heading={{ system, module }}>
       <div className="hs-page">
         <AdminHeader
           module={module}

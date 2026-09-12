@@ -97,7 +97,7 @@ const SYSTEM_MODULE_KEYS: Record<string, readonly string[]> = {
 };
 const SYSTEM_KEYS = Object.keys(SYSTEM_MODULE_KEYS);
 const BUSINESS_HANDOVER_CATEGORIES = new Set(['事務事項', '維修', '其他']);
-// 駐衛警交接簿下拉選單的清單鍵。清單內容在 guard_handover_options，由主管維護；
+// 駐警隊交接簿下拉選單的清單鍵。清單內容在 guard_handover_options，由主管維護；
 // 填寫時一律可自行輸入清單以外的文字，所以類別與物品狀態不再以固定清單驗證。
 const GUARD_OPTION_LISTS = new Set(['incident_category', 'item_condition', 'item_name', 'location', 'reported_to']);
 const GUARD_ATTACHMENT_BUCKET = 'guard-handover-files';
@@ -3224,7 +3224,7 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, { ok: false, message: '刪除範圍無效' }, 400);
     }
 
-    // ── 駐衛警交接簿：班別、時段、排定人員與巡邏打卡摘要 ──────────────────────────────
+    // ── 駐警隊交接簿：班別、時段、排定人員與巡邏打卡摘要 ──────────────────────────────
     // 規則與 web/lib/patrol-status.ts 的 getPatrolShiftsForDate 相同，改一邊就要改另一邊：
     // 班別名稱來自啟用中的 patrol_shift_template；每日時段來自 patrol_shifts（夜班存隔日，
     // 相容 2026-08-26 以前存於值班日的舊資料）；預定巡檢時段以 patrol_shift_staff.workTimes
@@ -3361,7 +3361,7 @@ export async function handleAppApiRequest(req: Request) {
     };
 
     if (action === 'handover_guard_context') {
-      if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐衛警電子交接簿' }, 403);
+      if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
       const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult] = await Promise.all([
@@ -3417,7 +3417,7 @@ export async function handleAppApiRequest(req: Request) {
     }
 
     if (action === 'guard_attachment_url') {
-      if (!canHandoverModule('guard') && !canHandoverModule('guard-approve')) return reply(req, { ok: false, message: '目前帳號未開放駐衛警電子交接簿' }, 403);
+      if (!canHandoverModule('guard') && !canHandoverModule('guard-approve')) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
       const attachmentId = id(body.attachment_id);
       if (!attachmentId) return reply(req, { ok: false, message: '附件識別碼無效' }, 400);
       const { data: row, error } = await admin.from('guard_handover_attachments').select('storage_path,file_name,content_type,is_deleted').eq('attachment_id', attachmentId).maybeSingle();
@@ -4120,7 +4120,7 @@ export async function handleAppApiRequest(req: Request) {
       }
 
       if (kind === 'guard_approve') {
-        if (!canGuardApprove()) return reply(req, { ok: false, message: '主管簽核須由系統管理員在權限頁明確開通「駐衛警交接主管簽核」' }, 403);
+        if (!canGuardApprove()) return reply(req, { ok: false, message: '主管簽核須由系統管理員在權限頁明確開通「駐警隊交接主管簽核」' }, 403);
         const dutyDate = text(body.duty_date, 10), note = text(body.note, 500);
         if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '簽核日期格式無效' }, 400);
         const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });

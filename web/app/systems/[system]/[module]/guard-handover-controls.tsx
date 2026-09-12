@@ -1,6 +1,6 @@
 'use client';
 
-// 駐衛警交接簿的「可選可填」下拉選單與清單管理面板。
+// 駐警隊交接簿的「可選可填」下拉選單與清單管理面板。
 // 只依賴 React；API 呼叫由 guard-handover.tsx 以回呼傳入，元件本身可以單獨渲染檢查版面。
 
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';

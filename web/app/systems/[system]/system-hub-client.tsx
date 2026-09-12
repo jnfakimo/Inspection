@@ -104,7 +104,7 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01', '進入系統　→'],
     ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'equipment-icon.png', 'HANDOVER 02', '進入系統　→'],
     ['business', '業管組電子交接簿', '登錄三班交接事項與出勤摘要，並保留建立、修改及刪除時間。', 'handover-icon.png', 'HANDOVER 03', '進入系統　→'],
-    ['guard', '駐衛警電子交接簿', '依巡檢排班帶入班別與人員，登錄勤務、異常與物品點交，交接班雙簽並由主管簽核。', 'guardpatrol-icon.png', 'HANDOVER 04', '進入系統　→'],
+    ['guard', '駐警隊電子交接簿', '依巡檢排班帶入班別與人員，登錄勤務、異常與物品點交，交接班雙簽並由主管簽核。', 'guardpatrol-icon.png', 'HANDOVER 04', '進入系統　→'],
     ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 05', '進入系統　→'],
     ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 06', '進入系統　→'],
     ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'guardpatrol-schedule-icon.png', 'HANDOVER 07', '進入系統　→'],

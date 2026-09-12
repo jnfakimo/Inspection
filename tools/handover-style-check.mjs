@@ -1,4 +1,4 @@
-// SYS-04 三本電子交接簿（機電課、業管組、駐衛警）的版型一致性檢查。
+// SYS-04 三本電子交接簿（機電課、業管組、駐警隊）的版型一致性檢查。
 //
 // 三本交接簿內容不同，但外觀必須一致：共同版型只放在 handover-sheet.css／handover-sheet.tsx，
 // 各本只在自己的檔案放「本簿特有」的區塊。歷史上就是各自複製一份樣式與圖示，才長成三種風格。
@@ -13,7 +13,7 @@ const read = name => fs.readFileSync(path.join(dir, name), 'utf8');
 const SHEETS = [
   { name: '機電課', tsx: 'mechanical-handover.tsx', css: 'mechanical-handover.css' },
   { name: '業管組', tsx: 'business-handover.tsx', css: 'business-handover.css' },
-  { name: '駐衛警', tsx: 'guard-handover.tsx', css: 'guard-handover.css', view: 'guard-handover-view.tsx' },
+  { name: '駐警隊', tsx: 'guard-handover.tsx', css: 'guard-handover.css', view: 'guard-handover-view.tsx' },
 ];
 
 // 共同骨架：少一項就是某一本又自己長了一套版面。
