@@ -101,23 +101,25 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     </AppShell>;
   }
   const cards = handover ? [
-    ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01'],
-    ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'equipment-icon.png', 'HANDOVER 02'],
-    ['business', '業管組電子交接簿', '登錄三班交接事項與出勤摘要，並保留建立、修改及刪除時間。', 'handover-icon.png', 'HANDOVER 03'],
-    ['guard', '駐衛警電子交接簿', '依巡檢排班帶入班別與人員，登錄勤務、異常與物品點交，交接班雙簽並由主管簽核。', 'guardpatrol-icon.png', 'HANDOVER 04'],
-    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 05'],
-    ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 06'],
-    ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'guardpatrol-schedule-icon.png', 'HANDOVER 07'],
+    ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01', '進入系統　→'],
+    ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'equipment-icon.png', 'HANDOVER 02', '進入系統　→'],
+    ['business', '業管組電子交接簿', '登錄三班交接事項與出勤摘要，並保留建立、修改及刪除時間。', 'handover-icon.png', 'HANDOVER 03', '進入系統　→'],
+    ['guard', '駐衛警電子交接簿', '依巡檢排班帶入班別與人員，登錄勤務、異常與物品點交，交接班雙簽並由主管簽核。', 'guardpatrol-icon.png', 'HANDOVER 04', '進入系統　→'],
+    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 05', '進入系統　→'],
+    ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 06', '進入系統　→'],
+    ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'guardpatrol-schedule-icon.png', 'HANDOVER 07', '進入系統　→'],
   ] : [
-    ['checkins', '駐衛警巡檢表', '查詢各樓層與巡檢點的打卡狀態，即時掌握待巡與逾期項目。', 'guardpatrol-list-icon.png', 'MODULE 01'],
-    ['map3d', '3D 駐警巡檢雲台', '以立體場域視角查看巡檢點位與打卡狀態，快速定位異常區域。', 'guardpatrol-3d-icon.png', 'MODULE 02'],
-    ['shifts', '巡檢排班系統', '管理每日巡檢班別、執勤人員與時段，維持排班資訊清楚且一致。', 'guardpatrol-schedule-icon.png', 'MODULE 03'],
-    ['notifications', 'LINE推播紀錄', '查詢巡檢逾時推播的發送時間、完成狀況、排定人員與 LINE 回應。', 'guardpatrol-line-push-icon.png', 'MODULE 04'],
+    ['checkins', '巡邏打卡', '巡邏點簽到、座標與現場狀況。', 'guardpatrol-list-icon.png', 'MODULE 01', '進入打卡　→'],
+    ['points', '巡邏點清單', 'QR／NFC 巡邏點與樓層位置。', 'guardpatrol-icon.png', 'MODULE 02', '查看清單　→'],
+    ['shifts', '巡檢排班', '班別、人員與預定巡檢時段。', 'guardpatrol-schedule-icon.png', 'MODULE 03', '管理班別　→'],
+    ['notifications', '逾時推播', '即時通訊與行動推播結果及失敗原因。', 'guardpatrol-line-push-icon.png', 'MODULE 04', '查看通知　→'],
+    ['records', '設備巡檢', '設備運轉狀態與異常紀錄。', 'equipment-icon.png', 'MODULE 05', '查看巡檢　→'],
+    ['map3d', '立體巡檢雲臺', '巡檢點與立體樓層關聯。', 'guardpatrol-3d-icon.png', 'MODULE 06', '開啟雲台　→'],
   ];
   return <AppShell profile={profile} title={system.title}
     heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
     <div className="operations-portal-note">{handover ? '電子交接簿流程' : '駐衛警巡檢流程'} · 點選圖卡進入功能系統</div>
-    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.filter(([key]) => canSeeModule(key)).map(([key, title, description, icon, code]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{handover ? '進入系統　→' : key === 'checkins' ? '進入系統　→' : key === 'map3d' ? '開啟立體檢視　→' : key === 'shifts' ? '管理巡檢班別　→' : '查看通知　→'}</b></Link>)}</section>
+    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.filter(([key]) => canSeeModule(key)).map(([key, title, description, icon, code, action]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
     {!cards.some(([key]) => canSeeModule(key)) && <div className="notice danger">目前帳號尚未指派任何可用子系統，請洽系統管理員設定。</div>}
   </AppShell>;
 }

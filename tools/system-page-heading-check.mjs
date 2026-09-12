@@ -42,8 +42,8 @@ assert.match(systemHub, /metaTitle: '系統入口', description: system\.descrip
 const operationsCss = readFileSync('web/app/systems/[system]/[module]/operations.css', 'utf8');
 assert.match(operationsCss, /\.operations-portal-grid\.patrol\{[\s\S]*?width:100%/,
   '駐衛警入口圖卡區必須維持桌面圖卡規格');
-assert.match(operationsCss, /grid-template-columns:repeat\(4,269px\)/,
-  '駐衛警入口桌面四張圖卡必須固定為 269px 欄寬');
+assert.match(operationsCss, /grid-template-columns:repeat\(3,269px\)/,
+  '駐衛警入口桌面六張圖卡必須固定為 269px 欄寬');
 assert.match(operationsCss, /\.operations-portal-grid\.patrol \.operations-portal-card\{[\s\S]*?width:269px;[\s\S]*?height:200px;[\s\S]*?min-height:200px;/,
   '駐衛警入口桌面圖卡必須固定為 269×200px');
 assert.match(operationsCss, /@media \(max-width:1100px\)[\s\S]*?\.operations-portal-grid\.patrol\{width:100%;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}/,
