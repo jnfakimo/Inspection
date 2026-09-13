@@ -1,6 +1,8 @@
 -- 公務車申請改為兩層核准：申請人送出 -> 課長 -> 部門經理 -> 派車。
 -- 所有核准、退回與派車動作仍透過單一 security definer RPC，並寫入流程歷程。
 
+begin;
+
 alter table public.vehicle_dispatch_requests
   add column if not exists department_manager_id uuid references public.users(user_id),
   add column if not exists department_manager_name text,
@@ -266,3 +268,5 @@ create trigger trg_guard_vehicle_two_level_dispatch
 
 revoke all on function public.guard_vehicle_dispatch_approval() from public,anon,authenticated;
 revoke all on function public.guard_vehicle_two_level_dispatch() from public,anon,authenticated;
+
+commit;
