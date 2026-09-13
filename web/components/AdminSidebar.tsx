@@ -13,8 +13,8 @@ type SidebarItem = {
 };
 
 const sidebarItems: SidebarItem[] = [
-  { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png' },
-  { href: '/systems/admin/layouts/', label: '戰情版面設定', icon: '/Inspection/assets/system-icons-v20260901/admin-icon.png', adminOnly: true },
+  { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons-v20260913/command-dashboard-icon.png' },
+  { href: '/systems/admin/layouts/', label: '戰情版面設定', icon: '/Inspection/assets/system-icons-v20260913/admin-icon.png', adminOnly: true },
   {
     href: '/systems/admin/settings/',
     label: '系統設定',
@@ -28,12 +28,12 @@ const sidebarItems: SidebarItem[] = [
     ],
   },
   { href: '/systems/admin/users/', label: '帳號管理', icon: '/Inspection/assets/system-icons-v20260901/account-icon.png', adminOnly: true },
-  { href: '/systems/equipment/', label: '設備建置管理', icon: '/Inspection/assets/system-icons-v20260901/equipment-icon.png', system: 'equipment' },
-  { href: '/systems/workorder/', label: '報修／派工／完工系統', icon: '/Inspection/assets/system-icons-v20260901/maintenance-icon.png', system: 'workorder' },
-  { href: '/systems/guardpatrol/', label: '駐衛警巡檢系統', icon: '/Inspection/assets/system-icons-v20260901/guardpatrol-icon.png', system: 'guardpatrol' },
-  { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons-v20260901/handover-icon.png', system: 'handover' },
-  { href: '/systems/structuremap/models/', label: '3D 雲臺建模', icon: '/Inspection/assets/system-icons-v20260901/equipment-icon.png', system: 'structuremap' },
-  { href: '/systems/structuremap/relations/', label: '專案關係地圖', icon: '/Inspection/assets/system-icons-v20260901/settings-icon.png', system: 'structuremap' },
+  { href: '/systems/equipment/', label: '設備建置管理', icon: '/Inspection/assets/system-icons-v20260913/equipment-icon.png', system: 'equipment' },
+  { href: '/systems/workorder/', label: '報修／派工／完工系統', icon: '/Inspection/assets/system-icons-v20260913/maintenance-icon.png', system: 'workorder' },
+  { href: '/systems/guardpatrol/', label: '駐衛警巡檢系統', icon: '/Inspection/assets/system-icons-v20260913/guardpatrol-icon.png', system: 'guardpatrol' },
+  { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons-v20260913/handover-icon.png', system: 'handover' },
+  { href: '/systems/structuremap/models/', label: '3D 雲臺建模', icon: '/Inspection/assets/system-icons-v20260913/structuremap-icon.png', system: 'structuremap' },
+  { href: '/systems/structuremap/relations/', label: '專案關係地圖', icon: '/Inspection/assets/system-icons-v20260913/structuremap-icon.png', system: 'structuremap' },
   { href: '/systems/equipment/costs/', label: '費用統計', icon: '/Inspection/assets/system-icons-v20260901/audit-icon.png', system: 'equipment' },
   {
     href: '/systems/admin/audit/',
@@ -91,7 +91,7 @@ export function AdminSidebar({
     <aside id="admin-v2-sidebar" className={`admin-sidebar${open ? ' is-open' : ''}`} aria-label={administrator ? '後台管理側邊導覽' : '系統功能導覽'}>
       <div className="admin-sidebar-brand">
         <Link href={administrator ? '/systems/admin/' : '/systems/'} onClick={onClose}>
-          <img src="/Inspection/assets/system-icons-v20260901/admin-icon.png" alt="" />
+          <img src="/Inspection/assets/system-icons-v20260913/admin-icon.png" alt="" />
           <strong>{administrator ? '後台管理系統' : '系統功能選單'}</strong>
         </Link>
         <button type="button" className="admin-sidebar-close" aria-label="關閉選單" onClick={onClose}>×</button>

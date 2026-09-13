@@ -29,14 +29,14 @@ function WorkorderHub({ profile }: { profile: Profile }) {
   }, []);
 
   return <AppShell profile={profile} title="報修／派工／完工系統">
-    <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons-v20260901/maintenance-icon.png" alt="" /> 報修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
+    <section className="workorder-page-header"><h2><img src="/Inspection/assets/system-icons-v20260913/maintenance-icon.png" alt="" /> 報修／派工／完工系統</h2><p>報修、派工及維修完工流程入口</p></section>
     {summary.length > 0 && <section className="mini-metrics workorder-summary">{summary.map(item => <article key={item.label} data-label={item.label}><span>{zhValue(item.label)}</span><strong>{item.value}</strong></article>)}</section>}
     <div className="workorder-note">■ 維修作業流程 ・ 點選圖卡進入功能系統</div>
     <section className="maintenance-hub-grid">
-      {hasModuleAccess(profile, 'workorder', 'requests') && <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/Inspection/assets/system-icons-v20260901/repair-request-icon.png" alt="報修與維修" /><h3>報修 &amp; 維修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>}
-      {hasModuleAccess(profile, 'workorder', 'dispatch') && <Link className="maintenance-card amber" href="/systems/workorder/dispatch/"><span className="maintenance-badge">MAIN-02</span><img src="/Inspection/assets/system-icons-v20260901/under-repair-icon.png" alt="派工" /><h3>派工系統</h3><p>建立派工、承辦指派<br />工單處理進度追蹤</p><b>▶ 進入派工系統</b></Link>}
-      {hasModuleAccess(profile, 'workorder', 'orders') && <Link className="maintenance-card green" href="/systems/workorder/orders/"><span className="maintenance-badge">MAIN-03</span><img src="/Inspection/assets/system-icons-v20260901/repair-complete-icon.png" alt="維修完工回報" /><h3>維修完工回報</h3><p>填寫完工紀錄、照片回報<br />驗收及主管結案</p><b>▶ 進入完工回報</b></Link>}
-      {hasModuleAccess(profile, 'workorder', 'repairmap3d') && <Link className="maintenance-card cyan" href="/systems/workorder/repairmap3d/"><span className="maintenance-badge">MAIN-04</span><img src="/Inspection/assets/system-icons-v20260901/settings-icon.png" alt="報修3D平面圖" /><h3>報修3D平面圖</h3><p>共用 3D 雲台圖資<br />查看報修點與空間位置</p><b>▶ 開啟圖面</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'requests') && <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/Inspection/assets/system-icons-v20260913/repair-request-icon.png" alt="報修與維修" /><h3>報修 &amp; 維修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'dispatch') && <Link className="maintenance-card amber" href="/systems/workorder/dispatch/"><span className="maintenance-badge">MAIN-02</span><img src="/Inspection/assets/system-icons-v20260913/dispatch-icon.png" alt="派工" /><h3>派工系統</h3><p>建立派工、承辦指派<br />工單處理進度追蹤</p><b>▶ 進入派工系統</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'orders') && <Link className="maintenance-card green" href="/systems/workorder/orders/"><span className="maintenance-badge">MAIN-03</span><img src="/Inspection/assets/system-icons-v20260913/repair-complete-icon.png" alt="維修完工回報" /><h3>維修完工回報</h3><p>填寫完工紀錄、照片回報<br />驗收及主管結案</p><b>▶ 進入完工回報</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'repairmap3d') && <Link className="maintenance-card cyan" href="/systems/workorder/repairmap3d/"><span className="maintenance-badge">MAIN-04</span><img src="/Inspection/assets/system-icons-v20260913/repair-map3d-icon.png" alt="報修3D平面圖" /><h3>報修3D平面圖</h3><p>共用 3D 雲台圖資<br />查看報修點與空間位置</p><b>▶ 開啟圖面</b></Link>}
     </section>
   </AppShell>;
 }
@@ -89,7 +89,7 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     return <AppShell profile={profile} title={system.title}
       heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
       <div className="operations-portal-note">公文傳送流程 · 點選圖卡進入功能系統</div>
-      <section className="operations-portal-grid officialdocs">{canSeeModule('routing') && <Link href="/systems/officialdocs/routing/" className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">MODULE 01</span><span className="operations-portal-status">● 系統連線</span></div><img src="/Inspection/assets/system-icons-v20260901/handover-icon.png" alt="" /><h2>公文傳送</h2><p>傳送、收文、簽收與核決流程管理。</p><b>進入系統　→</b></Link>}</section>
+      <section className="operations-portal-grid officialdocs">{canSeeModule('routing') && <Link href="/systems/officialdocs/routing/" className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">MODULE 01</span><span className="operations-portal-status">● 系統連線</span></div><img src="/Inspection/assets/system-icons-v20260913/officialdocs-icon.png" alt="" /><h2>公文傳送</h2><p>傳送、收文、簽收與核決流程管理。</p><b>進入系統　→</b></Link>}</section>
       {!canSeeModule('routing') && <div className="notice danger">目前帳號尚未開放公文傳送子系統，請洽系統管理員設定。</div>}
     </AppShell>;
   }
@@ -101,25 +101,25 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
     </AppShell>;
   }
   const cards = handover ? [
-    ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-icon.png', 'HANDOVER 01', '進入系統　→'],
-    ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'equipment-icon.png', 'HANDOVER 02', '進入系統　→'],
-    ['business', '業管組電子交接簿', '登錄三班交接事項與出勤摘要，並保留建立、修改及刪除時間。', 'handover-icon.png', 'HANDOVER 03', '進入系統　→'],
-    ['guard', '駐警隊電子交接簿', '依巡檢排班帶入班別與人員，登錄勤務、異常與物品點交，交接班雙簽並由主管簽核。', 'guardpatrol-icon.png', 'HANDOVER 04', '進入系統　→'],
-    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-icon.png', 'HANDOVER 05', '進入系統　→'],
+    ['records', '指揮台電子交接簿', '各班交接內容、簽核與時間，提供指揮台人員執行交接記錄與管理。', 'handover-command-icon.png', 'HANDOVER 01', '進入系統　→'],
+    ['mechanical', '機電課電子交接簿', '登錄三班維修養護工作，並列印每日紀錄表。', 'handover-mechanical-icon.png', 'HANDOVER 02', '進入系統　→'],
+    ['business', '業管組電子交接簿', '登錄三班交接事項與出勤摘要，並保留建立、修改及刪除時間。', 'handover-business-icon.png', 'HANDOVER 03', '進入系統　→'],
+    ['guard', '駐警隊電子交接簿', '依巡檢排班帶入班別與人員，登錄勤務、異常與物品點交，交接班雙簽並由主管簽核。', 'handover-guard-icon.png', 'HANDOVER 04', '進入系統　→'],
+    ['open-items', '未結事項', '查看跨班延續的異常與待辦事項。', 'handover-open-items-icon.png', 'HANDOVER 05', '進入系統　→'],
     ['equipment', '設備概況', '查看交接時的設備運轉摘要。', 'equipment-icon.png', 'HANDOVER 06', '進入系統　→'],
-    ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'guardpatrol-schedule-icon.png', 'HANDOVER 07', '進入系統　→'],
+    ['mechanical-schedule', '機電課排班表', '編排一市與二市整月班表，自動檢查休息間隔、每週工時與例休。', 'handover-schedule-icon.png', 'HANDOVER 07', '進入系統　→'],
   ] : [
-    ['checkins', '巡邏打卡', '巡邏點簽到、座標與現場狀況。', 'guardpatrol-list-icon.png', 'MODULE 01', '進入打卡　→'],
-    ['points', '巡邏點清單', 'QR／NFC 巡邏點與樓層位置。', 'guardpatrol-icon.png', 'MODULE 02', '查看清單　→'],
+    ['checkins', '巡邏打卡', '巡邏點簽到、座標與現場狀況。', 'guardpatrol-checkin-icon.png', 'MODULE 01', '進入打卡　→'],
+    ['points', '巡邏點清單', 'QR／NFC 巡邏點與樓層位置。', 'guardpatrol-points-icon.png', 'MODULE 02', '查看清單　→'],
     ['shifts', '巡檢排班', '班別、人員與預定巡檢時段。', 'guardpatrol-schedule-icon.png', 'MODULE 03', '管理班別　→'],
-    ['notifications', '逾時推播', '即時通訊與行動推播結果及失敗原因。', 'guardpatrol-line-push-icon.png', 'MODULE 04', '查看通知　→'],
-    ['records', '設備巡檢', '設備運轉狀態與異常紀錄。', 'equipment-icon.png', 'MODULE 05', '查看巡檢　→'],
+    ['notifications', '逾時推播', '即時通訊與行動推播結果及失敗原因。', 'guardpatrol-notification-icon.png', 'MODULE 04', '查看通知　→'],
+    ['records', '設備巡檢', '設備運轉狀態與異常紀錄。', 'inspection-icon.png', 'MODULE 05', '查看巡檢　→'],
     ['map3d', '立體巡檢雲臺', '巡檢點與立體樓層關聯。', 'guardpatrol-3d-icon.png', 'MODULE 06', '開啟雲台　→'],
   ];
   return <AppShell profile={profile} title={system.title}
     heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
     <div className="operations-portal-note">{handover ? '電子交接簿流程' : '駐衛警巡檢流程'} · 點選圖卡進入功能系統</div>
-    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.filter(([key]) => canSeeModule(key)).map(([key, title, description, icon, code, action]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260901/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
+    <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.filter(([key]) => canSeeModule(key)).map(([key, title, description, icon, code, action]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260913/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
     {!cards.some(([key]) => canSeeModule(key)) && <div className="notice danger">目前帳號尚未指派任何可用子系統，請洽系統管理員設定。</div>}
   </AppShell>;
 }
