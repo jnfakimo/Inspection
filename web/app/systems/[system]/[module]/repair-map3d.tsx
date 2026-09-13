@@ -15,12 +15,14 @@ import type { Row } from '@/components/admin/shared';
 const REPAIR_COLOR = '#ff3b3b';
 const SPACE_COLOR = '#00d4ff';
 const GAP_DEFAULT = 6;
+// 與駐衛警 3D、共用平面圖使用相同刻度，切換圖面時點位大小手感一致。
+const POINT_MIN = 0.5, POINT_MAX = 3, POINT_STEP = 0.1, POINT_DEFAULT = 1;
 const GAP_PER_STEP = 1.6 / GAP_DEFAULT;
 
 export function RepairMap3DModule({ module, profile: _profile, system: _system }: { module: ModuleDefinition; profile: Profile; system: SystemDefinition }) {
   const [models, setModels] = useState<Row[]>([]), [markers, setMarkers] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
-  const [explode, setExplode] = useState(GAP_DEFAULT), [showMarkers, setShowMarkers] = useState(true), [showLabels, setShowLabels] = useState(false);
+  const [explode, setExplode] = useState(GAP_DEFAULT), [pointScale, setPointScale] = useState(POINT_DEFAULT), [showMarkers, setShowMarkers] = useState(true), [showLabels, setShowLabels] = useState(false);
   const [visibleFloors, setVisibleFloors] = useState<Record<string, boolean>>({});
   const [pointsOpen, setPointsOpen] = useState(false), [ctrlOpen, setCtrlOpen] = useState(false), [floorsOpen, setFloorsOpen] = useState(false);
   const apiRef = useRef<FloorStackApi | null>(null);
@@ -56,14 +58,14 @@ export function RepairMap3DModule({ module, profile: _profile, system: _system }
       <img className="tb-system-icon" src="/Inspection/assets/system-icons-v20260901/maintenance-icon.png" alt="" data-system-page-logo /><span className="tb-title">{module.title}</span><span className="tb-space" />
       <StructuremapTopbarActions planeHref="/Inspection/v2/systems/structuremap/floor2d/?kind=repair" label="切換平面圖" />
     </div>
-    <div className="f3-stage">{models.length ? <FloorStack3D models={models as never} markers={stackMarkers} showMarkers={showMarkers} showLabels={showLabels} visibleFloors={visibleFloors} gap={explode * GAP_PER_STEP} apiRef={apiRef} /> : !busy && <p className="f3-empty">尚未設定樓層圖資，請至「圖資專案設定」建立。</p>}</div>
+    <div className="f3-stage">{models.length ? <FloorStack3D models={models as never} markers={stackMarkers} showMarkers={showMarkers} showLabels={showLabels} visibleFloors={visibleFloors} gap={explode * GAP_PER_STEP} markerScale={pointScale} apiRef={apiRef} /> : !busy && <p className="f3-empty">尚未設定樓層圖資，請至「圖資專案設定」建立。</p>}</div>
     {note && <div className="f3-error">{note}</div>}
     {!ctrlOpen && <button className="f3-toggle ctrl" onClick={() => setCtrlOpen(true)}>立體控制</button>}
     {!pointsOpen && <button className="f3-toggle marks" onClick={() => setPointsOpen(true)}>標記顯示</button>}
     {!floorsOpen && <button className="f3-toggle floors" onClick={() => setFloorsOpen(true)}>樓層顯示</button>}
     {pointsOpen && <div className="f3-mkpanel"><div className="panel-head"><span className="p-t">標記顯示</span><button className="panel-close" onClick={() => setPointsOpen(false)}>隱藏</button></div><label className="chk all"><input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} />顯示報修點與空間</label><label className="chk labels"><input type="checkbox" disabled={!showMarkers} checked={showLabels} onChange={e => setShowLabels(e.target.checked)} />文字標籤</label><div className="chk kind legend" style={{ '--kind-color': REPAIR_COLOR } as React.CSSProperties}><span className="legend-dot" />報修點 {active.filter(r => r.kind === 'repair').length}</div><div className="chk kind legend" style={{ '--kind-color': SPACE_COLOR } as React.CSSProperties}><span className="legend-dot" />空間 {active.filter(r => r.kind === 'space').length}</div></div>}
     {floorsOpen && <div className="f3-floors"><div className="panel-head"><span className="p-t">樓層顯示</span><button className="panel-close" onClick={() => setFloorsOpen(false)}>隱藏</button></div>{models.slice().reverse().map(row => { const id = String(row.floor_id); const on = visibleFloors[id] !== false; return <button key={id} className={`fbtn${on ? ' on' : ''}`} onClick={() => setVisibleFloors(current => ({ ...current, [id]: !on }))}><span className="dot" />{String(row.name || id)}</button>; })}<div className="f3-floors-count">顯示 {shownFloors.length}／{models.length} 層</div></div>}
-    {ctrlOpen && <div className="f3-panel"><div className="panel-head"><span className="p-t">立體控制</span><button className="panel-close" onClick={() => setCtrlOpen(false)}>隱藏</button></div><label htmlFor="repair-gap">樓層間距（視覺）</label><input id="repair-gap" type="range" min="1" max="20" step="0.5" value={explode} onChange={e => setExplode(Number(e.target.value))} /><div className="h-r">放大倍率：<span>{explode}×</span></div><div className="btnrow"><button className="mini" onClick={resetView}>⊡ 重置</button><button className="mini" onClick={() => apiRef.current?.topView()}>⊤ 俯視</button><button className="mini" onClick={() => setExplode(1)}>真實比例</button></div><p className="f2-note">圖資與標記同步讀取 3D 雲台使用的 floor_models、plan_markers。</p></div>}
+    {ctrlOpen && <div className="f3-panel"><div className="panel-head"><span className="p-t">立體控制</span><button className="panel-close" onClick={() => setCtrlOpen(false)}>隱藏</button></div><label htmlFor="repair-gap">樓層間距（視覺）</label><input id="repair-gap" type="range" min="1" max="20" step="0.5" value={explode} onChange={e => setExplode(Number(e.target.value))} /><div className="h-r">放大倍率：<span>{explode % 1 ? explode.toFixed(1) : explode}×</span></div><label htmlFor="repair-point-size">報修／空間點大小</label><input id="repair-point-size" type="range" min={POINT_MIN} max={POINT_MAX} step={POINT_STEP} value={pointScale} onChange={e => setPointScale(Number(e.target.value))} /><div className="h-r">圖面點位：<span>{pointScale.toFixed(1)}×</span></div><div className="btnrow"><button className="mini" onClick={resetView}>⊡ 重置</button><button className="mini" onClick={() => apiRef.current?.topView()}>⊤ 俯視</button><button className="mini" onClick={() => setExplode(1)}>真實比例</button><button className="mini" onClick={() => setPointScale(POINT_DEFAULT)}>點原大小</button></div><p className="f2-note">圖資與標記同步讀取 3D 雲台使用的 floor_models、plan_markers。</p></div>}
     <div className="f3-bottomright"><div className="f3-hint">左鍵拖曳：旋轉環繞　｜　右鍵拖曳：平移　｜　滾輪／雙指：縮放</div><div className="f3-hud"><div className="h-t">{module.title}</div><div className="h-r">顯示樓層：<span>{shownFloorText}</span></div><div className="h-r">標記：<span>報修點 {active.filter(r => r.kind === 'repair').length}／空間 {active.filter(r => r.kind === 'space').length}</span></div></div></div>
   </div>;
 }

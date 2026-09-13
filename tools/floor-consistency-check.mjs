@@ -48,6 +48,7 @@ const projectReaders = [
   'web/app/systems/[system]/[module]/structuremap-viewers.tsx',
   'web/app/systems/[system]/[module]/structuremap-floor3d.tsx',
   'web/app/systems/[system]/[module]/patrol-map3d.tsx',
+  'web/app/systems/[system]/[module]/repair-map3d.tsx',
 ];
 for (const relative of projectReaders) {
   const file = fs.readFileSync(path.join(root, relative), 'utf8');
@@ -56,6 +57,21 @@ for (const relative of projectReaders) {
   // 底層一樣是短效 signed URL，兩者都算合格；直接組公開網址才是要擋的事。
   if (!/signFloorplanPaths|signFloorPlanVariants/.test(file)) {
     throw new Error(`${relative} 未使用私有圖資的短效連結`);
+  }
+}
+
+// 報修與巡檢 3D 共用 FloorStack3D 的即時點位縮放，不可只在其中一張圖提供控制。
+const stack3d = fs.readFileSync(path.join(root, 'web/app/systems/[system]/[module]/floor-stack-3d.tsx'), 'utf8');
+if (!stack3d.includes('markerScale') || !stack3d.includes('dotsRef')) {
+  throw new Error('FloorStack3D 缺少不重建場景的點位縮放介面');
+}
+for (const relative of [
+  'web/app/systems/[system]/[module]/patrol-map3d.tsx',
+  'web/app/systems/[system]/[module]/repair-map3d.tsx',
+]) {
+  const file = fs.readFileSync(path.join(root, relative), 'utf8');
+  if (!file.includes('markerScale=') || !/type="range"/.test(file)) {
+    throw new Error(`${relative} 未提供 3D 圖面點位大小拉桿`);
   }
 }
 
