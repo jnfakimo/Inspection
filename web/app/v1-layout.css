@@ -242,7 +242,7 @@ html[data-theme="light"],html[data-theme="light"] body{background-color:#f4f6fa!
 
 /* 登入後共用的個人資料設定：基本資料、Google 個人行事曆與密碼集中於同一視窗。 */
 .profile-modal-bg{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:16px;background:rgba(2,8,23,.68);backdrop-filter:blur(5px)}
-.profile-modal{display:flex;width:min(960px,96vw);max-height:min(96dvh,880px);flex-direction:column;overflow:hidden;border:1px solid color-mix(in srgb,var(--cyan) 34%,var(--line));border-radius:14px;background:var(--panel);box-shadow:0 28px 90px rgba(2,8,23,.42)}
+.profile-modal{display:flex;width:min(560px,95vw);max-height:min(96dvh,880px);flex-direction:column;overflow:hidden;border:1px solid color-mix(in srgb,var(--cyan) 34%,var(--line));border-radius:14px;background:var(--panel);box-shadow:0 28px 90px rgba(2,8,23,.42)}
 .profile-modal>header{position:relative;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--cyan) 11%,var(--panel)),var(--panel) 70%)}
 .profile-modal>header:before{content:'';position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,var(--cyan),#38bdf8,transparent)}
 .profile-modal>header small{color:var(--cyan);font:700 .62rem var(--head);letter-spacing:.16em}.profile-modal>header h2{margin:2px 0 1px;font-size:1.15rem}.profile-modal>header p{margin:0;color:var(--dim);font-size:.72rem}

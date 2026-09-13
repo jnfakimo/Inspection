@@ -10,16 +10,10 @@
 .profile-form-grid.profile-basic-grid{
   display:grid;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:8px 12px;
+  gap:8px 10px;
 }
 
-@media(max-width:768px){
-  .profile-form-grid.profile-basic-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-  }
-}
-
-@media(max-width:600px){
+@media(max-width:480px){
   .profile-modal-body{grid-auto-rows:max-content}
 
   .profile-form-grid.profile-basic-grid{
