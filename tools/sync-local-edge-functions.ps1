@@ -48,7 +48,7 @@ $commit = & git -C $source rev-parse --short HEAD
 Write-Output "來源版本：$commit"
 
 # deno check 在主機上不一定有；至少確認 app-api 與 _shared 都在。
-foreach ($required in @('app-api\index.ts', 'app-api\validate.ts', 'app-api\audit.ts', 'app-api\handlers\vehicle.ts', '_shared\security-monitor.ts', '_shared\password-policy.ts', '_shared\floor.ts', '_shared\client-ip.ts')) {
+foreach ($required in @('app-api\index.ts', 'app-api\validate.ts', 'app-api\audit.ts', 'app-api\handlers\vehicle.ts', 'app-api\handlers\meeting.ts', '_shared\security-monitor.ts', '_shared\password-policy.ts', '_shared\floor.ts', '_shared\client-ip.ts')) {
     if (-not (Test-Path -LiteralPath (Join-Path $functionsSource $required))) { throw "來源缺少 $required。" }
 }
 

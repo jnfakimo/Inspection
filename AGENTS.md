@@ -265,7 +265,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   輸入清理放 `validate.ts`、稽核寫入用 `audit.ts`。每支 handler 附 `*.test.ts`，由
   `npm run test:app-api-handlers` 以假資料庫連線單獨測試。**新增的 API 一律寫進 handlers，不要再加進 index.ts。**
   搬移只能原樣剪貼，行為變更要另開 commit；新增 handler 檔時同步把它加入
-  `tools/sync-local-edge-functions.ps1` 的必要檔案清單。已拆：公務車。
+  `tools/sync-local-edge-functions.ps1` 的必要檔案清單。已拆：公務車、會議室。
 - **權限判斷失敗即拒絕（2026-09-13 訂）**：任何權限表查詢失敗時一律不放行，不得「沿用上一層」或回傳
   錯誤物件當真值。錯誤寫入函式日誌即可；使用者重新整理就能在資料庫恢復後取回權限。
   `npm run test:permission-fail-closed` 會擋住降級放行的寫法被加回來。
