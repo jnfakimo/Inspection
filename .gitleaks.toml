@@ -1,0 +1,61 @@
+title = "Beinong Inspection secret scanning"
+minVersion = "8.25.0"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Generated dependencies, caches, and deployment artifacts"
+paths = [
+  '''(?:^|/)(?:\.git|\.next|node_modules|_site|web/out|\.codex_tmp|\.ruff_cache|__pycache__)(?:/|$)''',
+]
+
+# Supabase anon JWT is intentionally public in browser clients.  Both the exact
+# source path and the public-client variable name must match; a JWT elsewhere
+# remains a blocking finding.
+[[allowlists]]
+description = "Browser and local-development Supabase anon keys"
+condition = "AND"
+targetRules = ["jwt"]
+regexTarget = "line"
+paths = [
+  '''(?:^|/)(?:system/(?:supabase-config\.js|theme\.js)|web/lib/config\.ts|tools/fix-selfhosted-login\.ps1)$''',
+]
+regexes = [
+  '''(?i)(?:SUPA_KEY|SUPABASE_ANON_KEY|CLOUD_SUPABASE_ANON_KEY|LOCAL_SUPABASE_ANON_KEY|\$Anon)\s*=''',
+]
+
+[[allowlists]]
+description = "Synthetic JWT used by the audit redaction unit test"
+condition = "AND"
+targetRules = ["jwt"]
+regexTarget = "line"
+paths = ['''(?:^|/)web/lib/security-audit-sanitize\.test\.ts$''']
+regexes = ['''const\s+jwt\s*=''' ]
+
+# Firebase Web API keys identify the client project and are not service-account
+# credentials.  The Google Cloud project must still restrict their referrers and
+# enabled APIs.
+[[allowlists]]
+description = "Firebase browser configuration API key"
+condition = "AND"
+targetRules = ["gcp-api-key", "generic-api-key"]
+regexTarget = "line"
+paths = ['''(?:^|/)system/(?:fcm-push\.js|firebase-messaging-sw\.js)$''']
+regexes = ['''\bapiKey\s*:''']
+
+[[allowlists]]
+description = "Public Web Push VAPID key"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''(?:^|/)system/fcm-push\.js$''']
+regexes = ['''\bvapidKey\s*=''' ]
+
+[[allowlists]]
+description = "Department UUID fixture, not a credential"
+condition = "AND"
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''(?:^|/)tools/e2e-official-document-flow\.mjs$''']
+regexes = ['''\bsecretary\s*:''']

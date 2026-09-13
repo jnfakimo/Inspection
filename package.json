@@ -15,7 +15,7 @@
     "verify:provenance": "node tools/verify-provenance.mjs",
     "security:audit": "node tools/security-design-audit.mjs",
     "security:secrets": "node tools/security-secret-scan.mjs",
-    "security:gitleaks": "gitleaks git . --config .gitleaks.toml --redact --no-banner",
+    "security:gitleaks": "node tools/run-gitleaks.mjs",
     "security:semgrep": "node tools/run-semgrep.mjs",
     "test:e2e:repair": "node tools/e2e-repair-flow.mjs",
     "test:e2e:vehicle": "node tools/e2e-vehicle-dispatch-flow.mjs",

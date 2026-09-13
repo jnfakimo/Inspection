@@ -37,6 +37,9 @@ jobs:
           gitleaks version
 
       - name: Scan complete Git history for secrets
+        run: gitleaks git . --config .gitleaks.toml --gitleaks-ignore-path .gitleaksignore --redact --no-banner
+
+      - name: Scan current source tree for secrets
         run: npm run security:gitleaks
 
       - name: Set up Python for Semgrep

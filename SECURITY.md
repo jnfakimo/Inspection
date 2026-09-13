@@ -17,10 +17,10 @@
 ## 自動化防線
 
 - `npm run security:secrets`：檢查公開前端是否誤放伺服器端秘密。
-- `npm run security:gitleaks`：掃描完整 Git 歷史；既有公開金鑰只用精確指紋放行。
+- `npm run security:gitleaks`：掃描目前版控檔案；CI 另掃描完整 Git 歷史，既有公開金鑰只用精確指紋放行。
 - `npm run security:semgrep`：以專案規則掃描維護中的應用程式來源。
 - GitHub Actions 的 CI、CodeQL 與 Hardened Pages 掃描必須全部通過後才能視為驗證完成。
 
-Supabase anon key、Firebase Web API key 與 Web Push VAPID public key本來就會傳送到
+Supabase anon key、Firebase Web API key 與 Web Push VAPID public key 本來就會傳送到
 瀏覽器，但仍須搭配 RLS、網域／API 限制及配額告警；service-role、Access Token、
 CRON_SECRET、服務帳戶私鑰與其他伺服器秘密禁止出現在版控中。

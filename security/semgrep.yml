@@ -1,0 +1,28 @@
+rules:
+  - id: beinong.javascript.no-eval
+    message: 禁止 eval()；請改用明確的資料解析或函式映射，避免程式碼注入。
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: eval(...)
+    metadata:
+      category: security
+      cwe: CWE-95
+
+  - id: beinong.javascript.no-function-constructor
+    message: 禁止動態 Function 建構器；請改用靜態函式，避免程式碼注入。
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: new Function(...)
+    metadata:
+      category: security
+      cwe: CWE-95
+
+  - id: beinong.generic.no-hardcoded-server-secret
+    message: 禁止在原始碼硬編碼伺服器端金鑰；請改由部署環境的 Secret 提供。
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: >-
+      (?i)(SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ACCESS_TOKEN|CRON_SECRET|LINE_CHANNEL_SECRET|CAPTCHA_SECRET|IPCAM_PASSWORD|GOOGLE_TOKEN_ENCRYPTION_KEY)\s*[:=]\s*["'][A-Za-z0-9_./+=-]{12,}["']
+    metadata:
+      category: secrets
+      cwe: CWE-798

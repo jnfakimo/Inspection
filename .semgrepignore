@@ -1,0 +1,10 @@
+# Semgrep scans maintained source only. These paths are generated artifacts,
+# third-party libraries, binary plans, or dependency caches.
+web/.next/
+web/out/
+web/public/vendor/
+system/vendor/
+system/plans/
+backend/node-api/dist/
+node_modules/
+__pycache__/
