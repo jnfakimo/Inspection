@@ -6,6 +6,7 @@ const packageUrl = process.env.HANDOVER_TEST_PGLITE_PATH
   ? pathToFileURL(process.env.HANDOVER_TEST_PGLITE_PATH).href : '@electric-sql/pglite';
 const { PGlite } = await import(packageUrl);
 const migration = readFileSync(new URL('../supabase/migrations/20260916132000_business_handover_market.sql', import.meta.url), 'utf8');
+const policyGrants = readFileSync(new URL('../supabase/migrations/20260916170000_business_handover_market_policy_grants.sql', import.meta.url), 'utf8');
 const db = new PGlite();
 const one = '00000000-0000-0000-0000-000000000001';
 const two = '00000000-0000-0000-0000-000000000002';
@@ -47,6 +48,8 @@ try {
   `);
   await db.exec(migration);
   await db.exec(migration);
+  await db.exec(policyGrants);
+  await db.exec(policyGrants);
   await actor(one);
   await query(`insert into business_handover_entries(market_code,handover_date,shift_code,description,created_by,updated_by)
     values('market_1','2020-01-01','01-09','一市事項',$1,$1)`, [one]);
@@ -62,5 +65,31 @@ try {
           ('market_2','2020-01-01','01-09','2020-01-01','09-17','[]','b',$2,'二市','${one}','一市')`, [one,two]);
   await query(`insert into business_handover_approvals(market_code,handover_date,stage,stage_label,approver_id)
     values('market_1','2020-01-01','director','一市場主任',$1),('market_2','2020-01-01','director','二市場主任',$2)`, [one,two]);
-  console.log('業管組交接市場隔離：重跑冪等、資料／交班／批核複合鍵與跨市場拒絕均通過。');
+  // 以一般登入使用者身分直接讀寫資料表（與頁面相同）：RLS 規則呼叫的函式必須授權給 authenticated，
+  // 否則正式環境一律回 permission denied for function。上面以超級使用者執行的測試抓不到這類授權缺漏。
+  const tables = 'business_handover_entries,business_handover_completions,business_handover_transfers,business_handover_approvals';
+  await db.exec(`
+    grant usage on schema public to authenticated;
+    grant select, insert, update on ${tables} to authenticated;
+    alter table business_handover_entries enable row level security;
+    alter table business_handover_completions enable row level security;
+    alter table business_handover_transfers enable row level security;
+    alter table business_handover_approvals enable row level security;
+  `);
+  await actor(one);
+  await query('set role authenticated');
+  try {
+    const entries = await query(`select market_code from business_handover_entries where handover_date='2020-01-01'`);
+    assert.deepEqual(entries.rows.map(row => row.market_code), ['market_1'], '一般使用者只能讀到自己市場的交接紀錄');
+    const approvals = await query(`select market_code from business_handover_approvals where handover_date='2020-01-01'`);
+    assert.deepEqual(approvals.rows.map(row => row.market_code), ['market_1'], '一般使用者只能讀到自己市場的批核');
+    const transfers = await query(`select market_code from business_handover_transfers where handover_date='2020-01-01'`);
+    assert.deepEqual(transfers.rows.map(row => row.market_code), ['market_1'], '一般使用者只能讀到自己市場的交班');
+    await query(`select count(*) from business_handover_completions`);
+    await assert.rejects(query(`select public.business_market_approval_allowed('${two}','market_2','director')`), /permission denied/,
+      '可查任意使用者簽核權的函式不得開放給一般使用者');
+  } finally {
+    await query('reset role');
+  }
+  console.log('業管組交接市場隔離：重跑冪等、資料／交班／批核複合鍵、跨市場拒絕與一般登入身分讀取均通過。');
 } finally { await db.close(); }
