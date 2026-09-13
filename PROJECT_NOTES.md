@@ -13,7 +13,11 @@
 - **根目錄檔案整頓與 ISO 27001 程式碼庫整潔**：
   - 將非核心抓取與臨時輔助腳本（`download_all_subs.py`、`extract_videos.py`、`ai-agent-ep03/`、`amis_crawler.py`、`merge_amis_veg.py` 等）歸檔移入 `scratch/`。
   - 於 `.gitignore` 補充 `.next/` 排除規則。
+- **個人資料設定版面單頁化與基本資料排版優化**：
+  - 「基本資料」欄位調整為兩列 3 欄並列：第一列「登入帳號、電子郵件、姓名」，第二列「聯絡電話、所屬單位、帳號角色」。
+  - 彈窗整體尺寸與內邊距最佳化（`width: min(960px, 96vw)`，精簡標題與卡片間距），使整個設定視窗在一般桌面解析度下可一頁完整呈現，不再產生捲軸。
 - **全套測試通過**：
+  - `tools/profile-modal-layout-check.mjs` 彈窗響應式與可讀性檢查通過。
   - `python tools/findtag-visible-probe.test.py` 26 個測試全部通過。
   - 前端與授權規則測試通過（`npm run test:page-headings`, `npm run test:button-standard`, `web/lib/*.test.ts`）。
 

@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
@@ -6,6 +7,10 @@ const nextConfig: NextConfig = {
   assetPrefix: '/Inspection/v2/',
   trailingSlash: true,
   images: { unoptimized: true },
+  webpack(config) {
+    config.resolve.alias['@'] = path.resolve(__dirname);
+    return config;
+  },
 };
 
 export default nextConfig;
