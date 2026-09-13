@@ -112,16 +112,20 @@ def parse_page(html, day, market, category):
     return list(unique.values()), {'raw_rows': len(rows), 'duplicate_rows': duplicates, 'placeholder_rows': placeholders, 'status': 'ready'}
 
 
-FETCH_BACKOFF_SECONDS = (3, 6, 15, 40, 90)
+# 北農官網對國外主機（GitHub Actions 位於 Azure）常出現 TCP 連線逾時，
+# 每次排程 5 次退避僅撐約 2.5 分鐘就整批放棄。改為退避到約 10 分鐘，
+# 連線逾時放寬到 30 秒，讓官網短暫壅塞時仍有機會抓完當日行情。
+FETCH_BACKOFF_SECONDS = (5, 15, 45, 90, 180, 300)
+FETCH_TIMEOUT = (30, 90)
 
 
 def fetch_scope(day, market, category):
     # Retry the entire WebForms exchange so cookies, viewstate and validation stay paired.
-    # 歷史回補會連續抓上千頁，官網偶爾會短暫拒絕連線；退避到 90 秒再放棄，避免整批中止。
+    # 歷史回補會連續抓上千頁，官網偶爾會短暫拒絕連線或壅塞；退避到約 10 分鐘再放棄，避免整批中止。
     for attempt in range(len(FETCH_BACKOFF_SECONDS)):
         try:
             with requests.Session() as session:
-                response = session.get(URL, timeout=(15, 90))
+                response = session.get(URL, timeout=FETCH_TIMEOUT)
                 response.raise_for_status()
                 soup = BeautifulSoup(response.content, 'html.parser')
                 data = {x['name']: x.get('value', '') for x in soup.select('input[name]')}
@@ -130,7 +134,7 @@ def fetch_scope(day, market, category):
                 data.update({PREFIX + 'txtDate': roc(day), PREFIX + 'DDL_Category': '2',
                              PREFIX + 'DDL_FV_Code': category, PREFIX + 'DDL_Market': market,
                              '__EVENTTARGET': PREFIX + 'btnQuery', '__EVENTARGUMENT': ''})
-                response = session.post(URL, data=data, timeout=(15, 90))
+                response = session.post(URL, data=data, timeout=FETCH_TIMEOUT)
                 response.raise_for_status()
                 return parse_page(response.content, day, market, category)
         except requests.RequestException as exc:

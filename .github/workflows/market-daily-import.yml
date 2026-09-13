@@ -24,7 +24,7 @@ concurrency:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
@@ -45,4 +45,13 @@ jobs:
           args=()
           if [ -n "$REQUESTED_DATE" ]; then args+=(--date "$REQUESTED_DATE"); fi
           if [ "$DRY_RUN" != 'true' ]; then args+=(--execute); fi
-          python tools/market_daily_import.py "${args[@]}"
+          # 北農官網對國外主機時常整段時間連不上；程式內退避約 10 分鐘後，
+          # 再由工作流程等 10 分鐘重跑一次。匯入本身冪等，重跑不會重複計數。
+          for attempt in 1 2; do
+            if python tools/market_daily_import.py "${args[@]}"; then exit 0; fi
+            if [ "$attempt" = '1' ]; then
+              echo '::warning::北農來源連線失敗，10 分鐘後重試整批匯入'
+              sleep 600
+            fi
+          done
+          exit 1
