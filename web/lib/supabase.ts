@@ -118,14 +118,19 @@ export async function invokeAppApi<T>(action: string, payload: Record<string, un
   });
   if (error) {
     console.error('地端 app-api 錯誤:', error);
-    let msg = error.message || '連線失敗';
+    // 伺服器已回傳業務訊息（權限、勾稽規則等）時直接呈現，不冠連線失敗字樣以免誤導使用者。
+    let serverMessage = '';
     if ((error as any).context && typeof (error as any).context.json === 'function') {
       try {
         const errData = await (error as any).context.json();
-        if (errData?.message) msg = errData.message;
-      } catch { /* ignore */ }
+        if (errData?.message) serverMessage = String(errData.message);
+      } catch { /* 回應非 JSON，視為連線失敗 */ }
     }
-    throw new Error(`地端 app-api 失敗: ${msg}`);
+    if (serverMessage) {
+      reportIfInfrastructureError(serverMessage, { action, via: 'local-app-api' });
+      throw new Error(serverMessage);
+    }
+    throw new Error(`系統服務連線失敗：${error.message || '請稍後再試'}`);
   }
   if (!data?.ok) {
     reportIfInfrastructureError(data?.message, { action, via: 'local-app-api' });
