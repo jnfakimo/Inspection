@@ -152,6 +152,12 @@
 - 整合 DuckDB OLAP SQL 引擎（Window Functions）即時運算各樓層故障風險設備排名。
 - 通過 Bandit SAST 靜態資安掃描（0 issues），符合 ISO 27001 規範。
 
+### 2026-09-13 美編與圖資自動化工具箱（Pillow + ezdxf + ColorThief）建置
+
+- 新增 `tools/floorplan_toolbox.py`，支援 AutoCAD DXF 解析、向量 SVG/JSON 轉檔、樓層多規格衍生圖（Desktop 2048px/Mobile 1024px、淺色黑線透明底、科技去光暈版及 WebP 壓縮）與自動色彩計畫提取。
+- 演算法與前端 `floor-stack-3d.tsx`（Luma 232 背景轉透明、Glow 64 濾除）完全一致。
+- 通過 Bandit SAST 靜態資安掃描（0 issues）。
+
 ### 下一步
 
 - 觀察下一個班別結束後 0–5 分鐘內是否產生 LINE 推播與 `patrol_timeout_notifications` 紀錄。
