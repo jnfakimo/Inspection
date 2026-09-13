@@ -1095,12 +1095,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
               const activeCustomRows = shiftCustomRows.filter(row => !isDeleted(row));
               const isShiftActive = shift.code === '17-01' && nowTime.hour < 1
                 ? date === moveDate(nowTime.today, -1) : isCurrentMajorShift(shift.code, isToday, nowTime.hour);
-              // 與資料庫規則一致：上一班已交班時，須由本班指定接班人確認接班後，才由該接班人登記完成。
-              const incoming = report?.incoming;
-              const completeBlocked = !incoming ? ''
-                : !incoming.received_at ? `須先由本班接班人 ${incoming.receiver_name} 確認接班，才能登記完成`
-                : incoming.received_by !== profile.user_id ? `本班由 ${incoming.received_name || incoming.receiver_name} 接班，請由接班人登記完成`
-                : '';
 
               return (
                 <section
@@ -1205,10 +1199,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                               {!isDeleted(row) && <div className="business-stage-actions">
                                 {!report?.outgoing && !row.content_locked && !row.is_completed && <button type="button" className="secondary-btn compact" disabled={busy}
                                   onClick={() => { setEditingEntry(row); setEditingShift(shift.code); }}>修改事項</button>}
-                                {!row.is_completed && !report?.outgoing && report && <button type="button" className="primary-btn compact" disabled={busy || confirmBusy || !isShiftActive || Boolean(completeBlocked)}
-                                  title={completeBlocked || undefined}
+                                {!row.is_completed && !report?.outgoing && report && <button type="button" className="primary-btn compact" disabled={busy || confirmBusy || !isShiftActive}
                                   onClick={() => openConfirmation({ operation: 'complete', shift: report, entry: row })}>標記已完成</button>}
-                                {!row.is_completed && !report?.outgoing && report && isShiftActive && completeBlocked && <small className="business-complete-hint">{completeBlocked}</small>}
                               </div>}
                             </div>
                           </article>

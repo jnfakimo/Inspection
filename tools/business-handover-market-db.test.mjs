@@ -7,6 +7,7 @@ const packageUrl = process.env.HANDOVER_TEST_PGLITE_PATH
 const { PGlite } = await import(packageUrl);
 const migration = readFileSync(new URL('../supabase/migrations/20260916132000_business_handover_market.sql', import.meta.url), 'utf8');
 const policyGrants = readFileSync(new URL('../supabase/migrations/20260916170000_business_handover_market_policy_grants.sql', import.meta.url), 'utf8');
+const completeRule = readFileSync(new URL('../supabase/migrations/20260916190000_business_handover_complete_without_receipt.sql', import.meta.url), 'utf8');
 const db = new PGlite();
 const one = '00000000-0000-0000-0000-000000000001';
 const two = '00000000-0000-0000-0000-000000000002';
@@ -50,6 +51,8 @@ try {
   await db.exec(migration);
   await db.exec(policyGrants);
   await db.exec(policyGrants);
+  await db.exec(completeRule);
+  await db.exec(completeRule);
   await actor(one);
   await query(`insert into business_handover_entries(market_code,handover_date,shift_code,description,created_by,updated_by)
     values('market_1','2020-01-01','01-09','一市事項',$1,$1)`, [one]);
@@ -65,6 +68,23 @@ try {
           ('market_2','2020-01-01','01-09','2020-01-01','09-17','[]','b',$2,'二市','${one}','一市')`, [one,two]);
   await query(`insert into business_handover_approvals(market_code,handover_date,stage,stage_label,approver_id)
     values('market_1','2020-01-01','director','一市場主任',$1),('market_2','2020-01-01','director','二市場主任',$2)`, [one,two]);
+  // 登記完成不必等接班確認：上一班已交給二市業管但尚未確認，一市業管仍可在目前當班登記完成。
+  const now = (await query(`select (now() at time zone 'Asia/Taipei')::date::text d, extract(hour from now() at time zone 'Asia/Taipei')::int h`)).rows[0];
+  const curShift = now.h < 1 || now.h >= 17 ? '17-01' : now.h < 9 ? '01-09' : '09-17';
+  const curDate = now.h < 1 ? (await query(`select ($1::date-1)::text d`, [now.d])).rows[0].d : now.d;
+  const prevDate = curShift === '01-09' ? (await query(`select ($1::date-1)::text d`, [curDate])).rows[0].d : curDate;
+  const prevShift = curShift === '01-09' ? '17-01' : curShift === '09-17' ? '01-09' : '09-17';
+  await query(`insert into business_handover_transfers(market_code,handover_date,shift_code,next_date,next_shift,items,revision,handed_by,handed_name,receiver_id,receiver_name)
+    values('market_1',$1,$2,$3,$4,'[]','c',$5,'一市業管',$6,'二市業管')`, [prevDate, prevShift, curDate, curShift, one, two]);
+  await actor(one);
+  const pending = (await query(`insert into business_handover_entries(market_code,handover_date,shift_code,description,created_by,updated_by)
+    values('market_1',$1,$2,'待完成事項',$3,$3) returning entry_id`, [curDate, curShift, one])).rows[0].entry_id;
+  await actor(two);
+  await assert.rejects(query(`select business_market_action('market_1','complete',$1,$2,$3)`, [curDate, curShift, pending]), /所選市場/);
+  await actor(one);
+  const done = (await query(`select business_market_action('market_1','complete',$1,$2,$3) data`, [curDate, curShift, pending])).rows[0].data;
+  assert.equal(done.completed_by, one, '接班尚未確認時，本市場有權限者仍可登記完成');
+  await assert.rejects(query(`select business_market_action('market_1','complete','2020-01-01','01-09',$1)`, [pending]), /目前當班/);
   // 以一般登入使用者身分直接讀寫資料表（與頁面相同）：RLS 規則呼叫的函式必須授權給 authenticated，
   // 否則正式環境一律回 permission denied for function。上面以超級使用者執行的測試抓不到這類授權缺漏。
   const tables = 'business_handover_entries,business_handover_completions,business_handover_transfers,business_handover_approvals';
@@ -91,5 +111,5 @@ try {
   } finally {
     await query('reset role');
   }
-  console.log('業管組交接市場隔離：重跑冪等、資料／交班／批核複合鍵、跨市場拒絕與一般登入身分讀取均通過。');
+  console.log('業管組交接市場隔離：重跑冪等、資料／交班／批核複合鍵、跨市場拒絕、免接班確認登記完成與一般登入身分讀取均通過。');
 } finally { await db.close(); }
