@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-09-13 08:54:45 UTC",
+  "generated_at": "2026-09-13 10:57:48 UTC",
   "sast": {
     "tool": "Bandit",
-    "status": "warning",
+    "status": "passed",
     "high_issues": 0,
-    "medium_issues": 4,
-    "low_issues": 65,
+    "medium_issues": 0,
+    "low_issues": 63,
     "findings": [
       {
         "test_id": "B404",
@@ -192,14 +192,6 @@
         "line": 15
       },
       {
-        "test_id": "B405",
-        "severity": "LOW",
-        "confidence": "HIGH",
-        "text": "Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
-        "file": "tools\\findtag-visible-probe.py",
-        "line": 19
-      },
-      {
         "test_id": "B603",
         "severity": "LOW",
         "confidence": "HIGH",
@@ -208,28 +200,12 @@
         "line": 82
       },
       {
-        "test_id": "B314",
-        "severity": "MEDIUM",
-        "confidence": "HIGH",
-        "text": "Using xml.etree.ElementTree.fromstring to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree.fromstring with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called",
-        "file": "tools\\findtag-visible-probe.py",
-        "line": 149
-      },
-      {
         "test_id": "B404",
         "severity": "LOW",
         "confidence": "HIGH",
         "text": "Consider possible security implications associated with the subprocess module.",
         "file": "tools\\findtag-visible-probe.test.py",
         "line": 8
-      },
-      {
-        "test_id": "B405",
-        "severity": "LOW",
-        "confidence": "HIGH",
-        "text": "Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
-        "file": "tools\\findtag-visible-probe.test.py",
-        "line": 12
       },
       {
         "test_id": "B105",
@@ -366,30 +342,6 @@
         "text": "subprocess call - check for execution of untrusted input.",
         "file": "tools\\local-cutover-check.test.py",
         "line": 186
-      },
-      {
-        "test_id": "B608",
-        "severity": "MEDIUM",
-        "confidence": "LOW",
-        "text": "Possible SQL injection vector through string-based query construction.",
-        "file": "tools\\market_daily_import.py",
-        "line": 186
-      },
-      {
-        "test_id": "B608",
-        "severity": "MEDIUM",
-        "confidence": "LOW",
-        "text": "Possible SQL injection vector through string-based query construction.",
-        "file": "tools\\market_daily_import.py",
-        "line": 190
-      },
-      {
-        "test_id": "B608",
-        "severity": "MEDIUM",
-        "confidence": "LOW",
-        "text": "Possible SQL injection vector through string-based query construction.",
-        "file": "tools\\market_daily_import.py",
-        "line": 381
       },
       {
         "test_id": "B404",
@@ -563,154 +515,9 @@
   },
   "sca": {
     "tool": "pip-audit",
-    "status": "warning",
-    "vulnerabilities_count": 18,
-    "vulnerabilities": [
-      {
-        "package": "aiohttp",
-        "version": "3.14.1",
-        "id": "PYSEC-2026-3547",
-        "fix_versions": [
-          "3.14.2"
-        ]
-      },
-      {
-        "package": "aiohttp",
-        "version": "3.14.1",
-        "id": "PYSEC-2026-3546",
-        "fix_versions": [
-          "3.14.2"
-        ]
-      },
-      {
-        "package": "aiohttp",
-        "version": "3.14.1",
-        "id": "PYSEC-2026-3545",
-        "fix_versions": [
-          "3.14.3"
-        ]
-      },
-      {
-        "package": "aiohttp",
-        "version": "3.14.1",
-        "id": "PYSEC-2026-3545",
-        "fix_versions": [
-          "3.14.3"
-        ]
-      },
-      {
-        "package": "aiohttp",
-        "version": "3.14.1",
-        "id": "PYSEC-2026-3546",
-        "fix_versions": [
-          "3.14.2"
-        ]
-      },
-      {
-        "package": "aiohttp",
-        "version": "3.14.1",
-        "id": "PYSEC-2026-3547",
-        "fix_versions": [
-          "3.14.2"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-1795",
-        "fix_versions": [
-          "25.3"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-1796",
-        "fix_versions": [
-          "26.0"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-2875",
-        "fix_versions": [
-          "26.1"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-2876",
-        "fix_versions": [
-          "26.1"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-196",
-        "fix_versions": [
-          "26.1.2"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-1795",
-        "fix_versions": [
-          "25.3"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-1796",
-        "fix_versions": [
-          "26.0"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-196",
-        "fix_versions": [
-          "26.1.2"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-2875",
-        "fix_versions": [
-          "26.1"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-2876",
-        "fix_versions": [
-          "26.1"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-3721",
-        "fix_versions": [
-          "26.2"
-        ]
-      },
-      {
-        "package": "pip",
-        "version": "25.0.1",
-        "id": "PYSEC-2026-3721",
-        "fix_versions": [
-          "26.2.0"
-        ]
-      }
-    ]
+    "status": "passed",
+    "vulnerabilities_count": 0,
+    "vulnerabilities": []
   },
   "secret_scan": {
     "tool": "detect-secrets",

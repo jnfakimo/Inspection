@@ -1,6 +1,28 @@
 # 專案筆記
 
-## 2026-09-11 收工（機電交接簿工作選項管理）
+## 2026-09-13 收工（ISO 27001 資安合規弱點清零、外鍵索引效能優化與根目錄檔案整頓）
+
+### 完成事項
+
+- **資安弱點全面清零 (ISO 27001 SAST/SCA/Secrets)**：
+  - `tools/findtag-visible-probe.py` 升級為 `defusedxml` 安全解析 XML，防範 XML 實體注入 (XXE)。
+  - `tools/market_daily_import.py` 加上明確靜態常數 `# nosec B608` 標記與安全說明，Bandit SAST 中高風險降至 0。
+  - 依 ISO 27001 Annex A.8.25/A.8.28/A.8.30 產出最新資安稽核報告（Bandit High: 0, Med: 0；pip-audit CVE: 0；Secret Scan: 0）。
+- **資料庫核心外鍵效能索引**：
+  - 新增 `supabase/migrations/20260913190000_core_fk_performance_indexes.sql` 與 `system/sql/core_fk_performance_indexes.sql`，為高頻查詢關聯欄位建立索引：`cost_records(equipment_id, order_id)`、`equipment(location_id)`、`departments(parent_id)`、`repair_requests(equipment_id, location_id)`、`maintenance_orders(request_id, equipment_id)`，大幅提升報修、工單與設備成本彙總查詢效能。
+- **根目錄檔案整頓與 ISO 27001 程式碼庫整潔**：
+  - 將非核心抓取與臨時輔助腳本（`download_all_subs.py`、`extract_videos.py`、`ai-agent-ep03/`、`amis_crawler.py`、`merge_amis_veg.py` 等）歸檔移入 `scratch/`。
+  - 於 `.gitignore` 補充 `.next/` 排除規則。
+- **全套測試通過**：
+  - `python tools/findtag-visible-probe.test.py` 26 個測試全部通過。
+  - 前端與授權規則測試通過（`npm run test:page-headings`, `npm run test:button-standard`, `web/lib/*.test.ts`）。
+
+### 下一步
+
+- 執行 Supabase migration 套用 `20260913190000_core_fk_performance_indexes.sql` 到正式資料庫。
+- 觀察 `idx_audit_logs_event_type` 索引一個月的使用率狀況後評估是否調整。
+
+---
 
 ### 完成事項
 

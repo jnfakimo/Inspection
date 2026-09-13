@@ -16,7 +16,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 
 PACKAGE = "com.lq.position"

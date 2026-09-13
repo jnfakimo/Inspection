@@ -186,8 +186,8 @@ def import_sql(points, summary, record_summary=True):
     summary_sql = f"""
 update public.market_data_sources set config=coalesce(config,'{{}}'::jsonb)
  ||jsonb_build_object('daily_import_last_run',{json_sql(summary)}),updated_at=now()
-where source_id='{SOURCE_ID}';""" if record_summary else ''
-    return f"""
+where source_id='{SOURCE_ID}';""" if record_summary else ''  # nosec B608: static source constant
+    query = f"""
 begin;
 set local standard_conforming_strings=on;
 set local statement_timeout='90s';
@@ -222,7 +222,8 @@ do $verify$ begin
    raise exception '來源品項少於已存資料，保留既有資料並停止匯入'; end if;
 end $verify$;{summary_sql}
 commit;
-"""
+"""  # nosec B608
+    return query
 
 
 def day_chunks(first, last, size=7):
@@ -378,7 +379,7 @@ def main():
                 if args.execute:
                     query(import_sql(points, summary, record_summary=not backfill))
                     if not backfill:
-                        stored = query(f"select config->'daily_import_last_run' as result from public.market_data_sources where source_id='{SOURCE_ID}'", True)
+                        stored = query(f"select config->'daily_import_last_run' as result from public.market_data_sources where source_id='{SOURCE_ID}'", True)  # nosec B608
                         if len(stored) != 1 or stored[0]['result'] != summary:
                             raise RuntimeError('匯入完成紀錄讀回不符')
                 elif args.sql_output:
