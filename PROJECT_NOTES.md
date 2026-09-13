@@ -158,6 +158,12 @@
 - 演算法與前端 `floor-stack-3d.tsx`（Luma 232 背景轉透明、Glow 64 濾除）完全一致。
 - 通過 Bandit SAST 靜態資安掃描（0 issues）。
 
+### 2026-09-13 ISO 27001 資安合規綜合弱點掃描器（Bandit + pip-audit + detect-secrets）建置
+
+- 新增 `tools/security_audit_runner.py`，一鍵執行 SAST 程式弱點掃描、SCA 第三方套件 CVE 檢測與全專案敏感憑證防外洩掃描。
+- 自動輸出 `docs/security_audit_report.md` 與 `security_audit_report.json` 稽核報告，完整對齊 ISO 27001 Annex A 控制措施（A.8.25、A.8.28、A.8.30）。
+- 實測 Secret Scan 0 筆未排除金鑰，Bandit SAST High 0 漏洞。
+
 ### 下一步
 
 - 觀察下一個班別結束後 0–5 分鐘內是否產生 LINE 推播與 `patrol_timeout_notifications` 紀錄。

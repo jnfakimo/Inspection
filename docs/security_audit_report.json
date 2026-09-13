@@ -1,0 +1,721 @@
+{
+  "generated_at": "2026-09-13 08:54:45 UTC",
+  "sast": {
+    "tool": "Bandit",
+    "status": "warning",
+    "high_issues": 0,
+    "medium_issues": 4,
+    "low_issues": 65,
+    "findings": [
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "backend\\signal-service\\demo.py",
+        "line": 7
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "backend\\signal-service\\demo.py",
+        "line": 43
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 37
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 38
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 39
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 40
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 41
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 43
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 45
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 53
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 54
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 55
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 58
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 59
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 60
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 66
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 72
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 73
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 81
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 90
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "backend\\signal-service\\tests\\test_service.py",
+        "line": 97
+      },
+      {
+        "test_id": "B406",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Using escape to parse untrusted XML data is known to be vulnerable to XML attacks. Replace escape with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
+        "file": "tools\\build_webclip.py",
+        "line": 25
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\findtag-visible-probe.py",
+        "line": 15
+      },
+      {
+        "test_id": "B405",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
+        "file": "tools\\findtag-visible-probe.py",
+        "line": 19
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\findtag-visible-probe.py",
+        "line": 82
+      },
+      {
+        "test_id": "B314",
+        "severity": "MEDIUM",
+        "confidence": "HIGH",
+        "text": "Using xml.etree.ElementTree.fromstring to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree.fromstring with its defusedxml equivalent function or make sure defusedxml.defuse_stdlib() is called",
+        "file": "tools\\findtag-visible-probe.py",
+        "line": 149
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\findtag-visible-probe.test.py",
+        "line": 8
+      },
+      {
+        "test_id": "B405",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
+        "file": "tools\\findtag-visible-probe.test.py",
+        "line": 12
+      },
+      {
+        "test_id": "B105",
+        "severity": "LOW",
+        "confidence": "MEDIUM",
+        "text": "Possible hardcoded password: 'false'",
+        "file": "tools\\findtag-visible-probe.test.py",
+        "line": 37
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 8
+      },
+      {
+        "test_id": "B105",
+        "severity": "LOW",
+        "confidence": "MEDIUM",
+        "text": "Possible hardcoded password: 'abcd efgh ijkl mnop'",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 16
+      },
+      {
+        "test_id": "B105",
+        "severity": "LOW",
+        "confidence": "MEDIUM",
+        "text": "Possible hardcoded password: 'abcdefghijklmnop'",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 30
+      },
+      {
+        "test_id": "B105",
+        "severity": "LOW",
+        "confidence": "MEDIUM",
+        "text": "Possible hardcoded password: 'ordinary-password'",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 31
+      },
+      {
+        "test_id": "B105",
+        "severity": "LOW",
+        "confidence": "MEDIUM",
+        "text": "Possible hardcoded password: 'abcdefghijklmnop'",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 32
+      },
+      {
+        "test_id": "B607",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Starting a process with a partial executable path",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 167
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 167
+      },
+      {
+        "test_id": "B607",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Starting a process with a partial executable path",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 180
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\gmail-repair.test.py",
+        "line": 180
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\inspect-local-cutover.py",
+        "line": 7
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\inspect-local-cutover.py",
+        "line": 25
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\local-cutover-check.test.py",
+        "line": 8
+      },
+      {
+        "test_id": "B607",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Starting a process with a partial executable path",
+        "file": "tools\\local-cutover-check.test.py",
+        "line": 174
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\local-cutover-check.test.py",
+        "line": 174
+      },
+      {
+        "test_id": "B607",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Starting a process with a partial executable path",
+        "file": "tools\\local-cutover-check.test.py",
+        "line": 186
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\local-cutover-check.test.py",
+        "line": 186
+      },
+      {
+        "test_id": "B608",
+        "severity": "MEDIUM",
+        "confidence": "LOW",
+        "text": "Possible SQL injection vector through string-based query construction.",
+        "file": "tools\\market_daily_import.py",
+        "line": 186
+      },
+      {
+        "test_id": "B608",
+        "severity": "MEDIUM",
+        "confidence": "LOW",
+        "text": "Possible SQL injection vector through string-based query construction.",
+        "file": "tools\\market_daily_import.py",
+        "line": 190
+      },
+      {
+        "test_id": "B608",
+        "severity": "MEDIUM",
+        "confidence": "LOW",
+        "text": "Possible SQL injection vector through string-based query construction.",
+        "file": "tools\\market_daily_import.py",
+        "line": 381
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\repair-local-gmail.py",
+        "line": 10
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\repair-local-gmail.py",
+        "line": 24
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\security_audit_runner.py",
+        "line": 10
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\security_audit_runner.py",
+        "line": 47
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\security_audit_runner.py",
+        "line": 84
+      },
+      {
+        "test_id": "B110",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Try, Except, Pass detected.",
+        "file": "tools\\security_audit_runner.py",
+        "line": 169
+      },
+      {
+        "test_id": "B404",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Consider possible security implications associated with the subprocess module.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 10
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 16
+      },
+      {
+        "test_id": "B603",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "subprocess call - check for execution of untrusted input.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 107
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 109
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 113
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 115
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 117
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 119
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 122
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 124
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 126
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 129
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 130
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 131
+      },
+      {
+        "test_id": "B101",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+        "file": "tools\\wsl-edge-repair-check.py",
+        "line": 132
+      }
+    ]
+  },
+  "sca": {
+    "tool": "pip-audit",
+    "status": "warning",
+    "vulnerabilities_count": 18,
+    "vulnerabilities": [
+      {
+        "package": "aiohttp",
+        "version": "3.14.1",
+        "id": "PYSEC-2026-3547",
+        "fix_versions": [
+          "3.14.2"
+        ]
+      },
+      {
+        "package": "aiohttp",
+        "version": "3.14.1",
+        "id": "PYSEC-2026-3546",
+        "fix_versions": [
+          "3.14.2"
+        ]
+      },
+      {
+        "package": "aiohttp",
+        "version": "3.14.1",
+        "id": "PYSEC-2026-3545",
+        "fix_versions": [
+          "3.14.3"
+        ]
+      },
+      {
+        "package": "aiohttp",
+        "version": "3.14.1",
+        "id": "PYSEC-2026-3545",
+        "fix_versions": [
+          "3.14.3"
+        ]
+      },
+      {
+        "package": "aiohttp",
+        "version": "3.14.1",
+        "id": "PYSEC-2026-3546",
+        "fix_versions": [
+          "3.14.2"
+        ]
+      },
+      {
+        "package": "aiohttp",
+        "version": "3.14.1",
+        "id": "PYSEC-2026-3547",
+        "fix_versions": [
+          "3.14.2"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-1795",
+        "fix_versions": [
+          "25.3"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-1796",
+        "fix_versions": [
+          "26.0"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-2875",
+        "fix_versions": [
+          "26.1"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-2876",
+        "fix_versions": [
+          "26.1"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-196",
+        "fix_versions": [
+          "26.1.2"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-1795",
+        "fix_versions": [
+          "25.3"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-1796",
+        "fix_versions": [
+          "26.0"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-196",
+        "fix_versions": [
+          "26.1.2"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-2875",
+        "fix_versions": [
+          "26.1"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-2876",
+        "fix_versions": [
+          "26.1"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-3721",
+        "fix_versions": [
+          "26.2"
+        ]
+      },
+      {
+        "package": "pip",
+        "version": "25.0.1",
+        "id": "PYSEC-2026-3721",
+        "fix_versions": [
+          "26.2.0"
+        ]
+      }
+    ]
+  },
+  "secret_scan": {
+    "tool": "detect-secrets",
+    "status": "passed",
+    "secrets_count": 0,
+    "findings": []
+  }
+}
