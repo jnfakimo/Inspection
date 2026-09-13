@@ -86,6 +86,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [entries, setEntries] = useState<Row[]>([]);
   const [signatures, setSignatures] = useState<Row[]>([]);
   const [approvals, setApprovals] = useState<Row[]>([]);
+  const [approvalNote, setApprovalNote] = useState('');
   const [carryHistory, setCarryHistory] = useState<Row[]>([]);
   const [scheduleRows, setScheduleRows] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
@@ -117,6 +118,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => { setPrintData(null); }, [date]);
+  useEffect(() => { setApprovalNote(''); }, [date]);
   useEffect(() => {
     const beforePrint = () => {
       document.body.classList.add('mechanical-printing');
@@ -241,7 +243,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     if (!canApproveMechanicalDay(date, new Date())) { setNote('本日交接簿須於隔日起由課長簽核'); return; }
     setBusy(true); setNote('');
     try {
-      await invokeAppApi('handover_save', { kind: 'mechanical_approve', work_date: date });
+      await invokeAppApi('handover_save', { kind: 'mechanical_approve', work_date: date, note: approvalNote.trim() });
       await load(); setNote('本日交接簿已完成課長簽核');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
@@ -358,8 +360,8 @@ export function MechanicalHandover({ system, module, profile }: Props) {
             <span className="hs-approval-icon"><HandoverIcon name={approval ? 'check' : 'pen'} size={22} /></span>
             <div><span>每日課長簽核</span><strong>{approval ? '本日已完成簽核' : '本日待課長簽核'}</strong><span>{approval ? `${userName(approval.approver_id)} · ${activityTime(approval.approved_at)}` : approvalOpen ? '已開放機電課課長確認當日交接內容。' : `當日不可簽核，最早於 ${approvalOpenDate.replaceAll('-', '/')} 起由機電課課長確認。`}</span></div>
           </div>
-          <div className="hs-approval-actions">
-            {approval ? <b className="hs-approval-seal">核准</b> : canApprove ? <button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button> : <span className="hs-muted">{approvalOpen ? '等待課長簽核' : '隔日開放簽核'}</span>}
+          <div className="hs-approval-actions mechanical-approval-actions">
+            {approval ? <><b className="hs-approval-seal">核准</b><div className="mechanical-approval-note is-approved"><span>批核意見</span><p>{String(approval.note || '—')}</p></div></> : canApprove ? <><button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button><label className="mechanical-approval-note"><span>批核意見</span><input value={approvalNote} maxLength={1000} disabled={busy} onChange={event => setApprovalNote(event.target.value)} placeholder="可留白；如有意見請填寫" /></label></> : <span className="hs-muted">{approvalOpen ? '等待課長簽核' : '隔日開放簽核'}</span>}
           </div>
         </section>
       </section>
@@ -446,7 +448,7 @@ export function PrintSheet({ date, entries, signatures, approval, userName }: { 
     </table>
     <div className="mechanical-print-total"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(validEntries))}</strong><span>費用未填 {validEntries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
     <div className="mechanical-print-signatures"><b>值班簽名</b>{SHIFTS.map(shift => <span key={shift.code}>{shift.label}<strong>{userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id)}</strong></span>)}</div>
-    <div className="mechanical-print-approval"><b>課長簽核</b><span className="mechanical-print-approval-detail"><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong>{approval && <b className="mechanical-print-approval-seal">核可</b>}</span><span>{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}</span></div>
+    <div className="mechanical-print-approval"><b>課長簽核</b><span className="mechanical-print-approval-detail"><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong>{approval && <b className="mechanical-print-approval-seal">核可</b>}</span><span>{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}</span><span className="mechanical-print-approval-note"><b>批核意見：</b>{approval?.note ? String(approval.note) : '　'}</span></div>
   </div></article>;
 }
 
