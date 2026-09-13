@@ -18,11 +18,12 @@ export function useFleetRole(profile: Profile) {
   const role = String(profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[profile.role] || profile.role || '');
   const isAdmin = role === 'sysadmin' || role === 'admin';
   const isUnitSupervisor = role === 'unit_supervisor';
+  const isMgmtSupervisor = role === 'mgmt_supervisor';
   useEffect(() => {
     let active = true;
     getSupabase().from('vehicle_dispatch_managers').select('user_id,active').eq('user_id', profile.user_id).eq('active', true).maybeSingle()
       .then(({ data }) => { if (active) setIsManager(Boolean(data)); });
     return () => { active = false; };
   }, [profile.user_id]);
-  return { isAdmin, isUnitSupervisor, isManager, canManageFleet: isAdmin || isManager };
+  return { isAdmin, isUnitSupervisor, isMgmtSupervisor, isManager, canManageFleet: isAdmin || isManager };
 }

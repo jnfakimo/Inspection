@@ -27,11 +27,11 @@ import type { Profile } from '@/types/app';
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
 const STATUS_LABEL: Record<string, string> = {
-  draft: '草稿', pending_approval: '待主管核可', returned: '已退回', approved: '待派車',
+  draft: '草稿', pending_approval: '待課長核准', pending_manager_approval: '待部門經理核准', returned: '已退回', approved: '待派車',
   assigned: '已派車', completed: '已完成', cancelled: '已取消',
 };
 const STATUS_TONE: Record<string, string> = {
-  draft: 'pending', pending_approval: 'pending', returned: 'cancelled', approved: 'review',
+  draft: 'pending', pending_approval: 'pending', pending_manager_approval: 'review', returned: 'cancelled', approved: 'review',
   assigned: 'assigned', completed: 'closed', cancelled: 'cancelled',
 };
 const VEHICLE_STATUS_LABEL: Record<string, string> = { active: '可派用', maintenance: '維修中', inactive: '停用' };
@@ -196,7 +196,7 @@ function blocksVehicleDispatch(row: Row, today: string, nowTime: string) {
 }
 
 /** 排除約束 vehicle_dispatch_no_time_overlap 納入計算的狀態，兩邊必須一致。 */
-const VEHICLE_OCCUPYING_STATUSES = ['pending_approval', 'approved', 'assigned', 'completed'];
+const VEHICLE_OCCUPYING_STATUSES = ['pending_approval', 'pending_manager_approval', 'approved', 'assigned', 'completed'];
 
 /**
  * 同一台車在重疊時段只能有一張派車單（資料庫的排除約束
@@ -252,7 +252,7 @@ export function VehicleWorkspace({ system, module }: { system: SystemDefinition;
 /* ──────────────────────────── 派車申請 (100% V1 視覺對齊) ──────────────────────────── */
 
 function RequestsModule({ module, profile }: Props) {
-  const { isAdmin, isUnitSupervisor, canManageFleet } = useFleetRole(profile);
+  const { isAdmin, isUnitSupervisor, isMgmtSupervisor, canManageFleet } = useFleetRole(profile);
   const [rows, setRows] = useState<Row[]>([]);
   const [vehicles, setVehicles] = useState<Row[]>([]);
   const [drivers, setDrivers] = useState<Row[]>([]);
@@ -311,6 +311,7 @@ function RequestsModule({ module, profile }: Props) {
 
   // KPI 統計數字
   const kApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_approval').length, [rows]);
+  const kManagerApprovalCount = useMemo(() => rows.filter(r => r.status === 'pending_manager_approval').length, [rows]);
   const kDispatchCount = useMemo(() => rows.filter(r => r.status === 'approved').length, [rows]);
   const kTodayCount = useMemo(() => rows.filter(r => String(r.trip_date) === today && r.status === 'assigned').length, [rows, today]);
   const kDriverCount = useMemo(() => rows.filter(r => r.status === 'assigned').length, [rows]);
@@ -320,10 +321,11 @@ function RequestsModule({ module, profile }: Props) {
   const driverTodayRows = useMemo(() => rows.filter(r => r.driver_id === profile.user_id && String(r.trip_date) === today && ['assigned', 'completed'].includes(String(r.status))), [rows, profile.user_id, today]);
   const todoRows = useMemo(() => rows.filter(r => {
     if (r.status === 'pending_approval' && (isAdmin || (isUnitSupervisor && r.applicant_id !== profile.user_id))) return true;
+    if (r.status === 'pending_manager_approval' && (isAdmin || (isMgmtSupervisor && r.applicant_id !== profile.user_id && r.supervisor_id !== profile.user_id))) return true;
     if (r.status === 'approved' && (canManageFleet || isAdmin)) return true;
     if (r.status === 'assigned' && r.driver_id === profile.user_id) return true;
     return false;
-  }), [rows, canManageFleet, isAdmin, isUnitSupervisor, profile.user_id]);
+  }), [rows, canManageFleet, isAdmin, isUnitSupervisor, isMgmtSupervisor, profile.user_id]);
 
   const tabRows = useMemo(() => {
     if (tab === 'mine') return mineRows;
@@ -361,31 +363,39 @@ function RequestsModule({ module, profile }: Props) {
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
 
-    {/* V1 四步驟流程 Banner */}
+    {/* 申請、兩層核准、派車與回報的五步驟流程 */}
     <div className="vehicle-flow-grid" style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
       <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--cyan)' }}>
         <b style={{ color: 'var(--cyan)', fontSize: '0.85rem' }}>1. 申請人填單</b>
         <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>線上填寫用車日期、地點、人數與事由</div>
       </div>
       <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--amber)' }}>
-        <b style={{ color: 'var(--amber)', fontSize: '0.85rem' }}>2. 單位主管核可</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>單位主管審核或退回派車申請</div>
+        <b style={{ color: 'var(--amber)', fontSize: '0.85rem' }}>2. 課長核准</b>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>申請人所屬課長審核或退回</div>
       </div>
       <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--violet)' }}>
-        <b style={{ color: 'var(--violet)', fontSize: '0.85rem' }}>3. 派車管理員</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>派車管理員指派公務車號與駕駛人員</div>
+        <b style={{ color: 'var(--violet)', fontSize: '0.85rem' }}>3. 部門經理核准</b>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>部門經理完成第二層審核</div>
       </div>
       <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--green)' }}>
-        <b style={{ color: 'var(--green)', fontSize: '0.85rem' }}>4. 司機接單與回報</b>
+        <b style={{ color: 'var(--green)', fontSize: '0.85rem' }}>4. 派車人員派車</b>
+        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>兩層核准完成後指派車號與駕駛</div>
+      </div>
+      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--blue)' }}>
+        <b style={{ color: 'var(--blue)', fontSize: '0.85rem' }}>5. 司機接單與回報</b>
         <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>司機於用車當日接單、實際里程與加油紀錄回報</div>
       </div>
     </div>
 
-    {/* V1 四大 KPI 統計卡 */}
+    {/* 兩層核准與派車 KPI */}
     <div className="vehicle-kpi-grid" style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
       <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--amber)' }}>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--amber)', lineHeight: 1 }}>{kApprovalCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待主管核可</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待課長核准</div>
+      </div>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--violet)' }}>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--violet)', lineHeight: 1 }}>{kManagerApprovalCount}</div>
+        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待部門經理核准</div>
       </div>
       <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--blue)' }}>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{kDispatchCount}</div>
@@ -477,7 +487,9 @@ function RequestsModule({ module, profile }: Props) {
     {detail && <DetailModal row={detail} logs={logs} busy={busy} profile={profile}
       vehicles={vehicles} drivers={drivers} canDispatch={canManageFleet || isAdmin}
       blockedVehicleIds={blockedVehicleIds} occupiedVehicleIds={occupiedVehicleIds}
-      canApprove={isAdmin || (isUnitSupervisor && detail.applicant_id !== profile.user_id)}
+      canApprove={isAdmin
+        || (detail.status === 'pending_approval' && isUnitSupervisor && detail.applicant_id !== profile.user_id)
+        || (detail.status === 'pending_manager_approval' && isMgmtSupervisor && detail.applicant_id !== profile.user_id && detail.supervisor_id !== profile.user_id)}
       onClose={() => setDetail(null)} onAct={act} onTrip={() => { setTripFor(detail); setDetail(null); }} />}
 
     {tripFor && <TripReportModal row={tripFor} vehicles={vehicles} onClose={() => setTripFor(null)}
@@ -820,8 +832,10 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       {field('用途', row.trip_purpose)}
       {field('搭乘人數', row.passenger_count)}
       {field('備註', row.applicant_note)}
-      {row.supervisor_name ? field('核可主管', `${row.supervisor_name}｜${fmtTime(row.approved_at)}`) : null}
-      {row.supervisor_note ? field('主管意見', row.supervisor_note) : null}
+      {row.supervisor_name ? field('課長核准', `${row.supervisor_name}｜${fmtTime(row.approved_at)}`) : null}
+      {row.supervisor_note ? field('課長意見', row.supervisor_note) : null}
+      {row.department_manager_name ? field('部門經理核准', `${row.department_manager_name}｜${fmtTime(row.department_manager_approved_at)}`) : null}
+      {row.department_manager_note ? field('部門經理意見', row.department_manager_note) : null}
       {row.plate_no ? field('指派車輛', row.plate_no) : null}
       {row.driver_name ? field('指派駕駛', `${row.driver_name}${row.driver_accepted_at ? `（已接單 ${fmtTime(row.driver_accepted_at)}）` : '（尚未接單）'}`) : null}
       {row.status === 'completed' ? field('實際時段', `${fmtTime(row.actual_departure_at)} – ${fmtTime(row.actual_return_at)}`) : null}
@@ -840,8 +854,8 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       </li>)}</ol>
     </div>}
 
-    {row.status === 'pending_approval' && canApprove && <div className="admin-form-grid">
-      <label className="wide">主管意見（退回時必填）<input value={reason} onChange={e => setReason(e.target.value)} /></label>
+    {['pending_approval', 'pending_manager_approval'].includes(String(row.status)) && canApprove && <div className="admin-form-grid">
+      <label className="wide">{row.status === 'pending_approval' ? '課長' : '部門經理'}意見（退回時必填）<input value={reason} onChange={e => setReason(e.target.value)} /></label>
     </div>}
     {row.status === 'approved' && canDispatch && <div className="admin-form-grid">
       <label>指派車輛<select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
@@ -867,9 +881,9 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
 
     <footer>
       <button className="secondary-btn" onClick={onClose}>關閉</button>
-      {row.status === 'pending_approval' && canApprove && <>
+      {['pending_approval', 'pending_manager_approval'].includes(String(row.status)) && canApprove && <>
         <button className="secondary-btn" disabled={busy} onClick={() => void onAct(row.request_id, 'return', { note: reason }, '已退回申請')}>退回</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'approve', { note: reason }, '已核可申請')}>核可</button>
+        <button className="primary-btn compact" disabled={busy} onClick={() => void onAct(row.request_id, 'approve', { note: reason }, row.status === 'pending_approval' ? '課長已核准，送交部門經理' : '部門經理已核准，可進行派車')}>核准</button>
       </>}
       {row.status === 'approved' && canDispatch &&
         <button className="primary-btn compact" disabled={busy || !vehicleId || !driverId || selectedVehicleBlocked || selectedVehicleOccupied} onClick={() => void onAct(row.request_id, 'dispatch', { note: reason, vehicleId, driverId }, '已完成派車')}>確認派車</button>}

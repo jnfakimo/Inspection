@@ -1,6 +1,6 @@
 -- ============================================================
 -- 公務車派車申請與行車紀錄
--- 流程：申請人送出 → 單位主管核可 → 車管派車 → 司機回報
+-- 流程：申請人送出 → 課長核准 → 部門經理核准 → 派車人員派車 → 司機回報
 -- 本檔可重複執行；正式資料只允許新增、修改或取消，不實體刪除。
 -- ============================================================
 
@@ -92,6 +92,10 @@ create table if not exists vehicle_dispatch_requests (
   supervisor_name text,
   supervisor_note text,
   approved_at timestamptz,
+  department_manager_id uuid references users(user_id),
+  department_manager_name text,
+  department_manager_note text,
+  department_manager_approved_at timestamptz,
   vehicle_manager_id uuid references users(user_id),
   vehicle_manager_name text,
   vehicle_id uuid references official_vehicles(vehicle_id),
@@ -144,6 +148,10 @@ alter table vehicle_dispatch_requests add column if not exists supervisor_id uui
 alter table vehicle_dispatch_requests add column if not exists supervisor_name text;
 alter table vehicle_dispatch_requests add column if not exists supervisor_note text;
 alter table vehicle_dispatch_requests add column if not exists approved_at timestamptz;
+alter table vehicle_dispatch_requests add column if not exists department_manager_id uuid references users(user_id);
+alter table vehicle_dispatch_requests add column if not exists department_manager_name text;
+alter table vehicle_dispatch_requests add column if not exists department_manager_note text;
+alter table vehicle_dispatch_requests add column if not exists department_manager_approved_at timestamptz;
 alter table vehicle_dispatch_requests add column if not exists vehicle_manager_id uuid references users(user_id);
 alter table vehicle_dispatch_requests add column if not exists vehicle_manager_name text;
 alter table vehicle_dispatch_requests add column if not exists vehicle_id uuid references official_vehicles(vehicle_id);
@@ -185,7 +193,7 @@ create index if not exists idx_vehicle_dispatch_applicant on vehicle_dispatch_re
 create index if not exists idx_vehicle_dispatch_driver on vehicle_dispatch_requests(driver_id,trip_date);
 alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_status_check;
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_status_check
-  check (status in ('draft','pending_approval','returned','approved','assigned','completed','cancelled'));
+  check (status in ('draft','pending_approval','pending_manager_approval','returned','approved','assigned','completed','cancelled'));
 alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_passenger_check;
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_passenger_check
   check (passenger_count > 0 and (actual_passenger_count is null or actual_passenger_count >= 0));
@@ -202,7 +210,7 @@ alter table vehicle_dispatch_requests add constraint vehicle_dispatch_no_time_ov
   exclude using gist (
     vehicle_id with =,
     tsrange(trip_date + planned_departure_time,trip_date + planned_return_time,'[)') with &&
-  ) where (status in ('pending_approval','approved','assigned','completed'));
+  ) where (status in ('pending_approval','pending_manager_approval','approved','assigned','completed'));
 alter table vehicle_dispatch_requests drop constraint if exists vehicle_dispatch_mileage_check;
 alter table vehicle_dispatch_requests add constraint vehicle_dispatch_mileage_check
   check ((odometer_start is null or odometer_start >= 0) and
@@ -309,7 +317,7 @@ declare
   actor_role text;
   actor_department text;
 begin
-  if old.status='pending_approval' and new.status in ('approved','returned') then
+  if old.status='pending_approval' and new.status in ('pending_manager_approval','returned') then
     if auth.uid() is null then return new; end if;
     select u.user_id,
       case coalesce(u.rbac_role,u.role,'reporter')
@@ -323,9 +331,26 @@ begin
     into actor_id,actor_role,actor_department
     from users u where u.auth_id=auth.uid() and u.status='active' limit 1;
     if actor_id is null then raise exception using errcode='42501',message='找不到有效的核可人員帳號'; end if;
-    if actor_role not in ('unit_supervisor','mgmt_supervisor','sysadmin') then raise exception using errcode='42501',message='目前帳號沒有單位主管核可權限'; end if;
+    if actor_role not in ('unit_supervisor','sysadmin') then raise exception using errcode='42501',message='目前帳號沒有課長核准權限'; end if;
     if actor_role<>'sysadmin' and actor_id=old.applicant_id then raise exception using errcode='42501',message='申請人不得核准或退回自己的派車申請'; end if;
     if actor_role<>'sysadmin' and trim(coalesce(actor_department,''))<>trim(coalesce(old.applicant_department,'')) then raise exception using errcode='42501',message='僅限申請人所屬單位主管核可'; end if;
+  elsif old.status='pending_manager_approval' and new.status in ('approved','returned') then
+    if auth.uid() is null then return new; end if;
+    select u.user_id,
+      case coalesce(u.rbac_role,u.role,'reporter')
+        when 'admin' then 'sysadmin'
+        when 'supervisor' then 'unit_supervisor'
+        when 'maintenance' then 'technician'
+        when 'inspector' then 'reporter'
+        else coalesce(u.rbac_role,u.role,'reporter')
+      end,
+      u.department
+    into actor_id,actor_role,actor_department
+    from users u where u.auth_id=auth.uid() and u.status='active' limit 1;
+    if actor_id is null then raise exception using errcode='42501',message='找不到有效的核准人員帳號'; end if;
+    if actor_role not in ('mgmt_supervisor','sysadmin') then raise exception using errcode='42501',message='目前帳號沒有部門經理核准權限'; end if;
+    if actor_role<>'sysadmin' and actor_id in (old.applicant_id,old.supervisor_id) then raise exception using errcode='42501',message='申請人、課長與部門經理必須由不同人員執行'; end if;
+    if actor_role<>'sysadmin' and trim(coalesce(actor_department,''))<>trim(coalesce(old.applicant_department,'')) then raise exception using errcode='42501',message='僅限申請人所屬部門經理核准'; end if;
   end if;
   return new;
 end;
@@ -472,7 +497,7 @@ begin
       or new.planned_departure_time is distinct from old.planned_departure_time
       or new.planned_return_time is distinct from old.planned_return_time;
   end if;
-  if (new.status in ('draft','pending_approval','approved','assigned') or (new.status='returned' and schedule_changed))
+  if (new.status in ('draft','pending_approval','pending_manager_approval','approved','assigned') or (new.status='returned' and schedule_changed))
     and ((new.trip_date+new.planned_departure_time) at time zone 'Asia/Taipei')<=now() then
     raise exception using errcode='22023',message='預計出發時間已經過去，請選擇目前時間之後的時段';
   end if;
