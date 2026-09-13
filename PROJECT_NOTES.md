@@ -18,6 +18,8 @@
   - 彈窗整體尺寸與內邊距最佳化（`width: min(960px, 96vw)`，精簡標題與卡片間距），使整個設定視窗在一般桌面解析度下可一頁完整呈現，不再產生捲軸。
 - **雲端正式資料庫 Migration 套用與驗收完成**：
   - 正式庫已成功套用 `deploy_20260913_migrations.sql`，建立核心外鍵索引（`cost_records`、`equipment`、`departments`、`repair_requests`、`maintenance_orders`）與 `market_import_batches` 批次追蹤表。
+- **低頻索引觀察與健康診斷機制建立**：
+  - 建立 `system/sql/analyze_index_usage.sql` 與 `docs/DATABASE_INDEX_OBSERVATION.md`，明確定義稽核類索引（`idx_audit_logs_event_type`）保留備查原則，避免因平時低頻讀取而誤刪關鍵資安調查索引。
 - **全套測試通過**：
   - `tools/profile-modal-layout-check.mjs` 彈窗響應式與可讀性檢查通過。
   - `python tools/findtag-visible-probe.test.py` 26 個測試全部通過。
