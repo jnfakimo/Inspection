@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-09-13 10:57:48 UTC",
+  "generated_at": "2026-09-13 13:58:40 UTC",
   "sast": {
     "tool": "Bandit",
     "status": "passed",
     "high_issues": 0,
     "medium_issues": 0,
-    "low_issues": 63,
+    "low_issues": 64,
     "findings": [
       {
         "test_id": "B404",
@@ -197,7 +197,7 @@
         "confidence": "HIGH",
         "text": "subprocess call - check for execution of untrusted input.",
         "file": "tools\\findtag-visible-probe.py",
-        "line": 82
+        "line": 84
       },
       {
         "test_id": "B404",
@@ -206,6 +206,14 @@
         "text": "Consider possible security implications associated with the subprocess module.",
         "file": "tools\\findtag-visible-probe.test.py",
         "line": 8
+      },
+      {
+        "test_id": "B405",
+        "severity": "LOW",
+        "confidence": "HIGH",
+        "text": "Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called.",
+        "file": "tools\\findtag-visible-probe.test.py",
+        "line": 12
       },
       {
         "test_id": "B105",

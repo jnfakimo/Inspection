@@ -1,5 +1,5 @@
 # ISO 27001 全專案資安稽核報告 (Security Audit Report)
-- **稽核時間**：`2026-09-13 10:57:48 UTC`
+- **稽核時間**：`2026-09-13 13:58:40 UTC`
 - **專案名稱**：臺北農產 中央戰情室暨巡檢系統
 - **總體狀態**：🟢 **合規 (COMPLIANT)**
 
@@ -9,7 +9,7 @@
 
 | 檢測維度 | 檢測工具 | 檢測範圍 | 結果 | 風險狀態 |
 | :--- | :--- | :--- | :--- | :--- |
-| **SAST 靜態代碼分析** | Bandit v1.9.4 | `backend/`, `tools/` | High: 0, Med: 0, Low: 63 | ✅ 通過 |
+| **SAST 靜態代碼分析** | Bandit v1.9.4 | `backend/`, `tools/` | High: 0, Med: 0, Low: 64 | ✅ 通過 |
 | **SCA 相依套件檢測** | pip-audit v2.10.1 | Python 第三方環境套件 | 發現 CVE 漏洞數: 0 | ✅ 安全 |
 | **Secret 憑證防外洩** | detect-secrets | `web/`, `backend/`, `tools/`, `system/` | 敏感金鑰殘留: 0 筆 | ✅ 乾淨 |
 
@@ -44,8 +44,9 @@
 - `[LOW]` **backend\signal-service\tests\test_service.py:97** - Use of assert detected. The enclosed code will be removed when compiling to optimised byte code. (`B101`)
 - `[LOW]` **tools\build_webclip.py:25** - Using escape to parse untrusted XML data is known to be vulnerable to XML attacks. Replace escape with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called. (`B406`)
 - `[LOW]` **tools\findtag-visible-probe.py:15** - Consider possible security implications associated with the subprocess module. (`B404`)
-- `[LOW]` **tools\findtag-visible-probe.py:82** - subprocess call - check for execution of untrusted input. (`B603`)
+- `[LOW]` **tools\findtag-visible-probe.py:84** - subprocess call - check for execution of untrusted input. (`B603`)
 - `[LOW]` **tools\findtag-visible-probe.test.py:8** - Consider possible security implications associated with the subprocess module. (`B404`)
+- `[LOW]` **tools\findtag-visible-probe.test.py:12** - Using xml.etree.ElementTree to parse untrusted XML data is known to be vulnerable to XML attacks. Replace xml.etree.ElementTree with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is called. (`B405`)
 - `[LOW]` **tools\findtag-visible-probe.test.py:37** - Possible hardcoded password: 'false' (`B105`)
 - `[LOW]` **tools\gmail-repair.test.py:8** - Consider possible security implications associated with the subprocess module. (`B404`)
 - `[LOW]` **tools\gmail-repair.test.py:16** - Possible hardcoded password: 'abcd efgh ijkl mnop' (`B105`)

@@ -16,6 +16,8 @@
 - **個人資料設定版面單頁化與基本資料排版優化**：
   - 「基本資料」欄位調整為兩列 3 欄並列：第一列「登入帳號、電子郵件、姓名」，第二列「聯絡電話、所屬單位、帳號角色」。
   - 彈窗整體尺寸與內邊距最佳化（`width: min(960px, 96vw)`，精簡標題與卡片間距），使整個設定視窗在一般桌面解析度下可一頁完整呈現，不再產生捲軸。
+- **雲端正式資料庫 Migration 套用與驗收完成**：
+  - 正式庫已成功套用 `deploy_20260913_migrations.sql`，建立核心外鍵索引（`cost_records`、`equipment`、`departments`、`repair_requests`、`maintenance_orders`）與 `market_import_batches` 批次追蹤表。
 - **全套測試通過**：
   - `tools/profile-modal-layout-check.mjs` 彈窗響應式與可讀性檢查通過。
   - `python tools/findtag-visible-probe.test.py` 26 個測試全部通過。
@@ -23,8 +25,7 @@
 
 ### 下一步
 
-- 執行 Supabase migration 套用 `20260913190000_core_fk_performance_indexes.sql` 到正式資料庫。
-- 觀察 `idx_audit_logs_event_type` 索引一個月的使用率狀況後評估是否調整。
+- 觀察 `idx_audit_logs_event_type` 索引一個月的使用率狀況後評估是否調整（預定 2026-10-13 檢視）。
 
 ---
 
