@@ -33,6 +33,14 @@ function friendlyError(raw: unknown, fallback: string = '系統服務暫時無�
   return text || fallback;
 }
 
+// 驗證既有登入狀態不可無限等待：逾時就回到可操作的登入表單，而不是讓整頁停在忙碌狀態。
+const PROFILE_CHECK_TIMEOUT_MS = 15_000;
+function withTimeout<T>(task: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); });
+  return Promise.race([task, timeout]).finally(() => clearTimeout(timer));
+}
+
 export default function LoginPage() {
   const passwordPolicy = usePasswordPolicy();
   const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
@@ -103,12 +111,14 @@ export default function LoginPage() {
       }
     } catch { /* 儲存區可能被瀏覽器停用 */ }
     let active = true;
-    void getSupabase().auth.getSession().then(async ({ data }) => {
+    void withTimeout(getSupabase().auth.getSession(), PROFILE_CHECK_TIMEOUT_MS, '登入狀態讀取逾時')
+      .catch(() => ({ data: { session: null } }))
+      .then(async ({ data }) => {
       if (!active) return;
       if (!data.session) { void loadCaptcha(); return; }
       setBusy(true);
       try {
-        const profile = await invokeAppApi<Profile>('profile');
+        const profile = await withTimeout(invokeAppApi<Profile>('profile'), PROFILE_CHECK_TIMEOUT_MS, '登入狀態驗證逾時，請重新登入');
         if (!active) return;
         saveProfile(profile);
         const destination = nextPath(profile);
@@ -150,7 +160,7 @@ export default function LoginPage() {
       if (result.error) { setMessage('登入狀態建立失敗，請重新登入'); setBusy(false); return; }
       let verifiedProfile: Profile;
       try {
-        verifiedProfile = await invokeAppApi<Profile>('profile');
+        verifiedProfile = await withTimeout(invokeAppApi<Profile>('profile'), PROFILE_CHECK_TIMEOUT_MS, '帳號資料載入逾時，請稍後重新登入');
         saveProfile(verifiedProfile);
       } catch (profileError) {
         clearProfile();

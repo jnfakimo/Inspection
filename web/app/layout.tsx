@@ -28,10 +28,30 @@ export const viewport: Viewport = {
   themeColor: '#f4f6fa',
 };
 
+const CHUNK_RECOVERY_SCRIPT = `(function(){
+var KEY='chunkRecoveryAt';
+function recover(){
+  try{var last=Number(sessionStorage.getItem(KEY)||0);if(Date.now()-last<60000)return;sessionStorage.setItem(KEY,String(Date.now()));}catch(e){return;}
+  location.reload();
+}
+window.addEventListener('error',function(event){
+  var el=event.target;var url=el&&(el.src||el.href);
+  if(url&&String(url).indexOf('/_next/static/')>=0&&(el.tagName==='SCRIPT'||el.tagName==='LINK'))recover();
+  else if(event.message&&/ChunkLoadError|Loading (CSS )?chunk/.test(event.message))recover();
+},true);
+window.addEventListener('unhandledrejection',function(event){
+  var r=event.reason;var text=r&&(r.name+' '+r.message);
+  if(text&&/ChunkLoadError|Loading (CSS )?chunk|Failed to load chunk/.test(text))recover();
+});
+})();`;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-Hant" suppressHydrationWarning>
       <head>
+        {/* 部署會整批替換 _next/static；瀏覽器若仍持有舊版 HTML，舊 JS/CSS 會 404，頁面按鈕完全沒反應。
+            偵測到版本檔載入失敗時自動重新載入一次（60 秒內不重複，避免真正斷線時無限重整）。 */}
+        <script dangerouslySetInnerHTML={{ __html: CHUNK_RECOVERY_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.setAttribute('data-theme',localStorage.getItem('siteTheme')||'light')" }} />
       </head>
       <body>
