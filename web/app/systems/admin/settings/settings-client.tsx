@@ -318,6 +318,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     errorThresholdCooldownMinutes: 60,
   });
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [expandedDeptIds, setExpandedDeptIds] = useState<Record<string, boolean>>({});
   const [departmentEditor, setDepartmentEditor] = useState<DepartmentEditor | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -377,6 +378,26 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     const ids = new Set(departments.map(department => department.dept_id));
     return departments.filter(department => department.parent_id && !ids.has(department.parent_id));
   }, [departments]);
+
+  const toggleExpand = (deptId: string) => {
+    setExpandedDeptIds(current => ({
+      ...current,
+      [deptId]: !current[deptId],
+    }));
+  };
+
+  const toggleAllExpand = () => {
+    const anyExpanded = roots.some(root => Boolean(expandedDeptIds[root.dept_id]));
+    if (anyExpanded) {
+      setExpandedDeptIds({});
+    } else {
+      const next: Record<string, boolean> = {};
+      roots.forEach(root => {
+        next[root.dept_id] = true;
+      });
+      setExpandedDeptIds(next);
+    }
+  };
 
   const saveIdentity = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -525,6 +546,9 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
 
   const openDepartmentEditor = (department?: Department, parentId = '') => {
     if (department) {
+      if (department.parent_id) {
+        setExpandedDeptIds(curr => ({ ...curr, [department.parent_id!]: true }));
+      }
       setDepartmentEditor({
         dept_id: department.dept_id,
         parent_id: department.parent_id ?? '',
@@ -534,6 +558,9 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
         status: department.status,
       });
       return;
+    }
+    if (parentId) {
+      setExpandedDeptIds(curr => ({ ...curr, [parentId]: true }));
     }
     const siblings = departments.filter(item => (item.parent_id ?? '') === parentId);
     const nextOrder = siblings.length
@@ -626,15 +653,34 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     }
   };
 
-  const departmentRow = (department: Department, child = false) => (
+  const departmentRow = (department: Department, child = false, childCount = 0, isExpanded = false) => (
     <div
       className={`${styles.departmentRow} ${child ? styles.departmentChild : ''} ${department.status === 'inactive' ? styles.inactive : ''}`}
       key={department.dept_id}
     >
       <div className={styles.departmentIdentity}>
-        <span className={styles.treeMark} aria-hidden="true">{child ? '└' : '◆'}</span>
+        {!child && childCount > 0 ? (
+          <button
+            type="button"
+            className={styles.treeToggle}
+            onClick={() => toggleExpand(department.dept_id)}
+            title={isExpanded ? '收合課／組／隊' : '展開課／組／隊'}
+            aria-label={isExpanded ? `收合 ${department.name} 的課／組／隊` : `展開 ${department.name} 的課／組／隊`}
+          >
+            {isExpanded ? '▼' : '▶'}
+          </button>
+        ) : (
+          <span className={styles.treeMark} aria-hidden="true">{child ? '└' : '◆'}</span>
+        )}
         <div>
-          <strong>{department.name}</strong>
+          <strong>
+            {department.name}
+            {!child && childCount > 0 ? (
+              <span className={styles.childCountBadge}>
+                {childCount} 個課／組／隊
+              </span>
+            ) : null}
+          </strong>
           <small>{department.code || '未設定代碼'} · 排序 {department.sort_order}</small>
         </div>
       </div>
@@ -703,38 +749,54 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
     </form>
   );
 
-  const renderDepartments = () => (
-    <section className={styles.formPanel}>
-      <div className={styles.panelHeading}>
-        <div>
-          <h3>組織架構</h3>
-          <p>採部／室與課／組／隊兩層式樹狀管理；歷史資料使用軟停用，不刪除部門。</p>
-        </div>
-        <div className={styles.headingActions}>
-          <span className={styles.codeBadge}>SYS-02</span>
-          <button className={styles.primaryButton} type="button" onClick={() => openDepartmentEditor()}>
-            ＋ 新增部／室
-          </button>
-        </div>
-      </div>
-      <div className={styles.departmentTree}>
-        {roots.length ? roots.map(root => (
-          <div className={styles.departmentBranch} key={root.dept_id}>
-            {departmentRow(root)}
-            {departments
-              .filter(item => item.parent_id === root.dept_id)
-              .map(child => departmentRow(child, true))}
+  const renderDepartments = () => {
+    const hasAnyChildren = roots.some(root => departments.some(item => item.parent_id === root.dept_id));
+    const anyExpanded = roots.some(root => Boolean(expandedDeptIds[root.dept_id]));
+
+    return (
+      <section className={styles.formPanel}>
+        <div className={styles.panelHeading}>
+          <div>
+            <h3>組織架構</h3>
+            <p>採部／室與課／組／隊兩層式樹狀管理；二階單位預設收合，點擊可展開檢視；歷史資料使用軟停用，不刪除部門。</p>
           </div>
-        )) : <div className={styles.emptyState}>目前沒有部門資料，請先新增部／室。</div>}
-        {orphanDepartments.length ? (
-          <div className={styles.orphanGroup}>
-            <strong>找不到上層部門的資料</strong>
-            {orphanDepartments.map(item => departmentRow(item, true))}
+          <div className={styles.headingActions}>
+            <span className={styles.codeBadge}>SYS-02</span>
+            {hasAnyChildren ? (
+              <button
+                className={styles.secondaryButton}
+                type="button"
+                onClick={toggleAllExpand}
+              >
+                {anyExpanded ? '全部收合' : '全部展開'}
+              </button>
+            ) : null}
+            <button className={styles.primaryButton} type="button" onClick={() => openDepartmentEditor()}>
+              ＋ 新增部／室
+            </button>
           </div>
-        ) : null}
-      </div>
-    </section>
-  );
+        </div>
+        <div className={styles.departmentTree}>
+          {roots.length ? roots.map(root => {
+            const children = departments.filter(item => item.parent_id === root.dept_id);
+            const isExpanded = Boolean(expandedDeptIds[root.dept_id]);
+            return (
+              <div className={styles.departmentBranch} key={root.dept_id}>
+                {departmentRow(root, false, children.length, isExpanded)}
+                {isExpanded && children.map(child => departmentRow(child, true))}
+              </div>
+            );
+          }) : <div className={styles.emptyState}>目前沒有部門資料，請先新增部／室。</div>}
+          {orphanDepartments.length ? (
+            <div className={styles.orphanGroup}>
+              <strong>找不到上層部門的資料</strong>
+              {orphanDepartments.map(item => departmentRow(item, true))}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    );
+  };
 
   const renderShifts = () => (
     <section className={styles.formPanel}>

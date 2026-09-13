@@ -578,71 +578,106 @@
 }
 
 .departmentRow.inactive {
-  background: #f6f6f6;
-  opacity: 0.7;
+  background: #f8fafc;
+  opacity: 0.72;
 }
 
 .departmentIdentity {
   align-items: center;
   display: flex;
-  gap: 10px;
-  min-width: 0;
+  gap: 12px;
 }
 
 .departmentIdentity > div {
   display: grid;
-  gap: 4px;
-  min-width: 0;
+  gap: 2px;
 }
 
 .departmentIdentity strong {
-  color: #26364a;
-  overflow-wrap: anywhere;
+  color: #172635;
+  font-size: 0.94rem;
 }
 
 .departmentIdentity small {
-  color: var(--muted);
-  font-size: 0.69rem;
+  color: #51657a;
+  font-size: 0.74rem;
 }
 
 .treeMark {
-  color: #0089ad;
-  flex: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: #8da4b8;
+  font-family: var(--font-rajdhani), monospace;
   font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.treeToggle {
+  align-items: center;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 700;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.15s ease;
+  user-select: none;
+  width: 24px;
+}
+
+.treeToggle:hover {
+  background: #e2e8f0;
+  border-color: #0089ad;
+  color: #007897;
+}
+
+.childCountBadge {
+  background: #e9eff5;
+  border-radius: 10px;
+  color: #486581;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: 6px;
+  padding: 2px 7px;
+  white-space: nowrap;
 }
 
 .statusActive,
 .statusInactive {
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 8px;
 }
 
 .statusActive {
-  background: #e9f8f0;
-  color: #117044;
+  background: #ebfbee;
+  color: #1a7f37;
 }
 
 .statusInactive {
-  background: #eef1f4;
-  color: #697788;
+  background: #f1f3f5;
+  color: #637083;
 }
 
 .rowActions {
+  align-items: center;
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  justify-content: flex-end;
 }
 
 .rowActions button {
   background: #fff;
-  border: 1px solid #c6d3df;
-  color: #3d556c;
-  min-height: 40px;
-  padding: 10px 14px;
+  border: 1px solid #c9d8e4;
+  color: #243b53;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 9px;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .rowActions button:hover {

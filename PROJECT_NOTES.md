@@ -137,6 +137,14 @@
 - 建立圖資共用存取規則：具有「駐衛警巡檢系統（`guardpatrol`）」或「報修／派工系統（`workorder`）」權限之使用者，自動開通「平面樓層圖（`structuremap/floor2d`）」，無須再單獨賦予 SYS-06 圖臺權限。
 - 通過 `module-access`、`login-destination`、`system-page-heading-check` 與共用元件測試。
 
+### 2026-09-13 後台組織架構（SYS-02）二階單位預設收合與展開互動
+
+- 後台系統設定之組織架構頁面（`/v2/systems/admin/settings/`）將二階單位（課／組／隊）改為預設收合狀態。
+- 一階單位（部／室）左側新增 `▶` / `▼` 展開／收合切換按鈕，並於單位名稱旁顯示「N 個課／組／隊」數量標籤。
+- 頁首動作列新增「全部展開 / 全部收合」批次切換按鈕。
+- 新增或編輯課／組／隊時，自動展開該所屬之一階部／室，確保操作流暢。
+- 驗證通過 UI 樣式、按鈕標準與選單標準檢查。
+
 ### 下一步
 
 - 觀察下一個班別結束後 0–5 分鐘內是否產生 LINE 推播與 `patrol_timeout_notifications` 紀錄。
@@ -149,4 +157,5 @@
 - 排班通知應直接讀取 `patrol_shift_template` 與當日 `patrol_shifts`，不可另維護不同名稱與時間的通知班別。
 - 複製 JWT 時曾產生格式錯誤；部署前需比對長度與實際呼叫結果。
 - Supabase CLI 會建立 `supabase/.temp/`，已加入 `.gitignore`。
+
 
