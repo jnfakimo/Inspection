@@ -8,7 +8,7 @@ const request = (overrides: Record<string, unknown> = {}) => {
   const userDb = {
     rpc: async (name: string, args: Record<string, unknown>) => {
       calls.push([name, args]);
-      return { data: 7, error: null };
+      return { data: name === 'apply_all_patrol_shift_templates_range' ? { templates: 5, days: 2, rows: 10 } : 7, error: null };
     },
   };
   return {
@@ -52,4 +52,12 @@ test('批次清除只把有效識別碼交給交易式資料庫函式', async ()
     p_from: '2099-01-02',
     p_duty_shift_ids: ['11111111-1111-1111-1111-111111111111'],
   }]]);
+});
+
+test('全部範本可一次套用到日期區間', async () => {
+  const { ctx, calls } = request({ body: { from_date: '2099-01-02', to_date: '2099-01-03' } });
+  const result = response(await handlePatrolShiftAction('patrol_shift_apply_all_templates', ctx));
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.data, { templates: 5, days: 2, rows: 10 });
+  assert.deepEqual(calls, [['apply_all_patrol_shift_templates_range', { p_from: '2099-01-02', p_to: '2099-01-03' }]]);
 });

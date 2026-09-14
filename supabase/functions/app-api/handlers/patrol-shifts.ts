@@ -4,7 +4,7 @@ import { text, validISODate } from '../validate.ts';
 
 /** 處理巡檢排班批次動作；單筆班別與範本刪除仍由既有流程處理。 */
 export async function handlePatrolShiftAction(action: string, ctx: AppApiContext): Promise<Response | null> {
-  if (action !== 'patrol_shift_delete_from_date') return null;
+  if (action !== 'patrol_shift_delete_from_date' && action !== 'patrol_shift_apply_all_templates') return null;
   const { req, body, profile, userDb, reply, can, canModule, isAdmin } = ctx;
   if (!can('guardpatrol') || !isAdmin) return reply(req, { ok: false, message: '只有巡邏系統管理者可以清除班別' }, 403);
   if (!canModule('guardpatrol', 'shifts')) return reply(req, { ok: false, message: '目前帳號未開放巡檢排班子系統' }, 403);
@@ -12,7 +12,20 @@ export async function handlePatrolShiftAction(action: string, ctx: AppApiContext
   const fromDate = text(body.from_date, 10);
   if (!validISODate(fromDate)) return reply(req, { ok: false, message: '起始值班日期格式無效' }, 400);
   const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-  if (fromDate < todayInTaipei) return reply(req, { ok: false, message: '只能清除今天或未來的班別，過去班表必須保留' }, 400);
+  if (fromDate < todayInTaipei) return reply(req, { ok: false, message: '只能從今天或未來日期調整班別，過去班表必須保留' }, 400);
+
+  if (action === 'patrol_shift_apply_all_templates') {
+    const toDate = text(body.to_date, 10);
+    if (!validISODate(toDate)) return reply(req, { ok: false, message: '結束值班日期格式無效' }, 400);
+    if (toDate < fromDate) return reply(req, { ok: false, message: '迄日不可早於起日' }, 400);
+    const { data, error } = await userDb.rpc('apply_all_patrol_shift_templates_range', {
+      p_from: fromDate,
+      p_to: toDate,
+    });
+    if (error) throw error;
+    return reply(req, { ok: true, data: data || { templates: 0, days: 0, rows: 0 } });
+  }
+
   const dutyShiftIds = (Array.isArray(body.duty_shift_ids) ? body.duty_shift_ids : [])
     .map((value: unknown) => text(value, 80))
     .filter((value: string) => /^[0-9a-f-]{36}$/i.test(value));

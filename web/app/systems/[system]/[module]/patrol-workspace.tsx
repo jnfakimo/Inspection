@@ -182,6 +182,7 @@ function ShiftsModule({ module, profile }: Props) {
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [editor, setEditor] = useState<Row | null>(null);
   const [applyTpl, setApplyTpl] = useState<Row | null>(null);
+  const [applyAll, setApplyAll] = useState(false);
   const [applyRange, setApplyRange] = useState({ from: taipeiToday(), to: taipeiToday() });
 
   const load = useCallback(async () => {
@@ -318,6 +319,21 @@ function ShiftsModule({ module, profile }: Props) {
     setBusy(false);
   };
 
+  const runApplyAll = async () => {
+    if (!applyRange.from || !applyRange.to) { setNote('失敗：請填寫套用的起訖日期'); return; }
+    if (applyRange.to < applyRange.from) { setNote('失敗：迄日不可早於起日'); return; }
+    setBusy(true); setNote('');
+    try {
+      const result = await invokeAppApi<{ templates?: number; days?: number; rows?: number }>('patrol_shift_apply_all_templates', {
+        from_date: applyRange.from,
+        to_date: applyRange.to,
+      });
+      setApplyAll(false); await load();
+      setNote(`已將 ${Number(result?.templates || 0)} 個班別範本套用到 ${applyRange.from} ～ ${applyRange.to}，共建立或更新 ${Number(result?.rows || 0)} 筆班別`);
+    } catch (error) { setNote(`套用失敗：${errorMessage(error)}`); }
+    setBusy(false);
+  };
+
   const clearFromDate = async () => {
     const today = taipeiToday();
     if (date < today) {
@@ -370,7 +386,11 @@ function ShiftsModule({ module, profile }: Props) {
     </section>
 
     <section className="panel admin-panel">
-      <div className="admin-toolbar"><span>班別範本（固定班別，供每日套用）</span></div>
+      <div className="admin-toolbar patrol-template-toolbar">
+        <span>班別範本（固定班別，供每日套用）</span>
+        <button className="primary-btn compact" disabled={busy || templates.length === 0}
+          onClick={() => { setApplyRange({ from: date, to: date }); setApplyAll(true); }}>重新套用全部範本</button>
+      </div>
       <div className="responsive-table"><table>
         <thead><tr><th>班別名稱</th><th>班別時段</th><th>通報時段</th><th>預設人員</th><th>操作</th></tr></thead>
         <tbody>{templates.map(row => <tr key={String(row.template_id)}>
@@ -435,6 +455,23 @@ function ShiftsModule({ module, profile }: Props) {
       <footer>
         <button className="secondary-btn" onClick={() => setApplyTpl(null)}>取消</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void runApply()}>{busy ? '套用中…' : '套用'}</button>
+      </footer>
+    </AdminModal>}
+
+    {applyAll && <AdminModal title="重新套用全部班別範本" onClose={() => setApplyAll(false)}>
+      <div className="admin-form-grid">
+        <label>起<LocalizedDateInput aria-label="全部範本套用起日（年/月/日）" value={applyRange.from}
+          onChange={e => setApplyRange(prev => ({ ...prev, from: e.target.value }))} /></label>
+        <label>迄<LocalizedDateInput aria-label="全部範本套用迄日（年/月/日）" value={applyRange.to}
+          onChange={e => setApplyRange(prev => ({ ...prev, to: e.target.value }))} /></label>
+      </div>
+      <p className="inline-message">
+        目前 {templates.length} 個啟用中的班別範本會一次套用到期間內每一天；同名班別會更新為範本內容。
+        整批作業與稽核在同一交易內完成，一次最多 366 天。
+      </p>
+      <footer>
+        <button className="secondary-btn" onClick={() => setApplyAll(false)}>取消</button>
+        <button className="primary-btn compact" disabled={busy} onClick={() => void runApplyAll()}>{busy ? '套用中…' : '全部套用'}</button>
       </footer>
     </AdminModal>}
   </AppShell>;

@@ -253,6 +253,7 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
    1. 頁首的「＋新增當日班別／重新載入」靠右對齊。
    2. 前一天／日期／後一天／今天四個控制項壓成同一列，「值班日 …」說明另起一行。 */
 .patrol-shift-shell{max-width:85%;margin:0 auto}
+.patrol-template-toolbar>span{margin-right:auto}
 @media (max-width:800px){
   .patrol-shift-shell{max-width:100%}
   .patrol-shift-toolbar{gap:6px}

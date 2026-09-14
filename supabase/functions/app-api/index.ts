@@ -1170,6 +1170,7 @@ export async function handleAppApiRequest(req: Request) {
       vehicle_roster_remove_all: 'admin-api:write',
       patrol_shift_delete: 'admin-api:write',
       patrol_shift_delete_from_date: 'admin-api:write',
+      patrol_shift_apply_all_templates: 'admin-api:write',
       handover_save: 'admin-api:write',
       equipment_save: 'admin-api:write',
       area_save: 'admin-api:write',
