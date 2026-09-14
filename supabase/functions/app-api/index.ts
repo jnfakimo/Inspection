@@ -10,6 +10,7 @@ import { text, validISODate } from './validate.ts';
 import { writeAudit } from './audit.ts';
 import { handleVehicleAction } from './handlers/vehicle.ts';
 import { handleMeetingAction } from './handlers/meeting.ts';
+import { handlePatrolShiftAction } from './handlers/patrol-shifts.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -1168,6 +1169,7 @@ export async function handleAppApiRequest(req: Request) {
       vehicle_roster_update: 'admin-api:write',
       vehicle_roster_remove_all: 'admin-api:write',
       patrol_shift_delete: 'admin-api:write',
+      patrol_shift_delete_from_date: 'admin-api:write',
       handover_save: 'admin-api:write',
       equipment_save: 'admin-api:write',
       area_save: 'admin-api:write',
@@ -3066,6 +3068,9 @@ export async function handleAppApiRequest(req: Request) {
     // 拋出的錯誤一樣由本函式最外層的 catch 統一處理，行為與搬移前相同。
     const vehicleResponse = await handleVehicleAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
     if (vehicleResponse) return vehicleResponse;
+
+    const patrolShiftResponse = await handlePatrolShiftAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
+    if (patrolShiftResponse) return patrolShiftResponse;
 
     if (action === 'patrol_shift_delete') {
       if (!can('guardpatrol') || !isAdmin) return reply(req, { ok: false, message: '只有巡邏系統管理者可以刪除班別' }, 403);

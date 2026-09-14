@@ -318,6 +318,27 @@ function ShiftsModule({ module, profile }: Props) {
     setBusy(false);
   };
 
+  const clearFromDate = async () => {
+    const today = taipeiToday();
+    if (date < today) {
+      setNote(`清除失敗：只能從今天（${today}）或未來日期開始，過去班表必須保留`);
+      return;
+    }
+    if (!confirm(`確定清除值班日 ${date}（含）之後的全部班別嗎？\n\n過去班表與班別範本會保留，清除後可由下方範本重新套用。`)) return;
+    setBusy(true); setNote('');
+    try {
+      const result = await invokeAppApi<{ count?: number }>('patrol_shift_delete_from_date', {
+        from_date: date,
+        // 夜班新資料存於隔日；帶入畫面上屬於本值班日的識別碼，後端才不會
+        // 把前一值班日存於界線日期的夜班誤判成這一天。
+        duty_shift_ids: shifts.map(row => String(row.shift_id || '')).filter(Boolean),
+      });
+      await load();
+      setNote(`已清除 ${date}（含）之後 ${Number(result?.count || 0)} 個班別；班別範本仍保留，可重新套用`);
+    } catch (error) { setNote(`清除失敗：${errorMessage(error)}`); }
+    setBusy(false);
+  };
+
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => openEditor({ name: '', start_time: '', end_time: '', sort_order: shifts.length, assigned_user_ids: [] }, 'date')}>＋ 新增當日班別</button>} />
@@ -329,6 +350,7 @@ function ShiftsModule({ module, profile }: Props) {
           <span className="admin-toolbar-date"><LocalizedDateInput aria-label="巡檢日期（年/月/日）" value={date} onChange={e => setDate(e.target.value)} /></span>
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
           <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
+          <button className="danger-btn compact" disabled={busy || date < taipeiToday()} onClick={() => void clearFromDate()}>清除當日及未來班別</button>
           <span>值班日 {date}｜{shifts.length} 個班別（夜班歸前一日隔夜）</span>
         </div>
         <div className="responsive-table"><table>
