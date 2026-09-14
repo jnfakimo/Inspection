@@ -4,9 +4,9 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { getSupabase } from '@/lib/supabase';
-import { loadMarketBimModels, type MarketBimModel } from '@/lib/market-bim-models';
+import { signFloorPlanVariants, type FloorPlanUrls } from '@/lib/floorplan-storage';
 import { canonicalFloor } from '@/lib/floor';
-import { FloorStack3D, type FloorStackApi, type StackMarker } from './floor-stack-3d';
+import { floorOrder, FloorStack3D, type FloorStackApi, type StackMarker } from './floor-stack-3d';
 import { StructuremapTopbarActions } from './structuremap-topbar-actions';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -20,7 +20,7 @@ const POINT_MIN = 0.5, POINT_MAX = 3, POINT_STEP = 0.1, POINT_DEFAULT = 1;
 const GAP_PER_STEP = 1.6 / GAP_DEFAULT;
 
 export function RepairMap3DModule({ module, profile: _profile, system: _system }: { module: ModuleDefinition; profile: Profile; system: SystemDefinition }) {
-  const [models, setModels] = useState<MarketBimModel[]>([]), [markers, setMarkers] = useState<Row[]>([]);
+  const [models, setModels] = useState<Row[]>([]), [markers, setMarkers] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [explode, setExplode] = useState(GAP_DEFAULT), [pointScale, setPointScale] = useState(POINT_DEFAULT), [showMarkers, setShowMarkers] = useState(true), [showLabels, setShowLabels] = useState(false);
   const [visibleFloors, setVisibleFloors] = useState<Record<string, boolean>>({});
@@ -29,20 +29,16 @@ export function RepairMap3DModule({ module, profile: _profile, system: _system }
 
   const load = useCallback(async () => {
     setBusy(true); setNote(''); const client = getSupabase();
-    let modelResult: MarketBimModel[];
-    let p;
-    try {
-      [modelResult, p] = await Promise.all([
-        loadMarketBimModels(),
-        client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status').in('kind', ['repair', 'space']).limit(1000),
-      ]);
-    } catch (error) {
-      setNote(`失敗：GLB 樓層模型載入失敗（${String(error)}）`);
-      setModels([]); setBusy(false);
-      return;
-    }
-    if (p.error) setNote(`失敗：${String(p.error.message || '標記載入失敗')}`);
-    setModels(modelResult); setVisibleFloors(Object.fromEntries(modelResult.map(row => [String(row.floor_id), true])));
+    const [m, p] = await Promise.all([
+      client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
+      client.from('plan_markers').select('marker_id,floor_id,label,kind,x,y,color,status').in('kind', ['repair', 'space']).limit(1000),
+    ]);
+    if (m.error || p.error) setNote(`失敗：${String((m.error || p.error)?.message || '圖資載入失敗')}`);
+    const source = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })).sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    let variants = new Map<string, FloorPlanUrls>();
+    try { variants = await signFloorPlanVariants(source.map(row => String(row.image_path || '')), client); } catch (error) { setNote(`失敗：${String(error)}`); }
+    const ready = source.map(row => { const urls = variants.get(String(row.image_path || '')); return { ...row, image_url: urls?.raw || '', light_url: urls?.light || '', tech_url: urls?.tech || '' }; }).filter(row => row.image_url || row.light_url || row.tech_url);
+    setModels(ready); setVisibleFloors(Object.fromEntries(ready.map(row => [String(row.floor_id), true])));
     setMarkers((p.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setBusy(false);
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -69,7 +65,7 @@ export function RepairMap3DModule({ module, profile: _profile, system: _system }
     {!floorsOpen && <button className="f3-toggle floors" onClick={() => setFloorsOpen(true)}>樓層顯示</button>}
     {pointsOpen && <div className="f3-mkpanel"><div className="panel-head"><span className="p-t">標記顯示</span><button className="panel-close" onClick={() => setPointsOpen(false)}>隱藏</button></div><label className="chk all"><input type="checkbox" checked={showMarkers} onChange={e => setShowMarkers(e.target.checked)} />顯示報修點與空間</label><label className="chk labels"><input type="checkbox" disabled={!showMarkers} checked={showLabels} onChange={e => setShowLabels(e.target.checked)} />文字標籤</label><div className="chk kind legend" style={{ '--kind-color': REPAIR_COLOR } as React.CSSProperties}><span className="legend-dot" />報修點 {active.filter(r => r.kind === 'repair').length}</div><div className="chk kind legend" style={{ '--kind-color': SPACE_COLOR } as React.CSSProperties}><span className="legend-dot" />空間 {active.filter(r => r.kind === 'space').length}</div></div>}
     {floorsOpen && <div className="f3-floors"><div className="panel-head"><span className="p-t">樓層顯示</span><button className="panel-close" onClick={() => setFloorsOpen(false)}>隱藏</button></div>{models.slice().reverse().map(row => { const id = String(row.floor_id); const on = visibleFloors[id] !== false; return <button key={id} className={`fbtn${on ? ' on' : ''}`} onClick={() => setVisibleFloors(current => ({ ...current, [id]: !on }))}><span className="dot" />{String(row.name || id)}</button>; })}<div className="f3-floors-count">顯示 {shownFloors.length}／{models.length} 層</div></div>}
-    {ctrlOpen && <div className="f3-panel"><div className="panel-head"><span className="p-t">立體控制</span><button className="panel-close" onClick={() => setCtrlOpen(false)}>隱藏</button></div><label htmlFor="repair-gap">樓層間距（視覺）</label><input id="repair-gap" type="range" min="1" max="20" step="0.5" value={explode} onChange={e => setExplode(Number(e.target.value))} /><div className="h-r">放大倍率：<span>{explode % 1 ? explode.toFixed(1) : explode}×</span></div><label htmlFor="repair-point-size">報修／空間點大小</label><input id="repair-point-size" type="range" min={POINT_MIN} max={POINT_MAX} step={POINT_STEP} value={pointScale} onChange={e => setPointScale(Number(e.target.value))} /><div className="h-r">圖面點位：<span>{pointScale.toFixed(1)}×</span></div><div className="btnrow"><button className="mini" onClick={resetView}>⊡ 重置</button><button className="mini" onClick={() => apiRef.current?.topView()}>⊤ 俯視</button><button className="mini" onClick={() => setExplode(1)}>真實比例</button><button className="mini" onClick={() => setPointScale(POINT_DEFAULT)}>點原大小</button></div><p className="f2-note">樓層圖資讀取 GLB manifest；標記同步讀取 plan_markers。</p></div>}
+    {ctrlOpen && <div className="f3-panel"><div className="panel-head"><span className="p-t">立體控制</span><button className="panel-close" onClick={() => setCtrlOpen(false)}>隱藏</button></div><label htmlFor="repair-gap">樓層間距（視覺）</label><input id="repair-gap" type="range" min="1" max="20" step="0.5" value={explode} onChange={e => setExplode(Number(e.target.value))} /><div className="h-r">放大倍率：<span>{explode % 1 ? explode.toFixed(1) : explode}×</span></div><label htmlFor="repair-point-size">報修／空間點大小</label><input id="repair-point-size" type="range" min={POINT_MIN} max={POINT_MAX} step={POINT_STEP} value={pointScale} onChange={e => setPointScale(Number(e.target.value))} /><div className="h-r">圖面點位：<span>{pointScale.toFixed(1)}×</span></div><div className="btnrow"><button className="mini" onClick={resetView}>⊡ 重置</button><button className="mini" onClick={() => apiRef.current?.topView()}>⊤ 俯視</button><button className="mini" onClick={() => setExplode(1)}>真實比例</button><button className="mini" onClick={() => setPointScale(POINT_DEFAULT)}>點原大小</button></div><p className="f2-note">圖資與標記同步讀取 3D 雲台使用的 floor_models、plan_markers。</p></div>}
     <div className="f3-bottomright"><div className="f3-hint">左鍵拖曳：旋轉環繞　｜　右鍵拖曳：平移　｜　滾輪／雙指：縮放</div><div className="f3-hud"><div className="h-t">{module.title}</div><div className="h-r">顯示樓層：<span>{shownFloorText}</span></div><div className="h-r">標記：<span>報修點 {active.filter(r => r.kind === 'repair').length}／空間 {active.filter(r => r.kind === 'space').length}</span></div></div></div>
   </div>;
 }

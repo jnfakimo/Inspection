@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
-import { loadMarketBimModels, type MarketBimModel } from '@/lib/market-bim-models';
+import { signFloorPlanVariants, type FloorPlanUrls } from '@/lib/floorplan-storage';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import { errorMessage, type Row } from '@/components/admin/shared';
 import { canonicalFloor } from '@/lib/floor';
@@ -45,7 +45,7 @@ function taipeiToday() {
 }
 
 export function PatrolMap3DModule({ module, profile }: Props) {
-  const [models, setModels] = useState<MarketBimModel[]>([]);
+  const [models, setModels] = useState<Row[]>([]);
   const [points, setPoints] = useState<Row[]>([]);
   const [checkins, setCheckins] = useState<Row[]>([]);
   const [date, setDate] = useState(taipeiToday());
@@ -68,24 +68,30 @@ export function PatrolMap3DModule({ module, profile }: Props) {
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
-    let modelsResult: MarketBimModel[];
-    let p;
-    let c;
+    const [m, p, c] = await Promise.all([
+      client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
+      client.from('plan_markers').select('marker_id,floor_id,label,x,y,status').eq('kind', 'patrol').limit(1000),
+      client.from('checkin_logs').select('checkin_id,target_id,label,floor_id,user_name,checkin_at')
+        .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(1000),
+    ]);
+    if (m.error || p.error || c.error) setNote(`失敗：${errorMessage(m.error || p.error || c.error, '立體巡檢資料載入失敗')}`);
+    const sourceRows = (m.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))
+      .sort((a, b) => floorOrder(String(a.floor_id)) - floorOrder(String(b.floor_id)));
+    // 與平面圖共用同一支：拿得到 light/、tech/ 成品圖就直接貼，不必逐像素重畫。
+    let variants = new Map<string, FloorPlanUrls>();
     try {
-      [modelsResult, p, c] = await Promise.all([
-        loadMarketBimModels(),
-        client.from('plan_markers').select('marker_id,floor_id,label,x,y,status').eq('kind', 'patrol').limit(1000),
-        client.from('checkin_logs').select('checkin_id,target_id,label,floor_id,user_name,checkin_at')
-          .gte('checkin_at', `${date}T00:00:00+08:00`).lte('checkin_at', `${date}T23:59:59+08:00`).limit(1000),
-      ]);
+      variants = await signFloorPlanVariants(sourceRows.map(row => String(row.image_path || '')), client);
     } catch (error) {
-      setNote(`失敗：${errorMessage(error, 'GLB 樓層模型載入失敗')}`);
-      setModels([]); setBusy(false);
-      return;
+      setNote(`失敗：${errorMessage(error, '樓層圖連結產生失敗')}`);
     }
-    if (p.error || c.error) setNote(`失敗：${errorMessage(p.error || c.error, '立體巡檢資料載入失敗')}`);
-    setModels(modelsResult);
-    setVisibleFloors(Object.fromEntries(modelsResult.map(row => [String(row.floor_id), true])));
+    const sorted = sourceRows
+      .map(row => {
+        const urls = variants.get(String(row.image_path || ''));
+        return { ...row, image_url: urls?.raw || '', light_url: urls?.light || '', tech_url: urls?.tech || '' };
+      })
+      .filter(row => row.image_url || row.light_url || row.tech_url);
+    setModels(sorted);
+    setVisibleFloors(Object.fromEntries(sorted.map(row => [String(row.floor_id), true])));
     setPoints((p.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
     setCheckins((c.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setBusy(false);
   }, [date]);

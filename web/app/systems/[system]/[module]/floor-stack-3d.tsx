@@ -11,20 +11,19 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { canonicalFloor } from '@/lib/floor';
+import { preparePlanCanvas } from '@/lib/floorplan-render';
 import { perspectiveFitDistance } from '@/lib/perspective-fit';
 
 // 樓層排序沿用全站唯一的 web/lib/floor.ts；此處再匯出，既有匯入端不必改寫。
 export { floorOrder } from '@/lib/floor';
 
-export type StackModel = {
-  floor_id: string;
-  name?: string | null;
-  level?: number | null;
-  /** 3D 與平面圖頁都只接受 GLB。 */
-  glb_url: string;
-  glb_bounds: { min: [number, number]; max: [number, number] };
-};
+export type StackModel = { floor_id: string; name?: string | null; image_path?: string | null; image_url?: string | null;
+  /** 已重畫好的成品圖（3D建模系統上傳時產生）。有值就直接貼，不必再逐像素重畫。 */
+  light_url?: string | null; tech_url?: string | null; level?: number | null };
 export type StackMarker = { id: string; floor_id: string; x: number; y: number; color: string; kind?: string; label?: string };
+
+export const floorTextureUrl = (signedUrl: unknown) => signedUrl ? String(signedUrl) : '';
+
 
 const PLANE_W = 10, PLANE_H = 7;
 
@@ -47,10 +46,26 @@ export type FloorStackApi = {
   focusMarker: (markerId: string) => boolean;
 };
 
-// 編修工具既有匯入路徑仍由此轉送；FloorStack3D 本身不會讀取 PNG。
+/**
+ * 把平面圖貼圖重畫成「黑線 + 透明底」。
+ *
+ * 線條顏色是烘在 PNG 裡的青色，用 material.color 相乘雖然能把青色壓成黑色，
+ * 但只要圖檔是不透明白底，整片平面就會一起變黑。逐像素判斷才安全：
+ * 亮度接近白的視為背景（轉全透明），其餘視為線條（塗黑並保留原本的濃淡）。
+ */
+function preparePlanTexture(THREE: typeof import('three'), texture: import('three').Texture, mode: 'light' | 'tech'): import('three').Texture {
+  const image = texture.image as HTMLImageElement | undefined;
+  if (!image?.width) return texture;
+  const canvas = preparePlanCanvas(image, mode);
+  if (!canvas) return texture;
+  const recoloured = new THREE.CanvasTexture(canvas);
+  recoloured.colorSpace = THREE.SRGBColorSpace;
+  return recoloured;
+}
+
 export { preparePlanCanvas, preparePlanObjectUrl } from '@/lib/floorplan-render';
 
-export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, markerScale = 1, apiRef, planMode = false, onMarkerClick, onPlanClick }: {
+export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, xPan = 0, yPan = 0, visibleKinds, showLabels, visibleFloors, markerScale = 1, apiRef }: {
   models: StackModel[]; markers: StackMarker[]; showMarkers?: boolean; gap?: number;
   xPan?: number; yPan?: number;
   visibleKinds?: Record<string, boolean>;
@@ -60,17 +75,12 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
   markerScale?: number;
   /** 可選。ref 物件的識別碼是穩定的，列入相依也不會多觸發場景重建。 */
   apiRef?: { current: FloorStackApi | null };
-  /** 平面圖模式：固定正上方俯角，可平面旋轉、平移與縮放。 */
-  planMode?: boolean;
-  onMarkerClick?: (markerId: string) => void;
-  onPlanClick?: (point: { x: number; y: number }) => void;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   // 圓點大小用 ref＋獨立 effect 調整：拉桿每動一格都重建整個場景會嚴重卡頓。
   const markerScaleRef = useRef(markerScale);
   const dotsRef = useRef<Array<{ scale: { setScalar: (value: number) => void } }>>([]);
-  const [modelErrors, setModelErrors] = useState<string[]>([]);
 
   // 主題會影響場景底色、樓層板顏色、邊線顏色與貼圖重畫，而這些全在建場景時就決定。
   // 必須跟著 data-theme 變動重建，否則切換主題後畫面停在舊主題直到重新整理——
@@ -91,14 +101,12 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
   useEffect(() => {
     let disposed = false;
-    setModelErrors([]);
     const normalizedModels = models.map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }));
     const normalizedMarkers = markers.map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }));
     if (!hostRef.current || !normalizedModels.length) return;
     (async () => {
       const THREE = await import('three');
       const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js');
-      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
       if (disposed || !hostRef.current) return;
       const host = hostRef.current;
       host.innerHTML = '';
@@ -108,9 +116,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       const isLight = theme === 'light';
       // 與 .f3-stage 的 var(--bg) 對齊：兩者一旦有色差，畫布邊緣就會露出一條異色線。
       scene.background = new THREE.Color(isLight ? 0xf4f6fa : 0x020b18);
-      const camera = planMode
-        ? new THREE.OrthographicCamera(-4 * width / height, 4 * width / height, 4, -4, 0.1, 2000)
-        : new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
       const renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(width, height);
@@ -118,11 +124,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      if (planMode) {
-        // 鎖定俯角、保留方位角，讓平面圖可以旋轉但不會被傾斜成透視視角。
-        controls.minPolarAngle = 0.001;
-        controls.maxPolarAngle = 0.001;
-      }
 
       scene.add(new THREE.AmbientLight(0xffffff, 1.1));
       const dir = new THREE.DirectionalLight(0xffffff, 0.7);
@@ -134,7 +135,8 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       // 標籤沿用 depthTest:false，會全部疊著畫；收集起來在每次算繪時做螢幕空間剔除。
       const labelSprites: Array<import('three').Sprite> = [];
       const leaderLines: Array<{ leader: import('three').Line; sprite: import('three').Sprite }> = [];
-      const gltfLoader = new GLTFLoader();
+      const loader = new THREE.TextureLoader();
+      loader.setCrossOrigin('anonymous');
       // level 目前資料皆為 0，故以清單順序乘間距堆疊；日後 level 有值則優先採用。
       const explicitLevels = normalizedModels.map(row => Number.isFinite(Number(row.level)) ? Number(row.level) : 0);
       const useLevel = explicitLevels.some(level => level !== 0);
@@ -146,15 +148,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       const fitView = (direction: import('three').Vector3) => {
         controls.target.set(xPan, (minY + maxY) / 2 + yPan, 0);
         direction.normalize();
-        if (camera instanceof THREE.OrthographicCamera) {
-          const viewportWidth = host.clientWidth || width;
-          const viewportHeight = host.clientHeight || height;
-          camera.zoom = Math.min((8 * viewportWidth / viewportHeight) / PLANE_W, 8 / PLANE_H) * 0.9;
-          camera.position.copy(controls.target).addScaledVector(direction, 20);
-          camera.updateProjectionMatrix();
-          controls.update();
-          return;
-        }
         const distance = perspectiveFitDistance({
           min: [-PLANE_W / 2, minY - 0.05, -PLANE_H / 2],
           max: [PLANE_W / 2, maxY + 0.3, PLANE_H / 2],
@@ -167,7 +160,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         controls.update();
       };
       // Fit both horizontal and vertical fields of view; portrait screens are narrower.
-      fitView(planMode ? new THREE.Vector3(0.001, 1, 0) : new THREE.Vector3(9, 9, 12));
+      fitView(new THREE.Vector3(9, 9, 12));
       const stopAutoFit = () => { autoFit = false; };
       controls.addEventListener('start', stopAutoFit);
 
@@ -177,53 +170,34 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         const isVisible = visibleFloors ? visibleFloors[String(row.floor_id)] !== false : true;
         if (!isVisible) return;
         
-        {
-          const bounds = row.glb_bounds;
-          const spanX = Math.max(bounds.max[0] - bounds.min[0], 0.001);
-          const spanZ = Math.max(bounds.max[1] - bounds.min[1], 0.001);
-          const scaleX = PLANE_W / spanX;
-          const scaleZ = PLANE_H / spanZ;
-          const scaleY = Math.min(scaleX, scaleZ);
-          const centreX = (bounds.min[0] + bounds.max[0]) / 2;
-          const centreMapY = (bounds.min[1] + bounds.max[1]) / 2;
-          gltfLoader.load(String(row.glb_url), gltf => {
-            if (disposed) return;
-            gltf.scene.scale.set(scaleX, scaleY, scaleZ);
-            // GLB 以 [x, 高度, -mapY] 儲存；縮放後對齊原本 10×7 的標記座標平面。
-            gltf.scene.position.set(-centreX * scaleX, y, centreMapY * scaleZ);
-            gltf.scene.traverse(object => {
-              if (!(object as import('three').Mesh).isMesh) return;
-              const source = object as import('three').Mesh;
-              const category = source.name.replace(/_\d+$/, '');
-              const common = { roughness: .9, metalness: .02, flatShading: true };
-              if (category === 'glass') source.material = new THREE.MeshStandardMaterial({
-                ...common, color: 0x5faab5, transparent: true, opacity: .36, depthWrite: false, side: THREE.DoubleSide,
-              });
-              else source.material = new THREE.MeshStandardMaterial({
-                ...common,
-                color: category === 'slab' ? (isLight ? 0xcfd8d5 : 0x26383a)
-                  : category === 'wall' ? (isLight ? 0xe1e7e4 : 0x354a4b)
-                    : category === 'column' ? (isLight ? 0x96a7a7 : 0x6f8585)
-                      : category === 'ramp' ? (isLight ? 0xc8bda9 : 0x766d5d)
-                        : (isLight ? 0xa9b9b6 : 0x657b78),
-                side: category === 'wall' ? THREE.DoubleSide : THREE.FrontSide,
-              });
-              const outline = new THREE.LineSegments(
-                new THREE.EdgesGeometry(source.geometry, 32),
-                new THREE.LineBasicMaterial({
-                  color: 0x21fff0, transparent: true, opacity: isLight ? .72 : .88,
-                  blending: isLight ? THREE.NormalBlending : THREE.AdditiveBlending,
-                  depthWrite: false, toneMapped: false,
-                }));
-              outline.renderOrder = 4;
-              source.add(outline);
-            });
-            scene.add(gltf.scene);
-          }, undefined, error => {
-            console.error(`GLB 樓層模型載入失敗：${row.floor_id}`, error);
-            if (!disposed) setModelErrors(current => current.includes(row.floor_id) ? current : [...current, row.floor_id]);
-          });
+        const material = new THREE.MeshBasicMaterial({ color: isLight ? 0xe0e0e0 : 0x0a2036, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(PLANE_W, PLANE_H), material);
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = y;
+        scene.add(mesh);
+
+        // 有成品圖就直接貼：省掉下載原圖後的 getImageData → 逐像素 → 重建貼圖，
+        // 7 層一起載入時這段的成本是乘以 7 的。拿不到成品才走原本的重畫流程。
+        const prerendered = String((isLight ? row.light_url : row.tech_url) || '');
+        const url = prerendered || floorTextureUrl(row.image_url);
+        if (url) {
+          loader.load(url, texture => {
+            texture.colorSpace = THREE.SRGBColorSpace;
+            // 平面圖的線條顏色烘在圖檔裡（青色）。淺色主題要黑線，但不能用
+            // material.color 相乘——若圖檔是不透明白底，整片平面會變黑。
+            // 改為逐像素重畫：近白視為背景轉全透明，其餘一律塗黑。
+            // 這同時讓堆疊的樓層彼此看得穿，不再互相遮擋。
+            material.map = prerendered ? texture : preparePlanTexture(THREE, texture, isLight ? 'light' : 'tech');
+            material.color.set(0xffffff);
+            material.needsUpdate = true;
+          }, undefined, () => { /* 貼圖載入失敗時保留底色，不中斷場景 */ });
         }
+
+        const edges = new THREE.LineSegments(
+          new THREE.EdgesGeometry(new THREE.PlaneGeometry(PLANE_W, PLANE_H)),
+          new THREE.LineBasicMaterial({ color: isLight ? 0x000000 : 0x1a4a70 }));
+        edges.rotation.x = -Math.PI / 2; edges.position.y = y + 0.002;
+        scene.add(edges);
 
         if (showMarkers) {
           for (const marker of normalizedMarkers.filter(m => m.floor_id === String(row.floor_id))) {
@@ -236,7 +210,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
               new THREE.SphereGeometry(0.0225, 12, 12),
               new THREE.MeshBasicMaterial({ color: new THREE.Color(isLight ? darkenColor(marker.color) : marker.color) }));
             dot.scale.setScalar(markerScaleRef.current);
-            dot.userData.markerId = marker.id;
             dots.push(dot);
             // 標記的 x／y 為 0–1 相對座標，換算到平面尺寸並置中。
             dot.position.set(marker.x * PLANE_W - PLANE_W / 2, y + 0.12, marker.y * PLANE_H - PLANE_H / 2);
@@ -306,34 +279,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         }
       });
 
-      // 平面圖以同一份 GLB 場景做點選與重新定位，不再依賴 PNG／OpenSeadragon。
-      const raycaster = new THREE.Raycaster();
-      const pointer = new THREE.Vector2();
-      let pointerStart: { x: number; y: number } | null = null;
-      const onPointerDown = (event: PointerEvent) => { pointerStart = { x: event.clientX, y: event.clientY }; };
-      const onPointerUp = (event: PointerEvent) => {
-        if (!planMode || !pointerStart) return;
-        const moved = Math.hypot(event.clientX - pointerStart.x, event.clientY - pointerStart.y);
-        pointerStart = null;
-        if (moved > 6) return;
-        const rect = renderer.domElement.getBoundingClientRect();
-        pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
-        raycaster.setFromCamera(pointer, camera);
-        const markerHit = raycaster.intersectObjects(dots, false)[0]?.object;
-        const markerId = markerHit?.userData.markerId;
-        if (markerId && onMarkerClick) { onMarkerClick(String(markerId)); return; }
-        if (!onPlanClick) return;
-        const floorY = levels[0] ?? 0;
-        const world = raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -floorY), new THREE.Vector3());
-        if (!world) return;
-        onPlanClick({
-          x: Math.max(0, Math.min(1, (world.x + PLANE_W / 2) / PLANE_W)),
-          y: Math.max(0, Math.min(1, (world.z + PLANE_H / 2) / PLANE_H)),
-        });
-      };
-      renderer.domElement.addEventListener('pointerdown', onPointerDown);
-      renderer.domElement.addEventListener('pointerup', onPointerUp);
-
       let raf = 0;
       // 螢幕空間網格剔除：把畫面切成格子，每格只留離鏡頭最近的一個標籤。
       // 不做精確的矩形碰撞是刻意的——標籤的螢幕尺寸隨距離變動，用固定格子既穩定
@@ -383,7 +328,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         apiRef.current = {
           resetView: () => {
             autoFit = true;
-            fitView(planMode ? new THREE.Vector3(0.001, 1, 0) : new THREE.Vector3(9, 9, 12));
+            fitView(new THREE.Vector3(9, 9, 12));
           },
           topView: () => {
             autoFit = true;
@@ -409,11 +354,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
 
       const onResize = () => {
         const w = host.clientWidth || width, h = host.clientHeight || height;
-        if (camera instanceof THREE.OrthographicCamera) {
-          camera.left = -4 * w / h; camera.right = 4 * w / h;
-          camera.top = 4; camera.bottom = -4;
-        } else camera.aspect = w / h;
-        camera.updateProjectionMatrix(); renderer.setSize(w, h);
+        camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
         if (autoFit) fitView(camera.position.clone().sub(controls.target));
       };
       window.addEventListener('resize', onResize);
@@ -423,8 +364,6 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
         dotsRef.current = [];
         cancelAnimationFrame(raf);
         window.removeEventListener('resize', onResize);
-        renderer.domElement.removeEventListener('pointerdown', onPointerDown);
-        renderer.domElement.removeEventListener('pointerup', onPointerUp);
         controls.removeEventListener('start', stopAutoFit);
         controls.dispose();
         scene.traverse(obj => {
@@ -439,13 +378,7 @@ export function FloorStack3D({ models, markers, showMarkers = true, gap = 1.6, x
       };
     })();
     return () => { disposed = true; cleanupRef.current(); cleanupRef.current = () => {}; };
-  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors, apiRef, theme, planMode, onMarkerClick, onPlanClick]);
+  }, [models, markers, showMarkers, gap, xPan, yPan, visibleKinds, showLabels, visibleFloors, apiRef, theme]);
 
-  return <div className="plan-stage" style={{ width: '100%', height: '100%', position: 'relative' }}>
-    <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
-    {modelErrors.length > 0 && <div role="alert" style={{
-      position: 'absolute', left: 16, bottom: 16, zIndex: 8, padding: '8px 12px',
-      border: '1px solid #ff5470', borderRadius: 8, background: 'rgba(22, 5, 12, .9)', color: '#fff',
-    }}>GLB 載入失敗：{modelErrors.join('、')}</div>}
-  </div>;
+  return <div ref={hostRef} className="plan-stage" style={{ width: '100%', height: '100%' }} />;
 }
