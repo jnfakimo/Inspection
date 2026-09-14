@@ -36,6 +36,39 @@ if (-not $dbContainer) {
 }
 Write-Host ("Found database container: " + $dbContainer) -ForegroundColor Green
 
+# Select a login role that already has the least set of privileges required by
+# these incremental migrations. Never broaden schema permissions to make a
+# hard-coded role work: this self-hosted stack owns public with supabase_admin.
+$roleSql = @'
+select r.rolname
+from pg_roles r
+where r.rolcanlogin
+  and has_schema_privilege(r.rolname, 'public', 'CREATE')
+  and has_table_privilege(r.rolname, 'public.patrol_shifts', 'SELECT')
+  and has_table_privilege(r.rolname, 'public.patrol_shifts', 'UPDATE')
+  and has_table_privilege(r.rolname, 'public.audit_logs', 'INSERT')
+  and has_table_privilege(r.rolname, 'public.users', 'SELECT')
+order by r.rolsuper desc,
+  case when r.rolname = 'supabase_admin' then 0 else 1 end,
+  r.rolname
+limit 1;
+'@
+$roleTemp = Join-Path $env:TEMP ('migration-role-' + [guid]::NewGuid().ToString('N') + '.sql')
+try {
+  [IO.File]::WriteAllText($roleTemp, $roleSql, (New-Object Text.UTF8Encoding($false)))
+  $wslRole = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $roleTemp).Trim()
+  $roleCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U postgres -d postgres -Atq < $wslRole 2>&1"
+  $roleOutput = @(& $wslCommand.Source --distribution $dist --user root --exec sh -c "$roleCmd")
+  if ($LASTEXITCODE -ne 0) { throw ($roleOutput -join [Environment]::NewLine) }
+  $migrationRole = @($roleOutput | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*$' }) | Select-Object -First 1
+} finally {
+  Remove-Item -LiteralPath $roleTemp -Force -ErrorAction SilentlyContinue
+}
+if (-not $migrationRole) {
+  throw 'No login role has the required schema and table privileges. No migration was started.'
+}
+Write-Host ("Migration database role: " + $migrationRole) -ForegroundColor Green
+
 if ($MigrationFile) {
   $targetFiles = @(Join-Path $migrationsDir $MigrationFile)
 } else {
@@ -52,14 +85,27 @@ if (-not $Apply) {
   exit 0
 }
 
-# Step 0: Ensure schema public ownership and permissions are fully granted
-Write-Host "Configuring schema public permissions..." -NoNewline
-$initSql = "DO `$\$ BEGIN EXECUTE 'ALTER SCHEMA public OWNER TO postgres'; EXECUTE 'GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role, supabase_admin'; EXECUTE 'GRANT ALL ON SCHEMA public TO PUBLIC'; EXCEPTION WHEN OTHERS THEN NULL; END `$\$;"
+# Step 0: Verify the selected existing role. Do not change schema ownership or
+# grant broad permissions as a migration workaround.
+Write-Host "Verifying migration database role..." -NoNewline
+$initSql = @'
+do $$
+begin
+  if not has_schema_privilege(current_user, 'public', 'CREATE')
+    or not has_table_privilege(current_user, 'public.patrol_shifts', 'SELECT')
+    or not has_table_privilege(current_user, 'public.patrol_shifts', 'UPDATE')
+    or not has_table_privilege(current_user, 'public.audit_logs', 'INSERT')
+    or not has_table_privilege(current_user, 'public.users', 'SELECT') then
+    raise exception 'migration role privileges are incomplete';
+  end if;
+end
+$$;
+'@
 $initTemp = Join-Path $env:TEMP ('init-perms-' + [guid]::NewGuid().ToString('N') + '.sql')
 try {
   [IO.File]::WriteAllText($initTemp, $initSql, (New-Object Text.UTF8Encoding($false)))
   $wslInit = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $initTemp).Trim()
-  $initCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U postgres -d postgres < $wslInit 2>&1"
+  $initCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U $migrationRole -d postgres < $wslInit 2>&1"
   & $wslCommand.Source --distribution $dist --user root --exec sh -c "$initCmd" | Out-Null
   Write-Host " [OK]" -ForegroundColor Green
 } finally {
@@ -80,7 +126,7 @@ foreach ($file in $targetFiles) {
     [IO.File]::WriteAllText($tempSql, $contentLf, (New-Object Text.UTF8Encoding($false)))
     $wslTemp = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $tempSql).Trim()
     
-    $execCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U postgres -d postgres < $wslTemp 2>&1"
+    $execCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U $migrationRole -d postgres < $wslTemp 2>&1"
     $output = @(& $wslCommand.Source --distribution $dist --user root --exec sh -c "$execCmd")
     $exitCode = $LASTEXITCODE
     
@@ -107,7 +153,7 @@ foreach ($file in $targetFiles) {
 
 # Reload PostgREST schema cache
 Write-Host "Reloading PostgREST schema cache..." -NoNewline
-$reloadCmd = 'docker exec -u postgres -i ' + $dbContainer + ' psql -U postgres -d postgres -c "NOTIFY pgrst, ''reload schema'';"'
+$reloadCmd = 'docker exec -u postgres -i ' + $dbContainer + ' psql -U ' + $migrationRole + ' -d postgres -c "NOTIFY pgrst, ''reload schema'';"'
 & $wslCommand.Source --distribution $dist --user root --exec sh -c "$reloadCmd" | Out-Null
 Write-Host " [OK]" -ForegroundColor Green
 
