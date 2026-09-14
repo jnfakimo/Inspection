@@ -6,6 +6,7 @@ const files = {
   v1Login: read('system/login.html'),
   handoverLogin: read('system/handover-login.html'),
   v2Login: read('web/app/login/page.tsx'),
+  usernameLogin: read('web/lib/username-login.ts'),
   authGate: read('web/components/AuthGate.tsx'),
   appShell: read('web/components/AppShell.tsx'),
   cache: read('web/lib/profile-cache.ts'),
@@ -26,7 +27,8 @@ assert(files.v1Login.includes("var v2Target = '/Inspection/v2/login/';") && file
   'V1 login must forward to the authoritative V2 login');
 assert(files.handoverLogin.includes('/Inspection/v2/login/?redirect=%2Fsystems%2Fhandover%2F') && files.handoverLogin.includes('window.location.replace(target)'),
   'handover login must forward to V2 login and preserve its destination');
-assert(files.v2Login.includes("functions.invoke('username-login'") && files.v2Login.includes('captcha_id') && files.v2Login.includes('auth.setSession'),
+assert(files.v2Login.includes('invokeUsernameLogin') && files.usernameLogin.includes("functions.invoke('username-login'")
+  && files.v2Login.includes('captcha_id') && files.v2Login.includes('auth.setSession'),
   'V2 login must use the shared captcha login and establish its session');
 assert(!/login_lookup_email|signInWithPassword|\.from\(['"]users['"]\)/.test(files.handoverLogin),
   'handover login must not bypass the shared login/profile path');
