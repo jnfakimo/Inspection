@@ -23,14 +23,14 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$dependencyCommit = 'e81349249e7057a0027f40474aed57ac52755779'
+$dependencyCommit = '8e1e1595d07bc1253e0e68a15b616d06f27d1985'
 $baseUrl = "https://raw.githubusercontent.com/jnfakimo/Inspection/$dependencyCommit"
 $releaseRoot = Join-Path $env:TEMP 'Inspection-patrol-release-e8134924'
 $migrationRoot = Join-Path $releaseRoot 'supabase\migrations'
 $runnerPath = Join-Path $releaseRoot 'tools\apply-local-migrations.ps1'
 
 $files = @(
-  @{ Relative = 'tools/apply-local-migrations.ps1'; Hash = '87220C4A89FB6F7F55FFEB4626677DF54B4431149D4552F4329E149D79F8103C' },
+  @{ Relative = 'tools/apply-local-migrations.ps1'; Hash = 'D14D8E7A5EE33631396A2F879769D3D4A80D009C6350CAB1A8680378CF07EB38' },
   @{ Relative = 'supabase/migrations/20260914170000_patrol_shift_bulk_reset.sql'; Hash = '25CF21ACDDDC26DA8A53FA944B4D8D821668CFE97C5B59AA87C8B96ADF80E8BC' },
   @{ Relative = 'supabase/migrations/20260914171000_patrol_shift_apply_all_templates.sql'; Hash = '0BE1D9A681A7704996F95A65C06DDDED3BFBC1BB04A2ED8F800A6C41ABCFB946' },
   @{ Relative = 'supabase/migrations/20260914172000_patrol_shift_day_status.sql'; Hash = '13B3DFCB259F58542C42884E6EACA6FB8F69DED2B1C68076275A06106CACF368' }
