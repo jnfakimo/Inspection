@@ -41,29 +41,36 @@ for (const relative of requiredSources) {
   if (!file.includes('canonicalFloor')) throw new Error(`${relative} 未接入共用樓層正規化規則`);
 }
 
-// 3D 建模系統是 V2 圖資的唯一來源。這些檢查防止新頁面改回靜態圖、
-// 公開網址或 V1 頁面，導致同一樓層在整合標記、平面圖與 3D 圖不同步。
-const projectReaders = [
-  'web/app/systems/[system]/[module]/structuremap-markerboard.tsx',
+// 檢視頁一律使用同一份 GLB manifest；PNG 只留在建模／標記編修流程。
+const glbReaders = [
   'web/app/systems/[system]/[module]/structuremap-viewers.tsx',
   'web/app/systems/[system]/[module]/structuremap-floor3d.tsx',
   'web/app/systems/[system]/[module]/patrol-map3d.tsx',
   'web/app/systems/[system]/[module]/repair-map3d.tsx',
 ];
-for (const relative of projectReaders) {
+for (const relative of glbReaders) {
   const file = fs.readFileSync(path.join(root, relative), 'utf8');
-  if (!file.includes("from('floor_models')")) throw new Error(`${relative} 未直接讀取 3D 建模專案`);
-  // signFloorPlanVariants 是 signFloorplanPaths 的上層包裝（多簽 light/、tech/ 成品圖與尺寸變體），
-  // 底層一樣是短效 signed URL，兩者都算合格；直接組公開網址才是要擋的事。
-  if (!/signFloorplanPaths|signFloorPlanVariants/.test(file)) {
-    throw new Error(`${relative} 未使用私有圖資的短效連結`);
-  }
+  if (!file.includes('loadMarketBimModels')) throw new Error(`${relative} 未讀取共用 GLB manifest`);
+  if (!file.includes('FloorStack3D')) throw new Error(`${relative} 未使用共用 GLB 算繪元件`);
+  if (/signFloorplanPaths|signFloorPlanVariants/.test(file)) throw new Error(`${relative} 不得回退載入 PNG`);
+}
+
+const glbHelper = fs.readFileSync(path.join(root, 'web/lib/market-bim-models.ts'), 'utf8');
+for (const token of ['MARKET_BIM_MANIFEST_URL', '/Inspection/v2/models/market-bim/manifest.json', 'glb_bounds']) {
+  if (!glbHelper.includes(token)) throw new Error(`market-bim-models.ts 缺少 GLB 共用設定：${token}`);
 }
 
 // 報修與巡檢 3D 共用 FloorStack3D 的即時點位縮放，不可只在其中一張圖提供控制。
 const stack3d = fs.readFileSync(path.join(root, 'web/app/systems/[system]/[module]/floor-stack-3d.tsx'), 'utf8');
 if (!stack3d.includes('markerScale') || !stack3d.includes('dotsRef')) {
   throw new Error('FloorStack3D 缺少不重建場景的點位縮放介面');
+}
+if (!stack3d.includes('GLTFLoader') || stack3d.includes('TextureLoader') || stack3d.includes('addLegacyPlane')) {
+  throw new Error('FloorStack3D 必須只載入 GLB，不得保留 PNG 貼圖或失敗備援');
+}
+const floor2d = fs.readFileSync(path.join(root, 'web/app/systems/[system]/[module]/structuremap-viewers.tsx'), 'utf8');
+if (!floor2d.includes('planMode') || !floor2d.includes('onPlanClick')) {
+  throw new Error('平面圖未使用 GLB 正交俯視與控制點定位介面');
 }
 for (const relative of [
   'web/app/systems/[system]/[module]/patrol-map3d.tsx',
@@ -106,4 +113,4 @@ for (const relative of v2NavigationSources) {
   }
 }
 
-console.log('樓層與圖資一致性檢查通過：代碼轉換統一，V2 標記／平面圖／3D 圖／巡檢雲臺共用 3D 建模專案。');
+console.log('樓層與圖資一致性檢查通過：V2 平面圖／3D 圖／巡檢雲臺共用 GLB manifest，沒有 PNG 回退。');

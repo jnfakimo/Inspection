@@ -20,16 +20,15 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './structuremap-floor3d.css';
 import { FloorStack3D, type FloorStackApi, type StackMarker } from './floor-stack-3d';
-import { canonicalFloor, floorOrder } from '@/lib/floor';
+import { canonicalFloor } from '@/lib/floor';
 import { computePatrolStatus, PATROL_COLORS, type PatrolState } from '@/lib/patrol-status';
 import { getSupabase } from '@/lib/supabase';
-import { signFloorPlanVariants, type FloorPlanUrls } from '@/lib/floorplan-storage';
+import { loadMarketBimModels, type MarketBimModel } from '@/lib/market-bim-models';
 import { STRUCTUREMAP_ROUTES } from '@/lib/structuremap-routes';
 import type { Profile } from '@/types/app';
 import { StructuremapTopbarActions } from './structuremap-topbar-actions';
 
 type Props = { profile: Profile };
-type FloorModel = { floor_id: string; name: string | null; image_path: string | null; image_url: string | null; level: number | null };
 type MarkerRow = {
   marker_id: string; floor_id: string; x: number; y: number;
   kind: string; label: string | null; color: string | null; status: string | null;
@@ -49,7 +48,7 @@ const GAP_PER_STEP = 1.6 / EXPLODE_DEFAULT;   // 6× ↔ FloorStack3D 原本的�
 const METERS_PER_UNIT = 22;                   // V1 的 ±220 m ↔ 場景的 ±10 單位
 
 export function Floor3DBoardModule({ profile }: Props) {
-  const [models, setModels] = useState<FloorModel[]>([]);
+  const [models, setModels] = useState<MarketBimModel[]>([]);
   const [markers, setMarkers] = useState<MarkerRow[]>([]);
   const [patrolStatus, setPatrolStatus] = useState<Map<string, PatrolState>>(new Map());
   const [progress, setProgress] = useState<{ pct: number; msg: string } | null>({ pct: 10, msg: '初始化…' });
@@ -90,40 +89,25 @@ export function Floor3DBoardModule({ profile }: Props) {
   const load = useCallback(async () => {
     setProgress({ pct: 25, msg: '讀取樓層模型…' });
     const client = getSupabase();
-    const [modelResult, markerResult] = await Promise.all([
-      client.from('floor_models').select('floor_id,name,image_path,level').order('floor_id').limit(200),
-      client.from('plan_markers').select('marker_id,floor_id,x,y,kind,label,color,status')
-        .eq('status', 'active').limit(1000),
-    ]);
-    if (modelResult.error) {
-      setLoadError('無法讀取樓層模型，請確認資料庫設定與權限。');
+    let modelResult: MarketBimModel[];
+    let markerResult;
+    try {
+      [markerResult, modelResult] = await Promise.all([
+        client.from('plan_markers').select('marker_id,floor_id,x,y,kind,label,color,status')
+          .eq('status', 'active').limit(1000),
+        loadMarketBimModels(),
+      ]);
+    } catch (error) {
+      console.error('GLB 樓層模型載入失敗', error);
+      setLoadError('GLB 樓層模型載入失敗，請確認模型檔與 manifest。');
       setProgress(null);
       return;
     }
     // 標記查詢失敗不擋畫面：樓層模型仍可檢視，但要說出來，不能只是沒有標記。
     if (markerResult.error) setLoadError('標記載入失敗，畫面只呈現樓層模型。');
 
-    const sourceRows = (modelResult.data || []).map(row => ({
-      ...(row as FloorModel), floor_id: canonicalFloor(row.floor_id),
-    }))
-      .filter(row => row.image_path)
-      .sort((a, b) => floorOrder(a.floor_id) - floorOrder(b.floor_id));
-    // 與平面圖共用同一支：拿得到 light/、tech/ 成品圖就直接貼，不必逐像素重畫。
-    let variants = new Map<string, FloorPlanUrls>();
-    try {
-      variants = await signFloorPlanVariants(sourceRows.map(row => row.image_path), client);
-    } catch {
-      setLoadError('樓層圖連結產生失敗，請重新登入後再試。');
-    }
-    const rows = sourceRows
-      .map(row => {
-        const urls = variants.get(String(row.image_path));
-        return { ...row, image_url: urls?.raw || '', light_url: urls?.light || '', tech_url: urls?.tech || '' };
-      })
-      .filter(row => row.image_url || row.light_url || row.tech_url);
-    if (rows.length < sourceRows.length && sourceRows.length) setLoadError('部分樓層圖無法取得授權連結。');
-    setModels(rows);
-    setVisibleFloors(Object.fromEntries(rows.map(row => [String(row.floor_id), true])));
+    setModels(modelResult);
+    setVisibleFloors(Object.fromEntries(modelResult.map(row => [String(row.floor_id), true])));
     setMarkers((markerResult.data || []).map(row => ({
       ...(row as MarkerRow), floor_id: canonicalFloor(row.floor_id),
     })));
