@@ -59,7 +59,7 @@ $initTemp = Join-Path $env:TEMP ('init-perms-' + [guid]::NewGuid().ToString('N')
 try {
   [IO.File]::WriteAllText($initTemp, $initSql, (New-Object Text.UTF8Encoding($false)))
   $wslInit = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $initTemp).Trim()
-  $initCmd = "docker exec -u postgres -i $dbContainer psql -U postgres -d postgres < $wslInit 2>&1"
+  $initCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U postgres -d postgres < $wslInit 2>&1"
   & $wslCommand.Source --distribution $dist --user root --exec sh -c "$initCmd" | Out-Null
   Write-Host " [OK]" -ForegroundColor Green
 } finally {
@@ -80,7 +80,7 @@ foreach ($file in $targetFiles) {
     [IO.File]::WriteAllText($tempSql, $contentLf, (New-Object Text.UTF8Encoding($false)))
     $wslTemp = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $tempSql).Trim()
     
-    $execCmd = "docker exec -u postgres -i $dbContainer psql -U postgres -d postgres < $wslTemp 2>&1"
+    $execCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U postgres -d postgres < $wslTemp 2>&1"
     $output = @(& $wslCommand.Source --distribution $dist --user root --exec sh -c "$execCmd")
     $exitCode = $LASTEXITCODE
     
@@ -92,7 +92,7 @@ foreach ($file in $targetFiles) {
       }
     }
     
-    if ($exitCode -ne 0 -and $hasFatalError) {
+    if ($exitCode -ne 0 -or $hasFatalError) {
       Write-Host " [FAILED]" -ForegroundColor Red
       $output | ForEach-Object { Write-Host $_ }
       throw ("Migration failed: " + $leaf)
