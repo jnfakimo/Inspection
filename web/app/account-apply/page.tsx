@@ -50,11 +50,13 @@ export default function AccountApplyPage() {
 
   useEffect(() => {
     void Promise.all([
-      getSupabase().functions.invoke('username-login', { body: { action: 'account_application_options' } })
-        .then(({ data, error }) => {
-          if (error || !data?.ok) throw new Error(data?.message || '單位資料載入失敗');
-          setDepartments(data.departments || []);
-        }),
+      invokeUsernameLogin<{ ok?: boolean; message?: string; departments?: any[] }>(
+        { action: 'account_application_options' },
+        '單位資料載入失敗'
+      ).then(data => {
+        if (!data?.ok) throw new Error(data?.message || '單位資料載入失敗');
+        setDepartments(data.departments || []);
+      }),
       loadCaptcha(),
     ]).catch(error => setMessage(friendlyError(error)));
   }, []);

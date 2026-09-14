@@ -18,10 +18,11 @@ import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import { requestedPostLoginPath, resolvePostLoginDestination } from '@/lib/login-destination';
 import { PATROL_IDLE_LOGOUT_MESSAGE_KEY, startPatrolSession } from '@/lib/patrol-session';
+import { invokeUsernameLogin } from '@/lib/username-login';
 import type { Profile } from '@/types/app';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
-function friendlyError(raw: unknown, fallback: string) {
+function friendlyError(raw: unknown, fallback: string = '系統服務暫時無法連線') {
   const text = raw instanceof Error ? raw.message : String(raw || '');
   if (/rate limit|too many requests|for security purposes/i.test(text)) return '操作過於頻繁，請稍後再試';
   if (/failed to fetch|network|load failed/i.test(text)) return '網路連線失敗，請確認連線後再試';
@@ -49,10 +50,20 @@ export default function LoginPage() {
   async function loadCaptcha() {
     setCaptcha(null);
     try {
-      const { data, error } = await getSupabase().functions.invoke('username-login', { body: { action: 'captcha' } });
-      if (error || !data?.challenge_id) return setMessage('驗證碼載入失敗，請確認網路後重新整理');
+      const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string; message?: string }>(
+        { action: 'captcha' },
+        '驗證碼載入失敗，請確認網路後重試',
+        { retries: 2 }
+      );
+      if (!data?.challenge_id || !data.image) {
+        setMessage(data?.message || '驗證碼載入失敗，請點擊 [重新產生]');
+        return;
+      }
+      setMessage('');
       setCaptcha({ id: data.challenge_id, image: data.image });
-    } catch { setMessage('驗證碼服務暫時無法連線，請稍後重試'); }
+    } catch (err) {
+      setMessage(friendlyError(err, '驗證碼載入失敗，請確認網路後重新整理'));
+    }
   }
 
   useEffect(() => {
@@ -119,11 +130,22 @@ export default function LoginPage() {
     event.preventDefault(); setBusy(true); setMessage('');
     const form = new FormData(event.currentTarget);
     try {
-      const { data, error } = await getSupabase().functions.invoke('username-login', { body: {
-        identifier: String(form.get('identifier') || '').trim(), password: String(form.get('password') || ''),
-        captcha_id: captcha?.id, captcha_answer: String(form.get('captcha') || '').trim(),
-      }});
-      if (error || !data?.access_token) { setMessage(data?.message || '帳號、密碼或驗證碼錯誤'); setBusy(false); await loadCaptcha(); return; }
+      const data = await invokeUsernameLogin<{ access_token?: string; refresh_token?: string; message?: string }>(
+        {
+          action: 'login',
+          identifier: String(form.get('identifier') || '').trim(),
+          password: String(form.get('password') || ''),
+          captcha_id: captcha?.id,
+          captcha_answer: String(form.get('captcha') || '').trim(),
+        },
+        '帳號、密碼或驗證碼錯誤',
+      );
+      if (!data?.access_token) {
+        setMessage(data?.message || '帳號、密碼或驗證碼錯誤');
+        setBusy(false);
+        await loadCaptcha();
+        return;
+      }
       const result = await getSupabase().auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token });
       if (result.error) { setMessage('登入狀態建立失敗，請重新登入'); setBusy(false); return; }
       let verifiedProfile: Profile;
@@ -140,7 +162,11 @@ export default function LoginPage() {
       const destination = nextPath(verifiedProfile);
       if (result.data.session) startPatrolSession(result.data.session);
       location.replace(destination);
-    } catch { setMessage('登入服務暫時無法連線，請稍後重試'); setBusy(false); }
+    } catch (error) {
+      setMessage(friendlyError(error, '登入服務暫時無法連線，請稍後重試'));
+      setBusy(false);
+      await loadCaptcha();
+    }
   }
 
   async function sendResetLink() {
