@@ -183,20 +183,24 @@ function ShiftsModule({ module, profile }: Props) {
   const [editor, setEditor] = useState<Row | null>(null);
   const [applyTpl, setApplyTpl] = useState<Row | null>(null);
   const [applyAll, setApplyAll] = useState(false);
+  const [daySuspended, setDaySuspended] = useState(false);
+  const [dayStatusEditor, setDayStatusEditor] = useState<{ suspended: boolean; reason: string } | null>(null);
   const [applyRange, setApplyRange] = useState({ from: taipeiToday(), to: taipeiToday() });
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
     const client = getSupabase();
     const overnightStorageDate = shiftDate(date, 1);
-    const [s, t, u, c, d] = await Promise.all([
+    const [s, t, u, c, d, dayStatus] = await Promise.all([
       client.from('patrol_shifts').select('*').in('shift_date', [date, overnightStorageDate]).order('sort_order').order('start_time'),
       client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
       client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
       client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
       client.from('departments').select('dept_id,name').limit(1000),
+      client.from('patrol_shift_day_status').select('status,reason').eq('duty_date', date).maybeSingle(),
     ]);
-    if (s.error || t.error || u.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error, '排班資料載入失敗')}`);
+    if (s.error || t.error || u.error || dayStatus.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error || dayStatus.error, '排班資料載入失敗')}`);
+    setDaySuspended(dayStatus.data?.status === 'suspended');
     const rawShifts = (s.data || []).filter(row => !isDeletedShift(row.name));
     const storedOvernightNames = new Set(rawShifts
       .filter(row => isNightShiftName(row.name) && String(row.shift_date) === overnightStorageDate)
@@ -343,15 +347,32 @@ function ShiftsModule({ module, profile }: Props) {
     if (!confirm(`確定清除值班日 ${date}（含）之後的全部班別嗎？\n\n過去班表與班別範本會保留，清除後可由下方範本重新套用。`)) return;
     setBusy(true); setNote('');
     try {
-      const result = await invokeAppApi<{ count?: number }>('patrol_shift_delete_from_date', {
+      const result = await invokeAppApi<{ count?: number; suspended_days?: number }>('patrol_shift_delete_from_date', {
         from_date: date,
         // 夜班新資料存於隔日；帶入畫面上屬於本值班日的識別碼，後端才不會
         // 把前一值班日存於界線日期的夜班誤判成這一天。
         duty_shift_ids: shifts.map(row => String(row.shift_id || '')).filter(Boolean),
       });
       await load();
-      setNote(`已清除 ${date}（含）之後 ${Number(result?.count || 0)} 個班別；班別範本仍保留，可重新套用`);
+      setNote(`已清除 ${date}（含）之後 ${Number(result?.count || 0)} 個班別，並停用 ${Number(result?.suspended_days || 0)} 個值班日；班別範本仍保留，可重新套用`);
     } catch (error) { setNote(`清除失敗：${errorMessage(error)}`); }
+    setBusy(false);
+  };
+
+  const saveDayStatus = async () => {
+    if (!dayStatusEditor) return;
+    if (dayStatusEditor.suspended && !dayStatusEditor.reason.trim()) { setNote('停用失敗：請填寫停用原因'); return; }
+    setBusy(true); setNote('');
+    try {
+      await invokeAppApi('patrol_shift_set_day_status', {
+        from_date: date,
+        suspended: dayStatusEditor.suspended,
+        reason: dayStatusEditor.reason.trim(),
+      });
+      const suspended = dayStatusEditor.suspended;
+      setDayStatusEditor(null); await load();
+      setNote(suspended ? `${date} 班表已停用，不會由固定範本自動遞補` : `${date} 班表已恢復，可使用每日班別或固定範本`);
+    } catch (error) { setNote(`班表狀態更新失敗：${errorMessage(error)}`); }
     setBusy(false);
   };
 
@@ -367,8 +388,11 @@ function ShiftsModule({ module, profile }: Props) {
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
           <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
           <button className="danger-btn compact" disabled={busy || date < taipeiToday()} onClick={() => void clearFromDate()}>清除當日及未來班別</button>
+          <button className={daySuspended ? 'primary-btn compact' : 'danger-btn compact'} disabled={busy || date < taipeiToday()}
+            onClick={() => setDayStatusEditor({ suspended: !daySuspended, reason: '' })}>{daySuspended ? '恢復當日班表' : '停用當日班表'}</button>
           <span>值班日 {date}｜{shifts.length} 個班別（夜班歸前一日隔夜）</span>
         </div>
+        {daySuspended && <p className="inline-message danger">本值班日已停用：固定班別範本不會自動遞補，巡邏打卡與交接簿不會產生本日班次。</p>}
         <div className="responsive-table"><table>
           <thead><tr><th>班別名稱</th><th>班別時段</th><th>通報時段</th><th>排定人員</th><th>操作</th></tr></thead>
           <tbody>{shifts.map(row => <tr key={String(row.shift_id)}>
@@ -472,6 +496,19 @@ function ShiftsModule({ module, profile }: Props) {
       <footer>
         <button className="secondary-btn" onClick={() => setApplyAll(false)}>取消</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void runApplyAll()}>{busy ? '套用中…' : '全部套用'}</button>
+      </footer>
+    </AdminModal>}
+
+    {dayStatusEditor && <AdminModal title={dayStatusEditor.suspended ? `停用當日班表｜${date}` : `恢復當日班表｜${date}`} onClose={() => setDayStatusEditor(null)}>
+      <label>{dayStatusEditor.suspended ? '停用原因（必填）' : '恢復說明（選填）'}
+        <textarea rows={4} maxLength={500} value={dayStatusEditor.reason}
+          onChange={e => setDayStatusEditor({ ...dayStatusEditor, reason: e.target.value })}
+          placeholder={dayStatusEditor.suspended ? '例如：休場、臨時停止巡檢或重新排班中' : '可填寫恢復班表的原因'} />
+      </label>
+      <p className="inline-message">所有狀態變更都會保留操作人員、時間、原因與變更前後內容。</p>
+      <footer>
+        <button className="secondary-btn" onClick={() => setDayStatusEditor(null)}>取消</button>
+        <button className={dayStatusEditor.suspended ? 'danger-btn compact' : 'primary-btn compact'} disabled={busy} onClick={() => void saveDayStatus()}>{busy ? '處理中…' : dayStatusEditor.suspended ? '確認停用' : '確認恢復'}</button>
       </footer>
     </AdminModal>}
   </AppShell>;

@@ -154,9 +154,12 @@ export function invalidatePatrolMarkers() {
  * 夜班欄位是前一日值班日的隔夜延續，因此查詢 duty date 時要讀下一日的實際資料列。
  */
 export async function getPatrolShiftsForDate(client: Client, dateStr: string): Promise<PatrolShift[]> {
-  const [{ templates, setting, timeoutRules }, overrides, overnightOverrides] = await Promise.all([
+  const [{ templates, setting, timeoutRules }, overrides, overnightOverrides, dayStatus] = await Promise.all([
     getBaseData(client), getOverrides(client, dateStr), getOverrides(client, patrolDateOffset(dateStr, 1)),
+    client.from('patrol_shift_day_status').select('status').eq('duty_date', dateStr).maybeSingle(),
   ]);
+  if (dayStatus.error) throw dayStatus.error;
+  if (dayStatus.data?.status === 'suspended') return [];
   const overrideByKey = new Map([
     ...(overrides || []).map(row => [`${dateStr}:${row.name}`, row] as const),
     ...(overnightOverrides || []).map(row => [`${patrolDateOffset(dateStr, 1)}:${row.name}`, row] as const),

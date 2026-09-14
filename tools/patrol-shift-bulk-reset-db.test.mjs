@@ -5,6 +5,7 @@ import { PGlite } from '@electric-sql/pglite';
 
 const migrationUrl = new URL('../supabase/migrations/20260914170000_patrol_shift_bulk_reset.sql', import.meta.url);
 const applyAllMigrationUrl = new URL('../supabase/migrations/20260914171000_patrol_shift_apply_all_templates.sql', import.meta.url);
+const dayStatusMigrationUrl = new URL('../supabase/migrations/20260914172000_patrol_shift_day_status.sql', import.meta.url);
 const actorAuth = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const actorUser = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
@@ -18,6 +19,9 @@ async function database() {
     create table public.users(user_id uuid primary key, auth_id uuid, status text);
     insert into public.users values ('${actorUser}', '${actorAuth}', 'active');
     create function public.is_admin() returns boolean language sql stable as $$ select true $$;
+    create function public.active_user_id() returns uuid language sql stable as $$ select '${actorUser}'::uuid $$;
+    create function public.reject_physical_data_removal() returns trigger language plpgsql as $$
+    begin raise exception 'physical removal disabled'; end $$;
     create table public.patrol_shifts(
       shift_id uuid primary key,
       shift_date date not null,
@@ -42,6 +46,7 @@ async function database() {
   `);
   await db.exec(await readFile(migrationUrl, 'utf8'));
   await db.exec(await readFile(applyAllMigrationUrl, 'utf8'));
+  await db.exec(await readFile(dayStatusMigrationUrl, 'utf8'));
   return db;
 }
 
@@ -86,7 +91,7 @@ test('稽核寫入失敗時班別清除會整批回復', async () => {
   await db.close();
 });
 
-test('全部範本在同一交易套用，停用範本不會重新建立', async () => {
+test('全部範本在同一交易套用並恢復值班日，停用範本不會重新建立', async () => {
   const db = await database();
   await db.exec(`
     insert into patrol_shift_template values
@@ -94,7 +99,8 @@ test('全部範本在同一交易套用，停用範本不會重新建立', async
       ('10000000-0000-0000-0000-000000000002','中班','active',2),
       ('10000000-0000-0000-0000-000000000003','舊班','inactive',3);
   `);
-  const result = await db.query("select apply_all_patrol_shift_templates_range('2099-03-01','2099-03-02') as result");
+  await db.query("select set_patrol_shift_day_status('2099-03-01',true,'休場')");
+  const result = await db.query("select apply_all_patrol_shift_templates_and_activate('2099-03-01','2099-03-02') as result");
   assert.deepEqual(result.rows[0].result, { templates: 2, days: 2, rows: 4 });
   const calls = await db.query('select template_id::text as template_id from apply_calls order by template_id');
   assert.deepEqual(calls.rows.map(row => row.template_id), [
@@ -103,5 +109,29 @@ test('全部範本在同一交易套用，停用範本不會重新建立', async
   ]);
   const audit = await db.query("select count(*)::int as count from audit_logs where source='v2-patrol-apply-all'");
   assert.equal(audit.rows[0].count, 1);
+  const statuses = await db.query('select duty_date::text as duty_date,status from patrol_shift_day_status order by duty_date');
+  assert.deepEqual(statuses.rows, [
+    { duty_date: '2099-03-01', status: 'active' },
+    { duty_date: '2099-03-02', status: 'active' },
+  ]);
+  await db.close();
+});
+
+test('批次清除會停用有排班的值班日期範圍，重新套用前不由範本遞補', async () => {
+  const db = await database();
+  await db.exec(`
+    insert into patrol_shifts values
+      ('20000000-0000-0000-0000-000000000001','2099-04-01','早班','{}'),
+      ('20000000-0000-0000-0000-000000000002','2099-04-03','中班','{}'),
+      ('20000000-0000-0000-0000-000000000003','2099-04-04','夜班','{}');
+  `);
+  const result = await db.query("select reset_patrol_shifts_from_date('2099-04-01','{}'::uuid[]) as result");
+  assert.deepEqual(result.rows[0].result, { count: 3, from_date: '2099-04-01', to_date: '2099-04-03', suspended_days: 3 });
+  const statuses = await db.query('select duty_date::text as duty_date,status from patrol_shift_day_status order by duty_date');
+  assert.deepEqual(statuses.rows, [
+    { duty_date: '2099-04-01', status: 'suspended' },
+    { duty_date: '2099-04-02', status: 'suspended' },
+    { duty_date: '2099-04-03', status: 'suspended' },
+  ]);
   await db.close();
 });

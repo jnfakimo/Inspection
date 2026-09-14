@@ -1171,6 +1171,7 @@ export async function handleAppApiRequest(req: Request) {
       patrol_shift_delete: 'admin-api:write',
       patrol_shift_delete_from_date: 'admin-api:write',
       patrol_shift_apply_all_templates: 'admin-api:write',
+      patrol_shift_set_day_status: 'admin-api:write',
       handover_save: 'admin-api:write',
       equipment_save: 'admin-api:write',
       area_save: 'admin-api:write',
@@ -3138,15 +3139,17 @@ export async function handleAppApiRequest(req: Request) {
     type GuardWork = { start?: string; end?: string };
     const guardShiftContext = async (dutyDate: string) => {
       const nextDate = guardDateOffset(dutyDate, 1);
-      const [templateResult, dailyResult, staffResult, ruleResult, markerResult] = await Promise.all([
+      const [templateResult, dailyResult, staffResult, ruleResult, markerResult, dayStatusResult] = await Promise.all([
         admin.from('patrol_shift_template').select('template_id,name,start_time,end_time,sort_order,assigned_user_ids').neq('status', 'inactive').order('sort_order'),
         admin.from('patrol_shifts').select('shift_id,shift_date,name,start_time,end_time,assigned_user_ids').in('shift_date', [dutyDate, nextDate]),
         admin.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
         admin.from('system_settings').select('value').eq('key', 'patrol_timeout_rules').maybeSingle(),
         admin.from('plan_markers').select('marker_id,floor_id').eq('kind', 'patrol').eq('status', 'active'),
+        admin.from('patrol_shift_day_status').select('status').eq('duty_date', dutyDate).maybeSingle(),
       ]);
-      const failure = templateResult.error || dailyResult.error || staffResult.error || ruleResult.error || markerResult.error;
+      const failure = templateResult.error || dailyResult.error || staffResult.error || ruleResult.error || markerResult.error || dayStatusResult.error;
       if (failure) throw failure;
+      if (dayStatusResult.data?.status === 'suspended') return [];
       let staffConfig: {
         templates?: Record<string, unknown>; dates?: Record<string, Record<string, unknown>>;
         workTimes?: { templates?: Record<string, GuardWork>; dates?: Record<string, Record<string, GuardWork>> };
