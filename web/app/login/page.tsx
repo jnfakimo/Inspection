@@ -140,7 +140,7 @@ export default function LoginPage() {
         },
         '帳號、密碼或驗證碼錯誤',
       );
-      if (!data?.access_token) {
+      if (!data?.access_token || !data.refresh_token) {
         setMessage(data?.message || '帳號、密碼或驗證碼錯誤');
         setBusy(false);
         await loadCaptcha();
