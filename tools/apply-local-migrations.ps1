@@ -153,8 +153,20 @@ foreach ($file in $targetFiles) {
 
 # Reload PostgREST schema cache
 Write-Host "Reloading PostgREST schema cache..." -NoNewline
-$reloadCmd = 'docker exec -u postgres -i ' + $dbContainer + ' psql -U ' + $migrationRole + ' -d postgres -c "NOTIFY pgrst, ''reload schema'';"'
-& $wslCommand.Source --distribution $dist --user root --exec sh -c "$reloadCmd" | Out-Null
-Write-Host " [OK]" -ForegroundColor Green
+$reloadTemp = Join-Path $env:TEMP ('reload-pgrst-' + [guid]::NewGuid().ToString('N') + '.sql')
+try {
+  [IO.File]::WriteAllText($reloadTemp, "NOTIFY pgrst, 'reload schema';`n", (New-Object Text.UTF8Encoding($false)))
+  $wslReload = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $reloadTemp).Trim()
+  $reloadCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U $migrationRole -d postgres < $wslReload 2>&1"
+  $reloadOutput = @(& $wslCommand.Source --distribution $dist --user root --exec sh -c "$reloadCmd")
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host " [FAILED]" -ForegroundColor Red
+    $reloadOutput | ForEach-Object { Write-Host $_ }
+    throw 'PostgREST schema cache reload failed.'
+  }
+  Write-Host " [OK]" -ForegroundColor Green
+} finally {
+  Remove-Item -LiteralPath $reloadTemp -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host ("Successfully applied " + $appliedCount + " migration(s).") -ForegroundColor Green
