@@ -79,6 +79,7 @@ function translateError(error: unknown) {
   if (message.includes('JWT expired')) return '登入已過期，請重新整理頁面';
   if (message.includes('relation') && message.includes('does not exist')) return '資料表不存在，請確認資料庫設定';
   if (/Failed to fetch|NetworkError|Load failed/.test(message)) return '網路連線失敗，請稍後再試';
+  if (/請輸入樓層|標記座標|標記類型與名稱|標記識別碼無效|找不到指定的標記|整合標記系統/.test(message)) return message;
   return '操作失敗，請稍後再試或聯絡系統管理員';
 }
 
@@ -454,8 +455,12 @@ export function MarkerBoardModule({ profile }: Props) {
   /* ──────────────── 新增／編輯 ──────────────── */
 
   function openCreate(x: number, y: number, link: PendingLink | null) {
+    // OpenSeadragon 的 canvas-click handler 只在 viewer 建立時註冊一次。
+    // 若讀取樓層後才由空字串切到預設樓層，這個 handler 內的 curFloor
+    // 仍會是初次 render 的舊值；必須從同步 ref 取得目前樓層。
+    const floorId = curFloorRef.current;
     setEditor({
-      id: null, x, y, floorId: curFloor,
+      id: null, x, y, floorId,
       kind: link?.kind || 'note',
       equipmentId: link?.kind === 'equipment' ? link.id : '',
       spaceId: link?.kind === 'space' ? link.id : '',
@@ -473,6 +478,10 @@ export function MarkerBoardModule({ profile }: Props) {
 
   const saveMarker = async () => {
     if (!editor) return;
+    if (!editor.floorId) {
+      setEditor({ ...editor, message: '尚未取得目前樓層，請關閉視窗後重新點選平面圖' });
+      return;
+    }
     const label = editor.label.trim();
     if (!label) { setEditor({ ...editor, message: '請輸入標記名稱' }); return; }
     const payload = {
