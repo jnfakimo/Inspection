@@ -62,6 +62,10 @@ const LIST_SOURCES = [
 ] as const;
 type ListSource = (typeof LIST_SOURCES)[number][0];
 
+function markerMatchesListSource(marker: Marker, source: ListSource) {
+  return source === 'markers' || marker.kind === source;
+}
+
 const STAT_LABEL: Record<string, string> = {
   pending: '待處理', dispatched: '已派工', processing: '處理中',
   accepted: '已受理', repairing: '維修中',
@@ -397,7 +401,9 @@ export function MarkerBoardModule({ profile }: Props) {
       if (cancelled) return;
       overlaysRef.current.forEach(el => { try { viewer.removeOverlay(el); } catch { /* 忽略 */ } });
       overlaysRef.current.clear();
-      markers.filter(marker => marker.floor_id === curFloor).forEach(marker => {
+      const visibleMarkers = markers.filter(
+        marker => marker.floor_id === curFloor && markerMatchesListSource(marker, listSource));
+      visibleMarkers.forEach(marker => {
         const el = document.createElement('button');
         el.type = 'button';
         el.className = `mb-pin${showLabels ? ' show-lab' : ''}${detailIdRef.current === marker.marker_id ? ' on' : ''}`;
@@ -423,7 +429,7 @@ export function MarkerBoardModule({ profile }: Props) {
       });
     })();
     return () => { cancelled = true; };
-  }, [markers, curFloor, showLabels, markerColor, viewerGeneration]);
+  }, [markers, curFloor, listSource, showLabels, markerColor, viewerGeneration]);
 
   // 深連結 ?marker=：資料與圖磚都就緒後才跳。
   useEffect(() => {
