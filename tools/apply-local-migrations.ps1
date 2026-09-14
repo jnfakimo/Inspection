@@ -115,6 +115,10 @@ try {
 $appliedCount = 0
 foreach ($file in $targetFiles) {
   $leaf = Split-Path $file -Leaf
+  $migrationMatch = [regex]::Match($leaf, '^(?<version>[0-9]{14})_(?<name>[a-z0-9_]+)\.sql$')
+  if (-not $migrationMatch.Success) {
+    throw ("Invalid migration file name: " + $leaf)
+  }
   Write-Host ("Applying: " + $leaf + " ...") -NoNewline
   
   $content = [IO.File]::ReadAllText($file, [Text.Encoding]::UTF8)
@@ -143,6 +147,26 @@ foreach ($file in $targetFiles) {
       $output | ForEach-Object { Write-Host $_ }
       throw ("Migration failed: " + $leaf)
     } else {
+      # Record only migrations that psql completed successfully. This keeps the
+      # self-hosted schema history truthful and prevents later inventory checks
+      # from reporting an already-applied release as missing.
+      $version = $migrationMatch.Groups['version'].Value
+      $migrationName = $migrationMatch.Groups['name'].Value
+      $historySql = "insert into supabase_migrations.schema_migrations(version,name,created_by) values ('$version','$migrationName','codex-local-runner') on conflict(version) do nothing;`n"
+      $historyTemp = Join-Path $env:TEMP ('migration-history-' + [guid]::NewGuid().ToString('N') + '.sql')
+      try {
+        [IO.File]::WriteAllText($historyTemp, $historySql, (New-Object Text.UTF8Encoding($false)))
+        $wslHistory = (& $wslCommand.Source --distribution $dist --user root --exec wslpath -a -u $historyTemp).Trim()
+        $historyCmd = "docker exec -u postgres -i $dbContainer psql -v ON_ERROR_STOP=1 -U $migrationRole -d postgres < $wslHistory 2>&1"
+        $historyOutput = @(& $wslCommand.Source --distribution $dist --user root --exec sh -c "$historyCmd")
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host " [HISTORY FAILED]" -ForegroundColor Red
+          $historyOutput | ForEach-Object { Write-Host $_ }
+          throw ("Migration succeeded but history recording failed: " + $leaf)
+        }
+      } finally {
+        Remove-Item -LiteralPath $historyTemp -Force -ErrorAction SilentlyContinue
+      }
       Write-Host " [OK]" -ForegroundColor Green
       $appliedCount++
     }
