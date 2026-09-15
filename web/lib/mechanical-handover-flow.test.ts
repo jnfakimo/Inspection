@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, outstandingMechanicalEntries, shiftSlot } from './mechanical-handover-flow.ts';
+import { canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, mechanicalWorkDetails, outstandingMechanicalEntries, shiftSlot } from './mechanical-handover-flow.ts';
+
+test('combines the selected category and common item into an editable work description', () => {
+  assert.equal(mechanicalWorkDetails('冷凍冷藏設備', 'B1F 冷藏主機巡檢、運轉壓力溫度紀錄'), '冷凍冷藏設備 B1F 冷藏主機巡檢、運轉壓力溫度紀錄');
+  assert.equal(mechanicalWorkDetails('', '臨時交辦事項'), '臨時交辦事項');
+});
 
 test('recognizes Taipei business shift including midnight carry', () => {
   assert.deepEqual(currentMechanicalShift(new Date('2026-09-10T03:52:00Z')), { workDate: '2026-09-10', shiftCode: '09-17' });

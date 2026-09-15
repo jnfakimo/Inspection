@@ -17,6 +17,17 @@
 .mechanical-carry-card small,.mechanical-carry-card span{color:var(--dim);font-size:12px}
 .mechanical-carry-card strong{overflow-wrap:anywhere}
 .mechanical-carry-card button{flex:0 0 auto}
+.mechanical-reconciliation{margin-top:12px}
+.mechanical-confirm-content{display:grid;gap:14px;padding:20px}
+.mechanical-confirm-content>p{margin:0;color:var(--dim);line-height:1.7}
+.mechanical-confirm-content>label{display:grid;gap:7px;font-weight:800}
+.mechanical-confirm-content select{min-height:42px}
+.mechanical-confirm-items{display:grid;gap:8px;max-height:44vh;margin:0;padding:0 0 0 24px;overflow:auto}
+.mechanical-confirm-items li{padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
+.mechanical-confirm-items b,.mechanical-confirm-items p,.mechanical-confirm-items small{display:block;margin:0}
+.mechanical-confirm-items p{padding:4px 0;line-height:1.55}
+.mechanical-confirm-items small{color:var(--dim)}
+.mechanical-confirm-actions{display:flex;justify-content:flex-end;gap:8px}
 .mechanical-carry-source{display:grid;gap:3px;margin:16px 20px 4px;padding:12px 14px;border-left:4px solid var(--violet);border-radius:5px;background:color-mix(in srgb,var(--violet) 8%,var(--panel2))}
 .mechanical-carry-source b{color:var(--violet)}
 .mechanical-carry-source span,.mechanical-carry-source small{color:var(--dim);font-size:12px}

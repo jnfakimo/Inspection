@@ -18,6 +18,10 @@ export function isUnfinishedMechanicalResult(result: unknown) {
   return UNFINISHED_MECHANICAL_RESULTS.has(String(result || ''));
 }
 
+export function mechanicalWorkDetails(category: unknown, item: unknown) {
+  return [category, item].map(value => String(value || '').trim()).filter(Boolean).join(' ');
+}
+
 export function shiftSlot(date: string, shiftCode: string) {
   const day = Math.floor(new Date(`${date}T12:00:00+08:00`).getTime() / 86_400_000);
   const shift = MECHANICAL_SHIFTS.indexOf(shiftCode as MechanicalShiftCode);
