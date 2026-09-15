@@ -13,6 +13,8 @@
 
 後端入口為 `handlers/business-handover.ts`，使用登入者權杖呼叫交易式 RPC。新表只授予 authenticated SELECT，簽認與完成不可透過直接寫表偽造。完成、交班、原始事項修改使用同一把交易鎖；交班另外比對內容版本，拒絕以過期画面簽認。接班候選人的授權規則與 `has_system_access`／`has_module_access` 一致，若變更四層權限規則須同步調整 `business_receiver_allowed`。
 
-部署順序：先提交並套用 `20260915120000_business_handover_reconciliation.sql`，再部署 app-api 與前端。GitHub Pages 使用雲端 Supabase；內網站台需另外套用同一 migration 與 `tools/sync-local-edge-functions.ps1`，不能只更新靜態網頁。
+部署順序：先確認既有 `20260911093000_business_handover_module_access.sql`、四層權限 migrations 與 `20260911200000_business_handover_approvals.sql` 均已套用，再套用 `20260915120000_business_handover_reconciliation.sql`，最後部署 app-api 與前端。GitHub Pages 使用雲端 Supabase；內網站台需另外套用同一 migration 與 `tools/sync-local-edge-functions.ps1`，不能只更新靜態網頁。
+
+2026-09-15 正式雲端補套主管批核 migration：原先瀏覽器快取備援掩蓋了批核表未建置，移除假成功備援後出現整頁載入失敗（PostgREST `PGRST205`）。部署檢查需執行 `node tools/check-business-handover-schema.mjs`，以 `limit=0` 唯讀核對完整相依欄位，不能只確認新增的兩張表存在。
 
 驗證：`npm run test:business-handover`、`npm run test:app-api-handlers`、前後端型別檢查、`npm run test:handover-style`、`npm run test:page-headings`。資料庫測試只使用隔離的 PGlite 合成資料，不對正式交接紀錄代簽。
