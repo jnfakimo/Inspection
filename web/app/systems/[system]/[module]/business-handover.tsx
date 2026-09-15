@@ -1,10 +1,10 @@
 'use client';
 
 // SYS-04 業管組電子交接簿。
-// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表、三級主管批核（一市場主任、營業部副理、營業部經理）與每日 A4 單頁精準列印／預覽報表。
+// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表、三級主管批核（一市場主任、營業部副理、營業部經理）與每日 A4精準列印／預覽報表。
 // 風格與駐警隊交接簿統一，支援當班時段光暈閃爍提示與點檢表預設收合展開。
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
@@ -13,6 +13,7 @@ import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import { HandoverIcon, HandoverSheetHeader, type IconName } from './handover-sheet';
+import { BusinessSignatures, BusinessConfirmModal, businessShiftName, businessTime, type BusinessShift, type BusinessConfirmation } from './business-handover-reconciliation';
 import './handover-sheet.css';
 import './business-handover.css';
 
@@ -280,7 +281,6 @@ export type CheckItemState = {
 export type DutyCheckMap = Record<string, CheckItemState>;
 
 const CHECKLIST_STORAGE_PREFIX = 'beinong_business_checklist_';
-const APPROVAL_STORAGE_PREFIX = 'beinong_business_approvals_';
 
 function todayTaipei() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -382,9 +382,15 @@ function isDeleted(row: Row) {
 const CHECKLIST_TAG = '【崗位勤務點檢紀錄】';
 
 export function BusinessHandover({ system, module, profile }: Props) {
-  const [date, setDate] = useState(todayTaipei());
+  const [date, setDate] = useState(() => getTaipeiTime().hour < 1 ? moveDate(todayTaipei(), -1) : todayTaipei());
   const [entries, setEntries] = useState<Row[]>([]);
+  const [shiftReports, setShiftReports] = useState<BusinessShift[]>([]);
+  const [confirmation, setConfirmation] = useState<BusinessConfirmation | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const loadGeneration = useRef(0);
   const [users, setUsers] = useState<Row[]>([]);
+  const [receivers, setReceivers] = useState<Row[]>([]);
   const [approvals, setApprovals] = useState<BusinessApproval[]>([]);
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
@@ -420,65 +426,65 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
   // 載入資料庫、點檢表與批核紀錄
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setBusy(true);
     setNote('');
-    const client = getSupabase();
-    const [entryResult, userResult, approvalResult] = await Promise.all([
-      client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
-      client.from('users').select('user_id,name,role,rbac_role,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
-      client.from('business_handover_approvals').select('*').eq('handover_date', date).order('created_at').then(res => res, () => ({ data: null, error: null })),
-    ]);
+    try {
+      const client = getSupabase();
+      const [entryResult, userResult, approvalResult, reports, eligibleReceivers] = await Promise.all([
+        client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
+        client.from('users').select('user_id,name,username,email,role,rbac_role,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
+        client.from('business_handover_approvals').select('*').eq('handover_date', date).order('created_at'),
+        invokeAppApi<BusinessShift[]>('business_handover_day', { handover_date: date }),
+        invokeAppApi<Row[]>('business_handover_receivers'),
+      ]);
+      if (generation !== loadGeneration.current) return;
+      if (entryResult.error || userResult.error || approvalResult.error) throw entryResult.error || userResult.error || approvalResult.error;
+      const rawEntries = entryResult.data || [];
+      setEntries(rawEntries);
+      setShiftReports(reports);
+      setReceivers(selectableActiveUsers(eligibleReceivers));
+      setUsers(selectableActiveUsers(userResult.data || []));
+      setApprovals((approvalResult.data as BusinessApproval[]) || []);
 
-    if (entryResult.error || userResult.error) {
-      setNote(`失敗：${errorMessage(entryResult.error || userResult.error, '業管組交接資料載入失敗')}`);
-    }
-
-    const rawEntries = entryResult.data || [];
-    setEntries(rawEntries);
-    setUsers(selectableActiveUsers(userResult.data || []));
-
-    // 載入批核資料（若後端表尚未備妥則自動從 LocalStorage 備援）
-    let loadedApprovals: BusinessApproval[] = (approvalResult?.data as BusinessApproval[]) || [];
-    if (loadedApprovals.length === 0 && typeof window !== 'undefined') {
-      try {
-        const local = localStorage.getItem(`${APPROVAL_STORAGE_PREFIX}${date}`);
-        if (local) loadedApprovals = JSON.parse(local);
-      } catch {
-        // ignore
-      }
-    }
-    setApprovals(loadedApprovals);
-
-    // 嘗試從資料庫中的點檢紀錄條目或 LocalStorage 載入點檢表狀態
-    let loadedChecks: DutyCheckMap = {};
-    const checklistEntry = rawEntries.find(r => !isDeleted(r) && String(r.description || '').includes(CHECKLIST_TAG));
-    if (checklistEntry) {
-      try {
-        const jsonPart = String(checklistEntry.description).split(CHECKLIST_TAG)[1]?.trim();
-        if (jsonPart) {
-          loadedChecks = JSON.parse(jsonPart);
+      // 嘗試從資料庫中的點檢紀錄條目或 LocalStorage 載入點檢表狀態
+      let loadedChecks: DutyCheckMap = {};
+      const checklistEntry = rawEntries.find(r => !isDeleted(r) && String(r.description || '').includes(CHECKLIST_TAG));
+      if (checklistEntry) {
+        try {
+          const jsonPart = String(checklistEntry.description).split(CHECKLIST_TAG)[1]?.trim();
+          if (jsonPart) {
+            loadedChecks = JSON.parse(jsonPart);
+          }
+        } catch {
+          // 解析失敗時從 LocalStorage 備援
         }
-      } catch {
-        // 解析失敗時從 LocalStorage 備援
       }
-    }
 
-    if (Object.keys(loadedChecks).length === 0 && typeof window !== 'undefined') {
-      try {
-        const local = localStorage.getItem(`${CHECKLIST_STORAGE_PREFIX}${date}`);
-        if (local) loadedChecks = JSON.parse(local);
-      } catch {
-        // ignore
+      if (Object.keys(loadedChecks).length === 0 && typeof window !== 'undefined') {
+        try {
+          const local = localStorage.getItem(`${CHECKLIST_STORAGE_PREFIX}${date}`);
+          if (local) loadedChecks = JSON.parse(local);
+        } catch {
+          // ignore
+        }
       }
-    }
 
-    // 初始化所有 25 個項目
-    const mergedChecks: DutyCheckMap = {};
-    for (const item of BUSINESS_DUTY_CHECKLIST) {
-      mergedChecks[item.id] = loadedChecks[item.id] || { status: 'uncompleted' };
+      // 初始化所有 25 個項目
+      const mergedChecks: DutyCheckMap = {};
+      for (const item of BUSINESS_DUTY_CHECKLIST) {
+        mergedChecks[item.id] = loadedChecks[item.id] || { status: 'uncompleted' };
+      }
+      setChecks(mergedChecks);
+    } catch (err) {
+      if (generation !== loadGeneration.current) return;
+      setShiftReports([]);
+      setEntries([]);
+      setApprovals([]);
+      setNote(`失敗：${errorMessage(err, '業管組交接資料載入失敗')}`);
+    } finally {
+      if (generation === loadGeneration.current) setBusy(false);
     }
-    setChecks(mergedChecks);
-    setBusy(false);
   }, [date]);
 
   useEffect(() => {
@@ -537,9 +543,10 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
   // 當前活耀大班別代碼
   const currentActiveShift = useMemo(() => {
+    if (nowTime.hour < 1) return date === moveDate(nowTime.today, -1) ? SHIFTS[2] : null;
     if (!isToday) return null;
     return SHIFTS.find(s => isCurrentMajorShift(s.code, isToday, nowTime.hour)) || null;
-  }, [isToday, nowTime.hour]);
+  }, [date, isToday, nowTime.hour, nowTime.today]);
 
   // 切換單項點檢狀態
   const handleToggleCheck = useCallback(
@@ -641,47 +648,36 @@ export function BusinessHandover({ system, module, profile }: Props) {
         note: noteContent.trim() || null,
       });
 
-      // 本地快取備援更新
-      const newApproval: BusinessApproval = {
-        handover_date: date,
-        stage,
-        stage_label: stageItem.label,
-        approver_id: profile.user_id,
-        approved_at: new Date().toISOString(),
-        note: noteContent.trim() || null,
-      };
-
-      const updatedApprovals = [...approvals.filter(a => a.stage !== stage), newApproval];
-      setApprovals(updatedApprovals);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`${APPROVAL_STORAGE_PREFIX}${date}`, JSON.stringify(updatedApprovals));
-      }
-
-      setNote(`✓ 已完成「${stageItem.label}」批核簽核紀錄`);
       setApprovingStage(null);
       setModalApprovalNote('');
       await load();
     } catch (err) {
-      // 容錯備援
-      const newApproval: BusinessApproval = {
-        handover_date: date,
-        stage,
-        stage_label: stageItem.label,
-        approver_id: profile.user_id,
-        approved_at: new Date().toISOString(),
-        note: noteContent.trim() || null,
-      };
-      const updatedApprovals = [...approvals.filter(a => a.stage !== stage), newApproval];
-      setApprovals(updatedApprovals);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`${APPROVAL_STORAGE_PREFIX}${date}`, JSON.stringify(updatedApprovals));
-      }
-      setNote(`✓「${stageItem.label}」批核已登記記錄`);
-      setApprovingStage(null);
-      setModalApprovalNote('');
+      setNote(`失敗：批核未儲存，${errorMessage(err)}`);
     } finally {
       setBusy(false);
     }
+  };
+
+  const openConfirmation = (value: BusinessConfirmation) => {
+    setConfirmMessage('');
+    setConfirmation(value);
+  };
+  const saveConfirmation = async (receiverId: string) => {
+    if (!confirmation || confirmBusy) return;
+    setConfirmBusy(true);
+    setConfirmMessage('');
+    try {
+      const { operation, shift, entry } = confirmation;
+      await invokeAppApi('business_handover_action', {
+        operation, handover_date: date, shift_code: shift.shift_code,
+        entry_id: entry?.entry_id, receiver_id: receiverId || undefined,
+        revision: operation === 'receive' ? shift.incoming?.revision : shift.revision,
+      });
+      setConfirmation(null);
+      await load();
+    } catch (err) {
+      setConfirmMessage(errorMessage(err));
+    } finally { setConfirmBusy(false); }
   };
 
   const print = () => {
@@ -704,7 +700,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 type="button"
                 className="secondary-btn compact"
                 onClick={() => setPreviewOpen(true)}
-                title="在畫面上預覽 A4 單頁報表"
+                title="在畫面上預覽 A4報表"
               >
                 <BusinessIcon name="eye" size={14} />
                 預覽本日報表
@@ -1067,11 +1063,11 @@ export function BusinessHandover({ system, module, profile }: Props) {
           {/* 三班交接清單卡片 */}
           <div className="hs-shifts">
             {SHIFTS.map((shift, shiftIndex) => {
-              const shiftCustomRows = entries.filter(
-                row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
-              );
+              const report = shiftReports.find(item => item.shift_code === shift.code);
+              const shiftCustomRows = report?.items || [];
               const activeCustomRows = shiftCustomRows.filter(row => !isDeleted(row));
-              const isShiftActive = isCurrentMajorShift(shift.code, isToday, nowTime.hour);
+              const isShiftActive = shift.code === '17-01' && nowTime.hour < 1
+                ? date === moveDate(nowTime.today, -1) : isCurrentMajorShift(shift.code, isToday, nowTime.hour);
 
               return (
                 <section
@@ -1114,6 +1110,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                       <button
                         type="button"
                         className="primary-btn compact"
+                        disabled={busy || !report || Boolean(report.outgoing)}
                         onClick={() => {
                           setEditingEntry(null);
                           setEditingShift(shift.code);
@@ -1124,6 +1121,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                     </div>
                   </div>
 
+                  {report && <BusinessSignatures shift={report} profileId={profile.user_id}
+                    disabled={busy || confirmBusy || new Date(`${date}T${shift.code.slice(0, 2)}:00:00+08:00`).getTime() > Date.now()} onConfirm={openConfirmation} />}
                   {/* 班別內容清單 */}
                   <div className="hs-shift-body is-single">
                     {shiftCustomRows.length ? (
@@ -1132,39 +1131,27 @@ export function BusinessHandover({ system, module, profile }: Props) {
                           <article
                             className={`business-entry${isDeleted(row) ? ' is-deleted' : ''}`}
                             key={String(row.entry_id)}
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              setEditingEntry(row);
-                              setEditingShift(shift.code);
-                            }}
-                            onKeyDown={event => {
-                              if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault();
-                                setEditingEntry(row);
-                                setEditingShift(shift.code);
-                              }
-                            }}
                           >
                             <div className="business-entry-main">
                               <div className="business-entry-category">
                                 <span className={`business-category-tag ${row.category === '維修' ? 'is-repair' : row.category === '事務事項' ? 'is-affair' : 'is-other'}`}>
                                   {String(row.category || '其他')}
                                 </span>
-                                <small>第 {itemIndex + 1} 件</small>
+                                <small>第 {itemIndex + 1} 件 · 是否完成：{row.is_completed ? '是' : '否（持續續辦）'}</small>
+                                {row.carried && <small>續帶自 {String(row.handover_date)} {businessShiftName(String(row.shift_code))}</small>}
                               </div>
-                              <p>{String(row.description || '—')}</p>
+                              <p>{row.carried ? String(row.description || '—').replace(/^本日應出勤人數：\d+ 人；未出勤人數：\d+ 人。\s*/u, '') : String(row.description || '—')}</p>
+                              {row.is_completed && <small>完成：{businessTime(row.completed_at)} · {String(row.completed_name || '—')}</small>}
                             </div>
 
-                            <div className="business-attendance">
+                            {!row.carried && <div className="business-attendance">
                               <span>
                                 應出勤 <b>{Number(row.expected_attendance || 0)}</b> 人
                               </span>
                               <span>
                                 未出勤 <b>{Number(row.absent_attendance || 0)}</b> 人
                               </span>
-                            </div>
-
+                            </div>}
                             <div className="business-audit">
                               <span>
                                 建立 {activityTime(row.created_at)} · {userName(row.created_by)}
@@ -1181,7 +1168,13 @@ export function BusinessHandover({ system, module, profile }: Props) {
                                   刪除 {activityTime(row.deleted_at)} · {userName(row.deleted_by)}
                                 </span>
                               )}
-                              <b>{isDeleted(row) ? '已刪除，保留紀錄' : '點擊修改'}</b>
+                              <b>{isDeleted(row) ? '已刪除，保留紀錄' : report?.outgoing || row.content_locked || row.is_completed ? '交接內容已鎖定' : '可編輯事項'}</b>
+                              {!isDeleted(row) && <div className="business-stage-actions">
+                                {!report?.outgoing && !row.content_locked && !row.is_completed && <button type="button" className="secondary-btn compact" disabled={busy}
+                                  onClick={() => { setEditingEntry(row); setEditingShift(shift.code); }}>修改事項</button>}
+                                {!row.is_completed && !report?.outgoing && report && <button type="button" className="primary-btn compact" disabled={busy || confirmBusy || !isShiftActive}
+                                  onClick={() => openConfirmation({ operation: 'complete', shift: report, entry: row })}>標記已完成</button>}
+                              </div>}
                             </div>
                           </article>
                         ))}
@@ -1199,13 +1192,14 @@ export function BusinessHandover({ system, module, profile }: Props) {
           </div>
         </section>
 
-        {/* 列印專用報表區 (A4 單頁精確排版) */}
+        {/* 列印專用報表區 (A4精確排版) */}
         <section className="hs-print-sheet" aria-label="業管組每日列印報表">
           <BusinessReportContent
             date={date}
             checkStats={checkStats}
             checks={checks}
             entries={entries}
+            shiftReports={shiftReports}
             approvals={approvals}
             userName={userName}
           />
@@ -1222,8 +1216,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
         >
           <div className="business-report-preview-bar">
             <div>
-              <strong>本日報表預覽（A4 單頁版面）</strong>
-              <span>{rocDate(date)} · A4 直式單頁排版，已整合雙欄點檢與三階批核簽章</span>
+              <strong>本日報表預覽（A4版面）</strong>
+              <span>{rocDate(date)} · A4 直式排版，資料較多時自動跨頁，已整合雙欄點檢與三階批核簽章</span>
             </div>
             <div className="business-report-preview-actions">
               <button
@@ -1258,6 +1252,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 checkStats={checkStats}
                 checks={checks}
                 entries={entries}
+                shiftReports={shiftReports}
                 approvals={approvals}
                 userName={userName}
               />
@@ -1266,6 +1261,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
         </div>
       )}
 
+      {confirmation && <BusinessConfirmModal confirmation={confirmation} users={receivers} profileId={profile.user_id}
+        busy={confirmBusy} message={confirmMessage} onClose={() => setConfirmation(null)} onSave={receiver => void saveConfirmation(receiver)} />}
       {/* 編輯交接彈窗 */}
       {editingShift && (
         <BusinessEntryModal
@@ -1327,12 +1324,13 @@ export function BusinessHandover({ system, module, profile }: Props) {
   );
 }
 
-// 供列印與螢幕預覽共用的 A4 單頁報表內容元件 (精確控制在一頁內)
+// 供列印與螢幕預覽共用的 A4報表內容元件 (精確控制在一頁內)
 function BusinessReportContent({
   date,
   checkStats,
   checks,
   entries,
+  shiftReports,
   approvals,
   userName,
 }: {
@@ -1340,6 +1338,7 @@ function BusinessReportContent({
   checkStats: { completed: number; total: number; percent: number };
   checks: DutyCheckMap;
   entries: Row[];
+  shiftReports: BusinessShift[];
   approvals: BusinessApproval[];
   userName: (id: unknown) => string;
 }) {
@@ -1429,12 +1428,11 @@ function BusinessReportContent({
         </thead>
         <tbody>
           {SHIFTS.map(shift => {
-            const shiftRows = entries.filter(
-              row => row.shift_code === shift.code && !String(row.description || '').includes(CHECKLIST_TAG)
-            );
+            const report = shiftReports.find(item => item.shift_code === shift.code);
+            const shiftRows = report?.items || [];
             const activeRows = shiftRows.filter(r => !isDeleted(r));
-            const expectedSum = activeRows.reduce((s, r) => s + Number(r.expected_attendance || 0), 0);
-            const absentSum = activeRows.reduce((s, r) => s + Number(r.absent_attendance || 0), 0);
+            const expectedSum = activeRows.filter(r => !r.carried).reduce((s, r) => s + Number(r.expected_attendance || 0), 0);
+            const absentSum = activeRows.filter(r => !r.carried).reduce((s, r) => s + Number(r.absent_attendance || 0), 0);
 
             return (
               <tr key={shift.code}>
@@ -1448,14 +1446,21 @@ function BusinessReportContent({
                     <div className="print-entries-wrap">
                       {activeRows.map((r, i) => (
                         <div key={String(r.entry_id)} className="print-entry-item">
-                          <span className="print-cat-tag">【{r.category || '交接'}】</span>
+                          <span className="print-cat-tag">【{r.category || '交接'}・{r.is_completed ? '已完成' : '未完成／續辦'}】</span>
+                          {r.carried && <small>來源 {String(r.handover_date)} {businessShiftName(String(r.shift_code))}　</small>}
+                          {r.is_completed && <small>完成 {businessTime(r.completed_at)} · {String(r.completed_name)}　</small>}
                           <span>{String(r.description || '').replace(/^本日應出勤人數：\d+ 人；未出勤人數：\d+ 人。\s*/u, '') || '正常交接'}</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <span className="print-muted-text">本班無特殊異常交接事項，全般勤務正常。</span>
+                    <span className="print-muted-text">本班無交接事項。</span>
                   )}
+                  <div className="business-print-reconciliation">
+                    <p>接班：{report?.incoming?.received_name || '尚未確認'} · {businessTime(report?.incoming?.received_at)}</p>
+                    <p>交班：{report?.outgoing?.handed_name || '尚未確認'} · {businessTime(report?.outgoing?.handed_at)}</p>
+                    <p>交予：{report?.outgoing?.receiver_name || '尚未指定'} · 下一班接班：{businessTime(report?.outgoing?.received_at)}</p>
+                  </div>
                 </td>
                 <td style={{ textAlign: 'center' }}>
                   {activeRows.length > 0 ? `${expectedSum} 人` : '—'}

@@ -25,11 +25,13 @@ const READ_ACTION_LABELS: Record<string, string> = {
   equipment_map: '讀取設備地圖資料',
   official_documents: '讀取公文傳送資料',
   handover_guard_context: '讀取駐警隊交接班別與巡邏摘要',
+  business_handover_day: '讀取業管組跨班續辦與雙方交接紀錄',
+  business_handover_receivers: '讀取可接班的業管組人員',
   guard_attachment_url: '讀取駐警隊交接附件',
 };
 
 // 公文流程動作固定走同源地端 app-api；名稱保留供既有路由相容。
-const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action']);
+const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action', 'business_handover_action']);
 
 const recordAppRead = (action: string) => {
   const label = READ_ACTION_LABELS[action];
