@@ -22,6 +22,15 @@ export function mechanicalWorkDetails(category: unknown, item: unknown) {
   return [category, item].map(value => String(value || '').trim()).filter(Boolean).join(' ');
 }
 
+export function appendMechanicalWorkDetails(details: unknown, previousSuggestion: unknown, nextSuggestion: unknown) {
+  const current = String(details || '');
+  const previous = String(previousSuggestion || '').trim();
+  const next = String(nextSuggestion || '').trim();
+  if (!next) return current;
+  if (!current.trim() || current === previous) return next;
+  return `${current}${current.endsWith('\n') ? '' : '\n'}${next}`;
+}
+
 export function shiftSlot(date: string, shiftCode: string) {
   const day = Math.floor(new Date(`${date}T12:00:00+08:00`).getTime() / 86_400_000);
   const shift = MECHANICAL_SHIFTS.indexOf(shiftCode as MechanicalShiftCode);

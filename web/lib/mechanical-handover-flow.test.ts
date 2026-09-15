@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, mechanicalWorkDetails, outstandingMechanicalEntries, shiftSlot } from './mechanical-handover-flow.ts';
+import { appendMechanicalWorkDetails, canApproveMechanicalDay, carryTargetShift, currentMechanicalShift, mechanicalApprovalOpensOn, mechanicalWorkDetails, outstandingMechanicalEntries, shiftSlot } from './mechanical-handover-flow.ts';
 
 test('combines the selected category and common item into an editable work description', () => {
   assert.equal(mechanicalWorkDetails('冷凍冷藏設備', 'B1F 冷藏主機巡檢、運轉壓力溫度紀錄'), '冷凍冷藏設備 B1F 冷藏主機巡檢、運轉壓力溫度紀錄');
   assert.equal(mechanicalWorkDetails('', '臨時交辦事項'), '臨時交辦事項');
+});
+
+test('keeps one work record and appends later selections on new detail lines', () => {
+  const first = '冷凍冷藏設備 B1F 冷藏主機巡檢';
+  const second = '供配電設備 B2F 配電室巡查';
+  assert.equal(appendMechanicalWorkDetails('', '', first), first);
+  assert.equal(appendMechanicalWorkDetails(first, first, second), second, 'changing the first selection before Enter replaces its suggestion');
+  assert.equal(appendMechanicalWorkDetails(`${first}\n`, first, second), `${first}\n${second}`, 'Enter preserves the first line and appends the next item');
+  assert.equal(appendMechanicalWorkDetails(`${first}\n人工補充`, first, second), `${first}\n人工補充\n${second}`);
 });
 
 test('recognizes Taipei business shift including midnight carry', () => {
