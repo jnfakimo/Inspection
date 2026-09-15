@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { repairCostCents, repairCostTotal, formatRepairCost } from '@/lib/mechanical-cost';
 import { canApproveMechanicalDay, currentMechanicalShift, mechanicalApprovalOpensOn, mechanicalWorkDetails } from '@/lib/mechanical-handover-flow';
@@ -106,6 +106,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
+  const [entrySequence, setEntrySequence] = useState(0);
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
   const [carrySource, setCarrySource] = useState<Row | null>(null);
   const [presetItem, setPresetItem] = useState('');
@@ -395,7 +396,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {optionsOpen && <MechanicalWorkOptionsModal categories={workCategories} items={workItems} onClose={() => setOptionsOpen(false)} onDone={load} />}
     {confirmation && <MechanicalConfirmModal confirmation={confirmation} users={eligibleReceivers} profileId={profile.user_id} busy={confirmationBusy} message={confirmationMessage} onClose={() => setConfirmation(null)} onSave={receiverId => void saveConfirmation(receiverId)} />}
-    {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} categories={workCategories} items={workItems} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === editingShift)?.outgoing) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
+    {editingShift && <WorkEntryModal key={`${editingShift}-${entrySequence}`} date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} categories={workCategories} items={workItems} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === editingShift)?.outgoing) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async (action, continueAdding = false) => { const wasCarry = Boolean(carrySource); const completedShift = editingShift; setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); if (continueAdding && action === 'created' && !wasCarry && completedShift) { setEntrySequence(value => value + 1); setEditingShift(completedShift); setNote('本筆工作已新增，請繼續輸入下一筆'); return; } setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
   </AppShell>;
 }
 
@@ -541,7 +542,7 @@ export function MechanicalWorkOptionsModal({ categories, items, onClose, onDone 
   </AdminModal>;
 }
 
-export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categories, items, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { date: string; shiftCode: string; users: Row[]; scheduledUserIds: string[]; categories: Row[]; items: Row[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted') => void }) {
+export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categories, items, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { date: string; shiftCode: string; users: Row[]; scheduledUserIds: string[]; categories: Row[]; items: Row[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted', continueAdding?: boolean) => void }) {
   const sourceRow = entry || carrySource;
   const sourceItem = String(sourceRow?.work_item || presetItem || '');
   const categoryNameById = new Map(categories.map(row => [String(row.category_id), String(row.name || '')]));
@@ -558,6 +559,7 @@ export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categ
   const [repairCost, setRepairCost] = useState(entry?.repair_cost == null ? '' : String(entry.repair_cost));
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const detailsRef = useRef<HTMLTextAreaElement>(null);
   const changeCategory = (value: string) => {
     const mayReplace = detailsAreAutomatic || !details.trim() || details.trim() === mechanicalWorkDetails(category, item);
     setCategory(value); setItem('');
@@ -567,16 +569,17 @@ export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categ
     const mayReplace = detailsAreAutomatic || !details.trim() || details.trim() === mechanicalWorkDetails(category, item);
     setItem(value);
     if (mayReplace) { setDetails(mechanicalWorkDetails(category, value)); setDetailsAreAutomatic(true); }
+    if (value) window.requestAnimationFrame(() => detailsRef.current?.focus());
   };
   const toggleTechnician = (id: string) => setTechnicians(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
-  const submit = async () => {
-    if (locked) return;
+  const submit = async (continueAdding = false) => {
+    if (locked || busy) return;
     if ((!item && !details.trim()) || !technicians.length) { setMessage('請選擇常用工作項目或填寫工作補充說明，並至少選擇一位維修人員'); return; }
     if (repairCostCents(repairCost) === undefined) { setMessage('維修費用請輸入 0 至 999,999,999.99 的金額，最多兩位小數'); return; }
     setBusy(true); setMessage('');
     try {
       await invokeAppApi('handover_save', { kind: entry ? 'mechanical_entry_update' : 'mechanical_entry', entry_id: entry?.entry_id, work_date: date, shift_code: shiftCode, category, work_item: item, details, technician_ids: technicians, result, notes, repair_cost: repairCost.trim() || null, carry_source_id: carrySource?.entry_id || null });
-      await onDone(entry ? 'updated' : 'created');
+      await onDone(entry ? 'updated' : 'created', continueAdding);
     } catch (error) { setMessage(errorMessage(error)); setBusy(false); }
   };
   const remove = async () => {
@@ -601,13 +604,13 @@ export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categ
     <div className="admin-form-grid mechanical-form">
       <label>工作分類<select disabled={locked} value={category} onChange={event => changeCategory(event.target.value)}><BlankSelectOption />{categoryOptions.map(value => <option key={value} value={value}>{value}</option>)}</select><small className="mechanical-blank-hint">第一列為空白，可不選分類。</small></label>
       <label>常用工作項目<select disabled={locked} value={item} onChange={event => changeItem(event.target.value)}><BlankSelectOption />{itemOptions.map(value => <option key={value} value={value}>{value}</option>)}</select><small className="mechanical-blank-hint">選取後會即時帶入下方說明，仍可繼續補充。</small></label>
-      <label className="wide">工作補充說明<textarea disabled={locked} rows={3} value={details} onChange={event => { setDetails(event.target.value); setDetailsAreAutomatic(false); }} placeholder="選擇分類與常用工作項目後自動帶入，也可補充設備位置、異常或處理內容" /></label>
+      <label className="wide">工作補充說明<textarea ref={detailsRef} disabled={locked} rows={3} value={details} onChange={event => { setDetails(event.target.value); setDetailsAreAutomatic(false); }} onKeyDown={event => { if (!entry && !carrySource && !event.shiftKey && !event.ctrlKey && !event.altKey && event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void submit(true); } }} placeholder="選擇分類與常用工作項目後自動帶入，也可補充設備位置、異常或處理內容" /><small className="mechanical-blank-hint">新增時按 Enter 儲存並開啟下一筆；Shift+Enter 可換行。</small></label>
       <fieldset className="wide" disabled={locked}><legend>維修人員（可複選） · 已選 {technicians.length} 人</legend><p className={`mechanical-roster-hint${scheduledUserIds.length ? '' : ' is-empty'}`}>{scheduledUserIds.length ? `已由二市排班表帶入本班 ${scheduledUserIds.length} 人，可依實際支援情形增減。` : '二市排班表尚未安排本班人員，請手動選擇或先完成排班。'}</p><div className="mechanical-person-grid">{sortedUsers.map(user => <label className={scheduledUserIds.includes(String(user.user_id)) ? 'is-scheduled' : ''} key={String(user.user_id)}><input type="checkbox" checked={technicians.includes(String(user.user_id))} onChange={() => toggleTechnician(String(user.user_id))} /><span>{user.name}</span><small>{scheduledUserIds.includes(String(user.user_id)) ? '本班排班' : '機電課'}</small></label>)}</div></fieldset>
       <label>處理結果<select disabled={locked} value={result} onChange={event => setResult(event.target.value)}>{RESULT_OPTIONS.map(value => <option key={value}>{value}</option>)}</select></label>
       <label>維修費用（新臺幣元）<input disabled={locked} aria-label="維修費用（新臺幣元）" inputMode="decimal" value={repairCost} onChange={event => setRepairCost(event.target.value)} placeholder="未填可留白，無費用填 0" /></label>
       <label className="wide">備註<input disabled={locked} value={notes} onChange={event => setNotes(event.target.value)} placeholder="待辦、交班或其他說明" /></label>
     </div>
     {message && <p role="alert" className="mechanical-modal-message">{message}</p>}
-    <footer><button className="secondary-btn" onClick={onClose}>{locked ? '關閉' : '取消'}</button>{entry && !locked && <button className="danger-btn compact" disabled={busy} onClick={() => void remove()}>{confirmDelete ? '確認刪除' : '刪除紀錄'}</button>}{!locked && <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '儲存中…' : entry ? '儲存修改' : carrySource ? '建立續辦紀錄' : '新增工作紀錄'}</button>}</footer>
+    <footer><button className="secondary-btn" onClick={onClose}>{locked ? '關閉' : '取消'}</button>{entry && !locked && <button className="danger-btn compact" disabled={busy} onClick={() => void remove()}>{confirmDelete ? '確認刪除' : '刪除紀錄'}</button>}{!locked && !entry && !carrySource && <button className="secondary-btn compact" disabled={busy} onClick={() => void submit(true)}>{busy ? '儲存中…' : '儲存並新增下一筆'}</button>}{!locked && <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '儲存中…' : entry ? '儲存修改' : carrySource ? '建立續辦紀錄' : '新增工作紀錄'}</button>}</footer>
   </AdminModal>;
 }
