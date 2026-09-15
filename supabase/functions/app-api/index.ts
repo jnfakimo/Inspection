@@ -11,6 +11,7 @@ import { writeAudit } from './audit.ts';
 import { handleVehicleAction } from './handlers/vehicle.ts';
 import { handleMeetingAction } from './handlers/meeting.ts';
 import { handlePatrolShiftAction } from './handlers/patrol-shifts.ts';
+import { handleBusinessHandoverAction } from './handlers/business-handover.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -3073,6 +3074,9 @@ export async function handleAppApiRequest(req: Request) {
 
     const patrolShiftResponse = await handlePatrolShiftAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
     if (patrolShiftResponse) return patrolShiftResponse;
+
+    const businessHandoverResponse = await handleBusinessHandoverAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
+    if (businessHandoverResponse) return businessHandoverResponse;
 
     if (action === 'patrol_shift_delete') {
       if (!can('guardpatrol') || !isAdmin) return reply(req, { ok: false, message: '只有巡邏系統管理者可以刪除班別' }, 403);
