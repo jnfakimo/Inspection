@@ -32,10 +32,22 @@ $runnerPath = Join-Path $releaseRoot 'tools\apply-local-migrations.ps1'
 
 $files = @(
   @{ Relative = 'tools/apply-local-migrations.ps1'; Hash = '61A35AE9B9E0FD7817585EEFF393DC3E8CB16344457F41F0CEB0B9C2046B7259' },
+  @{ Relative = 'supabase/migrations/20260909230000_mechanical_handover.sql'; Hash = 'F3C434E98D4286E5B101838F44131E158C91CB0CA738ED2BC11700276EAED950' },
+  @{ Relative = 'supabase/migrations/20260910040000_mechanical_repair_cost.sql'; Hash = 'D8A1E00FD80937FC99F4FA330A63939E1D347454C0F5D524254A89202B004429' },
+  @{ Relative = 'supabase/migrations/20260910050000_mechanical_carryover_approval.sql'; Hash = '3A240B99AD933A19F31E47A6E94EBF91CB7C690F64F741ABBFE8A45C07BE6D52' },
+  @{ Relative = 'supabase/migrations/20260910060000_mechanical_next_day_approval.sql'; Hash = 'DB0F2D549DD2468787E1F87C62747008FD99089874E40C83D46FBAA72EB1D833' },
+  @{ Relative = 'supabase/migrations/20260910143000_mechanical_handover_crud_audit.sql'; Hash = '9AFC8966CAFAA6F6C08F49CEF9245A8B21733036A2C2BB1E240094CA5E236C6C' },
+  @{ Relative = 'supabase/migrations/20260910170000_mechanical_schedule.sql'; Hash = '061CF5FC4E4FA0F87210C0FCD85EAFDC6F33DBBA5A599A5DA0894CF2A68DB2B5' },
+  @{ Relative = 'supabase/migrations/20260910181000_mechanical_staff_markets.sql'; Hash = '28F1556B04FA00F8CAA0713819AD5B52063BA81358E5B7EFD29339853E7A5AE2' },
+  @{ Relative = 'supabase/migrations/20260911093000_business_handover_module_access.sql'; Hash = '2F44AE46837BBA3B8EDC5F2E5F19E47D999F4B3491E670BEA43B569416C15044' },
   @{ Relative = 'supabase/migrations/20260911150000_guard_handover.sql'; Hash = '289DA40FC394D3200CA21782251F6B51797E8B476DD8812BAFBB25EAB25D1701' },
   @{ Relative = 'supabase/migrations/20260911160000_guard_handover_insert_lock.sql'; Hash = 'F2B5F58392377281F74CE02CCFFE763A362BB0CC947708DD5FE0AB919A3DEF90' },
   @{ Relative = 'supabase/migrations/20260911170000_guard_handover_attachments.sql'; Hash = '68C67AE535C68534C6582541900EEA576D63CB714B9C4CC701E2BABE7DFBAEA4' },
   @{ Relative = 'supabase/migrations/20260911180000_guard_handover_options.sql'; Hash = '3EA9D3223A7F75916BF89385EDDA69985B0B9085C989FE764E7386BE1B560676' },
+  @{ Relative = 'supabase/migrations/20260911193000_mechanical_work_options.sql'; Hash = '255663203B699687D6B5058C2115B4B3891C8F994A028A9A6F71C40C19C5C0EE' },
+  @{ Relative = 'supabase/migrations/20260911200000_business_handover_approvals.sql'; Hash = '78243C65D0A51B56A1EFA39CB2EF6B59F4CFC11CFF5093284A2E4B525B296AA2' },
+  @{ Relative = 'supabase/migrations/20260915120000_business_handover_reconciliation.sql'; Hash = 'B2615B3A1BFB01EB4417B8579DC3C3282C85DE7225AE91CD6B490AB1BEDE7FD5' },
+  @{ Relative = 'supabase/migrations/20260915160000_mechanical_handover_reconciliation.sql'; Hash = '2CC2E605560C96FB80D948C2754234E7C58C203A01B0CBBBEDB9E5ABBC200F62' },
   @{ Relative = 'supabase/migrations/20260916110000_guard_handover_designated_receiver.sql'; Hash = '41A2C3386DD9B7E9501D87949E890CA94DB5C378382615BBD6BFCD38BE4275F0' },
   @{ Relative = 'supabase/migrations/20260916120000_handover_market_keys.sql'; Hash = '989465CE64B1A88946AE0B620DAC747F1B90E8015EA78BC57A1F826B0AEC66A4' },
   @{ Relative = 'supabase/migrations/20260916131000_mechanical_handover_market.sql'; Hash = 'F4BEB2A6D2BCA8357F2EED36532B2D9937D8EDCC1190DEC5B575614FFA24E77A' },
@@ -85,20 +97,14 @@ begin
   foreach relation_name in array array[
     'public.users','public.departments','public.user_handover_module_access',
     'public.user_system_access','public.role_permissions','public.user_module_access','public.role_module_access',
-    'public.business_handover_entries','public.business_handover_approvals',
-    'public.business_handover_transfers','public.business_handover_completions',
-    'public.mechanical_handover_entries','public.mechanical_handover_signatures',
-    'public.mechanical_handover_daily_approvals','public.mechanical_handover_transfers',
-    'public.mechanical_staff_market_scopes','public.patrol_shift_template','public.patrol_shifts',
+    'public.patrol_shift_template','public.patrol_shifts',
     'public.patrol_shift_day_status','public.plan_markers','public.checkin_logs','storage.buckets'
   ] loop
     if to_regclass(relation_name) is null then missing := array_append(missing,relation_name); end if;
   end loop;
   foreach function_name in array array[
-    'public.reject_physical_data_removal()','public.has_handover_module_access(text)',
-    'public.active_user_id()','public.active_rbac_role()',
-    'public.can_approve_mechanical_handover()','public.business_receiver_allowed(uuid)',
-    'public.business_shift_start(date,text)'
+    'public.reject_physical_data_removal()',
+    'public.active_user_id()','public.active_rbac_role()'
   ] loop
     if to_regprocedure(function_name) is null then missing := array_append(missing,function_name); end if;
   end loop;
@@ -124,10 +130,22 @@ try {
 }
 
 $migrations = @(
+  '20260909230000_mechanical_handover.sql',
+  '20260910040000_mechanical_repair_cost.sql',
+  '20260910050000_mechanical_carryover_approval.sql',
+  '20260910060000_mechanical_next_day_approval.sql',
+  '20260910143000_mechanical_handover_crud_audit.sql',
+  '20260910170000_mechanical_schedule.sql',
+  '20260910181000_mechanical_staff_markets.sql',
+  '20260911093000_business_handover_module_access.sql',
   '20260911150000_guard_handover.sql',
   '20260911160000_guard_handover_insert_lock.sql',
   '20260911170000_guard_handover_attachments.sql',
   '20260911180000_guard_handover_options.sql',
+  '20260911193000_mechanical_work_options.sql',
+  '20260911200000_business_handover_approvals.sql',
+  '20260915120000_business_handover_reconciliation.sql',
+  '20260915160000_mechanical_handover_reconciliation.sql',
   '20260916110000_guard_handover_designated_receiver.sql',
   '20260916120000_handover_market_keys.sql',
   '20260916131000_mechanical_handover_market.sql',
@@ -200,10 +218,13 @@ begin
 
   select count(distinct version) into applied_versions
   from supabase_migrations.schema_migrations
-  where version in ('20260911150000','20260911160000','20260911170000','20260911180000',
+  where version in ('20260909230000','20260910040000','20260910050000','20260910060000',
+    '20260910143000','20260910170000','20260910181000','20260911093000',
+    '20260911150000','20260911160000','20260911170000','20260911180000',
+    '20260911193000','20260911200000','20260915120000','20260915160000',
     '20260916110000','20260916120000','20260916131000','20260916132000','20260916170000','20260916190000');
-  if applied_versions <> 10 then
-    raise exception 'handover market release history is incomplete: % of 10', applied_versions;
+  if applied_versions <> 22 then
+    raise exception 'handover market release history is incomplete: % of 22', applied_versions;
   end if;
 end
 $verify$;
