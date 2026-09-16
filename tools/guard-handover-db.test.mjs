@@ -11,6 +11,12 @@ const handover = '00000000-0000-0000-0000-000000000001';
 const receiver = '00000000-0000-0000-0000-000000000002';
 const other = '00000000-0000-0000-0000-000000000003';
 const dept = '10000000-0000-0000-0000-000000000001';
+const baseMigrations = [
+  '20260911150000_guard_handover.sql',
+  '20260911160000_guard_handover_insert_lock.sql',
+  '20260911170000_guard_handover_attachments.sql',
+  '20260911180000_guard_handover_options.sql',
+].map(name => readFileSync(new URL(`../supabase/migrations/${name}`, import.meta.url), 'utf8'));
 const migration = readFileSync(new URL('../supabase/migrations/20260916110000_guard_handover_designated_receiver.sql', import.meta.url), 'utf8');
 const query = (sql, args = []) => db.query(sql, args);
 const actor = who => query(`select set_config('test.actor',$1,false)`, [who]);
@@ -18,8 +24,11 @@ const actor = who => query(`select set_config('test.actor',$1,false)`, [who]);
 try {
   await db.exec(`
     create role anon; create role authenticated; create role service_role;
+    create schema storage;
+    create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
     create table departments(dept_id uuid primary key,name text,status text);
     create table users(user_id uuid primary key,name text,status text,username text,email text,department text,dept_id uuid,rbac_role text default 'reporter',role text default 'inspector');
+    create table user_handover_module_access(user_id uuid,module_key text);
     create table user_system_access(user_id uuid,system_key text,mode text);
     create table role_permissions(role_id text,perm text,allowed boolean);
     create table user_module_access(user_id uuid,system_key text,module_key text,mode text);
@@ -27,32 +36,29 @@ try {
     create function active_user_id() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
     create function has_handover_module_access(text) returns boolean language sql stable as $$select true$$;
     create function reject_physical_data_removal() returns trigger language plpgsql as $$begin raise exception 'no delete'; end$$;
-    create table guard_handover_daily_approvals(approval_id uuid primary key default gen_random_uuid(),duty_date date);
-    create table guard_handover_logs(
-      log_id uuid primary key default gen_random_uuid(), duty_date date not null, shift_name text not null,
-      shift_order int default 0, shift_start time not null, shift_end time not null, patrol_start time not null, patrol_end time not null,
-      scheduled_user_ids uuid[] default '{}', actual_user_ids uuid[] default '{}', substitute_note text default '', duty_summary text default '', important_notes text default '',
-      incidents jsonb default '[]', items jsonb default '[]', patrol_snapshot jsonb, status text default 'draft',
-      handover_by uuid, handover_at timestamptz, takeover_by uuid, takeover_at timestamptz,
-      created_by uuid not null, created_at timestamptz default now(), updated_by uuid not null, updated_at timestamptz default now()
-    );
-    create function protect_guard_handover_log() returns trigger language plpgsql as $$begin return new; end$$;
-    create trigger trg_protect_guard_handover_log before insert or update on guard_handover_logs for each row execute function protect_guard_handover_log();
+  `);
+  for (const baseMigration of baseMigrations) {
+    await db.exec(baseMigration);
+  }
+  await db.exec(`
     insert into departments values('${dept}','駐警隊','active');
     insert into role_permissions values('reporter','sys_handover',true);
+    insert into users(user_id,name,status,username,email,department,dept_id) values
+      ('${handover}','交班人','active','handover','handover@example.test','駐警隊','${dept}'),
+      ('${receiver}','接班人','active','receiver','receiver@example.test','駐警隊','${dept}'),
+      ('${other}','其他人員','active','other','other@example.test','駐警隊','${dept}');
     insert into guard_handover_logs(duty_date,shift_name,shift_start,shift_end,patrol_start,patrol_end,
-      status,handover_by,handover_at,created_by,updated_by)
-      values('2026-09-15','舊版待接','03:00','11:00','04:00','05:00','submitted','${handover}',now(),'${handover}','${handover}');
+      created_by,updated_by)
+      values('2026-09-15','舊版待接','03:00','11:00','04:00','05:00','${handover}','${handover}');
+    update guard_handover_logs set status='submitted',handover_by='${handover}',updated_by='${handover}' where shift_name='舊版待接';
     insert into guard_handover_logs(duty_date,shift_name,shift_start,shift_end,patrol_start,patrol_end,
-      status,handover_by,handover_at,takeover_by,takeover_at,created_by,updated_by)
-      values('2026-09-14','舊版已接','03:00','11:00','04:00','05:00','received','${handover}',now(),'${receiver}',now(),'${handover}','${receiver}');
+      created_by,updated_by)
+      values('2026-09-14','舊版已接','03:00','11:00','04:00','05:00','${handover}','${handover}');
+    update guard_handover_logs set status='submitted',handover_by='${handover}',updated_by='${handover}' where shift_name='舊版已接';
+    update guard_handover_logs set status='received',takeover_by='${receiver}',updated_by='${receiver}' where shift_name='舊版已接';
   `);
   await db.exec(migration);
   await db.exec(migration);
-  await query(`insert into users(user_id,name,status,username,email,department,dept_id) values
-    ($1,'交班人','active','handover','handover@example.test','駐警隊',$4),
-    ($2,'接班人','active','receiver','receiver@example.test','駐警隊',$4),
-    ($3,'其他人員','active','other','other@example.test','駐警隊',$4)`, [handover, receiver, other, dept]);
   await actor(handover);
   assert.equal((await query(`select guard_handover_receivers() as data`)).rows[0].data.length, 2);
   assert.equal((await query(`select receiver_id from guard_handover_logs where shift_name='舊版已接'`)).rows[0].receiver_id, null, '既有完成簽認不回寫');
