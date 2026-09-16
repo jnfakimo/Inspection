@@ -135,7 +135,8 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
             <div className={`hs-sign${log.handover_by ? ' is-signed' : ''}`}><span className="hs-sign-icon"><GuardIcon name={log.handover_by ? 'check' : 'pen'} size={16} /></span>
               <div><span>交班人</span><b>{log.handover_by ? nameOf(log.handover_by) : '尚未簽名'}</b>{log.handover_at && <small>{activityTime(log.handover_at)}</small>}</div></div>
             <div className={`hs-sign${log.takeover_by ? ' is-signed' : ''}`}><span className="hs-sign-icon"><GuardIcon name={log.takeover_by ? 'check' : 'pen'} size={16} /></span>
-              <div><span>接班人</span><b>{log.takeover_by ? nameOf(log.takeover_by) : '尚未簽名'}</b>{log.takeover_at && <small>{activityTime(log.takeover_at)}</small>}</div></div>
+              <div><span>{log.takeover_by ? '接班人' : '指定接班人'}</span><b>{log.takeover_by ? nameOf(log.takeover_by) : log.receiver_id ? nameOf(log.receiver_id) : '尚未指定'}</b>
+                {log.takeover_at ? <small>{activityTime(log.takeover_at)}</small> : log.receiver_id ? <small>等待本人登入確認</small> : null}</div></div>
           </div>
         </Block>}
       </div>
@@ -171,7 +172,9 @@ export function GuardDailyReport({ date, shifts, approval, logFor, nameOf, names
         }).join('\n') : '無'}</td></tr>
         <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>
         <tr><th>巡邏打卡</th><td colSpan={3}>{`應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%`}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
-        <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}` : ''}</td></tr>
+        <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by
+          ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}`
+          : log?.receiver_id ? `指定：${nameOf(log.receiver_id)}（待本人確認）` : ''}</td></tr>
       </tbody></table>;
     }) : <p className="hs-report-empty">巡檢排班沒有任何啟用中的班別。</p>}
     <footer>

@@ -22,13 +22,15 @@ export type GuardLog = {
   log_id: string; duty_date: string; shift_name: string; shift_start: string; shift_end: string; patrol_start: string; patrol_end: string;
   scheduled_user_ids: string[]; actual_user_ids: string[]; substitute_note: string; duty_summary: string; important_notes: string;
   incidents: Incident[]; items: Item[]; patrol_snapshot: PatrolSummary | null; status: 'draft' | 'submitted' | 'received';
-  handover_by: string | null; handover_at: string | null; takeover_by: string | null; takeover_at: string | null;
+  handover_by: string | null; handover_at: string | null; receiver_id: string | null; takeover_by: string | null; takeover_at: string | null;
   created_by: string; created_at: string; updated_by: string; updated_at: string;
 };
 export type Approval = { approval_id: string; approver_id: string; approved_at: string; note: string; shift_count: number; received_count: number };
 export type GuardContext = {
   duty_date: string; shifts: GuardShift[]; logs: GuardLog[]; approval: Approval | null; attachments: Attachment[];
-  staff: { user_id: string; name: string }[]; people: Record<string, string>; previous_items: Item[];
+  staff: { user_id: string; name: string }[];
+  receivers: { user_id: string; name: string; department?: string | null; status?: string }[];
+  people: Record<string, string>; previous_items: Item[];
   can_edit: boolean; can_approve: boolean; approval_open: boolean;
   options: GuardOption[]; options_available?: boolean; can_manage_options: boolean;
 };
@@ -60,7 +62,7 @@ export const DEFAULT_ITEMS: Item[] = [
   { name: '鑰匙（串）', qty: 1, condition: '正常', note: '' },
   { name: '門禁磁卡', qty: 1, condition: '正常', note: '' },
 ];
-export const STATUS_LABELS: Record<string, string> = { draft: '交接中', submitted: '已交班・待接班', received: '已接班' };
+export const STATUS_LABELS: Record<string, string> = { draft: '交接中', submitted: '已交班・待接班確認', received: '已接班' };
 export const SHIFT_STATE_LABELS: Record<string, string> = { upcoming: '尚未開始', active: '值勤中', ended: '已結束' };
 
 export function todayTaipei() {

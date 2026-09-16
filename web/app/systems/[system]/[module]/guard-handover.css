@@ -25,6 +25,20 @@
 .guard-file-remove:hover,.guard-file-remove:focus-visible{background:color-mix(in srgb,var(--red) 9%,var(--panel));color:var(--red);outline:none}
 /* 建立／編輯交接彈窗 */
 .guard-modal{width:min(980px,calc(100vw - 28px))}
+.guard-transfer-modal{width:min(680px,calc(100vw - 28px))}
+.guard-transfer-content{display:grid;gap:16px;padding:20px;color:var(--ink)}
+.guard-transfer-content>p{margin:0;line-height:1.75}
+.guard-transfer-content dl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}
+.guard-transfer-content dl>div{display:grid;gap:3px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.guard-transfer-content dt{color:var(--muted);font-size:12px}.guard-transfer-content dd{margin:0;font-weight:700}
+.guard-transfer-content>label{display:grid;gap:8px;font-weight:700}.guard-transfer-content select{width:100%}
+.guard-transfer-details{display:grid;gap:8px;max-height:42vh;overflow:auto;padding:2px}
+.guard-transfer-details>div{padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.guard-transfer-details strong{color:var(--ink);font-size:13px}
+.guard-transfer-details p{margin:5px 0 0;white-space:pre-wrap;line-height:1.6}
+.guard-transfer-details ul{margin:6px 0 0;padding-left:20px;line-height:1.65}
+.guard-transfer-warning{padding:10px 12px;border-left:4px solid var(--amber);border-radius:6px;background:color-mix(in srgb,var(--amber) 8%,var(--panel))}
+.guard-transfer-actions{display:flex;justify-content:flex-end;gap:10px}
 .guard-form{display:grid;gap:14px;padding:20px}
 .guard-form fieldset{display:grid;gap:10px;margin:0;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--panel2) 40%,var(--panel))}
 .guard-form legend{display:inline-flex;align-items:center;gap:7px;padding:0 8px;color:var(--ink);font-weight:700}.guard-form legend .hs-icon{color:var(--cyan)}
@@ -106,5 +120,6 @@
   .guard-item-row,.guard-incident-row{grid-template-columns:1fr}.guard-incident-row .wide{grid-column:auto}
   .guard-incident-row .guard-field.wide{grid-column:auto}
   .guard-options-list li{flex-wrap:wrap}.guard-options-actions{justify-content:flex-start;width:100%}
+  .guard-transfer-content dl{grid-template-columns:1fr}.guard-transfer-actions{flex-wrap:wrap}.guard-transfer-actions button{flex:1 1 160px}
 }
 @media(prefers-reduced-motion:reduce){.guard-progress.is-indeterminate>span{animation:none}}

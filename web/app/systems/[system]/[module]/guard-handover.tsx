@@ -16,7 +16,9 @@ import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { AdminHeader, AdminModal, errorMessage } from '@/components/admin/shared';
+import { BlankSelectOption } from '@/components/BlankSelectOption';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { selectableActiveUsers } from '@/lib/user-visibility';
 import { canCompressVideo, compressVideo, isVideoFile } from '@/lib/video-compress';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -48,6 +50,9 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [editing, setEditing] = useState<GuardShift | null>(null);
   const [approvalNote, setApprovalNote] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [submitting, setSubmitting] = useState<GuardShift | null>(null);
+  const [receiving, setReceiving] = useState<GuardShift | null>(null);
+  const [receiverId, setReceiverId] = useState('');
   const [filePreview, setFilePreview] = useState<Attachment | null>(null);
   const [optionsList, setOptionsList] = useState<GuardOptionList | null>(null);
   // 每 30 秒重算一次「當班」，班別交替時畫面自動換色，不必重新載入。
@@ -86,6 +91,7 @@ export function GuardHandover({ system, module, profile }: Props) {
     return (context?.options || []).filter(option => option.list_key === list).map(option => option.label);
   }, [context]);
   const canManageOptions = Boolean(context?.can_manage_options);
+  const receivers = useMemo(() => selectableActiveUsers(context?.receivers || []).filter(person => person.user_id !== profile.user_id), [context, profile.user_id]);
   const currentShift = shifts.find(shift => (liveState(now, shift.work_from, shift.work_to, shift.state) ?? shift.state) === 'active') || null;
   const optionAction = async (payload: Record<string, unknown>) => { await invokeAppApi('handover_save', payload); await load(); };
 
@@ -115,12 +121,13 @@ export function GuardHandover({ system, module, profile }: Props) {
     ];
   }, [logs, shifts]);
 
-  const run = async (kind: string, payload: Record<string, unknown>, done: string, confirmText: string) => {
-    if (!window.confirm(confirmText)) return;
+  const run = async (kind: string, payload: Record<string, unknown>, done: string, confirmText?: string) => {
+    if (confirmText && !window.confirm(confirmText)) return false;
     setActing(true); setNote('');
-    try { await invokeAppApi('handover_save', { kind, ...payload }); await load(); setNote(done); }
+    try { await invokeAppApi('handover_save', { kind, ...payload }); await load(); setNote(done); setActing(false); return true; }
     catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     setActing(false);
+    return false;
   };
   const defaultItemsFor = (shift: GuardShift) => {
     const index = shifts.findIndex(row => row.name === shift.name);
@@ -135,15 +142,13 @@ export function GuardHandover({ system, module, profile }: Props) {
     {log?.status === 'draft' && canEdit && <>
       <button type="button" className="secondary-btn compact" onClick={() => setEditing(shift)}>編輯交接</button>
       <button type="button" className="primary-btn compact" disabled={acting}
-        onClick={() => void run('guard_submit', { duty_date: date, shift_name: shift.name }, `${shift.name}已交班簽名，等待接班人確認`,
-          `確認以「${profile.name}」身分交班簽名？送出後內容與附件鎖定，只能在接班前撤回。`)}>交班簽名送出</button>
+        onClick={() => { setReceiverId(''); setSubmitting(shift); }}>核對內容並指定接班人</button>
     </>}
     {log?.status === 'submitted' && canEdit && (log.handover_by === profile.user_id
       ? <button type="button" className="secondary-btn compact" disabled={acting}
         onClick={() => void run('guard_withdraw', { duty_date: date, shift_name: shift.name }, `${shift.name}已撤回交班，可再修改`, '確認撤回交班簽名？撤回後可再修改內容。')}>撤回交班</button>
-      : <button type="button" className="primary-btn compact" disabled={acting}
-        onClick={() => void run('guard_receive', { duty_date: date, shift_name: shift.name }, `${shift.name}已完成接班簽名`,
-          `確認以「${profile.name}」身分接班簽名？簽名後本班交接內容鎖定。`)}>接班簽名確認</button>)}
+      : log.receiver_id === profile.user_id ? <button type="button" className="primary-btn compact" disabled={acting}
+        onClick={() => setReceiving(shift)}>本人核對並確認接班</button> : null)}
   </>;
 
   const report = { date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
@@ -210,6 +215,37 @@ export function GuardHandover({ system, module, profile }: Props) {
       onPreview={setFilePreview}
       onClose={() => { setEditing(null); void load(); }}
       onSaved={async () => { const name = editing.name; setEditing(null); await load(); setNote(`${name}交接內容已儲存`); }} />}
+    {submitting && <AdminModal className="guard-transfer-modal" title="核對交接內容並指定接班人" onClose={() => { if (!acting) setSubmitting(null); }}>
+      <div className="guard-transfer-content">
+        <p>送出後將以「{profile.name}」登記交班簽名，同時鎖定{submitting.name}交接內容與附件。只有指定的接班人本人登入後才能確認接班。</p>
+        <dl><div><dt>值班日期</dt><dd>{rocDate(date)}</dd></div><div><dt>交班班別</dt><dd>{submitting.name}（{hhmm(submitting.shift_start)}–{hhmm(submitting.shift_end)}）</dd></div></dl>
+        <GuardTransferDetails log={logFor(submitting.name)} />
+        <label>指定接班人
+          <select value={receiverId} onChange={event => setReceiverId(event.target.value)} disabled={acting}>
+            <BlankSelectOption />
+            {receivers.map(person => <option key={person.user_id} value={person.user_id}>{person.name}{person.department ? `（${person.department}）` : ''}</option>)}
+          </select>
+        </label>
+        {!receivers.length && <p className="guard-transfer-warning">目前沒有其他具「駐警隊電子交接簿」權限的在職人員，無法指定接班人。</p>}
+        <div className="guard-transfer-actions"><button type="button" className="secondary-btn" disabled={acting} onClick={() => setSubmitting(null)}>取消</button>
+          <button type="button" className="primary-btn" disabled={acting || !receiverId || !logFor(submitting.name)} onClick={async () => {
+            const done = await run('guard_submit', { duty_date: date, shift_name: submitting.name, receiver_id: receiverId,
+              expected_updated_at: logFor(submitting.name)?.updated_at }, `${submitting.name}已交班簽名，等待指定接班人確認`);
+            if (done) { setSubmitting(null); setReceiverId(''); }
+          }}>{acting ? '送出中…' : '本人確認交班'}</button></div>
+      </div>
+    </AdminModal>}
+    {receiving && <AdminModal className="guard-transfer-modal" title="核對上一班交接內容" onClose={() => { if (!acting) setReceiving(null); }}>
+      <div className="guard-transfer-content">
+        <p>請核對{receiving.name}的交班紀錄。接班簽認必須由指定的接班人「{profile.name}」本人執行，並記錄確認時間。</p>
+        <GuardTransferDetails log={logFor(receiving.name)} />
+        <div className="guard-transfer-actions"><button type="button" className="secondary-btn" disabled={acting} onClick={() => setReceiving(null)}>取消</button>
+          <button type="button" className="primary-btn" disabled={acting} onClick={async () => {
+            const done = await run('guard_receive', { duty_date: date, shift_name: receiving.name }, `${receiving.name}已完成接班簽名`);
+            if (done) setReceiving(null);
+          }}>{acting ? '確認中…' : '本人確認接班'}</button></div>
+      </div>
+    </AdminModal>}
     {filePreview && <GuardFilePreview file={filePreview} onClose={() => setFilePreview(null)} />}
     {optionsList && context && <AdminModal className="guard-options-modal" title="管理下拉選單" onClose={() => setOptionsList(null)}>
       <GuardOptionsPanel options={context.options || []} list={optionsList} onListChange={setOptionsList} busy={busy}
@@ -219,6 +255,19 @@ export function GuardHandover({ system, module, profile }: Props) {
         onMove={(option, direction) => optionAction({ kind: 'guard_option_move', option_id: option.option_id, direction })} />
     </AdminModal>}
   </AppShell>;
+}
+
+function GuardTransferDetails({ log }: { log: GuardLog | null }) {
+  if (!log) return <p className="guard-transfer-warning">交接內容已變更，請關閉視窗後重新載入。</p>;
+  return <div className="guard-transfer-details">
+    <div><strong>勤務概況</strong><p>{log.duty_summary || '尚未填寫'}</p></div>
+    <div><strong>重要交辦</strong><p>{log.important_notes || '無'}</p></div>
+    <div><strong>異常事件（{log.incidents.length} 件）</strong>
+      {log.incidents.length ? <ul>{log.incidents.map(incident => <li key={incident.id}>{incident.category}：{incident.description}{incident.action ? `；處理：${incident.action}` : ''}</li>)}</ul> : <p>無</p>}</div>
+    <div><strong>物品點交（{log.items.length} 項）</strong>
+      {log.items.length ? <ul>{log.items.map((item, index) => <li key={`${item.name}-${index}`}>{item.name}×{item.qty}（{item.condition}{item.note ? `；${item.note}` : ''}）</li>)}</ul> : <p>無</p>}</div>
+    {log.patrol_snapshot && <div><strong>巡邏打卡快照</strong><p>應打卡 {log.patrol_snapshot.expected}／已打卡 {log.patrol_snapshot.checked}／完成率 {log.patrol_snapshot.rate}%</p></div>}
+  </div>;
 }
 
 function GuardFilePreview({ file, onClose }: { file: Attachment; onClose: () => void }) {

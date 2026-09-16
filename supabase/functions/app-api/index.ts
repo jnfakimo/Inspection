@@ -13,6 +13,8 @@ import { handleMeetingAction } from './handlers/meeting.ts';
 import { handlePatrolShiftAction } from './handlers/patrol-shifts.ts';
 import { handleBusinessHandoverAction } from './handlers/business-handover.ts';
 import { handleMechanicalHandoverAction } from './handlers/mechanical-handover.ts';
+import { handleHandoverMarketAction } from './handlers/handover-market.ts';
+import { authorizeHandoverMarket } from './handover-market.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -3075,6 +3077,8 @@ export async function handleAppApiRequest(req: Request) {
 
     const patrolShiftResponse = await handlePatrolShiftAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
     if (patrolShiftResponse) return patrolShiftResponse;
+    const handoverMarketResponse = await handleHandoverMarketAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
+    if (handoverMarketResponse) return handoverMarketResponse;
 
     const businessHandoverResponse = await handleBusinessHandoverAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
     if (businessHandoverResponse) return businessHandoverResponse;
@@ -3259,7 +3263,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
-      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult] = await Promise.all([
+      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult, receiverResult] = await Promise.all([
         guardShiftContext(dutyDate),
         admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).order('shift_order'),
         admin.from('guard_handover_daily_approvals').select('*').eq('duty_date', dutyDate).maybeSingle(),
@@ -3270,6 +3274,7 @@ export async function handleAppApiRequest(req: Request) {
         admin.from('guard_handover_attachments').select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at')
           .eq('duty_date', dutyDate).eq('is_deleted', false).order('uploaded_at'),
         admin.from('guard_handover_options').select('option_id,list_key,label,sort_order').eq('is_active', true).order('sort_order').order('label'),
+        canHandoverModule('guard') ? userDb.rpc('guard_handover_receivers') : Promise.resolve({ data: [], error: null }),
       ]);
       const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error || attachmentResult.error;
       if (failure) throw failure;
@@ -3284,12 +3289,15 @@ export async function handleAppApiRequest(req: Request) {
       const referenced = new Set<string>(staff.map(person => person.user_id));
       for (const shift of shifts) shift.scheduled_user_ids.forEach(userId => referenced.add(userId));
       for (const log of logs) {
-        for (const userId of [...guardIdList(log.scheduled_user_ids), ...guardIdList(log.actual_user_ids), log.handover_by, log.takeover_by, log.created_by, log.updated_by]) {
+        for (const userId of [...guardIdList(log.scheduled_user_ids), ...guardIdList(log.actual_user_ids), log.handover_by, log.receiver_id, log.takeover_by, log.created_by, log.updated_by]) {
           if (userId) referenced.add(String(userId));
         }
       }
       // 選單資料表尚未建立（migration 未套用）時不讓整頁失敗，前端改用內建預設清單。
       if (optionResult.error) console.error('guard handover options lookup failed:', optionResult.error.message);
+      if (receiverResult.error) console.error('guard handover receiver lookup failed:', receiverResult.error.message);
+      const receivers = Array.isArray(receiverResult.data) ? receiverResult.data : [];
+      for (const receiver of receivers) if (receiver?.user_id) referenced.add(String(receiver.user_id));
       if (approval?.approver_id) referenced.add(String(approval.approver_id));
       for (const file of attachmentResult.data || []) if (file.uploaded_by) referenced.add(String(file.uploaded_by));
       const people: Record<string, string> = {};
@@ -3298,7 +3306,7 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, {
         ok: true,
         data: {
-          duty_date: dutyDate, shifts, logs, approval, staff, people,
+          duty_date: dutyDate, shifts, logs, approval, staff, receivers, people,
           previous_items: Array.isArray(previousResult.data?.items) ? previousResult.data.items : [],
           can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(),
           approval_open: dutyDate < todayInTaipei,
@@ -3338,6 +3346,18 @@ export async function handleAppApiRequest(req: Request) {
             : kind.startsWith('business_') ? 'business'
               : kind === 'create_case' || kind === 'add_attachment' ? 'open-items' : '';
       if (requiredModule && !canHandoverModule(requiredModule)) return reply(req, { ok: false, message: '目前帳號未開放此交接簿子系統' }, 403);
+      const mechanicalMarketKinds = new Set(['mechanical_entry','mechanical_entry_update','mechanical_entry_delete','mechanical_sign','mechanical_approve']);
+      const mechanicalMarket = mechanicalMarketKinds.has(kind)
+        ? await authorizeHandoverMarket(admin, profile.user_id, 'mechanical', body.market_code, isSysadmin) : null;
+      if (mechanicalMarketKinds.has(kind) && !mechanicalMarket) {
+        return reply(req, { ok: false, message: '目前帳號未開放所選市場的機電課交接簿' }, 403);
+      }
+      const businessMarketKinds = new Set(['business_entry','business_entry_update','business_entry_delete','business_approve']);
+      const businessMarket = businessMarketKinds.has(kind)
+        ? await authorizeHandoverMarket(admin, profile.user_id, 'business', body.market_code, isSysadmin) : null;
+      if (businessMarketKinds.has(kind) && !businessMarket) {
+        return reply(req, { ok: false, message: '目前帳號未開放所選市場的業管組交接簿' }, 403);
+      }
 
       if (kind === 'record') {
         const shiftDate = text(body.shift_date, 10), shiftType = text(body.shift_type, 20);
@@ -3538,7 +3558,7 @@ export async function handleAppApiRequest(req: Request) {
         if (!validISODate(workDate)) return reply(req, { ok: false, message: '工作日期格式無效' }, 400);
         if (!MECHANICAL_SHIFT_CODES.includes(shiftCode as (typeof MECHANICAL_SHIFT_CODES)[number])) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
         const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
-          .select('approval_id').eq('work_date', workDate).maybeSingle();
+          .select('approval_id').eq('market_code', mechanicalMarket).eq('work_date', workDate).maybeSingle();
         if (approvalReadError) throw approvalReadError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再新增工作' }, 409);
         const category = text(body.category, 80), workItem = text(body.work_item, 300), details = text(body.details, 3000);
@@ -3558,11 +3578,15 @@ export async function handleAppApiRequest(req: Request) {
           .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
         if (peopleError) throw peopleError;
         if ((people || []).length !== technicianIds.length || (people || []).some(isDeidentifiedAccount)) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
+        const { data: scopedTechnicians, error: scopeError } = await userDb.from('mechanical_staff_market_scopes')
+          .select('user_id').in('user_id', technicianIds).eq('market_code', mechanicalMarket).eq('is_active', true);
+        if (scopeError) throw scopeError;
+        if ((scopedTechnicians || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員必須屬於所選市場' }, 400);
         const carrySourceId = body.carry_source_id ? id(body.carry_source_id) : null;
         if (body.carry_source_id && !carrySourceId) return reply(req, { ok: false, message: '續辦來源資料無效' }, 400);
         if (carrySourceId) {
           const { data: source, error: sourceError } = await userDb.from('mechanical_handover_entries')
-            .select('entry_id,work_date,shift_code,result,is_deleted').eq('entry_id', carrySourceId).maybeSingle();
+            .select('entry_id,work_date,shift_code,result,is_deleted').eq('entry_id', carrySourceId).eq('market_code', mechanicalMarket).maybeSingle();
           if (sourceError) throw sourceError;
           if (!source || source.is_deleted) return reply(req, { ok: false, message: '找不到可接續的來源工作' }, 404);
           if (!MECHANICAL_UNFINISHED_RESULTS.has(String(source.result || ''))) return reply(req, { ok: false, message: '原工作已完成，不需要帶入下一班' }, 409);
@@ -3575,7 +3599,7 @@ export async function handleAppApiRequest(req: Request) {
           if (existingCarry) return reply(req, { ok: false, message: '這筆工作已由其他班次接續，請重新載入' }, 409);
         }
         const payload = {
-          work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
+          market_code: mechanicalMarket, work_date: workDate, shift_code: shiftCode, category, work_item: workItem,
           details: details || null, technician_ids: technicianIds,
           result, notes: text(body.notes, 1000) || null,
           repair_cost: costCents === null ? null : costCents / 100,
@@ -3595,13 +3619,13 @@ export async function handleAppApiRequest(req: Request) {
         const entryId = id(body.entry_id);
         if (!entryId) return reply(req, { ok: false, message: '工作紀錄識別碼無效' }, 400);
         const { data: before, error: readError } = await userDb.from('mechanical_handover_entries')
-          .select('*').eq('entry_id', entryId).maybeSingle();
+          .select('*').eq('entry_id', entryId).eq('market_code', mechanicalMarket).maybeSingle();
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的工作紀錄' }, 404);
         if (before.is_deleted) return reply(req, { ok: false, message: '已刪除的工作紀錄不可再修改' }, 409);
         const workDate = String(before.work_date || '');
         const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
-          .select('approval_id').eq('work_date', workDate).maybeSingle();
+          .select('approval_id').eq('market_code', mechanicalMarket).eq('work_date', workDate).maybeSingle();
         if (approvalReadError) throw approvalReadError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再修改工作' }, 409);
 
@@ -3623,6 +3647,10 @@ export async function handleAppApiRequest(req: Request) {
           .in('user_id', technicianIds).in('dept_id', mechanicalDeptIds).eq('status', 'active');
         if (peopleError) throw peopleError;
         if ((people || []).length !== technicianIds.length || (people || []).some(isDeidentifiedAccount)) return reply(req, { ok: false, message: '維修人員僅限第二階機電課的在職同仁' }, 400);
+        const { data: scopedTechnicians, error: scopeError } = await userDb.from('mechanical_staff_market_scopes')
+          .select('user_id').in('user_id', technicianIds).eq('market_code', mechanicalMarket).eq('is_active', true);
+        if (scopeError) throw scopeError;
+        if ((scopedTechnicians || []).length !== technicianIds.length) return reply(req, { ok: false, message: '維修人員必須屬於所選市場' }, 400);
 
         const payload = {
           category, work_item: workItem, details: details || null,
@@ -3631,7 +3659,7 @@ export async function handleAppApiRequest(req: Request) {
           updated_by: profile.user_id, updated_at: new Date().toISOString(),
         };
         const { data: updated, error } = await userDb.from('mechanical_handover_entries')
-          .update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+          .update(payload).eq('entry_id', entryId).eq('market_code', mechanicalMarket).eq('is_deleted', false).select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '工作紀錄修改失敗') }, String(error.code || '') === '42501' ? 403 : 409);
         if (!updated) return reply(req, { ok: false, message: '這筆工作已被其他人異動，請重新載入' }, 409);
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', entryId, 'update', before, updated);
@@ -3642,20 +3670,20 @@ export async function handleAppApiRequest(req: Request) {
         const entryId = id(body.entry_id);
         if (!entryId) return reply(req, { ok: false, message: '工作紀錄識別碼無效' }, 400);
         const { data: before, error: readError } = await userDb.from('mechanical_handover_entries')
-          .select('*').eq('entry_id', entryId).maybeSingle();
+          .select('*').eq('entry_id', entryId).eq('market_code', mechanicalMarket).maybeSingle();
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的工作紀錄' }, 404);
         if (before.is_deleted) return reply(req, { ok: false, message: '這筆工作紀錄已標記刪除' }, 409);
         const workDate = String(before.work_date || '');
         const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
-          .select('approval_id').eq('work_date', workDate).maybeSingle();
+          .select('approval_id').eq('market_code', mechanicalMarket).eq('work_date', workDate).maybeSingle();
         if (approvalReadError) throw approvalReadError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再刪除工作' }, 409);
 
         const deletedAt = new Date().toISOString();
         const payload = { is_deleted: true, deleted_at: deletedAt, deleted_by: profile.user_id, updated_by: profile.user_id, updated_at: deletedAt };
         const { data: updated, error } = await userDb.from('mechanical_handover_entries')
-          .update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+          .update(payload).eq('entry_id', entryId).eq('market_code', mechanicalMarket).eq('is_deleted', false).select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '工作紀錄刪除失敗') }, String(error.code || '') === '42501' ? 403 : 409);
         if (!updated) return reply(req, { ok: false, message: '這筆工作已被其他人異動，請重新載入' }, 409);
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_entries', entryId, 'status_change', before, updated);
@@ -3667,7 +3695,7 @@ export async function handleAppApiRequest(req: Request) {
         if (!validISODate(workDate)) return reply(req, { ok: false, message: '簽名日期格式無效' }, 400);
         if (!MECHANICAL_SHIFT_CODES.includes(shiftCode as (typeof MECHANICAL_SHIFT_CODES)[number])) return reply(req, { ok: false, message: '機電值班時段無效' }, 400);
         const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
-          .select('approval_id').eq('work_date', workDate).maybeSingle();
+          .select('approval_id').eq('market_code', mechanicalMarket).eq('work_date', workDate).maybeSingle();
         if (approvalReadError) throw approvalReadError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接簿已由課長簽核，不可再變更值班簽名' }, 409);
         const signerId = body.signer_id ? id(body.signer_id) : null;
@@ -3682,9 +3710,13 @@ export async function handleAppApiRequest(req: Request) {
             .eq('user_id', signerId).in('dept_id', mechanicalDeptIds).eq('status', 'active').maybeSingle();
           if (signerError) throw signerError;
           if (!signer || isDeidentifiedAccount(signer)) return reply(req, { ok: false, message: '值班簽名僅限第二階機電課的在職同仁' }, 400);
+          const { data: signerScope, error: scopeError } = await userDb.from('mechanical_staff_market_scopes')
+            .select('user_id').eq('user_id', signerId).eq('market_code', mechanicalMarket).eq('is_active', true).maybeSingle();
+          if (scopeError) throw scopeError;
+          if (!signerScope) return reply(req, { ok: false, message: '值班簽名人員必須屬於所選市場' }, 400);
         }
-        const payload = { work_date: workDate, shift_code: shiftCode, signer_id: signerId, signed_at: signerId ? new Date().toISOString() : null, updated_by: profile.user_id, updated_at: new Date().toISOString() };
-        const { data, error } = await userDb.from('mechanical_handover_signatures').upsert(payload, { onConflict: 'work_date,shift_code' }).select('signature_id').single();
+        const payload = { market_code: mechanicalMarket, work_date: workDate, shift_code: shiftCode, signer_id: signerId, signed_at: signerId ? new Date().toISOString() : null, updated_by: profile.user_id, updated_at: new Date().toISOString() };
+        const { data, error } = await userDb.from('mechanical_handover_signatures').upsert(payload, { onConflict: 'market_code,work_date,shift_code' }).select('signature_id').single();
         if (error) throw error;
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_signatures', data.signature_id, 'update', null, payload);
         return reply(req, { ok: true, data });
@@ -3706,7 +3738,7 @@ export async function handleAppApiRequest(req: Request) {
           if (!mechanicalDepartment) return reply(req, { ok: false, message: '每日簽核僅限第二階機電課課長' }, 403);
         }
         const payload = {
-          work_date: workDate, approver_id: profile.user_id,
+          market_code: mechanicalMarket, work_date: workDate, approver_id: profile.user_id,
           approved_at: new Date().toISOString(), note: text(body.note, 1000) || null,
         };
         const { data, error } = await userDb.from('mechanical_handover_daily_approvals').insert(payload).select('approval_id,approved_at').single();
@@ -3730,7 +3762,7 @@ export async function handleAppApiRequest(req: Request) {
         if (!Number.isInteger(expectedAttendance) || expectedAttendance < 0 || expectedAttendance > 50 || !Number.isInteger(absentAttendance) || absentAttendance < 0 || absentAttendance > expectedAttendance) {
           return reply(req, { ok: false, message: '出勤人數必須為 0 至 50，且未出勤人數不可超過應出勤人數' }, 400);
         }
-        const payload = { handover_date: handoverDate, shift_code: shiftCode, category, description, expected_attendance: expectedAttendance, absent_attendance: absentAttendance, created_by: profile.user_id, updated_by: profile.user_id };
+        const payload = { market_code: businessMarket, handover_date: handoverDate, shift_code: shiftCode, category, description, expected_attendance: expectedAttendance, absent_attendance: absentAttendance, created_by: profile.user_id, updated_by: profile.user_id };
         const { data, error } = await userDb.from('business_handover_entries').insert(payload).select('entry_id').single();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接紀錄新增失敗') }, String(error.code || '') === '42501' ? 403 : 400);
         await writeAudit(userDb, profile.user_id, 'business_handover_entries', data.entry_id, 'insert', null, payload);
@@ -3743,12 +3775,12 @@ export async function handleAppApiRequest(req: Request) {
         if (!entryId) return reply(req, { ok: false, message: '交接紀錄識別碼無效' }, 400);
         if (!BUSINESS_HANDOVER_CATEGORIES.has(category) || !description) return reply(req, { ok: false, message: '請完整填寫交接分類與交接說明' }, 400);
         if (!Number.isInteger(expectedAttendance) || expectedAttendance < 0 || expectedAttendance > 50 || !Number.isInteger(absentAttendance) || absentAttendance < 0 || absentAttendance > expectedAttendance) return reply(req, { ok: false, message: '出勤人數設定無效' }, 400);
-        const { data: before, error: readError } = await userDb.from('business_handover_entries').select('*').eq('entry_id', entryId).maybeSingle();
+        const { data: before, error: readError } = await userDb.from('business_handover_entries').select('*').eq('entry_id', entryId).eq('market_code', businessMarket).maybeSingle();
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的交接紀錄' }, 404);
         if (before.is_deleted) return reply(req, { ok: false, message: '已刪除的交接紀錄不可再修改' }, 409);
         const payload = { category, description, expected_attendance: expectedAttendance, absent_attendance: absentAttendance, updated_by: profile.user_id, updated_at: new Date().toISOString() };
-        const { data: updated, error } = await userDb.from('business_handover_entries').update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+        const { data: updated, error } = await userDb.from('business_handover_entries').update(payload).eq('entry_id', entryId).eq('market_code', businessMarket).eq('is_deleted', false).select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接紀錄修改失敗') }, String(error.code || '') === '42501' ? 403 : 409);
         if (!updated) return reply(req, { ok: false, message: '這筆交接紀錄已被其他人異動，請重新載入' }, 409);
         await writeAudit(userDb, profile.user_id, 'business_handover_entries', entryId, 'update', before, updated);
@@ -3758,13 +3790,13 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'business_entry_delete') {
         const entryId = id(body.entry_id);
         if (!entryId) return reply(req, { ok: false, message: '交接紀錄識別碼無效' }, 400);
-        const { data: before, error: readError } = await userDb.from('business_handover_entries').select('*').eq('entry_id', entryId).maybeSingle();
+        const { data: before, error: readError } = await userDb.from('business_handover_entries').select('*').eq('entry_id', entryId).eq('market_code', businessMarket).maybeSingle();
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的交接紀錄' }, 404);
         if (before.is_deleted) return reply(req, { ok: false, message: '這筆交接紀錄已標記刪除' }, 409);
         const now = new Date().toISOString();
         const payload = { is_deleted: true, deleted_at: now, deleted_by: profile.user_id, updated_by: profile.user_id, updated_at: now };
-        const { data: updated, error } = await userDb.from('business_handover_entries').update(payload).eq('entry_id', entryId).eq('is_deleted', false).select('*').maybeSingle();
+        const { data: updated, error } = await userDb.from('business_handover_entries').update(payload).eq('entry_id', entryId).eq('market_code', businessMarket).eq('is_deleted', false).select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接紀錄刪除失敗') }, String(error.code || '') === '42501' ? 403 : 409);
         if (!updated) return reply(req, { ok: false, message: '這筆交接紀錄已被其他人異動，請重新載入' }, 409);
         await writeAudit(userDb, profile.user_id, 'business_handover_entries', entryId, 'status_change', before, updated);
@@ -3779,13 +3811,17 @@ export async function handleAppApiRequest(req: Request) {
         if (!['director', 'deputy_manager', 'manager'].includes(stage)) {
           return reply(req, { ok: false, message: '批核階段無效' }, 400);
         }
+        const { data: approvalAllowed, error: approvalAccessError } = await userDb.rpc('business_market_can_approve', { p_market: businessMarket, p_stage: stage });
+        if (approvalAccessError) throw approvalAccessError;
+        if (approvalAllowed !== true) return reply(req, { ok: false, message: '目前帳號不在所選市場的本階主管組織鍊，無法批核' }, 403);
         const stageLabels: Record<string, string> = {
-          director: '一市場主任',
+          director: businessMarket === 'market_2' ? '二市場主任' : '一市場主任',
           deputy_manager: '營業部副理',
           manager: '營業部經理',
         };
         const stageLabel = stageLabels[stage] || stage;
         const payload = {
+          market_code: businessMarket,
           handover_date: handoverDate,
           stage,
           stage_label: stageLabel,
@@ -3795,7 +3831,7 @@ export async function handleAppApiRequest(req: Request) {
           updated_at: new Date().toISOString(),
         };
         const { data, error } = await userDb.from('business_handover_approvals')
-          .upsert(payload, { onConflict: 'handover_date,stage' })
+          .upsert(payload, { onConflict: 'market_code,handover_date,stage' })
           .select('*')
           .single();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '批核儲存失敗') }, String(error.code || '') === '42501' ? 403 : 400);
@@ -3992,22 +4028,35 @@ export async function handleAppApiRequest(req: Request) {
         let patch: Record<string, unknown>;
         if (kind === 'guard_submit') {
           if (before.status !== 'draft') return reply(req, { ok: false, message: '這班已經交班簽名' }, 409);
+          if (!body.expected_updated_at || String(before.updated_at) !== String(body.expected_updated_at)) {
+            return reply(req, { ok: false, message: '交接內容剛被修改，請重新載入並核對後再交班' }, 409);
+          }
           if (!String(before.duty_summary || '').trim()) return reply(req, { ok: false, message: '交班前請先填寫勤務概況' }, 400);
           if (!isSysadmin && !guardIdList(before.actual_user_ids).includes(profile.user_id)) {
             return reply(req, { ok: false, message: '交班簽名限本班實際值勤人員；請先在交接內容勾選自己' }, 403);
           }
+          const receiverId = id(body.receiver_id);
+          if (!receiverId) return reply(req, { ok: false, message: '請指定下一班接班人' }, 400);
+          if (receiverId === profile.user_id) return reply(req, { ok: false, message: '交班人與指定接班人不可為同一人' }, 400);
+          const { data: receiverAllowed, error: receiverError } = await admin.rpc('guard_receiver_allowed', { p_user: receiverId });
+          if (receiverError) return reply(req, { ok: false, message: '接班人權限驗證失敗，請確認資料庫移轉已完成' }, 503);
+          if (receiverAllowed !== true) return reply(req, { ok: false, message: '指定接班人必須是在職駐警人員，且已開放駐警隊電子交接簿權限' }, 400);
           const shift = (await guardShiftContext(dutyDate)).find(row => row.name === shiftName);
-          patch = { status: 'submitted', handover_by: profile.user_id, updated_by: profile.user_id, patrol_snapshot: shift ? shift.patrol : null };
+          patch = { status: 'submitted', handover_by: profile.user_id, receiver_id: receiverId, updated_by: profile.user_id, patrol_snapshot: shift ? shift.patrol : null };
         } else if (kind === 'guard_withdraw') {
           if (before.status !== 'submitted') return reply(req, { ok: false, message: '只有已交班、尚未接班的交接可以撤回' }, 409);
           if (String(before.handover_by) !== profile.user_id) return reply(req, { ok: false, message: '只有交班簽名人可以撤回' }, 403);
-          patch = { status: 'draft', handover_by: null, handover_at: null, patrol_snapshot: null, updated_by: profile.user_id };
+          patch = { status: 'draft', handover_by: null, handover_at: null, receiver_id: null, patrol_snapshot: null, updated_by: profile.user_id };
         } else {
           if (before.status !== 'submitted') return reply(req, { ok: false, message: '這班尚未交班簽名，無法接班' }, 409);
           if (String(before.handover_by) === profile.user_id) return reply(req, { ok: false, message: '交班人與接班人不可為同一人' }, 409);
+          if (!before.receiver_id) return reply(req, { ok: false, message: '這是舊版未指定接班人的交接，請由交班人撤回後重新送出' }, 409);
+          if (String(before.receiver_id) !== profile.user_id) return reply(req, { ok: false, message: '只有交班時指定的接班人本人可以確認接班' }, 403);
           patch = { status: 'received', takeover_by: profile.user_id, updated_by: profile.user_id };
         }
-        const { data, error } = await admin.from('guard_handover_logs').update(patch).eq('log_id', before.log_id).eq('status', String(before.status)).select('*').maybeSingle();
+        let transition = admin.from('guard_handover_logs').update(patch).eq('log_id', before.log_id).eq('status', String(before.status));
+        if (kind === 'guard_submit') transition = transition.eq('updated_at', before.updated_at);
+        const { data, error } = await transition.select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接狀態更新失敗') }, 409);
         if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
         await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'status_change', before, data);

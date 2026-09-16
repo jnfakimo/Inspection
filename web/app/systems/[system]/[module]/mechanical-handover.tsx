@@ -10,6 +10,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { BlankSelectOption } from '@/components/BlankSelectOption';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -90,6 +91,8 @@ function reportsFromTransfers(date: string, transfers: Row[]): MechanicalShiftRe
 }
 
 export function MechanicalHandover({ system, module, profile }: Props) {
+  const [market, setMarket] = useState<HandoverMarket | null>(null);
+  const [allowedMarkets, setAllowedMarkets] = useState<HandoverMarket[]>([]);
   const [date, setDate] = useState(todayTaipei());
   const [entries, setEntries] = useState<Row[]>([]);
   const [signatures, setSignatures] = useState<Row[]>([]);
@@ -123,6 +126,19 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [confirmationBusy, setConfirmationBusy] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
   const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    let cancelled = false;
+    void invokeAppApi<{ markets: HandoverMarket[]; assigned_market: HandoverMarket | null }>('handover_market_context', { team: 'mechanical' })
+      .then(result => {
+        if (cancelled) return;
+        setAllowedMarkets(result.markets);
+        setMarket(result.assigned_market || result.markets[0] || null);
+        if (!result.markets.length) setNote('目前未設定機電課市場歸屬，請由管理員核對人員市場設定。');
+      })
+      .catch(error => { if (!cancelled) { setNote(`市場權限載入失敗：${errorMessage(error)}`); setBusy(false); } });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
@@ -178,21 +194,22 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   }, [approvals, date, entries, previewOpen, signatures]);
 
   const load = useCallback(async () => {
+    if (!market) { setBusy(false); return; }
     setBusy(true); setNote('');
     const client = getSupabase();
     const [work, signs, approvalRows, people, departments, history, scheduled, marketScopes, categoryRows, itemRows, reports, receivers] = await Promise.all([
-      client.from('mechanical_handover_entries').select('*').eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
-      client.from('mechanical_handover_signatures').select('*').eq('work_date', date),
-      client.from('mechanical_handover_daily_approvals').select('*').eq('work_date', date),
+      client.from('mechanical_handover_entries').select('*').eq('market_code', market).eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
+      client.from('mechanical_handover_signatures').select('*').eq('market_code', market).eq('work_date', date),
+      client.from('mechanical_handover_daily_approvals').select('*').eq('market_code', market).eq('work_date', date),
       client.from('users').select('user_id,name,username,email,department,dept_id,role,rbac_role,status').order('name').limit(1000),
       client.from('departments').select('dept_id,name,parent_id,status,level').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
-      client.from('mechanical_handover_entries').select('work_item').eq('created_by', profile.user_id).eq('is_deleted', false).limit(1000),
-      client.from('mechanical_schedule_assignments').select('user_id,duty_code,market_code,duty_date').eq('duty_date', date).eq('market_code', 'market_2').eq('is_active', true).in('duty_code', SHIFTS.map(shift => shift.code)),
-      client.from('mechanical_staff_market_scopes').select('user_id').eq('market_code', 'market_2').eq('is_active', true).limit(1000),
+      client.from('mechanical_handover_entries').select('work_item').eq('market_code', market).eq('created_by', profile.user_id).eq('is_deleted', false).limit(1000),
+      client.from('mechanical_schedule_assignments').select('user_id,duty_code,market_code,duty_date').eq('duty_date', date).eq('market_code', market).eq('is_active', true).in('duty_code', SHIFTS.map(shift => shift.code)),
+      client.from('mechanical_staff_market_scopes').select('user_id').eq('market_code', market).eq('is_active', true).limit(1000),
       client.from('mechanical_work_categories').select('*').order('sort_order').order('name'),
       client.from('mechanical_work_items').select('*').order('sort_order').order('name'),
-      invokeAppApi<MechanicalShiftReport[]>('mechanical_handover_day', { handover_date: date }).then(data => ({ data, error: null })).catch(error => ({ data: [] as MechanicalShiftReport[], error })),
-      invokeAppApi<Row[]>('mechanical_handover_receivers').then(data => ({ data, error: null })).catch(error => ({ data: [] as Row[], error })),
+      invokeAppApi<MechanicalShiftReport[]>('mechanical_handover_day', { market_code: market, handover_date: date }).then(data => ({ data, error: null })).catch(error => ({ data: [] as MechanicalShiftReport[], error })),
+      invokeAppApi<Row[]>('mechanical_handover_receivers', { market_code: market }).then(data => ({ data, error: null })).catch(error => ({ data: [] as Row[], error })),
     ]);
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
     const secondMarketUserIds = new Set((marketScopes.data || []).map(row => String(row.user_id)));
@@ -213,7 +230,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     setShiftReports(reports.data || []); setEligibleReceivers(receivers.data || []);
     setWorkCategories(categoryRows.data || []); setWorkItems(itemRows.data || []);
     setHistoryItems([...itemCounts.entries()].filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).map(([item]) => item)); setBusy(false);
-  }, [date, profile.user_id]);
+  }, [date, market, profile.user_id]);
   useEffect(() => { void load(); }, [load]);
 
   const userName = useCallback((id: unknown) => directoryUsers.find(user => String(user.user_id) === String(id))?.name || '—', [directoryUsers]);
@@ -250,7 +267,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     setConfirmationBusy(true); setConfirmationMessage('');
     try {
       const revision = confirmation.operation === 'receive' ? confirmation.shift.incoming?.revision : confirmation.shift.revision;
-      await invokeAppApi('mechanical_handover_action', { operation: confirmation.operation, handover_date: date,
+      await invokeAppApi('mechanical_handover_action', { operation: confirmation.operation, market_code: market, handover_date: date,
         shift_code: confirmation.shift.shift_code, receiver_id: receiverId || null, revision });
       setConfirmation(null); await load();
       setNote(confirmation.operation === 'receive' ? '已由本人完成接班確認並記錄時間' : '已由本人送出交班並記錄時間');
@@ -261,7 +278,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     if (!canApproveMechanicalDay(date, new Date())) { setNote('本日交接簿須於隔日起由課長簽核'); return; }
     setBusy(true); setNote('');
     try {
-      await invokeAppApi('handover_save', { kind: 'mechanical_approve', work_date: date, note: approvalNote.trim() });
+      await invokeAppApi('handover_save', { kind: 'mechanical_approve', market_code: market, work_date: date, note: approvalNote.trim() });
       await load(); setNote('本日交接簿已完成課長簽核');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
@@ -274,6 +291,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       const works: Row[] = [];
       for (let offset = 0; ; offset += 500) {
         const { data, error } = await client.from('mechanical_handover_entries').select('*')
+          .eq('market_code', market)
           .gte('work_date', printFrom).lte('work_date', printTo)
           .order('work_date').order('shift_code').order('sort_order').order('created_at').order('entry_id')
           .range(offset, offset + 499);
@@ -282,12 +300,15 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         if (!data || data.length < 500) break;
       }
       const { data: signs, error } = await client.from('mechanical_handover_signatures').select('*')
+        .eq('market_code', market)
         .gte('work_date', printFrom).lte('work_date', printTo);
       if (error) throw error;
       const { data: approvalData, error: approvalError } = await client.from('mechanical_handover_daily_approvals').select('*')
+        .eq('market_code', market)
         .gte('work_date', printFrom).lte('work_date', printTo);
       if (approvalError) throw approvalError;
       const { data: transferData, error: transferError } = await client.from('mechanical_handover_transfers').select('*')
+        .eq('market_code', market)
         .gte('handover_date', shiftDate(printFrom, -1)).lte('handover_date', printTo);
       if (transferError) throw transferError;
       setPrintData({ dates: dateRange(printFrom, printTo), entries: works, signatures: signs || [], approvals: approvalData || [], transfers: transferData || [] });
@@ -310,6 +331,9 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       <AdminHeader module={module} busy={busy} note={note} onReload={load}
         action={<>{canManageOptions && <button className="secondary-btn compact" disabled={busy} onClick={() => setOptionsOpen(true)}>管理工作選項</button>}<button className="secondary-btn compact" disabled={busy} onClick={() => { setPrintData(null); setPrintRequested(false); setPreviewOpen(true); }}>預覽本日報表</button><button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button></>} />
       <section className="panel hs-toolbar">
+        {allowedMarkets.length > 1 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
+          <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
+            aria-pressed={market === code} disabled={busy} onClick={() => setMarket(code)}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
         <div className="hs-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value); }} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
         <span>{rocDate(date)}</span>
         <button className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
@@ -318,7 +342,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       {frequentItems.length > 0 && <section className="panel mechanical-frequent"><div><b>我的常用工作項目</b><small>依個人紀錄累計 3 次以上</small></div><div className="mechanical-frequent-list">{frequentItems.slice(0, 6).map(item => <button key={item} className="secondary-btn compact" onClick={() => { setEditingEntry(null); setCarrySource(null); setPresetItem(item); setEditingShift('01-09'); }}>{item}</button>)}</div></section>}
 
       <section className="hs-sheet" aria-label="機電設備交接紀錄">
-        <HandoverSheetHeader org="臺北農產運銷股份有限公司　第二批發市場" title="機電設備交接紀錄表"
+        <HandoverSheetHeader org={`臺北農產運銷股份有限公司　${market ? HANDOVER_MARKETS[market].name : ''}`} title="機電設備交接紀錄表"
           dateLabel={rocDate(date)} emblem="tool" kpis={kpis} />
         {currentEntries.some(row => row.repair_cost == null) && <p className="mechanical-cost-note">
           含 {currentEntries.filter(row => row.repair_cost == null).length} 件費用未填，合計僅計入已填金額。</p>}
@@ -395,7 +419,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {optionsOpen && <MechanicalWorkOptionsModal categories={workCategories} items={workItems} onClose={() => setOptionsOpen(false)} onDone={load} />}
     {confirmation && <MechanicalConfirmModal confirmation={confirmation} users={eligibleReceivers} profileId={profile.user_id} busy={confirmationBusy} message={confirmationMessage} onClose={() => setConfirmation(null)} onSave={receiverId => void saveConfirmation(receiverId)} />}
-    {editingShift && <WorkEntryModal date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} categories={workCategories} items={workItems} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === editingShift)?.outgoing) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
+    {editingShift && market && <WorkEntryModal market={market} date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} categories={workCategories} items={workItems} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === editingShift)?.outgoing) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />}
   </AppShell>;
 }
 
@@ -541,7 +565,7 @@ export function MechanicalWorkOptionsModal({ categories, items, onClose, onDone 
   </AdminModal>;
 }
 
-export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categories, items, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { date: string; shiftCode: string; users: Row[]; scheduledUserIds: string[]; categories: Row[]; items: Row[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted') => void }) {
+export function WorkEntryModal({ market, date, shiftCode, users, scheduledUserIds, categories, items, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { market: HandoverMarket; date: string; shiftCode: string; users: Row[]; scheduledUserIds: string[]; categories: Row[]; items: Row[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted') => void }) {
   const sourceRow = entry || carrySource;
   const sourceItem = String(sourceRow?.work_item || presetItem || '');
   const categoryNameById = new Map(categories.map(row => [String(row.category_id), String(row.name || '')]));
@@ -577,7 +601,7 @@ export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categ
     if (repairCostCents(repairCost) === undefined) { setMessage('維修費用請輸入 0 至 999,999,999.99 的金額，最多兩位小數'); return; }
     setBusy(true); setMessage('');
     try {
-      await invokeAppApi('handover_save', { kind: entry ? 'mechanical_entry_update' : 'mechanical_entry', entry_id: entry?.entry_id, work_date: date, shift_code: shiftCode, category, work_item: item, details, technician_ids: technicians, result, notes, repair_cost: repairCost.trim() || null, carry_source_id: carrySource?.entry_id || null });
+      await invokeAppApi('handover_save', { kind: entry ? 'mechanical_entry_update' : 'mechanical_entry', market_code: market, entry_id: entry?.entry_id, work_date: date, shift_code: shiftCode, category, work_item: item, details, technician_ids: technicians, result, notes, repair_cost: repairCost.trim() || null, carry_source_id: carrySource?.entry_id || null });
       await onDone(entry ? 'updated' : 'created');
     } catch (error) { setMessage(errorMessage(error)); setBusy(false); }
   };
@@ -586,7 +610,7 @@ export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categ
     if (!confirmDelete) { setConfirmDelete(true); setMessage('刪除後紀錄仍會保留並以刪除線顯示；請再按一次確認刪除。'); return; }
     setBusy(true); setMessage('');
     try {
-      await invokeAppApi('handover_save', { kind: 'mechanical_entry_delete', entry_id: entry.entry_id });
+      await invokeAppApi('handover_save', { kind: 'mechanical_entry_delete', market_code: market, entry_id: entry.entry_id });
       await onDone('deleted');
     } catch (error) { setMessage(errorMessage(error)); setBusy(false); }
   };
@@ -604,7 +628,7 @@ export function WorkEntryModal({ date, shiftCode, users, scheduledUserIds, categ
       <label>工作分類<select disabled={locked} value={category} onChange={event => changeCategory(event.target.value)}><BlankSelectOption />{categoryOptions.map(value => <option key={value} value={value}>{value}</option>)}</select><small className="mechanical-blank-hint">第一列為空白，可不選分類。</small></label>
       <label>常用工作項目<select disabled={locked} value={item} onChange={event => changeItem(event.target.value)}><BlankSelectOption />{itemOptions.map(value => <option key={value} value={value}>{value}</option>)}</select><small className="mechanical-blank-hint">選取後會即時帶入下方說明，仍可繼續補充。</small></label>
       <label className="wide">工作補充說明<textarea ref={detailsRef} disabled={locked} rows={3} value={details} onChange={event => setDetails(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) setItem(''); }} placeholder="選擇分類與常用工作項目後自動帶入，也可補充設備位置、異常或處理內容" /><small className="mechanical-blank-hint">按 Enter 在同一筆工作換到下一列，再選常用工作項目即可接續帶入；第一列會保留。</small></label>
-      <fieldset className="wide" disabled={locked}><legend>維修人員（可複選） · 已選 {technicians.length} 人</legend><p className={`mechanical-roster-hint${scheduledUserIds.length ? '' : ' is-empty'}`}>{scheduledUserIds.length ? `已由二市排班表帶入本班 ${scheduledUserIds.length} 人，可依實際支援情形增減。` : '二市排班表尚未安排本班人員，請手動選擇或先完成排班。'}</p><div className="mechanical-person-grid">{sortedUsers.map(user => <label className={scheduledUserIds.includes(String(user.user_id)) ? 'is-scheduled' : ''} key={String(user.user_id)}><input type="checkbox" checked={technicians.includes(String(user.user_id))} onChange={() => toggleTechnician(String(user.user_id))} /><span>{user.name}</span><small>{scheduledUserIds.includes(String(user.user_id)) ? '本班排班' : '機電課'}</small></label>)}</div></fieldset>
+      <fieldset className="wide" disabled={locked}><legend>維修人員（可複選） · 已選 {technicians.length} 人</legend><p className={`mechanical-roster-hint${scheduledUserIds.length ? '' : ' is-empty'}`}>{scheduledUserIds.length ? `已由${HANDOVER_MARKETS[market].short}排班表帶入本班 ${scheduledUserIds.length} 人，可依實際支援情形增減。` : `${HANDOVER_MARKETS[market].short}排班表尚未安排本班人員，請手動選擇或先完成排班。`}</p><div className="mechanical-person-grid">{sortedUsers.map(user => <label className={scheduledUserIds.includes(String(user.user_id)) ? 'is-scheduled' : ''} key={String(user.user_id)}><input type="checkbox" checked={technicians.includes(String(user.user_id))} onChange={() => toggleTechnician(String(user.user_id))} /><span>{user.name}</span><small>{scheduledUserIds.includes(String(user.user_id)) ? '本班排班' : '機電課'}</small></label>)}</div></fieldset>
       <label>處理結果<select disabled={locked} value={result} onChange={event => setResult(event.target.value)}>{RESULT_OPTIONS.map(value => <option key={value}>{value}</option>)}</select></label>
       <label>維修費用（新臺幣元）<input disabled={locked} aria-label="維修費用（新臺幣元）" inputMode="decimal" value={repairCost} onChange={event => setRepairCost(event.target.value)} placeholder="未填可留白，無費用填 0" /></label>
       <label className="wide">備註<input disabled={locked} value={notes} onChange={event => setNotes(event.target.value)} placeholder="待辦、交班或其他說明" /></label>

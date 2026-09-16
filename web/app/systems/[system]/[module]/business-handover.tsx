@@ -10,6 +10,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { selectableActiveUsers } from '@/lib/user-visibility';
+import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import { HandoverIcon, HandoverSheetHeader, type IconName } from './handover-sheet';
@@ -256,7 +257,7 @@ const CATEGORIES = ['事務事項', '維修', '其他'] as const;
 export type ApprovalStage = 'director' | 'deputy_manager' | 'manager';
 
 export const APPROVAL_STAGES: { stage: ApprovalStage; label: string; title: string; desc: string }[] = [
-  { stage: 'director', label: '一市場主任', title: '一市場主任批核', desc: '第一果菜市場主任查核點檢與交接事項' },
+  { stage: 'director', label: '市場主任', title: '市場主任批核', desc: '所屬市場主任查核點檢與交接事項' },
   { stage: 'deputy_manager', label: '營業部副理', title: '營業部副理批核', desc: '營業部副理複核業務執行狀況' },
   { stage: 'manager', label: '營業部經理', title: '營業部經理批核', desc: '營業部經理決行核定' },
 ];
@@ -382,6 +383,8 @@ function isDeleted(row: Row) {
 const CHECKLIST_TAG = '【崗位勤務點檢紀錄】';
 
 export function BusinessHandover({ system, module, profile }: Props) {
+  const [market, setMarket] = useState<HandoverMarket | null>(null);
+  const [allowedMarkets, setAllowedMarkets] = useState<HandoverMarket[]>([]);
   const [date, setDate] = useState(() => getTaipeiTime().hour < 1 ? moveDate(todayTaipei(), -1) : todayTaipei());
   const [entries, setEntries] = useState<Row[]>([]);
   const [shiftReports, setShiftReports] = useState<BusinessShift[]>([]);
@@ -424,19 +427,33 @@ export function BusinessHandover({ system, module, profile }: Props) {
   // 點檢表收折控制：剛進入時預設為「收起來」
   const [checklistOpen, setChecklistOpen] = useState<boolean>(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    void invokeAppApi<{ markets: HandoverMarket[]; assigned_market: HandoverMarket | null }>('handover_market_context', { team: 'business' })
+      .then(result => {
+        if (cancelled) return;
+        setAllowedMarkets(result.markets);
+        setMarket(result.assigned_market || result.markets[0] || null);
+        if (!result.markets.length) setNote('目前未設定業管組市場歸屬，請由管理員核對組織架構。');
+      })
+      .catch(error => { if (!cancelled) { setNote(`市場權限載入失敗：${errorMessage(error)}`); setBusy(false); } });
+    return () => { cancelled = true; };
+  }, []);
+
   // 載入資料庫、點檢表與批核紀錄
   const load = useCallback(async () => {
+    if (!market) { setBusy(false); return; }
     const generation = ++loadGeneration.current;
     setBusy(true);
     setNote('');
     try {
       const client = getSupabase();
       const [entryResult, userResult, approvalResult, reports, eligibleReceivers] = await Promise.all([
-        client.from('business_handover_entries').select('*').eq('handover_date', date).order('shift_code').order('created_at'),
+        client.from('business_handover_entries').select('*').eq('market_code', market).eq('handover_date', date).order('shift_code').order('created_at'),
         client.from('users').select('user_id,name,username,email,role,rbac_role,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
-        client.from('business_handover_approvals').select('*').eq('handover_date', date).order('created_at'),
-        invokeAppApi<BusinessShift[]>('business_handover_day', { handover_date: date }),
-        invokeAppApi<Row[]>('business_handover_receivers'),
+        client.from('business_handover_approvals').select('*').eq('market_code', market).eq('handover_date', date).order('created_at'),
+        invokeAppApi<BusinessShift[]>('business_handover_day', { market_code: market, handover_date: date }),
+        invokeAppApi<Row[]>('business_handover_receivers', { market_code: market }),
       ]);
       if (generation !== loadGeneration.current) return;
       if (entryResult.error || userResult.error || approvalResult.error) throw entryResult.error || userResult.error || approvalResult.error;
@@ -463,7 +480,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
       if (Object.keys(loadedChecks).length === 0 && typeof window !== 'undefined') {
         try {
-          const local = localStorage.getItem(`${CHECKLIST_STORAGE_PREFIX}${date}`);
+          const local = localStorage.getItem(`${CHECKLIST_STORAGE_PREFIX}${market}_${date}`);
           if (local) loadedChecks = JSON.parse(local);
         } catch {
           // ignore
@@ -485,7 +502,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
     } finally {
       if (generation === loadGeneration.current) setBusy(false);
     }
-  }, [date]);
+  }, [date, market]);
 
   useEffect(() => {
     void load();
@@ -564,12 +581,12 @@ export function BusinessHandover({ system, module, profile }: Props) {
           },
         };
         if (typeof window !== 'undefined') {
-          localStorage.setItem(`${CHECKLIST_STORAGE_PREFIX}${date}`, JSON.stringify(nextState));
+          if (market) localStorage.setItem(`${CHECKLIST_STORAGE_PREFIX}${market}_${date}`, JSON.stringify(nextState));
         }
         return nextState;
       });
     },
-    [date, profile.name]
+    [date, market, profile.name]
   );
 
   // 批量設為「點檢完成」或「未點檢」
@@ -587,12 +604,12 @@ export function BusinessHandover({ system, module, profile }: Props) {
           };
         }
         if (typeof window !== 'undefined') {
-          localStorage.setItem(`${CHECKLIST_STORAGE_PREFIX}${date}`, JSON.stringify(nextState));
+          if (market) localStorage.setItem(`${CHECKLIST_STORAGE_PREFIX}${market}_${date}`, JSON.stringify(nextState));
         }
         return nextState;
       });
     },
-    [date, profile.name]
+    [date, market, profile.name]
   );
 
   // 儲存點檢表至資料庫 (以專屬點檢紀錄條目保存)
@@ -606,6 +623,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
       if (existing) {
         await invokeAppApi('handover_save', {
           kind: 'business_entry_update',
+          market_code: market,
           entry_id: existing.entry_id,
           category: '事務事項',
           description: summaryText,
@@ -615,6 +633,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
       } else {
         await invokeAppApi('handover_save', {
           kind: 'business_entry',
+          market_code: market,
           handover_date: date,
           shift_code: '01-09',
           category: '事務事項',
@@ -643,6 +662,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
     try {
       await invokeAppApi('handover_save', {
         kind: 'business_approve',
+        market_code: market,
         handover_date: date,
         stage,
         note: noteContent.trim() || null,
@@ -669,7 +689,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
     try {
       const { operation, shift, entry } = confirmation;
       await invokeAppApi('business_handover_action', {
-        operation, handover_date: date, shift_code: shift.shift_code,
+        operation, market_code: market, handover_date: date, shift_code: shift.shift_code,
         entry_id: entry?.entry_id, receiver_id: receiverId || undefined,
         revision: operation === 'receive' ? shift.incoming?.revision : shift.revision,
       });
@@ -685,6 +705,10 @@ export function BusinessHandover({ system, module, profile }: Props) {
   };
 
   const approvedCount = approvals.length;
+  const marketDirectorLabel = market === 'market_2' ? '二市場主任' : '一市場主任';
+  const approvalStages = APPROVAL_STAGES.map(stage => stage.stage === 'director'
+    ? { ...stage, label: marketDirectorLabel, title: `${marketDirectorLabel}批核`, desc: `${HANDOVER_MARKETS[market || 'market_1'].name}主任查核點檢與交接事項` }
+    : stage);
 
   return (
     <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
@@ -725,6 +749,9 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
         {/* 頂部日期導覽與當班工具列 */}
         <section className="panel hs-toolbar">
+          {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
+            <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
+              aria-pressed={market === code} disabled={busy} onClick={() => setMarket(code)}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
           <div className="hs-date-nav">
             <button
               type="button"
@@ -774,7 +801,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
               </span>
               <div>
                 <strong>📋 業管組主管批核流程</strong>
-                <span>逐級審核：一市場主任 ➔ 營業部副理 ➔ 營業部經理（可輸入批核意見與簽核）</span>
+                <span>逐級審核：{marketDirectorLabel} ➔ 營業部副理 ➔ 營業部經理（可輸入批核意見與簽核）</span>
               </div>
             </div>
             <div className="business-approval-progress">
@@ -785,7 +812,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           </div>
 
           <div className="business-approval-stages-grid">
-            {APPROVAL_STAGES.map((stageItem, stageIdx) => {
+            {approvalStages.map((stageItem, stageIdx) => {
               const stageApproval = approvals.find(a => a.stage === stageItem.stage);
               const isApproved = Boolean(stageApproval);
 
@@ -874,7 +901,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
         {/* 主要交接紀錄外框 */}
         <section className="hs-sheet" aria-label="業管組電子交接簿">
           {/* 表頭與今日指標：三本交接簿共用同一支元件 */}
-          <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="業管組交接紀錄表"
+          <HandoverSheetHeader org={`臺北農產運銷股份有限公司　${HANDOVER_MARKETS[market || 'market_1'].name}`} title="業管組交接紀錄表"
             dateLabel={rocDate(date)} emblem="building" kpis={[
               { value: '3 個班別', label: '早班・中班・晚班', icon: 'clock', tone: 'cyan' },
               { value: `${customEntries.length} 筆交接`, label: '事務・維修・交辦', icon: 'note', tone: 'violet' },
@@ -1195,6 +1222,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
         {/* 列印專用報表區 (A4精確排版) */}
         <section className="hs-print-sheet" aria-label="業管組每日列印報表">
           <BusinessReportContent
+            market={market || 'market_1'}
             date={date}
             checkStats={checkStats}
             checks={checks}
@@ -1248,6 +1276,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           >
             <div className="business-report-preview-page">
               <BusinessReportContent
+                market={market || 'market_1'}
                 date={date}
                 checkStats={checkStats}
                 checks={checks}
@@ -1266,6 +1295,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
       {/* 編輯交接彈窗 */}
       {editingShift && (
         <BusinessEntryModal
+          market={market || 'market_1'}
           date={date}
           shiftCode={editingShift}
           entry={editingEntry}
@@ -1292,7 +1322,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
       {/* 主管修改批核意見彈窗 */}
       {approvingStage && (
         <AdminModal
-          title={`修改批核意見｜${APPROVAL_STAGES.find(s => s.stage === approvingStage)?.label}`}
+          title={`修改批核意見｜${approvalStages.find(s => s.stage === approvingStage)?.label}`}
           onClose={() => setApprovingStage(null)}
         >
           <div className="admin-form-grid" style={{ padding: '20px' }}>
@@ -1326,6 +1356,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
 // 供列印與螢幕預覽共用的 A4報表內容元件 (精確控制在一頁內)
 function BusinessReportContent({
+  market,
   date,
   checkStats,
   checks,
@@ -1334,6 +1365,7 @@ function BusinessReportContent({
   approvals,
   userName,
 }: {
+  market: HandoverMarket;
   date: string;
   checkStats: { completed: number; total: number; percent: number };
   checks: DutyCheckMap;
@@ -1349,7 +1381,7 @@ function BusinessReportContent({
   return (
     <div className="business-print-content">
       <header className="business-print-header">
-        <h2>臺北農產運銷股份有限公司第一果菜市場 業管組崗位勤務點檢與交接紀錄表</h2>
+        <h2>臺北農產運銷股份有限公司{HANDOVER_MARKETS[market].name} 業管組崗位勤務點檢與交接紀錄表</h2>
         <div className="business-print-meta-line">
           <span><b>交接日期：</b>{rocDate(date)}</span>
           <span><b>點檢完成率：</b>{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）</span>
@@ -1476,10 +1508,11 @@ function BusinessReportContent({
 
       {/* 3. 主管批核紀錄 (三階批核：一市場主任、營業部副理、營業部經理) */}
       <div className="business-print-section-title" style={{ marginTop: '3mm' }}>
-        三、主管批核紀錄（一市場主任 · 營業部副理 · 營業部經理）
+        三、主管批核紀錄（{market === 'market_2' ? '二市場主任' : '一市場主任'} · 營業部副理 · 營業部經理）
       </div>
       <div className="business-print-approvals-grid">
-        {APPROVAL_STAGES.map(stageItem => {
+        {APPROVAL_STAGES.map(baseStage => {
+          const stageItem = baseStage.stage === 'director' ? { ...baseStage, label: market === 'market_2' ? '二市場主任' : '一市場主任' } : baseStage;
           const approval = approvals.find(a => a.stage === stageItem.stage);
           const isApproved = Boolean(approval);
 
@@ -1514,6 +1547,7 @@ function BusinessReportContent({
 }
 
 function BusinessEntryModal({
+  market,
   date,
   shiftCode,
   entry,
@@ -1521,6 +1555,7 @@ function BusinessEntryModal({
   onClose,
   onDone,
 }: {
+  market: HandoverMarket;
   date: string;
   shiftCode: string;
   entry: Row | null;
@@ -1551,6 +1586,7 @@ function BusinessEntryModal({
     try {
       await invokeAppApi('handover_save', {
         kind: entry ? 'business_entry_update' : 'business_entry',
+        market_code: market,
         entry_id: entry?.entry_id,
         handover_date: date,
         shift_code: shiftCode,
@@ -1576,7 +1612,7 @@ function BusinessEntryModal({
     setBusy(true);
     setMessage('');
     try {
-      await invokeAppApi('handover_save', { kind: 'business_entry_delete', entry_id: entry.entry_id });
+      await invokeAppApi('handover_save', { kind: 'business_entry_delete', market_code: market, entry_id: entry.entry_id });
       await onDone('deleted');
     } catch (error) {
       setMessage(errorMessage(error));
