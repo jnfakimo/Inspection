@@ -24,9 +24,9 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$dependencyCommit = '4375a1a64abcba490b49edee1e0bfbfc58cf49b7'
+$dependencyCommit = '5e351771cfceeb6b5babb0eb221090db90a523cf'
 $baseUrl = "https://raw.githubusercontent.com/jnfakimo/Inspection/$dependencyCommit"
-$releaseRoot = Join-Path $env:TEMP 'Inspection-handover-market-release-4375a1a64'
+$releaseRoot = Join-Path $env:TEMP 'Inspection-handover-market-release-5e351771c'
 $migrationsDir = Join-Path $releaseRoot 'supabase\migrations'
 $runnerPath = Join-Path $releaseRoot 'tools\apply-local-migrations.ps1'
 
@@ -35,7 +35,9 @@ $files = @(
   @{ Relative = 'supabase/migrations/20260916110000_guard_handover_designated_receiver.sql'; Hash = '41A2C3386DD9B7E9501D87949E890CA94DB5C378382615BBD6BFCD38BE4275F0' },
   @{ Relative = 'supabase/migrations/20260916120000_handover_market_keys.sql'; Hash = '989465CE64B1A88946AE0B620DAC747F1B90E8015EA78BC57A1F826B0AEC66A4' },
   @{ Relative = 'supabase/migrations/20260916131000_mechanical_handover_market.sql'; Hash = 'F4BEB2A6D2BCA8357F2EED36532B2D9937D8EDCC1190DEC5B575614FFA24E77A' },
-  @{ Relative = 'supabase/migrations/20260916132000_business_handover_market.sql'; Hash = 'FC6273646C244F3832EF4589F6888DC06E1B86289F6F9679C8A077B4EC344747' }
+  @{ Relative = 'supabase/migrations/20260916132000_business_handover_market.sql'; Hash = 'FC6273646C244F3832EF4589F6888DC06E1B86289F6F9679C8A077B4EC344747' },
+  @{ Relative = 'supabase/migrations/20260916170000_business_handover_market_policy_grants.sql'; Hash = '40CC0ED0D77ECA40A4A90BC8EF60D454669B37C224205D0E2B69DA449E912F30' },
+  @{ Relative = 'supabase/migrations/20260916190000_business_handover_complete_without_receipt.sql'; Hash = 'D750C0CB8D1F93E33DE5CE96A4404090A12891C553E210D4B6B8C64EDA69651B' }
 )
 
 [IO.Directory]::CreateDirectory($migrationsDir) | Out-Null
@@ -56,7 +58,9 @@ $migrations = @(
   '20260916110000_guard_handover_designated_receiver.sql',
   '20260916120000_handover_market_keys.sql',
   '20260916131000_mechanical_handover_market.sql',
-  '20260916132000_business_handover_market.sql'
+  '20260916132000_business_handover_market.sql',
+  '20260916170000_business_handover_market_policy_grants.sql',
+  '20260916190000_business_handover_complete_without_receipt.sql'
 )
 
 foreach ($migration in $migrations) {
@@ -126,11 +130,20 @@ begin
     raise exception 'handover market release verification found missing functions';
   end if;
 
+  if not has_function_privilege('authenticated','public.business_market_allowed(text)','EXECUTE') then
+    raise exception 'authenticated is missing EXECUTE on business_market_allowed(text)';
+  end if;
+
+  if position('先完成接班確認再登記完成' in pg_get_functiondef('public.business_market_action(text,text,date,text,uuid,uuid,text)'::regprocedure)) > 0
+    or position('請由本班指定接班人先確認接班' in pg_get_functiondef('public.business_market_action(text,text,date,text,uuid,uuid,text)'::regprocedure)) > 0 then
+    raise exception 'business completion still requires receipt confirmation';
+  end if;
+
   select count(distinct version) into applied_versions
   from supabase_migrations.schema_migrations
-  where version in ('20260916110000','20260916120000','20260916131000','20260916132000');
-  if applied_versions <> 4 then
-    raise exception 'handover market release history is incomplete: % of 4', applied_versions;
+  where version in ('20260916110000','20260916120000','20260916131000','20260916132000','20260916170000','20260916190000');
+  if applied_versions <> 6 then
+    raise exception 'handover market release history is incomplete: % of 6', applied_versions;
   end if;
 end
 $verify$;
