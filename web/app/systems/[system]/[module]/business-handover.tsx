@@ -473,6 +473,27 @@ export function BusinessHandover({ system, module, profile }: Props) {
         await invokeAppApi('handover_save', {
           kind: 'business_entry',
           market_code: market,
+          handover_date: date,
+          shift_code: '01-09',
+          category: '事務事項',
+          description: summaryText,
+          expected_attendance: 0,
+          absent_attendance: 0,
+        });
+      }
+      setNote('點檢紀錄已同步保存');
+      await load();
+    } catch (err) {
+      setNote(`失敗：點檢未儲存，${errorMessage(err)}`);
+    } finally {
+      setSavingChecks(false);
+    }
+  };
+
+  // 主管批核動作
+  const handleApproveStage = async (stage: ApprovalStage | null, customNote?: string) => {
+    if (!stage) return;
+    const stageItem = approvalStages.find(s => s.stage === stage);
     if (!stageItem) return;
     const noteContent = customNote !== undefined ? customNote : approvalStageNote[stage] || '';
     setBusy(true);
