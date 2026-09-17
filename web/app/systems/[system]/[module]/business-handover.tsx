@@ -1178,7 +1178,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
           authorName={profile.name}
         />
       )}
-      </div>
     </AppShell>
   );
 }
