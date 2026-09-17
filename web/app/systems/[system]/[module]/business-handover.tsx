@@ -550,6 +550,12 @@ export function BusinessHandover({ system, module, profile }: Props) {
     ? { ...stage, label: marketDirectorLabel, title: `${marketDirectorLabel}批核`, desc: `${HANDOVER_MARKETS[market || 'market_1'].name}主任查核點檢與交接事項` }
     : stage);
 
+  const isItemCompleted = useCallback((id: string) => checks[id]?.status === 'completed', [checks]);
+  const visibleSlots = useMemo(
+    () => TIME_SLOTS.filter(s => selectedSlotFilter === 'all' || selectedSlotFilter === s.code),
+    [selectedSlotFilter]
+  );
+
   return (
     <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
       <div className="hs-page">
@@ -744,8 +750,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
           <HandoverSheetHeader
             org={`臺北農產運銷股份有限公司　${HANDOVER_MARKETS[market || 'market_1'].name}`}
             title="業管組交接紀錄表"
-            date={date}
-            stats={stats}
+            dateLabel={rocDate(date)}
+            emblem="clipboard"
           />
 
           {/* 崗位勤務時段點檢表（手風琴可收合） */}
@@ -754,11 +760,11 @@ export function BusinessHandover({ system, module, profile }: Props) {
               <button
                 type="button"
                 className="business-duty-accordion-toggle"
-                onClick={() => setDutyChecklistOpen(prev => !prev)}
-                aria-expanded={dutyChecklistOpen}
+                onClick={() => setChecklistOpen(prev => !prev)}
+                aria-expanded={checklistOpen}
               >
                 <div className="business-duty-accordion-title">
-                  <BusinessIcon name="clipboard-check" size={18} />
+                  <BusinessIcon name="clipboard" size={18} />
                   <span>崗位勤務時段點檢表</span>
                   <span className="business-duty-accordion-sub">
                     （涵蓋 7 大時段、{activeDutyItems.length} 項崗位職責 · 目前點檢進度：{checkStats.completed} / {checkStats.total}（{checkStats.percent}%））
@@ -769,7 +775,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                     {checkStats.percent === 100 ? '✓ 全數點檢完成' : `進行中 ${checkStats.percent}%`}
                   </span>
                   <span className="business-duty-accordion-arrow">
-                    {dutyChecklistOpen ? '▲ 收合點檢表' : '▼ 展開點檢表'}
+                    {checklistOpen ? '▲ 收合點檢表' : '▼ 展開點檢表'}
                   </span>
                 </div>
               </button>
@@ -780,20 +786,20 @@ export function BusinessHandover({ system, module, profile }: Props) {
                   onClick={() => setManageDutyOpen(true)}
                   title="管理點檢項目清單（新增、修改、刪除、排序、恢復預設）"
                 >
-                  <BusinessIcon name="settings" size={14} />
+                  <BusinessIcon name="tool" size={14} />
                   ⚙ 管理點檢項目
                 </button>
               </div>
             </div>
 
-            {dutyChecklistOpen && (
+            {checklistOpen && (
               <div className="business-duty-accordion-body">
                 {/* 時段篩選按鈕列 */}
                 <div className="business-slot-filter-bar">
                   <button
                     type="button"
-                    className={`business-slot-filter-btn ${selectedSlot === 'ALL' ? 'active' : ''}`}
-                    onClick={() => setSelectedSlot('ALL')}
+                    className={`business-slot-filter-btn ${selectedSlotFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setSelectedSlotFilter('all')}
                   >
                     全部時段 ({activeDutyItems.length})
                   </button>
@@ -804,8 +810,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                       <button
                         type="button"
                         key={slot.code}
-                        className={`business-slot-filter-btn ${selectedSlot === slot.code ? 'active' : ''}`}
-                        onClick={() => setSelectedSlot(slot.code)}
+                        className={`business-slot-filter-btn ${selectedSlotFilter === slot.code ? 'active' : ''}`}
+                        onClick={() => setSelectedSlotFilter(slot.code)}
                       >
                         {slot.label} ({slotDone}/{slotItems.length})
                       </button>
@@ -845,7 +851,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                             <tbody>
                               {slotItems.map((item, itemIdx) => {
                                 const isDone = isItemCompleted(item.id);
-                                const itemState = checklist[item.id] || {};
+                                const itemState = checks[item.id] || {};
                                 return (
                                   <tr
                                     key={item.id}
@@ -1172,6 +1178,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           authorName={profile.name}
         />
       )}
+      </div>
     </AppShell>
   );
 }
