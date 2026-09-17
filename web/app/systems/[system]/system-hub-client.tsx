@@ -118,7 +118,7 @@ function OperationsHub({ system, profile }: { system: SystemDefinition; profile:
   ];
   return <AppShell profile={profile} title={system.title}
     heading={{ system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description }}>
-    <div className="operations-portal-note">{handover ? '電子交接簿流程' : '駐衛警巡檢流程'} · 點選圖卡進入功能系統</div>
+    <div className="operations-portal-note">{handover ? '電子交接簿流程' : '駐衛警巡邏流程'} · 點選圖卡進入功能系統</div>
     <section className={`operations-portal-grid ${handover ? 'handover' : 'patrol'}`}>{cards.filter(([key]) => canSeeModule(key)).map(([key, title, description, icon, code, action]) => <Link key={key} href={`/systems/${system.key}/${key}/`} className="operations-portal-card"><div className="operations-portal-card-top"><span className="operations-portal-code">{code}</span><span className="operations-portal-status">● 系統連線</span></div><img src={`/Inspection/assets/system-icons-v20260913/${icon}`} alt="" /><h2>{title}</h2><p>{description}</p><b>{action}</b></Link>)}</section>
     {!cards.some(([key]) => canSeeModule(key)) && <div className="notice danger">目前帳號尚未指派任何可用子系統，請洽系統管理員設定。</div>}
   </AppShell>;

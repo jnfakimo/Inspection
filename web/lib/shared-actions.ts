@@ -10,7 +10,7 @@ export const SHARED_ACTIONS: SharedAction[] = [
   { href: '/systems/', label: '首頁', icon: '/Inspection/assets/system-icons-v20260913/home-nav-icon.png' },
   { href: '/', label: '戰情儀表板', icon: '/Inspection/assets/system-icons-v20260913/command-dashboard-icon.png' },
   { href: '/systems/workorder/', label: '維修／派完工', icon: '/Inspection/assets/system-icons-v20260913/maintenance-icon.png', sysKey: 'workorder' },
-  { href: '/systems/guardpatrol/', label: '駐衛警巡檢', icon: '/Inspection/assets/system-icons-v20260913/guardpatrol-icon.png', sysKey: 'guardpatrol' },
+  { href: '/systems/guardpatrol/', label: '駐衛警巡邏', icon: '/Inspection/assets/system-icons-v20260913/guardpatrol-icon.png', sysKey: 'guardpatrol' },
   { href: '/systems/handover/', label: '電子交接簿', icon: '/Inspection/assets/system-icons-v20260913/handover-icon.png', sysKey: 'handover' },
   { href: '/systems/admin/', label: '後台', icon: '/Inspection/assets/system-icons-v20260913/admin-icon.png', sysKey: 'admin' },
 ];

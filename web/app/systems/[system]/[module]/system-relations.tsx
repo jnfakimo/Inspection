@@ -14,7 +14,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 const SYSTEMS = [
   { key: 'admin', code: 'SYS-01', label: '後台管理', x: 40, y: 150 },
   { key: 'workorder', code: 'SYS-02', label: '維修派工', x: 260, y: 150 },
-  { key: 'guardpatrol', code: 'SYS-03', label: '駐衛警巡檢', x: 480, y: 150 },
+  { key: 'guardpatrol', code: 'SYS-03', label: '駐衛警巡邏', x: 480, y: 150 },
   { key: 'handover', code: 'SYS-04', label: '電子交接簿', x: 700, y: 150 },
   { key: 'equipment', code: 'SYS-05', label: '設備建置', x: 40, y: 250 },
   { key: 'structuremap', code: 'SYS-06', label: '專案關係與圖臺', x: 260, y: 250 },

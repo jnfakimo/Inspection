@@ -13,7 +13,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 messaging.onBackgroundMessage(payload => {
   const data = payload.data || {};
-  self.registration.showNotification(data.title || '駐衛警巡檢通知', {
+  self.registration.showNotification(data.title || '駐衛警巡邏通知', {
     body: data.body || '巡檢通報時間已到，請查看未完成巡檢點。',
     icon: '../assets/system-icons/guardpatrol-icon.png',
     badge: '../assets/system-icons/guardpatrol-icon.png',

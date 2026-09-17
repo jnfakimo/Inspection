@@ -602,8 +602,8 @@
     // guardpatrol.html/guardpatrol-index.html 這兩把多加了 label 檢查，因為 guardpatrol.html
     // 同時也是少數頁面（guardpatrol3d.html、patrolshifts.html、patrol-notifications.html）
     // 「巡檢稽核總覽」這個頁面專屬捷徑的目的地——純比對 href 會誤刪掉那個不相關的連結，
-    // 所以這兩把才需要連 label 文字也符合「駐衛警巡檢」才真的移除。
-    var replaceTargets={'dashboard.html':'','workorder.html':'','repair.html':'','admin.html':'','dispatch.html':'','equipment.html':'','guardpatrol.html':'駐衛警巡檢','guardpatrol-index.html':'駐衛警巡檢','handover.html':''};
+    // 所以這兩把才需要連 label 文字也符合「駐衛警巡邏」或「駐衛警巡檢」才真的移除。
+    var replaceTargets={'dashboard.html':'','workorder.html':'','repair.html':'','admin.html':'','dispatch.html':'','equipment.html':'','guardpatrol.html':'駐衛警','guardpatrol-index.html':'駐衛警','handover.html':''};
     Array.prototype.slice.call(host.children).forEach(function(child){
       if(child===meta)return;
       if(child.tagName==='A'){
@@ -628,7 +628,7 @@
       {href:'index.html',label:'首頁',icon:'<img class="system-action-icon" src="../assets/system-icons/home-icon.svg" alt="">'},
       {href:'dashboard.html',label:'戰情儀表板',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">'},
       {href:'https://jnfakimo.github.io/word-cloud/system/admin.html?v=8f9d41c#repairs',label:'維修/派完工',icon:'<img class="system-action-icon" src="../assets/system-icons/maintenance-icon.png" alt="">',sysKey:'workorder'},
-      {href:'https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7',label:'駐衛警巡檢',icon:'<img class="system-action-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">',sysKey:'guardpatrol'},
+      {href:'https://jnfakimo.github.io/word-cloud/system/guardpatrol-index.html?v=1fb34a7',label:'駐衛警巡邏',icon:'<img class="system-action-icon" src="../assets/system-icons/guardpatrol-icon.png" alt="">',sysKey:'guardpatrol'},
       {href:'handover.html',label:'電子交接簿',icon:'<img class="system-action-icon" src="../assets/system-icons/handover-icon.png" alt="">',sysKey:'handover'},
       {href:'admin.html',label:'後台',icon:'<img class="system-action-icon" src="../assets/system-icons/admin-icon.png" alt="">',sysKey:'admin'}
     ];

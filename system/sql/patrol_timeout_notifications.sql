@@ -1,4 +1,4 @@
--- 駐衛警巡檢逾時 LINE 推播
+-- 駐衛警巡邏逾時 LINE 推播
 -- 先部署 patrol-timeout-check Edge Function，再於 Supabase SQL Editor 執行本檔。
 
 create table if not exists patrol_timeout_notifications (

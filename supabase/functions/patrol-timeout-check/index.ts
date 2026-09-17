@@ -176,7 +176,7 @@ Deno.serve(async req=>{
       const floorCount:Record<string,number>={};unchecked.forEach((m:{floor_id:string})=>{const floor=canonicalFloor(m.floor_id)||"未設定";floorCount[floor]=(floorCount[floor]||0)+1;});
       const floorText=Object.entries(floorCount).map(([f,n])=>`${f}：${n} 點`).join("\n")||"無";
       const pointText=rule.include_points&&unchecked.length?"\n\n未完成點位：\n"+unchecked.slice(0,20).map((m:{floor_id:string;label:string})=>`${canonicalFloor(m.floor_id)||""}－${m.label||"未命名"}`).join("\n")+(unchecked.length>20?`\n另有 ${unchecked.length-20} 點`:""):"";
-      const text=`⚠️ 駐衛警巡檢逾時通知\n\n值班日：${shiftDate}${isNightShiftName(rule.label)?"（夜班隔夜）":""}\n巡邏時段：${rule.label}\n巡邏時間：${effectiveStart}～${effectiveEnd}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
+      const text=`⚠️ 駐衛警巡邏逾時通知\n\n值班日：${shiftDate}${isNightShiftName(rule.label)?"（夜班隔夜）":""}\n巡邏時段：${rule.label}\n巡邏時間：${effectiveStart}～${effectiveEnd}\n\n當班部門：${assignedDepartments.join("、")||"尚未設定"}\n排定人員：${assignedNames.join("、")||"尚未指派"}\n實際打卡：${actual.join("、")||"尚無人員打卡"}\n\n應打卡：${expected} 點\n已打卡：${checked} 點\n未打卡：${unchecked.length} 點\n完成率：${rate}%\n\n未完成樓層：\n${floorText}${pointText}`;
       if(body.dryRun){results.push({rule:rule.id,shift:rule.label,shiftDate,start:effectiveStart,end:effectiveEnd,expected,checked,unchecked:unchecked.length,dryRun:true});continue;}
       const record={rule_id:rule.id,shift_date:shiftDate,shift_name:rule.label,scheduled_end:endIso,expected_count:expected,checked_count:checked,unchecked_count:unchecked.length,assigned_departments:assignedDepartments,assigned_names:assignedNames,actual_names:actual,status:"pending"};
       await db.from("patrol_timeout_notifications").upsert(record,{onConflict:"rule_id,shift_date"});
@@ -189,7 +189,7 @@ Deno.serve(async req=>{
       let fcmResult={status:"skipped",success:0,failure:0,response:"FCM 未啟用"};
       if(fcmEnabled){
         const fcmBody=`${shiftDate} ${rule.label}｜未打卡 ${unchecked.length} 點｜完成率 ${rate}%`;
-        try{fcmResult=await sendFcm(db,"駐衛警巡檢逾時通知",fcmBody,`${rule.id}:${shiftDate}`);}catch(e){fcmResult={status:"failed",success:0,failure:1,response:e instanceof Error?e.message:String(e)};}
+        try{fcmResult=await sendFcm(db,"駐衛警巡邏逾時通知",fcmBody,`${rule.id}:${shiftDate}`);}catch(e){fcmResult={status:"failed",success:0,failure:1,response:e instanceof Error?e.message:String(e)};}
       }
       const anySent=lineResult.ok||fcmResult.success>0;
       await db.from("patrol_timeout_notifications").update({status:lineResult.status,line_response:lineResult.response,fcm_status:fcmResult.status,fcm_success_count:fcmResult.success,fcm_failure_count:fcmResult.failure,fcm_response:fcmResult.response,sent_at:anySent?new Date().toISOString():null}).eq("rule_id",rule.id).eq("shift_date",shiftDate);

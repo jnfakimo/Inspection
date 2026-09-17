@@ -70,7 +70,7 @@ const WIDGET_CATALOG: Record<
 const DEFAULT_ITEMS: LayoutItem[] = [
   { widget_key: 'alerts', title: '重要提醒與異常警報', width: 12, height: 2, visible: true },
   { widget_key: 'kpis', title: '營運關鍵指標', width: 12, height: 2, visible: true },
-  { widget_key: 'patrol', title: '駐衛警巡檢即時', width: 8, height: 4, visible: true },
+  { widget_key: 'patrol', title: '駐衛警巡邏即時', width: 8, height: 4, visible: true },
   { widget_key: 'repairs', title: '報修案件分佈', width: 4, height: 4, visible: true },
   { widget_key: 'equipment_status', title: '設備狀態監控', width: 6, height: 4, visible: true },
   { widget_key: 'trading_kpi', title: '市場交易量分析', width: 6, height: 3, visible: true },

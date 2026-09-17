@@ -4,7 +4,7 @@
     // 系統 11
     {key:'alerts',system:11,title:'重要提醒與異常警報',description:'即時重大警報、設備異常跑馬燈',x:0,y:0,w:12,h:2,minW:3,minH:1},
     {key:'kpis',system:11,title:'營運關鍵指標',description:'進場車次、出勤率、在線率、異常件數',x:0,y:2,w:12,h:2,minW:4,minH:2},
-    {key:'patrol',system:11,title:'駐衛警巡檢即時',description:'巡檢點打卡進度、排班執勤狀況',x:0,y:4,w:8,h:6,minW:4,minH:4},
+    {key:'patrol',system:11,title:'駐衛警巡邏即時',description:'巡檢點打卡進度、排班執勤狀況',x:0,y:4,w:8,h:6,minW:4,minH:4},
     {key:'repairs',system:11,title:'報修案件分佈',description:'各區報修處理進度與完工率',x:8,y:4,w:4,h:6,minW:3,minH:4},
     {key:'equipment_status',system:11,title:'設備狀態監控',description:'冷凍設備、電力系統、消防感測妥善率',x:0,y:10,w:6,h:4,minW:3,minH:3},
     {key:'realtime_incident_map',system:11,title:'全場異常事件即時地圖',description:'全市場熱點分佈、緊急應變案件定位',x:6,y:10,w:6,h:4,minW:3,minH:3},

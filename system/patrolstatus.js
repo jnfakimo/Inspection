@@ -1,4 +1,4 @@
-// 駐衛警巡檢系統 — 共用的巡檢狀態計算模組
+// 駐衛警巡邏系統 — 共用的巡檢狀態計算模組
 // 三色狀態：ok(已打卡) / pending(待打卡) / overdue(逾期未打卡)
 window.PatrolStatus = (function () {
   const COLORS = { ok: '#00ff9d', pending: '#c77dff', overdue: '#ff5470' };

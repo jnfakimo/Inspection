@@ -116,7 +116,7 @@ const WIDGET_CATALOG: Record<
   patrol: {
     systemId: 11,
     systemName: '戰情指揮中心',
-    defaultTitle: '駐衛警巡檢即時',
+    defaultTitle: '駐衛警巡邏即時',
     icon: '🛡️',
     defaultWidth: 8,
     defaultHeight: 6,
@@ -319,7 +319,7 @@ const WIDGET_CATALOG: Record<
 const DEFAULT_FALLBACK_ITEMS: Row[] = [
   { widget_key: 'alerts', title: '重要提醒與異常警報', width: 12, height: 2, visible: true, refresh_seconds: 60, sort_order: 10 },
   { widget_key: 'kpis', title: '營運關鍵指標', width: 12, height: 2, visible: true, refresh_seconds: 60, sort_order: 20 },
-  { widget_key: 'patrol', title: '駐衛警巡檢即時', width: 8, height: 4, visible: true, refresh_seconds: 60, sort_order: 30 },
+  { widget_key: 'patrol', title: '駐衛警巡邏即時', width: 8, height: 4, visible: true, refresh_seconds: 60, sort_order: 30 },
   { widget_key: 'repairs', title: '報修案件分佈', width: 4, height: 4, visible: true, refresh_seconds: 60, sort_order: 40 },
   { widget_key: 'equipment_status', title: '設備狀態監控', width: 6, height: 4, visible: true, refresh_seconds: 60, sort_order: 50 },
   { widget_key: 'trading_kpi', title: '市場交易量分析', width: 6, height: 3, visible: true, refresh_seconds: 60, sort_order: 60 },
@@ -1048,7 +1048,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               <optgroup label="🟥 第 11 系統 · 戰情儀表與指揮中心">
                 <option value="alerts">🚨 重要提醒與異常警報 (alerts)</option>
                 <option value="kpis">⚡ 營運關鍵指標 (kpis)</option>
-                <option value="patrol">🛡️ 駐衛警巡檢即時 (patrol)</option>
+                <option value="patrol">🛡️ 駐衛警巡邏即時 (patrol)</option>
                 <option value="repairs">🔧 報修案件分佈 (repairs)</option>
                 <option value="equipment_status">⚙️ 設備狀態監控 (equipment_status)</option>
                 <option value="realtime_incident_map">🗺️ 全場異常事件即時地圖 (realtime_incident_map)</option>

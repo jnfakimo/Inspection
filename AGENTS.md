@@ -186,7 +186,7 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   sit at the far right of the page header in this exact order: user, connectivity,
   clock.
 - **Shared header actions**: V2 一般內容頁（共 13 大系統的 67 個子系統）頂列只保留三個
-  帳號／入口動作：首頁、個人資料、登出；移除戰情儀表板、維修／派完工、駐衛警巡檢、
+  帳號／入口動作：首頁、個人資料、登出；移除戰情儀表板、維修／派完工、駐衛警巡邏、
   電子交接簿與後台等跨系統按鈕，系統切換改由入口頁、系統頁與後台側欄承擔。
   首頁使用 `assets/system-icons/home-nav-icon.png`，個人資料使用
   `assets/system-icons/profile-nav-icon.png`，兩者為同一套生圖的藍／青色立體 ICON；

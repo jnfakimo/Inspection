@@ -193,6 +193,17 @@
 - 自動輸出 `docs/security_audit_report.md` 與 `security_audit_report.json` 稽核報告，完整對齊 ISO 27001 Annex A 控制措施（A.8.25、A.8.28、A.8.30）。
 - 實測 Secret Scan 0 筆未排除金鑰，Bandit SAST High 0 漏洞。
 
+### 2026-09-17 全站 13 大系統與子系統名稱修正（「駐衛警巡檢」→「駐衛警巡邏」）
+
+- 依業主指示將全站 13 大系統、67 個子系統與所有頁面之「駐衛警巡檢」全數修正為「駐衛警巡邏」（SYS-03「駐衛警巡邏系統」）。
+- 更新涵蓋：
+  - 前端定義與導航：`web/lib/modules.ts`、`AdminSidebar.tsx`、`shared-actions.ts`、`system-hub-client.tsx`、`system-relations.tsx`、`patrol-pointlist.tsx`、`guard-handover.tsx`。
+  - 戰情儀表板與後台：`dashboard-client.tsx`、`tv-client.tsx`、`LayoutsAdmin.tsx`、`HealthAdmin.tsx`、`dashboard-builder.html`、`dashboard-layout.js`。
+  - V1 頁面與跳轉：`guardpatrol.html`、`guardpatrol-index.html`、`patrol-notifications.html`、`inspection-archived.html`、`app.html`、`api.html`、`analytics.html`、`theme.js`、`patrol-timeout-settings.js`、`patrolstatus.js`、`firebase-messaging-sw.js`。
+  - 後端與推播：`supabase/functions/patrol-timeout-check/`、`patrol-checkin/`、SQL 表定義與預設版面。
+  - 架構與手冊文件：`docs/V2-使用者操作手冊.md`、`ARCHITECTURE_V2.md`、`V2-MIGRATION-MATRIX.md`、`V1-V2-比較.md`、`AGENTS.md`、`PROJECT_CONTEXT.md`。
+- 通過 `test:page-headings`、`test:button-standard`、`test:schema-contract`、`test:auth-consistency`、`test:login-destination`、`user-visibility`、`module-access` 等全套測試。
+
 ### 下一步
 
 - 觀察下一個班別結束後 0–5 分鐘內是否產生 LINE 推播與 `patrol_timeout_notifications` 紀錄。
@@ -205,5 +216,6 @@
 - 排班通知應直接讀取 `patrol_shift_template` 與當日 `patrol_shifts`，不可另維護不同名稱與時間的通知班別。
 - 複製 JWT 時曾產生格式錯誤；部署前需比對長度與實際呼叫結果。
 - Supabase CLI 會建立 `supabase/.temp/`，已加入 `.gitignore`。
+
 
 

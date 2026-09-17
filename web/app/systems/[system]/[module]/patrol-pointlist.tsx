@@ -257,7 +257,7 @@ export function PointListModule({ module, profile }: Props) {
           <a href={STRUCTUREMAP_ROUTES.areas}>區域位置表</a>
           <a href={STRUCTUREMAP_ROUTES.markers}>整合標記系統</a>
           <a href={STRUCTUREMAP_ROUTES.patrolPoints}>巡邏點清單</a>
-          <a href={STRUCTUREMAP_ROUTES.patrolHome}>駐衛警巡檢系統</a>
+          <a href={STRUCTUREMAP_ROUTES.patrolHome}>駐衛警巡邏系統</a>
           <a href={STRUCTUREMAP_ROUTES.project}>圖資專案設定</a>
         </div>
       </nav>

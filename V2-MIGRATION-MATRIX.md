@@ -14,7 +14,7 @@ V1（`system/*.html`）保留不刪除；V2（`web/app`）逐模組轉移，完�
 |---|---|---|---|
 | 後台管理 | `/Inspection/v2/systems/admin/` | **十一個模組已完整搬移**（見下方） | `admin.html`、`rbac.html` |
 | 維修／派工 | `/Inspection/v2/systems/workorder/` | **五個模組已完整搬移**（見下方） | `workorder.html`、`dispatch.html` |
-| 駐衛警巡檢 | `/Inspection/v2/systems/guardpatrol/` | **六個模組已完整搬移**（見下方） | `patrolcheckin.html`、`patrolshifts.html` 等 |
+| 駐衛警巡邏 | `/Inspection/v2/systems/guardpatrol/` | **六個模組已完整搬移**（見下方） | `patrolcheckin.html`、`patrolshifts.html` 等 |
 | 電子交接簿 | `/Inspection/v2/systems/handover/`、`/v2/handover-pilot/` | **三個模組已完整搬移**（見下方） | `handover.html` |
 | 設備建置 | `/Inspection/v2/systems/equipment/` | **八個模組已完整搬移**（見下方） | `equipment.html`、`materials.html` |
 | 專案關係／圖臺 | `/Inspection/v2/systems/structuremap/` | **六個模組已完整搬移**（見下方） | `b1plan.html`、`floor3d.html` 等 |
@@ -175,7 +175,7 @@ B1=99／1F=101／RF=900，而 V2 自行實作的兩份用 B1=-1／1F=1／RF=999�
 巡邏點的三色打卡狀態抽成 `web/lib/patrol-status.ts`（V1 `patrolstatus.js` 的 compute()
 移植），整合標記系統與 3D模型圖共用。
 
-## SYS-03 駐衛警巡檢（2026-08-18 完成）
+## SYS-03 駐衛警巡邏（2026-08-18 完成）
 
 六個模組皆有專屬元件：打卡矩陣在 `operations-workspace.tsx`，其餘五個在 `patrol-workspace.tsx`。
 
@@ -225,7 +225,7 @@ B1=99／1F=101／RF=900，而 V2 自行實作的兩份用 B1=-1／1F=1／RF=999�
 ## 交付順序
 
 1. 維修／派工：報修、派工、工單、附件、分析。
-2. 駐衛警巡檢與電子交接簿：現場操作優先，支援手機與離線提示。
+2. 駐衛警巡邏與電子交接簿：現場操作優先，支援手機與離線提示。
 3. 後台與設備主檔：帳號、權限、場域、設備履歷。
 4. 圖臺、派車、會議室與通知／稽核。
 

@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     );
     const { data: patrolAllowed, error: patrolAccessError } = await authorizedClient.rpc("has_system_access", { p_permission: "sys_guardpatrol" });
     if (patrolAccessError || patrolAllowed !== true) {
-      return reply(req, { ok: false, code: "forbidden", message: "此帳號沒有駐衛警巡檢系統權限" }, 403);
+      return reply(req, { ok: false, code: "forbidden", message: "此帳號沒有駐衛警巡邏系統權限" }, 403);
     }
 
     const body = await req.json().catch(() => ({}));

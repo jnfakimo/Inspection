@@ -2,7 +2,7 @@
 
 // SYS-04 駐警隊電子交接簿。
 //
-// 班別、班別時段、預定巡檢時段與排定人員一律來自「駐衛警巡檢系統／巡檢排班」，由
+// 班別、班別時段、預定巡檢時段與排定人員一律來自「駐衛警巡邏系統／巡檢排班」，由
 // app-api 的 handover_guard_context 在伺服器端解析後提供——交接簿使用者不一定有
 // sys_guardpatrol，前端讀不到排班與打卡表。交接簿不能改排班，只能另記實際值勤人員
 // 與代班說明。流程：交接中 → 交班簽名 → 接班簽名（鎖定）→ 主管每日簽核（全日鎖定）。
@@ -190,7 +190,7 @@ export function GuardHandover({ system, module, profile }: Props) {
         <GuardSheetHeader date={date} kpis={context ? kpis : []} />
         <div className="hs-shifts">
           {busy && !context ? <p className="hs-empty">載入中…</p>
-            : !shifts.length ? <p className="hs-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡檢系統 → 巡檢排班」設定班別。</p>
+            : !shifts.length ? <p className="hs-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡邏系統 → 巡檢排班」設定班別。</p>
               : shifts.map((shift, index) => {
                 const log = logFor(shift.name);
                 return <GuardShiftCard key={shift.name} index={index} shift={shift} log={log} nameOf={nameOf} namesOf={namesOf}

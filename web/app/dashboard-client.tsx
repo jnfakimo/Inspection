@@ -47,7 +47,7 @@ type LayoutItem = {
 const CATALOG = [
   { key: 'alerts', title: '重要提醒', x: 0, y: 0, w: 12, h: 1, minW: 3, minH: 1 },
   { key: 'kpis', title: '營運關鍵指標', x: 0, y: 1, w: 12, h: 2, minW: 4, minH: 2 },
-  { key: 'patrol', title: '駐衛警巡檢即時', x: 0, y: 3, w: 8, h: 6, minW: 4, minH: 4 },
+  { key: 'patrol', title: '駐衛警巡邏即時', x: 0, y: 3, w: 8, h: 6, minW: 4, minH: 4 },
   { key: 'status', title: '案件狀態分佈', x: 8, y: 3, w: 4, h: 6, minW: 3, minH: 4 },
   { key: 'rank_dept', title: '各單位報修排行', x: 0, y: 9, w: 6, h: 4, minW: 3, minH: 3 },
   { key: 'rank_equipment', title: '各設備故障排行', x: 6, y: 9, w: 6, h: 4, minW: 3, minH: 3 },

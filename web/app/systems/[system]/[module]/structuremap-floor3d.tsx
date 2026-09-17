@@ -61,7 +61,7 @@ export function Floor3DBoardModule({ profile }: Props) {
   const [visibleFloors, setVisibleFloors] = useState<Record<string, boolean>>({});
 
   const [showMarkers, setShowMarkers] = useState(true);
-  // ?kind=patrol：從駐衛警巡檢的立體巡檢雲臺跳過來時只看巡邏點。不另外複製一份
+  // ?kind=patrol：從駐衛警巡邏的立體巡檢雲臺跳過來時只看巡邏點。不另外複製一份
   // 頁面，也不改預設——直接進本頁仍是全部類型都顯示。
   const [visibleKinds, setVisibleKinds] = useState<Record<string, boolean>>(() => {
     // 只認得的類型才套用。給了不存在的值就當沒給——否則會全部關掉變成空圖，
