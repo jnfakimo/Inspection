@@ -831,7 +831,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                         <div className="business-slot-card-head">
                           <div className="business-slot-card-title">
                             <span className="business-slot-badge">{slot.label}</span>
-                            <span className="business-slot-desc">{slot.shiftGroup}</span>
+                            <span className="business-slot-desc">{slot.shiftName}</span>
                           </div>
                           <div className="business-slot-card-stats">
                             時段完成度：<b>{slotDone} / {slotItems.length}</b>

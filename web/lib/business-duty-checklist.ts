@@ -314,7 +314,8 @@ export function parseDutyChecklist(raw: unknown, defaults: DutyItem[] = DEFAULT_
     if (hasOnlyCustom) {
       const removed = source.removed && typeof source.removed === 'object' && !Array.isArray(source.removed)
         ? source.removed as Record<string, { deletedAt: string; deletedBy: string }> : {};
-      const items = defaults.map(item => ({ ...item, ...removed[item.id] })).concat(parsedItems);
+      const baseItems: DutyItem[] = defaults.map(item => ({ ...item, ...(removed[item.id] || {}) }));
+      const items: DutyItem[] = baseItems.concat(parsedItems);
       return { items, checks };
     }
 
@@ -325,7 +326,7 @@ export function parseDutyChecklist(raw: unknown, defaults: DutyItem[] = DEFAULT_
 
   const removed = modern && source.removed && typeof source.removed === 'object' && !Array.isArray(source.removed)
     ? source.removed as Record<string, { deletedAt: string; deletedBy: string }> : {};
-  const items = defaults.map(item => ({ ...item, ...removed[item.id] }));
+  const items: DutyItem[] = defaults.map(item => ({ ...item, ...(removed[item.id] || {}) }));
   return { items, checks };
 }
 
