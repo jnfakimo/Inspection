@@ -5,40 +5,39 @@
 
 ## ⏯️ 目前做到哪
 
-**2026-09-11～09-13：app-api 依業務拆檔完成第 2 階段（公務車、會議室）；同時修好多項正式環境問題。**
+**2026-09-17：全站文字修正（駐衛警巡檢 ➔ 駐衛警巡邏）與業管組交接簿崗位勤務時段點檢項目管理功能完成上線。**
 
-本次已上線且驗證（細節與 commit／workflow 證據見 `Obsidian/04-開發與部署.md` 9/12、9/13 三筆）：
+本次已完成並驗證：
 
-- app-api 拆檔：`handlers/vehicle.ts`、`handlers/meeting.ts`，共用 `validate.ts`／`audit.ts`／`context.ts`。
-- 權限查詢失敗即拒絕；FindTag probe 改回內建 XML 解析器（CI 恢復綠燈）。
-- 行情匯入批次表 `market_import_batches`；9/13 蕹菜代碼變更已以官網為準修正。
-- 市場公開看板 503 修正（`market_source_date_ranges` 改走索引）；`tsconfig.json` BOM 移除。
-- 三本交接簿共用版型、駐衛警→駐警隊命名、四層授權（角色×子系統）、圖面打卡點大小拉桿。
+- **全站 12 大系統及子系統命名統一**：全面將「駐衛警巡檢」修正為「駐衛警巡邏」（包含導覽列、模組定義、各系統文字標籤與頁面標題）。
+- **業管組交接簿（`/v2/systems/handover/business/`）點檢項目管理彈窗**（`BusinessDutyModal`）：
+  - 比照駐警隊管理版型，支援 7 大時段 Tabs 切換與數量 Badge。
+  - 支援點檢項目：新增、行內修改文字、刪除、同勤務時段內項次排序（`↑` / `↓`）、一鍵恢復預設 27 項。
+  - 當日點檢進度（如 `0/27`、完成率）與 A4 每日列印／預覽報表（雙欄平衡動態拆分）全站即時連動。
+  - 透過 `web/lib/business-duty-checklist.ts` 保持向下相容性與稽核紀錄（更新者、更新時間）。
+- **自動化測試與規範檢查**：
+  - `web/lib/business-duty-checklist.test.ts` 4 項單元測試全數通過。
+  - 通過交接簿樣式一致性、按鈕標準（`.primary-btn` / `.secondary-btn`）、下拉選單空白列與資安檢核。
 
 ## 🚦 目前狀態
 
-- 正式站正常：最後推送 `d4163fce7`，CI／Edge／Pages／migration 全綠，`market_board_public` 回 200。
-- **app-api 拆檔做一半**：已拆 2／8 個業務，其餘仍在 `index.ts`。
+- 正式站正常：最新推送 Commit `db1d28d6c`，GitHub `origin/main` 已同步，GitHub Pages 自動部署中。
+- 工作區狀態：乾淨（Working tree clean）。
 
 ## ➡️ 下一步
 
-1. 繼續 app-api 拆檔：巡檢 → 設備 → 報修 → 公文 → 市場 → 交接簿。**每階段前先請 Codex 暫停修改 app-api**；
-   做法見 `AGENTS.md`「app-api 依業務拆檔」，每階段須逐行比對純搬移、附 handler 單元測試、deno check 與 `typecheck:api`。
-2. 每日行情匯入遇「代碼集合有變」時自動通知並列出品項（目前只會失敗）。
-3. 評估北農官網連線逾時頻繁（近 12 次 5 次失敗）的重試或排程調整。
+1. 繼續 app-api 拆檔：巡檢 → 設備 → 報修 → 公文 → 市場 → 交接簿（參考 `AGENTS.md` 拆檔指引）。
+2. 每日行情匯入遇「代碼集合有變」時自動通知並列出品項（防重複計量保護）。
+3. 評估北農官網連線逾時重試或排程調整機制。
 
 ## ⚠️ 注意事項
 
-- **共用 repo 背景維護反覆失敗**（Codex 資料夾 `.git`：`packed-refs.lock` 殘留、partial clone 缺物件）。
-  不影響 commit，但工作樹操作常被 `.git/worktrees/Inspection-guard/index.lock` 擋住——先確認沒有 git 行程再刪自己的鎖；
-  不要動 Codex 資料夾本身。暫存還原（stash pop）也可能被鎖擋下而未還原，務必確認 `git stash list`。
-- **每日行情匯入「代碼集合有變」是刻意的防重複計量保護**：先比對官網彙總與資料庫 `item_key` 找出品項，
-  確認後以 migration 原地更新並寫稽核，不可刪資料。
-- **Windows 寫檔勿帶 BOM**（deno 讀 tsconfig 會失敗）；Bash heredoc 會吃反斜線，含反斜線的內容改用檔案寫入。
-- 冒煙測試所需的公開 anon key 從 `web/lib/config.ts` 讀取（舊 migration 中的 JWT 已移除）。
-- 前次（9/5）自架站台登入修復的詳細交接已原文歸檔至 `Obsidian/10-地端移轉與驗收.md` 附錄；地端移轉進度以該文件為準。
+- **三本交接簿規範一致性**：機電、業管、駐警隊三大電子交接簿必須遵守 `handover-sheet.css`（`hs-*`）共用版型標準。
+- **資料下拉選單規範**：可留白的資料下拉首列必須為空值，按鈕遵循共用 V2 標準。
+- **Windows 寫檔勿帶 BOM**；敏感資訊（API key、token、真名）嚴禁 commit。
 
 ## 🕐 最後更新
 
-2026-09-13 21:17 · Claude Opus 5 @ DESKTOP-0CFB6UK
-· Git push：✅ 已推（`f0b93b9e7`，收工紀錄）
+2026-09-17 16:38 · AntiGravity @ Windows
+· Git push：✅ 已推（`db1d28d6c`）
+
