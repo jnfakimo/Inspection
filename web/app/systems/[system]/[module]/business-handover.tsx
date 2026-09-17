@@ -1207,6 +1207,20 @@ function BusinessReportContent({
     <div className="business-print-content">
       <header className="business-print-header">
         <h2>臺北農產運銷股份有限公司{HANDOVER_MARKETS[market].name} 業管組崗位勤務點檢與交接紀錄表</h2>
+        <div className="business-print-meta-line">
+          <span><b>交接日期：</b>{rocDate(date)}</span>
+          <span><b>點檢完成率：</b>{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）</span>
+          <span><b>三班交接：</b>共 {entries.filter(r => !isDeleted(r) && !String(r.description || '').includes(CHECKLIST_TAG)).length} 筆紀錄</span>
+        </div>
+      </header>
+
+      {/* 1. 崗位勤務時段點檢紀錄 (雙欄緊緻排版) */}
+      <div className="business-print-section-title">一、崗位勤務時段點檢紀錄（全日 7 時段 · {dutyItems.length} 項崗位職責）</div>
+      <div className="business-print-duty-cols">
+        <div className="business-print-duty-col">
+          <table className="business-print-table business-print-compact-table">
+            <thead>
+              <tr>
                 <th style={{ width: '22%' }}>時段</th>
                 <th>點檢項目與職責</th>
                 <th style={{ width: '20%', textAlign: 'center' }}>結果</th>
