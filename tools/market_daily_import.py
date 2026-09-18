@@ -22,6 +22,16 @@ MARKETS = {'1': '第一市場', '2': '第二市場'}
 CATEGORIES = {'V': '蔬菜', 'F': '水果'}
 TAIPEI = timezone(timedelta(hours=8))
 
+# 北農官網對國外主機時常整段時間連線逾時；農業部開放資料平台提供同一批交易行情，
+# 作為排程的備援來源。代號（作物代號＝品名代號）與官網完全相同，但 CropName 是
+# 「品名-品種」合併字串，切法與官網的品名欄不一致，因此品名一律沿用資料庫既有的
+# 代號對照，確保彙總後的品項、穩定鍵與官網完全一致。
+MOA_URL = 'https://data.moa.gov.tw/api/v1/AgriProductsTransType/'
+MOA_MARKETS = {'1': '台北一', '2': '台北二'}
+MOA_TYPES = {'V': 'N04', 'F': 'N05'}
+MOA_PAGE_SIZE = 1000
+MOA_IMPORT_METHOD = 'moa_open_data_backup'
+
 
 def roc(day):
     return f'{day.year - 1911:03d}/{day.month:02d}/{day.day:02d}'
@@ -146,6 +156,84 @@ def fetch_scope(day, market, category):
             time.sleep(FETCH_BACKOFF_SECONDS[attempt])
 
 
+def roc_dot(day):
+    return f'{day.year - 1911}.{day.month:02d}.{day.day:02d}'
+
+
+def fetch_moa_payload(day, market):
+    # 備援來源同樣重試：官網不通時多半是對外連線不穩，不該一次失敗就整日缺資料。
+    for attempt in range(len(FETCH_BACKOFF_SECONDS)):
+        try:
+            rows, skip = [], 0
+            while True:
+                params = {'Start_time': roc_dot(day), 'End_time': roc_dot(day),
+                          'MarketName': MOA_MARKETS[market], 'Skip': skip, 'Take': MOA_PAGE_SIZE}
+                response = requests.get(MOA_URL, params=params, headers={'accept': 'application/json'},
+                                        timeout=FETCH_TIMEOUT)
+                response.raise_for_status()
+                payload = response.json()
+                if not isinstance(payload, dict) or not isinstance(payload.get('Data'), list):
+                    raise ValueError('備援來源回應格式不符')
+                rows.extend(payload['Data'])
+                if len(payload['Data']) < MOA_PAGE_SIZE:
+                    return rows
+                skip += MOA_PAGE_SIZE
+                if skip > 20 * MOA_PAGE_SIZE:
+                    raise ValueError('備援來源分頁異常')
+        except (requests.RequestException, ValueError) as exc:
+            if attempt == len(FETCH_BACKOFF_SECONDS) - 1:
+                status = getattr(getattr(exc, 'response', None), 'status_code', None)
+                detail = type(exc).__name__ + (f' HTTP {status}' if status else '')
+                raise RuntimeError(f'備援來源連線失敗，已重試 {len(FETCH_BACKOFF_SECONDS)} 次（{detail}）') from None
+            time.sleep(FETCH_BACKOFF_SECONDS[attempt])
+
+
+def moa_scope(payload_rows, day, market, category, code_items):
+    # 只接受與要求完全相符的列；品名必須在既有對照中，否則寧可失敗也不寫入新品項，
+    # 避免同一天出現兩種品名切法而重複計量。
+    unique = {}
+    duplicates = 0
+    for record in payload_rows:
+        if str(record.get('MarketName', '')) != MOA_MARKETS[market] or str(record.get('TransDate', '')) != roc_dot(day):
+            raise ValueError('備援來源回應的市場或日期與要求不符')
+        if str(record.get('TcType', '')) != MOA_TYPES[category]:
+            continue
+        code = str(record.get('CropCode', '')).strip()
+        if not re.fullmatch(r'[A-Za-z0-9]+', code):
+            raise ValueError('備援來源的作物代號格式不符')
+        item = code_items.get((MARKETS[market], CATEGORIES[category], code))
+        if not item:
+            raise RuntimeError(f'備援來源出現官網近期未見的品名代號 {code}，'
+                               '為避免品名切法不同而重複計量，改由人工確認後再匯入')
+        values = tuple(numeric(str(record.get(key, ''))) for key in
+                       ('Avg_Price', 'Trans_Quantity', 'Upper_Price', 'Middle_Price', 'Lower_Price'))
+        row = {'code': code, 'item': item, 'variety': str(record.get('CropName', '')), 'values': values}
+        if code in unique:
+            if unique[code]['values'] != values or unique[code]['item'] != item:
+                raise ValueError(f'品名代號 {code} 有互相衝突的資料')
+            duplicates += 1
+        else:
+            unique[code] = row
+    rows = list(unique.values())
+    return rows, {'raw_rows': len(rows) + duplicates, 'duplicate_rows': duplicates, 'placeholder_rows': 0,
+                  'status': 'ready' if rows else 'no_data', 'source': MOA_IMPORT_METHOD}
+
+
+def load_code_items(days=90):
+    # 由既有行情資料建立「市場×品類×品名代號 → 品名」對照，取最近一次出現的品名。
+    sql = f"""select p.observed_on::text as observed_on, p.dimensions->>'market' as market,
+ p.dimensions->>'category' as category, p.dimensions->>'item' as item, p.dimensions->>'item_key' as item_key
+from public.market_data_points p
+where p.source_id='{SOURCE_ID}' and p.observed_on > current_date - {int(days)}
+order by p.observed_on"""  # nosec B608: 僅內嵌固定來源常數與整數天數
+    mapping = {}
+    for row in query(sql, True):
+        for code in str(row['item_key'] or '').split('|'):
+            if code:
+                mapping[(row['market'], row['category'], code)] = row['item']
+    return mapping
+
+
 def aggregate(rows, day, market, category):
     groups = defaultdict(list)
     for row in rows:
@@ -193,6 +281,14 @@ def optional_sql(value, cast=''):
     return 'null' if value in (None, '') else sql_literal(str(value)) + cast
 
 
+def batch_source(scopes):
+    # 任一範圍改用備援來源時，批次紀錄就標成備援，方便日後追查該日數值出處。
+    used = {scope.get('source') for scope in scopes or []}
+    if MOA_IMPORT_METHOD in used:
+        return MOA_IMPORT_METHOD, MOA_URL
+    return IMPORT_METHOD, URL
+
+
 def import_sql(points, summary, record_summary=True, batch_id=None):
     # One transaction for all fetched dates, with cardinality and exact-value checks.
     # Reject changed code sets rather than appending a second aggregate for the same item.
@@ -200,11 +296,12 @@ def import_sql(points, summary, record_summary=True, batch_id=None):
     # 批次紀錄與行情資料在同一個交易內寫入：任何驗證失敗時兩者一起回滾，不會留下孤兒批次。
     batch_id = str(uuid.UUID(batch_id)) if batch_id else str(uuid.uuid4())
     fetched_at = summary.get('completed_at') or datetime.now(TAIPEI).isoformat()
+    method, source_url = batch_source(summary.get('scopes'))
     batch_sql = f"""
 insert into public.market_import_batches(batch_id,source_id,import_method,mode,source_url,range_from,range_to,
  row_count,workflow_run,details,fetched_at)
-values ('{batch_id}','{SOURCE_ID}',{sql_literal(IMPORT_METHOD)},{optional_sql(summary.get('mode'))},
- {sql_literal(URL)},{optional_sql(summary.get('range_from'), '::date')},{optional_sql(summary.get('range_to'), '::date')},
+values ('{batch_id}','{SOURCE_ID}',{sql_literal(method)},{optional_sql(summary.get('mode'))},
+ {sql_literal(source_url)},{optional_sql(summary.get('range_from'), '::date')},{optional_sql(summary.get('range_to'), '::date')},
  {len(points)},{optional_sql(summary.get('workflow_run'))},{json_sql(BATCH_DETAILS)},{sql_literal(fetched_at)}::timestamptz);"""  # nosec B608
     summary_sql = f"""
 update public.market_data_sources set config=coalesce(config,'{{}}'::jsonb)
@@ -340,6 +437,8 @@ def main():
     parser.add_argument('--chunk-days', type=int, default=7, help='回補歷史時每個交易涵蓋的天數（預設 7）')
     parser.add_argument('--raw-output', type=Path,
                         help='另存逐品名代號（含品種）的原始列 JSONL 目錄，供日後改成代碼粒度時直接載入')
+    parser.add_argument('--no-backup', action='store_true',
+                        help='官網連不上時不改用農業部開放資料備援，直接失敗')
     parser.add_argument('--raw-input', type=Path,
                         help='不連官網，改讀此目錄中先前以 --raw-output 存下的原始列（<日期>-<市場>-<品類>.jsonl）')
     args = parser.parse_args()
@@ -367,6 +466,24 @@ def main():
         args.sql_output.parent.mkdir(parents=True, exist_ok=True)
         args.sql_output.write_text('', encoding='utf-8')
 
+    # 官網連不上時改用農業部開放資料；對照表要連資料庫取得，第一次需要時才載入。
+    code_items = {}
+
+    def fetch_with_backup(day, market, category):
+        try:
+            rows, stats = fetch_scope(day, market, category)
+            stats.setdefault('source', IMPORT_METHOD)
+            return rows, stats
+        except RuntimeError as web_error:
+            if args.no_backup:
+                raise
+            nonlocal code_items
+            if not code_items:
+                code_items = load_code_items()
+            print(f'::warning::{web_error}；改用農業部開放資料備援（{day} {MARKETS[market]}{CATEGORIES[category]}）', flush=True)
+            payload = fetch_moa_payload(day, market)
+            return moa_scope(payload, day, market, category, code_items)
+
     def fetch_days(first, last):
         points, scopes = [], []
         day = first
@@ -376,7 +493,7 @@ def main():
                     if args.raw_input:
                         rows, stats = load_raw_rows(args.raw_input, day, market, category)
                     else:
-                        rows, stats = fetch_scope(day, market, category)
+                        rows, stats = fetch_with_backup(day, market, category)
                     if args.raw_output and rows:
                         write_raw_rows(args.raw_output, day, market, category, rows)
                     batch = aggregate(rows, day, market, category)

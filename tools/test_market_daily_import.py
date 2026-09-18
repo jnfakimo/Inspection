@@ -4,7 +4,8 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from market_daily_import import aggregate, day_chunks, import_sql, load_raw_rows, parse_page, PREFIX, sql_literal, write_raw_rows
+from market_daily_import import (MOA_IMPORT_METHOD, MOA_URL, PREFIX, aggregate, batch_source, day_chunks, import_sql,
+                                 load_raw_rows, moa_scope, parse_page, roc_dot, sql_literal, write_raw_rows)
 
 DAY = date(2026, 9, 2)
 
@@ -145,3 +146,50 @@ class MarketImportTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def moa_row(code, name, kind='N04', market='台北一', avg='10', qty='100', high='20', middle='10', low='5'):
+    return {'TransDate': roc_dot(DAY), 'TcType': kind, 'CropCode': code, 'CropName': name, 'MarketCode': '109',
+            'MarketName': market, 'Upper_Price': high, 'Middle_Price': middle, 'Lower_Price': low,
+            'Avg_Price': avg, 'Trans_Quantity': qty}
+
+
+class MarketBackupSourceTests(unittest.TestCase):
+    # 農業部開放資料的作物代號與官網品名代號相同，但 CropName 是「品名-品種」合併字串，
+    # 因此品名一律沿用官網既有對照；彙總結果必須與官網完全一致。
+    CODE_ITEMS = {('第一市場', '蔬菜', 'FK41'): '甜椒', ('第一市場', '蔬菜', 'FK42'): '甜椒'}
+
+    def test_backup_matches_website_aggregate(self):
+        html = page([['FK41', '甜椒', '彩色種', '10', '100', '20', '10', '5'],
+                     ['FK42', '甜椒', '彩椒黃色', '20', '300', '30', '20', '10']])
+        web_rows, _ = parse_page(html, DAY, '1', 'V')
+        backup_rows, stats = moa_scope([moa_row('FK41', '甜椒-彩色種'),
+                                        moa_row('FK42', '甜椒-彩椒黃色', avg='20', qty='300', high='30', middle='20', low='10'),
+                                        moa_row('G11', '香蕉', kind='N05')], DAY, '1', 'V', self.CODE_ITEMS)
+        self.assertEqual(stats['source'], MOA_IMPORT_METHOD)
+        web_point, = aggregate(web_rows, DAY, '1', 'V')
+        backup_point, = aggregate(backup_rows, DAY, '1', 'V')
+        self.assertEqual(backup_point['external_key'], web_point['external_key'])
+        self.assertEqual(backup_point['dimensions'], web_point['dimensions'])
+        self.assertEqual(backup_point['measures'], web_point['measures'])
+
+    def test_unknown_code_stops_the_backup(self):
+        with self.assertRaisesRegex(RuntimeError, '人工確認'):
+            moa_scope([moa_row('ZZ99', '新品名-新品種')], DAY, '1', 'V', self.CODE_ITEMS)
+
+    def test_wrong_market_or_date_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, '市場或日期'):
+            moa_scope([moa_row('FK41', '甜椒-彩色種', market='台北二')], DAY, '1', 'V', self.CODE_ITEMS)
+
+    def test_duplicate_code_is_not_double_counted(self):
+        rows, stats = moa_scope([moa_row('FK41', '甜椒-彩色種'), moa_row('FK41', '甜椒-彩色種')], DAY, '1', 'V', self.CODE_ITEMS)
+        self.assertEqual(stats['duplicate_rows'], 1)
+        self.assertEqual(aggregate(rows, DAY, '1', 'V')[0]['measures']['quantity'], 100)
+
+    def test_batch_record_marks_the_source_actually_used(self):
+        self.assertEqual(batch_source([{'source': 'tapmc_daily'}])[0], 'tapmc_daily')
+        method, url = batch_source([{'source': 'tapmc_daily'}, {'source': MOA_IMPORT_METHOD}])
+        self.assertEqual((method, url), (MOA_IMPORT_METHOD, MOA_URL))
+        sql = import_sql([], {'scopes': [{'source': MOA_IMPORT_METHOD}]})
+        self.assertIn(sql_literal(MOA_IMPORT_METHOD), sql)
+        self.assertIn(sql_literal(MOA_URL), sql)

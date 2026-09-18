@@ -281,6 +281,13 @@ until an admin recreates them. Full procedure: `docs/DATABASE_BACKUP_RECOVERY.md
   `market_import_batches` 一筆，`market_data_points.metadata` 只留 `import_batch_id` 與逐筆才有意義的欄位；
   不要再把批次共用資訊逐筆塞進 metadata（45 萬筆行情有一半空間就是這樣吃掉的）。批次紀錄只增不改，
   必須與行情資料寫在同一個交易內。2026-09-13 以前的既有資料維持原樣，不回頭改寫。
+- **行情備援來源（2026-09-18 起）**：北農官網對 GitHub runner 常整段時間連線逾時，`fetch_scope`
+  重試約 10 分鐘後改抓農業部開放資料 `AgriProductsTransType`（`--no-backup` 可關閉）。作物代號與官網
+  品名代號相同，但 `CropName` 是「品名-品種」合併字串，切法與官網不同，因此品名一律以既有行情資料
+  建立的「市場×品類×代號 → 品名」對照為準；出現對照裡沒有的新代號就整批失敗，不要自行猜切法，
+  否則同一天會出現兩種品名而重複計量。備援批次的 `import_method` 記為 `moa_open_data_backup`，
+  官網恢復後同一穩定鍵會被官網數值覆寫（實測 258 個品項的品名與代號集合完全一致，僅少數價格有
+  0.1 元級距差異）。
 - **圖面標記大小**：立體巡檢雲臺與平面圖都提供「打卡點大小」拉桿，刻度一律是 0.5〜3 倍、預設 1 倍，
   兩張圖改一邊就要改另一邊，避免像 V1 的 floor3d.html 與 guardpatrol3d.html 那樣分岔。3D 走
   `FloorStack3D` 的 `markerScale`（以 ref＋獨立 effect 調整既有圓點的 scale，不重建場景）；
