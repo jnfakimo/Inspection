@@ -331,6 +331,7 @@ function GuardFilePreview({ market, file, onClose }: { market: HandoverMarket; f
 }
 
 type UploadTask = { key: string; incidentId: string; name: string; stage: string; progress: number | null; error?: string };
+const DEFAULT_DUTY_SUMMARY = '本班值勤正常';
 
 function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, shiftAttachments, optionsFor, onManage, onPreview, onClose, onSaved }: {
   market: HandoverMarket; date: string; shift: GuardShift; log: GuardLog | null; staff: { user_id: string; name: string }[]; people: Record<string, string>;
@@ -339,7 +340,7 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
 }) {
   const [actual, setActual] = useState<string[]>(log?.actual_user_ids?.length ? log.actual_user_ids : shift.scheduled_user_ids);
   const [substitute, setSubstitute] = useState(log?.substitute_note || '');
-  const [summary, setSummary] = useState(log?.duty_summary || '');
+  const [summary, setSummary] = useState(log ? log.duty_summary || '' : DEFAULT_DUTY_SUMMARY);
   const [important, setImportant] = useState(log?.important_notes || '');
   const [incidents, setIncidents] = useState<Incident[]>(() => (log?.incidents || []).map(incident => incident.id ? incident : { ...incident, id: newIncidentId() }));
   const [items, setItems] = useState<Item[]>(log?.items?.length ? log.items : defaultItems.map(item => ({ ...item })));
@@ -431,7 +432,13 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
         <label>代班說明{differs ? '（必填）' : ''}<input value={substitute} maxLength={500} onChange={event => setSubstitute(event.target.value)} placeholder="例：原排定人員請假，由某某代班" /></label>
       </fieldset>
       <fieldset><legend><GuardIcon name="note" size={16} />勤務概況</legend>
-        <label>安全狀況概述<textarea rows={4} value={summary} maxLength={4000} onChange={event => setSummary(event.target.value)} placeholder="本班門禁、巡邏與場區整體狀況；無特殊狀況請填「本班勤務正常」" /><small>交班簽名送出時為必填。</small></label>
+        <label>安全狀況概述<textarea rows={4} value={summary} maxLength={4000}
+          onFocus={event => { if (summary === DEFAULT_DUTY_SUMMARY) event.currentTarget.select(); }}
+          onChange={event => {
+            const next = event.target.value;
+            setSummary(summary === DEFAULT_DUTY_SUMMARY && next !== DEFAULT_DUTY_SUMMARY ? next.replace(DEFAULT_DUTY_SUMMARY, '') : next);
+          }}
+          placeholder="請記錄本班門禁、巡邏與場區整體狀況" /><small>預設為「本班值勤正常」；輸入其他內容時會取代預設文字。交班簽名送出時為必填。</small></label>
         <label>重要交辦事項<textarea rows={3} value={important} maxLength={4000} onChange={event => setImportant(event.target.value)} placeholder="需要下一班接續處理或特別留意的事項" /></label>
       </fieldset>
       <fieldset><legend><GuardIcon name="alert" size={16} />異常事件（{incidents.length} 件）</legend>
