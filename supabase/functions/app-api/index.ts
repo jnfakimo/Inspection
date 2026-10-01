@@ -3149,15 +3149,15 @@ export async function handleAppApiRequest(req: Request) {
           && roleModuleModes.get('handover/guard-approve') === 'allow')));
     const guardIdList = (value: unknown) => Array.isArray(value) ? value.map(item => String(item || '')).filter(Boolean) : [];
     type GuardWork = { start?: string; end?: string };
-    const guardShiftContext = async (dutyDate: string) => {
+    const guardShiftContext = async (dutyDate: string, marketCode: string) => {
       const nextDate = guardDateOffset(dutyDate, 1);
       const [templateResult, dailyResult, staffResult, ruleResult, markerResult, dayStatusResult] = await Promise.all([
-        admin.from('patrol_shift_template').select('template_id,name,start_time,end_time,sort_order,assigned_user_ids').neq('status', 'inactive').order('sort_order'),
-        admin.from('patrol_shifts').select('shift_id,shift_date,name,start_time,end_time,assigned_user_ids').in('shift_date', [dutyDate, nextDate]),
+        admin.from('patrol_shift_template').select('template_id,name,start_time,end_time,sort_order,assigned_user_ids').eq('market_code', marketCode).neq('status', 'inactive').order('sort_order'),
+        admin.from('patrol_shifts').select('shift_id,shift_date,name,start_time,end_time,assigned_user_ids').eq('market_code', marketCode).in('shift_date', [dutyDate, nextDate]),
         admin.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
         admin.from('system_settings').select('value').eq('key', 'patrol_timeout_rules').maybeSingle(),
-        admin.from('plan_markers').select('marker_id,floor_id').eq('kind', 'patrol').eq('status', 'active'),
-        admin.from('patrol_shift_day_status').select('status').eq('duty_date', dutyDate).maybeSingle(),
+        admin.from('plan_markers').select('marker_id,floor_id').eq('market_code', marketCode).eq('kind', 'patrol').eq('status', 'active'),
+        admin.from('patrol_shift_day_status').select('status').eq('market_code', marketCode).eq('duty_date', dutyDate).maybeSingle(),
       ]);
       const failure = templateResult.error || dailyResult.error || staffResult.error || ruleResult.error || markerResult.error || dayStatusResult.error;
       if (failure) throw failure;
@@ -3166,9 +3166,9 @@ export async function handleAppApiRequest(req: Request) {
         templates?: Record<string, unknown>; dates?: Record<string, Record<string, unknown>>;
         workTimes?: { templates?: Record<string, GuardWork>; dates?: Record<string, Record<string, GuardWork>> };
       } = {};
-      try { staffConfig = JSON.parse(String(staffResult.data?.value || '{}')) || {}; } catch { staffConfig = {}; }
+      if (marketCode === 'market_1') { try { staffConfig = JSON.parse(String(staffResult.data?.value || '{}')) || {}; } catch { staffConfig = {}; } }
       let rules: Array<{ label?: string; start?: string; end?: string }> = [];
-      try { const parsed = JSON.parse(String(ruleResult.data?.value || '[]')); if (Array.isArray(parsed)) rules = parsed; } catch { rules = []; }
+      if (marketCode === 'market_1') { try { const parsed = JSON.parse(String(ruleResult.data?.value || '[]')); if (Array.isArray(parsed)) rules = parsed; } catch { rules = []; } }
       const ruleName = (value: unknown) => String(value || '').trim().replace(/\s*巡邏\s*$/u, '');
       const noWork: GuardWork = {};
       const daily = (dailyResult.data || []).filter(row => !String(row.name || '').startsWith('[已刪除]'));
@@ -3201,7 +3201,7 @@ export async function handleAppApiRequest(req: Request) {
       const floorOf = new Map((markerResult.data || []).map(marker => [String(marker.marker_id), canonicalFloor(marker.floor_id) || '未設定'] as const));
       // 每班各查一次，避免整天合併查詢撞到 PostgREST 單次 1000 列的上限。
       const checkins = await Promise.all(resolved.map(shift => admin.from('checkin_logs').select('target_id,user_name,checkin_at')
-        .eq('target_type', 'marker').gte('checkin_at', shift.window.from.toISOString()).lte('checkin_at', shift.window.to.toISOString()).limit(1000)));
+        .eq('market_code', marketCode).eq('target_type', 'marker').gte('checkin_at', shift.window.from.toISOString()).lte('checkin_at', shift.window.to.toISOString()).limit(1000)));
       const checkinError = checkins.find(result => result.error)?.error;
       if (checkinError) throw checkinError;
       const computedAt = new Date().toISOString();
@@ -3240,9 +3240,9 @@ export async function handleAppApiRequest(req: Request) {
       return rows;
     };
     // 事件在交接內容中被移除時，它的附件一併軟刪除，不留下無主的附件。
-    const guardPruneAttachments = async (dutyDate: string, shiftName: string, incidentIds: string[]) => {
+    const guardPruneAttachments = async (marketCode: string, dutyDate: string, shiftName: string, incidentIds: string[]) => {
       let query = admin.from('guard_handover_attachments').update({ is_deleted: true, deleted_by: profile.user_id, deleted_at: new Date().toISOString() })
-        .eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('is_deleted', false);
+        .eq('market_code', marketCode).eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('is_deleted', false);
       if (incidentIds.length) query = query.not('incident_id', 'in', `(${incidentIds.join(',')})`);
       const { error } = await query;
       if (error) console.error('guard attachment prune failed:', error.message);
@@ -3263,25 +3263,32 @@ export async function handleAppApiRequest(req: Request) {
       if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
+      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin);
+      if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
       const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult, receiverResult] = await Promise.all([
-        guardShiftContext(dutyDate),
-        admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).order('shift_order'),
-        admin.from('guard_handover_daily_approvals').select('*').eq('duty_date', dutyDate).maybeSingle(),
-        admin.from('guard_handover_logs').select('items').lt('duty_date', dutyDate).neq('status', 'draft')
+        guardShiftContext(dutyDate, guardMarket),
+        admin.from('guard_handover_logs').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).order('shift_order'),
+        admin.from('guard_handover_daily_approvals').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).maybeSingle(),
+        admin.from('guard_handover_logs').select('items').eq('market_code', guardMarket).lt('duty_date', dutyDate).neq('status', 'draft')
           .order('duty_date', { ascending: false }).order('shift_order', { ascending: false }).limit(1).maybeSingle(),
         admin.from('users').select('user_id,name,username,email,dept_id,department,status').limit(5000),
-        admin.from('departments').select('dept_id,name').limit(2000),
+        admin.from('departments').select('dept_id,name,code,parent_id,status').limit(2000),
         admin.from('guard_handover_attachments').select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at')
-          .eq('duty_date', dutyDate).eq('is_deleted', false).order('uploaded_at'),
+          .eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('is_deleted', false).order('uploaded_at'),
         admin.from('guard_handover_options').select('option_id,list_key,label,sort_order').eq('is_active', true).order('sort_order').order('label'),
-        canHandoverModule('guard') ? userDb.rpc('guard_handover_receivers') : Promise.resolve({ data: [], error: null }),
+        canHandoverModule('guard') ? admin.rpc('guard_market_receivers', { p_market: guardMarket }) : Promise.resolve({ data: [], error: null }),
       ]);
       const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error || attachmentResult.error;
       if (failure) throw failure;
-      // 可勾選的實際值勤人員：單位名稱含「駐警／駐衛」者（以 dept_id 為準，users.department 後備）。
-      const patrolDepts = new Set((deptResult.data || []).filter(row => /駐警|駐衛/.test(String(row.name || ''))).map(row => String(row.dept_id)));
+      // 以正式組織樹辨識市場，絕不使用可過期的 users.department 文字副本。
+      const deptById = new Map((deptResult.data || []).filter(row => row.status === 'active').map(row => [String(row.dept_id), row]));
+      const staffInMarket = (user: { dept_id?: unknown }) => {
+        const dept = deptById.get(String(user.dept_id || ''));
+        const parent = deptById.get(String(dept?.parent_id || ''));
+        return parent?.code === (guardMarket === 'market_1' ? 'MKT1' : 'MKT2') && dept?.code === `${parent.code}-GUARD`;
+      };
       const users = userResult.data || [];
-      const staff = users.filter(user => user.status === 'active' && !isDeidentifiedAccount(user) && (patrolDepts.has(String(user.dept_id)) || /駐警|駐衛/.test(String(user.department || ''))))
+      const staff = users.filter(user => user.status === 'active' && !isDeidentifiedAccount(user) && staffInMarket(user))
         .map(user => ({ user_id: String(user.user_id), name: String(user.name || '') })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
       const logs = logResult.data || [];
       const approval = approvalResult.data || null;
@@ -3306,7 +3313,7 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, {
         ok: true,
         data: {
-          duty_date: dutyDate, shifts, logs, approval, staff, receivers, people,
+          market_code: guardMarket, duty_date: dutyDate, shifts, logs, approval, staff, receivers, people,
           previous_items: Array.isArray(previousResult.data?.items) ? previousResult.data.items : [],
           can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(),
           approval_open: dutyDate < todayInTaipei,
@@ -3321,9 +3328,11 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'guard_attachment_url') {
       if (!canHandoverModule('guard') && !canHandoverModule('guard-approve')) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
+      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin);
+      if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
       const attachmentId = id(body.attachment_id);
       if (!attachmentId) return reply(req, { ok: false, message: '附件識別碼無效' }, 400);
-      const { data: row, error } = await admin.from('guard_handover_attachments').select('storage_path,file_name,content_type,is_deleted').eq('attachment_id', attachmentId).maybeSingle();
+      const { data: row, error } = await admin.from('guard_handover_attachments').select('storage_path,file_name,content_type,is_deleted').eq('market_code', guardMarket).eq('attachment_id', attachmentId).maybeSingle();
       if (error) throw error;
       if (!row || row.is_deleted) return reply(req, { ok: false, message: '找不到這個附件' }, 404);
       const bucket = admin.storage.from(GUARD_ATTACHMENT_BUCKET);
@@ -3357,6 +3366,12 @@ export async function handleAppApiRequest(req: Request) {
         ? await authorizeHandoverMarket(admin, profile.user_id, 'business', body.market_code, isSysadmin) : null;
       if (businessMarketKinds.has(kind) && !businessMarket) {
         return reply(req, { ok: false, message: '目前帳號未開放所選市場的業管組交接簿' }, 403);
+      }
+      const guardMarketKinds = new Set(['guard_save','guard_attach_prepare','guard_attach_commit','guard_detach','guard_submit','guard_withdraw','guard_receive','guard_approve']);
+      const guardMarket = guardMarketKinds.has(kind)
+        ? await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin) : null;
+      if (guardMarketKinds.has(kind) && !guardMarket) {
+        return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
       }
 
       if (kind === 'record') {
@@ -3869,10 +3884,10 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'guard_save') {
         const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
         if (!validISODate(dutyDate) || !shiftName) return reply(req, { ok: false, message: '交接班別資料無效' }, 400);
-        const { data: dayApproval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id').eq('duty_date', dutyDate).maybeSingle();
+        const { data: dayApproval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id').eq('market_code', guardMarket).eq('duty_date', dutyDate).maybeSingle();
         if (approvalError) throw approvalError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接已由主管簽核，不可再修改' }, 409);
-        const shift = (await guardShiftContext(dutyDate)).find(row => row.name === shiftName);
+        const shift = (await guardShiftContext(dutyDate, guardMarket!)).find(row => row.name === shiftName);
         if (!shift) return reply(req, { ok: false, message: '巡檢排班找不到這個班別，請重新載入' }, 404);
         const incidents = guardIncidents(body.incidents), items = guardItems(body.items);
         if (!incidents) return reply(req, { ok: false, message: '異常事件資料不完整：請填寫發生時間、類別與事件經過' }, 400);
@@ -3883,6 +3898,8 @@ export async function handleAppApiRequest(req: Request) {
         const { data: actualUsers, error: actualError } = await admin.from('users').select('user_id').in('user_id', actualIds).eq('status', 'active');
         if (actualError) throw actualError;
         if ((actualUsers || []).length !== actualIds.length) return reply(req, { ok: false, message: '實際值勤人員包含停用或不存在的帳號' }, 400);
+        const staffMarkets = await Promise.all(actualIds.map(userId => admin.rpc('handover_staff_market', { p_user: userId, p_team: 'guard' })));
+        if (staffMarkets.some(result => result.error || result.data !== guardMarket)) return reply(req, { ok: false, message: '實際值勤人員必須屬於所選市場的駐警隊' }, 400);
         const substituteNote = text(body.substitute_note, 500);
         const differs = actualIds.length !== shift.scheduled_user_ids.length || actualIds.some(value => !shift.scheduled_user_ids.includes(value));
         if (differs && !substituteNote) return reply(req, { ok: false, message: '實際值勤人員與巡檢排班不同，請填寫代班說明' }, 400);
@@ -3894,20 +3911,20 @@ export async function handleAppApiRequest(req: Request) {
           duty_summary: text(body.duty_summary, 4000), important_notes: text(body.important_notes, 4000),
           incidents, items, updated_by: profile.user_id,
         };
-        const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
+        const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
         if (readError) throw readError;
         if (before && before.status !== 'draft') return reply(req, { ok: false, message: '這班已交班簽名，內容已鎖定；如需修改請先由交班人撤回' }, 409);
         if (!before) {
-          const { data, error } = await admin.from('guard_handover_logs').insert({ duty_date: dutyDate, shift_name: shiftName, ...content, created_by: profile.user_id }).select('*').single();
+          const { data, error } = await admin.from('guard_handover_logs').insert({ market_code: guardMarket, duty_date: dutyDate, shift_name: shiftName, ...content, created_by: profile.user_id }).select('*').single();
           if (error) return reply(req, { ok: false, message: String(error.code || '') === '23505' ? '這班交接剛由其他人建立，請重新載入' : dbMessage(error, '交接建立失敗') }, 409);
-          await guardPruneAttachments(dutyDate, shiftName, incidents.map(incident => incident.id));
+          await guardPruneAttachments(guardMarket!, dutyDate, shiftName, incidents.map(incident => incident.id));
           await writeAudit(admin, profile.user_id, 'guard_handover_logs', data.log_id, 'insert', null, data);
           return reply(req, { ok: true, data });
         }
-        const { data, error } = await admin.from('guard_handover_logs').update(content).eq('log_id', before.log_id).eq('status', 'draft').select('*').maybeSingle();
+        const { data, error } = await admin.from('guard_handover_logs').update(content).eq('market_code', guardMarket).eq('log_id', before.log_id).eq('status', 'draft').select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接儲存失敗') }, 409);
         if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
-        await guardPruneAttachments(dutyDate, shiftName, incidents.map(incident => incident.id));
+        await guardPruneAttachments(guardMarket!, dutyDate, shiftName, incidents.map(incident => incident.id));
         await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'update', before, data);
         return reply(req, { ok: true, data });
       }
@@ -3979,11 +3996,11 @@ export async function handleAppApiRequest(req: Request) {
           return reply(req, { ok: false, message: `單一附件上限 ${GUARD_ATTACHMENT_MAX_BYTES / 1048576} MB` }, 400);
         }
         const [approvalCheck, logCheck, countCheck, shiftCheck] = await Promise.all([
-          admin.from('guard_handover_daily_approvals').select('approval_id').eq('duty_date', dutyDate).maybeSingle(),
-          admin.from('guard_handover_logs').select('status').eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle(),
+          admin.from('guard_handover_daily_approvals').select('approval_id').eq('market_code', guardMarket).eq('duty_date', dutyDate).maybeSingle(),
+          admin.from('guard_handover_logs').select('status').eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle(),
           admin.from('guard_handover_attachments').select('attachment_id', { count: 'exact', head: true })
-            .eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('incident_id', incidentId).eq('is_deleted', false),
-          admin.from('patrol_shift_template').select('name').neq('status', 'inactive').eq('name', shiftName).limit(1),
+            .eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('incident_id', incidentId).eq('is_deleted', false),
+          admin.from('patrol_shift_template').select('name').eq('market_code', guardMarket).neq('status', 'inactive').eq('name', shiftName).limit(1),
         ]);
         const failure = approvalCheck.error || logCheck.error || countCheck.error || shiftCheck.error;
         if (failure) throw failure;
@@ -3994,12 +4011,12 @@ export async function handleAppApiRequest(req: Request) {
         const contentType = guardContentType(body.content_type);
         if (kind === 'guard_attach_prepare') {
           // 路徑由伺服器決定：只用值班日、事件識別碼與隨機檔名，原始檔名只存在索引表。
-          const path = `${dutyDate}/${incidentId}/${crypto.randomUUID()}${guardFileExtension(fileName)}`;
+          const path = `${guardMarket}/${dutyDate}/${incidentId}/${crypto.randomUUID()}${guardFileExtension(fileName)}`;
           const { data, error } = await admin.storage.from(GUARD_ATTACHMENT_BUCKET).createSignedUploadUrl(path);
           if (error || !data) return reply(req, { ok: false, message: `無法建立上傳網址：${error?.message || '未知錯誤'}` }, 500);
           return reply(req, { ok: true, data: { path: data.path || path, token: data.token, content_type: contentType } });
         }
-        const path = text(body.path, 300), folder = `${dutyDate}/${incidentId}`;
+        const path = text(body.path, 300), folder = `${guardMarket}/${dutyDate}/${incidentId}`;
         if (!new RegExp(`^${folder}/[0-9a-f-]{36}(\\.[a-z0-9]{1,10})?$`).test(path)) return reply(req, { ok: false, message: '附件路徑無效' }, 400);
         const objectName = path.slice(folder.length + 1);
         const { data: listed, error: listError } = await admin.storage.from(GUARD_ATTACHMENT_BUCKET).list(folder, { search: objectName, limit: 5 });
@@ -4013,7 +4030,7 @@ export async function handleAppApiRequest(req: Request) {
         }
         const originalSize = Number(body.original_size);
         const payload = {
-          duty_date: dutyDate, shift_name: shiftName, incident_id: incidentId, file_name: fileName, content_type: contentType,
+          market_code: guardMarket, duty_date: dutyDate, shift_name: shiftName, incident_id: incidentId, file_name: fileName, content_type: contentType,
           file_size: storedSize, original_size: Number.isInteger(originalSize) && originalSize > 0 ? originalSize : null,
           compressed: body.compressed === true, storage_path: path, uploaded_by: profile.user_id,
         };
@@ -4031,12 +4048,12 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'guard_detach') {
         const attachmentId = id(body.attachment_id);
         if (!attachmentId) return reply(req, { ok: false, message: '附件識別碼無效' }, 400);
-        const { data: before, error: readError } = await admin.from('guard_handover_attachments').select('*').eq('attachment_id', attachmentId).maybeSingle();
+        const { data: before, error: readError } = await admin.from('guard_handover_attachments').select('*').eq('market_code', guardMarket).eq('attachment_id', attachmentId).maybeSingle();
         if (readError) throw readError;
         if (!before || before.is_deleted) return reply(req, { ok: false, message: '找不到這個附件' }, 404);
         const { data, error } = await admin.from('guard_handover_attachments')
           .update({ is_deleted: true, deleted_by: profile.user_id, deleted_at: new Date().toISOString() })
-          .eq('attachment_id', attachmentId).eq('is_deleted', false).select('attachment_id').maybeSingle();
+          .eq('market_code', guardMarket).eq('attachment_id', attachmentId).eq('is_deleted', false).select('attachment_id').maybeSingle();
         if (error) return reply(req, { ok: false, message: String(error.code || '') === '23514' ? '這班已交班簽名或當日已主管簽核，附件不可移除' : dbMessage(error, '附件移除失敗') }, 409);
         if (!data) return reply(req, { ok: false, message: '這個附件剛被其他人異動，請重新載入' }, 409);
         await writeAudit(admin, profile.user_id, 'guard_handover_attachments', attachmentId, 'status_change', before, { ...before, is_deleted: true });
@@ -4046,10 +4063,10 @@ export async function handleAppApiRequest(req: Request) {
       if (kind === 'guard_submit' || kind === 'guard_withdraw' || kind === 'guard_receive') {
         const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
         if (!validISODate(dutyDate) || !shiftName) return reply(req, { ok: false, message: '交接班別資料無效' }, 400);
-        const { data: dayApproval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id').eq('duty_date', dutyDate).maybeSingle();
+        const { data: dayApproval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id').eq('market_code', guardMarket).eq('duty_date', dutyDate).maybeSingle();
         if (approvalError) throw approvalError;
         if (dayApproval) return reply(req, { ok: false, message: '本日交接已由主管簽核，不可再變更' }, 409);
-        const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
+        const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '這班尚未建立交接' }, 404);
         let patch: Record<string, unknown>;
@@ -4065,10 +4082,10 @@ export async function handleAppApiRequest(req: Request) {
           const receiverId = id(body.receiver_id);
           if (!receiverId) return reply(req, { ok: false, message: '請指定下一班接班人' }, 400);
           if (receiverId === profile.user_id) return reply(req, { ok: false, message: '交班人與指定接班人不可為同一人' }, 400);
-          const { data: receiverAllowed, error: receiverError } = await admin.rpc('guard_receiver_allowed', { p_user: receiverId });
+          const { data: receiverAllowed, error: receiverError } = await admin.rpc('guard_market_receiver_allowed', { p_user: receiverId, p_market: guardMarket });
           if (receiverError) return reply(req, { ok: false, message: '接班人權限驗證失敗，請確認資料庫移轉已完成' }, 503);
           if (receiverAllowed !== true) return reply(req, { ok: false, message: '指定接班人必須是在職駐警人員，且已開放駐警隊電子交接簿權限' }, 400);
-          const shift = (await guardShiftContext(dutyDate)).find(row => row.name === shiftName);
+          const shift = (await guardShiftContext(dutyDate, guardMarket!)).find(row => row.name === shiftName);
           patch = { status: 'submitted', handover_by: profile.user_id, receiver_id: receiverId, updated_by: profile.user_id, patrol_snapshot: shift ? shift.patrol : null };
         } else if (kind === 'guard_withdraw') {
           if (before.status !== 'submitted') return reply(req, { ok: false, message: '只有已交班、尚未接班的交接可以撤回' }, 409);
@@ -4081,7 +4098,7 @@ export async function handleAppApiRequest(req: Request) {
           if (String(before.receiver_id) !== profile.user_id) return reply(req, { ok: false, message: '只有交班時指定的接班人本人可以確認接班' }, 403);
           patch = { status: 'received', takeover_by: profile.user_id, updated_by: profile.user_id };
         }
-        let transition = admin.from('guard_handover_logs').update(patch).eq('log_id', before.log_id).eq('status', String(before.status));
+        let transition = admin.from('guard_handover_logs').update(patch).eq('market_code', guardMarket).eq('log_id', before.log_id).eq('status', String(before.status));
         if (kind === 'guard_submit') transition = transition.eq('updated_at', before.updated_at);
         const { data, error } = await transition.select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接狀態更新失敗') }, 409);
@@ -4097,8 +4114,8 @@ export async function handleAppApiRequest(req: Request) {
         const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
         if (dutyDate >= todayInTaipei) return reply(req, { ok: false, message: '主管簽核須於值班日隔日起進行' }, 409);
         const [shifts, logResult] = await Promise.all([
-          guardShiftContext(dutyDate),
-          admin.from('guard_handover_logs').select('shift_name,status').eq('duty_date', dutyDate),
+          guardShiftContext(dutyDate, guardMarket!),
+          admin.from('guard_handover_logs').select('shift_name,status').eq('market_code', guardMarket).eq('duty_date', dutyDate),
         ]);
         if (logResult.error) throw logResult.error;
         const rows = logResult.data || [];
@@ -4107,7 +4124,7 @@ export async function handleAppApiRequest(req: Request) {
         const created = new Set(rows.map(row => String(row.shift_name)));
         const missing = shifts.filter(shift => !created.has(shift.name)).length;
         if (missing && !note) return reply(req, { ok: false, message: `有 ${missing} 班未建立交接，請填寫簽核說明` }, 400);
-        const payload = { duty_date: dutyDate, approver_id: profile.user_id, note, shift_count: shifts.length, received_count: rows.length };
+        const payload = { market_code: guardMarket, duty_date: dutyDate, approver_id: profile.user_id, note, shift_count: shifts.length, received_count: rows.length };
         const { data, error } = await admin.from('guard_handover_daily_approvals').insert(payload).select('*').single();
         if (error) {
           if (String(error.code || '') === '23505') return reply(req, { ok: false, message: '本日交接已完成主管簽核' }, 409);

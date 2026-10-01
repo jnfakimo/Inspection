@@ -58,7 +58,7 @@
     "test:permission-fail-closed": "node tools/permission-fail-closed-check.mjs",
     "test:app-api-handlers": "node --experimental-strip-types --test supabase/functions/app-api/handlers/*.test.ts",
     "test:business-handover": "node tools/business-handover-db.test.mjs",
-    "test:guard-handover": "node tools/guard-handover-db.test.mjs",
+    "test:guard-handover": "node tools/guard-handover-db.test.mjs && node tools/guard-handover-market-db.test.mjs",
     "test:mechanical-handover": "node tools/mechanical-handover-db.test.mjs && node tools/mechanical-supervisor-correction-db.test.mjs",
     "test:admin-api": "node tools/admin-api-check.mjs && node --experimental-strip-types --test web/lib/user-visibility.test.ts web/lib/module-access.test.ts",
     "test:account-approval": "node tools/account-approval-default-password-check.mjs",

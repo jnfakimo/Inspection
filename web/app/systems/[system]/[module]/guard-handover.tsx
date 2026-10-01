@@ -11,13 +11,14 @@
 // 讀取用限時網址（guard_attachment_url）；影片一律先在瀏覽器壓縮（web/lib/video-compress.ts）。
 // 畫面元件在 guard-handover-view.tsx，型別與常數在 guard-handover-shared.ts。
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { AdminHeader, AdminModal, errorMessage } from '@/components/admin/shared';
 import { BlankSelectOption } from '@/components/BlankSelectOption';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
+import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import { canCompressVideo, compressVideo, isVideoFile } from '@/lib/video-compress';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -43,6 +44,9 @@ function defaultIncidentTime(date: string, shift: GuardShift) {
 
 export function GuardHandover({ system, module, profile }: Props) {
   const [date, setDate] = useState(todayTaipei());
+  const [market, setMarket] = useState<HandoverMarket | null>(null);
+  const [allowedMarkets, setAllowedMarkets] = useState<HandoverMarket[]>([]);
+  const loadSequence = useRef(0);
   const [context, setContext] = useState<GuardContext | null>(null);
   const [busy, setBusy] = useState(true);
   const [acting, setActing] = useState(false);
@@ -59,14 +63,27 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void invokeAppApi<{ markets: HandoverMarket[]; assigned_market: HandoverMarket | null }>('handover_market_context', { team: 'guard' })
+      .then(result => { if (!cancelled) { setAllowedMarkets(result.markets); setMarket(result.assigned_market || result.markets[0] || null); if (!result.markets.length) { setBusy(false); setNote('目前未設定駐警隊市場歸屬，請由管理員核對組織架構。'); } } })
+      .catch(error => { if (!cancelled) { setBusy(false); setNote(`市場權限載入失敗：${errorMessage(error)}`); } });
+    return () => { cancelled = true; };
+  }, []);
   const load = useCallback(async () => {
-    setBusy(true); setNote('');
-    try { setContext(await invokeAppApi<GuardContext>('handover_guard_context', { duty_date: date })); }
-    catch (error) { setContext(null); setNote(`失敗：${errorMessage(error, '駐警隊交接資料載入失敗')}`); }
-    setBusy(false);
-  }, [date]);
+    const sequence = ++loadSequence.current;
+    if (!market) { setContext(null); setBusy(false); return; }
+    setBusy(true); setNote(''); setContext(null);
+    try {
+      const result = await invokeAppApi<GuardContext>('handover_guard_context', { market_code: market, duty_date: date });
+      if (sequence === loadSequence.current) setContext(result);
+    } catch (error) {
+      if (sequence === loadSequence.current) { setContext(null); setNote(`失敗：${errorMessage(error, '駐警隊交接資料載入失敗')}`); }
+    }
+    if (sequence === loadSequence.current) setBusy(false);
+  }, [date, market]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setApprovalNote(''); }, [date]);
+  useEffect(() => { setApprovalNote(''); setEditing(null); setSubmitting(null); setReceiving(null); setFilePreview(null); setPreviewOpen(false); }, [date, market]);
   useEffect(() => {
     if (!previewOpen) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreviewOpen(false); };
@@ -124,7 +141,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const run = async (kind: string, payload: Record<string, unknown>, done: string, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return false;
     setActing(true); setNote('');
-    try { await invokeAppApi('handover_save', { kind, ...payload }); await load(); setNote(done); setActing(false); return true; }
+    try { await invokeAppApi('handover_save', { kind, market_code: market, ...payload }); await load(); setNote(done); setActing(false); return true; }
     catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     setActing(false);
     return false;
@@ -151,13 +168,16 @@ export function GuardHandover({ system, module, profile }: Props) {
         onClick={() => setReceiving(shift)}>本人核對並確認接班</button> : null)}
   </>;
 
-  const report = { date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
+  const report = { market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
         action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
       <section className="panel hs-toolbar">
+        {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
+          <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
+            aria-pressed={market === code} disabled={busy || acting} onClick={() => { setContext(null); setMarket(code); }}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
         <div className="hs-date-nav">
           <button type="button" className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => moveDate(current, -1))}>‹</button>
           <label>值班日期<LocalizedDateInput aria-label="值班日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label>
@@ -187,7 +207,7 @@ export function GuardHandover({ system, module, profile }: Props) {
       </section>}
 
       <section className="hs-sheet" aria-label="駐警隊電子交接簿">
-        <GuardSheetHeader date={date} kpis={context ? kpis : []} />
+        <GuardSheetHeader market={market} date={date} kpis={context ? kpis : []} />
         <div className="hs-shifts">
           {busy && !context ? <p className="hs-empty">載入中…</p>
             : !shifts.length ? <p className="hs-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡邏系統 → 巡檢排班」設定班別。</p>
@@ -209,7 +229,7 @@ export function GuardHandover({ system, module, profile }: Props) {
         <div className="hs-preview-scroll"><div className="hs-preview-paper"><GuardDailyReport {...report} /></div></div>
       </div>}
     </div>
-    {editing && context && <GuardLogModal date={date} shift={editing} log={logFor(editing.name)} staff={context.staff} people={context.people}
+    {editing && context && market && <GuardLogModal market={market} date={date} shift={editing} log={logFor(editing.name)} staff={context.staff} people={context.people}
       defaultItems={defaultItemsFor(editing)} shiftAttachments={attachments.filter(file => file.shift_name === editing.name)}
       optionsFor={optionsFor} onManage={canManageOptions ? setOptionsList : undefined}
       onPreview={setFilePreview}
@@ -246,7 +266,7 @@ export function GuardHandover({ system, module, profile }: Props) {
           }}>{acting ? '確認中…' : '本人確認接班'}</button></div>
       </div>
     </AdminModal>}
-    {filePreview && <GuardFilePreview file={filePreview} onClose={() => setFilePreview(null)} />}
+    {filePreview && market && <GuardFilePreview market={market} file={filePreview} onClose={() => setFilePreview(null)} />}
     {optionsList && context && <AdminModal className="guard-options-modal" title="管理下拉選單" onClose={() => setOptionsList(null)}>
       <GuardOptionsPanel options={context.options || []} list={optionsList} onListChange={setOptionsList} busy={busy}
         onAdd={(list, label) => optionAction({ kind: 'guard_option_save', list_key: list, label })}
@@ -270,18 +290,18 @@ function GuardTransferDetails({ log }: { log: GuardLog | null }) {
   </div>;
 }
 
-function GuardFilePreview({ file, onClose }: { file: Attachment; onClose: () => void }) {
+function GuardFilePreview({ market, file, onClose }: { market: HandoverMarket; file: Attachment; onClose: () => void }) {
   const [urls, setUrls] = useState<{ url: string; download_url: string } | null>(null);
   const [error, setError] = useState('');
   const [broken, setBroken] = useState(false);
   const kind = previewKind(file.content_type, file.file_name);
   useEffect(() => {
     let alive = true;
-    invokeAppApi<{ url: string; download_url: string }>('guard_attachment_url', { attachment_id: file.attachment_id })
+    invokeAppApi<{ url: string; download_url: string }>('guard_attachment_url', { market_code: market, attachment_id: file.attachment_id })
       .then(data => { if (alive) setUrls(data); })
       .catch(reason => { if (alive) setError(errorMessage(reason, '附件網址產生失敗')); });
     return () => { alive = false; };
-  }, [file.attachment_id]);
+  }, [file.attachment_id, market]);
   // 限時網址指向 Storage 網域；以新分頁開啟不受本站 CSP 限制，也不會把本站權杖帶過去。
   const openTab = (href: string) => { window.open(href, '_blank', 'noopener,noreferrer'); };
 
@@ -311,8 +331,8 @@ function GuardFilePreview({ file, onClose }: { file: Attachment; onClose: () => 
 
 type UploadTask = { key: string; incidentId: string; name: string; stage: string; progress: number | null; error?: string };
 
-function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAttachments, optionsFor, onManage, onPreview, onClose, onSaved }: {
-  date: string; shift: GuardShift; log: GuardLog | null; staff: { user_id: string; name: string }[]; people: Record<string, string>;
+function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, shiftAttachments, optionsFor, onManage, onPreview, onClose, onSaved }: {
+  market: HandoverMarket; date: string; shift: GuardShift; log: GuardLog | null; staff: { user_id: string; name: string }[]; people: Record<string, string>;
   defaultItems: Item[]; shiftAttachments: Attachment[]; optionsFor: (list: GuardOptionList) => string[]; onManage?: (list: GuardOptionList) => void;
   onPreview: (file: Attachment) => void; onClose: () => void; onSaved: () => Promise<void>;
 }) {
@@ -363,7 +383,7 @@ function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAtt
         }
         if (file.size > MAX_ATTACHMENT_BYTES) throw new Error(`${compressed ? '壓縮後仍' : ''}超過單檔 ${MAX_ATTACHMENT_BYTES / 1048576} MB 上限`);
         patchTask(key, { stage: '上傳中', progress: null });
-        const meta = { duty_date: date, shift_name: shift.name, incident_id: incidentId, file_name: file.name, file_size: file.size, content_type: file.type || 'application/octet-stream' };
+        const meta = { market_code: market, duty_date: date, shift_name: shift.name, incident_id: incidentId, file_name: file.name, file_size: file.size, content_type: file.type || 'application/octet-stream' };
         const prepared = await invokeAppApi<{ path: string; token: string; content_type: string }>('handover_save', { kind: 'guard_attach_prepare', ...meta });
         const uploaded = await getSupabase().storage.from(GUARD_ATTACHMENT_BUCKET).uploadToSignedUrl(prepared.path, prepared.token, file, { contentType: prepared.content_type });
         if (uploaded.error) throw uploaded.error;
@@ -379,7 +399,7 @@ function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAtt
   const detach = async (file: Attachment) => {
     if (!window.confirm(`確定移除附件「${file.file_name}」？移除後保留稽核紀錄，但不再顯示。`)) return;
     try {
-      await invokeAppApi('handover_save', { kind: 'guard_detach', attachment_id: file.attachment_id });
+      await invokeAppApi('handover_save', { kind: 'guard_detach', market_code: market, attachment_id: file.attachment_id });
       setFiles(current => current.filter(row => row.attachment_id !== file.attachment_id));
     } catch (error) { setMessage(errorMessage(error)); }
   };
@@ -393,7 +413,7 @@ function GuardLogModal({ date, shift, log, staff, people, defaultItems, shiftAtt
     setBusy(true); setMessage('');
     try {
       await invokeAppApi('handover_save', {
-        kind: 'guard_save', duty_date: date, shift_name: shift.name, actual_user_ids: actual,
+        kind: 'guard_save', market_code: market, duty_date: date, shift_name: shift.name, actual_user_ids: actual,
         substitute_note: substitute.trim(), duty_summary: summary.trim(), important_notes: important.trim(), incidents, items,
       });
       await onSaved();

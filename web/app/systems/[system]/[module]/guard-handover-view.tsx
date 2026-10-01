@@ -2,6 +2,7 @@
 // 資料載入、權限與動作都在 guard-handover.tsx；這裡的元件也可以單獨渲染來檢查版面。
 
 import type { ReactNode } from 'react';
+import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import { HandoverIcon, HandoverSheetHeader, type HandoverKpi, type IconName } from './handover-sheet';
 import {
   SHIFT_STATE_LABELS, STATUS_LABELS, activityTime, fileSizeLabel, hhmm, incidentTime, itemLine, liveState, previewKind, rocDate,
@@ -13,8 +14,8 @@ export const GuardIcon = HandoverIcon;
 export type { IconName };
 export type GuardKpi = HandoverKpi;
 
-export function GuardSheetHeader({ date, kpis }: { date: string; kpis: GuardKpi[] }) {
-  return <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="駐警隊交接紀錄表"
+export function GuardSheetHeader({ market, date, kpis }: { market: HandoverMarket | null; date: string; kpis: GuardKpi[] }) {
+  return <HandoverSheetHeader org={`臺北農產運銷股份有限公司　${market ? HANDOVER_MARKETS[market].name : ''}`} title="駐警隊交接紀錄表"
     dateLabel={rocDate(date)} emblem="shield" kpis={kpis} />;
 }
 
@@ -144,13 +145,13 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
   </section>;
 }
 
-export function GuardDailyReport({ date, shifts, approval, logFor, nameOf, namesOf, attachmentCount }: {
-  date: string; shifts: GuardShift[]; approval: Approval | null; logFor: (name: string) => GuardLog | null;
+export function GuardDailyReport({ market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount }: {
+  market: HandoverMarket | null; date: string; shifts: GuardShift[]; approval: Approval | null; logFor: (name: string) => GuardLog | null;
   nameOf: (id: unknown) => string; namesOf: (ids: string[] | null | undefined) => string;
   attachmentCount: (shiftName: string, incidentId: string) => number;
 }) {
   return <section className="hs-report">
-    <header><h2>臺北農產運銷股份有限公司第一果菜市場<br />駐警隊交接紀錄表</h2><p>{rocDate(date)}</p></header>
+    <header><h2>臺北農產運銷股份有限公司{market ? HANDOVER_MARKETS[market].name : ''}<br />駐警隊交接紀錄表</h2><p>{rocDate(date)}</p></header>
     {shifts.length ? shifts.map(shift => {
       const log = logFor(shift.name);
       const frozen = Boolean(log && log.status !== 'draft');

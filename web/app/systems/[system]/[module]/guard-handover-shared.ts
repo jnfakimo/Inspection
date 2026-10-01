@@ -27,7 +27,7 @@ export type GuardLog = {
 };
 export type Approval = { approval_id: string; approver_id: string; approved_at: string; note: string; shift_count: number; received_count: number };
 export type GuardContext = {
-  duty_date: string; shifts: GuardShift[]; logs: GuardLog[]; approval: Approval | null; attachments: Attachment[];
+  market_code: 'market_1' | 'market_2'; duty_date: string; shifts: GuardShift[]; logs: GuardLog[]; approval: Approval | null; attachments: Attachment[];
   staff: { user_id: string; name: string }[];
   receivers: { user_id: string; name: string; department?: string | null; status?: string }[];
   people: Record<string, string>; previous_items: Item[];
