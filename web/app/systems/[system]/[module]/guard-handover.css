@@ -141,6 +141,9 @@
 
 /* 修正編輯層高於日報表與一般表單，避免被預覽遮住。 */
 .guard-edit-backdrop{z-index:1300}.guard-correction-backdrop{z-index:1350}
+.guard-draft-status{padding:8px 20px;border-bottom:1px solid var(--line);color:var(--muted);font-size:13px}
+.guard-draft-conflict{margin:16px 20px;padding:14px;border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel));color:var(--ink)}
+.guard-draft-conflict p{margin:7px 0 12px;line-height:1.6}.guard-draft-conflict button{margin:0 8px 0 0}
 .guard-correction-modal{width:min(980px,calc(100vw - 24px))}
 .guard-correction-content{display:grid;gap:14px;padding:18px 20px;color:var(--ink)}
 .guard-correction-content label{display:grid;gap:5px;min-width:0;font-weight:600}.guard-correction-content input,.guard-correction-content textarea,.guard-correction-content select{box-sizing:border-box;width:100%;min-width:0;font-weight:400}

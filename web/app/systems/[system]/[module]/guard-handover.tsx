@@ -365,6 +365,21 @@ function GuardFilePreview({ market, file, onClose }: { market: HandoverMarket; f
 
 type UploadTask = { key: string; incidentId: string; name: string; stage: string; progress: number | null; error?: string };
 const DEFAULT_DUTY_SUMMARY = '本班值勤正常';
+type GuardFormContent = {
+  actual_user_ids: string[]; substitute_note: string; duty_summary: string; important_notes: string;
+  incidents: Incident[]; items: Item[];
+};
+type GuardFormDraft = { content: GuardFormContent; source_log_id: string | null; source_updated_at: string | null; updated_at: string };
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object).filter(key => object[key] !== undefined).sort()
+      .map(key => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+const formSnapshot = (value: GuardFormContent) => stableJson(value);
 
 function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, shiftAttachments, optionsFor, onManage, onPreview, onClose, onSaved }: {
   market: HandoverMarket; date: string; shift: GuardShift; log: GuardLog | null; staff: { user_id: string; name: string }[]; people: Record<string, string>;
@@ -381,6 +396,117 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
   const [tasks, setTasks] = useState<UploadTask[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftConflict, setDraftConflict] = useState<GuardFormDraft | null>(null);
+  const [draftStatus, setDraftStatus] = useState('檢查暫存中…');
+  const [draftBlocked, setDraftBlocked] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const lastSavedRef = useRef('');
+  const content = useMemo<GuardFormContent>(() => ({ actual_user_ids: actual, substitute_note: substitute,
+    duty_summary: summary, important_notes: important, incidents, items }), [actual, substitute, summary, important, incidents, items]);
+  const snapshot = useMemo(() => formSnapshot(content), [content]);
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+
+  useEffect(() => {
+    let cancelled = false;
+    void invokeAppApi<GuardFormDraft | null>('handover_guard_draft', {
+      operation: 'load', market_code: market, duty_date: date, shift_name: shift.name,
+    }).then(draft => {
+      if (cancelled) return;
+      if (draft && (draft.source_log_id !== (log?.log_id || null) || draft.source_updated_at !== (log?.updated_at || null))) {
+        setDraftConflict(draft);
+        setDraftStatus('找到較早版本的暫存，請選擇如何處理');
+        return;
+      }
+      if (draft) {
+        setActual(draft.content.actual_user_ids); setSubstitute(draft.content.substitute_note);
+        setSummary(draft.content.duty_summary); setImportant(draft.content.important_notes);
+        setIncidents(draft.content.incidents); setItems(draft.content.items);
+        lastSavedRef.current = formSnapshot(draft.content);
+        setDraftStatus(`已恢復 ${activityTime(draft.updated_at)} 的暫存`);
+      } else {
+        lastSavedRef.current = snapshotRef.current;
+        setDraftStatus('輸入後會自動暫存到系統');
+      }
+      setDraftReady(true);
+    }).catch(error => {
+      if (cancelled) return;
+      lastSavedRef.current = snapshotRef.current;
+      setDraftStatus(`暫存讀取失敗：${errorMessage(error)}`);
+      setDraftReady(true);
+    });
+    return () => { cancelled = true; };
+  // 表單在切換班別時由父元件卸載；此處只需在開啟時讀取一次。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const persistDraft = (value: string) => {
+    if (value === lastSavedRef.current) return writeQueueRef.current;
+    setDraftStatus('暫存中…');
+    writeQueueRef.current = writeQueueRef.current.catch(() => undefined).then(async () => {
+      if (value === lastSavedRef.current) return;
+      const saved = await invokeAppApi<{ updated_at: string }>('handover_guard_draft', {
+        operation: 'save', market_code: market, duty_date: date, shift_name: shift.name,
+        source_log_id: log?.log_id || null, source_updated_at: log?.updated_at || null,
+        content: JSON.parse(value) as GuardFormContent,
+      });
+      lastSavedRef.current = value;
+      setDraftStatus(`已暫存於系統 ${activityTime(saved.updated_at)}`);
+    }).catch(error => {
+      const detail = errorMessage(error);
+      if (detail.includes('已由其他人更新') || detail.includes('已交班簽名') || detail.includes('已簽核')) setDraftBlocked(true);
+      setDraftStatus(`暫存失敗：${detail}`);
+      throw error;
+    });
+    return writeQueueRef.current;
+  };
+
+  useEffect(() => {
+    if (!draftReady || draftConflict || draftBlocked || busy || snapshot === lastSavedRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => { timerRef.current = null; void persistDraft(snapshot).catch(() => undefined); }, 900);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); timerRef.current = null; };
+  // persistDraft uses the current form scope and is stable for this modal lifetime.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, draftReady, draftConflict, draftBlocked, busy]);
+
+  useEffect(() => {
+    if (!draftReady || snapshot === lastSavedRef.current) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [draftReady, snapshot]);
+
+  const close = async () => {
+    if (busy) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    if (draftReady && !draftConflict && !draftBlocked) {
+      try { await persistDraft(snapshotRef.current); }
+      catch (error) { setMessage(`暫存未成功，表單仍保持開啟：${errorMessage(error)}`); return; }
+    }
+    onClose();
+  };
+  const resolveConflict = async (restore: boolean) => {
+    const draft = draftConflict;
+    if (!draft) return;
+    if (restore) {
+      setActual(draft.content.actual_user_ids); setSubstitute(draft.content.substitute_note);
+      setSummary(draft.content.duty_summary); setImportant(draft.content.important_notes);
+      setIncidents(draft.content.incidents); setItems(draft.content.items);
+      lastSavedRef.current = '';
+      setDraftStatus(`已恢復 ${activityTime(draft.updated_at)} 的暫存`);
+    } else {
+      try {
+        await invokeAppApi('handover_guard_draft', { operation: 'clear', market_code: market, duty_date: date, shift_name: shift.name });
+        lastSavedRef.current = snapshotRef.current;
+        setDraftStatus('已捨棄舊暫存，輸入後會自動暫存');
+      } catch (error) { setMessage(`無法捨棄暫存：${errorMessage(error)}`); return; }
+    }
+    setDraftConflict(null); setDraftReady(true);
+  };
 
   const scheduled = useMemo(() => new Set(shift.scheduled_user_ids), [shift.scheduled_user_ids]);
   const differs = actual.length !== scheduled.size || actual.some(id => !scheduled.has(id));
@@ -440,6 +566,7 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
   };
 
   const save = async () => {
+    if (!draftReady || draftConflict || draftBlocked) return setMessage('請先處理暫存或重新載入交接內容');
     if (uploading) return setMessage('附件仍在壓縮或上傳中，請稍候再儲存');
     if (!actual.length) return setMessage('請至少勾選一位實際值勤人員');
     if (differs && !substitute.trim()) return setMessage('實際值勤人員與巡檢排班不同，請填寫代班說明');
@@ -447,15 +574,30 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
     if (incidents.some(incident => !incident.time || !incident.category || !incident.description.trim())) return setMessage('異常事件請填寫發生時間、類別與事件經過');
     setBusy(true); setMessage('');
     try {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      await writeQueueRef.current.catch(() => undefined);
       await invokeAppApi('handover_save', {
         kind: 'guard_save', market_code: market, duty_date: date, shift_name: shift.name, actual_user_ids: actual,
         substitute_note: substitute.trim(), duty_summary: summary.trim(), important_notes: important.trim(), incidents, items,
+        expected_updated_at: log?.updated_at || null,
       });
       await onSaved();
-    } catch (error) { setMessage(errorMessage(error)); setBusy(false); }
+    } catch (error) {
+      const detail = errorMessage(error);
+      if (detail.includes('已由其他人更新')) setDraftBlocked(true);
+      setMessage(detail); setBusy(false);
+    }
   };
 
-  return <AdminModal className="guard-modal" backdropClassName="guard-edit-backdrop" title={`${log ? '編輯' : '建立'}交接｜${shift.name}（${hhmm(shift.shift_start)}–${hhmm(shift.shift_end)}）`} onClose={onClose}>
+  return <AdminModal className="guard-modal" backdropClassName="guard-edit-backdrop" title={`${log ? '編輯' : '建立'}交接｜${shift.name}（${hhmm(shift.shift_start)}–${hhmm(shift.shift_end)}）`} onClose={() => void close()}>
+    <div className="guard-draft-status" role="status">{draftStatus}</div>
+    {draftConflict && <div className="guard-draft-conflict"><strong>找到較早版本的暫存</strong><p>交接內容在暫存後曾被更新。可恢復先前輸入，或捨棄暫存並使用目前內容。</p>
+      <button type="button" className="secondary-btn compact" onClick={() => void resolveConflict(true)}>恢復暫存</button>
+      <button type="button" className="secondary-btn compact" onClick={() => void resolveConflict(false)}>捨棄暫存</button></div>}
+    {draftBlocked && <p role="alert" className="guard-draft-conflict">交接內容已更新或簽核，請關閉並重新載入後再編輯。</p>}
+    {message && <p role="alert" className="inline-message danger">{message}</p>}
+    {draftReady && !draftConflict && !draftBlocked && <>
     <div className="guard-form">
       <fieldset><legend><GuardIcon name="users" size={16} />值勤人員</legend>
         <small>排定人員（巡檢排班）：{shift.scheduled_user_ids.length ? shift.scheduled_user_ids.map(id => people[id] || '（未知人員）').join('、') : '尚未排定'}</small>
@@ -526,7 +668,7 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
         <small>預設帶入上一班的點交結果，請依實際清點修改數量與狀態。</small>
       </fieldset>
     </div>
-    {message && <p role="alert" className="inline-message danger">{message}</p>}
-    <footer><button type="button" className="secondary-btn" onClick={onClose}>取消</button><button type="button" className="primary-btn compact" disabled={busy || uploading} onClick={() => void save()}>{busy ? '儲存中…' : uploading ? '附件處理中…' : '儲存交接內容'}</button></footer>
+    <footer><button type="button" className="secondary-btn" disabled={busy} onClick={() => void close()}>關閉（保留暫存）</button><button type="button" className="primary-btn compact" disabled={busy || uploading} onClick={() => void save()}>{busy ? '儲存中…' : uploading ? '附件處理中…' : '儲存交接內容'}</button></footer>
+    </>}
   </AdminModal>;
 }

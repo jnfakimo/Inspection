@@ -15,6 +15,7 @@ import { handleBusinessHandoverAction } from './handlers/business-handover.ts';
 import { handleMechanicalHandoverAction } from './handlers/mechanical-handover.ts';
 import { handleHandoverMarketAction } from './handlers/handover-market.ts';
 import { authorizeHandoverMarket } from './handover-market.ts';
+import { maskGuardPersonalData, maskGuardReportFields } from './guard-personal-data.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -3259,6 +3260,70 @@ export async function handleAppApiRequest(req: Request) {
       return rows;
     };
 
+    if (action === 'handover_guard_draft') {
+      if (!canHandoverModule('guard')) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
+      const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
+      const operation = text(body.operation, 10);
+      if (!validISODate(dutyDate) || !shiftName || !['load', 'save', 'clear'].includes(operation)) {
+        return reply(req, { ok: false, message: '交接暫存參數無效' }, 400);
+      }
+      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code == null ? 'market_1' : body.market_code, isSysadmin);
+      if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
+      const shift = (await guardShiftContext(dutyDate, guardMarket)).find(row => row.name === shiftName);
+      if (!shift) return reply(req, { ok: false, message: '巡檢排班找不到這個班別，請重新載入' }, 404);
+      const scope = () => userDb.from('guard_handover_form_drafts').select('content,source_log_id,source_updated_at,updated_at,expires_at,is_active')
+        .eq('owner_id', profile.user_id).eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName);
+      if (operation === 'load') {
+        const { data, error } = await scope().maybeSingle();
+        if (error) throw error;
+        return reply(req, { ok: true, data: data?.is_active && Date.parse(data.expires_at) > Date.now() ? data : null });
+      }
+      if (operation === 'clear') {
+        const { error } = await userDb.from('guard_handover_form_drafts').update({ content: {}, is_active: false })
+          .eq('owner_id', profile.user_id).eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName);
+        if (error) throw error;
+        return reply(req, { ok: true, data: null });
+      }
+      const raw = body.content;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return reply(req, { ok: false, message: '暫存內容格式無效' }, 400);
+      const content = raw as Record<string, unknown>;
+      const stringField = (value: unknown, max: number) => typeof value === 'string' && value.length <= max;
+      const actualIds = content.actual_user_ids;
+      const incidents = content.incidents, items = content.items;
+      if (!Array.isArray(actualIds) || actualIds.length > 20 || actualIds.some(value => !id(value))
+        || !stringField(content.substitute_note, 500) || !stringField(content.duty_summary, 4000)
+        || !stringField(content.important_notes, 4000) || !Array.isArray(incidents) || incidents.length > 50
+        || !Array.isArray(items) || items.length > 40
+        || incidents.some(value => !value || typeof value !== 'object' || Array.isArray(value)
+          || !id(value.id) || !stringField(value.time, 16) || !stringField(value.location, 100)
+          || !stringField(value.category, 40) || !stringField(value.description, 2000)
+          || !stringField(value.action, 2000) || !stringField(value.reported_to, 100))
+        || items.some(value => !value || typeof value !== 'object' || Array.isArray(value)
+          || !stringField(value.name, 50) || !Number.isInteger(value.qty) || value.qty < 0 || value.qty > 999
+          || !stringField(value.condition, 20) || !stringField(value.note, 200))
+        || new TextEncoder().encode(JSON.stringify(content)).length > 255000) {
+        return reply(req, { ok: false, message: '暫存內容超出欄位或容量限制' }, 400);
+      }
+      const { data: approval, error: approvalError } = await admin.from('guard_handover_daily_approvals').select('approval_id')
+        .eq('market_code', guardMarket).eq('duty_date', dutyDate).maybeSingle();
+      if (approvalError) throw approvalError;
+      if (approval) return reply(req, { ok: false, message: '本日交接已簽核，不能再暫存編輯' }, 409);
+      const { data: current, error: currentError } = await admin.from('guard_handover_logs').select('log_id,updated_at,status')
+        .eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
+      if (currentError) throw currentError;
+      if (current && current.status !== 'draft') return reply(req, { ok: false, message: '這班已交班簽名，不能再暫存編輯' }, 409);
+      if ((current?.log_id || null) !== (body.source_log_id || null)
+        || (current?.updated_at || null) !== (body.source_updated_at || null)) {
+        return reply(req, { ok: false, message: '交接內容已由其他人更新，請重新載入後確認暫存內容' }, 409);
+      }
+      const { data, error } = await userDb.from('guard_handover_form_drafts').upsert({
+        owner_id: profile.user_id, market_code: guardMarket, duty_date: dutyDate, shift_name: shiftName,
+        content, source_log_id: current?.log_id || null, source_updated_at: current?.updated_at || null, is_active: true,
+      }, { onConflict: 'owner_id,market_code,duty_date,shift_name' }).select('updated_at').single();
+      if (error) throw error;
+      return reply(req, { ok: true, data });
+    }
+
     if (action === 'handover_guard_context') {
       if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
@@ -3313,11 +3378,20 @@ export async function handleAppApiRequest(req: Request) {
       const people: Record<string, string> = {};
       for (const user of users) if (referenced.has(String(user.user_id))) people[String(user.user_id)] = String(user.name || '');
       const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+      const supervisorView = canGuardApprove();
+      const visibleLogs = supervisorView ? logs : logs.map(log => log.status === 'draft' ? log : maskGuardReportFields(log));
+      const visibleCorrections = supervisorView ? corrections : corrections.map(correction => ({
+        ...correction, before_values: maskGuardReportFields(correction.before_values),
+        after_values: maskGuardReportFields(correction.after_values),
+      }));
+      const visibleApproval = !supervisorView && approval?.note ? { ...approval, note: maskGuardPersonalData(String(approval.note)) } : approval;
+      const previousItems = Array.isArray(previousResult.data?.items) ? previousResult.data.items : [];
       return reply(req, {
         ok: true,
         data: {
-          market_code: guardMarket, duty_date: dutyDate, shifts, logs, corrections, approval, staff, receivers, people,
-          previous_items: Array.isArray(previousResult.data?.items) ? previousResult.data.items : [],
+          market_code: guardMarket, duty_date: dutyDate, shifts, logs: visibleLogs, corrections: visibleCorrections,
+          approval: visibleApproval, staff, receivers, people,
+          previous_items: supervisorView ? previousItems : maskGuardReportFields({ items: previousItems }).items,
           can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(), can_correct: canGuardApprove(),
           approval_open: dutyDate < todayInTaipei,
           attachments: attachmentResult.data || [],
@@ -3942,18 +4016,29 @@ export async function handleAppApiRequest(req: Request) {
         const { data: before, error: readError } = await admin.from('guard_handover_logs').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).maybeSingle();
         if (readError) throw readError;
         if (before && before.status !== 'draft') return reply(req, { ok: false, message: '這班已交班簽名，內容已鎖定；如需修改請先由交班人撤回' }, 409);
+        if (Object.hasOwn(body, 'expected_updated_at') && (before?.updated_at || null) !== (body.expected_updated_at || null)) {
+          return reply(req, { ok: false, message: '這班交接已由其他人更新，請重新載入後再編輯' }, 409);
+        }
+        const clearFormDrafts = async () => {
+          const { error } = await admin.from('guard_handover_form_drafts').update({ content: {}, is_active: false })
+            .eq('market_code', guardMarket).eq('duty_date', dutyDate).eq('shift_name', shiftName).eq('is_active', true);
+          if (error) console.error('guard form draft clear failed:', error.message);
+        };
         if (!before) {
           const { data, error } = await admin.from('guard_handover_logs').insert({ market_code: guardMarket, duty_date: dutyDate, shift_name: shiftName, ...content, created_by: profile.user_id }).select('*').single();
           if (error) return reply(req, { ok: false, message: String(error.code || '') === '23505' ? '這班交接剛由其他人建立，請重新載入' : dbMessage(error, '交接建立失敗') }, 409);
           await guardPruneAttachments(guardMarket!, dutyDate, shiftName, incidents.map(incident => incident.id));
           await writeAudit(admin, profile.user_id, 'guard_handover_logs', data.log_id, 'insert', null, data);
+          await clearFormDrafts();
           return reply(req, { ok: true, data });
         }
-        const { data, error } = await admin.from('guard_handover_logs').update(content).eq('market_code', guardMarket).eq('log_id', before.log_id).eq('status', 'draft').select('*').maybeSingle();
+        const { data, error } = await admin.from('guard_handover_logs').update(content).eq('market_code', guardMarket).eq('log_id', before.log_id)
+          .eq('status', 'draft').eq('updated_at', before.updated_at).select('*').maybeSingle();
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接儲存失敗') }, 409);
         if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
         await guardPruneAttachments(guardMarket!, dutyDate, shiftName, incidents.map(incident => incident.id));
         await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'update', before, data);
+        await clearFormDrafts();
         return reply(req, { ok: true, data });
       }
 
@@ -4137,7 +4222,7 @@ export async function handleAppApiRequest(req: Request) {
         if (error) return reply(req, { ok: false, message: dbMessage(error, '交接狀態更新失敗') }, 409);
         if (!data) return reply(req, { ok: false, message: '這班交接剛被其他人異動，請重新載入' }, 409);
         await writeAudit(admin, profile.user_id, 'guard_handover_logs', before.log_id, 'status_change', before, data);
-        return reply(req, { ok: true, data });
+        return reply(req, { ok: true, data: canGuardApprove() || data.status === 'draft' ? data : maskGuardReportFields(data) });
       }
 
       if (kind === 'guard_approve') {
