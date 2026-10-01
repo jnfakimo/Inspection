@@ -86,7 +86,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
     if (!market) { setContext(null); if (!marketLoading) setBusy(false); return; }
-    setBusy(true); setNote(''); setContext(null);
+    setBusy(true); setNote('');
     try {
       const result = await invokeAppApi<GuardContext>('handover_guard_context', { market_code: market, duty_date: date });
       if (sequence === loadSequence.current) setContext(result);
@@ -96,7 +96,7 @@ export function GuardHandover({ system, module, profile }: Props) {
     if (sequence === loadSequence.current) setBusy(false);
   }, [date, market, marketLoading]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setApprovalNote(''); setEditing(null); setCorrecting(null); setPreviewEditing(false); setSubmitting(null); setReceiving(null); setFilePreview(null); setPreviewOpen(false); }, [date, market]);
+  useEffect(() => { setContext(null); setApprovalNote(''); setEditing(null); setCorrecting(null); setPreviewEditing(false); setSubmitting(null); setReceiving(null); setFilePreview(null); setPreviewOpen(false); }, [date, market]);
   useEffect(() => {
     if (!previewOpen) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !editing && !correcting) setPreviewOpen(false); };
