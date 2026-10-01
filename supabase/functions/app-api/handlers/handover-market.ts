@@ -9,7 +9,7 @@ export async function handleHandoverMarketAction(action: string, ctx: AppApiCont
   if (team !== 'business' && team !== 'guard' && team !== 'mechanical') {
     return reply(req, { ok: false, message: '交接簿種類無效' }, 400);
   }
-  if (!can('handover') || !canModule('handover', team)) {
+  if (!can('handover') || !(canModule('handover', team) || (team === 'guard' && canModule('handover', 'guard-approve')))) {
     return reply(req, { ok: false, message: '目前帳號未開放此交接簿' }, 403);
   }
   // 唯一判斷來源在資料庫函式；前端 profile 與自由文字 department 都不構成授權。

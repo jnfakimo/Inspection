@@ -23,3 +23,17 @@ test('a system administrator can select either market', async () => {
   const result = await handleHandoverMarketAction('handover_market_context', context('unknown', true));
   assert.deepEqual((await result!.json()).data.markets, ['market_1', 'market_2']);
 });
+
+test('guard approval supervisors can load their scoped markets without guard edit access', async () => {
+  const ctx = {
+    req: new Request('https://local.invalid'), body: { team: 'guard' },
+    profile: { user_id: 'supervisor' }, isSysadmin: false,
+    can: () => true,
+    canModule: (_system: string, module: string) => module === 'guard-approve',
+    admin: { rpc: async () => ({ data: ['market_2'], error: null }) },
+    reply: (_request: Request, value: unknown, status = 200) => Response.json(value, { status }),
+  } as never;
+  const result = await handleHandoverMarketAction('handover_market_context', ctx);
+  assert.equal(result?.status, 200);
+  assert.deepEqual((await result!.json()).data.markets, ['market_2']);
+});
