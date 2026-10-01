@@ -131,9 +131,9 @@
 .mechanical-report-preview .mechanical-print-sheet td p{margin:6px 0 0}
 .mechanical-report-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mechanical-report-edit-action{min-height:30px}
-.mechanical-report-preview .mechanical-report-add-action{border-color:#db2777;background:#fbcfe8;color:#831843;font-weight:700}
+.mechanical-report-preview .mechanical-report-add-action{border-color:#db2777;background:rgb(251 207 232 / 80%);color:#831843;font-weight:700}
 .mechanical-report-preview .mechanical-report-add-action:not(:disabled):hover,
-.mechanical-report-preview .mechanical-report-add-action:focus-visible{border-color:#be185d;background:#f9a8d4;color:#701a3e;box-shadow:0 4px 12px rgba(219,39,119,.2)}
+.mechanical-report-preview .mechanical-report-add-action:focus-visible{border-color:#be185d;background:rgb(249 168 212 / 80%);color:#701a3e;box-shadow:0 4px 12px rgba(219,39,119,.2)}
 .mechanical-report-row-actions small{color:#64748b;font-size:12px}
 .mechanical-report-correction-mark{display:block;margin-top:8px;color:#075985;font-size:11px;font-weight:700}
 .mechanical-correction-modal{width:min(800px,calc(100vw - 24px))}
