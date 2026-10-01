@@ -3265,9 +3265,10 @@ export async function handleAppApiRequest(req: Request) {
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
       const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code == null ? 'market_1' : body.market_code, isSysadmin);
       if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
-      const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult, receiverResult] = await Promise.all([
+      const [shifts, logResult, correctionResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult, receiverResult] = await Promise.all([
         guardShiftContext(dutyDate, guardMarket),
         admin.from('guard_handover_logs').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).order('shift_order'),
+        admin.from('guard_handover_corrections').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).order('corrected_at').order('correction_id'),
         admin.from('guard_handover_daily_approvals').select('*').eq('market_code', guardMarket).eq('duty_date', dutyDate).maybeSingle(),
         admin.from('guard_handover_logs').select('items').eq('market_code', guardMarket).lt('duty_date', dutyDate).neq('status', 'draft')
           .order('duty_date', { ascending: false }).order('shift_order', { ascending: false }).limit(1).maybeSingle(),
@@ -3278,7 +3279,7 @@ export async function handleAppApiRequest(req: Request) {
         admin.from('guard_handover_options').select('option_id,list_key,label,sort_order').eq('is_active', true).order('sort_order').order('label'),
         canHandoverModule('guard') ? admin.rpc('guard_market_receivers', { p_market: guardMarket }) : Promise.resolve({ data: [], error: null }),
       ]);
-      const failure = logResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error || attachmentResult.error;
+      const failure = logResult.error || correctionResult.error || approvalResult.error || previousResult.error || userResult.error || deptResult.error || attachmentResult.error;
       if (failure) throw failure;
       // 以正式組織樹辨識市場，絕不使用可過期的 users.department 文字副本。
       const deptById = new Map((deptResult.data || []).filter(row => row.status === 'active').map(row => [String(row.dept_id), row]));
@@ -3291,6 +3292,7 @@ export async function handleAppApiRequest(req: Request) {
       const staff = users.filter(user => user.status === 'active' && !isDeidentifiedAccount(user) && staffInMarket(user))
         .map(user => ({ user_id: String(user.user_id), name: String(user.name || '') })).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'));
       const logs = logResult.data || [];
+      const corrections = correctionResult.data || [];
       const approval = approvalResult.data || null;
       // 只回傳畫面上會出現的人名，不整批輸出人員名冊。
       const referenced = new Set<string>(staff.map(person => person.user_id));
@@ -3300,6 +3302,7 @@ export async function handleAppApiRequest(req: Request) {
           if (userId) referenced.add(String(userId));
         }
       }
+      for (const correction of corrections) if (correction.corrected_by) referenced.add(String(correction.corrected_by));
       // 選單資料表尚未建立（migration 未套用）時不讓整頁失敗，前端改用內建預設清單。
       if (optionResult.error) console.error('guard handover options lookup failed:', optionResult.error.message);
       if (receiverResult.error) console.error('guard handover receiver lookup failed:', receiverResult.error.message);
@@ -3313,9 +3316,9 @@ export async function handleAppApiRequest(req: Request) {
       return reply(req, {
         ok: true,
         data: {
-          market_code: guardMarket, duty_date: dutyDate, shifts, logs, approval, staff, receivers, people,
+          market_code: guardMarket, duty_date: dutyDate, shifts, logs, corrections, approval, staff, receivers, people,
           previous_items: Array.isArray(previousResult.data?.items) ? previousResult.data.items : [],
-          can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(),
+          can_edit: canHandoverModule('guard'), can_approve: canGuardApprove(), can_correct: canGuardApprove(),
           approval_open: dutyDate < todayInTaipei,
           attachments: attachmentResult.data || [],
           limits: { file_bytes: GUARD_ATTACHMENT_MAX_BYTES, files_per_incident: GUARD_ATTACHMENTS_PER_INCIDENT },
@@ -3350,7 +3353,7 @@ export async function handleAppApiRequest(req: Request) {
       const requiredModule = kind === 'record' || kind === 'receive' ? 'records'
         : kind === 'mechanical_staff_market_save' || kind === 'mechanical_schedule_save' ? 'mechanical-schedule'
           : kind.startsWith('mechanical_') ? 'mechanical'
-            : kind === 'guard_approve' || kind.startsWith('guard_option_') ? ''
+            : kind === 'guard_approve' || kind === 'guard_supervisor_correction' || kind.startsWith('guard_option_') ? ''
             : kind.startsWith('guard_') ? 'guard'
             : kind.startsWith('business_') ? 'business'
               : kind === 'create_case' || kind === 'add_attachment' ? 'open-items' : '';
@@ -3367,7 +3370,7 @@ export async function handleAppApiRequest(req: Request) {
       if (businessMarketKinds.has(kind) && !businessMarket) {
         return reply(req, { ok: false, message: '目前帳號未開放所選市場的業管組交接簿' }, 403);
       }
-      const guardMarketKinds = new Set(['guard_save','guard_attach_prepare','guard_attach_commit','guard_detach','guard_submit','guard_withdraw','guard_receive','guard_approve']);
+      const guardMarketKinds = new Set(['guard_save','guard_attach_prepare','guard_attach_commit','guard_detach','guard_submit','guard_withdraw','guard_receive','guard_approve','guard_supervisor_correction']);
       const guardMarket = guardMarketKinds.has(kind)
         ? await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code == null ? 'market_1' : body.market_code, isSysadmin) : null;
       if (guardMarketKinds.has(kind) && !guardMarket) {
@@ -3881,6 +3884,31 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: true, data });
       }
 
+      if (kind === 'guard_supervisor_correction') {
+        if (!canGuardApprove()) return reply(req, { ok: false, message: '主管修正須由系統管理員明確開通駐警隊交接主管權限' }, 403);
+        const logId = id(body.log_id), expectedCorrection = body.expected_correction == null ? null : id(body.expected_correction);
+        const expectedUpdatedAt = typeof body.expected_updated_at === 'string' && !Number.isNaN(Date.parse(body.expected_updated_at)) ? body.expected_updated_at : null;
+        if (!logId || !expectedUpdatedAt || (body.expected_correction != null && !expectedCorrection)) {
+          return reply(req, { ok: false, message: '交接修正版本資料無效，請重新載入' }, 400);
+        }
+        const source = body.after_values;
+        if (!source || typeof source !== 'object' || Array.isArray(source)) return reply(req, { ok: false, message: '修正內容格式無效' }, 400);
+        const after = source as Record<string, unknown>;
+        if (typeof after.duty_summary !== 'string' || typeof after.important_notes !== 'string'
+          || !Array.isArray(after.incidents) || !Array.isArray(after.items)) {
+          return reply(req, { ok: false, message: '修正內容格式無效' }, 400);
+        }
+        const { data, error } = await userDb.rpc('guard_supervisor_correct_log', {
+          p_log_id: logId, p_market_code: guardMarket, p_after: after,
+          p_expected_updated_at: expectedUpdatedAt, p_expected_correction: expectedCorrection,
+        });
+        if (error) {
+          const code = String(error.code || '');
+          return reply(req, { ok: false, message: dbMessage(error, '主管修正儲存失敗') }, code === '42501' ? 403 : code === '22023' ? 400 : code === 'P0002' ? 404 : 409);
+        }
+        return reply(req, { ok: true, data });
+      }
+
       if (kind === 'guard_save') {
         const dutyDate = text(body.duty_date, 10), shiftName = text(body.shift_name, 40);
         if (!validISODate(dutyDate) || !shiftName) return reply(req, { ok: false, message: '交接班別資料無效' }, 400);
@@ -4075,7 +4103,12 @@ export async function handleAppApiRequest(req: Request) {
           if (!body.expected_updated_at || String(before.updated_at) !== String(body.expected_updated_at)) {
             return reply(req, { ok: false, message: '交接內容剛被修改，請重新載入並核對後再交班' }, 409);
           }
-          if (!String(before.duty_summary || '').trim()) return reply(req, { ok: false, message: '交班前請先填寫勤務概況' }, 400);
+          const { data: latestCorrection, error: correctionError } = await admin.from('guard_handover_corrections')
+            .select('after_values').eq('log_id', before.log_id).order('corrected_at', { ascending: false })
+            .order('correction_id', { ascending: false }).limit(1).maybeSingle();
+          if (correctionError) throw correctionError;
+          const effectiveSummary = latestCorrection?.after_values?.duty_summary ?? before.duty_summary;
+          if (!String(effectiveSummary || '').trim()) return reply(req, { ok: false, message: '交班前請先填寫勤務概況' }, 400);
           if (!isSysadmin && !guardIdList(before.actual_user_ids).includes(profile.user_id)) {
             return reply(req, { ok: false, message: '交班簽名限本班實際值勤人員；請先在交接內容勾選自己' }, 403);
           }

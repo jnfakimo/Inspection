@@ -3,7 +3,8 @@
 // Supabase、AppShell 等執行環境相依，畫面元件才能單獨渲染出來檢查版面。
 
 export type Item = { name: string; qty: number; condition: string; note: string };
-export type Incident = { id: string; time: string; location: string; category: string; description: string; action: string; reported_to: string };
+export type Incident = { id: string; time: string; location: string; category: string; description: string; action: string; reported_to: string;
+  handover_item?: boolean | null; reported_upward?: boolean | null };
 export type Attachment = {
   attachment_id: string; shift_name: string; incident_id: string; file_name: string; content_type: string;
   file_size: number; original_size: number | null; compressed: boolean; uploaded_by: string; uploaded_at: string;
@@ -24,14 +25,19 @@ export type GuardLog = {
   incidents: Incident[]; items: Item[]; patrol_snapshot: PatrolSummary | null; status: 'draft' | 'submitted' | 'received';
   handover_by: string | null; handover_at: string | null; receiver_id: string | null; takeover_by: string | null; takeover_at: string | null;
   created_by: string; created_at: string; updated_by: string; updated_at: string;
+  correction_count?: number; last_corrected_at?: string; last_corrected_by?: string;
 };
 export type Approval = { approval_id: string; approver_id: string; approved_at: string; note: string; shift_count: number; received_count: number };
+export type GuardCorrectionValues = Pick<GuardLog, 'duty_summary' | 'important_notes' | 'incidents' | 'items'>;
+export type GuardCorrection = { correction_id: string; log_id: string; before_values: GuardCorrectionValues;
+  after_values: GuardCorrectionValues; corrected_by: string; corrected_at: string };
 export type GuardContext = {
-  market_code: 'market_1' | 'market_2'; duty_date: string; shifts: GuardShift[]; logs: GuardLog[]; approval: Approval | null; attachments: Attachment[];
+  market_code: 'market_1' | 'market_2'; duty_date: string; shifts: GuardShift[]; logs: GuardLog[]; corrections: GuardCorrection[];
+  approval: Approval | null; attachments: Attachment[];
   staff: { user_id: string; name: string }[];
   receivers: { user_id: string; name: string; department?: string | null; status?: string }[];
   people: Record<string, string>; previous_items: Item[];
-  can_edit: boolean; can_approve: boolean; approval_open: boolean;
+  can_edit: boolean; can_approve: boolean; can_correct: boolean; approval_open: boolean;
   options: GuardOption[]; options_available?: boolean; can_manage_options: boolean;
 };
 

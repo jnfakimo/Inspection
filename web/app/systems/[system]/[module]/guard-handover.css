@@ -123,3 +123,43 @@
   .guard-transfer-content dl{grid-template-columns:1fr}.guard-transfer-actions{flex-wrap:wrap}.guard-transfer-actions button{flex:1 1 160px}
 }
 @media(prefers-reduced-motion:reduce){.guard-progress.is-indeterminate>span{animation:none}}
+
+/* 日報表預覽使用可捲動的 HTML 頁面；列印時才限制為紙張。 */
+.guard-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
+.guard-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.guard-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.guard-report-preview-bar strong{font-size:17px}.guard-report-preview-bar span{color:var(--muted);font-size:13px}
+.guard-report-preview-bar .guard-report-edit-hint{flex-basis:100%;color:var(--cyan);font-weight:600}
+.guard-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:#eef2f7}
+.guard-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:auto;padding:clamp(18px,3vw,40px);background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.16)}
+.guard-report-preview .hs-report{font-size:14px}.guard-report-preview .hs-report header{margin-bottom:24px}.guard-report-preview .hs-report header h2{font-size:clamp(21px,2.2vw,28px)}.guard-report-preview .hs-report header p{font-size:16px}
+.guard-report-preview .hs-report table{min-width:720px}.guard-report-preview .hs-report th,.guard-report-preview .hs-report td{padding:10px 12px;font-size:14px;line-height:1.55}
+.guard-report-preview .hs-report-shift{margin-bottom:0}.guard-report-preview .guard-report-shift{margin-bottom:20px}
+.guard-report-actions{display:flex;justify-content:flex-end;padding:8px 10px;border:1px solid #222;border-top:0;background:#fff}
+.guard-report-correction-mark{margin:0;padding:8px 10px;border:1px solid #222;border-top:0;color:#075985;font-size:12px;font-weight:700}
+.guard-incident-flags,.guard-correction-mark{font-weight:700;color:var(--cyan)}
+.guard-print-root{display:none}
+
+/* 修正編輯層高於日報表與一般表單，避免被預覽遮住。 */
+.guard-edit-backdrop{z-index:1300}.guard-correction-backdrop{z-index:1350}
+.guard-correction-modal{width:min(980px,calc(100vw - 24px))}
+.guard-correction-content{display:grid;gap:14px;padding:18px 20px;color:var(--ink)}
+.guard-correction-content label{display:grid;gap:5px;min-width:0;font-weight:600}.guard-correction-content input,.guard-correction-content textarea,.guard-correction-content select{box-sizing:border-box;width:100%;min-width:0;font-weight:400}
+.guard-correction-content textarea{resize:vertical}.guard-correction-intro{margin:0;padding:10px 12px;border-left:4px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,var(--panel));line-height:1.6}
+.guard-correction-content fieldset{display:grid;gap:10px;min-width:0;margin:0;padding:14px;border:1px solid var(--line);border-radius:10px}.guard-correction-content legend{padding:0 7px;font-weight:700}
+.guard-correction-row,.guard-correction-item{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.guard-correction-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guard-correction-item{grid-template-columns:minmax(130px,2fr) 90px minmax(110px,1fr) minmax(130px,2fr) auto;align-items:end}
+.guard-correction-history{max-height:320px;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.guard-correction-history h3{margin:0 0 8px;font-size:16px}
+.guard-correction-history article{padding:10px 0;border-top:1px solid var(--line)}.guard-correction-history article>strong{color:var(--cyan)}
+.guard-correction-change{display:grid;grid-template-columns:100px minmax(0,1fr) 18px minmax(0,1fr);gap:8px;margin-top:7px;overflow-wrap:anywhere;white-space:pre-wrap;font-size:12px}
+.guard-correction-content footer{display:flex;justify-content:flex-end;gap:8px}
+@media(max-width:800px){.guard-report-preview-bar{align-items:flex-start;flex-direction:column}.guard-report-preview-bar>div:last-child{align-self:flex-end}.guard-report-preview-page{padding:16px 10px}.guard-correction-item{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-correction-item button{justify-self:start}}
+@media(max-width:550px){.guard-correction-grid{grid-template-columns:1fr}.guard-correction-change{grid-template-columns:1fr 18px 1fr}.guard-correction-change b{grid-column:1/-1}}
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  body.guard-printing>*:not(.guard-print-root){display:none!important}
+  body.guard-printing>.guard-print-root{display:block!important;width:100%;margin:0;padding:0;background:#fff}
+  .guard-print-root .guard-report-shift{break-inside:avoid}
+  .guard-print-root .hs-report-shift{margin-bottom:2.2mm}
+  .guard-print-root .guard-report-correction-mark{border:0;padding:0 0 2mm;font-size:7pt}
+  .guard-print-root .guard-report-actions{display:none!important}
+}

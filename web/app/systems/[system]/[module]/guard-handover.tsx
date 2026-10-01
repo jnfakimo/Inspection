@@ -12,6 +12,7 @@
 // 畫面元件在 guard-handover-view.tsx，型別與常數在 guard-handover-shared.ts。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
@@ -29,6 +30,7 @@ import {
   type Attachment, type GuardContext, type GuardLog, type GuardOptionList, type GuardShift, type Incident, type Item,
 } from './guard-handover-shared';
 import { AttachmentChips, GuardDailyReport, GuardIcon, GuardShiftCard, GuardSheetHeader, type GuardKpi } from './guard-handover-view';
+import { GuardCorrectionModal } from './guard-handover-correction';
 import { GuardCombo, GuardOptionsPanel } from './guard-handover-controls';
 import './handover-sheet.css';
 import './guard-handover.css';
@@ -55,6 +57,9 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [editing, setEditing] = useState<GuardShift | null>(null);
   const [approvalNote, setApprovalNote] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewEditing, setPreviewEditing] = useState(false);
+  const [correcting, setCorrecting] = useState<GuardShift | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState<GuardShift | null>(null);
   const [receiving, setReceiving] = useState<GuardShift | null>(null);
   const [receiverId, setReceiverId] = useState('');
@@ -63,6 +68,13 @@ export function GuardHandover({ system, module, profile }: Props) {
   // 每 30 秒重算一次「當班」，班別交替時畫面自動換色，不必重新載入。
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const before = () => document.body.classList.add('guard-printing');
+    const after = () => document.body.classList.remove('guard-printing');
+    window.addEventListener('beforeprint', before); window.addEventListener('afterprint', after);
+    return () => { window.removeEventListener('beforeprint', before); window.removeEventListener('afterprint', after); after(); };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,19 +96,28 @@ export function GuardHandover({ system, module, profile }: Props) {
     if (sequence === loadSequence.current) setBusy(false);
   }, [date, market, marketLoading]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setApprovalNote(''); setEditing(null); setSubmitting(null); setReceiving(null); setFilePreview(null); setPreviewOpen(false); }, [date, market]);
+  useEffect(() => { setApprovalNote(''); setEditing(null); setCorrecting(null); setPreviewEditing(false); setSubmitting(null); setReceiving(null); setFilePreview(null); setPreviewOpen(false); }, [date, market]);
   useEffect(() => {
     if (!previewOpen) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreviewOpen(false); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !editing && !correcting) setPreviewOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [previewOpen]);
+  }, [previewOpen, editing, correcting]);
 
   const shifts = useMemo(() => context?.shifts || [], [context]);
   const logs = useMemo(() => context?.logs || [], [context]);
+  const corrections = useMemo(() => context?.corrections || [], [context]);
+  const correctionsFor = useCallback((logId: string) => corrections.filter(row => row.log_id === logId), [corrections]);
+  const effectiveLogs = useMemo(() => logs.map(log => {
+    const history = corrections.filter(row => row.log_id === log.log_id);
+    const latest = history[history.length - 1];
+    return latest ? { ...log, ...latest.after_values, correction_count: history.length,
+      last_corrected_at: latest.corrected_at, last_corrected_by: latest.corrected_by } : log;
+  }), [logs, corrections]);
   const attachments = useMemo(() => context?.attachments || [], [context]);
   const approval = context?.approval || null;
-  const logFor = useCallback((name: string) => logs.find(log => log.shift_name === name) || null, [logs]);
+  const logFor = useCallback((name: string) => effectiveLogs.find(log => log.shift_name === name) || null, [effectiveLogs]);
+  const rawLogFor = useCallback((name: string) => logs.find(log => log.shift_name === name) || null, [logs]);
   const attachmentsFor = useCallback((shiftName: string, incidentId: string) =>
     attachments.filter(file => file.shift_name === shiftName && file.incident_id === incidentId), [attachments]);
   const nameOf = useCallback((id: unknown) => {
@@ -124,7 +145,7 @@ export function GuardHandover({ system, module, profile }: Props) {
         : '本日交接均已完成接班，可進行主管簽核。';
 
   const kpis = useMemo<GuardKpi[]>(() => {
-    const incidentTotal = logs.reduce((sum, log) => sum + (log.incidents?.length || 0), 0);
+    const incidentTotal = effectiveLogs.reduce((sum, log) => sum + (log.incidents?.length || 0), 0);
     const rates = shifts.filter(shift => shift.state !== 'upcoming').map(shift => {
       const log = logs.find(row => row.shift_name === shift.name);
       return log && log.status !== 'draft' && log.patrol_snapshot ? log.patrol_snapshot : shift.patrol;
@@ -137,7 +158,7 @@ export function GuardHandover({ system, module, profile }: Props) {
       { label: '異常事件', value: `${incidentTotal} 件`, icon: 'alert', tone: incidentTotal ? 'red' : 'green' },
       { label: '巡邏平均完成率', value: average === null ? '尚未設定' : `${average}%`, icon: 'route', tone: average === null ? 'cyan' : average >= 100 ? 'green' : average >= 60 ? 'amber' : 'red' },
     ];
-  }, [logs, shifts]);
+  }, [logs, effectiveLogs, shifts]);
 
   const run = async (kind: string, payload: Record<string, unknown>, done: string, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return false;
@@ -150,7 +171,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const defaultItemsFor = (shift: GuardShift) => {
     const index = shifts.findIndex(row => row.name === shift.name);
     for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-      const previous = logFor(shifts[cursor].name);
+      const previous = rawLogFor(shifts[cursor].name);
       if (previous?.items?.length) return previous.items;
     }
     return context?.previous_items?.length ? context.previous_items : DEFAULT_ITEMS;
@@ -158,7 +179,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const actionsFor = (shift: GuardShift, log: GuardLog | null) => <>
     {!log && canEdit && <button type="button" className="primary-btn compact" onClick={() => setEditing(shift)}>建立交接</button>}
     {log?.status === 'draft' && canEdit && <>
-      <button type="button" className="secondary-btn compact" onClick={() => setEditing(shift)}>編輯交接</button>
+      {!correctionsFor(log.log_id).length && <button type="button" className="secondary-btn compact" onClick={() => setEditing(shift)}>編輯交接</button>}
       <button type="button" className="primary-btn compact" disabled={acting}
         onClick={() => { setReceiverId(''); setSubmitting(shift); }}>核對內容並指定接班人</button>
     </>}
@@ -170,6 +191,12 @@ export function GuardHandover({ system, module, profile }: Props) {
   </>;
 
   const report = { market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
+  const editReportShift = (shift: GuardShift) => {
+    const log = logFor(shift.name);
+    if (log && context?.can_correct) setCorrecting(shift);
+    else if (!log && canEdit || log?.status === 'draft' && canEdit && !correctionsFor(log.log_id).length) setEditing(shift);
+    else if (log && correctionsFor(log.log_id).length) setCorrecting(shift);
+  };
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
@@ -220,22 +247,28 @@ export function GuardHandover({ system, module, profile }: Props) {
         </div>
       </section>
 
-      {/* 預覽與列印共用同一個報表元件：畫面上看到的就是印出來的內容。 */}
-      {context && <div className="hs-print-sheet"><GuardDailyReport {...report} /></div>}
-      {previewOpen && context && <div className="hs-preview" role="dialog" aria-modal="true" aria-label="駐警隊交接日報表預覽">
-        <div className="hs-preview-bar">
-          <div><strong>日報表預覽</strong><span>{rocDate(date)} · A4 直式，與列印內容相同</span></div>
-          <div><button type="button" className="primary-btn compact" onClick={() => window.print()}>列印</button><button type="button" className="secondary-btn compact" onClick={() => setPreviewOpen(false)}>關閉預覽</button></div>
+      {mounted && context && createPortal(<div className="guard-print-root"><GuardDailyReport {...report} /></div>, document.body)}
+      {mounted && previewOpen && context && createPortal(<div className="guard-report-preview" role="dialog" aria-modal="true" aria-label="駐警隊交接日報表預覽">
+        <div className="guard-report-preview-bar">
+          <div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>
+            {previewEditing && <span className="guard-report-edit-hint">{context.can_correct ? '主管可修正勤務概況、重要交辦、異常事件與物品點交；每次修正保留紀錄。' : '按班別內的按鈕修改交接；已鎖定的內容可查看主管修正紀錄。'}</span>}</div>
+          <div><button type="button" className={previewEditing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={previewEditing} onClick={() => setPreviewEditing(value => !value)}>{previewEditing ? '完成編輯' : '編輯內容'}</button>
+            <button type="button" className="primary-btn compact" onClick={() => window.print()}>列印本日報表</button>
+            <button type="button" className="secondary-btn compact" onClick={() => { setPreviewEditing(false); setPreviewOpen(false); }}>關閉預覽</button></div>
         </div>
-        <div className="hs-preview-scroll"><div className="hs-preview-paper"><GuardDailyReport {...report} /></div></div>
-      </div>}
+        <div className="guard-report-preview-scroll"><div className="guard-report-preview-page"><GuardDailyReport {...report} editing={previewEditing}
+          canCorrect={Boolean(context.can_correct)} canEdit={canEdit} correctionCount={logId => correctionsFor(logId).length} onEditShift={editReportShift} /></div></div>
+      </div>, document.body)}
     </div>
-    {editing && context && market && <GuardLogModal market={market} date={date} shift={editing} log={logFor(editing.name)} staff={context.staff} people={context.people}
+    {mounted && editing && context && market && createPortal(<GuardLogModal market={market} date={date} shift={editing} log={rawLogFor(editing.name)} staff={context.staff} people={context.people}
       defaultItems={defaultItemsFor(editing)} shiftAttachments={attachments.filter(file => file.shift_name === editing.name)}
       optionsFor={optionsFor} onManage={canManageOptions ? setOptionsList : undefined}
       onPreview={setFilePreview}
       onClose={() => { setEditing(null); void load(); }}
-      onSaved={async () => { const name = editing.name; setEditing(null); await load(); setNote(`${name}交接內容已儲存`); }} />}
+      onSaved={async () => { const name = editing.name; setEditing(null); await load(); setNote(`${name}交接內容已儲存`); }} />, document.body)}
+    {mounted && correcting && market && rawLogFor(correcting.name) && createPortal(<GuardCorrectionModal key={`${rawLogFor(correcting.name)!.log_id}:${correctionsFor(rawLogFor(correcting.name)!.log_id).length}`}
+      market={market} log={rawLogFor(correcting.name)!} corrections={correctionsFor(rawLogFor(correcting.name)!.log_id)} canCorrect={Boolean(context?.can_correct)} nameOf={nameOf}
+      onClose={() => setCorrecting(null)} onDone={async () => { setCorrecting(null); await load(); setNote(`${correcting.name}報表內容已修正並留下紀錄`); }} />, document.body)}
     {submitting && <AdminModal className="guard-transfer-modal" title="核對交接內容並指定接班人" onClose={() => { if (!acting) setSubmitting(null); }}>
       <div className="guard-transfer-content">
         <p>送出後將以「{profile.name}」登記交班簽名，同時鎖定{submitting.name}交接內容與附件。只有指定的接班人本人登入後才能確認接班。</p>
@@ -422,7 +455,7 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
     } catch (error) { setMessage(errorMessage(error)); setBusy(false); }
   };
 
-  return <AdminModal className="guard-modal" title={`${log ? '編輯' : '建立'}交接｜${shift.name}（${hhmm(shift.shift_start)}–${hhmm(shift.shift_end)}）`} onClose={onClose}>
+  return <AdminModal className="guard-modal" backdropClassName="guard-edit-backdrop" title={`${log ? '編輯' : '建立'}交接｜${shift.name}（${hhmm(shift.shift_start)}–${hhmm(shift.shift_end)}）`} onClose={onClose}>
     <div className="guard-form">
       <fieldset><legend><GuardIcon name="users" size={16} />值勤人員</legend>
         <small>排定人員（巡檢排班）：{shift.scheduled_user_ids.length ? shift.scheduled_user_ids.map(id => people[id] || '（未知人員）').join('、') : '尚未排定'}</small>

@@ -29,6 +29,7 @@ function Block({ icon, title, meta, tone, children }: { icon: IconName; title: s
 function conditionTone(condition: string) {
   return condition === '正常' ? 'is-ok' : condition === '損壞' || condition === '遺失' ? 'is-bad' : 'is-warn';
 }
+const incidentFlag = (value: boolean | null | undefined) => value === true ? '是' : value === false ? '否' : '未設定';
 
 export function AttachmentChips({ files, onPreview, onRemove }: {
   files: Attachment[]; onPreview: (file: Attachment) => void; onRemove?: (file: Attachment) => void;
@@ -104,6 +105,7 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
               <p>{incident.description}</p>
               {incident.action ? <p><b>處理：</b>{incident.action}</p> : null}
               {incident.reported_to ? <p><b>通報：</b>{incident.reported_to}</p> : null}
+              <p className="guard-incident-flags">交接項目：{incidentFlag(incident.handover_item)} · 向上陳報：{incidentFlag(incident.reported_upward)}</p>
               <AttachmentChips files={attachmentsFor(shift.name, incident.id)} onPreview={onPreview} />
             </li>)}</ol> : <p className="hs-muted">本班無異常事件。</p>}
           </Block>
@@ -131,7 +133,7 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
               <td><span className={`hs-tag ${conditionTone(item.condition)}`}>{item.condition}</span></td><td>{item.note || '—'}</td></tr>)}
           </tbody></table> : <p className="hs-muted">未登錄點交物品。</p>}
         </Block>}
-        {log && <Block icon="pen" title="交接簽名" meta={`最後編修 ${activityTime(log.updated_at)} · ${nameOf(log.updated_by)}`}>
+        {log && <Block icon="pen" title="交接簽名" meta={`原件最後編修 ${activityTime(log.updated_at)} · ${nameOf(log.updated_by)}`}>
           <div className="hs-signs">
             <div className={`hs-sign${log.handover_by ? ' is-signed' : ''}`}><span className="hs-sign-icon"><GuardIcon name={log.handover_by ? 'check' : 'pen'} size={16} /></span>
               <div><span>交班人</span><b>{log.handover_by ? nameOf(log.handover_by) : '尚未簽名'}</b>{log.handover_at && <small>{activityTime(log.handover_at)}</small>}</div></div>
@@ -139,16 +141,20 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
               <div><span>{log.takeover_by ? '接班人' : '指定接班人'}</span><b>{log.takeover_by ? nameOf(log.takeover_by) : log.receiver_id ? nameOf(log.receiver_id) : '尚未指定'}</b>
                 {log.takeover_at ? <small>{activityTime(log.takeover_at)}</small> : log.receiver_id ? <small>等待本人登入確認</small> : null}</div></div>
           </div>
+          {log.correction_count ? <p className="guard-correction-mark">主管修正 {log.correction_count} 次 · 最近 {activityTime(log.last_corrected_at)} · {nameOf(log.last_corrected_by)}</p> : null}
         </Block>}
       </div>
     </div>
   </section>;
 }
 
-export function GuardDailyReport({ market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount }: {
+export function GuardDailyReport({ market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount,
+  editing = false, canCorrect = false, canEdit = false, correctionCount, onEditShift }: {
   market: HandoverMarket | null; date: string; shifts: GuardShift[]; approval: Approval | null; logFor: (name: string) => GuardLog | null;
   nameOf: (id: unknown) => string; namesOf: (ids: string[] | null | undefined) => string;
   attachmentCount: (shiftName: string, incidentId: string) => number;
+  editing?: boolean; canCorrect?: boolean; canEdit?: boolean; correctionCount?: (logId: string) => number;
+  onEditShift?: (shift: GuardShift) => void;
 }) {
   return <section className="hs-report">
     <header><h2>臺北農產運銷股份有限公司{market ? HANDOVER_MARKETS[market].name : ''}<br />駐警隊交接紀錄表</h2><p>{rocDate(date)}</p></header>
@@ -158,7 +164,9 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
       const times = frozen && log ? log : shift;
       const patrol = frozen && log?.patrol_snapshot ? log.patrol_snapshot : shift.patrol;
       const scheduled = frozen && log ? log.scheduled_user_ids : shift.scheduled_user_ids;
-      return <table className="hs-report-shift" key={shift.name}><tbody>
+      const count = log && correctionCount ? correctionCount(log.log_id) : 0;
+      const canChange = Boolean(log ? canCorrect || canEdit && log.status === 'draft' && !count : canEdit);
+      return <div className="guard-report-shift" key={shift.name}><table className="hs-report-shift"><tbody>
         <tr><th className="hs-report-label">班別</th><td>{shift.name}（{hhmm(times.shift_start)}–{hhmm(times.shift_end)}）</td><th className="hs-report-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}　狀態：{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
         <tr><th>排定人員</th><td>{namesOf(scheduled)}</td><th>實際值勤</th><td>{log ? namesOf(log.actual_user_ids) : '—'}{log?.substitute_note ? `\n代班：${log.substitute_note}` : ''}</td></tr>
         <tr><th>勤務概況</th><td colSpan={3}>{log?.duty_summary || '—'}</td></tr>
@@ -169,14 +177,16 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
           const clean = (value: string) => value.trim().replace(/[。；;，,、]+$/u, '');
           const parts = [`${incident.category}：${clean(incident.description)}`,
             incident.action ? `處理：${clean(incident.action)}` : '', incident.reported_to ? `通報：${clean(incident.reported_to)}` : ''].filter(Boolean);
-          return `${incidentTime(incident.time)}　${incident.location || '—'}　${parts.join('；')}${files ? `（附件 ${files} 件）` : ''}`;
+          return `${incidentTime(incident.time)}　${incident.location || '—'}　${parts.join('；')}；交接項目：${incidentFlag(incident.handover_item)}；向上陳報：${incidentFlag(incident.reported_upward)}${files ? `（附件 ${files} 件）` : ''}`;
         }).join('\n') : '無'}</td></tr>
         <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>
         <tr><th>巡邏打卡</th><td colSpan={3}>{patrol.expected ? `應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%` : '本市場尚未設定巡邏點'}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
         <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by
           ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}`
           : log?.receiver_id ? `指定：${nameOf(log.receiver_id)}（待本人確認）` : ''}</td></tr>
-      </tbody></table>;
+      </tbody></table>{count > 0 && <p className="guard-report-correction-mark">主管修正 {count} 次 · 最近 {activityTime(log?.last_corrected_at)} · {nameOf(log?.last_corrected_by)}</p>}
+        {editing && (canChange || count > 0) && <div className="guard-report-actions"><button type="button" className="secondary-btn compact" onClick={() => onEditShift?.(shift)}>{log && canCorrect ? '主管修正' : canChange ? log ? '編輯交接' : '建立交接' : '查看修正紀錄'}</button></div>}
+      </div>;
     }) : <p className="hs-report-empty">巡檢排班沒有任何啟用中的班別。</p>}
     <footer>
       <div><b>主管簽核</b><br />{approval ? `${nameOf(approval.approver_id)}　${activityTime(approval.approved_at)}${approval.note ? `\n說明：${approval.note}` : ''}` : '尚未簽核'}</div>
