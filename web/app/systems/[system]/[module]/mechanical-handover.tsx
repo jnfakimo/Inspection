@@ -176,22 +176,12 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   }, [printRequested, printData]);
   useEffect(() => {
     if (!previewOpen) return;
-    let frame = 0;
-    const refresh = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(fitMechanicalReportPreview);
-    };
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setPreviewOpen(false); };
-    refresh();
-    void document.fonts.ready.then(refresh);
-    window.addEventListener('resize', refresh);
     window.addEventListener('keydown', closeOnEscape);
     return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', refresh);
       window.removeEventListener('keydown', closeOnEscape);
     };
-  }, [approvals, date, entries, previewOpen, signatures]);
+  }, [previewOpen]);
 
   const load = useCallback(async () => {
     if (!market) { setBusy(false); return; }
@@ -435,7 +425,7 @@ export function PrintRangeModal({ error, from, to, busy, onFrom, onTo, onClose, 
 }
 
 export function fitMechanicalPrint() {
-  document.querySelectorAll<HTMLElement>('.mechanical-print-sheet').forEach(sheet => {
+  document.querySelectorAll<HTMLElement>('.mechanical-print-preview .mechanical-print-sheet').forEach(sheet => {
     const content = sheet.querySelector<HTMLElement>('.mechanical-print-content');
     if (!content) return;
     content.style.removeProperty('--mechanical-print-scale');
@@ -447,24 +437,9 @@ export function fitMechanicalPrint() {
   });
 }
 
-export function fitMechanicalReportPreview() {
-  const preview = document.querySelector<HTMLElement>('.mechanical-report-preview');
-  const scroll = preview?.querySelector<HTMLElement>('.mechanical-report-preview-scroll');
-  const frame = preview?.querySelector<HTMLElement>('.mechanical-report-preview-page');
-  const sheet = frame?.querySelector<HTMLElement>('.mechanical-print-sheet');
-  if (!scroll || !frame || !sheet) return;
-  fitMechanicalPrint();
-  sheet.style.removeProperty('transform');
-  const availableWidth = Math.max(240, scroll.clientWidth - 32);
-  const scale = Math.min(1, availableWidth / sheet.offsetWidth);
-  sheet.style.transform = `scale(${scale})`;
-  frame.style.width = `${sheet.offsetWidth * scale}px`;
-  frame.style.height = `${sheet.offsetHeight * scale}px`;
-}
-
 export function DailyReportPreview({ date, entries, signatures, shiftReports, approval, userName, onClose, onPrint }: { date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; onClose: () => void; onPrint: () => void }) {
   return <div className="mechanical-report-preview" role="dialog" aria-modal="true" aria-label="機電交接本日報表預覽">
-    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · A4 直式一頁，內容過多時自動等比例縮小</span></div><div><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
+    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span></div><div><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
     <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} /></div></div>
   </div>;
 }
