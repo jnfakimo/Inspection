@@ -69,6 +69,36 @@ function isDeleted(row: Row) {
 function activeEntries(rows: Row[]) {
   return rows.filter(row => !isDeleted(row));
 }
+function correctionHistory(rows: Row[], entryId: unknown) {
+  return rows.filter(row => String(row.entry_id) === String(entryId))
+    .sort((a, b) => String(a.corrected_at).localeCompare(String(b.corrected_at)) || String(a.correction_id).localeCompare(String(b.correction_id)));
+}
+function correctedEntries(rows: Row[], corrections: Row[]) {
+  const grouped = new Map<string, Row[]>();
+  corrections.forEach(row => {
+    const key = String(row.entry_id);
+    grouped.set(key, [...(grouped.get(key) || []), row]);
+  });
+  return rows.map(row => {
+    const history = correctionHistory(grouped.get(String(row.entry_id)) || [], row.entry_id);
+    if (!history.length) return row;
+    const last = history[history.length - 1];
+    return { ...row, ...(last.after_values || {}), correction_count: history.length,
+      last_correction_id: last.correction_id, last_corrected_at: last.corrected_at,
+      last_corrected_by: last.corrected_by };
+  });
+}
+async function readCorrections(client: ReturnType<typeof getSupabase>, market: HandoverMarket, from: string, to: string) {
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await client.from('mechanical_handover_corrections').select('*')
+      .eq('market_code', market).gte('work_date', from).lte('work_date', to)
+      .order('corrected_at').order('correction_id').range(offset, offset + 499);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 500) return rows;
+  }
+}
 function activityTime(value: unknown) {
   if (!value) return '—';
   const parsed = new Date(String(value));
@@ -95,6 +125,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [allowedMarkets, setAllowedMarkets] = useState<HandoverMarket[]>([]);
   const [date, setDate] = useState(todayTaipei());
   const [entries, setEntries] = useState<Row[]>([]);
+  const [corrections, setCorrections] = useState<Row[]>([]);
   const [signatures, setSignatures] = useState<Row[]>([]);
   const [approvals, setApprovals] = useState<Row[]>([]);
   const [approvalNote, setApprovalNote] = useState('');
@@ -110,12 +141,13 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
+  const [correctingEntry, setCorrectingEntry] = useState<Row | null>(null);
   const [carrySource, setCarrySource] = useState<Row | null>(null);
   const [presetItem, setPresetItem] = useState('');
   const [printOpen, setPrintOpen] = useState(false);
   const [printFrom, setPrintFrom] = useState(date);
   const [printTo, setPrintTo] = useState(date);
-  const [printData, setPrintData] = useState<{ dates: string[]; entries: Row[]; signatures: Row[]; approvals: Row[]; transfers: Row[] } | null>(null);
+  const [printData, setPrintData] = useState<{ dates: string[]; entries: Row[]; corrections: Row[]; signatures: Row[]; approvals: Row[]; transfers: Row[] } | null>(null);
   const [printError, setPrintError] = useState('');
   const [mounted, setMounted] = useState(false);
   const [printRequested, setPrintRequested] = useState(false);
@@ -187,8 +219,9 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     if (!market) { setBusy(false); return; }
     setBusy(true); setNote('');
     const client = getSupabase();
-    const [work, signs, approvalRows, people, departments, history, scheduled, marketScopes, categoryRows, itemRows, reports, receivers] = await Promise.all([
+    const [work, correctionRows, signs, approvalRows, people, departments, history, scheduled, marketScopes, categoryRows, itemRows, reports, receivers] = await Promise.all([
       client.from('mechanical_handover_entries').select('*').eq('market_code', market).eq('work_date', date).order('shift_code').order('sort_order').order('created_at'),
+      readCorrections(client, market, date, date).then(data => ({ data, error: null })).catch(error => ({ data: [] as Row[], error })),
       client.from('mechanical_handover_signatures').select('*').eq('market_code', market).eq('work_date', date),
       client.from('mechanical_handover_daily_approvals').select('*').eq('market_code', market).eq('work_date', date),
       client.from('users').select('user_id,name,username,email,department,dept_id,role,rbac_role,status').order('name').limit(1000),
@@ -206,7 +239,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     const scopedPeople = selectableActiveUsers(people.data || []).filter(person => mechanicalDeptIds.has(String(person.dept_id)) && secondMarketUserIds.has(String(person.user_id)));
     const selectableIds = new Set(scopedPeople.map(person => String(person.user_id)));
     const scopedScheduleRows = (scheduled.data || []).filter(row => selectableIds.has(String(row.user_id)));
-    const failures = [work.error, signs.error, approvalRows.error, people.error, departments.error, history.error, scheduled.error, marketScopes.error, categoryRows.error, itemRows.error, reports.error, receivers.error].filter(Boolean);
+    const failures = [work.error, correctionRows.error, signs.error, approvalRows.error, people.error, departments.error, history.error, scheduled.error, marketScopes.error, categoryRows.error, itemRows.error, reports.error, receivers.error].filter(Boolean);
     const failure = failures[0];
     if (failure) {
       const localOrigin = typeof window !== 'undefined' && /^(?:localhost|127\.0\.0\.1|\d{1,3}(?:\.\d{1,3}){3})$/.test(window.location.hostname);
@@ -216,7 +249,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     }
     const itemCounts = new Map<string, number>();
     (history.data || []).forEach(row => { const item = String(row.work_item || ''); if (item) itemCounts.set(item, (itemCounts.get(item) || 0) + 1); });
-    setEntries(work.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setScheduleRows(scopedScheduleRows);
+    setEntries(work.data || []); setCorrections(correctionRows.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setScheduleRows(scopedScheduleRows);
     setShiftReports(reports.data || []); setEligibleReceivers(receivers.data || []);
     setWorkCategories(categoryRows.data || []); setWorkItems(itemRows.data || []);
     setHistoryItems([...itemCounts.entries()].filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1]).map(([item]) => item)); setBusy(false);
@@ -228,7 +261,8 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const scheduledIdsFor = useCallback((shiftCode: string) => scheduleRows.filter(row => row.duty_code === shiftCode).map(row => String(row.user_id)), [scheduleRows]);
   const configuredItemNames = useMemo(() => new Set(workItems.filter(row => row.is_active !== false).map(row => String(row.name || ''))), [workItems]);
   const frequentItems = useMemo(() => historyItems.filter(item => configuredItemNames.size ? configuredItemNames.has(item) : Object.values(WORK_ITEMS).some(items => items.includes(item))), [configuredItemNames, historyItems]);
-  const byShift = (code: string) => entries.filter(entry => entry.shift_code === code);
+  const displayEntries = useMemo(() => correctedEntries(entries, corrections), [entries, corrections]);
+  const byShift = (code: string) => displayEntries.filter(entry => entry.shift_code === code);
   const approval = approvals[0];
   const activeShift = currentMechanicalShift(now);
   const role = String(profile.rbac_role || ({ admin: 'sysadmin', supervisor: 'unit_supervisor' } as Record<string, string>)[profile.role] || profile.role || '');
@@ -238,10 +272,15 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const approvalOpenDate = mechanicalApprovalOpensOn(date);
   const allTransfersComplete = shiftReports.length === SHIFTS.length && shiftReports.every(report => Boolean(report.outgoing?.received_at));
   const canApprove = hasApprovalRole && approvalOpen && allTransfersComplete;
-  const currentEntries = activeEntries(entries);
+  const currentEntries = activeEntries(displayEntries);
   const deletedEntryCount = entries.length - currentEntries.length;
   const openEntry = (row: Row) => {
-    setCarrySource(null); setPresetItem(''); setEditingEntry(row); setEditingShift(String(row.shift_code || ''));
+    const original = entries.find(entry => String(entry.entry_id) === String(row.entry_id)) || row;
+    setCarrySource(null); setPresetItem(''); setEditingEntry(original); setEditingShift(String(original.shift_code || ''));
+  };
+  const editReportEntry = (row: Row) => {
+    if (hasApprovalRole && !isDeleted(row)) setCorrectingEntry(row);
+    else openEntry(row);
   };
   const carryByShift = useMemo(() => {
     const grouped = new Map<string, Row[]>();
@@ -273,6 +312,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
   const preparePrint = async () => {
+    if (!market) { setPrintError('尚未取得機電課市場權限'); return; }
     if (!printFrom || !printTo || printFrom > printTo || dateRange(printFrom, printTo).length > 31) return;
     setPrintBusy(true); setPrintError('');
     try {
@@ -301,7 +341,8 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         .eq('market_code', market)
         .gte('handover_date', shiftDate(printFrom, -1)).lte('handover_date', printTo);
       if (transferError) throw transferError;
-      setPrintData({ dates: dateRange(printFrom, printTo), entries: works, signatures: signs || [], approvals: approvalData || [], transfers: transferData || [] });
+      const printCorrections = await readCorrections(client, market, printFrom, printTo);
+      setPrintData({ dates: dateRange(printFrom, printTo), entries: works, corrections: printCorrections, signatures: signs || [], approvals: approvalData || [], transfers: transferData || [] });
       setPrintOpen(false); setPrintRequested(true);
     } catch (error) {
       setPrintError(errorMessage(error, '報表資料讀取失敗，請重試'));
@@ -374,11 +415,11 @@ export function MechanicalHandover({ system, module, profile }: Props) {
               </article>)}
             </div>}
             <div className="mechanical-entry-list">{rows.length ? rows.map((row, entryIndex) =>
-              <article className={`mechanical-entry-card${isDeleted(row) ? ' is-deleted' : ''}`} key={String(row.entry_id)} role="button" tabIndex={0} aria-label={`第 ${entryIndex + 1} 件：${String(row.work_item || '')}，${isDeleted(row) ? '已刪除，點擊查看' : '點擊修改'}`} onClick={() => openEntry(row)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEntry(row); } }}>
+              <article className={`mechanical-entry-card${isDeleted(row) ? ' is-deleted' : ''}`} key={String(row.entry_id)} role="button" tabIndex={0} aria-label={`第 ${entryIndex + 1} 件：${String(row.work_item || '')}，${isDeleted(row) ? '已刪除，點擊查看' : '點擊查看或修改原紀錄'}`} onClick={() => openEntry(row)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openEntry(row); } }}>
                 <div className="mechanical-entry-main"><small><b className="mechanical-entry-number">第 {entryIndex + 1} 件</b>{row.carry_source_id && <b className="mechanical-entry-carry">續辦</b>}{String(row.category || '未分類')}</small><h3>{String(row.work_item || '未選常用項目')}</h3>{row.details && <p>{String(row.details)}</p>}</div>
                 <div className="mechanical-entry-people"><small>維修人員</small><p>{(Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—'}</p>{row.notes && <p className="mechanical-entry-note">備註：{String(row.notes)}</p>}</div>
                 <div className="mechanical-entry-result"><small>處理結果</small><b className={`result-badge result-${isDeleted(row) ? 'deleted' : RESULT_TONES[String(row.result || '')] || 'neutral'}`}>{isDeleted(row) ? '已刪除' : String(row.result || '—')}</b><small>維修費用</small><strong>{isDeleted(row) ? '—' : row.repair_cost == null ? '未填' : formatRepairCost(repairCostCents(row.repair_cost) || 0)}</strong></div>
-                <div className="mechanical-entry-audit"><span>建立 {activityTime(row.created_at)} · {userName(row.created_by)}</span>{hasLaterUpdate(row) && <span>修改 {activityTime(row.updated_at)} · {userName(row.updated_by)}</span>}{isDeleted(row) && <span className="is-delete-event">刪除 {activityTime(row.deleted_at)} · {userName(row.deleted_by)}</span>}<b>{shiftLocked ? '已交班鎖定' : isDeleted(row) ? '保留刪除紀錄' : '點擊修改'}</b></div>
+                <div className="mechanical-entry-audit"><span>建立 {activityTime(row.created_at)} · {userName(row.created_by)}</span>{hasLaterUpdate(row) && <span>修改 {activityTime(row.updated_at)} · {userName(row.updated_by)}</span>}{row.correction_count > 0 && <span>主管修正 {row.correction_count} 次 · 最近 {activityTime(row.last_corrected_at)} · {userName(row.last_corrected_by)}</span>}{isDeleted(row) && <span className="is-delete-event">刪除 {activityTime(row.deleted_at)} · {userName(row.deleted_by)}</span>}<b>{isDeleted(row) ? '保留刪除紀錄' : row.correction_count > 0 ? '已有主管修正' : shiftLocked ? '已交班鎖定' : '點擊修改'}</b></div>
               </article>
             ) : <p className="hs-empty">本班尚無工作紀錄，請按「新增工作」建立。</p>}</div>
             <MechanicalSignatures shift={shiftReport} profileId={profile.user_id} disabled={busy || Boolean(approval)} onConfirm={value => { setConfirmationMessage(''); setConfirmation(value); }} />
@@ -398,18 +439,19 @@ export function MechanicalHandover({ system, module, profile }: Props) {
 
       {mounted && createPortal(<section className="mechanical-print-preview" aria-label="每日列印報表">
         {(printData?.dates || [date]).map(printDate => <PrintSheet key={printDate} date={printDate}
-          entries={(printData?.entries || entries).filter(row => String(row.work_date) === printDate)}
+          entries={correctedEntries((printData?.entries || entries).filter(row => String(row.work_date) === printDate), printData?.corrections || corrections)}
           signatures={(printData?.signatures || signatures).filter(row => String(row.work_date) === printDate)}
           shiftReports={printData ? reportsFromTransfers(printDate, printData.transfers) : shiftReports}
           approval={(printData?.approvals || approvals).find(row => String(row.work_date) === printDate)}
           userName={userName} />)}
       </section>, document.body)}
-      {mounted && previewOpen && createPortal(<DailyReportPreview date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} onEditEntry={openEntry} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
+      {mounted && previewOpen && createPortal(<DailyReportPreview date={date} entries={displayEntries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} canCorrect={hasApprovalRole} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} onEditEntry={editReportEntry} onCorrectEntry={row => setCorrectingEntry(row)} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
     </div>
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {optionsOpen && <MechanicalWorkOptionsModal categories={workCategories} items={workItems} onClose={() => setOptionsOpen(false)} onDone={load} />}
     {confirmation && <MechanicalConfirmModal confirmation={confirmation} users={eligibleReceivers} profileId={profile.user_id} busy={confirmationBusy} message={confirmationMessage} onClose={() => setConfirmation(null)} onSave={receiverId => void saveConfirmation(receiverId)} />}
-    {mounted && editingShift && market && createPortal(<WorkEntryModal market={market} date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} categories={workCategories} items={workItems} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === editingShift)?.outgoing) || Boolean(editingEntry && isDeleted(editingEntry))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />, document.body)}
+    {mounted && editingShift && market && createPortal(<WorkEntryModal market={market} date={date} shiftCode={editingShift} users={mechanicalUsers} scheduledUserIds={scheduledIdsFor(editingShift)} categories={workCategories} items={workItems} entry={editingEntry} presetItem={presetItem} carrySource={carrySource} locked={Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === editingShift)?.outgoing) || Boolean(editingEntry && (isDeleted(editingEntry) || corrections.some(row => String(row.entry_id) === String(editingEntry.entry_id))))} userName={userName} onClose={() => { setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); }} onDone={async action => { const wasCarry = Boolean(carrySource); setEditingShift(null); setEditingEntry(null); setPresetItem(''); setCarrySource(null); await load(); setNote(action === 'deleted' ? '工作紀錄已標記刪除並保留異動時間' : action === 'updated' ? '工作紀錄已修改並記錄異動時間' : wasCarry ? '上班未完成工作已建立續辦紀錄' : '維修養護工作已新增'); }} />, document.body)}
+    {mounted && correctingEntry && market && createPortal(<SupervisorCorrectionModal market={market} entry={correctingEntry} corrections={correctionHistory(corrections, correctingEntry.entry_id)} canCorrect={hasApprovalRole} userName={userName} onClose={() => setCorrectingEntry(null)} onDone={async () => { setCorrectingEntry(null); await load(); setNote('主管修正已儲存，前後內容與修改者已留存'); }} />, document.body)}
   </AppShell>;
 }
 
@@ -437,15 +479,15 @@ export function fitMechanicalPrint() {
   });
 }
 
-export function DailyReportPreview({ date, entries, signatures, shiftReports, approval, userName, onClose, onPrint, onEditEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; onClose: () => void; onPrint: () => void; onEditEntry: (entry: Row) => void; onAddEntry: (shiftCode: string) => void }) {
+export function DailyReportPreview({ date, entries, signatures, shiftReports, approval, userName, canCorrect, onClose, onPrint, onEditEntry, onCorrectEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; canCorrect: boolean; onClose: () => void; onPrint: () => void; onEditEntry: (entry: Row) => void; onCorrectEntry: (entry: Row) => void; onAddEntry: (shiftCode: string) => void }) {
   const [editing, setEditing] = useState(false);
   return <div className="mechanical-report-preview" role="dialog" aria-modal="true" aria-label="機電交接本日報表預覽">
-    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>{editing && <span className="mechanical-report-edit-hint" role="status">按列內按鈕修改或新增；儲存後會更新系統紀錄並保留異動歷程。</span>}</div><div><button type="button" className={editing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成編輯' : '編輯內容'}</button><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
-    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} editable={editing} onEditEntry={onEditEntry} onAddEntry={onAddEntry} /></div></div>
+    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>{editing && <span className="mechanical-report-edit-hint" role="status">{canCorrect ? '主管可修正工作內容、處理結果與備註；每次修正都保留前後內容。' : '按列內按鈕修改或新增；已修正的工作可查看主管修正紀錄。'}</span>}</div><div><button type="button" className={editing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成編輯' : '編輯內容'}</button><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
+    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} editable={editing} canCorrect={canCorrect} onEditEntry={onEditEntry} onCorrectEntry={onCorrectEntry} onAddEntry={onAddEntry} /></div></div>
   </div>;
 }
 
-export function PrintSheet({ date, entries, signatures, shiftReports = [], approval, userName, editable = false, onEditEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports?: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; editable?: boolean; onEditEntry?: (entry: Row) => void; onAddEntry?: (shiftCode: string) => void }) {
+export function PrintSheet({ date, entries, signatures, shiftReports = [], approval, userName, editable = false, canCorrect = false, onEditEntry, onCorrectEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports?: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; editable?: boolean; canCorrect?: boolean; onEditEntry?: (entry: Row) => void; onCorrectEntry?: (entry: Row) => void; onAddEntry?: (shiftCode: string) => void }) {
   const validEntries = activeEntries(entries);
   return <article className="mechanical-print-sheet"><div className="mechanical-print-content">
     <header><h2>臺北農產運銷股份有限公司第二批發市場<br />機電設備養護紀錄表</h2><p>{rocDate(date)}</p></header>
@@ -458,7 +500,7 @@ export function PrintSheet({ date, entries, signatures, shiftReports = [], appro
         const shiftLocked = Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === shift.code)?.outgoing);
         return <tbody className="mechanical-print-shift" key={shift.code}>{(rows.length ? rows : [null]).map((row, rowIndex) => <tr className={row && isDeleted(row) ? 'is-deleted' : ''} key={row ? String(row.entry_id) : 'empty'}>
           {rowIndex === 0 && <th rowSpan={Math.max(1, rows.length)}>{['早班', '中班', '晚班'][index]}<br />{shift.label}<br />共 {validRows.length} 件{deletedRows ? <><br />刪除 {deletedRows} 件</> : null}</th>}
-          <td>{row ? <><b>{rowIndex + 1}. {String(row.work_item || '未選常用項目')}</b>{row.details && <p>{String(row.details)}</p>}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onEditEntry?.(row)}>{isDeleted(row) || shiftLocked ? '查看紀錄' : '修改紀錄'}</button></div>}</> : <>{'尚無工作紀錄'}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" disabled={shiftLocked} onClick={() => onAddEntry?.(shift.code)}>新增工作紀錄</button>{shiftLocked && <small>本班已完成交班或簽核，暫不可新增。</small>}</div>}</>}</td>
+          <td>{row ? <><b>{rowIndex + 1}. {String(row.work_item || '未選常用項目')}</b>{row.details && <p>{String(row.details)}</p>}{row.correction_count > 0 && <small className="mechanical-report-correction-mark">主管修正 {row.correction_count} 次 · {activityTime(row.last_corrected_at)} · {userName(row.last_corrected_by)}</small>}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onEditEntry?.(row)}>{isDeleted(row) ? '查看紀錄' : canCorrect ? '主管修正' : shiftLocked || row.correction_count > 0 ? '查看紀錄' : '修改紀錄'}</button>{row.correction_count > 0 && !canCorrect && <button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onCorrectEntry?.(row)}>修正歷程</button>}</div>}</> : <>{'尚無工作紀錄'}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" disabled={shiftLocked} onClick={() => onAddEntry?.(shift.code)}>新增工作紀錄</button>{shiftLocked && <small>本班已完成交班或簽核，暫不可新增。</small>}</div>}</>}</td>
           <td>{row ? (Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—' : '—'}</td>
           <td>{row ? isDeleted(row) ? '已刪除' : String(row.result || '—') : '—'}</td><td>{row ? <>{String(row.notes || '—')}{isDeleted(row) && <small className="mechanical-print-delete-time">刪除：{activityTime(row.deleted_at)}</small>}</> : '—'}</td>
           <td>{row && !isDeleted(row) && row.repair_cost != null ? formatRepairCost(repairCostCents(row.repair_cost) || 0).replace('NT$ ', '') : row && isDeleted(row) ? '—' : '未填'}</td>
@@ -542,6 +584,50 @@ export function MechanicalWorkOptionsModal({ categories, items, onClose, onDone 
   </AdminModal>;
 }
 
+export function SupervisorCorrectionModal({ market, entry, corrections, canCorrect, userName, onClose, onDone }: { market: HandoverMarket; entry: Row; corrections: Row[]; canCorrect: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: () => Promise<void> }) {
+  const [workItem, setWorkItem] = useState(String(entry.work_item || ''));
+  const [details, setDetails] = useState(String(entry.details || ''));
+  const [result, setResult] = useState(String(entry.result || '正常'));
+  const [notes, setNotes] = useState(String(entry.notes || ''));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const latest = corrections[corrections.length - 1];
+  const save = async () => {
+    if (!canCorrect || busy) return;
+    setBusy(true); setMessage('');
+    try {
+      await invokeAppApi('handover_save', { kind: 'mechanical_entry_correction', market_code: market,
+        entry_id: entry.entry_id, expected_correction_id: latest?.correction_id || null,
+        work_item: workItem, details, result, notes });
+      await onDone();
+    } catch (error) { setMessage(`失敗：${errorMessage(error)}`); }
+    finally { setBusy(false); }
+  };
+  const fields = [
+    { key: 'work_item', label: '常用工作項目' }, { key: 'details', label: '工作補充說明' },
+    { key: 'result', label: '處理結果' }, { key: 'notes', label: '備註' },
+  ];
+  return <AdminModal className="mechanical-modal mechanical-correction-modal" backdropClassName="mechanical-work-backdrop" title={`${canCorrect ? '主管修正' : '主管修正紀錄'}｜${String(entry.work_date)} ${String(entry.shift_code)}`} onClose={onClose}>
+    <p className="mechanical-correction-intro">僅修正報表的工作內容、處理結果與備註。原始交接與簽核快照保留，續辦流程仍依當時交接紀錄；每次儲存會記下修正前後內容、帳號與時間。</p>
+    {canCorrect && <div className="admin-form-grid mechanical-correction-form">
+      <label className="wide">常用工作項目<input maxLength={300} value={workItem} onChange={event => setWorkItem(event.target.value)} /></label>
+      <label className="wide">工作補充說明<textarea maxLength={3000} rows={3} value={details} onChange={event => setDetails(event.target.value)} /></label>
+      <label>處理結果<select value={result} onChange={event => setResult(event.target.value)}>{RESULT_OPTIONS.map(value => <option key={value}>{value}</option>)}</select></label>
+      <label className="wide">備註<input maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} /></label>
+    </div>}
+    <section className="mechanical-correction-history" aria-label="主管修正歷程"><h3>修正歷程 · {corrections.length} 次</h3>
+      {corrections.length ? [...corrections].reverse().map(row => {
+        const before = row.before_values || {}, after = row.after_values || {};
+        return <article key={String(row.correction_id)}><strong>{activityTime(row.corrected_at)} · {userName(row.corrected_by)}</strong>
+          {fields.filter(field => String(before[field.key] ?? '') !== String(after[field.key] ?? '')).map(field =>
+            <p key={field.key}><b>{field.label}</b><span>{String(before[field.key] || '—')}</span><span aria-hidden="true">→</span><span>{String(after[field.key] || '—')}</span></p>)}</article>;
+      }) : <p>尚無主管修正紀錄。</p>}
+    </section>
+    {message && <p role="alert" className="mechanical-modal-message">{message}</p>}
+    <footer><button className="secondary-btn" onClick={onClose}>{canCorrect ? '取消' : '關閉'}</button>{canCorrect && <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存主管修正'}</button>}</footer>
+  </AdminModal>;
+}
+
 export function WorkEntryModal({ market, date, shiftCode, users, scheduledUserIds, categories, items, entry, presetItem = '', carrySource, locked, userName, onClose, onDone }: { market: HandoverMarket; date: string; shiftCode: string; users: Row[]; scheduledUserIds: string[]; categories: Row[]; items: Row[]; entry?: Row | null; presetItem?: string; carrySource?: Row | null; locked: boolean; userName: (id: unknown) => string; onClose: () => void; onDone: (action: 'created' | 'updated' | 'deleted') => void }) {
   const sourceRow = entry || carrySource;
   const sourceItem = String(sourceRow?.work_item || presetItem || '');
@@ -600,7 +686,7 @@ export function WorkEntryModal({ market, date, shiftCode, users, scheduledUserId
   const title = entry ? locked ? '查看機電工作' : '修改機電工作' : carrySource ? '接續處理' : '新增機電工作';
   return <AdminModal className="mechanical-modal mechanical-work-modal" backdropClassName="mechanical-work-backdrop" title={`${title}｜${SHIFTS.find(shift => shift.code === shiftCode)?.label}`} onClose={onClose}>
     {carrySource && <div className="mechanical-carry-source"><b>上班續辦</b><span>{String(carrySource.work_date)} · {SHIFTS.find(shift => shift.code === carrySource.shift_code)?.label}</span><strong>{String(carrySource.work_item || '')}</strong><small>原紀錄不會被修改，本次儲存會建立新的續辦紀錄。</small></div>}
-    {entry && <div className={`mechanical-edit-history${isDeleted(entry) ? ' is-deleted' : ''}`}><b>{isDeleted(entry) ? '已刪除紀錄' : locked ? '本日已簽核，僅可查看' : '異動時間紀錄'}</b><span>建立：{activityTime(entry.created_at)} · {userName(entry.created_by)}</span>{hasLaterUpdate(entry) && <span>修改：{activityTime(entry.updated_at)} · {userName(entry.updated_by)}</span>}{isDeleted(entry) && <span>刪除：{activityTime(entry.deleted_at)} · {userName(entry.deleted_by)}</span>}</div>}
+    {entry && <div className={`mechanical-edit-history${isDeleted(entry) ? ' is-deleted' : ''}`}><b>{isDeleted(entry) ? '已刪除紀錄' : locked ? '原始工作內容已鎖定，僅可查看' : '異動時間紀錄'}</b><span>建立：{activityTime(entry.created_at)} · {userName(entry.created_by)}</span>{hasLaterUpdate(entry) && <span>修改：{activityTime(entry.updated_at)} · {userName(entry.updated_by)}</span>}{isDeleted(entry) && <span>刪除：{activityTime(entry.deleted_at)} · {userName(entry.deleted_by)}</span>}</div>}
     <div className="admin-form-grid mechanical-form">
       <label>工作分類<select disabled={locked} value={category} onChange={event => changeCategory(event.target.value)}><BlankSelectOption />{categoryOptions.map(value => <option key={value} value={value}>{value}</option>)}</select><small className="mechanical-blank-hint">第一列為空白，可不選分類。</small></label>
       <label>常用工作項目<select disabled={locked} value={item} onChange={event => changeItem(event.target.value)}><BlankSelectOption />{itemOptions.map(value => <option key={value} value={value}>{value}</option>)}</select><small className="mechanical-blank-hint">選取後會即時帶入下方說明，仍可繼續補充。</small></label>

@@ -3346,7 +3346,7 @@ export async function handleAppApiRequest(req: Request) {
             : kind.startsWith('business_') ? 'business'
               : kind === 'create_case' || kind === 'add_attachment' ? 'open-items' : '';
       if (requiredModule && !canHandoverModule(requiredModule)) return reply(req, { ok: false, message: '目前帳號未開放此交接簿子系統' }, 403);
-      const mechanicalMarketKinds = new Set(['mechanical_entry','mechanical_entry_update','mechanical_entry_delete','mechanical_sign','mechanical_approve']);
+      const mechanicalMarketKinds = new Set(['mechanical_entry','mechanical_entry_update','mechanical_entry_delete','mechanical_entry_correction','mechanical_sign','mechanical_approve']);
       const mechanicalMarket = mechanicalMarketKinds.has(kind)
         ? await authorizeHandoverMarket(admin, profile.user_id, 'mechanical', body.market_code, isSysadmin) : null;
       if (mechanicalMarketKinds.has(kind) && !mechanicalMarket) {
@@ -3615,6 +3615,25 @@ export async function handleAppApiRequest(req: Request) {
         return reply(req, { ok: true, data });
       }
 
+      if (kind === 'mechanical_entry_correction') {
+        const entryId = id(body.entry_id);
+        const expectedCorrection = body.expected_correction_id == null ? null : id(body.expected_correction_id);
+        if (!entryId || (body.expected_correction_id != null && !expectedCorrection))
+          return reply(req, { ok: false, message: '工作或修正紀錄識別碼無效' }, 400);
+        const workItem = text(body.work_item, 300), details = text(body.details, 3000);
+        const result = text(body.result, 80), notes = text(body.notes, 1000);
+        if ((!workItem && !details) || !MECHANICAL_RESULT_SET.has(result))
+          return reply(req, { ok: false, message: '請填寫工作內容並選擇有效的處理結果' }, 400);
+        const { data, error } = await userDb.rpc('mechanical_supervisor_correct_entry', {
+          p_entry_id: entryId, p_market_code: mechanicalMarket, p_work_item: workItem,
+          p_details: details, p_result: result, p_notes: notes,
+          p_expected_correction: expectedCorrection,
+        });
+        if (error) return reply(req, { ok: false, message: dbMessage(error, '主管修正失敗') },
+          String(error.code || '') === '42501' ? 403 : String(error.code || '') === '22023' ? 400 : 409);
+        return reply(req, { ok: true, data });
+      }
+
       if (kind === 'mechanical_entry_update') {
         const entryId = id(body.entry_id);
         if (!entryId) return reply(req, { ok: false, message: '工作紀錄識別碼無效' }, 400);
@@ -3623,6 +3642,10 @@ export async function handleAppApiRequest(req: Request) {
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的工作紀錄' }, 404);
         if (before.is_deleted) return reply(req, { ok: false, message: '已刪除的工作紀錄不可再修改' }, 409);
+        const { data: priorCorrections, error: correctionReadError } = await userDb.from('mechanical_handover_corrections')
+          .select('correction_id').eq('entry_id', entryId).limit(1);
+        if (correctionReadError) throw correctionReadError;
+        if (priorCorrections?.length) return reply(req, { ok: false, message: '已有主管修正，請由主管續修，原始紀錄不可覆寫' }, 409);
         const workDate = String(before.work_date || '');
         const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
           .select('approval_id').eq('market_code', mechanicalMarket).eq('work_date', workDate).maybeSingle();
@@ -3674,6 +3697,10 @@ export async function handleAppApiRequest(req: Request) {
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的工作紀錄' }, 404);
         if (before.is_deleted) return reply(req, { ok: false, message: '這筆工作紀錄已標記刪除' }, 409);
+        const { data: priorCorrections, error: correctionReadError } = await userDb.from('mechanical_handover_corrections')
+          .select('correction_id').eq('entry_id', entryId).limit(1);
+        if (correctionReadError) throw correctionReadError;
+        if (priorCorrections?.length) return reply(req, { ok: false, message: '已有主管修正，原始紀錄不可刪除' }, 409);
         const workDate = String(before.work_date || '');
         const { data: dayApproval, error: approvalReadError } = await userDb.from('mechanical_handover_daily_approvals')
           .select('approval_id').eq('market_code', mechanicalMarket).eq('work_date', workDate).maybeSingle();

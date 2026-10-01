@@ -58,6 +58,11 @@ try {
   assert.equal((await query("select count(*)::int as n from public.audit_logs where source='mechanical-supervisor-correction'")).rows[0].n, 2);
 
   await db.exec('set role authenticated');
+  await actor(otherMarketSupervisor, 'unit_supervisor');
+  assert.equal((await query('select count(*)::int as n from public.mechanical_handover_corrections')).rows[0].n, 0,
+    '其他市場不得讀取修正歷程');
+  await actor(supervisor, 'unit_supervisor');
+  assert.equal((await query('select count(*)::int as n from public.mechanical_handover_corrections')).rows[0].n, 2);
   await assert.rejects(query('insert into public.mechanical_handover_corrections(entry_id,market_code,work_date,before_values,after_values,corrected_by) values($1,$2,current_date,$3,$4,$5)',
     [entry, 'market_2', '{}', '{"result":"偽造"}', supervisor]), /permission denied/);
   await db.exec('reset role');

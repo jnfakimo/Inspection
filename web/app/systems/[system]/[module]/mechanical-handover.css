@@ -132,6 +132,17 @@
 .mechanical-report-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mechanical-report-edit-action{min-height:30px}
 .mechanical-report-row-actions small{color:#64748b;font-size:12px}
+.mechanical-report-correction-mark{display:block;margin-top:8px;color:#075985;font-size:11px;font-weight:700}
+.mechanical-correction-modal{width:min(800px,calc(100vw - 24px))}
+.mechanical-correction-intro{margin:16px 20px 0;padding:10px 12px;border-left:4px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,var(--panel2));font-size:13px;line-height:1.6}
+.mechanical-correction-form{padding:18px 20px 4px}
+.mechanical-correction-history{max-height:320px;overflow:auto;margin:14px 20px;padding:12px;border:1px solid var(--line);border-radius:7px;background:var(--panel2)}
+.mechanical-correction-history h3{margin:0 0 10px;font-size:15px}
+.mechanical-correction-history article{padding:10px 0;border-top:1px solid var(--line)}
+.mechanical-correction-history article strong{color:var(--cyan);font-size:13px}
+.mechanical-correction-history article p{display:grid;grid-template-columns:100px minmax(0,1fr) 20px minmax(0,1fr);gap:8px;margin:7px 0;overflow-wrap:anywhere;font-size:12px}
+.mechanical-correction-history article p b{color:var(--text)}
+@media(max-width:600px){.mechanical-correction-intro,.mechanical-correction-history{margin-inline:14px}.mechanical-correction-form{padding-inline:14px}.mechanical-correction-history article p{grid-template-columns:1fr 20px 1fr}.mechanical-correction-history article p b{grid-column:1/-1}}
 .mechanical-report-preview .print-shift{width:9%}.mechanical-report-preview .print-work{width:34%}.mechanical-report-preview .print-people{width:17%}.mechanical-report-preview .print-result{width:12%}.mechanical-report-preview .print-notes{width:16%}.mechanical-report-preview .print-cost{width:12%}
 .mechanical-report-preview .mechanical-print-total{display:flex;justify-content:space-between;gap:18px;padding:14px;border:1px solid #111;border-top:0;color:#111;font-size:14px}
 .mechanical-report-preview .mechanical-print-signatures{display:grid;grid-template-columns:minmax(110px,.7fr) repeat(3,minmax(0,1fr));border:1px solid #111;border-top:0;color:#111;font-size:14px}
