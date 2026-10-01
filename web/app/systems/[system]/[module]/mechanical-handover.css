@@ -114,6 +114,7 @@
 .mechanical-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .mechanical-report-preview-bar strong{font-size:17px}
 .mechanical-report-preview-bar span{color:var(--dim);font-size:13px}
+.mechanical-report-preview-bar .mechanical-report-edit-hint{flex-basis:100%;color:var(--cyan);font-weight:600}
 .mechanical-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:#eef2f7}
 .mechanical-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:0 auto}
 .mechanical-report-preview .mechanical-print-sheet{position:static;box-sizing:border-box;width:100%;height:auto;min-height:0;overflow:visible;padding:clamp(18px,3vw,40px);background:#fff;color:#111;font-family:"Noto Sans TC",sans-serif;box-shadow:0 8px 28px rgba(15,23,42,.16)}
@@ -126,6 +127,9 @@
 .mechanical-report-preview .mechanical-print-sheet thead th{text-align:center}
 .mechanical-report-preview .mechanical-print-sheet tbody>tr>th{vertical-align:middle;text-align:center}
 .mechanical-report-preview .mechanical-print-sheet td p{margin:6px 0 0}
+.mechanical-report-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.mechanical-report-edit-action{min-height:30px}
+.mechanical-report-row-actions small{color:#64748b;font-size:12px}
 .mechanical-report-preview .print-shift{width:9%}.mechanical-report-preview .print-work{width:34%}.mechanical-report-preview .print-people{width:17%}.mechanical-report-preview .print-result{width:12%}.mechanical-report-preview .print-notes{width:16%}.mechanical-report-preview .print-cost{width:12%}
 .mechanical-report-preview .mechanical-print-total{display:flex;justify-content:space-between;gap:18px;padding:14px;border:1px solid #111;border-top:0;color:#111;font-size:14px}
 .mechanical-report-preview .mechanical-print-signatures{display:grid;grid-template-columns:minmax(110px,.7fr) repeat(3,minmax(0,1fr));border:1px solid #111;border-top:0;color:#111;font-size:14px}

@@ -404,7 +404,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
           approval={(printData?.approvals || approvals).find(row => String(row.work_date) === printDate)}
           userName={userName} />)}
       </section>, document.body)}
-      {mounted && previewOpen && createPortal(<DailyReportPreview date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} />, document.body)}
+      {mounted && previewOpen && createPortal(<DailyReportPreview date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} onEditEntry={openEntry} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
     </div>
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {optionsOpen && <MechanicalWorkOptionsModal categories={workCategories} items={workItems} onClose={() => setOptionsOpen(false)} onDone={load} />}
@@ -437,14 +437,15 @@ export function fitMechanicalPrint() {
   });
 }
 
-export function DailyReportPreview({ date, entries, signatures, shiftReports, approval, userName, onClose, onPrint }: { date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; onClose: () => void; onPrint: () => void }) {
+export function DailyReportPreview({ date, entries, signatures, shiftReports, approval, userName, onClose, onPrint, onEditEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; onClose: () => void; onPrint: () => void; onEditEntry: (entry: Row) => void; onAddEntry: (shiftCode: string) => void }) {
+  const [editing, setEditing] = useState(false);
   return <div className="mechanical-report-preview" role="dialog" aria-modal="true" aria-label="機電交接本日報表預覽">
-    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span></div><div><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
-    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} /></div></div>
+    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>{editing && <span className="mechanical-report-edit-hint" role="status">按列內按鈕修改或新增；儲存後會更新系統紀錄並保留異動歷程。</span>}</div><div><button type="button" className={editing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成編輯' : '編輯內容'}</button><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
+    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} editable={editing} onEditEntry={onEditEntry} onAddEntry={onAddEntry} /></div></div>
   </div>;
 }
 
-export function PrintSheet({ date, entries, signatures, shiftReports = [], approval, userName }: { date: string; entries: Row[]; signatures: Row[]; shiftReports?: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string }) {
+export function PrintSheet({ date, entries, signatures, shiftReports = [], approval, userName, editable = false, onEditEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports?: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; editable?: boolean; onEditEntry?: (entry: Row) => void; onAddEntry?: (shiftCode: string) => void }) {
   const validEntries = activeEntries(entries);
   return <article className="mechanical-print-sheet"><div className="mechanical-print-content">
     <header><h2>臺北農產運銷股份有限公司第二批發市場<br />機電設備養護紀錄表</h2><p>{rocDate(date)}</p></header>
@@ -454,9 +455,10 @@ export function PrintSheet({ date, entries, signatures, shiftReports = [], appro
         const rows = entries.filter(row => row.shift_code === shift.code);
         const validRows = activeEntries(rows);
         const deletedRows = rows.length - validRows.length;
+        const shiftLocked = Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === shift.code)?.outgoing);
         return <tbody className="mechanical-print-shift" key={shift.code}>{(rows.length ? rows : [null]).map((row, rowIndex) => <tr className={row && isDeleted(row) ? 'is-deleted' : ''} key={row ? String(row.entry_id) : 'empty'}>
           {rowIndex === 0 && <th rowSpan={Math.max(1, rows.length)}>{['早班', '中班', '晚班'][index]}<br />{shift.label}<br />共 {validRows.length} 件{deletedRows ? <><br />刪除 {deletedRows} 件</> : null}</th>}
-          <td>{row ? <><b>{rowIndex + 1}. {String(row.work_item || '未選常用項目')}</b>{row.details && <p>{String(row.details)}</p>}</> : '尚無工作紀錄'}</td>
+          <td>{row ? <><b>{rowIndex + 1}. {String(row.work_item || '未選常用項目')}</b>{row.details && <p>{String(row.details)}</p>}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onEditEntry?.(row)}>{isDeleted(row) || shiftLocked ? '查看紀錄' : '修改紀錄'}</button></div>}</> : <>{'尚無工作紀錄'}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" disabled={shiftLocked} onClick={() => onAddEntry?.(shift.code)}>新增工作紀錄</button>{shiftLocked && <small>本班已完成交班或簽核，暫不可新增。</small>}</div>}</>}</td>
           <td>{row ? (Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—' : '—'}</td>
           <td>{row ? isDeleted(row) ? '已刪除' : String(row.result || '—') : '—'}</td><td>{row ? <>{String(row.notes || '—')}{isDeleted(row) && <small className="mechanical-print-delete-time">刪除：{activityTime(row.deleted_at)}</small>}</> : '—'}</td>
           <td>{row && !isDeleted(row) && row.repair_cost != null ? formatRepairCost(repairCostCents(row.repair_cost) || 0).replace('NT$ ', '') : row && isDeleted(row) ? '—' : '未填'}</td>
