@@ -116,12 +116,12 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
             <div><b>{patrol.expected}</b><span>應打卡</span></div>
             <div><b>{notStarted ? '—' : patrol.checked}</b><span>已打卡</span></div>
             <div className={!notStarted && patrol.unchecked ? 'is-low' : ''}><b>{notStarted ? '—' : patrol.unchecked}</b><span>未打卡</span></div>
-            <div className={!notStarted && patrol.rate < 100 ? 'is-low' : ''}><b>{notStarted ? '—' : `${patrol.rate}%`}</b><span>完成率</span></div>
+            <div className={!notStarted && patrol.expected > 0 && patrol.rate < 100 ? 'is-low' : ''}><b>{notStarted || !patrol.expected ? '—' : `${patrol.rate}%`}</b><span>完成率</span></div>
           </div>
-          {!notStarted && <div className="guard-progress" role="progressbar" aria-label="巡邏完成率" aria-valuemin={0} aria-valuemax={100} aria-valuenow={patrol.rate}>
+          {!notStarted && patrol.expected > 0 && <div className="guard-progress" role="progressbar" aria-label="巡邏完成率" aria-valuemin={0} aria-valuemax={100} aria-valuenow={patrol.rate}>
             <span className={rateTone} style={{ width: `${Math.max(0, Math.min(100, patrol.rate))}%` }} />
           </div>}
-          <p className="guard-patrol-note">{notStarted ? '本班尚未開始巡檢。'
+          <p className="guard-patrol-note">{!patrol.expected ? '本市場尚未設定巡邏點。' : notStarted ? '本班尚未開始巡檢。'
             : patrol.unchecked_floors.length ? `未打卡樓層：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : '所有巡邏點均已打卡。'}
           {!notStarted && patrol.checkers.length ? `　打卡人員：${patrol.checkers.join('、')}` : ''}</p>
         </Block>
@@ -172,7 +172,7 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
           return `${incidentTime(incident.time)}　${incident.location || '—'}　${parts.join('；')}${files ? `（附件 ${files} 件）` : ''}`;
         }).join('\n') : '無'}</td></tr>
         <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>
-        <tr><th>巡邏打卡</th><td colSpan={3}>{`應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%`}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
+        <tr><th>巡邏打卡</th><td colSpan={3}>{patrol.expected ? `應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%` : '本市場尚未設定巡邏點'}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
         <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by
           ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}`
           : log?.receiver_id ? `指定：${nameOf(log.receiver_id)}（待本人確認）` : ''}</td></tr>

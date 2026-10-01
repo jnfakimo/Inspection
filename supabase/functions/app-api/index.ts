@@ -3215,7 +3215,7 @@ export async function handleAppApiRequest(req: Request) {
           ...shift,
           patrol: {
             expected, checked, unchecked: expected - checked,
-            rate: expected ? Math.round((checked / expected) * 1000) / 10 : 100,
+            rate: expected ? Math.round((checked / expected) * 1000) / 10 : 0,
             unchecked_floors: [...uncheckedFloors].map(([floor, count]) => ({ floor, count })).sort((a, b) => a.floor.localeCompare(b.floor, 'zh-Hant')),
             checkers: [...new Set(rows.map(row => String(row.user_name || '')).filter(Boolean))],
             window_start: shift.patrol_start, window_end: shift.patrol_end, computed_at: computedAt,
@@ -3263,7 +3263,7 @@ export async function handleAppApiRequest(req: Request) {
       if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
       const dutyDate = text(body.duty_date, 10);
       if (!validISODate(dutyDate)) return reply(req, { ok: false, message: '值班日期格式無效' }, 400);
-      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin);
+      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code == null ? 'market_1' : body.market_code, isSysadmin);
       if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
       const [shifts, logResult, approvalResult, previousResult, userResult, deptResult, attachmentResult, optionResult, receiverResult] = await Promise.all([
         guardShiftContext(dutyDate, guardMarket),
@@ -3328,7 +3328,7 @@ export async function handleAppApiRequest(req: Request) {
 
     if (action === 'guard_attachment_url') {
       if (!canHandoverModule('guard') && !canHandoverModule('guard-approve')) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
-      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin);
+      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code == null ? 'market_1' : body.market_code, isSysadmin);
       if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
       const attachmentId = id(body.attachment_id);
       if (!attachmentId) return reply(req, { ok: false, message: '附件識別碼無效' }, 400);
@@ -3369,7 +3369,7 @@ export async function handleAppApiRequest(req: Request) {
       }
       const guardMarketKinds = new Set(['guard_save','guard_attach_prepare','guard_attach_commit','guard_detach','guard_submit','guard_withdraw','guard_receive','guard_approve']);
       const guardMarket = guardMarketKinds.has(kind)
-        ? await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin) : null;
+        ? await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code == null ? 'market_1' : body.market_code, isSysadmin) : null;
       if (guardMarketKinds.has(kind) && !guardMarket) {
         return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
       }

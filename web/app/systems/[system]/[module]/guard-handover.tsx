@@ -46,6 +46,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [date, setDate] = useState(todayTaipei());
   const [market, setMarket] = useState<HandoverMarket | null>(null);
   const [allowedMarkets, setAllowedMarkets] = useState<HandoverMarket[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
   const loadSequence = useRef(0);
   const [context, setContext] = useState<GuardContext | null>(null);
   const [busy, setBusy] = useState(true);
@@ -66,13 +67,13 @@ export function GuardHandover({ system, module, profile }: Props) {
   useEffect(() => {
     let cancelled = false;
     void invokeAppApi<{ markets: HandoverMarket[]; assigned_market: HandoverMarket | null }>('handover_market_context', { team: 'guard' })
-      .then(result => { if (!cancelled) { setAllowedMarkets(result.markets); setMarket(result.assigned_market || result.markets[0] || null); if (!result.markets.length) { setBusy(false); setNote('目前未設定駐警隊市場歸屬，請由管理員核對組織架構。'); } } })
-      .catch(error => { if (!cancelled) { setBusy(false); setNote(`市場權限載入失敗：${errorMessage(error)}`); } });
+      .then(result => { if (!cancelled) { setAllowedMarkets(result.markets); setMarket(result.assigned_market || result.markets[0] || null); setMarketLoading(false); if (!result.markets.length) { setBusy(false); setNote('目前未設定駐警隊市場歸屬，請由管理員核對組織架構。'); } } })
+      .catch(error => { if (!cancelled) { setBusy(false); setMarketLoading(false); setNote(`市場權限載入失敗：${errorMessage(error)}`); } });
     return () => { cancelled = true; };
   }, []);
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
-    if (!market) { setContext(null); setBusy(false); return; }
+    if (!market) { setContext(null); if (!marketLoading) setBusy(false); return; }
     setBusy(true); setNote(''); setContext(null);
     try {
       const result = await invokeAppApi<GuardContext>('handover_guard_context', { market_code: market, duty_date: date });
@@ -81,7 +82,7 @@ export function GuardHandover({ system, module, profile }: Props) {
       if (sequence === loadSequence.current) { setContext(null); setNote(`失敗：${errorMessage(error, '駐警隊交接資料載入失敗')}`); }
     }
     if (sequence === loadSequence.current) setBusy(false);
-  }, [date, market]);
+  }, [date, market, marketLoading]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setApprovalNote(''); setEditing(null); setSubmitting(null); setReceiving(null); setFilePreview(null); setPreviewOpen(false); }, [date, market]);
   useEffect(() => {
@@ -126,15 +127,15 @@ export function GuardHandover({ system, module, profile }: Props) {
     const incidentTotal = logs.reduce((sum, log) => sum + (log.incidents?.length || 0), 0);
     const rates = shifts.filter(shift => shift.state !== 'upcoming').map(shift => {
       const log = logs.find(row => row.shift_name === shift.name);
-      return (log && log.status !== 'draft' && log.patrol_snapshot ? log.patrol_snapshot : shift.patrol).rate;
-    });
+      return log && log.status !== 'draft' && log.patrol_snapshot ? log.patrol_snapshot : shift.patrol;
+    }).filter(patrol => patrol.expected > 0).map(patrol => patrol.rate);
     const average = rates.length ? Math.round((rates.reduce((sum, rate) => sum + rate, 0) / rates.length) * 10) / 10 : null;
     const received = shifts.filter(shift => logs.some(row => row.shift_name === shift.name && row.status === 'received')).length;
     return [
       { label: '今日班別', value: String(shifts.length), icon: 'clock', tone: 'cyan' },
       { label: '完成接班', value: `${received} / ${shifts.length}`, icon: 'check', tone: shifts.length && received === shifts.length ? 'green' : 'violet' },
       { label: '異常事件', value: `${incidentTotal} 件`, icon: 'alert', tone: incidentTotal ? 'red' : 'green' },
-      { label: '巡邏平均完成率', value: average === null ? '—' : `${average}%`, icon: 'route', tone: average === null ? 'cyan' : average >= 100 ? 'green' : average >= 60 ? 'amber' : 'red' },
+      { label: '巡邏平均完成率', value: average === null ? '尚未設定' : `${average}%`, icon: 'route', tone: average === null ? 'cyan' : average >= 100 ? 'green' : average >= 60 ? 'amber' : 'red' },
     ];
   }, [logs, shifts]);
 
@@ -286,7 +287,7 @@ function GuardTransferDetails({ log }: { log: GuardLog | null }) {
       {log.incidents.length ? <ul>{log.incidents.map(incident => <li key={incident.id}>{incident.category}：{incident.description}{incident.action ? `；處理：${incident.action}` : ''}</li>)}</ul> : <p>無</p>}</div>
     <div><strong>物品點交（{log.items.length} 項）</strong>
       {log.items.length ? <ul>{log.items.map((item, index) => <li key={`${item.name}-${index}`}>{item.name}×{item.qty}（{item.condition}{item.note ? `；${item.note}` : ''}）</li>)}</ul> : <p>無</p>}</div>
-    {log.patrol_snapshot && <div><strong>巡邏打卡快照</strong><p>應打卡 {log.patrol_snapshot.expected}／已打卡 {log.patrol_snapshot.checked}／完成率 {log.patrol_snapshot.rate}%</p></div>}
+    {log.patrol_snapshot && <div><strong>巡邏打卡快照</strong><p>{log.patrol_snapshot.expected ? `應打卡 ${log.patrol_snapshot.expected}／已打卡 ${log.patrol_snapshot.checked}／完成率 ${log.patrol_snapshot.rate}%` : '本市場尚未設定巡邏點'}</p></div>}
   </div>;
 }
 
