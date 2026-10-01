@@ -80,8 +80,8 @@ export function StatusPill({ value }: { value: unknown }) {
   const tone = ['active', 'published', 'acknowledged'].includes(key) ? 'closed' : ['open', 'failed'].includes(key) ? 'cancelled' : key === 'draft' ? 'assigned' : 'pending';
   return <span className={`status-pill ${tone}`}>{label}</span>;
 }
-export function AdminModal({ title, children, onClose, className = '' }: { title: string; children: ReactNode; onClose: () => void; className?: string }) {
-  return <div className="admin-modal-backdrop" role="dialog" aria-modal="true" aria-label={title}>
+export function AdminModal({ title, children, onClose, className = '', backdropClassName = '' }: { title: string; children: ReactNode; onClose: () => void; className?: string; backdropClassName?: string }) {
+  return <div className={`admin-modal-backdrop ${backdropClassName}`.trim()} role="dialog" aria-modal="true" aria-label={title}>
     <section className={`admin-modal ${className}`.trim()}><header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="關閉">×</button></header>{children}</section>
   </div>;
 }

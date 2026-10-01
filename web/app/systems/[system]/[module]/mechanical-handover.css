@@ -108,6 +108,8 @@
 @media(max-width:520px){.mechanical-scheduled-roster{align-items:flex-start;flex-direction:column}.mechanical-scheduled-roster>a{margin-left:0}}
 @media print{.mechanical-scheduled-roster{display:none!important}}
 
+.admin-modal-backdrop.mechanical-work-backdrop{z-index:1300}
+
 /* 本日報表預覽：螢幕使用可捲動的 HTML 報表；A4 尺寸只套用於列印樣式。 */
 .mechanical-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
 .mechanical-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.22)}
