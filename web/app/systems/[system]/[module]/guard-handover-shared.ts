@@ -3,8 +3,9 @@
 // Supabase、AppShell 等執行環境相依，畫面元件才能單獨渲染出來檢查版面。
 
 export type Item = { name: string; qty: number; condition: string; note: string };
+export type IncidentPerson = { name: string; id_number: string; phone: string };
 export type Incident = { id: string; time: string; location: string; category: string; description: string; action: string; reported_to: string;
-  handover_item?: boolean | null; reported_upward?: boolean | null };
+  persons?: IncidentPerson[]; handover_item?: boolean | null; reported_upward?: boolean | null };
 export type Attachment = {
   attachment_id: string; shift_name: string; incident_id: string; file_name: string; content_type: string;
   file_size: number; original_size: number | null; compressed: boolean; uploaded_by: string; uploaded_at: string;

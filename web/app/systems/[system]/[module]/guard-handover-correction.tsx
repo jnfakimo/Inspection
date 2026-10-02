@@ -9,7 +9,8 @@ import { activityTime, type GuardCorrection, type GuardCorrectionValues, type Gu
 
 function flagLabel(value: boolean | null | undefined) { return value === true ? '是' : value === false ? '否' : '未設定'; }
 function incidentText(row: Incident) {
-  return `${row.time} ${row.location || '—'}｜${row.category}｜${row.description}｜處理：${row.action || '—'}｜通報：${row.reported_to || '—'}｜交接項目：${flagLabel(row.handover_item)}｜向上陳報：${flagLabel(row.reported_upward)}`;
+  const persons = (row.persons || []).map(person => `${person.name}／${person.id_number || '—'}／${person.phone || '—'}`).join('、');
+  return `${row.time} ${row.location || '—'}｜${row.category}｜${row.description}｜處理：${row.action || '—'}｜通報：${row.reported_to || '—'}｜相關人員：${persons || '—'}｜交接項目：${flagLabel(row.handover_item)}｜向上陳報：${flagLabel(row.reported_upward)}`;
 }
 function itemText(row: Item) { return `${row.name} × ${row.qty}｜${row.condition}｜${row.note || '—'}`; }
 
@@ -26,10 +27,19 @@ export function GuardCorrectionModal({ market, log, corrections, canCorrect, nam
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const updateIncident = (index: number, patch: Partial<Incident>) => setIncidents(current => current.map((row, cursor) => cursor === index ? { ...row, ...patch } : row));
+  const updatePerson = (index: number, personIndex: number, patch: Partial<NonNullable<Incident['persons']>[number]>) =>
+    setIncidents(current => current.map((row, cursor) => cursor === index ? {
+      ...row, persons: (row.persons || []).map((person, position) => position === personIndex ? { ...person, ...patch } : person),
+    } : row));
   const updateItem = (index: number, patch: Partial<Item>) => setItems(current => current.map((row, cursor) => cursor === index ? { ...row, ...patch } : row));
   const save = async () => {
     if (!summary.trim()) return setMessage('請填寫勤務概況');
     if (incidents.some(row => !row.time || !row.category.trim() || !row.description.trim())) return setMessage('異常事件時間、類別及經過不可留白');
+    if (incidents.some(row => (row.persons || []).length > 10 || (row.persons || []).some(person =>
+      !person.name.trim() || person.name.length > 40 || (person.id_number && !/^[A-Z][12]\d{8}$/i.test(person.id_number.trim()))
+      || (person.phone && !/^[+0-9][0-9 ()-]{5,23}$/.test(person.phone.trim()))))) {
+      return setMessage('相關人員請填姓名；身分證字號與電話若填寫，請確認格式正確');
+    }
     if (items.some(row => !row.name.trim() || !row.condition.trim() || !Number.isInteger(row.qty) || row.qty < 0 || row.qty > 999)) return setMessage('物品名稱、狀態及數量無效');
     const after_values: GuardCorrectionValues = { duty_summary: summary.trim(), important_notes: important.trim(), incidents, items };
     setBusy(true); setMessage('');
@@ -56,6 +66,16 @@ export function GuardCorrectionModal({ market, log, corrections, canCorrect, nam
             </div>
             <label>事件經過<textarea rows={2} maxLength={2000} value={row.description} onChange={event => updateIncident(index, { description: event.target.value })} /></label>
             <label>處理情形<textarea rows={2} maxLength={2000} value={row.action} onChange={event => updateIncident(index, { action: event.target.value })} /></label>
+            <fieldset className="guard-incident-persons"><legend>相關人員個資</legend>
+              {(row.persons || []).map((person, personIndex) => <div className="guard-incident-person" key={personIndex}>
+                <label>姓名<input value={person.name} maxLength={40} autoComplete="off" onChange={event => updatePerson(index, personIndex, { name: event.target.value })} /></label>
+                <label>身分證字號<input value={person.id_number} maxLength={10} autoComplete="off" spellCheck={false} onChange={event => updatePerson(index, personIndex, { id_number: event.target.value.toUpperCase() })} /></label>
+                <label>電話<input value={person.phone} type="tel" maxLength={24} autoComplete="off" onChange={event => updatePerson(index, personIndex, { phone: event.target.value })} /></label>
+                <button type="button" className="danger-btn compact" onClick={() => updateIncident(index, { persons: (row.persons || []).filter((_, position) => position !== personIndex) })}>移除人員</button>
+              </div>)}
+              <button type="button" className="secondary-btn compact" disabled={(row.persons || []).length >= 10}
+                onClick={() => updateIncident(index, { persons: [...(row.persons || []), { name: '', id_number: '', phone: '' }] })}>＋ 新增相關人員</button>
+            </fieldset>
             <div className="guard-correction-grid">
               <label>是否交接項目<select value={row.handover_item == null ? '' : String(row.handover_item)} onChange={event => updateIncident(index, { handover_item: event.target.value === '' ? null : event.target.value === 'true' })}><option value="">未設定</option><option value="true">是</option><option value="false">否</option></select></label>
               <label>是否向上陳報<select value={row.reported_upward == null ? '' : String(row.reported_upward)} onChange={event => updateIncident(index, { reported_upward: event.target.value === '' ? null : event.target.value === 'true' })}><option value="">未設定</option><option value="true">是</option><option value="false">否</option></select></label>

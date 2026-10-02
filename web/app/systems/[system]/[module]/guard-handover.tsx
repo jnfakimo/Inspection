@@ -31,6 +31,7 @@ import {
 } from './guard-handover-shared';
 import { AttachmentChips, GuardDailyReport, GuardIcon, GuardShiftCard, GuardSheetHeader, type GuardKpi } from './guard-handover-view';
 import { GuardCorrectionModal } from './guard-handover-correction';
+import { GuardIncidentSearch } from './guard-incident-search';
 import { GuardCombo, GuardOptionsPanel } from './guard-handover-controls';
 import './handover-sheet.css';
 import './guard-handover.css';
@@ -65,6 +66,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   const [receiverId, setReceiverId] = useState('');
   const [filePreview, setFilePreview] = useState<Attachment | null>(null);
   const [optionsList, setOptionsList] = useState<GuardOptionList | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   // 每 30 秒重算一次「當班」，班別交替時畫面自動換色，不必重新載入。
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
@@ -201,7 +203,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
-        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
+        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} aria-expanded={searchOpen} onClick={() => setSearchOpen(value => !value)}>{searchOpen ? '關閉異常事件搜尋' : '搜尋異常事件'}</button><button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
       <section className="panel hs-toolbar">
         {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
           <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
@@ -217,6 +219,8 @@ export function GuardHandover({ system, module, profile }: Props) {
           <span className="hs-toolbar-summary"><GuardIcon name="calendar" size={15} />{rocDate(date)} · {shifts.length} 個班別 · 已接班 {receivedCount} 班</span>
         </div>
       </section>
+
+      {searchOpen && market && context && <GuardIncidentSearch market={market} canSearchPersonal={Boolean(context.can_approve)} />}
 
       {context && <section className={`hs-approval${approval ? ' is-approved' : canApproveNow ? ' is-ready' : ''}`} aria-label="主管簽核">
         <div className="hs-approval-main">
@@ -317,7 +321,8 @@ function GuardTransferDetails({ log }: { log: GuardLog | null }) {
     <div><strong>勤務概況</strong><p>{log.duty_summary || '尚未填寫'}</p></div>
     <div><strong>重要交辦</strong><p>{log.important_notes || '無'}</p></div>
     <div><strong>異常事件（{log.incidents.length} 件）</strong>
-      {log.incidents.length ? <ul>{log.incidents.map(incident => <li key={incident.id}>{incident.category}：{incident.description}{incident.action ? `；處理：${incident.action}` : ''}</li>)}</ul> : <p>無</p>}</div>
+      {log.incidents.length ? <ul>{log.incidents.map(incident => <li key={incident.id}>{incident.category}：{incident.description}{incident.action ? `；處理：${incident.action}` : ''}
+        {(incident.persons || []).length ? `；相關人員：${(incident.persons || []).map(person => person.name).join('、')}` : ''}</li>)}</ul> : <p>無</p>}</div>
     <div><strong>物品點交（{log.items.length} 項）</strong>
       {log.items.length ? <ul>{log.items.map((item, index) => <li key={`${item.name}-${index}`}>{item.name}×{item.qty}（{item.condition}{item.note ? `；${item.note}` : ''}）</li>)}</ul> : <p>無</p>}</div>
     {log.patrol_snapshot && <div><strong>巡邏打卡快照</strong><p>{log.patrol_snapshot.expected ? `應打卡 ${log.patrol_snapshot.expected}／已打卡 ${log.patrol_snapshot.checked}／完成率 ${log.patrol_snapshot.rate}%` : '本市場尚未設定巡邏點'}</p></div>}
@@ -522,6 +527,10 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
   const toggle = (id: string) => setActual(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
   const updateItem = (index: number, patch: Partial<Item>) => setItems(current => current.map((item, cursor) => cursor === index ? { ...item, ...patch } : item));
   const updateIncident = (index: number, patch: Partial<Incident>) => setIncidents(current => current.map((incident, cursor) => cursor === index ? { ...incident, ...patch } : incident));
+  const updatePerson = (index: number, personIndex: number, patch: Partial<NonNullable<Incident['persons']>[number]>) =>
+    setIncidents(current => current.map((incident, cursor) => cursor === index ? {
+      ...incident, persons: (incident.persons || []).map((person, position) => position === personIndex ? { ...person, ...patch } : person),
+    } : incident));
   const patchTask = (key: string, patch: Partial<UploadTask>) => setTasks(current => current.map(task => task.key === key ? { ...task, ...patch } : task));
   const removeIncident = (index: number) => {
     const count = filesFor(incidents[index].id).length;
@@ -572,6 +581,11 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
     if (differs && !substitute.trim()) return setMessage('實際值勤人員與巡檢排班不同，請填寫代班說明');
     if (items.some(item => !item.name.trim() || !item.condition.trim())) return setMessage('物品點交有尚未填寫名稱或狀態的項目');
     if (incidents.some(incident => !incident.time || !incident.category || !incident.description.trim())) return setMessage('異常事件請填寫發生時間、類別與事件經過');
+    if (incidents.some(incident => (incident.persons || []).length > 10 || (incident.persons || []).some(person =>
+      !person.name.trim() || person.name.length > 40 || (person.id_number && !/^[A-Z][12]\d{8}$/i.test(person.id_number.trim()))
+      || (person.phone && !/^[+0-9][0-9 ()-]{5,23}$/.test(person.phone.trim()))))) {
+      return setMessage('相關人員請填姓名；身分證字號與電話若填寫，請確認格式正確');
+    }
     setBusy(true); setMessage('');
     try {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -629,6 +643,17 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
             <button type="button" className="danger-btn compact" onClick={() => removeIncident(index)}>移除</button>
             <label className="wide">事件經過<textarea rows={2} value={incident.description} maxLength={2000} onChange={event => updateIncident(index, { description: event.target.value })} /></label>
             <label className="wide">處理情形<textarea rows={2} value={incident.action} maxLength={2000} onChange={event => updateIncident(index, { action: event.target.value })} /></label>
+            <fieldset className="guard-incident-persons wide"><legend>相關人員個資（僅主管可看原文）</legend>
+              {(incident.persons || []).map((person, personIndex) => <div className="guard-incident-person" key={personIndex}>
+                <label>姓名<input value={person.name} maxLength={40} autoComplete="off" onChange={event => updatePerson(index, personIndex, { name: event.target.value })} /></label>
+                <label>身分證字號<input value={person.id_number} maxLength={10} autoComplete="off" spellCheck={false} onChange={event => updatePerson(index, personIndex, { id_number: event.target.value.toUpperCase() })} /></label>
+                <label>電話<input value={person.phone} type="tel" maxLength={24} autoComplete="off" onChange={event => updatePerson(index, personIndex, { phone: event.target.value })} /></label>
+                <button type="button" className="danger-btn compact" onClick={() => updateIncident(index, { persons: (incident.persons || []).filter((_, position) => position !== personIndex) })}>移除人員</button>
+              </div>)}
+              <button type="button" className="secondary-btn compact" disabled={(incident.persons || []).length >= 10}
+                onClick={() => updateIncident(index, { persons: [...(incident.persons || []), { name: '', id_number: '', phone: '' }] })}>＋ 新增相關人員</button>
+              <small>每件事件最多 10 人；姓名必填，身分證字號與電話可留白。一般人員檢視時會遮蔽。</small>
+            </fieldset>
             <div className="guard-field wide"><span>通報對象</span><GuardCombo value={incident.reported_to} onChange={value => updateIncident(index, { reported_to: value })} options={optionsFor('reported_to')}
               ariaLabel={`第 ${index + 1} 件異常事件通報對象`} placeholder="例：指揮台" maxLength={100} onManage={onManage && (() => onManage('reported_to'))} manageLabel="管理通報對象清單" /></div>
             <div className="guard-incident-files">
@@ -649,7 +674,7 @@ function GuardLogModal({ market, date, shift, log, staff, people, defaultItems, 
           </div>;
         })}</div>
         <button type="button" className="secondary-btn compact" disabled={incidents.length >= 50}
-          onClick={() => setIncidents(current => [...current, { id: newIncidentId(), time: defaultIncidentTime(date, shift), location: '', category: '', description: '', action: '', reported_to: '' }])}>＋ 新增異常事件</button>
+          onClick={() => setIncidents(current => [...current, { id: newIncidentId(), time: defaultIncidentTime(date, shift), location: '', category: '', description: '', action: '', reported_to: '', persons: [] }])}>＋ 新增異常事件</button>
         {!incidents.length && <small>本班無異常事件時免填。</small>}
       </fieldset>
       <fieldset><legend><GuardIcon name="box" size={16} />物品點交（{items.length} 項）</legend>

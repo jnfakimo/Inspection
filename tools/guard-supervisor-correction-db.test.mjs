@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 
 const db = new PGlite();
 const migration = readFileSync(new URL('../supabase/migrations/20261001170000_guard_supervisor_corrections.sql', import.meta.url), 'utf8');
+const peopleMigration = readFileSync(new URL('../supabase/migrations/20261002090000_guard_incident_people.sql', import.meta.url), 'utf8');
 const supervisor = '00000000-0000-0000-0000-000000000001';
 const worker = '00000000-0000-0000-0000-000000000002';
 const otherMarket = '00000000-0000-0000-0000-000000000003';
@@ -15,7 +16,7 @@ const report = (description = '原始事件', handoverItem = null, reportedUpwar
   duty_summary: '本班值勤正常', important_notes: '需注意門禁',
   incidents: [{ id: incidentId, time: '2026-10-01T10:00', location: '一樓', category: '門禁管制',
     description, action: '已處理', reported_to: '指揮台', handover_item: handoverItem,
-    reported_upward: reportedUpward }],
+    reported_upward: reportedUpward, persons: [] }],
   items: [{ name: '無線電', qty: 2, condition: '正常', note: '已清點' }],
 });
 const correct = (after, expected = null, market = 'market_1', stamp = '2026-10-01T02:00:00Z') =>
@@ -55,6 +56,9 @@ try {
   `);
   await db.exec(migration);
   await db.exec(migration);
+  await db.exec("alter table public.guard_handover_logs add column shift_name text default '早班', add column shift_order integer default 1");
+  await db.exec(peopleMigration);
+  await db.exec(peopleMigration);
   await db.exec('set role authenticated');
   await actor(worker);
   await assert.rejects(correct(report('無權修正')), /主管|權限/);
@@ -69,10 +73,23 @@ try {
   assert.equal(first.after_values.incidents[0].handover_item, true);
   assert.equal(first.after_values.incidents[0].reported_upward, false);
   assert.equal(first.corrected_by, supervisor);
+  const withPerson = report('再次修正', false, true);
+  withPerson.incidents[0].persons = [{ name: '王小明', id_number: 'A123456789', phone: '0912345678' }];
   await assert.rejects(correct(report('過期覆寫')), /重新載入/);
-  const second = (await correct(report('再次修正', false, true), first.correction_id)).rows[0].data;
+  const second = (await correct(withPerson, first.correction_id)).rows[0].data;
   assert.equal(second.before_values.incidents[0].description, '修正事件');
   assert.equal(second.after_values.incidents[0].reported_upward, true);
+  assert.equal(second.after_values.incidents[0].persons[0].id_number, 'A123456789');
+  await assert.rejects(query("select * from public.guard_incident_search_rows('market_1','2026-10-01','2026-10-01')"), /permission denied/);
+  await assert.rejects(query('select * from public.guard_incident_person_search_audit'), /permission denied/);
+  await db.exec('reset role');
+  const found = (await query("select * from public.guard_incident_search_rows('market_1','2026-10-01','2026-10-01')")).rows;
+  assert.equal(found[0].incidents[0].persons[0].name, '王小明');
+  await db.exec('set role authenticated');
+  await actor(supervisor);
+  const invalidPerson = report('錯誤個資');
+  invalidPerson.incidents[0].persons = [{ name: '王小明', id_number: 'A123', phone: '' }];
+  await assert.rejects(correct(invalidPerson, second.correction_id), /相關人員/);
   await assert.rejects(query('insert into public.guard_handover_corrections(log_id,market_code,duty_date,before_values,after_values,corrected_by) values($1,$2,current_date,$3,$4,$5)',
     [logId, 'market_1', '{}', '{"duty_summary":"偽造"}', supervisor]), /permission denied/);
   await db.exec('reset role');

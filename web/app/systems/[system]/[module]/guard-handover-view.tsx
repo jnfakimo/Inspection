@@ -104,6 +104,8 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
               </div>
               <p>{incident.description}</p>
               {incident.action ? <p><b>處理：</b>{incident.action}</p> : null}
+              {(incident.persons || []).length > 0 && <p><b>相關人員：</b>{(incident.persons || []).map(person =>
+                `${person.name}${person.id_number ? `／身分證 ${person.id_number}` : ''}${person.phone ? `／電話 ${person.phone}` : ''}`).join('；')}</p>}
               {incident.reported_to ? <p><b>通報：</b>{incident.reported_to}</p> : null}
               <p className="guard-incident-flags">交接項目：{incidentFlag(incident.handover_item)} · 向上陳報：{incidentFlag(incident.reported_upward)}</p>
               <AttachmentChips files={attachmentsFor(shift.name, incident.id)} onPreview={onPreview} />
@@ -176,7 +178,10 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
           // 各段自己結尾的標點先去掉再以「；」串接，避免印出「。；」這種重複標點。
           const clean = (value: string) => value.trim().replace(/[。；;，,、]+$/u, '');
           const parts = [`${incident.category}：${clean(incident.description)}`,
-            incident.action ? `處理：${clean(incident.action)}` : '', incident.reported_to ? `通報：${clean(incident.reported_to)}` : ''].filter(Boolean);
+            incident.action ? `處理：${clean(incident.action)}` : '',
+            (incident.persons || []).length ? `相關人員：${(incident.persons || []).map(person =>
+              `${person.name}${person.id_number ? `／身分證 ${person.id_number}` : ''}${person.phone ? `／電話 ${person.phone}` : ''}`).join('、')}` : '',
+            incident.reported_to ? `通報：${clean(incident.reported_to)}` : ''].filter(Boolean);
           return `${incidentTime(incident.time)}　${incident.location || '—'}　${parts.join('；')}；交接項目：${incidentFlag(incident.handover_item)}；向上陳報：${incidentFlag(incident.reported_upward)}${files ? `（附件 ${files} 件）` : ''}`;
         }).join('\n') : '無'}</td></tr>
         <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>

@@ -16,6 +16,7 @@ import { handleMechanicalHandoverAction } from './handlers/mechanical-handover.t
 import { handleHandoverMarketAction } from './handlers/handover-market.ts';
 import { authorizeHandoverMarket } from './handover-market.ts';
 import { maskGuardPersonalData, maskGuardReportFields } from './guard-personal-data.ts';
+import { incidentPersonMatches, normalizeGuardIncidentPeople, type GuardIncidentPerson } from './guard-incident-people.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -113,7 +114,8 @@ function guardFileExtension(name: string) {
   const match = name.toLowerCase().match(/\.([a-z0-9]{1,10})$/);
   return match ? `.${match[1]}` : '';
 }
-type GuardIncident = { id: string; time: string; location: string; category: string; description: string; action: string; reported_to: string };
+type GuardIncident = { id: string; time: string; location: string; category: string; description: string; action: string; reported_to: string;
+  persons: GuardIncidentPerson[] };
 type GuardItem = { name: string; qty: number; condition: string; note: string };
 
 function mechanicalShiftSlot(workDate: string, shiftCode: string) {
@@ -3231,12 +3233,13 @@ export async function handleAppApiRequest(req: Request) {
       for (const raw of value) {
         const row = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
         const time = text(row.time, 16), category = text(row.category, 40), description = text(row.description, 2000);
-        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !category || !description) return null;
+        const persons = normalizeGuardIncidentPeople(row.persons);
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(time) || !category || !description || !persons) return null;
         // 事件識別碼是附件的掛點；缺漏或重複時由伺服器補發，不信任前端的重複值。
         let incidentId = id(row.id) || crypto.randomUUID();
         if (seenIncidentIds.has(incidentId)) incidentId = crypto.randomUUID();
         seenIncidentIds.add(incidentId);
-        rows.push({ id: incidentId, time, location: text(row.location, 100), category, description, action: text(row.action, 2000), reported_to: text(row.reported_to, 100) });
+        rows.push({ id: incidentId, time, location: text(row.location, 100), category, description, action: text(row.action, 2000), reported_to: text(row.reported_to, 100), persons });
       }
       return rows;
     };
@@ -3297,7 +3300,8 @@ export async function handleAppApiRequest(req: Request) {
         || incidents.some(value => !value || typeof value !== 'object' || Array.isArray(value)
           || !id(value.id) || !stringField(value.time, 16) || !stringField(value.location, 100)
           || !stringField(value.category, 40) || !stringField(value.description, 2000)
-          || !stringField(value.action, 2000) || !stringField(value.reported_to, 100))
+          || !stringField(value.action, 2000) || !stringField(value.reported_to, 100)
+          || !normalizeGuardIncidentPeople(value.persons))
         || items.some(value => !value || typeof value !== 'object' || Array.isArray(value)
           || !stringField(value.name, 50) || !Number.isInteger(value.qty) || value.qty < 0 || value.qty > 999
           || !stringField(value.condition, 20) || !stringField(value.note, 200))
@@ -3401,6 +3405,61 @@ export async function handleAppApiRequest(req: Request) {
           can_manage_options: canGuardApprove(),
         },
       });
+    }
+
+    if (action === 'handover_guard_incident_search') {
+      if (!canHandoverModule('guard') && !canGuardApprove()) return reply(req, { ok: false, message: '目前帳號未開放駐警隊電子交接簿' }, 403);
+      const guardMarket = await authorizeHandoverMarket(admin, profile.user_id, 'guard', body.market_code, isSysadmin);
+      if (!guardMarket) return reply(req, { ok: false, message: '目前帳號未開放所選市場的駐警隊交接簿' }, 403);
+      const from = text(body.date_from, 10), to = text(body.date_to, 10), query = text(body.query, 80);
+      const field = text(body.field, 20);
+      const personal = field === 'name' || field === 'id_number' || field === 'phone';
+      const days = (Date.parse(`${to}T00:00:00+08:00`) - Date.parse(`${from}T00:00:00+08:00`)) / 86_400_000;
+      if (!validISODate(from) || !validISODate(to) || !Number.isFinite(days) || days < 0 || days > 90
+        || !['event', 'name', 'id_number', 'phone'].includes(field) || query.length < 2) {
+        return reply(req, { ok: false, message: '請輸入搜尋文字並選擇不超過 90 天的日期範圍' }, 400);
+      }
+      if (personal && !canGuardApprove()) return reply(req, { ok: false, message: '姓名、身分證字號與電話只能由駐警隊主管搜尋' }, 403);
+      if (field === 'id_number' && !/^[A-Z][12]\d{8}$/i.test(query)
+        || field === 'phone' && (!/^[+0-9][0-9 ()-]{5,23}$/.test(query)
+          || !/^\d{8,15}$/.test(query.replace(/\D/g, '')))) {
+        return reply(req, { ok: false, message: '請輸入完整身分證字號或電話號碼' }, 400);
+      }
+      const { data: searchRows, error: searchError } = await admin.rpc('guard_incident_search_rows', {
+        p_market: guardMarket, p_from: from, p_to: to,
+      });
+      if (searchError) throw searchError;
+      if ((searchRows || []).length > 900) {
+        return reply(req, { ok: false, message: '此期間資料較多，請縮小日期範圍後再搜尋' }, 400);
+      }
+      const results: Record<string, unknown>[] = [];
+      for (const log of searchRows || []) {
+        const incidents = log.incidents;
+        if (!Array.isArray(incidents)) continue;
+        for (const raw of incidents) {
+          if (!raw || typeof raw !== 'object') continue;
+          const incident = raw as Record<string, unknown>;
+          const visible = canGuardApprove() ? incident : maskGuardReportFields({ incidents: [incident] }).incidents[0] as Record<string, unknown>;
+          const eventText = ['time', 'location', 'category', 'description', 'action', 'reported_to']
+            .map(key => String(visible[key] || '')).join(' ').toLocaleLowerCase('zh-Hant');
+          const matches = personal
+            ? (normalizeGuardIncidentPeople(incident.persons) || []).some(person =>
+              incidentPersonMatches(person, field as 'name' | 'id_number' | 'phone', query))
+            : eventText.includes(query.toLocaleLowerCase('zh-Hant'));
+          if (!matches) continue;
+          results.push({ duty_date: log.duty_date, shift_name: log.shift_name, status: log.status, incident: visible });
+          if (results.length >= 100) break;
+        }
+        if (results.length >= 100) break;
+      }
+      if (personal) {
+        const { error } = await admin.from('guard_incident_person_search_audit').insert({
+          actor_id: profile.user_id, market_code: guardMarket, search_field: field,
+          date_from: from, date_to: to, result_count: results.length,
+        });
+        if (error) throw error;
+      }
+      return reply(req, { ok: true, data: { results, truncated: results.length >= 100 } });
     }
 
     if (action === 'guard_attachment_url') {

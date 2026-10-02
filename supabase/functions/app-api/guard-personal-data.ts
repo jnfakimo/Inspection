@@ -6,6 +6,7 @@ const SENTENCE_PARTICLES = new Set([...`於在向與及因由後前和跟的了�
 const NAME_CONTEXT = /(?:姓名|當事人|車主|駕駛|報案人|被害人|傷者|民眾|竊嫌|嫌疑人|失主|住戶|訪客|行人|司機|涉事者|聯絡人)[：:\s]*$/u;
 const HAN = /^\p{Script=Han}{1,4}$/u;
 const ID_NUMBER = /(?<![A-Za-z0-9])[A-Z][12]\d{8}(?![A-Za-z0-9])/giu;
+const PHONE_NUMBER = /(?<![A-Za-z0-9])(?:09\d{2}[- ]?\d{3}[- ]?\d{3}|0[2-8][- ]?\d{3,4}[- ]?\d{4})(?![A-Za-z0-9])/gu;
 const SEGMENTER = new Intl.Segmenter('zh-Hant', { granularity: 'word' });
 
 type Span = { start: number; end: number; replacement: string };
@@ -14,11 +15,30 @@ function maskedName(name: string) {
   return letters.length === 2 ? `${letters[0]}O` : `${letters[0]}${'O'.repeat(letters.length - 2)}${letters.at(-1)}`;
 }
 
+export function maskGuardName(name: string): string { return maskedName(name); }
+export function maskGuardIdNumber(value: string): string {
+  return value.length > 5 ? `${value.slice(0, 5)}${'*'.repeat(value.length - 5)}` : '*'.repeat(value.length);
+}
+export function maskGuardPhone(value: string): string {
+  const digits = [...value].filter(char => /\d/.test(char)).length;
+  let seen = 0;
+  return [...value].map(char => {
+    if (!/\d/.test(char)) return char;
+    seen += 1;
+    return seen <= Math.min(3, digits - 2) || seen > digits - 2 ? char : '*';
+  }).join('');
+}
+
 export function maskGuardPersonalData(input: string): string {
   if (!input) return input;
   const spans: Span[] = [];
   for (const match of input.matchAll(ID_NUMBER)) {
     spans.push({ start: match.index, end: match.index + match[0].length, replacement: `${match[0].slice(0, 5)}*****` });
+  }
+  for (const match of input.matchAll(PHONE_NUMBER)) {
+    if (!spans.some(span => match.index < span.end && match.index + match[0].length > span.start)) {
+      spans.push({ start: match.index, end: match.index + match[0].length, replacement: maskGuardPhone(match[0]) });
+    }
   }
   const words = [...SEGMENTER.segment(input)]
     .map(part => ({ value: part.segment, start: part.index, end: part.index + part.segment.length }));
@@ -59,22 +79,41 @@ export function maskGuardPersonalData(input: string): string {
 
 export function maskGuardReportFields<T extends Record<string, unknown>>(row: T): T {
   const masked = { ...row } as Record<string, unknown>;
+  const persons = Array.isArray(row.incidents) ? row.incidents.flatMap(incident =>
+    incident && typeof incident === 'object' && Array.isArray(incident.persons) ? incident.persons : []) : [];
+  const maskText = (value: string) => {
+    let result = value;
+    for (const person of persons) {
+      if (!person || typeof person !== 'object') continue;
+      for (const [field, masker] of [['name', maskGuardName], ['id_number', maskGuardIdNumber], ['phone', maskGuardPhone]] as const) {
+        const raw = person[field];
+        if (typeof raw === 'string' && raw.length >= 2) result = result.split(raw).join(masker(raw));
+      }
+    }
+    return maskGuardPersonalData(result);
+  };
   for (const field of ['substitute_note', 'duty_summary', 'important_notes', 'note']) {
-    if (typeof masked[field] === 'string') masked[field] = maskGuardPersonalData(masked[field]);
+    if (typeof masked[field] === 'string') masked[field] = maskText(masked[field]);
   }
   if (Array.isArray(row.incidents)) masked.incidents = row.incidents.map(incident => {
     if (!incident || typeof incident !== 'object') return incident;
     const copy = { ...incident } as Record<string, unknown>;
     for (const field of ['location', 'category', 'description', 'action', 'reported_to']) {
-      if (typeof copy[field] === 'string') copy[field] = maskGuardPersonalData(copy[field]);
+      if (typeof copy[field] === 'string') copy[field] = maskText(copy[field]);
     }
+    if (Array.isArray(copy.persons)) copy.persons = copy.persons.map(person => person && typeof person === 'object' ? {
+      ...person,
+      name: typeof person.name === 'string' ? maskGuardName(person.name) : '',
+      id_number: typeof person.id_number === 'string' ? maskGuardIdNumber(person.id_number) : '',
+      phone: typeof person.phone === 'string' ? maskGuardPhone(person.phone) : '',
+    } : person);
     return copy;
   });
   if (Array.isArray(row.items)) masked.items = row.items.map(item => {
     if (!item || typeof item !== 'object') return item;
     const copy = { ...item } as Record<string, unknown>;
     for (const field of ['name', 'condition', 'note']) {
-      if (typeof copy[field] === 'string') copy[field] = maskGuardPersonalData(copy[field]);
+      if (typeof copy[field] === 'string') copy[field] = maskText(copy[field]);
     }
     return copy;
   });
