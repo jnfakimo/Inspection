@@ -140,6 +140,9 @@
 .guard-report-preview .hs-report table{min-width:720px}.guard-report-preview .hs-report th,.guard-report-preview .hs-report td{padding:10px 12px;font-size:14px;line-height:1.55}
 .guard-report-preview .hs-report-shift{margin-bottom:0}.guard-report-preview .guard-report-shift{margin-bottom:20px}
 .guard-report-actions{display:flex;justify-content:flex-end;padding:8px 10px;border:1px solid #222;border-top:0;background:#fff}
+.guard-report-preview .guard-report-pink-action{border-color:#db2777;background:rgb(251 207 232 / 80%);color:#831843;font-weight:700}
+.guard-report-preview .guard-report-pink-action:not(:disabled):hover,
+.guard-report-preview .guard-report-pink-action:focus-visible{border-color:#be185d;background:rgb(249 168 212 / 80%);color:#701a3e;box-shadow:0 4px 12px rgba(219,39,119,.2)}
 .guard-report-correction-mark{margin:0;padding:8px 10px;border:1px solid #222;border-top:0;color:#075985;font-size:12px;font-weight:700}
 .guard-incident-flags,.guard-correction-mark{font-weight:700;color:var(--cyan)}
 .guard-print-root{display:none}

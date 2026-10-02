@@ -168,6 +168,8 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
       const scheduled = frozen && log ? log.scheduled_user_ids : shift.scheduled_user_ids;
       const count = log && correctionCount ? correctionCount(log.log_id) : 0;
       const canChange = Boolean(log ? canCorrect || canEdit && log.status === 'draft' && !count : canEdit);
+      const actionLabel = log && canCorrect ? '主管修正' : canChange ? log ? '編輯交接' : '建立交接' : '查看修正紀錄';
+      const pinkAction = actionLabel === '主管修正' || actionLabel === '建立交接';
       return <div className="guard-report-shift" key={shift.name}><table className="hs-report-shift"><tbody>
         <tr><th className="hs-report-label">班別</th><td>{shift.name}（{hhmm(times.shift_start)}–{hhmm(times.shift_end)}）</td><th className="hs-report-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}　狀態：{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
         <tr><th>排定人員</th><td>{namesOf(scheduled)}</td><th>實際值勤</th><td>{log ? namesOf(log.actual_user_ids) : '—'}{log?.substitute_note ? `\n代班：${log.substitute_note}` : ''}</td></tr>
@@ -190,7 +192,7 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
           ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}`
           : log?.receiver_id ? `指定：${nameOf(log.receiver_id)}（待本人確認）` : ''}</td></tr>
       </tbody></table>{count > 0 && <p className="guard-report-correction-mark">主管修正 {count} 次 · 最近 {activityTime(log?.last_corrected_at)} · {nameOf(log?.last_corrected_by)}</p>}
-        {editing && (canChange || count > 0) && <div className="guard-report-actions"><button type="button" className="secondary-btn compact" onClick={() => onEditShift?.(shift)}>{log && canCorrect ? '主管修正' : canChange ? log ? '編輯交接' : '建立交接' : '查看修正紀錄'}</button></div>}
+        {editing && (canChange || count > 0) && <div className="guard-report-actions"><button type="button" className={`secondary-btn compact${pinkAction ? ' guard-report-pink-action' : ''}`} onClick={() => onEditShift?.(shift)}>{actionLabel}</button></div>}
       </div>;
     }) : <p className="hs-report-empty">巡檢排班沒有任何啟用中的班別。</p>}
     <footer>
