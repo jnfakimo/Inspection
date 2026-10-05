@@ -170,10 +170,11 @@ export function GuardHandover({ system, module, profile }: Props) {
     setActing(false);
     return false;
   };
+  const openDailyReport = () => { setPreviewEditing(false); setPreviewOpen(true); };
   const approveDailyReport = async () => {
     const signed = await run('guard_approve', { duty_date: date, note: approvalNote.trim() }, '主管簽核完成，本日交接已全部鎖定',
       `確認以「${profile.name}」身分完成 ${rocDate(date)} 的主管簽核？簽核後本日交接全部鎖定，不可再修改。`);
-    if (signed) { setApprovalNote(''); setPreviewEditing(false); setPreviewOpen(true); }
+    if (signed) { setApprovalNote(''); openDailyReport(); }
   };
   const defaultItemsFor = (shift: GuardShift) => {
     const index = shifts.findIndex(row => row.name === shift.name);
@@ -208,7 +209,7 @@ export function GuardHandover({ system, module, profile }: Props) {
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
       <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
-        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} aria-expanded={searchOpen} onClick={() => setSearchOpen(value => !value)}>{searchOpen ? '關閉異常事件搜尋' : '搜尋異常事件'}</button><button type="button" className="secondary-btn compact" disabled={!context} onClick={() => setPreviewOpen(true)}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
+        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} aria-expanded={searchOpen} onClick={() => setSearchOpen(value => !value)}>{searchOpen ? '關閉異常事件搜尋' : '搜尋異常事件'}</button><button type="button" className="secondary-btn compact" disabled={!context} onClick={openDailyReport}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
       <section className="panel hs-toolbar">
         {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
           <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
@@ -232,13 +233,12 @@ export function GuardHandover({ system, module, profile }: Props) {
           <span className="hs-approval-icon"><GuardIcon name={approval ? 'check' : 'pen'} size={22} /></span>
           <div>
             <strong>{approval ? `主管已簽核：${nameOf(approval.approver_id)}` : '主管每日簽核'}</strong>
-            <span>{approval ? `${activityTime(approval.approved_at)}${approval.note ? `・說明：${approval.note}` : ''}（簽核後本日交接全部鎖定）` : approvalHint}</span>
+            <span>{approval ? `${activityTime(approval.approved_at)}${approval.note ? `・說明：${approval.note}` : ''}（簽核後本日交接全部鎖定）` : `${approvalHint} 請先核閱日報表，再於報表底部簽核。`}</span>
           </div>
         </div>
-        {!approval && context.can_approve && <div className="hs-approval-actions">
-          <input value={approvalNote} maxLength={500} onChange={event => setApprovalNote(event.target.value)} placeholder={missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '簽核說明（選填）'} aria-label="簽核說明" />
-          <button type="button" className="primary-btn compact" disabled={acting || !canApproveNow}
-            onClick={() => void approveDailyReport()}>主管簽核</button>
+        {context.can_approve && <div className="hs-approval-actions">
+          <button type="button" className="primary-btn compact" disabled={acting} onClick={openDailyReport}
+            title={approval ? '查看已簽核日報表' : '開啟日報表，核閱後於底部簽核'}>{approval ? '查看已簽核日報表' : '主管簽核'}</button>
         </div>}
       </section>}
 
