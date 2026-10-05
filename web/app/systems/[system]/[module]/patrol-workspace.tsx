@@ -20,12 +20,15 @@
 //   fcm_response 永遠是空的，期間篩選也只在 100 筆內作用。改為直接查表。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createThenRefresh } from '@/lib/create-refresh';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { isDeletedShift, isNightShiftName } from '@/lib/patrol-status';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
+import { OperationState } from '@/components/operation-states';
+import '@/components/operation-states.css';
 import { TimeSelect } from '@/components/TimeSelect';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { locationOptions, type LocationLike } from '@/lib/locations';
@@ -71,12 +74,17 @@ function RecordsModule({ module, profile }: Props) {
   const [form, setForm] = useState({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
   const [locationChoices, setLocationChoices] = useState<LocationLike[]>([]);
 
-  const load = useCallback(async () => {
-    setBusy(true); setNote('');
+  const load = useCallback(async (options?: { preserveNote?: boolean }): Promise<{ ok: true } | { ok: false; error: string }> => {
+    setBusy(true); if (!options?.preserveNote) setNote('');
     try {
       const data = await invokeAppApi<{ rows: Row[]; equipment: Row[]; locations?: LocationLike[] }>('inspections');
       setRows(data.rows || []); setEquipment(data.equipment || []); setLocationChoices(data.locations || []);
-    } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
+      return { ok: true };
+    } catch (error) {
+      const message = errorMessage(error);
+      setNote(`讀取失敗：${message}`);
+      return { ok: false, error: message };
+    }
     finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -90,25 +98,36 @@ function RecordsModule({ module, profile }: Props) {
   }), [rows, query, status]);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const closeCreate = () => {
+    if (busy) return;
+    setCreating(false);
+    setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
+  };
+
   const submit = async () => {
+    if (busy) return;
     if (!form.equipment_id) { setNote('失敗：請選擇設備'); return; }
     if (form.run_status === 'abnormal' && !form.abnormal_note.trim()) { setNote('失敗：異常巡檢必須填寫說明'); return; }
     setBusy(true); setNote('');
     try {
-      await invokeAppApi('create_inspection', {
-        equipment_id: form.equipment_id, run_status: form.run_status,
-        location_point: form.location_point.trim() || null,
-        abnormal_note: form.run_status === 'abnormal' ? form.abnormal_note.trim() : null,
-        location_id: form.location_id || null,
-      });
+      const result = await createThenRefresh(
+        () => invokeAppApi('create_inspection', {
+          equipment_id: form.equipment_id, run_status: form.run_status,
+          location_point: form.location_point.trim() || null,
+          abnormal_note: form.run_status === 'abnormal' ? form.abnormal_note.trim() : null,
+          location_id: form.location_id || null,
+        }),
+        () => load({ preserveNote: true }),
+      );
       setCreating(false); setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
-      await load(); setNote('巡檢紀錄已新增');
+      if (result.refreshed) setNote('\u5de1\u6aa2\u7d00\u9304\u5df2\u65b0\u589e');
+      else setNote('\u5de1\u6aa2\u7d00\u9304\u5df2\u65b0\u589e\uff1b\u6e05\u55ae\u66f4\u65b0\u5931\u6557\uff0c\u8acb\u91cd\u65b0\u8f09\u5165\u3002' + errorMessage(result.error));
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增巡檢</button>} />
+      action={<button className="primary-btn compact" disabled={busy} onClick={() => setCreating(true)}>＋ 新增巡檢</button>} />
     <section className="panel admin-panel patrol-notifications-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋設備、資產碼、巡檢人員或異常說明" />
@@ -117,7 +136,7 @@ function RecordsModule({ module, profile }: Props) {
         </select>
         <span>異常 {filtered.filter(r => r.run_status === 'abnormal').length}／共 {filtered.length} 筆</span>
       </div>
-      <div className="responsive-table"><table>
+      <div className="responsive-table" aria-busy={busy}><table>
         <thead><tr><th>巡檢時間</th><th>設備</th><th>位置</th><th>巡檢人員</th><th>結果</th><th>異常說明</th></tr></thead>
         <tbody>{paged.map(row => {
           const eq = (row.equipment as Row) || {}, who = (row.users as Row) || {};
@@ -131,13 +150,15 @@ function RecordsModule({ module, profile }: Props) {
           </tr>;
         })}</tbody>
       </table></div>
-      {!busy && paged.length === 0 && <p className="empty">目前沒有設備巡檢紀錄</p>}
+      {busy && rows.length === 0 && <OperationState kind="loading" title={"\u8f09\u5165\u5de1\u6aa2\u7d00\u9304\u4e2d\u2026"} />}
+      {!busy && !note && paged.length === 0 && <OperationState kind="empty" title={rows.length ? "\u6c92\u6709\u7b26\u5408\u689d\u4ef6\u7684\u5de1\u6aa2\u7d00\u9304" : "\u76ee\u524d\u6c92\u6709\u5de1\u6aa2\u7d00\u9304"} detail={rows.length ? "\u8acb\u8abf\u6574\u641c\u5c0b\u6587\u5b57\u6216\u72c0\u614b\u7be9\u9078\u3002" : "\u65b0\u589e\u5de1\u6aa2\u7d00\u9304\u5f8c\u6703\u986f\u793a\u5728\u9019\u88e1\u3002"} />}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
 
-    {creating && <AdminModal title="新增設備巡檢" onClose={() => setCreating(false)}>
-      <div className="admin-form-grid">
-        <label className="wide">設備（必填）<select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })}>
+    {creating && <AdminModal title="新增設備巡檢" onClose={closeCreate} closeDisabled={busy}>
+      <form id="patrol-create-form" onSubmit={event => { event.preventDefault(); void submit(); }}>
+      <fieldset className="admin-form-grid" disabled={busy} style={{ border: 0, minWidth: 0, margin: 0 }}>
+        <label className="wide">設備（必填）<select required value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })}>
           <option value="">-- 請選擇 --</option>
           {equipment.map(eq => <option key={String(eq.equipment_id)} value={String(eq.equipment_id)}>{`${eq.asset_code || ''} ${eq.name || ''}`.trim()}{eq.floor ? `｜${eq.floor}` : ''}</option>)}
         </select></label>
@@ -147,11 +168,12 @@ function RecordsModule({ module, profile }: Props) {
         <label>位置說明<input value={form.location_point} onChange={e => setForm({ ...form, location_point: e.target.value })} /></label>
         <label>場域位置（選填，供位置統計）<ComboboxSelect value={form.location_id} onChange={value => setForm(current => ({ ...current, location_id: value }))} options={locationOptions(locationChoices)} placeholder="輸入可篩選，留白代表不綁定" ariaLabel="場域位置" /></label>
         {form.run_status === 'abnormal' && <label className="wide">異常說明（必填）
-          <textarea rows={2} value={form.abnormal_note} onChange={e => setForm({ ...form, abnormal_note: e.target.value })} /></label>}
-      </div>
+          <textarea required rows={2} value={form.abnormal_note} onChange={e => setForm({ ...form, abnormal_note: e.target.value })} /></label>}
+      </fieldset>
+      </form>
       <footer>
-        <button className="secondary-btn" onClick={() => setCreating(false)}>取消</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出'}</button>
+        <button type="button" className="secondary-btn" disabled={busy} onClick={closeCreate}>取消</button>
+        <button form="patrol-create-form" type="submit" className="primary-btn compact" disabled={busy}>{busy ? '送出中…' : '送出'}</button>
       </footer>
     </AdminModal>}
   </AppShell>;

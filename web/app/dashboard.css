@@ -1,8 +1,11 @@
 /* 戰情儀表板：版面由 dashboard_layout_items 驅動，樣式對應 V1 dashboard.html。 */
 
 .dash-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:16px}
+.dash-range-buttons,.dash-date-fields{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.dash-date-fields{flex:1 1 270px;min-width:0}
+.dash-date-fields>.localized-date-input{flex:1 1 125px;min-width:0}
 .dash-toolbar input[type=date],.dash-toolbar input[type=text],.dash-toolbar select{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;box-sizing:border-box}
-.dash-toolbar button{background:transparent;border:1px solid var(--line);color:var(--dim);padding:8px 14px;border-radius:6px;cursor:pointer}
+.dash-toolbar button{min-height:44px;background:transparent;border:1px solid var(--line);color:var(--dim);padding:8px 14px;border-radius:6px;cursor:pointer}
 .dash-toolbar button.active{color:#001018;background:var(--cyan);border-color:var(--cyan);font-weight:700}
 .dash-toolbar button.range-btn{background:#fff;border-color:var(--line);color:var(--dim);font-weight:600}
 .dash-toolbar button.range-btn:hover{background:#f0fdf4;border-color:#86efac;color:#047857}
@@ -15,7 +18,7 @@
 .dash-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px;align-items:start}
 /* 背景與文字一律走主題變數：v1-layout.css 的淺色主題是白名單制，
    寫死深色的新 class 不在名單內，淺色下會變成深底深字。 */
-.dash-widget{grid-column:span 12;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:18px 20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);transition:all 0.3s}
+.dash-widget{grid-column:span var(--dash-span,12);background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:18px 20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);transition:all 0.3s}
 .dash-widget>header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px}
 .dash-widget>header h2{margin:0;font-size:15px}
 .dash-widget>header span{color:var(--dim);font-size:11px}
@@ -101,5 +104,23 @@
 .dash-market-kpis .dash-market-compare{grid-column:1/-1;color:var(--dim);font-size:9px;line-height:1.4;white-space:normal}
 .dash-market-kpis .market-movement-badge>span{grid-column:auto;color:inherit;font-size:inherit}
 .dash-market-list strong{color:var(--text)}
+@media(max-width:960px){
+  .dash-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .dash-widget{grid-column:span 6!important}
+  .dash-toolbar .spacer{flex:1 1 100%;margin-left:0}
+}
+@media(max-width:560px){
+  .dash-grid{grid-template-columns:1fr}
+  .dash-widget{grid-column:span 1!important}
+  .dash-toolbar{align-items:stretch}
+  .dash-range-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+  .dash-toolbar button{min-height:44px}
+  .dash-date-fields{flex-basis:100%;display:grid;grid-template-columns:1fr 1fr}
+  .dash-widget{padding:14px}
+  .dash-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .weather-metrics{grid-template-columns:1fr 1fr}
+  .dash-toolbar .spacer{font-size:11px;line-height:1.5}
+}
+@media(max-width:360px){.dash-date-fields{grid-template-columns:1fr}}
 @media(max-width:760px){.dash-market-stock-legend small{width:100%;margin-left:0}}
 @media(max-width:430px){.dash-market-stock-legend{display:grid;grid-template-columns:1fr 1fr}.dash-market-stock-legend b,.dash-market-stock-legend small{grid-column:1/-1}.dash-market-kpis>div{min-width:0}}
