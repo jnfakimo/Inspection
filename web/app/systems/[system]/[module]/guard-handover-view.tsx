@@ -184,25 +184,29 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
       const canChange = Boolean(log ? canCorrect || canEdit && log.status === 'draft' && !count : canEdit);
       const actionLabel = log && canCorrect ? '主管修正' : canChange ? log ? '編輯交接' : '建立交接' : '查看修正紀錄';
       const pinkAction = actionLabel === '主管修正' || actionLabel === '建立交接';
-      return <div className="guard-report-shift" key={shift.name}>
+      const incidentText = log?.incidents.length ? log.incidents.map(incident => {
+        const files = attachmentCount(shift.name, incident.id);
+        // 各段自己結尾的標點先去掉再以「；」串接，避免印出「。；」這種重複標點。
+        const clean = (value: string) => value.trim().replace(/[。；;，,、]+$/u, '');
+        const parts = [`${incident.category}：${clean(incident.description)}`,
+          incident.action ? `處理：${clean(incident.action)}` : '',
+          (incident.persons || []).length ? `相關人員：${(incident.persons || []).map(person =>
+            `${person.name}${person.id_number ? `／身分證 ${person.id_number}` : ''}${person.phone ? `／電話 ${person.phone}` : ''}`).join('、')}` : '',
+          incident.reported_to ? `通報：${clean(incident.reported_to)}` : ''].filter(Boolean);
+        return `${incidentTime(incident.time)}　${incident.location || '—'}　${parts.join('；')}；交接項目：${incidentFlag(incident.handover_item)}；向上陳報：${incidentFlag(incident.reported_upward)}${files ? `（附件 ${files} 件）` : ''}`;
+      }).join('\n') : '無';
+      const itemText = log?.items.length ? log.items.map(itemLine).join('、') : '—';
+      const reportFields = [log?.duty_summary || '', log?.important_notes || '', incidentText, itemText];
+      const longShift = reportFields.some(value => value.length > 450) || reportFields.reduce((sum, value) => sum + value.length, 0) > 750;
+      return <div className={`guard-report-shift${longShift ? ' is-long' : ''}`} key={shift.name}>
         <div className="guard-report-shift-heading"><span className="guard-report-shift-no">{String(index + 1).padStart(2, '0')}</span><div><small>值勤班次</small><h3>{shift.name}</h3></div><span className="guard-report-shift-time">{hhmm(times.shift_start)}–{hhmm(times.shift_end)}</span><span className={`guard-report-shift-state${log?.status === 'received' ? ' is-complete' : log ? ' is-progress' : ''}`}>{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</span></div>
         <table className="hs-report-shift"><tbody>
         <tr><th className="hs-report-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}</td><th className="hs-report-label">交接狀態</th><td>{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
         <tr><th>排定人員</th><td>{namesOf(scheduled)}</td><th>實際值勤</th><td>{log ? namesOf(log.actual_user_ids) : '—'}{log?.substitute_note ? `\n代班：${log.substitute_note}` : ''}</td></tr>
-        <tr><th>勤務概況</th><td colSpan={3}>{log?.duty_summary || '—'}</td></tr>
-        <tr><th>重要交辦</th><td colSpan={3}>{log?.important_notes || '—'}</td></tr>
-        <tr><th>異常事件</th><td colSpan={3}>{log?.incidents.length ? log.incidents.map(incident => {
-          const files = attachmentCount(shift.name, incident.id);
-          // 各段自己結尾的標點先去掉再以「；」串接，避免印出「。；」這種重複標點。
-          const clean = (value: string) => value.trim().replace(/[。；;，,、]+$/u, '');
-          const parts = [`${incident.category}：${clean(incident.description)}`,
-            incident.action ? `處理：${clean(incident.action)}` : '',
-            (incident.persons || []).length ? `相關人員：${(incident.persons || []).map(person =>
-              `${person.name}${person.id_number ? `／身分證 ${person.id_number}` : ''}${person.phone ? `／電話 ${person.phone}` : ''}`).join('、')}` : '',
-            incident.reported_to ? `通報：${clean(incident.reported_to)}` : ''].filter(Boolean);
-          return `${incidentTime(incident.time)}　${incident.location || '—'}　${parts.join('；')}；交接項目：${incidentFlag(incident.handover_item)}；向上陳報：${incidentFlag(incident.reported_upward)}${files ? `（附件 ${files} 件）` : ''}`;
-        }).join('\n') : '無'}</td></tr>
-        <tr><th>物品點交</th><td colSpan={3}>{log?.items.length ? log.items.map(itemLine).join('、') : '—'}</td></tr>
+        <tr className={(log?.duty_summary?.length || 0) > 450 ? 'is-long-row' : undefined}><th>勤務概況</th><td colSpan={3}>{log?.duty_summary || '—'}</td></tr>
+        <tr className={(log?.important_notes?.length || 0) > 450 ? 'is-long-row' : undefined}><th>重要交辦</th><td colSpan={3}>{log?.important_notes || '—'}</td></tr>
+        <tr className={incidentText.length > 450 ? 'is-long-row' : undefined}><th>異常事件</th><td colSpan={3}>{incidentText}</td></tr>
+        <tr className={itemText.length > 450 ? 'is-long-row' : undefined}><th>物品點交</th><td colSpan={3}>{itemText}</td></tr>
         <tr><th>巡邏打卡</th><td colSpan={3}>{patrol.expected ? `應打卡 ${patrol.expected}／已打卡 ${patrol.checked}／完成率 ${patrol.rate}%` : '本市場尚未設定巡邏點'}{patrol.unchecked_floors.length ? `；未打卡：${patrol.unchecked_floors.map(floor => `${floor.floor}×${floor.count}`).join('、')}` : ''}</td></tr>
         <tr><th>交班簽名</th><td>{log?.handover_by ? `${nameOf(log.handover_by)}　${activityTime(log.handover_at)}` : ''}</td><th>接班簽名</th><td>{log?.takeover_by
           ? `${nameOf(log.takeover_by)}　${activityTime(log.takeover_at)}`
