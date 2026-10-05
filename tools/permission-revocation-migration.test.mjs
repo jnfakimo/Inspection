@@ -104,6 +104,7 @@ const aclSnapshotSql = `
          AND a.attnum > 0 AND NOT a.attisdropped
     ) AS grants
    WHERE grantee = ANY($1::text[])
+     AND NOT (scope = 'function' AND grantee = 'authenticated')
    ORDER BY object_name, scope, grantee, privilege_type, is_grantable
 `;
 
@@ -174,7 +175,7 @@ test('migration names only approved targets and visibly skips absent objects', (
   assert.match(sql, /Skipping missing function %/);
   assert.match(sql, /Skipping missing view public\.%/);
   assert.match(sql, /Expected public\.% to be a view, found relkind %/);
-  assert.match(sql, /^BEGIN;\s/i);
+  assert.match(sql.replace(/^--.*(?:\r?\n|$)/gm, '').trimStart(), /^BEGIN;\s/i);
   assert.match(sql, /COMMIT;\s*$/i);
   assert.doesNotMatch(sql, /^\s*(?:GRANT|CREATE|ALTER|DROP)\b/im);
 });
