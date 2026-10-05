@@ -170,6 +170,11 @@ export function GuardHandover({ system, module, profile }: Props) {
     setActing(false);
     return false;
   };
+  const approveDailyReport = async () => {
+    const signed = await run('guard_approve', { duty_date: date, note: approvalNote.trim() }, '主管簽核完成，本日交接已全部鎖定',
+      `確認以「${profile.name}」身分完成 ${rocDate(date)} 的主管簽核？簽核後本日交接全部鎖定，不可再修改。`);
+    if (signed) { setApprovalNote(''); setPreviewEditing(false); setPreviewOpen(true); }
+  };
   const defaultItemsFor = (shift: GuardShift) => {
     const index = shifts.findIndex(row => row.name === shift.name);
     for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
@@ -231,10 +236,9 @@ export function GuardHandover({ system, module, profile }: Props) {
           </div>
         </div>
         {!approval && context.can_approve && <div className="hs-approval-actions">
-          {missingCount > 0 && <input value={approvalNote} maxLength={500} onChange={event => setApprovalNote(event.target.value)} placeholder={`有 ${missingCount} 班未建立交接，請填寫說明`} aria-label="簽核說明" />}
+          <input value={approvalNote} maxLength={500} onChange={event => setApprovalNote(event.target.value)} placeholder={missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '簽核說明（選填）'} aria-label="簽核說明" />
           <button type="button" className="primary-btn compact" disabled={acting || !canApproveNow}
-            onClick={() => void run('guard_approve', { duty_date: date, note: approvalNote.trim() }, '主管簽核完成，本日交接已全部鎖定',
-              `確認以「${profile.name}」身分完成 ${rocDate(date)} 的主管簽核？簽核後本日交接全部鎖定，不可再修改。`)}>主管簽核</button>
+            onClick={() => void approveDailyReport()}>主管簽核</button>
         </div>}
       </section>}
 
@@ -261,7 +265,13 @@ export function GuardHandover({ system, module, profile }: Props) {
             <button type="button" className="secondary-btn compact" onClick={() => { setPreviewEditing(false); setPreviewOpen(false); }}>關閉預覽</button></div>
         </div>
         <div className="guard-report-preview-scroll"><div className="guard-report-preview-page"><GuardDailyReport {...report} editing={previewEditing}
-          canCorrect={Boolean(context.can_correct)} canEdit={canEdit} correctionCount={logId => correctionsFor(logId).length} onEditShift={editReportShift} /></div></div>
+          canCorrect={Boolean(context.can_correct)} canEdit={canEdit} correctionCount={logId => correctionsFor(logId).length} onEditShift={editReportShift}
+          approvalControls={!approval && context.can_approve ? <div className="guard-report-approve-form">
+            <label htmlFor="guard-report-approval-note">簽核說明<textarea id="guard-report-approval-note" value={approvalNote} maxLength={500}
+              onChange={event => setApprovalNote(event.target.value)} placeholder={missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '可填寫當日案件處理與核閱說明（選填）'} /></label>
+            <div><p>{approvalHint}</p><button type="button" className="primary-btn" disabled={acting || !canApproveNow}
+              onClick={() => void approveDailyReport()}>主管簽核並產製日報表</button></div>
+          </div> : undefined} /></div></div>
       </div>, document.body)}
     </div>
     {mounted && editing && context && market && createPortal(<GuardLogModal market={market} date={date} shift={editing} log={rawLogFor(editing.name)} staff={context.staff} people={context.people}

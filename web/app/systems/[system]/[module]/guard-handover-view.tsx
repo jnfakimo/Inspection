@@ -151,16 +151,30 @@ export function GuardShiftCard({ index, shift, log, nameOf, namesOf, actions, ca
 }
 
 export function GuardDailyReport({ market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount,
-  editing = false, canCorrect = false, canEdit = false, correctionCount, onEditShift }: {
+  editing = false, canCorrect = false, canEdit = false, correctionCount, onEditShift, approvalControls }: {
   market: HandoverMarket | null; date: string; shifts: GuardShift[]; approval: Approval | null; logFor: (name: string) => GuardLog | null;
   nameOf: (id: unknown) => string; namesOf: (ids: string[] | null | undefined) => string;
   attachmentCount: (shiftName: string, incidentId: string) => number;
   editing?: boolean; canCorrect?: boolean; canEdit?: boolean; correctionCount?: (logId: string) => number;
-  onEditShift?: (shift: GuardShift) => void;
+  onEditShift?: (shift: GuardShift) => void; approvalControls?: ReactNode;
 }) {
-  return <section className="hs-report">
-    <header><h2>臺北農產運銷股份有限公司{market ? HANDOVER_MARKETS[market].name : ''}<br />駐警隊交接紀錄表</h2><p>{rocDate(date)}</p></header>
-    {shifts.length ? shifts.map(shift => {
+  const receivedCount = shifts.filter(shift => logFor(shift.name)?.status === 'received').length;
+  const incidentCount = shifts.reduce((total, shift) => total + (logFor(shift.name)?.incidents.length || 0), 0);
+  const upwardCount = shifts.reduce((total, shift) => total + (logFor(shift.name)?.incidents.filter(incident => incident.reported_upward === true).length || 0), 0);
+  return <section className="hs-report guard-daily-report">
+    <header className="guard-report-heading">
+      <div className="guard-report-heading-top"><span>駐警隊每日勤務日報</span><span>{market ? HANDOVER_MARKETS[market].name : '駐警隊'}</span></div>
+      <h2>臺北農產運銷股份有限公司{market ? HANDOVER_MARKETS[market].name : ''}<br />駐警隊交接紀錄表</h2>
+      <p>當日勤務暨案件報表 <span aria-hidden="true">／</span> {rocDate(date)}</p>
+      <span className={`guard-report-state${approval ? ' is-approved' : ''}`}>{approval ? '主管已簽核' : '待主管簽核'}</span>
+    </header>
+    <div className="guard-report-overview" aria-label="本日報表摘要">
+      <div><span>值勤班別</span><strong>{shifts.length}</strong><small>班</small></div>
+      <div><span>完成接班</span><strong>{receivedCount}</strong><small>／{shifts.length} 班</small></div>
+      <div><span>異常事件</span><strong>{incidentCount}</strong><small>件</small></div>
+      <div><span>向上陳報</span><strong>{upwardCount}</strong><small>件</small></div>
+    </div>
+    {shifts.length ? shifts.map((shift, index) => {
       const log = logFor(shift.name);
       const frozen = Boolean(log && log.status !== 'draft');
       const times = frozen && log ? log : shift;
@@ -170,8 +184,10 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
       const canChange = Boolean(log ? canCorrect || canEdit && log.status === 'draft' && !count : canEdit);
       const actionLabel = log && canCorrect ? '主管修正' : canChange ? log ? '編輯交接' : '建立交接' : '查看修正紀錄';
       const pinkAction = actionLabel === '主管修正' || actionLabel === '建立交接';
-      return <div className="guard-report-shift" key={shift.name}><table className="hs-report-shift"><tbody>
-        <tr><th className="hs-report-label">班別</th><td>{shift.name}（{hhmm(times.shift_start)}–{hhmm(times.shift_end)}）</td><th className="hs-report-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}　狀態：{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
+      return <div className="guard-report-shift" key={shift.name}>
+        <div className="guard-report-shift-heading"><span className="guard-report-shift-no">{String(index + 1).padStart(2, '0')}</span><div><small>值勤班次</small><h3>{shift.name}</h3></div><span className="guard-report-shift-time">{hhmm(times.shift_start)}–{hhmm(times.shift_end)}</span><span className={`guard-report-shift-state${log?.status === 'received' ? ' is-complete' : log ? ' is-progress' : ''}`}>{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</span></div>
+        <table className="hs-report-shift"><tbody>
+        <tr><th className="hs-report-label">預定巡檢</th><td>{hhmm(times.patrol_start)}–{hhmm(times.patrol_end)}</td><th className="hs-report-label">交接狀態</th><td>{log ? STATUS_LABELS[log.status] || log.status : '尚未建立'}</td></tr>
         <tr><th>排定人員</th><td>{namesOf(scheduled)}</td><th>實際值勤</th><td>{log ? namesOf(log.actual_user_ids) : '—'}{log?.substitute_note ? `\n代班：${log.substitute_note}` : ''}</td></tr>
         <tr><th>勤務概況</th><td colSpan={3}>{log?.duty_summary || '—'}</td></tr>
         <tr><th>重要交辦</th><td colSpan={3}>{log?.important_notes || '—'}</td></tr>
@@ -195,9 +211,14 @@ export function GuardDailyReport({ market, date, shifts, approval, logFor, nameO
         {editing && (canChange || count > 0) && <div className="guard-report-actions"><button type="button" className={`secondary-btn compact${pinkAction ? ' guard-report-pink-action' : ''}`} onClick={() => onEditShift?.(shift)}>{actionLabel}</button></div>}
       </div>;
     }) : <p className="hs-report-empty">巡檢排班沒有任何啟用中的班別。</p>}
-    <footer>
-      <div><b>主管簽核</b><br />{approval ? `${nameOf(approval.approver_id)}　${activityTime(approval.approved_at)}${approval.note ? `\n說明：${approval.note}` : ''}` : '尚未簽核'}</div>
-      <div><b>產製時間</b><br />{activityTime(new Date().toISOString())}</div>
-    </footer>
+    <div className="guard-report-footer">
+      <div className="guard-report-footer-heading"><span>主管核閱與簽核</span><small>簽核紀錄與說明會隨報表一併列印</small></div>
+      <div className="guard-report-approval-details">
+        <div><span>主管簽核</span><strong>{approval ? nameOf(approval.approver_id) : '尚未簽核'}</strong><small>{approval ? activityTime(approval.approved_at) : '簽核後顯示主管與時間'}</small></div>
+        <div><span>簽核說明</span><p>{approval?.note || '—'}</p></div>
+      </div>
+      {approvalControls}
+      <p className="guard-report-generated">報表產製時間：{activityTime(new Date().toISOString())}</p>
+    </div>
   </section>;
 }
