@@ -1,10 +1,13 @@
 -- Record the targeted ACL revocations already applied and independently verified
 -- on 2026-10-05. This migration changes grants only; it does not redefine objects.
+BEGIN;
+
 DO $migration$
 DECLARE
   function_signature text;
   view_name text;
   view_relkind "char";
+  view_column record;
 BEGIN
   FOREACH function_signature IN ARRAY ARRAY[
     'public.admin_reset_user_password(text,text)',
@@ -50,7 +53,36 @@ BEGIN
         'REVOKE ALL PRIVILEGES ON TABLE %I.%I FROM anon, PUBLIC',
         'public', view_name
       );
+
+      -- Table-level REVOKE does not necessarily remove column-level grants.
+      -- Revoke only existing column ACL entries for anon/PUBLIC so every other
+      -- role's table and column privileges remain untouched.
+      FOR view_column IN
+        SELECT DISTINCT a.attname, acl.privilege_type
+          FROM pg_catalog.pg_attribute AS a
+          CROSS JOIN LATERAL pg_catalog.aclexplode(a.attacl) AS acl
+          JOIN pg_catalog.pg_class AS c ON c.oid = a.attrelid
+          JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public'
+           AND c.relname = view_name
+           AND a.attnum > 0
+           AND NOT a.attisdropped
+           AND acl.grantee IN (
+             0,
+             (SELECT r.oid FROM pg_catalog.pg_roles AS r WHERE r.rolname = 'anon')
+           )
+      LOOP
+        EXECUTE pg_catalog.format(
+          'REVOKE %s (%I) ON TABLE %I.%I FROM anon, PUBLIC',
+          view_column.privilege_type,
+          view_column.attname,
+          'public',
+          view_name
+        );
+      END LOOP;
     END IF;
   END LOOP;
 END
 $migration$;
+
+COMMIT;
