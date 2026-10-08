@@ -401,6 +401,41 @@ export async function handleAdminApiRequest(req: Request) {
       return reply(req, { ok: true, data: { line_token_configured: true } });
     }
 
+    if (action === 'admin_test_line_notification') {
+      try {
+        // Reuse line-notify's admin-only test path and its stored LINE credentials.
+        // Forward the user's JWT, never the service-role key or channel token.
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/line-notify`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(10000),
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ test: true }),
+        });
+        const result = await response.json().catch(() => null);
+        const delivered = response.ok && result?.ok === true;
+        await audit('system_settings', 'line_test', 'status_change', {
+          result: delivered ? '送出' : '失敗',
+          http_status: response.status,
+        });
+        if (!delivered) {
+          const message = result?.msg === 'LINE not configured'
+            ? '尚未設定 LINE Channel Token 或群組 ID'
+            : result?.msg === 'LINE delivery failed'
+              ? 'LINE 平台拒絕推播，請檢查 Channel Token、群組 ID 及 Bot 是否在群組內'
+              : 'LINE 測試通知服務未能完成推播，請稍後再試';
+          return reply(req, { ok: false, message }, 502);
+        }
+        return reply(req, { ok: true, message: 'LINE 測試訊息已送出' });
+      } catch (error) {
+        await audit('system_settings', 'line_test', 'status_change', { result: '失敗', reason: '通知服務連線異常' });
+        console.error('LINE test notification failed:', error instanceof Error ? error.name : 'UnknownError');
+        return reply(req, { ok: false, message: 'LINE 測試通知服務連線逾時或無法使用' }, 502);
+      }
+    }
+
     if (action === 'admin_test_error_threshold_notification') {
       const windowMinutes = boundedInteger(body.window_minutes, 15, 1, 1440);
       const thresholdCount = boundedInteger(body.threshold_count, 20, 1, 5000);
