@@ -23,7 +23,7 @@
 // KPI／提醒的計算逐項沿用 V1 render() 的公式（SLA、MTTR、MTBF、逾期、待派工），
 // 曆日一律以台北時區為準——timestamptz 回傳的是 UTC，直接 slice(0,10) 會跨日算錯。
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './dashboard.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
@@ -31,6 +31,10 @@ import { getSupabase } from '@/lib/supabase';
 import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
 import { WeatherWidget } from './weather-widget';
+import { OperationNotice } from '@/components/operation-states';
+import '@/components/operation-states.css';
+import { debounceTask } from '@/lib/debounce-task';
+import { createRequestSequence, dateRangeChanged, isValidDateRange } from '@/lib/request-sequence';
 import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
@@ -126,13 +130,22 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   const [from, setFrom] = useState(() => { const now = new Date(); return ymd(new Date(now.getFullYear(), now.getMonth(), 1)); });
   const [to, setTo] = useState(() => ymd(new Date()));
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [updatedAt, setUpdatedAt] = useState('');
+  const loadSequence = useRef(createRequestSequence());
+  const dateRange = useRef({ from, to });
+
+  const updateDateRange = (nextFrom: string, nextTo: string) => {
+    const next = { from: nextFrom, to: nextTo };
+    if (dateRangeChanged(dateRange.current, next)) loadSequence.current.invalidate();
+    dateRange.current = next;
+    setFrom(nextFrom); setTo(nextTo);
+  };
 
   const applyQuickRange = (key: 'today' | 'month' | 'year') => {
     const now = new Date();
     const start = key === 'today' ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
       : key === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1)
         : new Date(now.getFullYear(), 0, 1);
-    setRange(key); setFrom(ymd(start)); setTo(ymd(now));
+    setRange(key); updateDateRange(ymd(start), ymd(now));
   };
 
   // 版面只在進頁時讀一次；改版面是後台的行為，這裡不需要跟著期間重讀。
@@ -150,6 +163,12 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   }, []);
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
+    if (!isValidDateRange({ from, to })) {
+      setError(!from || !to ? '請選擇完整日期範圍。' : '開始日期不可晚於結束日期。');
+      setBusy(false);
+      return;
+    }
     setBusy(true); setError('');
     const client = getSupabase();
     const rangeStart = `${from}T00:00:00+08:00`, rangeEnd = `${to}T23:59:59+08:00`;
@@ -171,6 +190,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
       getPatrolShiftsForDate(client, day),
     ]);
+    if (!loadSequence.current.isCurrent(sequence)) return;
 
     if (requestResult.error || orderResult.error) {
       setError(`資料載入失敗：${(requestResult.error || orderResult.error)?.message || '請稍後再試'}`);
@@ -230,7 +250,14 @@ export function DashboardClient({ profile }: { profile: Profile }) {
     setUpdatedAt(new Date().toLocaleTimeString('zh-TW', { hour12: false }));
     setBusy(false);
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  const scheduleLoad = useMemo(() => debounceTask(() => { void load(); }, 250), [load]);
+  useEffect(() => {
+    scheduleLoad.schedule();
+    return () => {
+      scheduleLoad.cancel();
+      loadSequence.current.invalidate();
+    };
+  }, [scheduleLoad]);
 
   const stats = useMemo(() => {
     const day = today(), month = day.slice(0, 7), now = new Date();
@@ -332,27 +359,27 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   };
 
   return <AppShell profile={profile} title="戰情儀表板">
-    {error && <div className="notice danger">{error}</div>}
+    {error && <OperationNotice tone="error" action={<button type="button" className="secondary-btn" onClick={() => { scheduleLoad.cancel(); void load(); }} disabled={busy}>重新載入</button>}>{error}</OperationNotice>}
+    {busy && !updatedAt && <OperationNotice>正在載入戰情資料…</OperationNotice>}
     {layoutNote && <p className="inline-message">{layoutNote}</p>}
 
-    <div className="dash-toolbar">
-      <button className={`range-btn${range === 'today' ? ' active' : ''}`} onClick={() => applyQuickRange('today')}>今日</button>
-      <button className={`range-btn${range === 'month' ? ' active' : ''}`} onClick={() => applyQuickRange('month')}>本月</button>
-      <button className={`range-btn${range === 'year' ? ' active' : ''}`} onClick={() => applyQuickRange('year')}>今年</button>
-      <div style={{ width: '130px' }}>
-        <LocalizedDateInput aria-label="起始日期（年/月/日）" value={from} onChange={e => setFrom(e.target.value)} />
+    <div className="dash-toolbar" role="group" aria-label="戰情資料範圍與更新">
+      <div className="dash-range-buttons" role="group" aria-label="快速日期範圍">
+        <button type="button" className={`range-btn${range === 'today' ? ' active' : ''}`} aria-pressed={range === 'today'} onClick={() => applyQuickRange('today')}>今天</button>
+        <button type="button" className={`range-btn${range === 'month' ? ' active' : ''}`} aria-pressed={range === 'month'} onClick={() => applyQuickRange('month')}>本月</button>
+        <button type="button" className={`range-btn${range === 'year' ? ' active' : ''}`} aria-pressed={range === 'year'} onClick={() => applyQuickRange('year')}>今年</button>
       </div>
-      <div style={{ width: '130px' }}>
-        <LocalizedDateInput aria-label="結束日期（年/月/日）" value={to} onChange={e => setTo(e.target.value)} />
+      <div className="dash-date-fields">
+        <LocalizedDateInput aria-label="開始日期" value={from} onChange={e => updateDateRange(e.target.value, dateRange.current.to)} />
+        <LocalizedDateInput aria-label="結束日期" value={to} onChange={e => updateDateRange(dateRange.current.from, e.target.value)} />
       </div>
-      <button onClick={() => void load()} disabled={busy}>{busy ? '載入中…' : '重新整理'}</button>
-      <span className="spacer">區間：{from} ~ {to}{updatedAt && `　最後更新：${updatedAt}`}</span>
+      <button type="button" onClick={() => { scheduleLoad.cancel(); void load(); }} disabled={busy}>{busy ? '載入中…' : '更新資料'}</button>
+      <span className="spacer">資料區間：{from} ~ {to}{updatedAt && `｜最後更新：${updatedAt}`}</span>
     </div>
-
-    <div className="dash-grid">
+    <div className="dash-grid" aria-busy={busy}>
       {layout.filter(item => item.visible).map(item =>
         <section className="dash-widget" key={item.widget_key}
-          style={{ gridColumn: `span ${item.width}`, minHeight: item.height * 56 }}>
+          style={{ ['--dash-span' as string]: Math.min(12, item.width), minHeight: item.height * 56 }}>
           <header><h2>{item.title}</h2><span>{item.widget_key}</span></header>
           {widget(item)}
         </section>)}
