@@ -188,29 +188,79 @@ def fetch_moa_payload(day, market):
             time.sleep(FETCH_BACKOFF_SECONDS[attempt])
 
 
+_MOA_MISSING = object()
+
+
+def _moa_safe_repr(value):
+    # CropCode 才會進入診斷；不輸出整筆來源列或其他欄位。字串使用 ASCII repr，並限制長度。
+    if value is _MOA_MISSING:
+        return '<missing>'
+    if isinstance(value, str):
+        sample_limit = 48 if value.isascii() else 6
+        preview = ascii(value[:sample_limit])
+        rendered = (preview[:-1] + f"...<truncated; length={len(value)}>'"
+                    if len(value) > sample_limit else preview)
+    elif type(value) is int and value.bit_length() > 256:
+        rendered = f'<int bits={value.bit_length()}>'
+    elif value is None or type(value) in (bool, int, float):
+        rendered = ascii(value)
+    else:
+        # JSON 非純量只記型別，不展開可能包含其他來源內容的結構。
+        rendered = f'<{type(value).__name__}>'
+    return rendered if len(rendered) <= 112 else rendered[:109] + '...'
+
+
+def _moa_row_context(record, row_number, day, market, category):
+    raw_code = record.get('CropCode', _MOA_MISSING) if isinstance(record, dict) else _MOA_MISSING
+    code_type = 'missing' if raw_code is _MOA_MISSING else type(raw_code).__name__
+    return (f"MOA 資料列 {row_number} 日期={day.isoformat()} 市場={MARKETS.get(market, market)} "
+            f"品類={CATEGORIES.get(category, category)} CropCode 型別={code_type} "
+            f"CropCode repr={_moa_safe_repr(raw_code)}")
+
+
 def moa_scope(payload_rows, day, market, category, code_items):
-    # 只接受與要求完全相符的列；品名必須在既有對照中，否則寧可失敗也不寫入新品項，
-    # 避免同一天出現兩種品名切法而重複計量。
+    # 只接受與要求完全相符的列；品名必須在注入的既有對照中。無真實休市佔位列樣本前，
+    # 空白或非法代號一律拒絕，不把異常列推定為休市資料。
     unique = {}
     duplicates = 0
-    for record in payload_rows:
-        if str(record.get('MarketName', '')) != MOA_MARKETS[market] or str(record.get('TransDate', '')) != roc_dot(day):
-            raise ValueError('備援來源回應的市場或日期與要求不符')
+    for row_number, record in enumerate(payload_rows, start=1):
+        context = _moa_row_context(record, row_number, day, market, category)
+        if not isinstance(record, dict):
+            raise ValueError(f'{context} 格式錯誤：來源資料列不是物件')
+        actual_market = record.get('MarketName', '')
+        actual_date = record.get('TransDate', '')
+        if str(actual_market) != MOA_MARKETS[market] or str(actual_date) != roc_dot(day):
+            raise ValueError(f'{context} 備援來源回應市場或日期與要求不符；'
+                             f'回應日期={_moa_safe_repr(actual_date)} 市場={_moa_safe_repr(actual_market)}')
         if str(record.get('TcType', '')) != MOA_TYPES[category]:
             continue
-        code = str(record.get('CropCode', '')).strip()
+        raw_code = record.get('CropCode', _MOA_MISSING)
+        if isinstance(raw_code, str):
+            code = raw_code.strip()
+        elif type(raw_code) is int and raw_code >= 0:
+            # MOA 回傳整數型代號時仍接受純數字值；字串代號則保留前導零。
+            try:
+                code = str(raw_code)
+            except ValueError:
+                # 極大的 JSON 整數可能超過 Python 的安全十進位轉換限制；以同一筆上下文拒絕。
+                code = ''
+        else:
+            code = ''
         if not re.fullmatch(r'[A-Za-z0-9]+', code):
-            raise ValueError('備援來源的作物代號格式不符')
+            raise ValueError(f'{context} 備援來源的作物代號格式不符')
         item = code_items.get((MARKETS[market], CATEGORIES[category], code))
         if not item:
-            raise RuntimeError(f'備援來源出現官網近期未見的品名代號 {code}，'
+            raise RuntimeError(f'{context} 備援來源出現官網近期未見的品名代號；'
                                '為避免品名切法不同而重複計量，改由人工確認後再匯入')
-        values = tuple(numeric(str(record.get(key, ''))) for key in
-                       ('Avg_Price', 'Trans_Quantity', 'Upper_Price', 'Middle_Price', 'Lower_Price'))
+        try:
+            values = tuple(numeric(str(record.get(key, ''))) for key in
+                           ('Avg_Price', 'Trans_Quantity', 'Upper_Price', 'Middle_Price', 'Lower_Price'))
+        except ValueError as exc:
+            raise ValueError(f'{context} 量價欄位格式不符：{exc}') from exc
         row = {'code': code, 'item': item, 'variety': str(record.get('CropName', '')), 'values': values}
         if code in unique:
             if unique[code]['values'] != values or unique[code]['item'] != item:
-                raise ValueError(f'品名代號 {code} 有互相衝突的資料')
+                raise ValueError(f'{context} 品名代號有互相衝突的資料')
             duplicates += 1
         else:
             unique[code] = row
