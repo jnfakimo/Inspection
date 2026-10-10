@@ -5,11 +5,11 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 
 const USERNAME_LOGIN_TIMEOUT_MS = 15_000;
 
-async function invokeSameOrigin(body: Record<string, unknown>) {
+async function invokePublicLogin(body: Record<string, unknown>) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), USERNAME_LOGIN_TIMEOUT_MS);
   try {
-    const response = await fetch(`${window.location.origin}/functions/v1/username-login`, {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/username-login`, {
       method: 'POST',
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -26,6 +26,9 @@ async function invokeSameOrigin(body: Record<string, unknown>) {
       throw error;
     }
     return payload;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('驗證服務回應逾時，請稍後再試');
+    throw error;
   } finally {
     window.clearTimeout(timer);
   }
@@ -57,10 +60,12 @@ export async function invokeUsernameLogin<T>(
   while (attempt <= maxRetries) {
     attempt++;
     try {
+      // Captcha is public and must not wait for an old Auth session to refresh.
+      if (body.action === 'captcha') return await invokePublicLogin(body) as T;
       // Follow the configured backend: Next.js development has no Edge routes.
       if (typeof window !== 'undefined' && SUPABASE_URL === window.location.origin) {
         try {
-          return await invokeSameOrigin(body) as T;
+          return await invokePublicLogin(body) as T;
         } catch (error) {
           const status = (error as Error & { status?: number }).status;
           // Do not fallback or retry on deliberate 4xx client errors (e.g. 400 bad captcha, 401 wrong password, 429 rate limit).
@@ -93,9 +98,11 @@ export async function invokeUsernameLogin<T>(
       return data as T;
     } catch (err) {
       lastError = err;
+      const status = (err as { status?: number } | null)?.status;
       const errorText = err instanceof Error ? err.message : String(err || '');
       // Do not retry client validation errors or explicit user-facing status messages
-      if (attempt <= maxRetries && !/帳號|密碼|驗證碼錯誤|頻繁|無效/i.test(errorText)) {
+      if (attempt <= maxRetries && !(typeof status === 'number' && status >= 400 && status < 500)
+        && !/帳號|密碼|驗證碼錯誤|頻繁|無效/i.test(errorText)) {
         await new Promise(resolve => setTimeout(resolve, attempt * 400));
         continue;
       }

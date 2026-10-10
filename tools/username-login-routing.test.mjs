@@ -27,7 +27,7 @@ test('development uses existing cloud Supabase despite stale settings; productio
         let sameOriginCalls = 0;
         globalThis.fetch = async url => {
           sameOriginCalls++;
-          assert.equal(url, `${origin}/functions/v1/username-login`);
+          assert.equal(url, `${config.SUPABASE_URL}/functions/v1/username-login`);
           return Response.json({ challenge_id: 'test' });
         };
         const loginUrl = moduleUrl(loginSource
@@ -36,6 +36,10 @@ test('development uses existing cloud Supabase despite stale settings; productio
         globalThis.__loginEdgeCall = () => { edgeCalls++; };
         const { invokeUsernameLogin } = await import(loginUrl);
         assert.deepEqual(await invokeUsernameLogin({ action: 'captcha' }, '失敗'), { challenge_id: 'test' });
+        assert.equal(edgeCalls, 0, 'captcha must not wait for the Auth client');
+        assert.equal(sameOriginCalls, 1);
+        edgeCalls = 0; sameOriginCalls = 0;
+        await invokeUsernameLogin({ action: 'login' }, '失敗');
         assert.equal(edgeCalls, development ? 1 : 0);
         assert.equal(sameOriginCalls, development ? 0 : 1);
       }
@@ -44,5 +48,34 @@ test('development uses existing cloud Supabase despite stale settings; productio
     if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
     globalThis.fetch = savedFetch;
     delete globalThis.__loginEdgeCall;
+  }
+});
+
+test('captcha bypasses a blocked Auth client, aborts on timeout, and does not retry HTTP 4xx', async () => {
+  const savedWindow = globalThis.window;
+  const savedFetch = globalThis.fetch;
+  try {
+    const source = loginSource
+      .replace("import { getSupabase } from './supabase';", 'const getSupabase = () => { throw new Error("Auth client must not be used for captcha"); };')
+      .replace("import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';", 'const SUPABASE_ANON_KEY = "public-key"; const SUPABASE_URL = "https://cloud.test";');
+    const { invokeUsernameLogin } = await import(moduleUrl(source));
+    globalThis.window = { setTimeout: callback => setTimeout(callback, 10), clearTimeout };
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, 'https://cloud.test/functions/v1/username-login');
+      assert.equal(options.headers.Authorization, 'Bearer public-key');
+      return Response.json({ challenge_id: 'captcha' });
+    };
+    assert.deepEqual(await invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 0 }), { challenge_id: 'captcha' });
+    globalThis.fetch = (url, options) => new Promise((resolve, reject) => {
+      options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    });
+    await assert.rejects(invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 0 }), /逾時/);
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; return Response.json({ message: '請稍後再試' }, { status: 429 }); };
+    await assert.rejects(invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 3 }), /請稍後再試/);
+    assert.equal(calls, 1);
+  } finally {
+    if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
+    globalThis.fetch = savedFetch;
   }
 });
