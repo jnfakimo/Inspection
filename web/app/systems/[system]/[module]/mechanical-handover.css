@@ -5,7 +5,7 @@
 .mechanical-modal{width:min(780px,calc(100vw - 32px))}.mechanical-print-modal{width:min(620px,calc(100vw - 32px))}.mechanical-form{gap:12px 18px}.mechanical-form>label{align-content:start}.mechanical-form>fieldset.wide{grid-column:1/-1}.mechanical-form textarea{box-sizing:border-box;width:100%;min-height:88px;padding:10px 11px;border:1px solid var(--line);border-radius:4px;background:var(--panel);color:var(--text);font:inherit;resize:vertical}.mechanical-form select,.mechanical-form input{min-height:44px}.mechanical-form fieldset{box-sizing:border-box;min-width:0;margin:0;border:1px solid var(--line);border-radius:6px;padding:12px}.mechanical-form fieldset legend{padding:0 7px;color:var(--text);font-weight:700}.mechanical-person-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px}.mechanical-person-grid label{display:flex;min-width:0;min-height:42px;align-items:center;gap:8px;box-sizing:border-box;padding:8px 10px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);color:var(--text);font-size:14px;cursor:pointer}.mechanical-person-grid input{flex:0 0 auto;width:18px;min-height:18px;height:18px;margin:0;accent-color:var(--cyan)}.mechanical-person-grid span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mechanical-person-grid small{margin-left:auto;color:var(--dim);font-size:12px;white-space:nowrap}.mechanical-modal-message{margin:0 20px 12px;color:var(--red)}.mechanical-print-range{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px 20px 0}.mechanical-print-range label{display:grid;min-width:0;gap:6px;color:var(--text);font-weight:700}.mechanical-print-range .localized-date-input,.mechanical-print-range .localized-date-input>input:first-child{box-sizing:border-box;width:100%;min-width:0}.mechanical-print-hint{margin:14px 20px;color:var(--dim)}.mechanical-print-modal .inline-message{display:block;margin:0 20px 12px}.mechanical-print-preview{display:none}
 @media(max-width:800px){.mechanical-legend{justify-content:flex-start;margin-left:0}.mechanical-frequent{align-items:stretch;flex-direction:column}.mechanical-frequent-list{justify-content:flex-start}.mechanical-entry-card{grid-template-columns:minmax(0,1fr) minmax(140px,.6fr);gap:10px 16px}.mechanical-entry-result{grid-column:1/-1;grid-template-columns:auto auto auto 1fr;justify-content:start}.mechanical-entry-result .result-badge{justify-self:start}.mechanical-entry-result strong{text-align:left}.mechanical-form{grid-template-columns:1fr!important}.mechanical-form .wide{grid-column:auto!important}.mechanical-work-modal{width:min(640px,calc(100vw - 16px))}.mechanical-print-modal{width:min(560px,calc(100vw - 16px))}}
 @media(max-width:520px){.mechanical-entry-card{display:block}.mechanical-entry-people,.mechanical-entry-result{margin-top:11px}.mechanical-entry-result{display:grid;grid-template-columns:auto 1fr;gap:7px 8px}.mechanical-entry-result .result-badge{justify-self:end}.mechanical-entry-result strong{justify-self:end;text-align:right}.mechanical-person-grid{grid-template-columns:1fr}.mechanical-print-range{grid-template-columns:1fr}.admin-modal-backdrop:has(.mechanical-modal){padding:8px}.mechanical-modal{width:100%}}
-@media print{@page{size:A4 portrait;margin:0}html,body{width:210mm!important;min-width:210mm!important;margin:0!important;padding:0!important;background:#fff!important}body.mechanical-printing>*:not(.mechanical-print-preview){display:none!important}body.mechanical-printing>.mechanical-print-preview{display:block!important;width:210mm!important;margin:0!important;padding:0!important}.mechanical-print-preview,.mechanical-print-preview *{visibility:visible!important}.mechanical-print-sheet{position:relative;box-sizing:border-box;width:210mm;height:297mm;overflow:hidden;break-after:page;page-break-after:always;padding:9mm;background:#fff;color:#000;font-family:"Noto Sans TC",sans-serif}.mechanical-print-sheet:last-child{break-after:auto;page-break-after:auto}.mechanical-print-content{width:100%;transform:scale(var(--mechanical-print-scale,1));transform-origin:top left}.mechanical-print-sheet header{text-align:center;margin-bottom:5mm}.mechanical-print-sheet h2{margin:0;color:#000;font-size:14pt;line-height:1.35}.mechanical-print-sheet header p{margin:2mm 0 0;font-size:10pt;font-weight:700}.mechanical-print-sheet table{width:100%;border-collapse:collapse;table-layout:fixed}.mechanical-print-sheet th,.mechanical-print-sheet td{padding:2.2mm;border:1px solid #000;color:#000;font-size:8.5pt;line-height:1.35;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}.mechanical-print-sheet thead th{text-align:center}.mechanical-print-sheet tbody>tr>th{vertical-align:middle;text-align:center}.mechanical-print-sheet td p{margin:1mm 0 0}.print-shift{width:17mm}.print-work{width:70mm}.print-people{width:34mm}.print-result{width:22mm}.print-notes{width:27mm}.print-cost{width:22mm}.mechanical-print-total{display:flex;justify-content:space-between;gap:6mm;padding:2.5mm;border:1px solid #000;border-top:0;font-size:9pt}.mechanical-print-signatures{display:grid;grid-template-columns:22mm repeat(3,1fr);border:1px solid #000;border-top:0;font-size:9pt}.mechanical-print-signatures>b,.mechanical-print-signatures>span{padding:3mm;border-right:1px solid #000}.mechanical-print-signatures>span:last-child{border-right:0}.mechanical-print-signatures strong{display:block;min-height:7mm;margin-top:2mm;color:#000}.result-badge{border-color:#000!important;background:#fff!important;color:#000!important}}
+@media print{@page{size:A4 portrait;margin:0}html,body{width:210mm!important;min-width:210mm!important;margin:0!important;padding:0!important;background:#fff!important}body.mechanical-printing>*:not(.mechanical-print-preview){display:none!important}body.mechanical-printing>.mechanical-print-preview{display:block!important;width:210mm!important;margin:0!important;padding:0!important}.mechanical-print-preview,.mechanical-print-preview *{visibility:visible!important}.mechanical-print-sheet{position:relative;box-sizing:border-box;width:210mm;height:297mm;overflow:hidden;break-after:page;page-break-after:always;padding:9mm;background:#fff;color:#000;font-family:var(--font)}.mechanical-print-sheet:last-child{break-after:auto;page-break-after:auto}.mechanical-print-content{width:100%;transform:scale(var(--mechanical-print-scale,1));transform-origin:top left}.mechanical-print-sheet header{text-align:center;margin-bottom:5mm}.mechanical-print-sheet h2{margin:0;color:#000;font-size:14pt;line-height:1.35}.mechanical-print-sheet header p{margin:2mm 0 0;font-size:10pt;font-weight:700}.mechanical-print-sheet table{width:100%;border-collapse:collapse;table-layout:fixed}.mechanical-print-sheet th,.mechanical-print-sheet td{padding:2.2mm;border:1px solid #000;color:#000;font-size:8.5pt;line-height:1.35;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}.mechanical-print-sheet thead th{text-align:center}.mechanical-print-sheet tbody>tr>th{vertical-align:middle;text-align:center}.mechanical-print-sheet td p{margin:1mm 0 0}.print-shift{width:17mm}.print-work{width:70mm}.print-people{width:34mm}.print-result{width:22mm}.print-notes{width:27mm}.print-cost{width:22mm}.mechanical-print-total{display:flex;justify-content:space-between;gap:6mm;padding:2.5mm;border:1px solid #000;border-top:0;font-size:9pt}.mechanical-print-signatures{display:grid;grid-template-columns:22mm repeat(3,1fr);border:1px solid #000;border-top:0;font-size:9pt}.mechanical-print-signatures>b,.mechanical-print-signatures>span{padding:3mm;border-right:1px solid #000}.mechanical-print-signatures>span:last-child{border-right:0}.mechanical-print-signatures strong{display:block;min-height:7mm;margin-top:2mm;color:#000}.result-badge{border-color:#000!important;background:#fff!important;color:#000!important}}
 .legend-chip.shift-current{border-left-color:var(--violet);background:color-mix(in srgb,var(--violet) 10%,var(--panel))}
 .mechanical-entry-carry{display:inline-block;margin-right:8px;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--violet) 13%,var(--panel2));color:var(--violet);letter-spacing:0}
 .mechanical-carry-list{margin-top:12px;padding:10px;border:1px dashed color-mix(in srgb,var(--violet) 55%,var(--line));border-radius:6px;background:color-mix(in srgb,var(--violet) 7%,var(--panel2))}
@@ -111,6 +111,7 @@
 .admin-modal-backdrop.mechanical-work-backdrop{z-index:1300}
 
 /* 本日報表預覽：螢幕使用可捲動的 HTML 報表；A4 尺寸只套用於列印樣式。 */
+/* 本日報表預覽：螢幕使用可捲動的 HTML 報表；A4 尺寸只套用於列印樣式。 */
 .mechanical-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
 .mechanical-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.22)}
 .mechanical-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -118,17 +119,9 @@
 .mechanical-report-preview-bar span{color:var(--dim);font-size:13px}
 .mechanical-report-preview-bar .mechanical-report-edit-hint{flex-basis:100%;color:var(--cyan);font-weight:600}
 .mechanical-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:#eef2f7}
-.mechanical-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:0 auto}
-.mechanical-report-preview .mechanical-print-sheet{position:static;box-sizing:border-box;width:100%;height:auto;min-height:0;overflow:visible;padding:clamp(18px,3vw,40px);background:#fff;color:#111;font-family:"Noto Sans TC",sans-serif;box-shadow:0 8px 28px rgba(15,23,42,.16)}
+.mechanical-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:0 auto;padding:clamp(18px,3vw,40px);background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.16)}
+.mechanical-report-preview .mechanical-print-sheet{position:static;box-sizing:border-box;width:100%;height:auto;min-height:0;overflow:visible;padding:0;background:#fff;color:#1e293b;font-family:var(--font);box-shadow:none}
 .mechanical-report-preview .mechanical-print-content{width:100%;transform:none}
-.mechanical-report-preview .mechanical-print-sheet header{text-align:center;margin-bottom:24px}
-.mechanical-report-preview .mechanical-print-sheet h2{margin:0;color:#000;font-size:clamp(20px,2.2vw,28px);line-height:1.45}
-.mechanical-report-preview .mechanical-print-sheet header p{margin:10px 0 0;color:#000;font-size:16px;font-weight:700}
-.mechanical-report-preview .mechanical-print-sheet table{width:100%;min-width:820px;border-collapse:collapse;table-layout:fixed}
-.mechanical-report-preview .mechanical-print-sheet th,.mechanical-report-preview .mechanical-print-sheet td{padding:12px;border:1px solid #111;color:#111;font-size:14px;line-height:1.55;vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
-.mechanical-report-preview .mechanical-print-sheet thead th{text-align:center}
-.mechanical-report-preview .mechanical-print-sheet tbody>tr>th{vertical-align:middle;text-align:center}
-.mechanical-report-preview .mechanical-print-sheet td p{margin:6px 0 0}
 .mechanical-report-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mechanical-report-edit-action{min-height:30px}
 .mechanical-report-preview .mechanical-report-add-action{border-color:#db2777;background:rgb(251 207 232 / 80%);color:#831843;font-weight:700}
@@ -146,20 +139,70 @@
 .mechanical-correction-history article p{display:grid;grid-template-columns:100px minmax(0,1fr) 20px minmax(0,1fr);gap:8px;margin:7px 0;overflow-wrap:anywhere;font-size:12px}
 .mechanical-correction-history article p b{color:var(--text)}
 @media(max-width:600px){.mechanical-correction-intro,.mechanical-correction-history{margin-inline:14px}.mechanical-correction-form{padding-inline:14px}.mechanical-correction-history article p{grid-template-columns:1fr 20px 1fr}.mechanical-correction-history article p b{grid-column:1/-1}}
-.mechanical-report-preview .print-shift{width:9%}.mechanical-report-preview .print-work{width:34%}.mechanical-report-preview .print-people{width:17%}.mechanical-report-preview .print-result{width:12%}.mechanical-report-preview .print-notes{width:16%}.mechanical-report-preview .print-cost{width:12%}
-.mechanical-report-preview .mechanical-print-total{display:flex;justify-content:space-between;gap:18px;padding:14px;border:1px solid #111;border-top:0;color:#111;font-size:14px}
-.mechanical-report-preview .mechanical-print-signatures{display:grid;grid-template-columns:minmax(110px,.7fr) repeat(3,minmax(0,1fr));border:1px solid #111;border-top:0;color:#111;font-size:14px}
-.mechanical-report-preview .mechanical-print-signatures>b,.mechanical-report-preview .mechanical-print-signatures>span{padding:16px;border-right:1px solid #111;color:#111}
-.mechanical-report-preview .mechanical-print-signatures>span:last-child{border-right:0}
-.mechanical-report-preview .mechanical-print-signatures strong{display:block;min-height:28px;margin-top:10px;color:#000}
-.mechanical-report-preview .mechanical-print-approval{grid-template-columns:minmax(110px,.7fr) minmax(140px,1fr) minmax(140px,1fr) minmax(220px,2fr);color:#111}
-.mechanical-report-preview .mechanical-print-approval>*{padding:16px;border-color:#111;color:#111}
-.mechanical-report-preview .mechanical-print-approval-detail{gap:10px}
-.mechanical-report-preview .mechanical-print-approval-seal{width:48px;height:48px;font-size:14px}
-.mechanical-report-preview .result-badge{border-color:#000!important;background:#fff!important;color:#000!important}
-@media(max-width:900px){.mechanical-report-preview .mechanical-print-approval{grid-template-columns:repeat(2,minmax(0,1fr))}.mechanical-report-preview .mechanical-print-signatures{grid-template-columns:repeat(2,minmax(0,1fr))}.mechanical-report-preview .mechanical-print-signatures>b{grid-row:span 2}}
-@media(max-width:700px){.mechanical-report-preview-bar{align-items:flex-start;flex-direction:column;padding:10px 12px}.mechanical-report-preview-bar>div:last-child{align-self:flex-end}.mechanical-report-preview-scroll{padding:12px 8px}.mechanical-report-preview .mechanical-print-sheet{padding:20px 14px}.mechanical-report-preview .mechanical-print-sheet header{margin-bottom:18px}.mechanical-report-preview .mechanical-print-sheet th,.mechanical-report-preview .mechanical-print-sheet td{padding:9px;font-size:12px}.mechanical-report-preview .mechanical-print-total{align-items:flex-start;flex-direction:column;gap:6px}.mechanical-report-preview .mechanical-print-signatures{grid-template-columns:1fr}.mechanical-report-preview .mechanical-print-signatures>b{grid-row:auto}.mechanical-report-preview .mechanical-print-signatures>b,.mechanical-report-preview .mechanical-print-signatures>span{border-right:0;border-bottom:1px solid #111}.mechanical-report-preview .mechanical-print-signatures>span:last-child{border-bottom:0}.mechanical-report-preview .mechanical-print-approval{grid-template-columns:1fr}.mechanical-report-preview .mechanical-print-approval>*{border-right:0;border-bottom:1px solid #111}.mechanical-report-preview .mechanical-print-approval>*:last-child{border-bottom:0}}
-@media print{.mechanical-report-preview{display:none!important}}
+@media(max-width:700px){
+  .mechanical-report-preview-bar{align-items:flex-start;flex-direction:column;padding:10px 12px}
+  .mechanical-report-preview-bar>div:last-child{align-self:flex-end}
+  .mechanical-report-preview-scroll{padding:12px 8px}
+}
+@media print{.mechanical-report-preview{display:none!important}.mechanical-print-sheet .mechanical-report-row-actions,.mechanical-print-sheet .hs-report-approval-form,.mechanical-print-sheet .hs-report-approval-readonly{display:none!important}}
 
 .mechanical-cost-note{margin:0;padding:10px 20px 0;color:var(--muted);font-size:12.5px}
 .hs-sign select{min-width:min(260px,100%)}
+
+/* 機電養護報表保留本簿欄位；紙面標題、班別卡與簽核區沿用 handover-sheet.css。 */
+.mechanical-print-sheet.hs-daily-report{color:#1e293b}
+.mechanical-print-table{min-width:780px}
+.mechanical-print-table th:nth-child(1){width:34%}.mechanical-print-table th:nth-child(2){width:18%}.mechanical-print-table th:nth-child(3){width:14%}.mechanical-print-table th:nth-child(4){width:20%}.mechanical-print-table th:nth-child(5){width:14%}
+.mechanical-report-shift-summary{margin:0;padding:8px 12px;border-bottom:1px solid #d9e2e9;background:#f5f9fb;color:#526579;font-size:12px;font-weight:700}
+.mechanical-print-total{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:-18px;margin-bottom:18px;padding:11px 14px;border:1px solid #d5e5ed;border-radius:0 0 10px 10px;background:#f2f8fb;color:#12314d;font-size:13px}
+.mechanical-print-total strong{font-size:14px}.mechanical-print-total span{color:#526579;font-size:12px}
+.mechanical-report-handoffs{margin:18px 0 0;padding:14px;border:1px solid #d5e5ed;border-radius:10px;background:#f7fafc}
+.mechanical-report-handoffs h3{margin:0 0 10px;color:#12314d;font-size:14px}
+.mechanical-report-handoff-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mechanical-report-handoff-grid article{display:grid;align-content:start;gap:5px;min-width:0;padding:10px 12px;border:1px solid #d5e5ed;border-radius:8px;background:#fff}
+.mechanical-report-handoff-grid article>span{color:#526579;font-size:11px;font-weight:700}
+.mechanical-report-handoff-grid article>strong{color:#12314d;font-size:13px;overflow-wrap:anywhere}
+.mechanical-report-handoff-grid article>small{color:#64748b;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:800px){.mechanical-report-handoff-grid{grid-template-columns:1fr}}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  html,body{width:210mm!important;min-width:210mm!important;margin:0!important;padding:0!important;background:#fff!important}
+  body.mechanical-printing>*:not(.mechanical-print-preview){display:none!important}
+  body.mechanical-printing>.mechanical-print-preview{display:block!important;width:210mm!important;margin:0!important;padding:0!important}
+  .mechanical-print-preview,.mechanical-print-preview *{visibility:visible!important}
+  .mechanical-print-sheet{position:relative;box-sizing:border-box;width:210mm;height:297mm;overflow:hidden;break-after:page;page-break-after:always;padding:9mm;background:#fff;color:#111;font-family:var(--font)}
+  .mechanical-print-sheet:last-child{break-after:auto;page-break-after:auto}
+  .mechanical-print-content{width:100%;transform:scale(var(--mechanical-print-scale,1));transform-origin:top left}
+  .hs-daily-report .mechanical-print-table{min-width:0}
+  .mechanical-print-total{margin-top:-3mm;margin-bottom:3mm;padding:2mm 3mm;font-size:7.5pt}
+  .mechanical-print-total strong{font-size:8pt}.mechanical-print-total span{font-size:7pt}
+  .mechanical-report-shift-summary{padding:1.5mm 2mm;font-size:7pt}
+  .mechanical-report-handoffs{margin-top:3mm;padding:2.5mm}
+  .mechanical-report-handoffs h3{margin-bottom:1.5mm;font-size:8pt}
+  .mechanical-report-handoff-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:1.5mm}
+  .mechanical-report-handoff-grid article{gap:1mm;padding:2mm}
+  .mechanical-report-handoff-grid article>span,.mechanical-report-handoff-grid article>small{font-size:6.5pt}
+  .mechanical-report-handoff-grid article>strong{font-size:7pt}
+  .mechanical-print-sheet .mechanical-report-row-actions{display:none!important}
+  .mechanical-print-sheet.is-multipage{height:auto;min-height:297mm;overflow:visible;break-inside:auto;page-break-inside:auto}
+  .mechanical-print-sheet.is-multipage .mechanical-print-content{transform:none}
+  .mechanical-print-sheet.is-multipage .hs-report-shift-card.is-long{break-inside:auto;page-break-inside:auto}
+  .mechanical-print-sheet.is-multipage .mechanical-print-table thead{display:table-header-group}
+  .mechanical-print-sheet.is-multipage .mechanical-print-table tbody{break-inside:auto;page-break-inside:auto}
+  .mechanical-print-sheet.is-multipage .hs-report-footer,.mechanical-print-sheet.is-multipage .mechanical-report-handoffs{break-inside:avoid-page;page-break-inside:avoid}
+.result-badge{border-color:#111!important;background:#fff!important;color:#111!important}
+}
+
+@media screen{
+  .mechanical-print-range{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-template-rows:auto 44px;column-gap:12px;row-gap:6px;align-items:start}
+  .mechanical-print-range .mechanical-print-date-start{grid-column:1;grid-row:1/3;grid-template-rows:min-content 44px}
+  .mechanical-print-range .mechanical-print-range-arrow{display:grid;grid-column:2;grid-row:2;align-self:center;justify-self:center;color:var(--cyan);font-size:22px;line-height:1}
+  .mechanical-print-range .mechanical-print-date-end{grid-column:3;grid-row:1/3;grid-template-rows:min-content 44px}
+  .mechanical-print-range .hs-date-range-field>.localized-date-input{height:44px}
+}
+@media screen and (max-width:520px){
+  .mechanical-print-range{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 28px auto;row-gap:6px}
+  .mechanical-print-range .mechanical-print-date-start{grid-column:1;grid-row:1;grid-template-rows:min-content 44px}
+  .mechanical-print-range .mechanical-print-range-arrow{grid-column:1;grid-row:2}
+  .mechanical-print-range .mechanical-print-date-end{grid-column:1;grid-row:3;grid-template-rows:min-content 44px}
+}

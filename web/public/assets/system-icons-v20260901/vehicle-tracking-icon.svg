@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">公務車定位追蹤</title>
+  <desc id="desc">地圖定位圖釘、車輛與藍牙訊號組成的系統圖示</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#063b5f"/>
+      <stop offset="1" stop-color="#04192d"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00d4ff"/>
+      <stop offset="1" stop-color="#00ff9d"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="27" fill="url(#panel)" stroke="#00d4ff" stroke-width="4"/>
+  <path d="M29 88h69l-6-18a10 10 0 0 0-9-7H45a10 10 0 0 0-9 7z" fill="#e8f7ff" stroke="#00d4ff" stroke-width="3"/>
+  <path d="M38 63l8-15h35l9 15" fill="none" stroke="#e8f7ff" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="43" cy="88" r="8" fill="#04192d" stroke="#00ff9d" stroke-width="4"/>
+  <circle cx="85" cy="88" r="8" fill="#04192d" stroke="#00ff9d" stroke-width="4"/>
+  <path d="M64 18c-13 0-23 10-23 23 0 18 23 38 23 38s23-20 23-38c0-13-10-23-23-23z" fill="url(#pin)" stroke="#e8f7ff" stroke-width="3"/>
+  <circle cx="64" cy="41" r="8" fill="#04192d"/>
+  <path d="M99 28c8 7 8 19 0 26M105 21c13 11 13 29 0 40" fill="none" stroke="#00ff9d" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -74,7 +74,7 @@ for (const token of REQUIRED) {
 
 // 機電課簽核意見必須從畫面一路送入既有 note 欄位，並列入 A4 報表。
 const mechanical = read('mechanical-handover.tsx');
-for (const token of ['approvalNote.trim()', 'note: approvalNote.trim()', '批核意見', 'mechanical-print-approval-note']) {
+for (const token of ['approvalNote.trim()', 'note: approvalNote.trim()', 'HandoverReportApprovalForm', 'id="mechanical-report-approval-note"']) {
   if (!mechanical.includes(token)) errors.push(`機電課：課長批核意見流程缺少 ${token}`);
 }
 

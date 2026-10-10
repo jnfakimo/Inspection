@@ -19,6 +19,7 @@ import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import { requestedPostLoginPath, resolvePostLoginDestination } from '@/lib/login-destination';
 import { PATROL_IDLE_LOGOUT_MESSAGE_KEY, startPatrolSession } from '@/lib/patrol-session';
 import { invokeUsernameLogin } from '@/lib/username-login';
+import { parseCaptchaPayload } from '@/lib/username-login-error';
 import type { Profile } from '@/types/app';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
@@ -44,8 +45,8 @@ function withTimeout<T>(task: Promise<T>, ms: number, message: string): Promise<
 export default function LoginPage() {
   const passwordPolicy = usePasswordPolicy();
   const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
-  const [captchaLoading, setCaptchaLoading] = useState(false);
   const captchaInFlight = useRef(false);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
   const [view, setView] = useState<'login' | 'forgot' | 'reset'>('login');
   const [resetReady, setResetReady] = useState(false);
   const [message, setMessage] = useState('');
@@ -63,19 +64,19 @@ export default function LoginPage() {
     setCaptchaLoading(true);
     setCaptcha(null);
     try {
-      const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string; message?: string }>(
+      const data = await invokeUsernameLogin<unknown>(
         { action: 'captcha' },
-        '驗證碼載入失敗，請確認網路後重試',
-        { retries: 0 }
+        '驗證碼載入失敗，請稍後再試'
       );
-      if (!data?.challenge_id || !data.image) {
-        setMessage(data?.message || '驗證碼載入失敗，請點擊 [重新產生]');
+      const captchaPayload = parseCaptchaPayload(data);
+      if (!captchaPayload) {
+        setMessage('驗證碼載入失敗（代碼 captcha_invalid_response），請稍後再試');
         return;
       }
       setMessage('');
-      setCaptcha({ id: data.challenge_id, image: data.image });
+      setCaptcha(captchaPayload);
     } catch (err) {
-      setMessage(friendlyError(err, '驗證碼載入失敗，請確認網路後重新整理'));
+      setMessage(err instanceof Error ? err.message : '驗證碼載入失敗（代碼 captcha_unknown），請稍後再試');
     } finally {
       captchaInFlight.current = false;
       setCaptchaLoading(false);
@@ -119,12 +120,11 @@ export default function LoginPage() {
       }
     } catch { /* 儲存區可能被瀏覽器停用 */ }
     let active = true;
-    void loadCaptcha();
     void withTimeout(getSupabase().auth.getSession(), PROFILE_CHECK_TIMEOUT_MS, '登入狀態讀取逾時')
       .catch(() => ({ data: { session: null } }))
       .then(async ({ data }) => {
       if (!active) return;
-      if (!data.session) return;
+      if (!data.session) { void loadCaptcha(); return; }
       setBusy(true);
       try {
         const profile = await withTimeout(invokeAppApi<Profile>('profile'), PROFILE_CHECK_TIMEOUT_MS, '登入狀態驗證逾時，請重新登入');
@@ -135,10 +135,11 @@ export default function LoginPage() {
         location.replace(destination);
       } catch (profileError) {
         clearProfile();
-        await withTimeout(getSupabase().auth.signOut({ scope: 'local' }), PROFILE_CHECK_TIMEOUT_MS, '登出狀態清理逾時').catch(() => {});
+        await getSupabase().auth.signOut({ scope: 'local' }).catch(() => {});
         if (!active) return;
         setMessage(friendlyError(profileError, '找不到啟用中的系統帳號，請聯絡管理員'));
         setBusy(false);
+        void loadCaptcha();
       }
     });
     return () => { active = false; };
@@ -217,7 +218,7 @@ export default function LoginPage() {
   }
 
   const brand = <>
-    <img className="v1-login-logo" src="/Inspection/system/assets/logo-title.png" alt="臺北農產第一果菜市場" />
+    <img className="v1-login-logo" src="/Inspection/v2/system/assets/logo-title.png" alt="臺北農產第一果菜市場" />
     <h1>臺北農產公司</h1>
     <p className="v1-login-sub">第一果菜市場 設備巡檢維修系統</p>
   </>;

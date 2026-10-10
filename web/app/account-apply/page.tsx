@@ -93,7 +93,7 @@ export default function AccountApplyPage() {
 
   return <main className="v1-login-page account-apply-page">
     <form className="login-card v1-login-card account-apply-card" onSubmit={submit}>
-      <img className="v1-login-logo" src="/Inspection/system/assets/logo-title.png" alt="臺北農產第一果菜市場" />
+      <img className="v1-login-logo" src="/Inspection/v2/system/assets/logo-title.png" alt="臺北農產第一果菜市場" />
       <h1>申請系統帳號</h1>
       <p className="v1-login-hint">填寫人員資料後，由系統管理員核定系統角色與直屬課室主管。</p>
       {done ? <div className="account-apply-result">

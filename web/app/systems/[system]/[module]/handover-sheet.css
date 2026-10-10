@@ -1,30 +1,61 @@
 /* SYS-04 電子交接簿的共同版型。機電課、業管組、駐衛警三本交接簿一律共用這一份，
    內容不同但外觀相同——三個分頁各自複製一份樣式就是版面分岔的起點（V1 的教訓）。
-   色彩一律取主題變數；班別強調色（--shift）只用於邊框、圖示與低比例底色。
+   色彩一律取主題變數；早／中／晚固定使用共用班別色 token，當班狀態另以綠框與文字標示。
    各交接簿只在自己的 css 放「本簿特有」的區塊（例如駐衛警的巡邏打卡與附件、
    業管組的點檢表、機電課的工作卡片），不得在這裡以外重新定義 hs-* 的外觀。 */
+:root{
+  --hs-shift-color-1:#0284c7;
+  --hs-shift-color-2:#047857;
+  --hs-shift-color-3:#b45309;
+  --hs-shift-color-4:#db2777;
+  --hs-shift-foreground-1:#07111a;
+  --hs-shift-foreground-2:#fff;
+  --hs-shift-foreground-3:#fff;
+  --hs-shift-foreground-4:#fff;
+  --hs-current-color:#10b981;
+  --hs-current-ink:#047857;
+}
 .hs-page{display:grid;gap:16px}
 .hs-icon{display:block;flex:none}
 
 /* 工具列 */
-.panel.hs-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 7%,var(--panel)),var(--panel) 60%)}
+.panel.hs-toolbar{display:flex;align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(120deg,color-mix(in srgb,var(--cyan) 7%,var(--panel)),var(--panel) 60%)}
 .hs-date-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.hs-date-nav label{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700}
-.hs-date-nav label>span{width:180px}
+.hs-date-nav .hs-date-label{display:inline-flex;align-items:center;color:var(--ink);font-weight:700;white-space:nowrap}
+/* Date field: prior 180px width → 135px; visible height follows 回到今天's 32px compact control. Arrow font 11 → 22px, frame width 42 → 33.6px; keep 44×44 outer hit targets. */
+.hs-date-nav>.localized-date-input,.hs-date-range-field>.localized-date-input{box-sizing:border-box;height:44px}
+.hs-date-nav>.localized-date-input{flex:0 0 135px;width:135px}
+.hs-date-range-field>.localized-date-input{display:block;width:100%;min-width:0}
+.hs-date-nav>.localized-date-input>input:not(.localized-date-native),.hs-date-range-field>.localized-date-input>input:not(.localized-date-native){position:absolute;top:50%;left:0;box-sizing:border-box;width:100%;height:32px;min-height:32px;transform:translateY(-50%)}
+.hs-date-nav>.hs-date-arrow{position:relative;display:inline-grid;place-items:center;box-sizing:border-box;flex:none;width:44px;min-width:44px;height:44px;min-height:44px;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:var(--ink);font-size:22px!important;line-height:1;transform:none!important}
+.hs-date-nav>.hs-date-arrow::before{position:absolute;top:50%;left:50%;box-sizing:border-box;width:33.6px;height:32px;transform:translate(-50%,-50%);border:1px solid color-mix(in srgb,var(--cyan) 34%,var(--line));border-radius:0;background:var(--panel);content:'';pointer-events:none}
+.hs-date-nav>.hs-date-arrow>span{position:relative;z-index:1;display:block}
+.hs-date-nav>.hs-date-arrow:hover:not(:disabled),.hs-date-nav>.hs-date-arrow:focus-visible{border-color:transparent!important;background:transparent!important;box-shadow:none!important;transform:none!important}
+.hs-date-nav>.hs-date-arrow:hover:not(:disabled)::before,.hs-date-nav>.hs-date-arrow:focus-visible::before{border-color:var(--green);background:color-mix(in srgb,var(--cyan) 18%,var(--panel));box-shadow:0 4px 12px color-mix(in srgb,var(--cyan) 10%,transparent)}
+.hs-date-nav>.hs-date-arrow:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+.hs-date-nav>.localized-date-input>button{font-size:0;color:transparent}
+.hs-date-nav>.localized-date-input>button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 .hs-market-switch{display:inline-flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
 .hs-market-switch .secondary-btn.is-active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,var(--panel));color:var(--ink);box-shadow:0 0 0 2px color-mix(in srgb,var(--cyan) 12%,transparent)}
-.hs-toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hs-toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-left:auto}
 .hs-toolbar-summary{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid color-mix(in srgb,var(--cyan) 30%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--cyan) 9%,var(--panel));color:var(--ink);font-size:13px;font-weight:600}
 .hs-toolbar-summary .hs-icon{color:var(--cyan)}
+.hs-toolbar-summary,.hs-current-now{white-space:nowrap}
 .hs-header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 /* 主管簽核 */
-.hs-approval{--tone:var(--amber);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid color-mix(in srgb,var(--tone) 38%,var(--line));border-radius:14px;background:linear-gradient(90deg,color-mix(in srgb,var(--tone) 12%,var(--panel)),var(--panel) 75%)}
-.hs-approval.is-ready{--tone:var(--cyan)}.hs-approval.is-approved{--tone:var(--green)}
+.hs-approval{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid #CBD5E1;border-radius:14px;background:#F1F5F9}
 .hs-approval-main{display:flex;align-items:center;gap:14px}.hs-approval-main>div{display:grid;gap:4px}
-.hs-approval-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:13px;background:color-mix(in srgb,var(--tone) 16%,var(--panel));color:var(--tone)}
-.hs-approval-main strong{color:var(--ink);font-size:17px}.hs-approval-main>div>span{color:var(--muted);font-size:13px}
+.hs-approval-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:13px;background:#E2E8F0;color:#475569}
+.hs-approval-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hs-approval-main strong{color:#334155;font-size:17px}
+.hs-approval-status{display:inline-flex;align-items:center;min-height:24px;padding:3px 8px;border:1px solid #CBD5E1;border-radius:999px;background:#E2E8F0;color:#334155;font:700 12px/1 var(--font);white-space:nowrap}
+.hs-approval-status.is-approved{background:#fff;border-color:#94A3B8}
+.hs-approval-detail{color:#475569;font-size:13px;line-height:1.5}
 .hs-approval-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.hs-approval-actions input{min-width:260px}
+.hs-approval-action{border-color:#334155!important;background:#334155!important;color:#fff!important}
+.hs-approval-action:hover:not(:disabled){border-color:#475569!important;background:#475569!important;color:#fff!important}
+.hs-approval-action:focus-visible{border-color:#334155!important;background:#334155!important;color:#fff!important;outline:3px solid #0284C7;outline-offset:2px;box-shadow:0 0 0 2px #fff!important;transform:none}
+.hs-approval-action:disabled{border-color:#CBD5E1!important;background:#E2E8F0!important;color:#475569!important;opacity:1;cursor:not-allowed;transform:none;box-shadow:none}
 .hs-approval-seal{display:inline-grid;place-items:center;padding:8px 16px;border:2px solid var(--green);border-radius:10px;color:var(--green);font-size:17px;font-weight:800;letter-spacing:.18em}
 
 /* 交接紀錄表外框、表頭與今日指標 */
@@ -46,12 +77,15 @@
 
 /* 班別卡片 */
 .hs-shifts{display:grid;gap:16px;padding:18px}
-.hs-shift{--shift:#0284c7;overflow:hidden;border:1px solid color-mix(in srgb,var(--shift) 28%,var(--line));border-radius:16px;background:var(--panel);box-shadow:0 1px 0 color-mix(in srgb,var(--shift) 20%,transparent);transition:box-shadow .2s ease}
+.hs-shift{--shift:var(--hs-shift-color-1);--shift-ink:var(--hs-shift-foreground-1);overflow:hidden;border:1px solid color-mix(in srgb,var(--shift) 28%,var(--line));border-radius:16px;background:var(--panel);box-shadow:0 1px 0 color-mix(in srgb,var(--shift) 20%,transparent);transition:box-shadow .2s ease}
 .hs-shift:hover{box-shadow:0 12px 28px color-mix(in srgb,var(--shift) 14%,transparent)}
-.hs-shift-2{--shift:#7c3aed}.hs-shift-3{--shift:#b45309}.hs-shift-4{--shift:#db2777}
+.hs-shift-1{--shift:var(--hs-shift-color-1);--shift-ink:var(--hs-shift-foreground-1)}
+.hs-shift-2{--shift:var(--hs-shift-color-2);--shift-ink:var(--hs-shift-foreground-2)}
+.hs-shift-3{--shift:var(--hs-shift-color-3);--shift-ink:var(--hs-shift-foreground-3)}
+.hs-shift-4{--shift:var(--hs-shift-color-4);--shift-ink:var(--hs-shift-foreground-4)}
 .hs-shift-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid color-mix(in srgb,var(--shift) 22%,var(--line));background:linear-gradient(90deg,color-mix(in srgb,var(--shift) 12%,var(--panel)),var(--panel) 72%)}
 .hs-shift-title{display:flex;align-items:center;gap:14px}
-.hs-shift-no{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:var(--shift);color:#fff;font-size:22px;box-shadow:0 8px 16px color-mix(in srgb,var(--shift) 32%,transparent)}
+.hs-shift-no{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:var(--shift);color:var(--shift-ink);font-size:22px;box-shadow:0 8px 16px color-mix(in srgb,var(--shift) 32%,transparent)}
 .hs-shift-name{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.hs-shift-name b{color:var(--ink);font-size:21px}
 .hs-state{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;background:var(--panel2);color:var(--muted);font-size:12px;font-weight:700}
 .hs-state.is-active{background:color-mix(in srgb,var(--green) 15%,var(--panel));color:var(--ink)}
@@ -67,11 +101,8 @@
 .hs-pill.is-submitted{border-color:color-mix(in srgb,var(--cyan) 45%,var(--line));background:color-mix(in srgb,var(--cyan) 12%,var(--panel));color:var(--ink)}.hs-pill.is-submitted::before{background:var(--cyan);opacity:1}
 .hs-pill.is-received{border-color:color-mix(in srgb,var(--green) 45%,var(--line));background:color-mix(in srgb,var(--green) 12%,var(--panel));color:var(--ink)}.hs-pill.is-received::before{background:var(--green);opacity:1}
 
-/* 當班標示：綠色（#10b981）＝目前當班，三本交接簿一致；班別配色因此不用綠色。
-   白字底色用較深的 #047857，對比度才夠；外框與光暈用 #10b981。 */
-.hs-shift.is-current{--shift:#10b981;border:2px solid #10b981;box-shadow:0 0 0 4px color-mix(in srgb,#10b981 16%,transparent),0 14px 30px color-mix(in srgb,#10b981 20%,transparent)}
-.hs-shift.is-current .hs-shift-head{background:linear-gradient(90deg,color-mix(in srgb,#10b981 22%,var(--panel)),color-mix(in srgb,#10b981 6%,var(--panel)) 80%)}
-.hs-shift.is-current .hs-shift-no{background:#047857}
+/* 當班狀態由綠色外框、光暈與文字標示；班別色保持不變。 */
+.hs-shift.is-current{border:2px solid #10b981;box-shadow:0 0 0 4px color-mix(in srgb,#10b981 16%,transparent),0 14px 30px color-mix(in srgb,#10b981 20%,transparent)}
 .hs-current-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;background:#047857;color:#fff;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px color-mix(in srgb,#10b981 40%,transparent)}
 .hs-pulse-dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:#34d399;animation:hs-live 1.8s infinite}
 @keyframes hs-live{0%{box-shadow:0 0 0 0 rgba(16,185,129,.65)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
@@ -121,7 +152,7 @@
 
 /* 日報表：螢幕預覽與列印共用。紙張固定白底黑字（背景與文字成對寫死，兩種主題都一樣是紙）。 */
 .hs-print-sheet{display:none}
-.hs-report{color:#111;background:#fff;font-family:"Noto Sans TC",sans-serif;font-size:8.4pt}
+.hs-report{color:#111;background:#fff;font-family:var(--font);font-size:14px}
 .hs-report header{text-align:center;margin-bottom:3mm}
 .hs-report header h2{margin:0;color:#111;font-size:14pt;line-height:1.4}
 .hs-report header p{margin:1.5mm 0 0;font-size:10pt}
@@ -130,9 +161,51 @@
 .hs-report th{background:#f1f1f1;font-weight:700}
 .hs-report .hs-report-shift{break-inside:avoid;margin-bottom:2.2mm}
 .hs-report .hs-report-label{width:21mm}
-.hs-report footer{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:3mm}
-.hs-report footer div{min-height:13mm;padding:2mm;border:1px solid #222;white-space:pre-line}
+.hs-report footer:not(.hs-report-footer){display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:3mm}
+.hs-report footer:not(.hs-report-footer) div{min-height:13mm;padding:2mm;border:1px solid #222;white-space:pre-line}
 .hs-report-empty{padding:6mm 0;text-align:center}
+
+/* Three daily report sheets share one heading, shift-card, table-grid and approval template. */
+.hs-daily-report{color:#1e293b;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+.hs-daily-report .hs-report-heading{position:relative;margin:0 0 18px;padding:0 0 22px;border-bottom:3px solid #0f7890;text-align:center}
+.hs-report-heading-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px;color:#0f7890;font-size:11px;font-weight:800;letter-spacing:.12em;text-align:left}
+.hs-daily-report .hs-report-heading h2{color:#12314d;font-size:clamp(21px,2.2vw,28px);line-height:1.45}
+.hs-daily-report .hs-report-heading p{margin:8px 0 0;color:#475569;font-size:14px;letter-spacing:.04em}
+.hs-report-state{display:inline-flex;margin-top:14px;padding:5px 13px;border:1px solid #e2a83d;border-radius:999px;background:#fff8e9;color:#854d0e;font-size:12px;font-weight:800}
+.hs-report-state.is-approved{border-color:#61a98a;background:#edf9f2;color:#166534}
+.hs-report-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:22px}
+.hs-report-overview>div{display:flex;align-items:baseline;gap:5px;min-width:0;padding:12px 15px;border:1px solid #d5e5ed;border-radius:10px;background:#f2f8fb}
+.hs-report-overview span{margin-right:auto;color:#475569;font-size:12px;font-weight:700}.hs-report-overview strong{color:#12314d;font-size:24px;line-height:1}.hs-report-overview small{color:#64748b;font-size:11px}
+.hs-report-shift-card{--report-shift:var(--hs-shift-color-1);--report-shift-ink:var(--hs-shift-foreground-1);margin-bottom:18px;overflow-x:auto;border:1px solid #cbdbe5;border-left:4px solid var(--report-shift);border-radius:11px;background:#fff;break-inside:avoid-page}
+.hs-report-shift-card.hs-report-shift-2{--report-shift:var(--hs-shift-color-2);--report-shift-ink:var(--hs-shift-foreground-2)}
+.hs-report-shift-card.hs-report-shift-3{--report-shift:var(--hs-shift-color-3);--report-shift-ink:var(--hs-shift-foreground-3)}
+.hs-report-shift-card.hs-report-shift-4{--report-shift:var(--hs-shift-color-4);--report-shift-ink:var(--hs-shift-foreground-4)}
+.hs-report-shift-heading{display:flex;align-items:center;gap:12px;min-width:680px;padding:11px 14px;border-bottom:1px solid color-mix(in srgb,var(--report-shift) 24%,#cbdbe5);background:color-mix(in srgb,var(--report-shift) 10%,#fff)}
+.hs-report-shift-no{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;background:var(--report-shift);color:var(--report-shift-ink);font-size:14px;font-weight:800}
+.hs-report-shift-title{display:grid;gap:1px;margin-right:auto}.hs-report-shift-title small{color:#527083;font-size:10px;font-weight:700}.hs-report-shift-title h3{margin:0;color:#12314d;font-size:16px;line-height:1.2}
+.hs-report-shift-time{color:#33546b;font-size:13px;font-weight:700;white-space:nowrap}
+.hs-report-shift-state{padding:5px 10px;border:1px solid #e2c989;border-radius:999px;background:#fff9e8;color:#7c5312;font-size:11px;font-weight:800;white-space:nowrap}
+.hs-report-shift-state.is-progress{border-color:#a9cce5;background:#f0f7fd;color:#155e8b}.hs-report-shift-state.is-complete{border-color:#a5d5b8;background:#effaf3;color:#166534}
+.hs-daily-report .hs-report-shift{min-width:720px;margin:0;border:0;break-inside:avoid-page}
+.hs-daily-report .hs-report-shift th,.hs-daily-report .hs-report-shift td{border-color:#d9e2e9;padding:9px 12px;color:#243447;font-size:14px;line-height:1.6}
+.hs-daily-report .hs-report-shift tr:first-child th,.hs-daily-report .hs-report-shift tr:first-child td{border-top:0}
+.hs-daily-report .hs-report-shift tr:last-child th,.hs-daily-report .hs-report-shift tr:last-child td{border-bottom:0}
+.hs-daily-report .hs-report-shift th{background:#f5f8fa;color:#35526a;font-weight:700}.hs-daily-report .hs-report-shift td{background:#fff}
+.hs-daily-report .hs-report-shift thead th{text-align:center}
+.hs-report-footer{display:block;margin-top:24px;overflow:hidden;border:1px solid #bfd2de;border-radius:11px;background:#fff}
+.hs-report-footer-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#12314d;color:#fff}
+.hs-report-footer-heading span{font-size:15px;font-weight:800}.hs-report-footer-heading small{font-size:11px;color:#d5e6ed}
+.hs-report-approval-details{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr)}
+.hs-report-approval-details>div{display:grid;align-content:start;gap:7px;min-height:90px;padding:16px}.hs-report-approval-details>div+div{border-left:1px solid #d9e2e9}
+.hs-report-approval-details span{color:#64748b;font-size:11px;font-weight:700}.hs-report-approval-details strong{color:#12314d;font-size:18px}.hs-report-approval-details small{color:#64748b;font-size:11px}
+.hs-report-approval-details p{margin:0;color:#243447;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.hs-report-approval-form{display:grid;gap:12px;padding:16px;border-top:1px solid #d9e2e9;background:#f5f9fb;color:#12314d}
+.hs-report-approval-form label{display:grid;gap:7px;color:#12314d;font-size:13px;font-weight:700}
+.hs-report-approval-form textarea{box-sizing:border-box;width:100%;min-height:84px;padding:10px 12px;resize:vertical;border:1px solid #b5ccd9;border-radius:8px;background:#fff;color:#1e293b;font:inherit;font-weight:400;line-height:1.6}
+.hs-report-approval-form>div{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.hs-report-approval-form p{margin:0;color:#526579;font-size:12px;line-height:1.5}
+.hs-report-approval-readonly{margin:0;padding:12px 16px;border-top:1px solid #d9e2e9;background:#f5f9fb;color:#526579;font-size:12px;line-height:1.6}
+.hs-report-generated{margin:0;padding:9px 16px;border-top:1px solid #d9e2e9;color:#64748b;font-size:11px;text-align:right}
+
 .hs-preview{position:fixed;inset:0;z-index:1200;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(15,23,42,.66)}
 .hs-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink)}
 .hs-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -144,14 +217,35 @@
 @media(max-width:1000px){.hs-shift-body{grid-template-columns:1fr}}
 @media(max-width:800px){
   .panel.hs-toolbar{align-items:stretch}
-  .hs-date-nav label{order:-1;width:100%}.hs-date-nav label>span{width:100%}
-  .hs-toolbar-right{width:100%}.hs-toolbar-summary,.hs-current-now{justify-content:center;width:100%}
+  .hs-date-nav .hs-date-label{order:-1;width:100%}
+  .hs-toolbar-right{width:100%;margin-left:0;flex-wrap:wrap}.hs-toolbar-summary,.hs-current-now{justify-content:center;width:100%;white-space:normal}
   .hs-approval{display:grid}.hs-approval-actions{justify-content:flex-start}.hs-approval-actions input{width:100%;min-width:0}
   .hs-sheet-head{padding:20px 16px 16px}.hs-sheet-title h2{font-size:22px}.hs-sheet-emblem{width:48px;height:48px}
   .hs-kpis{gap:8px;padding:12px}
   .hs-shifts{gap:12px;padding:12px}.hs-shift-head{display:grid}.hs-shift-actions{justify-content:flex-start}.hs-shift-body{padding:12px}
   .hs-signs{grid-template-columns:1fr}
+  .hs-report-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.hs-report-approval-details{grid-template-columns:1fr}.hs-report-approval-details>div+div{border-left:0;border-top:1px solid #d9e2e9}
+  .hs-report-footer-heading{align-items:flex-start;flex-direction:column}
   .hs-preview-bar{flex-direction:column;align-items:flex-start}.hs-preview-scroll{padding:12px 8px}.hs-preview-paper{min-height:0;padding:4mm}
+}
+@media print{
+  .hs-approval{background:#fff!important;border:1px solid #111!important;box-shadow:none!important;break-inside:avoid-page}
+  .hs-approval-icon,.hs-approval-status{background:#fff!important;color:#111!important;border:1px solid #111!important}
+  .hs-approval-main strong,.hs-approval-detail{color:#111!important}
+  .hs-approval-action,.hs-approval-action:hover:not(:disabled),.hs-approval-action:disabled{background:#fff!important;color:#111!important;border:1px solid #111!important;box-shadow:none!important;opacity:1;transform:none}
+  .hs-report{font-size:8.4pt}
+  .hs-daily-report .hs-report-heading{margin-bottom:3mm;padding-bottom:3mm}
+  .hs-report-heading-top{margin-bottom:3mm;font-size:7pt}
+  .hs-report-overview{gap:2mm;margin-bottom:3mm}.hs-report-overview>div{padding:2mm;border-radius:2mm}.hs-report-overview strong{font-size:14pt}
+  .hs-report-shift-card{margin-bottom:3mm;overflow:visible;break-inside:avoid-page;border-color:#111!important;border-left:2mm solid #111!important}
+  .hs-report-shift-heading{min-width:0;padding:2mm 3mm;break-after:avoid;background:#fff!important;border-bottom-color:#111!important}.hs-report-shift-title h3{font-size:10pt}
+  .hs-report-shift-no{background:#fff!important;color:#111!important;border:1px solid #111}
+  .hs-daily-report .hs-report-shift{min-width:0;break-inside:avoid-page}.hs-daily-report .hs-report-shift tr{break-inside:avoid}
+  .hs-report-shift-card.is-long,.hs-report-shift-card.is-long .hs-report-shift{break-inside:auto}
+  .hs-report-shift-card.is-long .hs-report-shift tr.is-long-row{break-inside:auto}
+  .hs-daily-report .hs-report-shift th,.hs-daily-report .hs-report-shift td{padding:1.4mm 1.8mm;font-size:8pt}
+  .hs-report-footer{margin-top:3mm;break-inside:avoid}.hs-report-footer-heading{padding:2mm 3mm}.hs-report-approval-details>div{min-height:16mm;padding:3mm}
+  .hs-report-approval-form,.hs-report-approval-readonly{display:none!important}
 }
 @media(prefers-reduced-motion:reduce){.hs-state.is-active::before,.hs-pulse-dot{animation:none}.hs-shift{transition:none}}
 .hs-kpi.is-cyan{--tone:var(--cyan)}

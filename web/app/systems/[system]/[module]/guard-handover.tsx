@@ -29,6 +29,7 @@ import {
   activityTime, fileSizeLabel, hhmm, liveState, moveDate, newIncidentId, previewKind, rocDate, todayTaipei,
   type Attachment, type GuardContext, type GuardLog, type GuardOptionList, type GuardShift, type Incident, type Item,
 } from './guard-handover-shared';
+import { HandoverReportApprovalForm } from './handover-sheet';
 import { AttachmentChips, GuardDailyReport, GuardIcon, GuardShiftCard, GuardSheetHeader, type GuardKpi } from './guard-handover-view';
 import { GuardCorrectionModal } from './guard-handover-correction';
 import { GuardIncidentSearch } from './guard-incident-search';
@@ -198,7 +199,7 @@ export function GuardHandover({ system, module, profile }: Props) {
         onClick={() => setReceiving(shift)}>本人核對並確認接班</button> : null)}
   </>;
 
-  const report = { market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
+  const report = { market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length, correctionCount: (logId: string) => correctionsFor(logId).length };
   const editReportShift = (shift: GuardShift) => {
     const log = logFor(shift.name);
     if (log && context?.can_correct) setCorrecting(shift);
@@ -266,12 +267,12 @@ export function GuardHandover({ system, module, profile }: Props) {
         </div>
         <div className="guard-report-preview-scroll"><div className="guard-report-preview-page"><GuardDailyReport {...report} editing={previewEditing}
           canCorrect={Boolean(context.can_correct)} canEdit={canEdit} correctionCount={logId => correctionsFor(logId).length} onEditShift={editReportShift}
-          approvalControls={!approval && context.can_approve ? <div className="guard-report-approve-form">
-            <label htmlFor="guard-report-approval-note">簽核說明<textarea id="guard-report-approval-note" value={approvalNote} maxLength={500}
-              onChange={event => setApprovalNote(event.target.value)} placeholder={missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '可填寫當日案件處理與核閱說明（選填）'} /></label>
-            <div><p>{approvalHint}</p><button type="button" className="primary-btn" disabled={acting || !canApproveNow}
-              onClick={() => void approveDailyReport()}>主管簽核並產製日報表</button></div>
-          </div> : undefined} /></div></div>
+          approvalControls={!approval ? <HandoverReportApprovalForm id="guard-report-approval-note" label="簽核說明"
+            value={approvalNote} maxLength={500} onChange={setApprovalNote}
+            placeholder={!context.can_approve ? '目前帳號僅可檢視' : missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '可填寫當日案件處理與核閱說明（選填）'}
+            hint={approvalHint} buttonLabel="主管簽核並產製日報表" inputDisabled={acting} inputReadOnly={!context.can_approve}
+            submitDisabled={acting || !context.can_approve || !canApproveNow}
+            onSubmit={() => void approveDailyReport()} /> : undefined} /></div></div>
       </div>, document.body)}
     </div>
     {mounted && editing && context && market && createPortal(<GuardLogModal market={market} date={date} shift={editing} log={rawLogFor(editing.name)} staff={context.staff} people={context.people}

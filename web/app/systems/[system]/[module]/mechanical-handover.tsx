@@ -3,9 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { repairCostCents, repairCostTotal, formatRepairCost } from '@/lib/mechanical-cost';
+import { calculateMechanicalPrintFit } from '@/lib/mechanical-print-fit';
 import { appendMechanicalWorkDetails, canApproveMechanicalDay, currentMechanicalShift, mechanicalApprovalOpensOn, mechanicalWorkDetails } from '@/lib/mechanical-handover-flow';
 import { AppShell } from '@/components/AppShell';
-import { HandoverIcon, HandoverSheetHeader, type HandoverKpi } from './handover-sheet';
+import {
+  HandoverIcon, HandoverReportApprovalFooter, HandoverReportApprovalForm, HandoverReportHeading,
+  HandoverReportOverview, HandoverReportShiftCard, HandoverSheetHeader, type HandoverKpi,
+} from './handover-sheet';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { BlankSelectOption } from '@/components/BlankSelectOption';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
@@ -19,6 +23,7 @@ import './mechanical-handover.css';
 import { MechanicalConfirmModal, MechanicalSignatures, type MechanicalConfirmation, type MechanicalShiftReport } from './mechanical-handover-reconciliation';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
+type MechanicalReportApprovalPresentation = { showForm: boolean; inputReadOnly: boolean; submitDisabled: boolean; hint: string };
 type Shift = { code: string; label: string };
 
 const SHIFTS: Shift[] = [
@@ -272,6 +277,13 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const approvalOpenDate = mechanicalApprovalOpensOn(date);
   const allTransfersComplete = shiftReports.length === SHIFTS.length && shiftReports.every(report => Boolean(report.outgoing?.received_at));
   const canApprove = hasApprovalRole && approvalOpen && allTransfersComplete;
+  const approvalHint = !hasApprovalRole ? '目前帳號僅可檢視，無機電課課長簽核權限。'
+    : !allTransfersComplete ? '三個班別須先完成交班與接班雙方勾稽。'
+      : approvalOpen ? '已開放機電課課長核閱並確認當日交接內容。'
+        : `本日尚未開放簽核，最早於 ${approvalOpenDate.replaceAll('-', '/')} 起由機電課課長確認。`;
+  const approvalPresentation: MechanicalReportApprovalPresentation = {
+    showForm: !approval, inputReadOnly: !hasApprovalRole, submitDisabled: !canApprove, hint: approvalHint,
+  };
   const currentEntries = activeEntries(displayEntries);
   const deletedEntryCount = entries.length - currentEntries.length;
   const openEntry = (row: Row) => {
@@ -429,23 +441,26 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         <section className={`hs-approval${approval ? ' is-approved' : canApprove ? ' is-ready' : ''}`} aria-label="每日課長簽核">
           <div className="hs-approval-main">
             <span className="hs-approval-icon"><HandoverIcon name={approval ? 'check' : 'pen'} size={22} /></span>
-            <div><span>每日課長簽核</span><strong>{approval ? '本日已完成簽核' : '本日待課長簽核'}</strong><span>{approval ? `${userName(approval.approver_id)} · ${activityTime(approval.approved_at)}` : !allTransfersComplete ? '三個班別須先完成交班與接班雙方勾稽。' : approvalOpen ? '已開放機電課課長確認當日交接內容。' : `當日不可簽核，最早於 ${approvalOpenDate.replaceAll('-', '/')} 起由機電課課長確認。`}</span></div>
+            <div>
+              <div className="hs-approval-heading"><strong>每日課長簽核</strong><span className={`hs-approval-status${approval ? ' is-approved' : ''}`}>{approval ? '已簽' : '待簽'}</span></div>
+              <span className="hs-approval-detail">{approval ? `${userName(approval.approver_id)} · ${activityTime(approval.approved_at)}` : `${approvalHint} 請先核閱本日報表，再於報表底部簽核。`}</span>
+            </div>
           </div>
           <div className="hs-approval-actions mechanical-approval-actions">
-            {approval ? <><b className="hs-approval-seal">核准</b><div className="mechanical-approval-note is-approved"><span>批核意見</span><p>{String(approval.note || '—')}</p></div></> : canApprove ? <><button className="primary-btn" disabled={busy} onClick={() => void approveDaily()}>課長確認簽核</button><label className="mechanical-approval-note"><span>批核意見</span><input value={approvalNote} maxLength={1000} disabled={busy} onChange={event => setApprovalNote(event.target.value)} placeholder="可留白；如有意見請填寫" /></label></> : <span className="hs-muted">{!allTransfersComplete ? '等待完成雙方交接' : approvalOpen ? '等待課長簽核' : '隔日開放簽核'}</span>}
+            {hasApprovalRole && <button type="button" className="secondary-btn compact hs-approval-action" disabled={busy} onClick={() => setPreviewOpen(true)}>{approval ? '查看已簽核日報表' : '核閱並完成簽核'}</button>}
           </div>
         </section>
       </section>
 
-      {mounted && createPortal(<section className="mechanical-print-preview" aria-label="每日列印報表">
-        {(printData?.dates || [date]).map(printDate => <PrintSheet key={printDate} date={printDate}
+      {mounted && market && createPortal(<section className="mechanical-print-preview" aria-label="每日列印報表">
+        {(printData?.dates || [date]).map(printDate => <PrintSheet key={printDate} market={market} date={printDate}
           entries={correctedEntries((printData?.entries || entries).filter(row => String(row.work_date) === printDate), printData?.corrections || corrections)}
           signatures={(printData?.signatures || signatures).filter(row => String(row.work_date) === printDate)}
           shiftReports={printData ? reportsFromTransfers(printDate, printData.transfers) : shiftReports}
           approval={(printData?.approvals || approvals).find(row => String(row.work_date) === printDate)}
           userName={userName} />)}
       </section>, document.body)}
-      {mounted && previewOpen && createPortal(<DailyReportPreview date={date} entries={displayEntries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} canCorrect={hasApprovalRole} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} onEditEntry={editReportEntry} onCorrectEntry={row => setCorrectingEntry(row)} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
+      {mounted && previewOpen && market && createPortal(<DailyReportPreview market={market} date={date} entries={displayEntries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} canCorrect={hasApprovalRole} canApprove={canApprove} approvalHint={approvalHint} approvalPresentation={approvalPresentation} approvalNote={approvalNote} busy={busy} onApprovalNote={setApprovalNote} onApprove={() => void approveDaily()} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} onEditEntry={editReportEntry} onCorrectEntry={row => setCorrectingEntry(row)} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
     </div>
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {optionsOpen && <MechanicalWorkOptionsModal categories={workCategories} items={workItems} onClose={() => setOptionsOpen(false)} onDone={load} />}
@@ -469,51 +484,85 @@ export function PrintRangeModal({ error, from, to, busy, onFrom, onTo, onClose, 
 export function fitMechanicalPrint() {
   document.querySelectorAll<HTMLElement>('.mechanical-print-preview .mechanical-print-sheet').forEach(sheet => {
     const content = sheet.querySelector<HTMLElement>('.mechanical-print-content');
-    if (!content) return;
-    content.style.removeProperty('--mechanical-print-scale');
-    if (!sheet.clientHeight || !content.scrollHeight) return;
+    sheet.classList.remove('is-multipage');
+    content?.style.removeProperty('--mechanical-print-scale');
+    if (!content || !sheet.clientHeight || !content.scrollHeight) return;
     const style = window.getComputedStyle(sheet);
     const verticalPadding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
-    const ratio = Math.min(1, (sheet.clientHeight - verticalPadding - 2) / content.scrollHeight);
-    content.style.setProperty('--mechanical-print-scale', String(ratio));
+    const fit = calculateMechanicalPrintFit(sheet.clientHeight - verticalPadding - 2, content.scrollHeight);
+    if (fit.mode === 'multipage') {
+      sheet.classList.add('is-multipage');
+      return;
+    }
+    content.style.setProperty('--mechanical-print-scale', String(fit.scale));
   });
 }
 
-export function DailyReportPreview({ date, entries, signatures, shiftReports, approval, userName, canCorrect, onClose, onPrint, onEditEntry, onCorrectEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; canCorrect: boolean; onClose: () => void; onPrint: () => void; onEditEntry: (entry: Row) => void; onCorrectEntry: (entry: Row) => void; onAddEntry: (shiftCode: string) => void }) {
+export function DailyReportPreview({ market, date, entries, signatures, shiftReports, approval, userName, canCorrect, canApprove, approvalHint, approvalPresentation, approvalNote, busy, onApprovalNote, onApprove, onClose, onPrint, onEditEntry, onCorrectEntry, onAddEntry }: { market: HandoverMarket; date: string; entries: Row[]; signatures: Row[]; shiftReports: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; canCorrect: boolean; canApprove: boolean; approvalHint: string; approvalPresentation: MechanicalReportApprovalPresentation; approvalNote: string; busy: boolean; onApprovalNote: (note: string) => void; onApprove: () => void; onClose: () => void; onPrint: () => void; onEditEntry: (entry: Row) => void; onCorrectEntry: (entry: Row) => void; onAddEntry: (shiftCode: string) => void }) {
   const [editing, setEditing] = useState(false);
   return <div className="mechanical-report-preview" role="dialog" aria-modal="true" aria-label="機電交接本日報表預覽">
-    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>{editing && <span className="mechanical-report-edit-hint" role="status">{canCorrect ? '主管可修正工作內容、處理結果與備註；每次修正都保留前後內容。' : '按列內按鈕修改或新增；已修正的工作可查看主管修正紀錄。'}</span>}</div><div><button type="button" className={editing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成編輯' : '編輯內容'}</button><button type="button" className="primary-btn compact" onClick={onPrint}>列印本日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
-    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} editable={editing} canCorrect={canCorrect} onEditEntry={onEditEntry} onCorrectEntry={onCorrectEntry} onAddEntry={onAddEntry} /></div></div>
+    <div className="mechanical-report-preview-bar"><div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>{editing && <span className="mechanical-report-edit-hint" role="status">{canCorrect ? '主管可修正工作內容、處理結果與備註；每次修正都保留前後內容。' : '按列內按鈕修改或新增；已修正的工作可查看主管修正紀錄。'}</span>}</div><div><button type="button" className={editing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? '完成編輯' : '編輯內容'}</button><button type="button" className="primary-btn compact" onClick={onPrint}>列印日報表</button><button type="button" className="secondary-btn compact" onClick={onClose}>關閉預覽</button></div></div>
+    <div className="mechanical-report-preview-scroll"><div className="mechanical-report-preview-page"><PrintSheet market={market} date={date} entries={entries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} editable={editing} canCorrect={canCorrect} canApprove={canApprove} approvalHint={approvalHint} approvalPresentation={approvalPresentation} approvalNote={approvalNote} busy={busy} onApprovalNote={onApprovalNote} onApprove={onApprove} onEditEntry={onEditEntry} onCorrectEntry={onCorrectEntry} onAddEntry={onAddEntry} /></div></div>
   </div>;
 }
 
-export function PrintSheet({ date, entries, signatures, shiftReports = [], approval, userName, editable = false, canCorrect = false, onEditEntry, onCorrectEntry, onAddEntry }: { date: string; entries: Row[]; signatures: Row[]; shiftReports?: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; editable?: boolean; canCorrect?: boolean; onEditEntry?: (entry: Row) => void; onCorrectEntry?: (entry: Row) => void; onAddEntry?: (shiftCode: string) => void }) {
+export function PrintSheet({ market, date, entries, signatures, shiftReports = [], approval, userName, editable = false, canCorrect = false, canApprove = false, approvalHint = '', approvalPresentation, approvalNote = '', busy = false, onApprovalNote, onApprove, onEditEntry, onCorrectEntry, onAddEntry }: { market: HandoverMarket; date: string; entries: Row[]; signatures: Row[]; shiftReports?: MechanicalShiftReport[]; approval?: Row; userName: (id: unknown) => string; editable?: boolean; canCorrect?: boolean; canApprove?: boolean; approvalHint?: string; approvalPresentation?: MechanicalReportApprovalPresentation; approvalNote?: string; busy?: boolean; onApprovalNote?: (note: string) => void; onApprove?: () => void; onEditEntry?: (entry: Row) => void; onCorrectEntry?: (entry: Row) => void; onAddEntry?: (shiftCode: string) => void }) {
   const validEntries = activeEntries(entries);
-  return <article className="mechanical-print-sheet"><div className="mechanical-print-content">
-    <header><h2>臺北農產運銷股份有限公司第二批發市場<br />機電設備養護紀錄表</h2><p>{rocDate(date)}</p></header>
-    <table><colgroup><col className="print-shift" /><col className="print-work" /><col className="print-people" /><col className="print-result" /><col className="print-notes" /><col className="print-cost" /></colgroup>
-      <thead><tr><th>班別</th><th>維修養護工作內容</th><th>維修人員</th><th>處理結果</th><th>備註</th><th>費用（元）</th></tr></thead>
-      {SHIFTS.map((shift, index) => {
-        const rows = entries.filter(row => row.shift_code === shift.code);
-        const validRows = activeEntries(rows);
-        const deletedRows = rows.length - validRows.length;
-        const shiftLocked = Boolean(approval) || Boolean(shiftReports.find(report => report.shift_code === shift.code)?.outgoing);
-        return <tbody className="mechanical-print-shift" key={shift.code}>{(rows.length ? rows : [null]).map((row, rowIndex) => <tr className={row && isDeleted(row) ? 'is-deleted' : ''} key={row ? String(row.entry_id) : 'empty'}>
-          {rowIndex === 0 && <th rowSpan={Math.max(1, rows.length)}>{['早班', '中班', '晚班'][index]}<br />{shift.label}<br />共 {validRows.length} 件{deletedRows ? <><br />刪除 {deletedRows} 件</> : null}</th>}
-          <td>{row ? <><b>{rowIndex + 1}. {String(row.work_item || '未選常用項目')}</b>{row.details && <p>{String(row.details)}</p>}{row.correction_count > 0 && <small className="mechanical-report-correction-mark">主管修正 {row.correction_count} 次 · {activityTime(row.last_corrected_at)} · {userName(row.last_corrected_by)}</small>}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onEditEntry?.(row)}>{isDeleted(row) ? '查看紀錄' : canCorrect ? '主管修正' : shiftLocked || row.correction_count > 0 ? '查看紀錄' : '修改紀錄'}</button>{row.correction_count > 0 && !canCorrect && <button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onCorrectEntry?.(row)}>修正歷程</button>}</div>}</> : <>{'尚無工作紀錄'}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action mechanical-report-add-action" disabled={shiftLocked} onClick={() => onAddEntry?.(shift.code)}>新增工作紀錄</button>{shiftLocked && <small>本班已完成交班或簽核，暫不可新增。</small>}</div>}</>}</td>
-          <td>{row ? (Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—' : '—'}</td>
-          <td>{row ? isDeleted(row) ? '已刪除' : String(row.result || '—') : '—'}</td><td>{row ? <>{String(row.notes || '—')}{isDeleted(row) && <small className="mechanical-print-delete-time">刪除：{activityTime(row.deleted_at)}</small>}</> : '—'}</td>
-          <td>{row && !isDeleted(row) && row.repair_cost != null ? formatRepairCost(repairCostCents(row.repair_cost) || 0).replace('NT$ ', '') : row && isDeleted(row) ? '—' : '未填'}</td>
-        </tr>)}</tbody>;
-      })}
-    </table>
+  const completedShifts = shiftReports.filter(report => Boolean(report.outgoing?.received_at)).length;
+  const shiftNames = ['早班', '中班', '晚班'];
+  const approvalControls = approvalPresentation?.showForm ? <HandoverReportApprovalForm id="mechanical-report-approval-note"
+    label="簽核說明" value={approvalNote} maxLength={1000} inputDisabled={busy}
+    inputReadOnly={approvalPresentation.inputReadOnly} submitDisabled={busy || approvalPresentation.submitDisabled}
+    placeholder="可留白；如有意見請填寫" hint={approvalPresentation.hint} buttonLabel="課長確認簽核"
+    onChange={note => onApprovalNote?.(note)} onSubmit={() => onApprove?.()} /> : undefined;
+  return <article className="mechanical-print-sheet hs-report hs-daily-report"><div className="mechanical-print-content">
+    <HandoverReportHeading kicker="機電課每日養護紀錄" site={HANDOVER_MARKETS[market].name}
+      organization={'臺北農產運銷股份有限公司' + HANDOVER_MARKETS[market].name} title="機電設備養護紀錄表"
+      subtitle="設備養護暨維修報表" date={rocDate(date)} approved={Boolean(approval)}
+      approvedLabel="課長已簽核" pendingLabel="待課長簽核" />
+    <HandoverReportOverview label="設備養護紀錄概覽" metrics={[
+      { label: '值勤班別', value: String(SHIFTS.length), detail: '班' },
+      { label: '完成交接', value: String(completedShifts), detail: '／' + SHIFTS.length + ' 班' },
+      { label: '養護紀錄', value: String(validEntries.length), detail: '件' },
+      { label: '維修費用合計', value: formatRepairCost(repairCostTotal(validEntries)), detail: '新臺幣' },
+    ]} />
+    {SHIFTS.map((shift, index) => {
+      const rows = entries.filter(row => row.shift_code === shift.code);
+      const validRows = activeEntries(rows);
+      const deletedRows = rows.length - validRows.length;
+      const reportFields = rows.flatMap(row => [row.work_item, row.details, row.notes].map(value => String(value || '')));
+      const longShift = rows.length > 4 || reportFields.some(value => value.length > 450) || reportFields.reduce((sum, value) => sum + value.length, 0) > 750;
+      const report = shiftReports.find(item => item.shift_code === shift.code);
+      const shiftLocked = Boolean(approval) || Boolean(report?.outgoing);
+      const isReceived = Boolean(report?.outgoing?.received_at);
+      const status = isReceived ? '交接完成' : report?.outgoing ? '待接班確認' : '待交接勾稽';
+      return <HandoverReportShiftCard key={shift.code} index={index + 1} label="設備養護班別"
+        name={shiftNames[index]} time={shift.label} status={status}
+        statusTone={isReceived ? 'complete' : report?.outgoing ? 'progress' : 'pending'} longContent={longShift}>
+        <p className="mechanical-report-shift-summary">有效紀錄 {validRows.length} 件 · 保留刪除紀錄 {deletedRows} 件</p>
+        <table className="hs-report-shift mechanical-print-table">
+          <thead><tr><th>維修養護工作內容</th><th>維修人員</th><th>處理結果</th><th>備註</th><th>費用（元）</th></tr></thead>
+          <tbody className="mechanical-print-shift">{(rows.length ? rows : [null]).map((row, rowIndex) => <tr className={`${row && isDeleted(row) ? 'is-deleted' : ''}${row && [row.work_item, row.details, row.notes].some(value => String(value || '').length > 450) ? ' is-long-row' : ''}`} key={row ? String(row.entry_id) : 'empty'}>
+            <td>{row ? <><b>{rowIndex + 1}. {String(row.work_item || '未選常用項目')}</b>{row.details && <p>{String(row.details)}</p>}{row.correction_count > 0 && <small className="mechanical-report-correction-mark">主管修正 {row.correction_count} 次 · {activityTime(row.last_corrected_at)} · {userName(row.last_corrected_by)}</small>}{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onEditEntry?.(row)}>{isDeleted(row) ? '查看紀錄' : canCorrect ? '主管修正' : shiftLocked || row.correction_count > 0 ? '查看紀錄' : '修改紀錄'}</button>{row.correction_count > 0 && !canCorrect && <button type="button" className="secondary-btn compact mechanical-report-edit-action" onClick={() => onCorrectEntry?.(row)}>修正歷程</button>}</div>}</> : <>尚無工作紀錄{editable && <div className="mechanical-report-row-actions"><button type="button" className="secondary-btn compact mechanical-report-edit-action mechanical-report-add-action" disabled={shiftLocked} onClick={() => onAddEntry?.(shift.code)}>新增工作紀錄</button>{shiftLocked && <small>本班已完成交班或簽核，暫不可新增。</small>}</div>}</>}</td>
+            <td>{row ? (Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—' : '—'}</td>
+            <td>{row ? isDeleted(row) ? '已刪除' : String(row.result || '—') : '—'}</td>
+            <td>{row ? <>{String(row.notes || '—')}{isDeleted(row) && <small className="mechanical-print-delete-time">刪除：{activityTime(row.deleted_at)}</small>}</> : '—'}</td>
+            <td>{row && !isDeleted(row) && row.repair_cost != null ? formatRepairCost(repairCostCents(row.repair_cost) || 0).replace('NT$ ', '') : row && isDeleted(row) ? '—' : '未填'}</td>
+          </tr>)}</tbody>
+        </table>
+      </HandoverReportShiftCard>;
+    })}
     <div className="mechanical-print-total"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(validEntries))}</strong><span>費用未填 {validEntries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
-    <div className="mechanical-print-signatures"><b>交接勾稽</b>{SHIFTS.map(shift => {
+    <section className="mechanical-report-handoffs" aria-label="交接勾稽"><h3>交接勾稽</h3><div className="mechanical-report-handoff-grid">{SHIFTS.map((shift, index) => {
       const report = shiftReports.find(row => row.shift_code === shift.code);
       const legacy = userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id);
-      return <span key={shift.code}>{shift.label}<strong>{report?.outgoing ? `${report.outgoing.handed_name} → ${report.outgoing.receiver_name}` : legacy}</strong><small>{report?.outgoing?.handed_at ? `交 ${activityTime(report.outgoing.handed_at)}；接 ${activityTime(report.outgoing.received_at)}` : '尚未完成雙方交接'}</small></span>;
-    })}</div>
-    <div className="mechanical-print-approval"><b>課長簽核</b><span className="mechanical-print-approval-detail"><strong>{approval ? userName(approval.approver_id) : '待簽核'}</strong>{approval && <b className="mechanical-print-approval-seal">核可</b>}</span><span>{approval?.approved_at ? new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(String(approval.approved_at))) : '—'}</span><span className="mechanical-print-approval-note"><b>批核意見：</b>{approval?.note ? String(approval.note) : '　'}</span></div>
+      return <article key={shift.code}><span>{shiftNames[index]} · {shift.label}</span><strong>{report?.outgoing ? `${report.outgoing.handed_name} → ${report.outgoing.receiver_name}` : legacy}</strong><small>{report?.outgoing?.handed_at ? `交班 ${activityTime(report.outgoing.handed_at)} · 接班 ${activityTime(report.outgoing.received_at)}` : '尚未記錄交接勾稽'}</small></article>;
+    })}</div></section>
+    <HandoverReportApprovalFooter signerLabel="課長簽核" signerName={approval ? userName(approval.approver_id) : '尚未簽核'}
+      signedAt={approval?.approved_at ? activityTime(approval.approved_at) : ''} pendingTimeLabel="簽核後顯示課長與時間"
+      noteLabel="簽核說明" note={approval?.note ? String(approval.note) : '—'} controls={approvalControls}
+      readOnlyHint={!approval && !canApprove ? approvalHint : undefined}
+      generatedAt={`報表產製時間：${activityTime(new Date().toISOString())}`} />
   </div></article>;
 }
 

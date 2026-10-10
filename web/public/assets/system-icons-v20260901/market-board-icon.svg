@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">市場公開看板</title>
+  <desc id="desc">看盤蠟燭線與跑馬燈組成的市場公開看板圖示</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b2b42"/>
+      <stop offset="1" stop-color="#062033"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb300"/>
+      <stop offset="1" stop-color="#ff7a3d"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="18" width="220" height="220" rx="48" fill="url(#bg)" stroke="#4dd9ff" stroke-width="6"/>
+  <path d="M50 176h156" fill="none" stroke="#8bb3c7" stroke-width="6" stroke-linecap="round"/>
+  <g stroke="url(#amber)" stroke-width="12" stroke-linecap="round">
+    <path d="M78 168V96M78 84V70"/>
+    <path d="M118 176V120M118 108V88"/>
+    <path d="M158 148V78M158 66V52"/>
+  </g>
+  <path d="M64 150l30-34 26 20 44-58" fill="none" stroke="#00ff9d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M170 62l18-4-4 18" fill="none" stroke="#00ff9d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="46" y="192" width="164" height="26" rx="8" fill="none" stroke="#8bb3c7" stroke-width="6"/>
+  <path d="M58 205h44M112 205h30M150 205h48" stroke="url(#amber)" stroke-width="8" stroke-linecap="round"/>
+</svg>

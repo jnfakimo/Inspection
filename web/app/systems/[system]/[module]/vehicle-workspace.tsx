@@ -590,7 +590,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
     </tr>`).join('');
 
     popup.document.write(`<!doctype html><html lang="zh-TW"><head><meta charset="utf-8"><title>公務車派車報表</title><style>
-      body{font-family:'Noto Sans TC',sans-serif;padding:18px;color:#111}
+      body{font-family:'Noto Sans TC','Microsoft JhengHei UI','Microsoft JhengHei',sans-serif;padding:18px;color:#111}
       h1{font-size:20px;margin:0 0 6px}
       .meta{font-size:12px;color:#555;margin-bottom:12px}
       .summary{display:flex;gap:18px;padding:8px 12px;background:#eef7ff;margin-bottom:12px;font-size:13px;border-radius:4px}

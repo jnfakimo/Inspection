@@ -1,123 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { PUBLIC_WEATHER_SERVICE, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 import { createWeatherReader } from '@/lib/weather-api';
-// 版面微調集中在 web/lib/weather-map-tuning.ts，那支檔案不含邏輯，可直接改數字。
-import { COAST_MARGIN, MARKER_MIN_GAP, COUNTY_MARGIN_OFFSET, COUNTY_MARKER_POSITIONS } from '@/lib/weather-map-tuning';
+import { createRequestSequence } from '@/lib/request-sequence';
+import { emptyTownForecastView, formatWeatherMetric, formatWeatherTextMetric, visibleTownForecastView, type TownForecastView } from '@/lib/weather-presentation';
+// County weather markers use the transformed SVG county centroids as their anchors.
+import { formatWeatherTemperature, layoutWeatherMarkers, WEATHER_MAP_TRANSFORM, WEATHER_MAP_VIEWBOX, type WeatherMapCountyShape } from '@/lib/weather-map-geometry';
 
 type Row = Record<string, any>;
-type MapCountyShape = {
-  id: string;
-  county: string;
-  centerX: number;
-  centerY: number;
-  path: string;
-  title: string;
-};
+type MapCountyShape = WeatherMapCountyShape & { id: string; title: string };
 
 
 const COUNTIES = ['基隆市', '臺北市', '新北市', '桃園市', '新竹市', '新竹縣', '苗栗縣', '臺中市', '彰化縣', '南投縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣'];
 
-const MAIN_ISLAND_VIEWBOX = '220 185 450 610';
-const MARKER_POSITIONS: Record<string, [number, number]> = {
-  '基隆市': [525, 268],
-  '臺北市': [478, 256],
-  '新北市': [431, 264],
-  '桃園市': [384, 281],
-  '新竹市': [342, 311],
-  '新竹縣': [308, 349],
-  '苗栗縣': [278, 400],
-  '臺中市': [278, 455],
-  '彰化縣': [278, 511],
-  '雲林縣': [278, 566],
-  '嘉義市': [278, 621],
-  '嘉義縣': [295, 672],
-  '臺南市': [342, 698],
-  '高雄市': [401, 715],
-  '屏東縣': [486, 689],
-  '臺東縣': [546, 647],
-  '花蓮縣': [593, 545],
-  '宜蘭縣': [597, 404],
-  '南投縣': [452, 468]
-};
 // 圖示離海岸線的固定間距（外層座標）。距離是以台灣輪廓為基準量出來的，
 // 不是相對畫布的比例——沿岸每個圖示與陸地的空隙才會一致。
 
 // 找不到輪廓時（地圖還沒渲染完）的退路：沿用原本的外圍座標插值。
-const MARKER_PULL = 0.72;
-const MAP_SCALE = 0.65;
-const MAP_TX = 180;
-const MAP_TY = 140;
-
-
-/**
- * 從縣市中心沿「離島中心」的方向往外走，直到離開陸地為止，再加上固定邊距。
- * 判定是否還在陸地上用 SVG 的 isPointInFill()，量的是真正的輪廓而不是外框，
- * 所以西部平直海岸與東部山線都能得到一致的空隙。
- */
-function coastAnchor(
-  paths: SVGGeometryElement[],
-  centerLocal: [number, number],
-  originLocal: [number, number],
-  extraMargin = 0,
-): [number, number] {
-  const dx = centerLocal[0] - originLocal[0];
-  const dy = centerLocal[1] - originLocal[1];
-  const length = Math.hypot(dx, dy) || 1;
-  const ux = dx / length;
-  const uy = dy / length;
-  const onLand = (x: number, y: number) => {
-    const point = new DOMPoint(x, y);
-    return paths.some(path => { try { return path.isPointInFill(point); } catch { return false; } });
-  };
-  const STEP = 4;
-  const MAX = 400;
-  let travelled = 0;
-  // 先走出陸地。中心點理論上一定在陸地上，但離島或破碎海岸可能一開始就在外面。
-  while (travelled < MAX && onLand(centerLocal[0] + ux * travelled, centerLocal[1] + uy * travelled)) {
-    travelled += STEP;
-  }
-  const margin = (COAST_MARGIN + extraMargin) / MAP_SCALE; // 邊距以外層座標定義，換算回地圖本身的座標系
-  return [centerLocal[0] + ux * (travelled + margin), centerLocal[1] + uy * (travelled + margin)];
-}
-
-/**
- * 把圖示往各自的縣市中心拉近，再用簡單的鬆弛法把過近的推開。
- * 推開時兩點各退一半，方向沿著連線，所以整體排列仍保持原本的方位關係。
- */
-function layoutMarkers(points: Array<{ name: string; x: number; y: number; manual?: boolean }>) {
-  for (let round = 0; round < 60; round += 1) {
-    let adjusted = false;
-    for (let i = 0; i < points.length; i += 1) {
-      for (let j = i + 1; j < points.length; j += 1) {
-        const dx = points[j].x - points[i].x;
-        const dy = points[j].y - points[i].y;
-        const distance = Math.hypot(dx, dy) || 0.001;
-        if (distance >= MARKER_MIN_GAP) continue;
-        const ux = dx / distance;
-        const uy = dy / distance;
-        const gap = MARKER_MIN_GAP - distance;
-        if (points[i].manual && points[j].manual) continue;
-        if (points[i].manual) {
-          points[j].x += ux * gap; points[j].y += uy * gap;
-        } else if (points[j].manual) {
-          points[i].x -= ux * gap; points[i].y -= uy * gap;
-        } else {
-          const push = gap / 2;
-          points[i].x -= ux * push; points[i].y -= uy * push;
-          points[j].x += ux * push; points[j].y += uy * push;
-        }
-        adjusted = true;
-      }
-    }
-    if (!adjusted) break;
-  }
-  return new Map(points.map(point => [point.name, point]));
-}
-
-const LEFT_TEMP_COUNTIES = new Set(['苗栗縣', '臺中市', '彰化縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣']);
-
 const readWeather = createWeatherReader({ url: `${SUPABASE_URL}/functions/v1/cwa-weather`, anonKey: SUPABASE_ANON_KEY }, PUBLIC_WEATHER_SERVICE);
 
 // Helpers
@@ -127,7 +27,6 @@ const localTime = (value: unknown) => {
   if (Number.isNaN(date.getTime())) return String(value);
   return new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
 };
-const num = (value: unknown, digits = 0) => (value !== null && value !== undefined && Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—');
 
 function weatherIcon(text: string, code?: string) {
   const value = String(text || '') + ' ' + String(code || '');
@@ -143,20 +42,33 @@ function weatherIcon(text: string, code?: string) {
 
 export function WeatherWidget() {
   const [summary, setSummary] = useState<Row | null>(null);
-  const [towns, setTowns] = useState<Row[]>([]);
   const [county, setCounty] = useState('臺北市');
+  const [townView, setTownView] = useState<TownForecastView<Row>>(() => emptyTownForecastView());
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
-  const [townError, setTownError] = useState('');
-  const [townBusy, setTownBusy] = useState(false);
   // SVG is parsed into a narrow, typed set of React attributes. Keeping raw
   // markup out of state avoids an injection sink if the asset is replaced.
   const [mapShapes, setMapShapes] = useState<MapCountyShape[]>([]);
+  const [mapError, setMapError] = useState('');
   const [countyCenters, setCountyCenters] = useState<Record<string, [number, number]>>({});
   // 依台灣輪廓量出的自動落點；有手動定位時由 COUNTY_MARKER_POSITIONS 優先取用。
-  const [coastSpots, setCoastSpots] = useState<Record<string, [number, number]>>({});
-  const mapGroupRef = useRef<SVGGElement>(null);
-  const [townsOpen, setTownsOpen] = useState(false);
+  const summaryRequests = useRef(createRequestSequence());
+  const townRequests = useRef(createRequestSequence());
+  const currentTownView = visibleTownForecastView(townView, county);
+  const { towns, selectedTown, error: townError, busy: townBusy } = currentTownView;
+  const markerPositions = useMemo(() => {
+    const anchors = COUNTIES.flatMap(name => {
+      const center = countyCenters[name];
+      return center ? [{ name, x: center[0], y: center[1] }] : [];
+    });
+    return new Map(layoutWeatherMarkers(anchors, mapShapes).map(marker => [marker.name, marker] as const));
+  }, [countyCenters, mapShapes]);
+
+  const switchCounty = useCallback((nextCounty: string) => {
+    townRequests.current.invalidate();
+    setTownView(emptyTownForecastView<Row>(nextCounty));
+    setCounty(nextCounty);
+  }, []);
 
   const loadMap = useCallback(async () => {
     try {
@@ -166,9 +78,7 @@ export function WeatherWidget() {
         const parser = new DOMParser();
         const doc = parser.parseFromString(text, 'image/svg+xml');
         
-        const SCALE = 0.65;
-        const TX = 180;
-        const TY = 140;
+        const { scale: SCALE, translateX: TX, translateY: TY } = WEATHER_MAP_TRANSFORM;
 
         if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg') {
           throw new Error('Invalid Taiwan county SVG');
@@ -203,98 +113,91 @@ export function WeatherWidget() {
         if (!shapes.length) throw new Error('Taiwan county SVG has no county paths');
         setCountyCenters(centers);
         setMapShapes(shapes);
-      }
+      } else setMapError('縣市地圖目前無法載入');
     } catch (err) {
       console.error('Map loading failed', err);
+      setMapError('縣市地圖目前無法載入');
     }
   }, []);
 
   const load = useCallback(async () => {
+    const request = summaryRequests.current.begin();
     setBusy(true); setError('');
     try {
       const payload = await readWeather<Row>('summary');
-      setSummary(payload);
+      if (summaryRequests.current.isCurrent(request)) setSummary(payload);
     } catch (e: any) {
-      setError(e.message || '天氣資料載入失敗');
+      if (summaryRequests.current.isCurrent(request)) setError(e.message || '天氣資料載入失敗');
+    } finally {
+      if (summaryRequests.current.isCurrent(request)) setBusy(false);
     }
-    setBusy(false);
   }, []);
 
   useEffect(() => {
     void loadMap(); void load();
     const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 600_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      summaryRequests.current.invalidate();
+    };
   }, [loadMap, load]);
   
   useEffect(() => {
-    let active = true;
-    setTowns([]); setTownError(''); setTownBusy(false);
-    if (townsOpen && county) {
-      setTownBusy(true);
+    const request = townRequests.current.begin();
+    setTownView(emptyTownForecastView<Row>(county));
+    if (county) {
       const loadTowns = async () => {
         try {
           const payload = await readWeather<Row>('town', county);
-          if (active) setTowns(payload.towns || []);
+          if (townRequests.current.isCurrent(request)) {
+            setTownView({ county, towns: payload.towns || [], selectedTown: null, error: '', busy: false });
+          }
         } catch (e) {
-          if (active) setTownError(e instanceof Error ? e.message : '鄉鎮預報載入失敗');
-        } finally { if (active) setTownBusy(false); }
+          if (townRequests.current.isCurrent(request)) {
+            setTownView({ county, towns: [], selectedTown: null, error: e instanceof Error ? e.message : '鄉鎮預報載入失敗', busy: false });
+          }
+        }
       };
       void loadTowns();
     }
-    return () => { active = false; };
-  }, [county, townsOpen]);
+    return () => townRequests.current.invalidate();
+  }, [county]);
 
-  useEffect(() => {
-    const group = mapGroupRef.current;
-    const names = Object.keys(countyCenters);
-    if (!group || !mapShapes.length || !names.length) return;
-    const paths = Array.from(group.querySelectorAll('.county')) as SVGGeometryElement[];
-    if (!paths.length) return;
-    const toLocal = ([x, y]: [number, number]): [number, number] =>
-      [(x - MAP_TX) / MAP_SCALE, (y - MAP_TY) / MAP_SCALE];
-    const locals = names.map(name => toLocal(countyCenters[name]));
-    // 以所有縣市中心的平均當島中心，決定每個圖示要往哪個方向離開陸地。
-    const origin: [number, number] = [
-      locals.reduce((sum, point) => sum + point[0], 0) / locals.length,
-      locals.reduce((sum, point) => sum + point[1], 0) / locals.length,
-    ];
-    const spots: Record<string, [number, number]> = {};
-    names.forEach((name, index) => {
-      const [lx, ly] = coastAnchor(paths, locals[index], origin, COUNTY_MARGIN_OFFSET[name] || 0);
-      spots[name] = [lx * MAP_SCALE + MAP_TX, ly * MAP_SCALE + MAP_TY];
-    });
-    setCoastSpots(spots);
-  }, [mapShapes, countyCenters]);
 
-  if (busy && !summary) return <p className="empty">正在取得中央氣象署資料…</p>;
-  if (error && !summary) return <div role="status"><p className="empty">{error}</p><button className="secondary-btn" onClick={() => void load()} disabled={busy}>重新取得氣象</button></div>;
+
 
   const current: Row = (summary?.counties || []).find((row: Row) => row.county.replace('台', '臺') === county) || {};
   const stem = county.replace(/[市縣]$/, '');
+  const detail: Row = selectedTown || current;
+  const detailPlace = selectedTown ? String(selectedTown.town) : county;
   const countyAlerts: Row[] = (summary?.alerts || []).filter((alert: Row) =>
     (alert.areas || []).some((area: unknown) => String(area).includes(stem)));
 
   return (
-    <div className="weather-widget" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+    <div className="weather-widget">
+      <section className="weather-map-panel" style={{ background: 'transparent' }} aria-label="台灣縣市即時天氣分布">
+      <h3 className="weather-map-heading">台灣縣市天氣</h3>
       {/* 地圖區域 */}
-      <div className="weather-map-container" style={{ flex: '1 1 400px', position: 'relative', minHeight: '650px', background: 'var(--panel2)', borderRadius: '12px', overflow: 'hidden' }}>
-        <svg viewBox={MAIN_ISLAND_VIEWBOX} style={{ width: '100%', height: '100%', display: 'block' }}>
+      <div className="weather-map-container" style={{ background: 'transparent' }}>
+        {mapError && <p className="weather-map-status" role="status">{mapError}</p>}
+        {!mapError && !mapShapes.length && <p className="weather-map-status" role="status">正在載入縣市地圖…</p>}
+        <svg viewBox={WEATHER_MAP_VIEWBOX} style={{ width: '100%', height: '100%', display: 'block' }}>
           
           {/* 注入台灣地圖路徑，設定樣式 */}
           <style>{`
             .weather-map-container svg .county {
-              fill: var(--line);
-              stroke: var(--dim);
-              stroke-width: 1px;
+              fill: #E6F8FC;
+              stroke: #55B7E8;
+              stroke-width: 0.9px;
               transition: fill 0.2s;
             }
             .weather-map-container svg .county.selected {
-              fill: rgba(34, 211, 238, 0.4);
-              stroke: var(--cyan);
+              fill: #C6EDF7;
+              stroke: #167FB2;
               stroke-width: 2px;
             }
             .weather-map-container svg .county:hover {
-              fill: rgba(34, 211, 238, 0.2);
+              fill: #D8F2F8;
             }
           `}</style>
           {/* 地圖路徑由 React 安全地建立，並用 data-county 屬性選擇器點亮選取的縣市。
@@ -310,7 +213,7 @@ export function WeatherWidget() {
             }
           `}</style>}
           
-          <g ref={mapGroupRef} transform="translate(180, 140) scale(0.65)" fillRule="evenodd">
+          <g transform={`translate(${WEATHER_MAP_TRANSFORM.translateX}, ${WEATHER_MAP_TRANSFORM.translateY}) scale(${WEATHER_MAP_TRANSFORM.scale})`} fillRule="evenodd">
             {mapShapes.map(shape => (
               <path
                 key={shape.id}
@@ -326,60 +229,53 @@ export function WeatherWidget() {
           </g>
 
           <g className="weather-marker-layer">
-            {(() => {
-            const placed = layoutMarkers(COUNTIES.flatMap(name => {
-              const center = countyCenters[name];
-              const outer = COUNTY_MARKER_POSITIONS[name] || MARKER_POSITIONS[name];
-              if (!center || !outer) return [];
-              const manual = COUNTY_MARKER_POSITIONS[name];
-              const anchored = manual || coastSpots[name];
-              return [anchored
-                ? { name, x: anchored[0], y: anchored[1], manual: Boolean(manual) }
-                : {
-                  name,
-                  x: center[0] + (outer[0] - center[0]) * MARKER_PULL,
-                  y: center[1] + (outer[1] - center[1]) * MARKER_PULL,
-                }];
-            }));
-            return COUNTIES.map(name => {
+            {COUNTIES.map(name => {
               const data = (summary?.counties || []).find((r: Row) => r.county.replace('台', '臺') === name) || {};
-              const pos = COUNTY_MARKER_POSITIONS[name] || MARKER_POSITIONS[name];
-              const cx = countyCenters[name];
-              if (!pos || !cx) return null;
-              
-              const isLeft = LEFT_TEMP_COUNTIES.has(name);
               const isSelected = name === county;
-              // 位置已於 layoutMarkers 統一算好：先往縣市中心拉近，再把過近的推開。
-              const spot = placed.get(name);
+              const spot = markerPositions.get(name);
               if (!spot) return null;
               const mx = spot.x;
               const my = spot.y;
               
               return (
-                <g key={name} onClick={() => setCounty(name)} style={{ cursor: 'pointer', outline: 'none' }} tabIndex={0}>
+                <g
+                  key={name}
+                  role="button"
+                  aria-label={`${name}天氣詳情`}
+                  aria-pressed={isSelected}
+                  onClick={() => switchCounty(name)}
+                  onKeyDown={event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      switchCounty(name);
+                    }
+                  }}
+                  style={{ cursor: 'pointer', outline: 'none' }}
+                  tabIndex={0}
+                >
+                  <title>{name}</title>
                   {/* 圖示與氣溫卡 */}
                   <g transform={`translate(${mx} ${my})`}>
-                    <circle r={isSelected ? "20" : "17"} fill={isSelected ? "var(--cyan)" : "var(--panel)"} stroke="var(--cyan)" strokeWidth={isSelected ? "0" : "1.5"} opacity={isSelected ? "1" : "0.9"} />
+                    <circle r={isSelected ? "12" : "11.5"} fill="#FFFFFF" stroke={isSelected ? "#167FB2" : "#55B7E8"} strokeWidth={isSelected ? "1.5" : "1"} style={{ filter: "drop-shadow(0 1px 2px rgba(8, 42, 75, 0.28))" }} />
                     <text y="-1" textAnchor="middle" dominantBaseline="central" fontSize={isSelected ? "18px" : "16px"}>
                       {weatherIcon(data.weather, data.weatherCode)}
                     </text>
-                    <text 
-                      y={isLeft ? "1" : "26"} 
-                      x={isLeft ? "-26" : "0"} 
-                      textAnchor={isLeft ? "end" : "middle"} 
+                    <text
+                      y={spot.temperatureOffsetY}
+                      x="0"
+                      textAnchor="middle"
                       dominantBaseline="central" 
-                      fontSize="13px" 
-                      fontWeight="400" 
-                      fill="var(--text-hi)" 
-                      style={{ textShadow: '0 1px 2px rgba(255,255,255,0.9)', letterSpacing: '0.02em' }}
+                      fontSize="10px"
+                      fontWeight="500"
+                      fill="#164E70"
+                      style={{ letterSpacing: '0.01em' }}
                     >
-                      {data.temperature ? Math.round(Number(data.temperature)) + '°' : ''}
+                      {formatWeatherTemperature(data.temperature) || ''}
                     </text>
                   </g>
                 </g>
               );
-            });
-            })()}
+            })}
           </g>
         </svg>
         <div style={{ 
@@ -404,10 +300,15 @@ export function WeatherWidget() {
           點擊地圖或周圍圖示可切換縣市
         </div>
       </div>
+      </section>
 
       {/* 資訊區域 */}
-      <div className="weather-info-container" style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {error && <p className="inline-message" role="status">更新失敗，目前保留上次資料：{error}</p>}
+      <div className="weather-info-container">
+        {busy && !summary && <p className="empty" role="status">正在載入天氣資訊…</p>}
+        {error && <div className="inline-message" role="status">
+          <span>{summary ? `更新失敗，目前保留上次資料：${error}` : error}</span>
+          <button className="secondary-btn compact" onClick={() => void load()} disabled={busy}>重新取得天氣</button>
+        </div>}
         {summary?.sourceWarnings?.length > 0 && <p className="inline-message" role="status">部分氣象資料暫缺，請以中央氣象署最新公告為準。</p>}
         
         {/* 全區警報 */}
@@ -421,18 +322,23 @@ export function WeatherWidget() {
         </div>
 
         <div className="weather-controls" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <select value={county} onChange={e => setCounty(e.target.value)} style={{ padding: '8px 12px', borderRadius: '6px', background: 'var(--panel2)', color: 'var(--text-hi)', border: '1px solid var(--border)' }}>
+          <label className="weather-county-select">縣市
+          <select aria-label="選擇縣市" value={county} onChange={e => switchCounty(e.target.value)} style={{ padding: '8px 12px', borderRadius: '6px', background: 'var(--panel2)', color: 'var(--text-hi)', border: '1px solid var(--border)' }}>
             {COUNTIES.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
+          </label>
           <button onClick={() => void load()} disabled={busy} className="secondary-btn" style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--panel2)', color: 'var(--text-hi)', border: '1px solid var(--border)', cursor: 'pointer' }}>
             {busy ? '更新中…' : '重新取得'}
           </button>
-          <button onClick={() => setTownsOpen(!townsOpen)} className="secondary-btn" style={{ padding: '8px 16px', borderRadius: '6px', background: 'rgba(34, 211, 238, 0.1)', color: 'var(--cyan)', border: '1px solid var(--cyan)', cursor: 'pointer' }}>
-            {townsOpen ? '隱藏鄉鎮預報' : '顯示鄉鎮預報'}
-          </button>
         </div>
         
-        <div style={{ fontSize: '13px', color: 'var(--dim)' }}>
+        <nav className="weather-breadcrumb" aria-label="目前天氣位置">
+          <span>台灣各縣市</span><span aria-hidden="true">›</span><strong>{county}</strong>
+          {selectedTown && <><span aria-hidden="true">›</span><strong aria-current="page">{selectedTown.town}</strong></>}
+          {selectedTown && <button type="button" className="secondary-btn compact" onClick={() => setTownView(view => view.county === county ? { ...view, selectedTown: null } : view)}>返回縣市摘要</button>}
+        </nav>
+
+        <div className="weather-updated" style={{ fontSize: '13px', color: 'var(--dim)' }}>
           {summary?.updatedAt ? `更新時間：${localTime(summary.updatedAt)}` : ''} {summary?.stale ? '【快取資料】' : ''}
           {summary?.usingFallback && <span> · 使用備援氣象服務</span>}
         </div>
@@ -440,34 +346,36 @@ export function WeatherWidget() {
         {/* 主要天氣卡片 */}
         <div style={{ background: 'var(--panel2)', borderRadius: '12px', padding: '24px', border: '1px solid var(--border)' }}>
           <h3 style={{ margin: '0 0 20px 0', color: 'var(--cyan)', fontSize: '28px', borderBottom: '1px solid var(--border-hi)', paddingBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span>{county}</span>
-            <span style={{ color: 'var(--text-hi)', fontSize: '22px' }}>{current.weather || '—'}</span>
-            <span style={{ fontSize: '32px', marginLeft: 'auto' }}>{weatherIcon(current.weather, current.weatherCode)}</span>
+            <span>{detailPlace}</span>
+            <span style={{ color: 'var(--text-hi)', fontSize: '22px' }}>{detail.weather || '未提供'}</span>
+            <span style={{ fontSize: '32px', marginLeft: 'auto' }}>{weatherIcon(detail.weather, detail.weatherCode)}</span>
           </h3>
+          {selectedTown && <p className="weather-town-forecast-time">鄉鎮預報時間：{selectedTown.startsAt ? localTime(selectedTown.startsAt) : '未提供'}</p>}
+          {selectedTown?.description && <p className="weather-town-description">{String(selectedTown.description)}</p>}
           <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', margin: 0 }}>
             <div>
               <dt style={{ color: 'var(--dim)', fontSize: '14px', marginBottom: '8px' }}>目前溫度</dt>
-              <dd style={{ margin: 0, fontSize: '32px', fontWeight: 'bold', color: 'var(--cyan)' }}>{num(current.temperature, 1)}<small style={{ fontSize: '20px' }}>°C</small></dd>
+              <dd style={{ margin: 0, fontSize: '32px', fontWeight: 'bold', color: 'var(--cyan)' }}>{formatWeatherMetric(detail.temperature, '°C', 1)}</dd>
             </div>
             <div>
               <dt style={{ color: 'var(--dim)', fontSize: '14px', marginBottom: '8px' }}>今日高／低</dt>
-              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{num(current.maxTemperature)} / {num(current.minTemperature)}°C</dd>
+              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{formatWeatherMetric(detail.maxTemperature, '°C')} / {formatWeatherMetric(detail.minTemperature, '°C')}</dd>
             </div>
             <div>
               <dt style={{ color: 'var(--dim)', fontSize: '14px', marginBottom: '8px' }}>相對濕度</dt>
-              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{num(current.humidity)}%</dd>
+              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{formatWeatherMetric(detail.humidity, '%')}</dd>
             </div>
             <div>
               <dt style={{ color: 'var(--dim)', fontSize: '14px', marginBottom: '8px' }}>降雨機率</dt>
-              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{num(current.rainProbability)}%</dd>
+              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{formatWeatherMetric(detail.rainProbability, '%')}</dd>
             </div>
             <div>
               <dt style={{ color: 'var(--dim)', fontSize: '14px', marginBottom: '8px' }}>風速</dt>
-              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{num(current.windSpeed, 1)} m/s</dd>
+              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{formatWeatherTextMetric(detail.windSpeed, ' m/s')}</dd>
             </div>
             <div>
               <dt style={{ color: 'var(--dim)', fontSize: '14px', marginBottom: '8px' }}>降雨量</dt>
-              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{num(current.rainfall, 1)} mm</dd>
+              <dd style={{ margin: 0, fontSize: '22px', color: 'var(--text-hi)' }}>{formatWeatherMetric(detail.rainfall, ' mm', 1)}</dd>
             </div>
           </dl>
         </div>
@@ -485,8 +393,12 @@ export function WeatherWidget() {
         )}
 
         {/* 鄉鎮市區列表 */}
-        {townsOpen && (
-          <div className="responsive-table" style={{ maxHeight: '500px', overflowY: 'auto', background: 'var(--panel2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+          <details className="weather-town-details">
+            <summary>
+              <span>鄉鎮預報</span>
+              <span>{townBusy ? '載入中…' : towns.length ? `${towns.length} 個鄉鎮` : '展開查看'}</span>
+            </summary>
+            <div className="responsive-table" style={{ maxHeight: '500px', overflowY: 'auto', background: 'var(--panel2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
             {townBusy && <p role="status">正在取得鄉鎮預報…</p>}
             {townError && <p role="status">{townError}</p>}
             {!townBusy && !townError && !towns.length && <p>目前無鄉鎮預報資料。</p>}
@@ -503,18 +415,17 @@ export function WeatherWidget() {
               <tbody>
                 {towns.map((town, i) => (
                   <tr key={String(town.town)} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                    <td style={{ padding: '12px', color: 'var(--text-hi)' }}><strong>{String(town.town)}</strong></td>
-                    <td style={{ padding: '12px', color: 'var(--text-hi)' }}>{weatherIcon(town.weather, town.weatherCode)} {town.weather || '—'}</td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-hi)' }}>{num(town.temperature)}°C</td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-hi)' }}>{num(town.rainProbability)}%</td>
-                    <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-hi)' }}>{num(town.humidity)}%</td>
+                    <td style={{ padding: '12px', color: 'var(--text-hi)' }}><button type="button" className="weather-town-select" aria-pressed={selectedTown?.town === town.town} onClick={() => setTownView(view => view.county === county ? { ...view, selectedTown: town } : view)}>{String(town.town)}</button></td>
+                    <td style={{ padding: '12px', color: 'var(--text-hi)' }}>{weatherIcon(town.weather, town.weatherCode)} {town.weather || '未提供'}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-hi)' }}>{formatWeatherMetric(town.temperature, '°C')}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-hi)' }}>{formatWeatherMetric(town.rainProbability, '%')}</td>
+                    <td style={{ padding: '12px', textAlign: 'center', color: 'var(--text-hi)' }}>{formatWeatherMetric(town.humidity, '%')}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!towns.length && <p style={{ padding: '24px', textAlign: 'center', color: 'var(--dim)' }}>載入中或無資料…</p>}
           </div>
-        )}
+          </details>
 
       </div>
     </div>

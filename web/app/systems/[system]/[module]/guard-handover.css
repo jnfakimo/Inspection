@@ -130,58 +130,8 @@
 @media(prefers-reduced-motion:reduce){.guard-progress.is-indeterminate>span{animation:none}}
 
 /* 日報表預覽使用可捲動的 HTML 頁面；列印時才限制為紙張。 */
-.guard-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
-.guard-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink)}
-.guard-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.guard-report-preview-bar strong{font-size:17px}.guard-report-preview-bar span{color:var(--muted);font-size:13px}
-.guard-report-preview-bar .guard-report-edit-hint{flex-basis:100%;color:var(--cyan);font-weight:600}
-.guard-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:#eef2f7}
-.guard-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:auto;padding:clamp(18px,3vw,40px);background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.16)}
-.guard-report-preview .hs-report{font-size:14px}.guard-report-preview .hs-report header{margin-bottom:24px}.guard-report-preview .hs-report header h2{font-size:clamp(21px,2.2vw,28px)}.guard-report-preview .hs-report header p{font-size:16px}
-.guard-report-preview .hs-report table{min-width:720px}.guard-report-preview .hs-report th,.guard-report-preview .hs-report td{padding:10px 12px;font-size:14px;line-height:1.55}
-.guard-report-preview .hs-report-shift{margin-bottom:0}.guard-report-preview .guard-report-shift{margin-bottom:20px}
-.guard-report-actions{display:flex;justify-content:flex-end;padding:8px 10px;border:1px solid #222;border-top:0;background:#fff}
-.guard-daily-report{color:#1e293b;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-.guard-daily-report .guard-report-heading{position:relative;margin:0 0 18px;padding:0 0 22px;border-bottom:3px solid #0f7890;text-align:center}
-.guard-report-heading-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px;color:#0f7890;font-size:11px;font-weight:800;letter-spacing:.12em;text-align:left}
-.guard-daily-report .guard-report-heading h2{color:#12314d;font-size:clamp(21px,2.2vw,28px);line-height:1.45}
-.guard-daily-report .guard-report-heading p{margin:8px 0 0;color:#475569;font-size:14px;letter-spacing:.04em}
-.guard-report-state{display:inline-flex;margin-top:14px;padding:5px 13px;border:1px solid #e2a83d;border-radius:999px;background:#fff8e9;color:#854d0e;font-size:12px;font-weight:800}
-.guard-report-state.is-approved{border-color:#61a98a;background:#edf9f2;color:#166534}
-.guard-report-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:22px}
-.guard-report-overview>div{display:flex;align-items:baseline;gap:5px;min-width:0;padding:12px 15px;border:1px solid #d5e5ed;border-radius:10px;background:#f2f8fb}
-.guard-report-overview span{margin-right:auto;color:#475569;font-size:12px;font-weight:700}.guard-report-overview strong{color:#12314d;font-size:24px;line-height:1}.guard-report-overview small{color:#64748b;font-size:11px}
-.guard-daily-report .guard-report-shift{margin-bottom:18px;overflow-x:auto;border:1px solid #cbdbe5;border-radius:11px;background:#fff}
-.guard-report-shift-heading{display:flex;align-items:center;gap:12px;min-width:680px;padding:11px 14px;border-bottom:1px solid #cbdbe5;background:#eaf4f8}
-.guard-report-shift-no{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;background:#0f7890;color:#fff;font-size:14px;font-weight:800}
-.guard-report-shift-heading>div{display:grid;gap:1px;margin-right:auto}.guard-report-shift-heading small{color:#527083;font-size:10px;font-weight:700}.guard-report-shift-heading h3{margin:0;color:#12314d;font-size:16px;line-height:1.2}
-.guard-report-shift-time{color:#33546b;font-size:13px;font-weight:700;white-space:nowrap}
-.guard-report-shift-state{padding:5px 10px;border:1px solid #e2c989;border-radius:999px;background:#fff9e8;color:#7c5312;font-size:11px;font-weight:800;white-space:nowrap}
-.guard-report-shift-state.is-progress{border-color:#a9cce5;background:#f0f7fd;color:#155e8b}.guard-report-shift-state.is-complete{border-color:#a5d5b8;background:#effaf3;color:#166534}
-.guard-daily-report .hs-report-shift{margin:0;border:0}.guard-daily-report .hs-report-shift th,.guard-daily-report .hs-report-shift td{border-color:#d9e2e9;padding:9px 12px;color:#243447;line-height:1.6}
-.guard-daily-report .hs-report-shift tr:first-child th,.guard-daily-report .hs-report-shift tr:first-child td{border-top:0}
-.guard-daily-report .hs-report-shift th{width:13%;background:#f5f8fa;color:#35526a;font-weight:700}
-.guard-daily-report .hs-report-shift td{background:#fff}
-.guard-daily-report .guard-report-actions{border:0;border-top:1px solid #d9e2e9;background:#f8fafc}
-.guard-daily-report .guard-report-correction-mark{border-color:#d9e2e9;background:#f5fbff}
-.guard-report-footer{margin-top:24px;overflow:hidden;border:1px solid #bfd2de;border-radius:11px;background:#fff}
-.guard-report-footer-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:#12314d;color:#fff}
-.guard-report-footer-heading span{font-size:15px;font-weight:800}.guard-report-footer-heading small{font-size:11px;color:#d5e6ed}
-.guard-report-approval-details{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr)}
-.guard-report-approval-details>div{display:grid;align-content:start;gap:7px;min-height:90px;padding:16px}.guard-report-approval-details>div+div{border-left:1px solid #d9e2e9}
-.guard-report-approval-details span{color:#64748b;font-size:11px;font-weight:700}.guard-report-approval-details strong{color:#12314d;font-size:18px}.guard-report-approval-details small{color:#64748b;font-size:11px}
-.guard-report-approval-details p{margin:0;color:#243447;font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
-.guard-report-approve-form{display:grid;gap:12px;padding:16px;border-top:1px solid #d9e2e9;background:#f5f9fb}
-.guard-report-approve-form label{display:grid;gap:7px;color:#12314d;font-size:13px;font-weight:700}
-.guard-report-approve-form textarea{box-sizing:border-box;width:100%;min-height:84px;padding:10px 12px;resize:vertical;border:1px solid #b5ccd9;border-radius:8px;background:#fff;color:#1e293b;font:inherit;font-weight:400;line-height:1.6}
-.guard-report-approve-form>div{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.guard-report-approve-form p{margin:0;color:#526579;font-size:12px;line-height:1.5}
-.guard-report-generated{margin:0;padding:9px 16px;border-top:1px solid #d9e2e9;color:#64748b;font-size:11px;text-align:right}
-.guard-report-preview .guard-report-pink-action{border-color:#db2777;background:rgb(251 207 232 / 80%);color:#831843;font-weight:700}
-.guard-report-preview .guard-report-pink-action:not(:disabled):hover,
-.guard-report-preview .guard-report-pink-action:focus-visible{border-color:#be185d;background:rgb(249 168 212 / 80%);color:#701a3e;box-shadow:0 4px 12px rgba(219,39,119,.2)}
-.guard-report-correction-mark{margin:0;padding:8px 10px;border:1px solid #222;border-top:0;color:#075985;font-size:12px;font-weight:700}
-.guard-incident-flags,.guard-correction-mark{font-weight:700;color:var(--cyan)}
-.guard-print-root{display:none}
 
+.guard-incident-flags,.guard-correction-mark{font-weight:700;color:var(--cyan)}
 /* 修正編輯層高於日報表與一般表單，避免被預覽遮住。 */
 .guard-edit-backdrop{z-index:1300}.guard-correction-backdrop{z-index:1350}
 .guard-draft-status{padding:8px 20px;border-bottom:1px solid var(--line);color:var(--muted);font-size:13px}
@@ -203,9 +153,61 @@
 .guard-incident-search-controls label{display:grid;gap:5px;min-width:0;font-size:13px;font-weight:700}.guard-incident-search-controls input,.guard-incident-search-controls select{box-sizing:border-box;width:100%;min-width:0}
 .guard-incident-search-results ol{display:grid;gap:10px;margin:10px 0 0;padding:0;list-style:none}.guard-incident-search-results li{padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
 .guard-incident-search-results li>div{display:flex;gap:10px;flex-wrap:wrap}.guard-incident-search-results li span{color:var(--muted)}.guard-incident-search-results li p{margin:7px 0 0;overflow-wrap:anywhere}
-@media(max-width:800px){.guard-report-preview-bar{align-items:flex-start;flex-direction:column}.guard-report-preview-bar>div:last-child{align-self:flex-end}.guard-report-preview-page{padding:16px 10px}.guard-report-overview{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-report-approval-details{grid-template-columns:1fr}.guard-report-approval-details>div+div{border-left:0;border-top:1px solid #d9e2e9}.guard-report-footer-heading{align-items:flex-start;flex-direction:column}.guard-correction-item{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-correction-item button{justify-self:start}}
+
+@media(max-width:800px){.guard-correction-item{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-correction-item button{justify-self:start}}
 @media(max-width:900px){.guard-incident-search-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-incident-search-controls button{justify-self:start}.guard-incident-person{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:550px){.guard-correction-grid{grid-template-columns:1fr}.guard-correction-change{grid-template-columns:1fr 18px 1fr}.guard-correction-change b{grid-column:1/-1}.guard-incident-search-controls,.guard-incident-person{grid-template-columns:1fr}}
+.guard-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
+.guard-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.guard-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.guard-report-preview-bar strong{font-size:17px}.guard-report-preview-bar span{color:var(--muted);font-size:13px}
+.guard-report-preview-bar .guard-report-edit-hint{flex-basis:100%;color:var(--cyan);font-weight:600}
+.guard-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:#eef2f7}
+.guard-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:auto;padding:clamp(18px,3vw,40px);background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.16)}
+.guard-report-actions{display:flex;justify-content:flex-end;padding:8px 10px;border-top:1px solid #d9e2e9;background:#f8fafc}
+.guard-report-preview .guard-report-pink-action{border-color:#db2777;background:rgb(251 207 232 / 80%);color:#831843;font-weight:700}
+.guard-report-preview .guard-report-pink-action:not(:disabled):hover,
+.guard-report-preview .guard-report-pink-action:focus-visible{border-color:#be185d;background:rgb(249 168 212 / 80%);color:#701a3e;box-shadow:0 4px 12px rgba(219,39,119,.2)}
+.guard-report-correction-mark{margin:0;padding:8px 10px;border:1px solid #d9e2e9;border-top:0;background:#f5fbff;color:#075985;font-size:12px;font-weight:700}
+.guard-incident-flags,.guard-correction-mark{font-weight:700;color:var(--cyan)}
+.guard-print-root{display:none}
+
+/* 修正編輯層高於日報表與一般表單，避免被預覽遮住。 */
+.guard-edit-backdrop{z-index:1300}.guard-correction-backdrop{z-index:1350}
+.guard-draft-status{padding:8px 20px;border-bottom:1px solid var(--line);color:var(--muted);font-size:13px}
+.guard-draft-conflict{margin:16px 20px;padding:14px;border:1px solid color-mix(in srgb,var(--cyan) 40%,var(--line));border-radius:8px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel));color:var(--ink)}
+.guard-draft-conflict p{margin:7px 0 12px;line-height:1.6}.guard-draft-conflict button{margin:0 8px 0 0}
+.guard-correction-modal{width:min(980px,calc(100vw - 24px))}
+.guard-correction-content{display:grid;gap:14px;padding:18px 20px;color:var(--ink)}
+.guard-correction-content label{display:grid;gap:5px;min-width:0;font-weight:600}.guard-correction-content input,.guard-correction-content textarea,.guard-correction-content select{box-sizing:border-box;width:100%;min-width:0;font-weight:400}
+.guard-correction-content textarea{resize:vertical}.guard-correction-intro{margin:0;padding:10px 12px;border-left:4px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,var(--panel));line-height:1.6}
+.guard-correction-content fieldset{display:grid;gap:10px;min-width:0;margin:0;padding:14px;border:1px solid var(--line);border-radius:10px}.guard-correction-content legend{padding:0 7px;font-weight:700}
+.guard-correction-row,.guard-correction-item{display:grid;gap:10px;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.guard-correction-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.guard-correction-item{grid-template-columns:minmax(130px,2fr) 90px minmax(110px,1fr) minmax(130px,2fr) auto;align-items:end}
+.guard-correction-history{max-height:320px;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.guard-correction-history h3{margin:0 0 8px;font-size:16px}
+.guard-correction-history article{padding:10px 0;border-top:1px solid var(--line)}.guard-correction-history article>strong{color:var(--cyan)}
+.guard-correction-change{display:grid;grid-template-columns:100px minmax(0,1fr) 18px minmax(0,1fr);gap:8px;margin-top:7px;overflow-wrap:anywhere;white-space:pre-wrap;font-size:12px}
+.guard-correction-content footer{display:flex;justify-content:flex-end;gap:8px}
+.admin-modal.guard-print-modal{width:min(580px,calc(100vw - 32px));overflow:hidden}
+.admin-modal.guard-print-modal>header{background:color-mix(in srgb,var(--cyan) 5%,var(--panel))}
+.guard-print-range{display:grid;grid-template-columns:220px 28px 220px;align-items:end;justify-content:start;gap:8px;margin:18px 20px 0;padding:16px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--cyan) 4%,var(--panel2))}
+.guard-print-range label{gap:7px;font-size:14px;letter-spacing:.04em}
+.guard-print-range .localized-date-input{width:220px}
+.guard-print-range-arrow{display:grid;height:44px;place-items:center;color:var(--cyan);font-size:20px;font-weight:700}
+.guard-print-hint{margin:14px 20px 0;padding:11px 13px;border-left:4px solid var(--cyan);border-radius:5px;background:color-mix(in srgb,var(--cyan) 7%,var(--panel2));line-height:1.55}
+.guard-print-hint strong{color:var(--cyan);font-size:1.08em}
+.guard-print-error,.guard-print-invalid{margin:12px 20px 0;padding:9px 12px;border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber) 7%,var(--panel2));color:var(--text);line-height:1.5}
+.guard-print-error{border-left-color:var(--red);background:color-mix(in srgb,var(--red) 7%,var(--panel2))}
+.admin-modal.guard-print-modal>footer{margin-top:18px;background:var(--panel2)}
+.guard-incident-search{display:grid;gap:12px;padding:18px}.guard-incident-search h2{margin:0;font-size:18px}.guard-incident-search>p{margin:0;color:var(--muted)}
+.guard-incident-search-controls{display:grid;grid-template-columns:145px 145px 170px minmax(180px,1fr) auto;gap:10px;align-items:end}
+.guard-incident-search-controls label{display:grid;gap:5px;min-width:0;font-size:13px;font-weight:700}.guard-incident-search-controls input,.guard-incident-search-controls select{box-sizing:border-box;width:100%;min-width:0}
+.guard-incident-search-results ol{display:grid;gap:10px;margin:10px 0 0;padding:0;list-style:none}.guard-incident-search-results li{padding:12px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
+.guard-incident-search-results li>div{display:flex;gap:10px;flex-wrap:wrap}.guard-incident-search-results li span{color:var(--muted)}.guard-incident-search-results li p{margin:7px 0 0;overflow-wrap:anywhere}
+@media(max-width:800px){.guard-report-preview-bar{align-items:flex-start;flex-direction:column}.guard-report-preview-bar>div:last-child{align-self:flex-end}.guard-report-preview-page{padding:16px 10px}.guard-correction-item{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-correction-item button{justify-self:start}}
+@media(max-width:900px){.guard-incident-search-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.guard-incident-search-controls button{justify-self:start}.guard-incident-person{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.admin-modal.guard-print-modal{width:min(520px,calc(100vw - 16px))}.guard-print-range{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.guard-print-range .localized-date-input{width:100%}.guard-print-range-arrow{display:none}}
+@media(max-width:550px){.guard-correction-grid{grid-template-columns:1fr}.guard-correction-change{grid-template-columns:1fr 18px 1fr}.guard-correction-change b{grid-column:1/-1}.guard-incident-search-controls,.guard-incident-person{grid-template-columns:1fr}}
+@media(max-width:520px){.admin-modal.guard-print-modal{width:100%}.guard-print-range{grid-template-columns:1fr;margin:14px 14px 0;padding:12px}.guard-print-hint,.guard-print-error,.guard-print-invalid{margin-inline:14px}.admin-modal.guard-print-modal>footer{margin-top:14px}}
 @media print{
   @page{size:A4 portrait;margin:10mm}
   html:has(body.guard-printing),html:has(body.guard-printing) body.guard-printing{background:#fff!important;background-image:none!important}
@@ -213,18 +215,8 @@
   body.guard-printing>.guard-print-root{display:block!important;width:100%;margin:0;padding:0;background:#fff}
   body.guard-printing>.guard-print-root,body.guard-printing>.guard-print-root *{visibility:visible!important}
   body.guard-printing>.guard-print-root{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  .guard-print-root .guard-report-shift{break-inside:avoid}
-  .guard-print-root .hs-report-shift{margin-bottom:2.2mm}
+  .guard-print-root .guard-print-day:not(.is-first){break-before:page;page-break-before:always}
+  .guard-print-root .guard-print-day{break-inside:auto;page-break-inside:auto}
   .guard-print-root .guard-report-correction-mark{border:0;padding:0 0 2mm;font-size:7pt}
   .guard-print-root .guard-report-actions{display:none!important}
-  .guard-print-root .guard-daily-report .guard-report-heading{margin-bottom:3mm;padding-bottom:3mm}
-  .guard-print-root .guard-report-heading-top{margin-bottom:3mm;font-size:7pt}
-  .guard-print-root .guard-report-overview{gap:2mm;margin-bottom:3mm}.guard-print-root .guard-report-overview>div{padding:2mm;border-radius:2mm}.guard-print-root .guard-report-overview strong{font-size:14pt}
-  .guard-print-root .guard-daily-report .guard-report-shift{margin-bottom:3mm;overflow:visible;break-inside:avoid-page}
-  .guard-print-root .guard-report-shift-heading{min-width:0;padding:2mm 3mm;break-after:avoid}.guard-print-root .guard-report-shift-heading h3{font-size:10pt}
-  .guard-print-root .guard-daily-report .hs-report-shift{min-width:0;break-inside:avoid-page}.guard-print-root .guard-daily-report .hs-report-shift tr{break-inside:avoid}
-  .guard-print-root .guard-daily-report .guard-report-shift.is-long,.guard-print-root .guard-daily-report .guard-report-shift.is-long .hs-report-shift{break-inside:auto}
-  .guard-print-root .guard-daily-report .guard-report-shift.is-long tr.is-long-row{break-inside:auto}
-  .guard-print-root .guard-daily-report .hs-report-shift th,.guard-print-root .guard-daily-report .hs-report-shift td{padding:1.4mm 1.8mm;font-size:8pt}
-  .guard-print-root .guard-report-footer{margin-top:3mm;break-inside:avoid}.guard-print-root .guard-report-footer-heading{padding:2mm 3mm}.guard-print-root .guard-report-approval-details>div{min-height:16mm;padding:3mm}
 }

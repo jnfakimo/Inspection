@@ -7,7 +7,10 @@ assert.equal(systems.length, 13, '系統標題稽核必須涵蓋 13 大系統');
 assert.equal(moduleCount, 67, '系統標題稽核必須涵蓋 67 個子系統');
 
 for (const system of systems) {
-  const iconPath = `.${system.icon.replace('/Inspection', '')}`;
+  const publicAssetPrefix = '/Inspection/v2/';
+  assert.ok(system.icon.startsWith(publicAssetPrefix),
+    `${system.key} Logo URL 必須包含 V2 basePath：${system.icon}`);
+  const iconPath = `web/public/${system.icon.slice(publicAssetPrefix.length)}`;
   assert.ok(existsSync(iconPath), `${system.key} 的正式 Logo 不存在：${iconPath}`);
   // 系統 Logo 最大顯示尺寸是入口圖卡的 88px，來源一律收在 320px 以內（見 AGENTS.md）。
   // 2026-08-28 曾有 1254px、1MB 以上的 PNG 直接上線，入口頁光圖示就要載 2.6MB。
@@ -37,6 +40,19 @@ assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaT
   '交接紀錄首頁必須使用模組名稱作為大標題');
 
 const systemHub = readFileSync('web/app/systems/[system]/system-hub-client.tsx', 'utf8');
+const handoverRootStart = systemHub.indexOf("if (system.key === 'handover' && allowed)");
+const otherOperationsHubStart = systemHub.indexOf("if ((system.key === 'guardpatrol'");
+assert.ok(handoverRootStart >= 0 && handoverRootStart < otherOperationsHubStart,
+  '電子交接簿根路由必須先於入口卡分派直接進入交接紀錄');
+const handoverRoot = systemHub.slice(handoverRootStart, otherOperationsHubStart);
+assert.match(handoverRoot, /module\.key === 'records'/);
+assert.match(handoverRoot, /HandoverModules/);
+assert.match(handoverRoot, /title: '交接紀錄'/);
+const handoverWorkspace = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
+assert.match(handoverWorkspace, /const allowedModules = profile\.allowed_handover_modules \|\| \[\]/);
+assert.match(handoverWorkspace, /allowedModules\.includes\(module\.key\)/);
+assert.match(handoverWorkspace, /module\.key === 'guard' && allowedModules\.includes\('guard-approve'\)/);
+assert.match(handoverWorkspace, /if \(!allowed\) return/);
 assert.match(systemHub, /metaTitle: '系統入口', description: system\.description/,
   '駐衛警系統入口必須使用共用標題與系統說明');
 const operationsCss = readFileSync('web/app/systems/[system]/[module]/operations.css', 'utf8');

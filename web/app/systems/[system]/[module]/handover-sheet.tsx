@@ -6,6 +6,8 @@
 
 import type { ReactNode } from 'react';
 
+const REPORT_SHIFT_CLASS = ['hs-report-shift-1', 'hs-report-shift-2', 'hs-report-shift-3', 'hs-report-shift-4'];
+
 export type IconName = 'shield' | 'clock' | 'route' | 'users' | 'note' | 'flag' | 'alert' | 'box' | 'pen' | 'check' | 'clip' | 'image' | 'video' | 'file' | 'doc' | 'calendar' | 'building' | 'tool' | 'clipboard' | 'chevron-down' | 'chevron-up' | 'list' | 'printer' | 'eye' | 'save';
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
@@ -90,4 +92,67 @@ export function HandoverSheetHeader({ org, title, dateLabel, emblem = 'shield', 
       <div><b>{kpi.value}</b><small>{kpi.label}</small></div>
     </div>)}</div>}
   </>;
+}
+
+export function HandoverReportHeading({ kicker, site, organization, title, subtitle, date, approved, approvedLabel, pendingLabel }: {
+  kicker: string; site: string; organization: string; title: string; subtitle: string; date: string;
+  approved: boolean; approvedLabel: string; pendingLabel: string;
+}) {
+  return <header className="hs-report-heading">
+    <div className="hs-report-heading-top"><span>{kicker}</span><span>{site}</span></div>
+    <h2>{organization}<br />{title}</h2>
+    <p>{subtitle} <span aria-hidden="true">／</span> {date}</p>
+    <span className={`hs-report-state${approved ? ' is-approved' : ''}`}>{approved ? approvedLabel : pendingLabel}</span>
+  </header>;
+}
+
+export type HandoverReportMetric = { label: string; value: string; detail: string };
+
+export function HandoverReportOverview({ metrics, label = '本日報表摘要' }: { metrics: HandoverReportMetric[]; label?: string }) {
+  return <div className="hs-report-overview" aria-label={label}>{metrics.map(metric =>
+    <div key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></div>)}</div>;
+}
+
+export function HandoverReportShiftCard({ index, label, name, time, status, statusTone = 'pending', longContent = false, children }: {
+  index: number; label: string; name: string; time: string; status: string;
+  statusTone?: 'pending' | 'progress' | 'complete'; longContent?: boolean; children: ReactNode;
+}) {
+  const shiftClass = REPORT_SHIFT_CLASS[(index - 1) % REPORT_SHIFT_CLASS.length];
+  return <div className={`hs-report-shift-card ${shiftClass}${longContent ? ' is-long' : ''}`}>
+    <div className="hs-report-shift-heading">
+      <span className="hs-report-shift-no">{String(index).padStart(2, '0')}</span>
+      <div className="hs-report-shift-title"><small>{label}</small><h3>{name}</h3></div>
+      <span className="hs-report-shift-time">{time}</span>
+      <span className={`hs-report-shift-state is-${statusTone}`}>{status}</span>
+    </div>
+    {children}
+  </div>;
+}
+
+export function HandoverReportApprovalFooter({ signerLabel, signerName, signedAt, pendingTimeLabel, noteLabel, note, controls, readOnlyHint, generatedAt }: {
+  signerLabel: string; signerName: string; signedAt: string; pendingTimeLabel: string; noteLabel: string; note: string;
+  controls?: ReactNode; readOnlyHint?: string; generatedAt: string;
+}) {
+  return <footer className="hs-report-footer">
+    <div className="hs-report-footer-heading"><span>主管核閱與簽核</span><small>簽核紀錄與說明會隨報表一併列印</small></div>
+    <div className="hs-report-approval-details">
+      <div><span>{signerLabel}</span><strong>{signerName}</strong><small>{signedAt || pendingTimeLabel}</small></div>
+      <div><span>{noteLabel}</span><p>{note || '—'}</p></div>
+    </div>
+    {controls}
+    {!signedAt && !controls && readOnlyHint && <p className="hs-report-approval-readonly">{readOnlyHint}</p>}
+    <p className="hs-report-generated">{generatedAt}</p>
+  </footer>;
+}
+
+export function HandoverReportApprovalForm({ id, label, value, maxLength, placeholder, hint, buttonLabel, disabled = false, inputDisabled = disabled, inputReadOnly = false, submitDisabled = disabled, onChange, onSubmit }: {
+  id: string; label: string; value: string; maxLength: number; placeholder: string; hint: string; buttonLabel: string;
+  disabled?: boolean; inputDisabled?: boolean; inputReadOnly?: boolean; submitDisabled?: boolean;
+  onChange: (value: string) => void; onSubmit: () => void;
+}) {
+  return <div className="hs-report-approval-form">
+    <label htmlFor={id}>{label}<textarea id={id} value={value} maxLength={maxLength} disabled={inputDisabled} readOnly={inputReadOnly}
+      onChange={event => onChange(event.target.value)} placeholder={placeholder} /></label>
+    <div><p>{hint}</p><button type="button" className="primary-btn" disabled={submitDisabled} onClick={onSubmit}>{buttonLabel}</button></div>
+  </div>;
 }

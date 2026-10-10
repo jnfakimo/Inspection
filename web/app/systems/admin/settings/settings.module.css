@@ -605,7 +605,7 @@
 
 .treeMark {
   color: #8da4b8;
-  font-family: var(--font-rajdhani), monospace;
+  font-family: var(--head);
   font-size: 0.78rem;
   font-weight: 700;
 }
