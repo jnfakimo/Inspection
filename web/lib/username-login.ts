@@ -1,11 +1,9 @@
 'use client';
 
 import { getSupabase } from './supabase';
-import { SUPABASE_ANON_KEY } from './config';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
 
 const USERNAME_LOGIN_TIMEOUT_MS = 15_000;
-
-const isIpAddress = (hostname: string) => /^(?:\d{1,3}\.){3}\d{1,3}$/u.test(hostname);
 
 async function invokeSameOrigin(body: Record<string, unknown>) {
   const controller = new AbortController();
@@ -59,10 +57,8 @@ export async function invokeUsernameLogin<T>(
   while (attempt <= maxRetries) {
     attempt++;
     try {
-      // Self-hosted deployments are commonly opened by IP with a router port
-      // (e.g. https://1.34.250.22:5057). Try same-origin first, then cloud failover if 5xx / network error.
-      if (typeof window !== 'undefined' && (isIpAddress(window.location.hostname)
-        || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      // Follow the configured backend: Next.js development has no Edge routes.
+      if (typeof window !== 'undefined' && SUPABASE_URL === window.location.origin) {
         try {
           return await invokeSameOrigin(body) as T;
         } catch (error) {

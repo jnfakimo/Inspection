@@ -10,7 +10,7 @@ import { markPatrolSessionExpired } from './patrol-session';
 
 let client: SupabaseClient | null = null;
 // The formal self-hosted site must keep writes on the same backend as its login.
-const nodeAppApiUrl = usesLocalBackendOrigin(new URL(SUPABASE_URL).hostname)
+const nodeAppApiUrl = process.env.NODE_ENV === 'development' || usesLocalBackendOrigin(new URL(SUPABASE_URL).hostname)
   ? undefined : process.env.NEXT_PUBLIC_APP_API_URL?.trim().replace(/\/$/, '');
 // 地端相容 API 不能讓前端無限等待；逾時後改走同源地端 app-api。
 const NODE_API_TIMEOUT_MS = 5000;
