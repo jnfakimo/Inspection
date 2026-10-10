@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PGlite } from '@electric-sql/pglite';
+import { pathToFileURL } from 'node:url';
+
+const packageUrl = process.env.HANDOVER_TEST_PGLITE_PATH
+  ? pathToFileURL(process.env.HANDOVER_TEST_PGLITE_PATH).href : '@electric-sql/pglite';
+const { PGlite } = await import(packageUrl);
 
 const db = new PGlite();
 const actorA = '00000000-0000-0000-0000-000000000001', actorB = '00000000-0000-0000-0000-000000000002', actorC = '00000000-0000-0000-0000-000000000003';

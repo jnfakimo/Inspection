@@ -33,6 +33,7 @@
 .business-approval-note-box b{color:var(--ink);display:block;margin-bottom:2px}
 .business-approval-note-box p{margin:0;color:var(--ink);line-height:1.45;white-space:pre-line}
 .business-approval-note-box.is-empty{border-left-color:var(--line);background:var(--panel2);color:var(--muted)}
+.business-approval-readonly{margin:0;padding:7px 9px;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;background:color-mix(in srgb,var(--amber) 8%,var(--panel));color:var(--ink);font-size:12px;line-height:1.5}
 .business-stage-actions{margin-top:8px;display:flex;justify-content:flex-end}
 
 .business-stage-pending-info{display:grid;gap:8px;margin-top:auto}

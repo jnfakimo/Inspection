@@ -12,6 +12,13 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import {
+  businessApprovalPresentation,
+  businessApprovalReadonlyReason,
+  emptyBusinessApprovalAccess,
+  type BusinessApprovalAccess,
+  type BusinessApprovalStage,
+} from '@/lib/business-handover-approval';
+import {
   DEFAULT_BUSINESS_DUTY_CHECKLIST,
   TIME_SLOT_DEFS,
   parseDutyChecklist,
@@ -45,7 +52,8 @@ const SHIFTS = [
 
 const CATEGORIES = ['事務事項', '維修', '其他'] as const;
 
-export type ApprovalStage = 'director' | 'deputy_manager' | 'manager';
+export type ApprovalStage = BusinessApprovalStage;
+type ApprovalAccessState = BusinessApprovalAccess;
 
 export const APPROVAL_STAGES: { stage: ApprovalStage; label: string; title: string; desc: string }[] = [
   { stage: 'director', label: '市場主任', title: '市場主任批核', desc: '所屬市場主任查核點檢與交接事項' },
@@ -186,8 +194,10 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const [users, setUsers] = useState<Row[]>([]);
   const [receivers, setReceivers] = useState<Row[]>([]);
   const [approvals, setApprovals] = useState<BusinessApproval[]>([]);
+  const [approvalAccess, setApprovalAccess] = useState<Record<ApprovalStage, ApprovalAccessState>>(() => emptyBusinessApprovalAccess());
   const [busy, setBusy] = useState(true);
   const [note, setNote] = useState('');
+  const approvalSubmitRef = useRef(false);
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
 
@@ -235,18 +245,20 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
   // 載入資料庫、點檢表與批核紀錄
   const load = useCallback(async () => {
-    if (!market) { setBusy(false); return; }
+    if (!market) { setApprovalAccess(emptyBusinessApprovalAccess('unavailable')); setBusy(false); return; }
     const generation = ++loadGeneration.current;
     setBusy(true);
+    setApprovalAccess(emptyBusinessApprovalAccess('checking'));
     setNote('');
     try {
       const client = getSupabase();
-      const [entryResult, userResult, approvalResult, reports, eligibleReceivers] = await Promise.all([
+      const [entryResult, userResult, approvalResult, reports, eligibleReceivers, approvalAccessResults] = await Promise.all([
         client.from('business_handover_entries').select('*').eq('market_code', market).eq('handover_date', date).order('shift_code').order('created_at'),
         client.from('users').select('user_id,name,username,email,role,rbac_role,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
         client.from('business_handover_approvals').select('*').eq('market_code', market).eq('handover_date', date).order('created_at'),
         invokeAppApi<BusinessShift[]>('business_handover_day', { market_code: market, handover_date: date }),
         invokeAppApi<Row[]>('business_handover_receivers', { market_code: market }),
+        Promise.allSettled(APPROVAL_STAGES.map(({ stage }) => client.rpc('business_market_can_approve', { p_market: market, p_stage: stage }))),
       ]);
       if (generation !== loadGeneration.current) return;
       if (entryResult.error || userResult.error || approvalResult.error) throw entryResult.error || userResult.error || approvalResult.error;
@@ -256,6 +268,11 @@ export function BusinessHandover({ system, module, profile }: Props) {
       setReceivers(selectableActiveUsers(eligibleReceivers));
       setUsers(selectableActiveUsers(userResult.data || []));
       setApprovals((approvalResult.data as BusinessApproval[]) || []);
+      setApprovalAccess(Object.fromEntries(approvalAccessResults.map((result, index) => {
+        const stage = APPROVAL_STAGES[index].stage;
+        if (result.status === 'rejected' || result.value.error) return [stage, 'unavailable'];
+        return [stage, result.value.data === true ? 'allowed' : 'denied'];
+      })) as Record<ApprovalStage, ApprovalAccessState>);
 
       // 嘗試從資料庫中的點檢紀錄條目或 LocalStorage 載入點檢表狀態與自訂項目
       let loadedChecks: DutyCheckMap = {};
@@ -317,6 +334,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
       setShiftReports([]);
       setEntries([]);
       setApprovals([]);
+      setApprovalAccess(emptyBusinessApprovalAccess('unavailable'));
       setNote(`失敗：${errorMessage(err, '業管組交接資料載入失敗')}`);
     } finally {
       if (generation === loadGeneration.current) setBusy(false);
@@ -495,6 +513,12 @@ export function BusinessHandover({ system, module, profile }: Props) {
     if (!stage) return;
     const stageItem = approvalStages.find(s => s.stage === stage);
     if (!stageItem) return;
+    if (approvalAccess[stage] !== 'allowed') {
+      setNote(businessApprovalReadonlyReason(approvalAccess[stage]));
+      return;
+    }
+    if (approvalSubmitRef.current) return;
+    approvalSubmitRef.current = true;
     const noteContent = customNote !== undefined ? customNote : approvalStageNote[stage] || '';
     setBusy(true);
     setNote('');
@@ -514,6 +538,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
     } catch (err) {
       setNote(`失敗：批核未儲存，${errorMessage(err)}`);
     } finally {
+      approvalSubmitRef.current = false;
       setBusy(false);
     }
   };
@@ -661,6 +686,10 @@ export function BusinessHandover({ system, module, profile }: Props) {
             {approvalStages.map((stageItem, stageIdx) => {
               const stageApproval = approvals.find(a => a.stage === stageItem.stage);
               const isApproved = Boolean(stageApproval);
+              const stageAccess = approvalAccess[stageItem.stage];
+              const presentation = businessApprovalPresentation(isApproved, stageAccess);
+              const canApprove = presentation.canSubmit || presentation.canEditSaved;
+              const readOnlyReason = businessApprovalReadonlyReason(stageAccess);
 
               return (
                 <div
@@ -689,37 +718,42 @@ export function BusinessHandover({ system, module, profile }: Props) {
                       </div>
                       {stageApproval.note ? (
                         <div className="business-approval-note-box">
-                          <b>批核意見：</b>
+                          <b>簽核說明（已保存）：</b>
                           <p>{stageApproval.note}</p>
                         </div>
                       ) : (
                         <div className="business-approval-note-box is-empty">
-                          <small>（無填寫批核意見）</small>
+                          <small>簽核時未填寫說明</small>
                         </div>
                       )}
+                      {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
                       <div className="business-stage-actions">
                         <button
                           type="button"
                           className="secondary-btn compact"
+                          disabled={busy || !canApprove}
+                          title={readOnlyReason || undefined}
                           onClick={() => {
                             setApprovingStage(stageItem.stage);
                             setModalApprovalNote(stageApproval.note || '');
                           }}
                         >
                           <BusinessIcon name="pen" size={13} />
-                          修改批核意見
+                          修改簽核說明
                         </button>
                       </div>
                     </div>
                   ) : (
                     <div className="business-stage-pending-info">
                       <label className="business-note-input-label">
-                        <span>批核意見（可選填）：</span>
+                        <span>簽核說明（可留白）：</span>
                         <input
                           type="text"
                           className="business-note-input"
                           placeholder="例如：查核無誤、同意備查、請加強巡檢..."
                           value={approvalStageNote[stageItem.stage]}
+                          readOnly={!canApprove || busy}
+                          aria-readonly={!canApprove || busy || undefined}
                           onChange={e =>
                             setApprovalStageNote(prev => ({
                               ...prev,
@@ -728,9 +762,12 @@ export function BusinessHandover({ system, module, profile }: Props) {
                           }
                         />
                       </label>
+                      {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
                       <button
                         type="button"
                         className="primary-btn compact business-approve-btn"
+                        disabled={busy || !canApprove}
+                        title={readOnlyReason || undefined}
                         onClick={() => void handleApproveStage(stageItem.stage)}
                       >
                         <BusinessIcon name="check" size={14} />
@@ -1137,22 +1174,26 @@ export function BusinessHandover({ system, module, profile }: Props) {
         />
       )}
 
-      {/* 主管修改批核意見彈窗 */}
+      {/* 主管修改簽核說明彈窗 */}
       {approvingStage && (
         <AdminModal
-          title={`修改批核意見｜${approvalStages.find(s => s.stage === approvingStage)?.label}`}
+          title={`修改簽核說明｜${approvalStages.find(s => s.stage === approvingStage)?.label}`}
           onClose={() => setApprovingStage(null)}
         >
           <div className="admin-form-grid" style={{ padding: '20px' }}>
             <label className="wide">
-              批核意見 / 審核說明
+              簽核說明
               <textarea
                 rows={4}
                 value={modalApprovalNote}
+                readOnly={approvalAccess[approvingStage] !== 'allowed'}
                 onChange={e => setModalApprovalNote(e.target.value)}
                 placeholder="請輸入審核指示或備註說明..."
               />
             </label>
+            {approvalAccess[approvingStage] !== 'allowed' && (
+              <p className="business-approval-readonly" role="status">{businessApprovalReadonlyReason(approvalAccess[approvingStage])}</p>
+            )}
           </div>
           <footer>
             <button className="secondary-btn" onClick={() => setApprovingStage(null)}>
@@ -1160,7 +1201,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
             </button>
             <button
               className="primary-btn compact"
-              disabled={busy}
+              disabled={busy || approvalAccess[approvingStage] !== 'allowed'}
               onClick={() => void handleApproveStage(approvingStage, modalApprovalNote)}
             >
               確認儲存批核
@@ -1365,8 +1406,8 @@ function BusinessReportContent({
                   <small>{approval ? activityTime(approval.approved_at) : '　　年　月　日'}</small>
                 </div>
                 <div className="print-box-note">
-                  <span>批核意見：</span>
-                  <p>{approval?.note || '—'}</p>
+                  <span>簽核說明（已保存）：</span>
+                  <p>{approval ? approval.note || '簽核時未填寫說明' : '尚未簽核'}</p>
                 </div>
               </div>
             </div>
