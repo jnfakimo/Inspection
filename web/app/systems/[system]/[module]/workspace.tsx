@@ -13,6 +13,7 @@ import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { locationOptions, type LocationLike } from '@/lib/locations';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import { captureRepairDetailSession, runRepairMutationWithDetailRefresh, type RepairDetailSession } from '@/lib/repair-detail-refresh';
 
 type ModuleData = {
   title: string;
@@ -210,6 +211,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const [detailLoading, setDetailLoading] = useState(false);
     const [detailError, setDetailError] = useState('');
     const detailRequestSeq = useRef(0);
+    const detailSessionRef = useRef<RepairDetailSession | null>(null);
     const dataKeyRef = useRef('');
     const [syncing, setSyncing] = useState(false);
     const [showCreate, setShowCreate] = useState(false);
@@ -252,17 +254,17 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const runRepairWorkflow = async (row: Record<string, unknown>, action: string, nextStatus: string, payload: Record<string, unknown> = {}) => {
       const requestId = String(row.request_id || row.id || '');
       if (!requestId) { setDispatchMessage('案件缺少報修單編號'); return; }
-      setDispatchSaving(true);
-      setDispatchMessage('');
-      try {
-        await invokeAppApi('workorder_workflow', { request_id: requestId, workflow_action: action, payload });
-        await load();
-        void openRepairDetail({ ...row, request_id: requestId, status: nextStatus });
-      } catch (caught) {
-        setDispatchMessage(caught instanceof Error ? `流程更新失敗：${caught.message}` : '流程更新失敗');
-      } finally {
-        setDispatchSaving(false);
-      }
+      const session = captureRepairDetailSession(detailSessionRef.current, requestId);
+      await runRepairMutationWithDetailRefresh({
+        session,
+        getActiveSession: () => detailSessionRef.current,
+        mutate: () => invokeAppApi('workorder_workflow', { request_id: requestId, workflow_action: action, payload }),
+        reload: load,
+        clearError: () => setDispatchMessage(''),
+        onError: caught => setDispatchMessage(caught instanceof Error ? `流程更新失敗：${caught.message}` : '流程更新失敗'),
+        setBusy: setDispatchSaving,
+        refreshDetail: () => { void openRepairDetail({ ...row, request_id: requestId, status: nextStatus }); },
+      });
     };
     const dispatchRepair = async () => {
       const current = repairDetail?.request || selectedRow || {};
@@ -273,10 +275,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       if (!requestId) { setDispatchMessage('案件缺少報修單編號'); return; }
       if (!technician && !vendor) { setDispatchMessage('請選擇維修人員或填寫委外廠商'); return; }
       const toIso = (value: string) => { if (!value) return null; const date = new Date(value); return Number.isNaN(date.getTime()) ? null : date.toISOString(); };
-      setDispatchSaving(true);
-      setDispatchMessage('');
-      try {
-        await invokeAppApi('workorder_workflow', {
+      const session = captureRepairDetailSession(detailSessionRef.current, requestId);
+      await runRepairMutationWithDetailRefresh({
+        session,
+        getActiveSession: () => detailSessionRef.current,
+        mutate: () => invokeAppApi('workorder_workflow', {
           request_id: requestId,
           workflow_action: 'dispatch',
           payload: {
@@ -288,16 +291,17 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             need_shutdown: dispatchForm.needShutdown,
             need_approval: dispatchForm.needApproval,
           },
-        });
-        setShowDispatchForm(false);
-        setDispatchForm({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
-        await load();
-        void openRepairDetail({ ...current, request_id: requestId, status: 'assigned' });
-      } catch (caught) {
-        setDispatchMessage(caught instanceof Error ? `派工失敗：${caught.message}` : '派工失敗');
-      } finally {
-        setDispatchSaving(false);
-      }
+        }),
+        reload: load,
+        clearError: () => setDispatchMessage(''),
+        onError: caught => setDispatchMessage(caught instanceof Error ? `派工失敗：${caught.message}` : '派工失敗'),
+        setBusy: setDispatchSaving,
+        onSuccess: () => {
+          setShowDispatchForm(false);
+          setDispatchForm({ technician: '', vendor: '', expectedArrival: '', expectedFinish: '', workContent: '', needShutdown: false, needApproval: false });
+        },
+        refreshDetail: () => { void openRepairDetail({ ...current, request_id: requestId, status: 'assigned' }); },
+      });
     };
     const openCompletionForm = () => {
       const order = repairDetail?.order;
@@ -328,10 +332,11 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
         if (value !== null && (!Number.isFinite(value) || value < 0)) { setDispatchMessage(`${label}必須是零以上的數字`); return; }
       }
       if (laborHours != null && (!Number.isFinite(laborHours) || laborHours < 0)) { setDispatchMessage('工時必須是零以上的數字'); return; }
-      setDispatchSaving(true);
-      setDispatchMessage('');
-      try {
-        await invokeAppApi('workorder_workflow', {
+      const session = captureRepairDetailSession(detailSessionRef.current, requestId);
+      await runRepairMutationWithDetailRefresh({
+        session,
+        getActiveSession: () => detailSessionRef.current,
+        mutate: () => invokeAppApi('workorder_workflow', {
           request_id: requestId,
           workflow_action: 'engineer_complete',
           payload: {
@@ -344,15 +349,14 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
             labor_cost: laborCost,
             note: completionForm.note.trim() || null,
           },
-        });
-        setShowCompletionForm(false);
-        await load();
-        void openRepairDetail({ ...current, status: 'pending_review' });
-      } catch (caught) {
-        setDispatchMessage(caught instanceof Error ? `完工回報失敗：${caught.message}` : '完工回報失敗');
-      } finally {
-        setDispatchSaving(false);
-      }
+        }),
+        reload: load,
+        clearError: () => setDispatchMessage(''),
+        onError: caught => setDispatchMessage(caught instanceof Error ? `完工回報失敗：${caught.message}` : '完工回報失敗'),
+        setBusy: setDispatchSaving,
+        onSuccess: () => setShowCompletionForm(false),
+        refreshDetail: () => { void openRepairDetail({ ...current, status: 'pending_review' }); },
+      });
     };
     const acceptByReporter = async () => {
       const current = repairDetail?.request;
@@ -370,6 +374,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     };
     const closeRepairDetail = () => {
       detailRequestSeq.current += 1;
+      detailSessionRef.current = null;
       setSelectedRow(null);
       setRepairDetail(null);
       setDetailError('');
@@ -381,6 +386,8 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
 
     const openRepairDetail = async (row: Record<string, unknown>) => {
       const seq = ++detailRequestSeq.current;
+      const requestId = String(row.request_id || row.id || '');
+      detailSessionRef.current = requestId ? { generation: seq, requestId } : null;
       setSelectedRow(row);
       setRepairDetail(null);
       setDetailError('');
@@ -389,7 +396,6 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       setShowCompletionForm(false);
       setDispatchMessage('');
       try {
-        const requestId = String(row.request_id || row.id || '');
         const requestNo = String(row.req_no || '');
         if (!requestId && !requestNo) throw new Error('找不到報修案件識別碼');
         const detail = await invokeAppApi<RepairDetail & { warnings?: string[] }>('workorder_detail', {
@@ -411,6 +417,7 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
       if (dataKeyRef.current !== key) {
         dataKeyRef.current = key;
         detailRequestSeq.current += 1;
+        detailSessionRef.current = null;
         setData(null);
         setSelectedRow(null);
         setRepairDetail(null);

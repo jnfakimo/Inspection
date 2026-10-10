@@ -30,6 +30,7 @@ import { TimeSelect } from '@/components/TimeSelect';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { locationOptions, type LocationLike } from '@/lib/locations';
 import { selectableActiveUsers } from '@/lib/user-visibility';
+import { createThenRefresh } from '@/lib/create-refresh';
 import { PatrolMap3DModule } from './patrol-map3d';
 import { PointListModule } from './patrol-pointlist';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -71,13 +72,17 @@ function RecordsModule({ module, profile }: Props) {
   const [form, setForm] = useState({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
   const [locationChoices, setLocationChoices] = useState<LocationLike[]>([]);
 
-  const load = useCallback(async () => {
-    setBusy(true); setNote('');
+  const load = useCallback(async (options?: { preserveNote?: boolean }): Promise<{ ok: true } | { ok: false; error: string }> => {
+    setBusy(true); if (!options?.preserveNote) setNote('');
     try {
       const data = await invokeAppApi<{ rows: Row[]; equipment: Row[]; locations?: LocationLike[] }>('inspections');
       setRows(data.rows || []); setEquipment(data.equipment || []); setLocationChoices(data.locations || []);
-    } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
-    finally { setBusy(false); }
+      return { ok: true };
+    } catch (error) {
+      const message = errorMessage(error);
+      setNote('讀取失敗：' + message);
+      return { ok: false, error: message };
+    } finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, status]);
@@ -90,25 +95,36 @@ function RecordsModule({ module, profile }: Props) {
   }), [rows, query, status]);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const closeCreate = () => {
+    if (busy) return;
+    setCreating(false);
+    setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
+  };
+
   const submit = async () => {
+    if (busy) return;
     if (!form.equipment_id) { setNote('失敗：請選擇設備'); return; }
     if (form.run_status === 'abnormal' && !form.abnormal_note.trim()) { setNote('失敗：異常巡檢必須填寫說明'); return; }
     setBusy(true); setNote('');
     try {
-      await invokeAppApi('create_inspection', {
-        equipment_id: form.equipment_id, run_status: form.run_status,
-        location_point: form.location_point.trim() || null,
-        abnormal_note: form.run_status === 'abnormal' ? form.abnormal_note.trim() : null,
-        location_id: form.location_id || null,
-      });
-      setCreating(false); setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
-      await load(); setNote('巡檢紀錄已新增');
-    } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
+      const result = await createThenRefresh(
+        () => invokeAppApi('create_inspection', {
+          equipment_id: form.equipment_id, run_status: form.run_status,
+          location_point: form.location_point.trim() || null,
+          abnormal_note: form.run_status === 'abnormal' ? form.abnormal_note.trim() : null,
+          location_id: form.location_id || null,
+        }),
+        () => load({ preserveNote: true }),
+      );
+      setCreating(false);
+      setForm({ equipment_id: '', run_status: 'normal', location_point: '', abnormal_note: '', location_id: '' });
+      if (result.refreshed) setNote('巡檢紀錄已新增');
+      else setNote('巡檢紀錄已新增；清單更新失敗，請重新載入。' + errorMessage(result.error));
+    } catch (error) { setNote('失敗：' + errorMessage(error)); setBusy(false); }
   };
-
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增巡檢</button>} />
+      action={<button className="primary-btn compact" disabled={busy} onClick={() => setCreating(true)}>＋ 新增巡檢</button>} />
     <section className="panel admin-panel patrol-notifications-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋設備、資產碼、巡檢人員或異常說明" />
@@ -135,7 +151,7 @@ function RecordsModule({ module, profile }: Props) {
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
 
-    {creating && <AdminModal title="新增設備巡檢" onClose={() => setCreating(false)}>
+    {creating && <AdminModal title="新增設備巡檢" onClose={closeCreate}>
       <div className="admin-form-grid">
         <label className="wide">設備（必填）<select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })}>
           <option value="">-- 請選擇 --</option>
@@ -150,7 +166,7 @@ function RecordsModule({ module, profile }: Props) {
           <textarea rows={2} value={form.abnormal_note} onChange={e => setForm({ ...form, abnormal_note: e.target.value })} /></label>}
       </div>
       <footer>
-        <button className="secondary-btn" onClick={() => setCreating(false)}>取消</button>
+        <button className="secondary-btn" disabled={busy} onClick={closeCreate}>取消</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出'}</button>
       </footer>
     </AdminModal>}

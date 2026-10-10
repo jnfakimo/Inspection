@@ -121,7 +121,7 @@
 .request-detail-timeline{margin:0;padding:0 0 0 26px;list-style:none}
 .request-detail-timeline li{position:relative;padding:0 0 18px;border-left:1px solid var(--line)}
 .request-detail-timeline li::before{position:absolute;top:4px;left:-6px;width:11px;height:11px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px rgba(0,132,199,.55);content:''}
-.localized-date-input{position:relative;display:inline-block;width:100%}
+.localized-date-input{position:relative;display:inline-block;width:100%}.localized-date-input>input[aria-invalid="true"]{border-color:var(--red)}.localized-date-error{display:block;margin-top:4px;color:var(--red);font-size:12px;line-height:1.4}
 /* 原生 date 欄位預設隱藏（只當 showPicker 的載體）；觸控裝置改為透明覆蓋層，
    點欄位就直接叫出系統日曆，不再依賴 iOS 上會丟例外的 showPicker()。 */
 .localized-date-native{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0;margin:0}

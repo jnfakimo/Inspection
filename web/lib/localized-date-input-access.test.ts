@@ -42,5 +42,5 @@ test('the component wires the access decision to both picker and manual controls
   assert.match(component, /aria-readonly=\{access\.ariaReadOnly\}/);
   assert.match(component, /disabled=\{access\.pickerDisabled\}/);
   assert.match(component, /onChange=\{access\.manualEditable \?/);
-  assert.match(component, /onChange=\{access\.nativeChangeEnabled \? onChange : undefined\}/);
+  assert.match(component, /onChange=\{access\.nativeChangeEnabled \? handleNativeChange : undefined\}/);
 });
