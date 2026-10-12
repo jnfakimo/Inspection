@@ -57,7 +57,8 @@ test('approved Blender V4 icons layer remains unchanged', () => {
 });
 
 test('source county SVG is the approved asset used to build the V3 map', () => {
-  assert.equal(createHash('sha256').update(sourceSvg).digest('hex'), '701f571d53e96e55ca2493a28d3276cb38a58a9f59cf88702fed5ea2a2aae6b5');
+  const normalizedSvg = sourceSvg.toString('utf8').replace(/\r\n/g, '\n');
+  assert.equal(createHash('sha256').update(normalizedSvg).digest('hex'), '0217081eeb4c334e49a2f0bc4236dfc7c8ff1658124c8865c3af1773bfd98ac1');
 });
 
 test('county affine transform reaches the approved V3 mainland bounds', () => {
