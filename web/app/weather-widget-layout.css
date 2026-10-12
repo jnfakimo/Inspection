@@ -40,3 +40,7 @@
 .weather-town-select:focus-visible,.weather-map-panel svg [role="button"]:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 @media(max-width:900px){.weather-widget{grid-template-columns:minmax(0,1fr)}.weather-map-panel{grid-column:1;grid-row:1}.weather-info-container{grid-column:1;grid-row:2}.weather-map-container{height:min(54vh,480px);min-height:300px}}
 @media(max-width:640px){.weather-widget{gap:14px}.weather-map-container{height:42vh;min-height:260px}.weather-info-container>div[style*="background"]{padding:16px!important}.weather-town-select{min-height:40px}}
+
+.weather-map-caption{display:flex;align-items:flex-start;gap:8px;box-sizing:border-box;min-height:44px;margin:0;padding:10px 14px 12px;border-top:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.weather-map-caption__dot{flex:0 0 6px;width:6px;height:6px;margin-top:.45em;border-radius:50%;background:var(--cyan)}
+@media(max-width:640px){.weather-map-caption{padding:10px 12px 12px}}

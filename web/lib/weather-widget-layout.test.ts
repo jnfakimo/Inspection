@@ -33,3 +33,21 @@ test('narrow layouts place the map before the drilldown', () => {
 test('the weather layout override is loaded after the dashboard stylesheet', () => {
   assert.match(dashboard, /import ['"]\.\/dashboard\.css['"];[\s\S]*import ['"]\.\/weather-widget-layout\.css['"]/);
 });
+
+
+test('weather map note uses normal flow after the map canvas at desktop and narrow widths', () => {
+  const mapStart = widget.indexOf('<div className="weather-map-container"');
+  const mapEnd = widget.indexOf('</div>\n        <p className="weather-map-caption"', mapStart);
+  const captionStart = widget.indexOf('<p className="weather-map-caption"');
+  const sectionEnd = widget.indexOf('</section>', captionStart);
+  assert.ok(mapStart >= 0 && mapEnd > mapStart, 'caption must follow the closed map container');
+  assert.ok(captionStart > mapEnd && sectionEnd > captionStart, 'caption must remain within the map panel but outside the canvas');
+  assert.match(widget.slice(captionStart, widget.indexOf('</p>', captionStart)), /圖示為示意圖，非即時天氣/);
+  const captionRule = layout.match(/\.weather-map-caption\{[^}]+\}/)?.[0];
+  assert.ok(captionRule, 'caption needs a shared responsive layout rule');
+  assert.match(captionRule, /display:flex/);
+  assert.match(captionRule, /min-height:44px/);
+  assert.match(captionRule, /overflow-wrap:anywhere/);
+  assert.doesNotMatch(captionRule, /position:\s*absolute/);
+  assert.match(layout, /@media\(max-width:640px\)\{\.weather-map-caption\{/);
+});

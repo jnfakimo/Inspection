@@ -1,23 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PUBLIC_WEATHER_SERVICE, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 import { createWeatherReader } from '@/lib/weather-api';
 import { createRequestSequence } from '@/lib/request-sequence';
 import { emptyTownForecastView, formatWeatherMetric, formatWeatherTextMetric, visibleTownForecastView, type TownForecastView } from '@/lib/weather-presentation';
-// County weather markers use the transformed SVG county centroids as their anchors.
-import { formatWeatherTemperature, layoutWeatherMarkers, WEATHER_MAP_TRANSFORM, WEATHER_MAP_VIEWBOX, type WeatherMapCountyShape } from '@/lib/weather-map-geometry';
+import { formatWeatherTemperature } from '@/lib/weather-map-geometry';
+import { WEATHER_MAP_V3_BADGE_RADIUS, WEATHER_MAP_V3_CANVAS, WEATHER_MAP_V3_MAP_MATRIX, WEATHER_MAP_V3_MARKERS, WEATHER_MAP_V3_TEMPERATURE_LABEL_OFFSET_Y, WEATHER_MAP_V3_VIEWBOX } from '@/lib/weather-map-v3';
 
 type Row = Record<string, any>;
-type MapCountyShape = WeatherMapCountyShape & { id: string; title: string };
+type MapCountyShape = { id: string; county: string; path: string; title: string };
 
 
 const COUNTIES = ['基隆市', '臺北市', '新北市', '桃園市', '新竹市', '新竹縣', '苗栗縣', '臺中市', '彰化縣', '南投縣', '雲林縣', '嘉義市', '嘉義縣', '臺南市', '高雄市', '屏東縣', '宜蘭縣', '花蓮縣', '臺東縣'];
 
-// 圖示離海岸線的固定間距（外層座標）。距離是以台灣輪廓為基準量出來的，
-// 不是相對畫布的比例——沿岸每個圖示與陸地的空隙才會一致。
-
-// 找不到輪廓時（地圖還沒渲染完）的退路：沿用原本的外圍座標插值。
 const readWeather = createWeatherReader({ url: `${SUPABASE_URL}/functions/v1/cwa-weather`, anonKey: SUPABASE_ANON_KEY }, PUBLIC_WEATHER_SERVICE);
 
 // Helpers
@@ -50,19 +46,10 @@ export function WeatherWidget() {
   // markup out of state avoids an injection sink if the asset is replaced.
   const [mapShapes, setMapShapes] = useState<MapCountyShape[]>([]);
   const [mapError, setMapError] = useState('');
-  const [countyCenters, setCountyCenters] = useState<Record<string, [number, number]>>({});
-  // 依台灣輪廓量出的自動落點；有手動定位時由 COUNTY_MARKER_POSITIONS 優先取用。
   const summaryRequests = useRef(createRequestSequence());
   const townRequests = useRef(createRequestSequence());
   const currentTownView = visibleTownForecastView(townView, county);
   const { towns, selectedTown, error: townError, busy: townBusy } = currentTownView;
-  const markerPositions = useMemo(() => {
-    const anchors = COUNTIES.flatMap(name => {
-      const center = countyCenters[name];
-      return center ? [{ name, x: center[0], y: center[1] }] : [];
-    });
-    return new Map(layoutWeatherMarkers(anchors, mapShapes).map(marker => [marker.name, marker] as const));
-  }, [countyCenters, mapShapes]);
 
   const switchCounty = useCallback((nextCounty: string) => {
     townRequests.current.invalidate();
@@ -73,47 +60,30 @@ export function WeatherWidget() {
   const loadMap = useCallback(async () => {
     try {
       const res = await fetch('/Inspection/v2/taiwan-counties.svg');
-      if (res.ok) {
-        const text = await res.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'image/svg+xml');
-        
-        const { scale: SCALE, translateX: TX, translateY: TY } = WEATHER_MAP_TRANSFORM;
-
-        if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg') {
-          throw new Error('Invalid Taiwan county SVG');
+      if (!res.ok) throw new Error('County SVG request failed');
+      const text = await res.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'image/svg+xml');
+      if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg') {
+        throw new Error('Invalid Taiwan county SVG');
+      }
+      const shapes: MapCountyShape[] = [];
+      doc.querySelectorAll('path.county').forEach((el, index) => {
+        const rawCounty = el.getAttribute('data-county');
+        const pathData = el.getAttribute('d');
+        if (rawCounty && pathData) {
+          const county = rawCounty.replace('台', '臺');
+          shapes.push({
+            id: 'county-shape-' + index,
+            county,
+            path: pathData,
+            title: el.querySelector('title')?.textContent || county,
+          });
         }
-
-        const centers: Record<string, [number, number]> = {};
-        const shapes: MapCountyShape[] = [];
-        doc.querySelectorAll('path.county').forEach((el, index) => {
-          const c = el.getAttribute('data-county');
-          const cx = el.getAttribute('data-cx');
-          const cy = el.getAttribute('data-cy');
-          const path = el.getAttribute('d');
-          const centerX = Number(cx);
-          const centerY = Number(cy);
-          if (c && path && Number.isFinite(centerX) && Number.isFinite(centerY)) {
-            // Normalize "台" to "臺" just in case the SVG uses "台"
-            const canonicalName = c.replace('台', '臺');
-            centers[canonicalName] = [
-              centerX * SCALE + TX,
-              centerY * SCALE + TY
-            ];
-            shapes.push({
-              id: 'county-shape-' + index,
-              county: canonicalName,
-              centerX,
-              centerY,
-              path,
-              title: el.querySelector('title')?.textContent || canonicalName,
-            });
-          }
-        });
-        if (!shapes.length) throw new Error('Taiwan county SVG has no county paths');
-        setCountyCenters(centers);
-        setMapShapes(shapes);
-      } else setMapError('縣市地圖目前無法載入');
+      });
+      if (!shapes.length) throw new Error('Taiwan county SVG has no county paths');
+      setMapShapes(shapes);
+      setMapError('');
     } catch (err) {
       console.error('Map loading failed', err);
       setMapError('縣市地圖目前無法載入');
@@ -175,131 +145,103 @@ export function WeatherWidget() {
 
   return (
     <div className="weather-widget">
-      <section className="weather-map-panel" style={{ background: 'transparent' }} aria-label="台灣縣市即時天氣分布">
+      <section className="weather-map-panel" style={{ background: 'transparent' }} aria-label="台灣縣市天氣分布；圖示為示意圖，非即時天氣">
       <h3 className="weather-map-heading">台灣縣市天氣</h3>
       {/* 地圖區域 */}
       <div className="weather-map-container" style={{ background: 'transparent' }}>
         {mapError && <p className="weather-map-status" role="status">{mapError}</p>}
         {!mapError && !mapShapes.length && <p className="weather-map-status" role="status">正在載入縣市地圖…</p>}
-        <svg viewBox={WEATHER_MAP_VIEWBOX} style={{ width: '100%', height: '100%', display: 'block' }}>
+        <svg viewBox={WEATHER_MAP_V3_VIEWBOX} style={{ width: '100%', height: '100%', display: 'block' }}>
           
           {/* 注入台灣地圖路徑，設定樣式 */}
-          <style>{`
-            .weather-map-container svg .county {
-              fill: #E6F8FC;
-              stroke: #55B7E8;
-              stroke-width: 0.9px;
-              transition: fill 0.2s;
-            }
-            .weather-map-container svg .county.selected {
-              fill: #C6EDF7;
-              stroke: #167FB2;
-              stroke-width: 2px;
-            }
-            .weather-map-container svg .county:hover {
-              fill: #D8F2F8;
-            }
-          `}</style>
-          {/* 地圖路徑由 React 安全地建立，並用 data-county 屬性選擇器點亮選取的縣市。
-              縣市名同時比對「臺」與「台」兩種寫法，SVG 用哪一種都吃得到。
-              county 只可能是 COUNTIES 裡的固定值，這裡再擋一次，避免任何外部字串
-              被插進樣式表。 */}
-          {COUNTIES.includes(county) && <style>{`
-            .weather-map-container svg .county[data-county="${county}"],
-            .weather-map-container svg .county[data-county="${county.replace('臺', '台')}"] {
-              fill: color-mix(in srgb, var(--cyan) 42%, transparent);
-              stroke: var(--cyan);
-              stroke-width: 2px;
-            }
-          `}</style>}
-          
-          <g transform={`translate(${WEATHER_MAP_TRANSFORM.translateX}, ${WEATHER_MAP_TRANSFORM.translateY}) scale(${WEATHER_MAP_TRANSFORM.scale})`} fillRule="evenodd">
-            {mapShapes.map(shape => (
-              <path
-                key={shape.id}
-                className="county"
-                data-county={shape.county}
-                data-cx={shape.centerX}
-                data-cy={shape.centerY}
-                d={shape.path}
-              >
-                <title>{shape.title}</title>
-              </path>
-            ))}
-          </g>
-
-          <g className="weather-marker-layer">
-            {COUNTIES.map(name => {
-              const data = (summary?.counties || []).find((r: Row) => r.county.replace('台', '臺') === name) || {};
-              const isSelected = name === county;
-              const spot = markerPositions.get(name);
-              if (!spot) return null;
-              const mx = spot.x;
-              const my = spot.y;
-              
+          <style>{`.weather-map-container svg .county { fill: transparent; stroke: transparent; stroke-width: 1.1px; pointer-events: all; transition: fill 0.2s, stroke 0.2s; }
+.weather-map-container svg .county.selected { fill: color-mix(in srgb, var(--cyan) 16%, transparent); stroke: color-mix(in srgb, var(--cyan) 58%, transparent); stroke-width: 2px; }
+.weather-map-container svg .county[role="button"] { cursor: pointer; }
+.weather-map-container svg .county[role="button"]:hover { fill: color-mix(in srgb, var(--cyan) 12%, transparent); }
+.weather-map-container svg .county[role="button"]:focus-visible { stroke: var(--cyan); stroke-width: 2.5px; }
+.weather-map-container svg .weather-map-art, .weather-map-container svg .weather-icons-art { pointer-events: none; }
+.weather-map-container svg .weather-marker-hit { fill: transparent; stroke: transparent; pointer-events: all; }
+.weather-map-container svg .weather-marker-known.selected .weather-marker-hit { fill: color-mix(in srgb, var(--cyan) 8%, transparent); stroke: var(--cyan); stroke-width: 1.6px; }
+.weather-map-container svg .weather-marker-known:focus-visible .weather-marker-hit { stroke: var(--cyan); stroke-width: 2px; }
+.weather-map-container svg .weather-marker-temperature { fill: var(--text-hi); font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--panel); stroke-width: 1px; }
+.weather-map-container svg [role="button"]:focus-visible { outline: none; }`}</style>
+          {/* Blender V4 raster provides the approved map appearance; SVG paths remain the county hit regions. */}
+          <image className="weather-map-art" href="/Inspection/v2/taiwan-weather-map-layer.png" x={0} y={0} width={WEATHER_MAP_V3_CANVAS.width} height={WEATHER_MAP_V3_CANVAS.height} preserveAspectRatio="none" aria-hidden="true" pointerEvents="none" />
+          <g className="weather-county-hit-layer" transform={`matrix(${WEATHER_MAP_V3_MAP_MATRIX.join(' ')})`} fillRule="evenodd">
+            {mapShapes.map(shape => {
+              const selectable = COUNTIES.includes(shape.county);
+              const isSelected = shape.county === county;
               return (
-                <g
-                  key={name}
-                  role="button"
-                  aria-label={`${name}天氣詳情`}
-                  aria-pressed={isSelected}
-                  onClick={() => switchCounty(name)}
-                  onKeyDown={event => {
+                <path
+                  key={shape.id}
+                  className={isSelected ? 'county selected' : 'county'}
+                  data-county={shape.county}
+                  role={selectable ? 'button' : undefined}
+                  aria-label={selectable ? `${shape.county}天氣摘要` : undefined}
+                  aria-pressed={selectable ? isSelected : undefined}
+                  onClick={selectable ? () => switchCounty(shape.county) : undefined}
+                  onKeyDown={selectable ? event => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      switchCounty(name);
+                      switchCounty(shape.county);
                     }
-                  }}
-                  style={{ cursor: 'pointer', outline: 'none' }}
-                  tabIndex={0}
+                  } : undefined}
+                  tabIndex={selectable ? 0 : undefined}
+                  d={shape.path}
                 >
-                  <title>{name}</title>
-                  {/* 圖示與氣溫卡 */}
-                  <g transform={`translate(${mx} ${my})`}>
-                    <circle r={isSelected ? "12" : "11.5"} fill="#FFFFFF" stroke={isSelected ? "#167FB2" : "#55B7E8"} strokeWidth={isSelected ? "1.5" : "1"} style={{ filter: "drop-shadow(0 1px 2px rgba(8, 42, 75, 0.28))" }} />
-                    <text y="-1" textAnchor="middle" dominantBaseline="central" fontSize={isSelected ? "18px" : "16px"}>
-                      {weatherIcon(data.weather, data.weatherCode)}
-                    </text>
-                    <text
-                      y={spot.temperatureOffsetY}
-                      x="0"
-                      textAnchor="middle"
-                      dominantBaseline="central" 
-                      fontSize="10px"
-                      fontWeight="500"
-                      fill="#164E70"
-                      style={{ letterSpacing: '0.01em' }}
-                    >
-                      {formatWeatherTemperature(data.temperature) || ''}
-                    </text>
-                  </g>
+                  <title>{shape.title}</title>
+                </path>
+              );
+            })}
+          </g>
+
+          <image className="weather-icons-art" href="/Inspection/v2/taiwan-weather-icons-layer.png" x={0} y={0} width={WEATHER_MAP_V3_CANVAS.width} height={WEATHER_MAP_V3_CANVAS.height} preserveAspectRatio="none" aria-hidden="true" pointerEvents="none" />
+          <g className="weather-marker-layer">
+            {WEATHER_MAP_V3_MARKERS.map((marker, index) => {
+              const mappedCounty = marker.county;
+              const data = mappedCounty
+                ? (summary?.counties || []).find((row: Row) => String(row.county || '').replace('台', '臺') === mappedCounty) || {}
+                : {};
+              const isSelected = mappedCounty === county;
+              const temperature = formatWeatherTemperature(data.temperature) || '--°C';
+              const markerNumber = String(index + 1).padStart(2, '0');
+              const markerLabel = mappedCounty
+                ? `${mappedCounty}天氣摘要，${temperature}`
+                : `位置 ${markerNumber}：縣市對應待確認，氣溫 ${temperature}`;
+              return (
+                <g
+                  key={marker.id}
+                  className={mappedCounty ? `weather-marker-known${isSelected ? ' selected' : ''}` : 'weather-marker-unknown'}
+                  transform={`translate(${marker.x} ${marker.y})`}
+                  role={mappedCounty ? 'button' : 'img'}
+                  aria-label={markerLabel}
+                  aria-pressed={mappedCounty ? isSelected : undefined}
+                  onClick={mappedCounty ? () => switchCounty(mappedCounty) : undefined}
+                  onKeyDown={mappedCounty ? event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      switchCounty(mappedCounty);
+                    }
+                  } : undefined}
+                  tabIndex={mappedCounty ? 0 : undefined}
+                  style={{ cursor: mappedCounty ? 'pointer' : 'default', outline: 'none' }}
+                >
+                  <title>{markerLabel}</title>
+                  <circle className="weather-marker-hit" r={WEATHER_MAP_V3_BADGE_RADIUS} />
+                  <text x={0} y={WEATHER_MAP_V3_TEMPERATURE_LABEL_OFFSET_Y} textAnchor="middle" dominantBaseline="central" className="weather-marker-temperature">
+                    {temperature}
+                  </text>
                 </g>
               );
             })}
           </g>
         </svg>
-        <div style={{ 
-          position: 'absolute', 
-          bottom: '24px', 
-          right: '24px', 
-          background: 'color-mix(in srgb, var(--panel) 90%, transparent)',
-          backdropFilter: 'blur(4px)',
-          border: '1px solid var(--line)',
-          padding: '8px 16px', 
-          borderRadius: '20px', 
-          color: 'var(--text)', 
-          fontSize: '13px',
-          fontWeight: '500',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          pointerEvents: 'none'
-        }}>
-          <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--cyan)' }}></span>
-          點擊地圖或周圍圖示可切換縣市
-        </div>
+
       </div>
+        <p className="weather-map-caption" role="note">
+          <span className="weather-map-caption__dot" aria-hidden="true" />
+          <span>圖示為示意圖，非即時天氣；點擊縣市地圖或已確認標記，可切換縣市資訊。</span>
+        </p>
       </section>
 
       {/* 資訊區域 */}
