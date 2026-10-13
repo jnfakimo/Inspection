@@ -871,8 +871,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
-                background: '#0284c7',
-                color: '#fff',
+                background: 'var(--panel2)',
+                color: 'var(--text)',
                 border: 'none',
                 cursor: 'pointer',
               }}
@@ -912,7 +912,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
         }
       />
 
-      <section className="panel admin-panel" style={{ marginTop: '12px' }}>
+      <section className="panel admin-panel layout-editor-panel" style={{ marginTop: '12px' }}>
         {/* 頂部控制列：版本切換與編輯模式 */}
         <div
           className="admin-toolbar"
@@ -1007,8 +1007,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             marginTop: '12px',
             padding: '12px 16px',
             borderRadius: '8px',
-            background: 'rgba(15, 23, 42, 0.7)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'var(--panel2)',
+            border: '1px solid var(--line)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1018,7 +1018,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
         >
           {/* 下拉式選單新增 (滿足使用者：可以再加入 10 11 12 項的資料，可以增加移除用下拉式選單增加) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', color: '#38bdf8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--cyan-text,var(--cyan))', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>⚡</span> 快速下拉選單加入：
             </span>
             <select
@@ -1027,12 +1027,12 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               style={{
                 padding: '6px 12px',
                 borderRadius: '6px',
-                background: '#1e293b',
-                color: '#f8fafc',
-                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'var(--panel2)',
+                color: 'var(--text)',
+                border: '1px solid var(--line)',
                 fontSize: '13px',
                 fontWeight: 500,
-                maxWidth: '360px',
+
               }}
             >
               <optgroup label="🟧 第 10 系統 · 市場營運分析系統">
@@ -1081,8 +1081,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
-                background: '#0284c7',
-                color: '#fff',
+                background: 'var(--panel2)',
+                color: 'var(--text)',
                 border: 'none',
                 padding: '6px 14px',
                 borderRadius: '6px',
@@ -1098,13 +1098,13 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
 
           {/* 長條矩形 / 畫布尺寸與長寬可調式設定 (支援長條 3500*400、2560*400 等無捲軸自適應模式) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', color: '#fbbf24', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--amber)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>📐</span> 看板尺寸與長條矩形比例：
             </span>
             <select
               value={customRatioMode}
               onChange={e => handleRatioPresetChange(e.target.value)}
-              style={{ padding: '6px 10px', borderRadius: '6px', background: '#1e293b', color: '#f8fafc', border: '1px solid rgba(255,255,255,0.2)', fontSize: '12px', cursor: 'pointer' }}
+              style={{ padding: '6px 10px', borderRadius: '6px', background: 'var(--panel2)', color: 'var(--text)', border: '1px solid var(--line)', fontSize: '12px', cursor: 'pointer' }}
             >
               <option value="16:9">📺 16:9 標準螢幕 (1920 × 1080)</option>
               <option value="3500x400">📏 超寬長條看板 (3500 × 400)</option>
@@ -1115,7 +1115,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               <option value="custom">⚙️ 自訂長寬像素</option>
             </select>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--panel2)', padding: '2px 8px', borderRadius: '6px' }}>
               <span style={{ fontSize: '11px', color: 'var(--muted)' }}>寬:</span>
               <input
                 type="number"
@@ -1123,7 +1123,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 max="10000"
                 step="10"
                 value={canvasWidth}
-                style={{ width: '60px', padding: '3px 4px', borderRadius: '4px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)', color: '#38bdf8', fontSize: '12px', textAlign: 'center', fontWeight: 700 }}
+                style={{ width: '60px', padding: '3px 4px', borderRadius: '4px', background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--cyan-text,var(--cyan))', fontSize: '12px', textAlign: 'center', fontWeight: 700 }}
                 onChange={e => {
                   setCanvasWidth(Number(e.target.value) || 1920);
                   setCustomRatioMode('custom');
@@ -1136,7 +1136,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 max="5000"
                 step="10"
                 value={canvasHeight}
-                style={{ width: '56px', padding: '3px 4px', borderRadius: '4px', background: '#0f172a', border: '1px solid rgba(255,255,255,0.2)', color: '#38bdf8', fontSize: '12px', textAlign: 'center', fontWeight: 700 }}
+                style={{ width: '56px', padding: '3px 4px', borderRadius: '4px', background: 'var(--panel2)', border: '1px solid var(--line)', color: 'var(--cyan-text,var(--cyan))', fontSize: '12px', textAlign: 'center', fontWeight: 700 }}
                 onChange={e => {
                   setCanvasHeight(Number(e.target.value) || 1080);
                   setCustomRatioMode('custom');
@@ -1153,9 +1153,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   borderRadius: '4px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  background: canvasGridCols === 24 ? '#0284c7' : 'rgba(255,255,255,0.05)',
-                  color: canvasGridCols === 24 ? '#fff' : '#94a3b8',
+                  border: '1px solid var(--line)',
+                  background: canvasGridCols === 24 ? 'color-mix(in srgb,var(--cyan) 18%,var(--panel))' : 'rgba(255,255,255,0.05)',
+                  color: canvasGridCols === 24 ? 'var(--text)' : 'var(--dim)',
                   cursor: 'pointer',
                 }}
                 onClick={() => setCanvasGridCols(canvasGridCols === 24 ? 12 : 24)}
@@ -1168,9 +1168,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   fontSize: '11px',
                   padding: '3px 8px',
                   borderRadius: '4px',
-                  background: 'rgba(16, 185, 129, 0.15)',
-                  color: '#34d399',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  background: 'color-mix(in srgb,var(--green) 10%,var(--panel))',
+                  color: 'var(--green-text,var(--green))',
+                  border: '1px solid var(--line)',
                   fontWeight: 600,
                   display: 'flex',
                   alignItems: 'center',
@@ -1231,9 +1231,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     style={{
                       padding: '3px 8px',
                       borderRadius: '4px',
-                      border: '1px solid #f59e0b',
-                      background: selectedSystemFilter === 10 ? '#f59e0b' : 'rgba(245,158,11,0.1)',
-                      color: selectedSystemFilter === 10 ? '#000' : '#fbbf24',
+                      border: '1px solid var(--line)',
+                      background: selectedSystemFilter === 10 ? 'var(--amber)' : 'rgba(245,158,11,0.1)',
+                      color: selectedSystemFilter === 10 ? '#000' : 'var(--amber)',
                       fontSize: '11px',
                       cursor: 'pointer',
                     }}
@@ -1246,9 +1246,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     style={{
                       padding: '3px 8px',
                       borderRadius: '4px',
-                      border: '1px solid #ef4444',
-                      background: selectedSystemFilter === 11 ? '#ef4444' : 'rgba(239,68,68,0.1)',
-                      color: selectedSystemFilter === 11 ? '#fff' : '#fca5a5',
+                      border: '1px solid var(--line)',
+                      background: selectedSystemFilter === 11 ? 'var(--red)' : 'rgba(239,68,68,0.1)',
+                      color: selectedSystemFilter === 11 ? 'var(--text)' : 'var(--red)',
                       fontSize: '11px',
                       cursor: 'pointer',
                     }}
@@ -1261,9 +1261,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     style={{
                       padding: '3px 8px',
                       borderRadius: '4px',
-                      border: '1px solid #22c55e',
-                      background: selectedSystemFilter === 12 ? '#22c55e' : 'rgba(34,197,94,0.1)',
-                      color: selectedSystemFilter === 12 ? '#000' : '#86efac',
+                      border: '1px solid var(--line)',
+                      background: selectedSystemFilter === 12 ? 'var(--green-text,var(--green))' : 'rgba(34,197,94,0.1)',
+                      color: selectedSystemFilter === 12 ? '#000' : 'var(--green-text,var(--green))',
                       fontSize: '11px',
                       cursor: 'pointer',
                     }}
@@ -1278,9 +1278,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   style={{
                     padding: '3px 10px',
                     borderRadius: '4px',
-                    border: '1px solid rgba(255,255,255,0.15)',
+                    border: '1px solid var(--line)',
                     background: showRightCatalog ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)',
-                    color: showRightCatalog ? '#60a5fa' : '#94a3b8',
+                    color: showRightCatalog ? 'var(--blue)' : 'var(--dim)',
                     fontSize: '11px',
                     cursor: 'pointer',
                     fontWeight: 600,
@@ -1294,10 +1294,10 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               {/* 視窗畫布容器 (零捲軸自適應寬高與長條矩形比例) */}
               <div
                 style={{
-                  background: '#070d1e',
+                  background: 'var(--panel2)',
                   padding: '16px',
                   borderRadius: '12px',
-                  border: '1px solid rgba(0, 212, 255, 0.25)',
+                  border: '1px solid var(--line)',
                   boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.7), 0 4px 20px rgba(0,0,0,0.5)',
                   overflow: 'hidden',
                   width: '100%',
@@ -1314,7 +1314,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                     paddingBottom: '8px',
                     borderBottom: '1px dashed rgba(255,255,255,0.08)',
                     fontSize: '12px',
-                    color: '#94a3b8',
+                    color: 'var(--dim)',
                     flexWrap: 'wrap',
                     gap: '8px',
                   }}
@@ -1322,23 +1322,23 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span>
                       🖥️ <strong>畫布目標解析度：</strong>
-                      <span style={{ color: '#38bdf8', fontWeight: 700 }}>
+                      <span style={{ color: 'var(--cyan-text,var(--cyan))', fontWeight: 700 }}>
                         {canvasWidth} × {canvasHeight} px
                       </span>
-                      <span style={{ marginLeft: '6px', color: '#94a3b8', fontSize: '11px' }}>
+                      <span style={{ marginLeft: '6px', color: 'var(--dim)', fontSize: '11px' }}>
                         (比例 {(canvasWidth / Math.max(1, canvasHeight)).toFixed(2)}:1)
                       </span>
                       {canvasWidth >= 2500 && (
-                        <span style={{ marginLeft: '6px', color: '#fbbf24', fontWeight: 600 }}>
+                        <span style={{ marginLeft: '6px', color: 'var(--amber)', fontWeight: 600 }}>
                           [超寬長條看板模式]
                         </span>
                       )}
                     </span>
-                    <span style={{ color: '#34d399', fontSize: '11px' }}>
+                    <span style={{ color: 'var(--green-text,var(--green))', fontSize: '11px' }}>
                       ｜ 網格：{canvasGridCols} 欄無捲軸自適應
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#60a5fa' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--blue)' }}>
                     <span>🖱️</span>
                     <span>按住圖塊右下角 <strong>◢</strong> 或邊緣可直接滑鼠拖曳縮放</span>
                   </div>
@@ -1432,7 +1432,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             alignItems: 'center',
                             marginBottom: '8px',
                             gap: '8px',
-                            borderBottom: '1px solid rgba(255,255,255,0.08)',
+                            borderBottom: '1px solid var(--line)',
                             paddingBottom: '6px',
                             cursor: 'grab',
                           }}
@@ -1447,7 +1447,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                               flex: 1,
                             }}
                           >
-                            <span style={{ color: '#38bdf8', fontSize: '13px', cursor: 'grab' }} title="拖曳排序握把">
+                            <span style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '13px', cursor: 'grab' }} title="拖曳排序握把">
                               ⠿
                             </span>
                             <span style={{ fontSize: '15px' }}>{info.icon}</span>
@@ -1457,10 +1457,10 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                               style={{
                                 fontWeight: 600,
                                 fontSize: '13px',
-                                color: '#e2e8f0',
+                                color: 'var(--text)',
                                 background: 'transparent',
                                 border: '1px solid transparent',
-                                borderBottom: '1px solid rgba(255,255,255,0.2)',
+                                borderBottom: '1px solid var(--line)',
                                 padding: '2px 4px',
                                 width: '100%',
                                 maxWidth: '180px',
@@ -1482,10 +1482,10 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                     : 'rgba(239,68,68,0.2)',
                                 color:
                                   info.systemId === 10
-                                    ? '#fbbf24'
+                                    ? 'var(--amber)'
                                     : info.systemId === 12
-                                    ? '#86efac'
-                                    : '#fca5a5',
+                                    ? 'var(--green-text,var(--green))'
+                                    : 'var(--red)',
                               }}
                             >
                               系統{info.systemId}
@@ -1497,8 +1497,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                   padding: '1px 6px',
                                   borderRadius: '4px',
                                   fontWeight: 700,
-                                  background: '#0284c7',
-                                  color: '#fff',
+                                  background: 'var(--panel2)',
+                                  color: 'var(--text)',
                                   boxShadow: '0 0 8px rgba(2,132,199,0.8)',
                                   whiteSpace: 'nowrap',
                                 }}
@@ -1513,8 +1513,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             <button
                               type="button"
                               style={{
-                                background: 'rgba(255,255,255,0.06)',
-                                color: '#94a3b8',
+                                background: 'var(--panel2)',
+                                color: 'var(--dim)',
                                 border: 'none',
                                 borderRadius: '4px',
                                 width: '22px',
@@ -1534,8 +1534,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             <button
                               type="button"
                               style={{
-                                background: 'rgba(255,255,255,0.06)',
-                                color: '#94a3b8',
+                                background: 'var(--panel2)',
+                                color: 'var(--dim)',
                                 border: 'none',
                                 borderRadius: '4px',
                                 width: '22px',
@@ -1577,7 +1577,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                               type="button"
                               style={{
                                 background: 'rgba(239,68,68,0.15)',
-                                color: '#fca5a5',
+                                color: 'var(--red)',
                                 border: 'none',
                                 borderRadius: '4px',
                                 width: '22px',
@@ -1604,7 +1604,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         <div
                           style={{
                             flex: 1,
-                            background: 'rgba(0,0,0,0.3)',
+                            background: 'var(--panel2)',
                             borderRadius: '6px',
                             padding: '8px 10px',
                             display: 'flex',
@@ -1651,9 +1651,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                                     padding: '2px 5px',
                                     borderRadius: '3px',
                                     fontSize: '10px',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    background: width === w ? '#0284c7' : 'rgba(255,255,255,0.05)',
-                                    color: width === w ? '#fff' : '#94a3b8',
+                                    border: '1px solid var(--line)',
+                                    background: width === w ? 'color-mix(in srgb,var(--cyan) 18%,var(--panel))' : 'rgba(255,255,255,0.05)',
+                                    color: width === w ? 'var(--text)' : 'var(--dim)',
                                     cursor: 'pointer',
                                     fontWeight: width === w ? 700 : 400,
                                   }}
@@ -1670,9 +1670,9 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             <button
                               type="button"
                               style={{
-                                background: 'rgba(255,255,255,0.08)',
+                                background: 'var(--panel2)',
                                 border: 'none',
-                                color: '#e2e8f0',
+                                color: 'var(--text)',
                                 width: '18px',
                                 height: '18px',
                                 borderRadius: '3px',
@@ -1687,15 +1687,15 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             >
                               -
                             </button>
-                            <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 700, minWidth: '16px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--cyan-text,var(--cyan))', fontWeight: 700, minWidth: '16px', textAlign: 'center' }}>
                               {height}
                             </span>
                             <button
                               type="button"
                               style={{
-                                background: 'rgba(255,255,255,0.08)',
+                                background: 'var(--panel2)',
                                 border: 'none',
-                                color: '#e2e8f0',
+                                color: 'var(--text)',
                                 width: '18px',
                                 height: '18px',
                                 borderRadius: '3px',
@@ -1727,7 +1727,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                             display: 'flex',
                             alignItems: 'flex-end',
                             justifyContent: 'flex-end',
-                            color: isResizing || isFocused ? '#00d4ff' : '#64748b',
+                            color: isResizing || isFocused ? 'var(--cyan-text,var(--cyan))' : 'var(--dim)',
                             fontSize: '13px',
                             fontWeight: 'bold',
                             userSelect: 'none',
@@ -1779,7 +1779,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         gridColumn: `span ${canvasGridCols}`,
                         textAlign: 'center',
                         padding: '60px 20px',
-                        color: '#64748b',
+                        color: 'var(--dim)',
                       }}
                     >
                       <div style={{ fontSize: '32px', marginBottom: '10px' }}>📋</div>
@@ -1795,8 +1795,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               <aside
                 style={{
                   width: '320px',
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'var(--panel2)',
+                  border: '1px solid var(--line)',
                   borderRadius: '10px',
                   padding: '14px',
                   maxHeight: 'calc(100vh - 200px)',
@@ -1807,18 +1807,18 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                 }}
               >
-                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
-                  <h4 style={{ margin: 0, fontSize: '14px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ borderBottom: '1px solid var(--line)', paddingBottom: '8px' }}>
+                  <h4 style={{ margin: 0, fontSize: '14px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span>📦</span> 圖塊元件庫 (共 {Object.keys(WIDGET_CATALOG).length} 款)
                   </h4>
-                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--dim)' }}>
                     點選下方任意圖塊卡片即可直接加入排版畫布。
                   </p>
                 </div>
 
                 {/* 系統 10 區塊 */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--amber)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>🟧</span> 系統 10 · 市場營運分析 (8)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1828,23 +1828,23 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         <div
                           key={k}
                           style={{
-                            background: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(245,158,11,0.2)',
+                            background: 'var(--panel2)',
+                            border: '1px solid var(--line)',
                             borderRadius: '6px',
                             padding: '8px',
                             cursor: 'pointer',
                             transition: 'all 0.15s',
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.borderColor = '#f59e0b')}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--amber)')}
                           onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(245,158,11,0.2)')}
                           onClick={() => addWidget(k)}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text)', fontWeight: 600 }}>
                             <span>{d.icon}</span>
                             <span>{d.defaultTitle}</span>
-                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#f59e0b' }}>➕</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--amber)' }}>➕</span>
                           </div>
-                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{d.desc}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--dim)', marginTop: '2px' }}>{d.desc}</div>
                         </div>
                       ))}
                   </div>
@@ -1852,7 +1852,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
 
                 {/* 系統 11 區塊 */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#fca5a5', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--red)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>🟥</span> 系統 11 · 戰情指揮中心 (10)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1862,23 +1862,23 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         <div
                           key={k}
                           style={{
-                            background: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(239,68,68,0.2)',
+                            background: 'var(--panel2)',
+                            border: '1px solid var(--line)',
                             borderRadius: '6px',
                             padding: '8px',
                             cursor: 'pointer',
                             transition: 'all 0.15s',
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.borderColor = '#ef4444')}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--red)')}
                           onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)')}
                           onClick={() => addWidget(k)}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text)', fontWeight: 600 }}>
                             <span>{d.icon}</span>
                             <span>{d.defaultTitle}</span>
-                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#ef4444' }}>➕</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--red)' }}>➕</span>
                           </div>
-                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{d.desc}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--dim)', marginTop: '2px' }}>{d.desc}</div>
                         </div>
                       ))}
                   </div>
@@ -1886,7 +1886,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
 
                 {/* 系統 12 區塊 */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: 700, color: '#86efac', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--green-text,var(--green))', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <span>🟩</span> 系統 12 · 市場公開看板 (8)
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1896,23 +1896,23 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         <div
                           key={k}
                           style={{
-                            background: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(34,197,94,0.2)',
+                            background: 'var(--panel2)',
+                            border: '1px solid var(--line)',
                             borderRadius: '6px',
                             padding: '8px',
                             cursor: 'pointer',
                             transition: 'all 0.15s',
                           }}
-                          onMouseEnter={e => (e.currentTarget.style.borderColor = '#22c55e')}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--green-text,var(--green))')}
                           onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(34,197,94,0.2)')}
                           onClick={() => addWidget(k)}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#f1f5f9', fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text)', fontWeight: 600 }}>
                             <span>{d.icon}</span>
                             <span>{d.defaultTitle}</span>
-                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#22c55e' }}>➕</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '11px', color: 'var(--green-text,var(--green))' }}>➕</span>
                           </div>
-                          <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{d.desc}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--dim)', marginTop: '2px' }}>{d.desc}</div>
                         </div>
                       ))}
                   </div>
@@ -1989,7 +1989,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       <button
                         type="button"
                         className="secondary-btn"
-                        style={{ color: '#f87171' }}
+                        style={{ color: 'var(--red)' }}
                         onClick={() => removeItem(index)}
                       >
                         刪除
@@ -2043,7 +2043,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               placeholder="例如：設定 3500*400 超寬長條戰情矩形版面"
             />
             {dirty && (
-              <small style={{ color: '#f59e0b', whiteSpace: 'nowrap' }}>
+              <small style={{ color: 'var(--amber)', whiteSpace: 'nowrap' }}>
                 ● 有尚未儲存的修改
               </small>
             )}
@@ -2094,8 +2094,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
         >
           <div
             style={{
-              background: '#041022',
-              border: '1px solid #00d4ff',
+              background: 'var(--panel2)',
+              border: '1px solid var(--line)',
               borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
@@ -2109,8 +2109,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             <div
               style={{
                 padding: '10px 18px',
-                background: 'rgba(5, 16, 30, 0.95)',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                background: 'var(--panel2)',
+                borderBottom: '1px solid var(--line)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -2121,11 +2121,11 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '18px' }}>🖥️</span>
                 <strong>戰情看板即時視窗預覽</strong>
-                <span style={{ fontSize: '12px', color: '#38bdf8' }}>
+                <span style={{ fontSize: '12px', color: 'var(--cyan-text,var(--cyan))' }}>
                   ({canvasWidth} × {canvasHeight} px · {canvasGridCols} 欄模式)
                 </span>
                 {canvasWidth >= 2500 && (
-                  <span style={{ fontSize: '11px', background: 'rgba(245,158,11,0.2)', color: '#fbbf24', padding: '1px 6px', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '11px', background: 'rgba(245,158,11,0.2)', color: 'var(--amber)', padding: '1px 6px', borderRadius: '4px' }}>
                     長條矩形看板
                   </span>
                 )}
@@ -2133,12 +2133,12 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
 
               {/* 預覽縮放工具列 (滿足：不要有卷軸，配置圖面可以放大縮小) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--panel2)', padding: '2px 6px', borderRadius: '6px' }}>
                   <button
                     type="button"
                     style={{
-                      background: previewZoomScale === 'fit' ? '#10b981' : 'transparent',
-                      color: previewZoomScale === 'fit' ? '#fff' : '#94a3b8',
+                      background: previewZoomScale === 'fit' ? 'var(--green-text,var(--green))' : 'transparent',
+                      color: previewZoomScale === 'fit' ? 'var(--text)' : 'var(--dim)',
                       border: 'none',
                       borderRadius: '4px',
                       padding: '3px 8px',
@@ -2154,8 +2154,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   <button
                     type="button"
                     style={{
-                      background: previewZoomScale === 0.5 ? '#0284c7' : 'transparent',
-                      color: previewZoomScale === 0.5 ? '#fff' : '#94a3b8',
+                      background: previewZoomScale === 0.5 ? 'color-mix(in srgb,var(--cyan) 18%,var(--panel))' : 'transparent',
+                      color: previewZoomScale === 0.5 ? 'var(--text)' : 'var(--dim)',
                       border: 'none',
                       borderRadius: '4px',
                       padding: '3px 6px',
@@ -2169,8 +2169,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   <button
                     type="button"
                     style={{
-                      background: previewZoomScale === 0.75 ? '#0284c7' : 'transparent',
-                      color: previewZoomScale === 0.75 ? '#fff' : '#94a3b8',
+                      background: previewZoomScale === 0.75 ? 'color-mix(in srgb,var(--cyan) 18%,var(--panel))' : 'transparent',
+                      color: previewZoomScale === 0.75 ? 'var(--text)' : 'var(--dim)',
                       border: 'none',
                       borderRadius: '4px',
                       padding: '3px 6px',
@@ -2184,8 +2184,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   <button
                     type="button"
                     style={{
-                      background: previewZoomScale === 1 ? '#0284c7' : 'transparent',
-                      color: previewZoomScale === 1 ? '#fff' : '#94a3b8',
+                      background: previewZoomScale === 1 ? 'color-mix(in srgb,var(--cyan) 18%,var(--panel))' : 'transparent',
+                      color: previewZoomScale === 1 ? 'var(--text)' : 'var(--dim)',
                       border: 'none',
                       borderRadius: '4px',
                       padding: '3px 6px',
@@ -2199,8 +2199,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   <button
                     type="button"
                     style={{
-                      background: previewZoomScale === 1.25 ? '#0284c7' : 'transparent',
-                      color: previewZoomScale === 1.25 ? '#fff' : '#94a3b8',
+                      background: previewZoomScale === 1.25 ? 'color-mix(in srgb,var(--cyan) 18%,var(--panel))' : 'transparent',
+                      color: previewZoomScale === 1.25 ? 'var(--text)' : 'var(--dim)',
                       border: 'none',
                       borderRadius: '4px',
                       padding: '3px 6px',
@@ -2226,7 +2226,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   type="button"
                   style={{
                     background: 'rgba(239,68,68,0.2)',
-                    color: '#f87171',
+                    color: 'var(--red)',
                     border: 'none',
                     borderRadius: '6px',
                     padding: '4px 10px',
@@ -2247,7 +2247,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 flex: 1,
                 overflow: previewZoomScale === 'fit' ? 'hidden' : 'auto',
                 padding: '16px',
-                background: '#020b18',
+                background: 'var(--panel2)',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -2262,10 +2262,10 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                   display: 'grid',
                   gridTemplateColumns: `repeat(${canvasGridCols}, 1fr)`,
                   gap: previewZoomScale === 'fit' ? '10px' : '14px',
-                  background: '#070f22',
+                  background: 'var(--panel2)',
                   padding: '16px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(0,212,255,0.25)',
+                  border: '1px solid var(--line)',
                   boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
                   boxSizing: 'border-box',
                 }}
@@ -2285,8 +2285,8 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                         style={{
                           gridColumn: `span ${width}`,
                           minHeight: previewZoomScale === 'fit' ? 'auto' : `${height * 65}px`,
-                          background: 'rgba(15, 23, 42, 0.95)',
-                          border: '1px solid rgba(0, 212, 255, 0.25)',
+                          background: 'var(--panel2)',
+                          border: '1px solid var(--line)',
                           borderRadius: '8px',
                           padding: '10px 12px',
                           display: 'flex',
@@ -2296,7 +2296,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
                           <span>{info.icon}</span>
-                          <strong style={{ color: '#00d4ff', fontSize: '13px' }}>{item.title}</strong>
+                          <strong style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '13px' }}>{item.title}</strong>
                           <span
                             style={{
                               marginLeft: 'auto',
@@ -2304,7 +2304,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                               padding: '1px 5px',
                               borderRadius: '3px',
                               background: 'rgba(0, 212, 255, 0.1)',
-                              color: '#38bdf8',
+                              color: 'var(--cyan-text,var(--cyan))',
                               fontWeight: 700,
                             }}
                           >

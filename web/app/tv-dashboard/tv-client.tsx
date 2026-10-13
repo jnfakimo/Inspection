@@ -170,28 +170,28 @@ export function TvClient({ profile: _profile }: TvClientProps) {
   const visibleItems = items.filter(item => item.visible !== false);
 
   return (
-    <div
+    <div className="tv-display"
       style={{
-        backgroundColor: '#020b18',
+        backgroundColor: 'var(--bg)',
         minHeight: '100vh',
         padding: '16px 20px',
-        color: '#f8fafc',
+        color: 'var(--text)',
         display: 'flex',
         flexDirection: 'column',
         boxSizing: 'border-box',
       }}
     >
-      <header
+      <header className="tv-display-header"
         style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: '16px',
           paddingBottom: '12px',
-          borderBottom: '1px solid rgba(0, 212, 255, 0.25)',
+          borderBottom: '1px solid var(--line)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="tv-display-brand" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '26px' }}>🖥️</span>
           <div>
             <h1
@@ -199,30 +199,30 @@ export function TvClient({ profile: _profile }: TvClientProps) {
                 margin: 0,
                 fontSize: '22px',
                 fontWeight: 800,
-                color: '#00d4ff',
+                color: 'var(--cyan-text,var(--cyan))',
                 letterSpacing: '1px',
                 textShadow: '0 0 16px rgba(0, 212, 255, 0.6)',
               }}
             >
               臺北農產公司 · 營運戰情大螢幕即時看板
             </h1>
-            <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--cyan-text,var(--cyan))', marginTop: '2px' }}>
               即時系統監控 · 智慧巡檢 · 市場批發行情全聯網 ｜ 網格：{cols} 欄自適應
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="tv-display-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div
             style={{
               fontSize: '20px',
-              color: '#34d399',
+              color: 'var(--green-text,var(--green))',
               fontWeight: 700,
               fontFamily: 'monospace',
               background: 'rgba(16, 185, 129, 0.1)',
               padding: '5px 12px',
               borderRadius: '6px',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
+              border: '1px solid var(--line)',
             }}
           >
             {time.toLocaleString('zh-TW', { hour12: false })}
@@ -230,13 +230,13 @@ export function TvClient({ profile: _profile }: TvClientProps) {
           <a
             href="/Inspection/v2/systems/admin/layouts/"
             style={{
-              color: '#94a3b8',
+              color: 'var(--dim)',
               fontSize: '12px',
               textDecoration: 'none',
               padding: '5px 10px',
-              border: '1px solid rgba(255,255,255,0.15)',
+              border: '1px solid var(--line)',
               borderRadius: '6px',
-              background: 'rgba(255,255,255,0.04)',
+              background: 'var(--panel2)',
             }}
           >
             ⚙️ 版面設定
@@ -245,11 +245,11 @@ export function TvClient({ profile: _profile }: TvClientProps) {
       </header>
 
       {/* 依設定之格線模式呈現大螢幕看板 (支援 12 欄與 24 欄超寬看板) */}
-      <main
+      <main className="tv-display-grid"
         style={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
           gap: '12px',
           alignContent: 'start',
         }}
@@ -265,12 +265,13 @@ export function TvClient({ profile: _profile }: TvClientProps) {
 
           return (
             <div
+              className="tv-display-widget"
               key={`${item.widget_key}-${index}`}
               style={{
                 gridColumn: `span ${width}`,
                 minHeight: `${Math.max(90, height * 50)}px`,
-                background: 'rgba(15, 23, 42, 0.95)',
-                border: '1px solid rgba(0, 212, 255, 0.25)',
+                background: 'var(--panel2)',
+                border: '1px solid var(--line)',
                 borderRadius: '8px',
                 padding: '10px 12px',
                 display: 'flex',
@@ -287,11 +288,11 @@ export function TvClient({ profile: _profile }: TvClientProps) {
                   gap: '6px',
                   marginBottom: '8px',
                   paddingBottom: '5px',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  borderBottom: '1px solid var(--line)',
                 }}
               >
                 <span style={{ fontSize: '14px' }}>{info.icon}</span>
-                <strong style={{ color: '#00d4ff', fontSize: '13px' }}>{item.title}</strong>
+                <strong style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '13px' }}>{item.title}</strong>
                 <span
                   style={{
                     marginLeft: 'auto',
@@ -299,7 +300,7 @@ export function TvClient({ profile: _profile }: TvClientProps) {
                     padding: '1px 5px',
                     borderRadius: '3px',
                     background: 'rgba(0, 212, 255, 0.1)',
-                    color: '#38bdf8',
+                    color: 'var(--cyan-text,var(--cyan))',
                     fontWeight: 700,
                   }}
                 >

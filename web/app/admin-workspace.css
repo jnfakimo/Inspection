@@ -10,7 +10,7 @@
 .admin-panel table.center-head td.num{text-align:right}
 .admin-panel td.nowrap .admin-row-actions{flex-wrap:nowrap}
 .admin-panel td.nowrap .admin-row-actions button{white-space:nowrap}.admin-panel td small{margin-top:4px;color:var(--muted)}
-.admin-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}.admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}.admin-toolbar>input{min-width:min(420px,100%);flex:1}.admin-toolbar>span{color:var(--muted);font-size:.88rem}
+.admin-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}.admin-toolbar input,.admin-toolbar select,.admin-form-grid input,.admin-form-grid select,.admin-tabs+input,.layout-summary select,.admin-layout-actions input,.layout-editor input,.permission-matrix select{min-height:var(--form-control-height);padding:9px 11px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}.admin-toolbar>input{min-width:min(420px,100%);flex:1}.admin-toolbar>span{color:var(--muted);font-size:.88rem}
 /* LocalizedDateInput 的外層 span 帶著 inline width:100%（其他頁面都包在 <label>
    裡所以看不出來）。它若直接放進 .admin-toolbar 這個 flex 容器，會要求整列寬度，
    把同列的前後一天／今天／筆數擠到換行。日期只需容納 YYYY/MM/DD 與日曆鈕。 */
@@ -26,7 +26,7 @@
    critical 兩種，而 warning 先前沒有規則、落到預設灰色，看起來跟一般提示無異。
    info 一併補上，避免同樣的缺口。 */
 .admin-alert-list,.admin-notice-list{display:grid;gap:12px}.admin-alert{padding:17px;border:1px solid var(--line);border-left:4px solid #94a3b8;border-radius:5px;background:#fff}.admin-alert.severity-critical,.admin-alert.severity-high{border-left-color:#ef4444}.admin-alert.severity-warning,.admin-alert.severity-medium{border-left-color:#f59e0b}.admin-alert.severity-info,.admin-alert.severity-low{border-left-color:#38bdf8}.admin-alert header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.admin-alert header>div{display:flex;align-items:center;gap:10px}.admin-alert h3{margin:0}.admin-alert .severity{padding:3px 7px;border-radius:3px;background:#eef2f7;color:#475569;font-size:.75rem;font-weight:700}.admin-alert dl{display:flex;gap:24px;flex-wrap:wrap}.admin-alert dl div{display:grid;gap:3px}.admin-alert dt{color:var(--muted);font-size:.75rem}.admin-alert dd{margin:0}.admin-notice-list article{display:flex;justify-content:space-between;gap:18px;padding:17px;border:1px solid var(--line);border-left:4px solid var(--blue);background:#fff}.admin-notice-list article.read{border-left-color:#cbd5e1;opacity:.72}.admin-notice-list h3{margin:5px 0}.admin-notice-list p{margin:0 0 8px}.admin-notice-list time,.notice-event{color:var(--muted);font-size:.78rem}
-.security-alert-entry{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 12px;border:1px solid color-mix(in srgb,var(--red) 42%,var(--line));border-radius:6px;background:color-mix(in srgb,var(--red) 7%,var(--surface));color:var(--ink);font-size:.85rem;font-weight:700;text-decoration:none}.security-alert-entry strong{display:grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:var(--red);color:#fff;font-size:.75rem}.security-alert-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--red) 28%,var(--line));border-radius:5px;background:color-mix(in srgb,var(--red) 5%,var(--surface))}.security-alert-summary strong{color:var(--ink)}.security-alert-summary span{color:var(--muted);font-size:.78rem}.security-alert-filters{display:grid;grid-template-columns:minmax(240px,2.2fr) minmax(110px,1fr) repeat(3,minmax(105px,1fr)) minmax(140px,1.1fr) minmax(140px,1.1fr) auto;align-items:center;gap:6px;margin-bottom:14px}.security-alert-filters>input,.security-alert-filters>select{width:100%;min-width:0;min-height:36px;padding:7px 8px;font-size:.8rem}.security-alert-filters>input{flex:none}.security-alert-filters>label{width:auto;min-width:0;gap:4px;white-space:nowrap;font-size:.76rem}.security-alert-filters>.security-alert-date .localized-date-input{display:block;flex:0 1 128px;width:128px;min-width:0}.security-alert-filters>.security-alert-date .localized-date-input input:first-child{box-sizing:border-box;width:100%;min-width:0;padding:7px 25px 7px 8px;font-size:.8rem}.security-alert-filters>button{min-height:36px;padding:7px 10px;font-size:.8rem;white-space:nowrap}.admin-alert header>div{flex-wrap:wrap}.admin-alert .alert-type{padding:3px 7px;border:1px solid var(--line);border-radius:3px;color:var(--muted);font-size:.75rem;font-weight:700}.admin-alert dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 20px}.admin-alert dl div{min-width:0;padding-top:8px;border-top:1px solid var(--line)}.admin-alert dd{overflow-wrap:anywhere}.admin-alert dd small{display:block;margin-top:3px;color:var(--muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.admin-alert .alert-device,.audit-device,.audit-content{max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.alert-acknowledged{display:block;margin-top:12px;color:var(--muted)}
+.security-alert-entry{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:8px 12px;border:1px solid color-mix(in srgb,var(--red) 42%,var(--line));border-radius:6px;background:color-mix(in srgb,var(--red) 7%,var(--surface));color:var(--ink);font-size:.85rem;font-weight:700;text-decoration:none}.security-alert-entry strong{display:grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:var(--red);color:#fff;font-size:.75rem}.security-alert-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:12px 14px;border:1px solid color-mix(in srgb,var(--red) 28%,var(--line));border-radius:5px;background:color-mix(in srgb,var(--red) 5%,var(--surface))}.security-alert-summary strong{color:var(--ink)}.security-alert-summary span{color:var(--muted);font-size:.78rem}.security-alert-filters{display:grid;grid-template-columns:minmax(240px,2.2fr) minmax(110px,1fr) repeat(3,minmax(105px,1fr)) minmax(140px,1.1fr) minmax(140px,1.1fr) auto;align-items:center;gap:6px;margin-bottom:14px}.security-alert-filters>input,.security-alert-filters>select{width:100%;min-width:0;min-height:var(--form-control-height);padding:7px 8px;font-size:.8rem}.security-alert-filters>input{flex:none}.security-alert-filters>label{width:auto;min-width:0;gap:4px;white-space:nowrap;font-size:.76rem}.security-alert-filters>.security-alert-date .localized-date-input{display:block;flex:0 1 128px;width:128px;min-width:0}.security-alert-filters>.security-alert-date .localized-date-input input:first-child{box-sizing:border-box;width:100%;min-width:0;padding:7px 25px 7px 8px;font-size:.8rem}.security-alert-filters>button{min-height:36px;padding:7px 10px;font-size:.8rem;white-space:nowrap}.admin-alert header>div{flex-wrap:wrap}.admin-alert .alert-type{padding:3px 7px;border:1px solid var(--line);border-radius:3px;color:var(--muted);font-size:.75rem;font-weight:700}.admin-alert dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 20px}.admin-alert dl div{min-width:0;padding-top:8px;border-top:1px solid var(--line)}.admin-alert dd{overflow-wrap:anywhere}.admin-alert dd small{display:block;margin-top:3px;color:var(--muted);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.admin-alert .alert-device,.audit-device,.audit-content{max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.alert-acknowledged{display:block;margin-top:12px;color:var(--muted)}
 .security-alert-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 /* severity 的 low／info 分開上色：low 用藍、info 用灰，其餘沿用上面的規則。 */
 .admin-alert.severity-low{border-left-color:#38bdf8}.admin-alert.severity-info{border-left-color:#94a3b8}
@@ -58,7 +58,7 @@
 .audit-log-table .audit-content,.audit-log-table .audit-device{max-width:230px}
 
 /* 資安告警篩選列採可收縮欄寬，避免桌面版固定最小欄位造成水平溢出。 */
-.security-alert-filters{grid-template-columns:minmax(180px,2fr) repeat(4,minmax(0,1fr)) repeat(2,minmax(130px,1.1fr)) auto;min-width:0;width:100%;max-width:100%}
+@media(min-width:1101px){.security-alert-filters{grid-template-columns:minmax(180px,2fr) repeat(4,minmax(0,1fr)) repeat(2,minmax(130px,1.1fr)) auto;min-width:0;width:100%;max-width:100%}}
 .security-alert-filters>*{min-width:0}
 
 /* 稽核頁不提供水平捲軸：所有欄位已在桌面版固定比例內收斂。 */
@@ -172,8 +172,8 @@
    桌面版仍是同一列，這裡只調整 800px 以下。六個控制項統一 36px 高、12px 字，兩列才會對齊；
    選擇器要寫到兩層才蓋得過 button-standard.css 的 .primary-btn.compact。 */
 @media (max-width:800px){
-    .vehicle-request-toolbar>select,
-  .vehicle-request-toolbar .localized-date-input>input:first-child:not(.localized-date-native){min-height:var(--form-control-height);height:var(--form-control-height);padding:0 8px;font-size:12px;line-height:1.2}
+  .vehicle-request-toolbar>select,
+  .vehicle-request-toolbar .localized-date-input>input:first-child:not(.localized-date-native){box-sizing:border-box;min-height:var(--form-control-height);height:var(--form-control-height);padding:0 8px;font-size:12px;line-height:1.2}
   .vehicle-request-toolbar>.vehicle-request-clear,
   .vehicle-request-toolbar .vehicle-request-actions>button{min-height:36px;height:36px;padding:0 8px;font-size:12px;line-height:1.2}
   .vehicle-request-toolbar>select{flex:1 1 0;min-width:0}
@@ -236,7 +236,7 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
   .handover-create-modal>header{position:sticky;top:0;z-index:2;padding:13px 16px}
   .handover-create-modal>header h2{font-size:1.05rem}
   .handover-create-modal .admin-form-grid{grid-template-columns:1fr;gap:10px;padding:14px 16px}
-  .handover-create-modal .admin-form-grid input,.handover-create-modal .admin-form-grid select{min-height:var(--form-control-height);font-size:16px}
+  .handover-create-modal .admin-form-grid input:not([type="checkbox"]):not([type="radio"]),.handover-create-modal .admin-form-grid select{min-height:var(--form-control-height);font-size:16px}
   .handover-create-modal .detail-timeline{padding:0 16px 4px}
   .handover-create-modal .detail-timeline h3{font-size:.95rem;margin-bottom:8px}
   .handover-create-modal .detail-grid{grid-template-columns:1fr 1fr;gap:8px;padding:10px 0}
@@ -438,3 +438,12 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
 .permission-matrix thead th:first-child{z-index:4}
 .permission-matrix tbody td:first-child{z-index:2;box-shadow:inset -1px 0 0 var(--line)}
 .granular-module-note{grid-column:1/-1;margin:0;padding:0 4px 4px;color:var(--muted);font-size:.72rem;line-height:1.5}
+
+/* 版面編輯器長版本名稱不得撐出手機視窗，保留控制列換行。 */
+@media screen and (max-width:800px){
+  .layout-editor-panel>div,.layout-editor-panel>div>div,.layout-editor-panel .admin-toolbar label{min-width:0;max-width:100%}
+  .layout-editor-panel .admin-toolbar label{flex-wrap:wrap}
+  .layout-editor-panel select{min-width:0;max-width:100%;width:100%}
+}
+
+@media(max-width:360px){.security-alert-filters{grid-template-columns:minmax(0,1fr)}.security-alert-filters>.security-alert-date{white-space:normal}}
