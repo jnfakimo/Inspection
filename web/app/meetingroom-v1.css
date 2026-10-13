@@ -327,3 +327,12 @@
     white-space:nowrap;
   }
 }
+
+@media screen {
+  .mr-modal .field input,
+  .mr-modal .field select,
+  .booking-modal .field input,
+  .booking-modal .field select,
+  .mr-modal.wide:not(.booking-modal) .field input,
+  .mr-modal.wide:not(.booking-modal) .field select { min-height: var(--form-control-height); }
+}

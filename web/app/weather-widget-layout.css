@@ -10,7 +10,7 @@
 .weather-info-container>div[style*="background"] dl{gap:12px!important}
 .weather-info-container>div[style*="background"] dd{font-size:18px!important}
 .weather-info-container>div[style*="background"] dd:first-child{font-size:26px!important}
-.weather-controls select,.weather-controls button{min-height:42px;font-size:14px}
+.weather-controls select{min-height:var(--form-control-height);font-size:14px}.weather-controls button{min-height:42px}
 .weather-bulletins{margin:0}
 .weather-bulletin{font-size:14px}
 .weather-bulletin small{font-size:12px}
@@ -35,7 +35,7 @@
 .weather-town-details>summary>span:last-child{margin-left:auto;color:var(--dim);font-size:12px;font-weight:500}
 .weather-town-details[open]>summary{border-bottom:1px solid var(--line)}
 .weather-town-details>.responsive-table{border:0!important;border-radius:0!important}
-.weather-town-select{min-height:36px;padding:4px 6px;border:0;border-radius:5px;background:transparent;color:var(--cyan);font:inherit;font-weight:700;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.weather-town-select{min-height:var(--form-control-height);padding:4px 6px;border:0;border-radius:5px;background:transparent;color:var(--cyan);font:inherit;font-weight:700;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .weather-town-select:hover,.weather-town-select[aria-pressed="true"]{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--text)}
 .weather-town-select:focus-visible,.weather-map-panel svg [role="button"]:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 @media(max-width:900px){.weather-widget{grid-template-columns:minmax(0,1fr)}.weather-map-panel{grid-column:1;grid-row:1}.weather-info-container{grid-column:1;grid-row:2}.weather-map-container{height:min(54vh,480px);min-height:300px}}

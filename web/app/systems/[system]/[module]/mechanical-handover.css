@@ -21,7 +21,7 @@
 .mechanical-confirm-content{display:grid;gap:14px;padding:20px}
 .mechanical-confirm-content>p{margin:0;color:var(--dim);line-height:1.7}
 .mechanical-confirm-content>label{display:grid;gap:7px;font-weight:800}
-.mechanical-confirm-content select{min-height:42px}
+.mechanical-confirm-content select{min-height:var(--form-control-height)}
 .mechanical-confirm-items{display:grid;gap:8px;max-height:44vh;margin:0;padding:0 0 0 24px;overflow:auto}
 .mechanical-confirm-items li{padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel2)}
 .mechanical-confirm-items b,.mechanical-confirm-items p,.mechanical-confirm-items small{display:block;margin:0}

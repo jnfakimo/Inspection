@@ -148,7 +148,7 @@
 .vehicle-detail-modal .detail-timeline li p{margin-top:3px;font-size:.76rem}
 .vehicle-detail-modal .admin-form-grid{gap:6px;margin:3px 14px 6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface-soft)}
 .vehicle-detail-modal .admin-form-grid label{gap:3px;font-size:.76rem}
-.vehicle-detail-modal .admin-form-grid input,.vehicle-detail-modal .admin-form-grid select{min-height:34px;padding:6px 9px;border-color:var(--line);background:var(--surface)}
+.vehicle-detail-modal .admin-form-grid input,.vehicle-detail-modal .admin-form-grid select{min-height:var(--form-control-height);padding:6px 9px;border-color:var(--line);background:var(--surface)}
 .vehicle-detail-modal>footer{position:sticky;bottom:0;z-index:2;padding:8px 14px;border-top-color:var(--line);background:color-mix(in srgb,var(--surface) 96%,transparent);backdrop-filter:blur(8px)}
 .vehicle-detail-modal>footer button{min-height:34px;padding:7px 11px}
 @media (max-width:1100px){
@@ -172,11 +172,10 @@
    桌面版仍是同一列，這裡只調整 800px 以下。六個控制項統一 36px 高、12px 字，兩列才會對齊；
    選擇器要寫到兩層才蓋得過 button-standard.css 的 .primary-btn.compact。 */
 @media (max-width:800px){
-  .vehicle-request-toolbar>select,
+    .vehicle-request-toolbar>select,
+  .vehicle-request-toolbar .localized-date-input>input:first-child:not(.localized-date-native){min-height:var(--form-control-height);height:var(--form-control-height);padding:0 8px;font-size:12px;line-height:1.2}
   .vehicle-request-toolbar>.vehicle-request-clear,
-  .vehicle-request-toolbar .localized-date-input>input:first-child,
-  .vehicle-request-toolbar .vehicle-request-actions>button{
-    min-height:36px;height:36px;padding:0 8px;font-size:12px;line-height:1.2}
+  .vehicle-request-toolbar .vehicle-request-actions>button{min-height:36px;height:36px;padding:0 8px;font-size:12px;line-height:1.2}
   .vehicle-request-toolbar>select{flex:1 1 0;min-width:0}
   .vehicle-request-toolbar .localized-date-input{flex:1 1 0;min-width:0;width:auto}
   .vehicle-request-toolbar .localized-date-input>input:first-child{min-width:0!important;width:100%;padding-right:26px}
@@ -237,7 +236,7 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
   .handover-create-modal>header{position:sticky;top:0;z-index:2;padding:13px 16px}
   .handover-create-modal>header h2{font-size:1.05rem}
   .handover-create-modal .admin-form-grid{grid-template-columns:1fr;gap:10px;padding:14px 16px}
-  .handover-create-modal .admin-form-grid input,.handover-create-modal .admin-form-grid select{min-height:46px;font-size:16px}
+  .handover-create-modal .admin-form-grid input,.handover-create-modal .admin-form-grid select{min-height:var(--form-control-height);font-size:16px}
   .handover-create-modal .detail-timeline{padding:0 16px 4px}
   .handover-create-modal .detail-timeline h3{font-size:.95rem;margin-bottom:8px}
   .handover-create-modal .detail-grid{grid-template-columns:1fr 1fr;gap:8px;padding:10px 0}
@@ -400,7 +399,7 @@ html[data-theme="tech"] .handover-submit-btn{background:#dbeafe;color:#075985;bo
 .granular-system-title em{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.7rem;font-style:normal}
 .granular-system-title>b{margin-left:auto;color:var(--cyan);font-size:.72rem;white-space:nowrap}
 .granular-system-row>label{display:grid;gap:3px;color:var(--muted);font-size:.68rem}
-.granular-system-row select,.granular-module-grid select{min-height:36px;width:100%;font-size:.78rem}
+.granular-system-row select,.granular-module-grid select{min-height:var(--form-control-height);width:100%;font-size:.78rem}
 .effective-access{min-height:28px;padding:4px 8px;border:1px solid var(--line)}
 .granular-module-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 12px 12px;border-top:1px solid var(--line);background:var(--surface-soft)}
 .granular-module-grid>label{display:grid;grid-template-columns:minmax(0,1fr) 76px;grid-template-areas:"copy copy" "mode state";gap:8px 10px;align-items:center;padding:10px;border:1px solid var(--line);border-left:3px solid var(--muted);border-radius:5px;background:var(--surface)}

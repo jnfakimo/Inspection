@@ -1,19 +1,33 @@
-/* 這一頁刻意是淺色的：.page 在此把 --ink／--muted／--line 遮蔽成自己的淺色值，
-   底色也全部固定，因此深淺兩個主題下長得一樣，不隨 data-theme 改變。
-   唯二的例外原本是兩個全域的 sky 變數——它們會跟著主題走，科技版下文字色是
-   #bae6fd，印在寫死的 #fff 上只有 1.33:1，頁首標籤等於消失。改成模組自有的
-   --accent／--accent-text，取淺色主題原本的值，外觀不變但不再受主題影響。 */
+/* 管理設定頁跟隨全站 light/tech 主題。狀態底色、文字與邊框都由主題 token 計算。 */
 .page {
-  --ink: #172033;
-  --muted: #64748b;
-  --line: #dbe4ee;
-  --soft: #f4f7fa;
-  --primary: #007fa3;
-  --accent: #7dd3fc;
-  --accent-text: #0369a1;
+  --ink: var(--text);
+  --muted: var(--dim);
+  --settings-line: var(--line);
+  --soft: var(--surface-soft);
+  --accent: var(--cyan);
+  --accent-text: var(--blue);
+  --settings-success-bg: color-mix(in srgb, var(--green) 12%, var(--panel));
+  --settings-success-border: color-mix(in srgb, var(--green) 40%, var(--settings-line));
+  --settings-success-text: color-mix(in srgb, var(--green) 70%, var(--text));
+  --settings-error-bg: color-mix(in srgb, var(--red) 12%, var(--panel));
+  --settings-error-border: color-mix(in srgb, var(--red) 40%, var(--settings-line));
+  --settings-error-text: color-mix(in srgb, var(--red) 70%, var(--text));
+  --settings-info-bg: color-mix(in srgb, var(--blue) 10%, var(--panel));
+  --settings-info-border: color-mix(in srgb, var(--blue) 38%, var(--settings-line));
+  --settings-info-text: color-mix(in srgb, var(--blue) 70%, var(--text));
+  --settings-warning-bg: color-mix(in srgb, var(--amber) 12%, var(--panel));
+  --settings-warning-border: color-mix(in srgb, var(--amber) 42%, var(--settings-line));
+  --settings-warning-text: color-mix(in srgb, var(--amber) 70%, var(--text));
+  --settings-primary-bg: var(--blue);
+  --settings-primary-fg: var(--panel);
   color: var(--ink);
   min-height: 100%;
   padding-bottom: 48px;
+}
+
+:global(:root[data-theme="tech"]) .page {
+  --settings-primary-bg: var(--cyan);
+  --settings-primary-fg: var(--bg);
 }
 
 .breadcrumbs {
@@ -26,7 +40,7 @@
 }
 
 .breadcrumbs a {
-  color: #087fa1;
+  color: var(--blue);
   text-decoration: none;
 }
 
@@ -42,9 +56,8 @@
 .hero {
   align-items: center;
   background:
-    linear-gradient(120deg, rgba(0, 169, 214, 0.08), rgba(255, 255, 255, 0) 48%),
-    #fff;
-  border: 1px solid var(--line);
+    linear-gradient(120deg, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 48%), var(--panel);
+  border: 1px solid var(--settings-line);
   border-left: 5px solid var(--accent);
   box-shadow: 0 10px 28px rgba(15, 35, 58, 0.07);
   display: flex;
@@ -80,10 +93,10 @@
 
 .hero button,
 .detailNav button {
-  background: #fff;
-  border: 1px solid #b9cad9;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   border-radius: 7px;
-  color: #385269;
+  color: var(--text);
   cursor: pointer;
   flex: none;
   font: inherit;
@@ -95,7 +108,7 @@
 .hero button:hover,
 .detailNav button:hover {
   border-color: var(--accent);
-  color: #006f8c;
+  color: var(--blue);
 }
 
 .hero button:disabled,
@@ -113,8 +126,8 @@
 .card {
   --settings-accent: var(--accent);
   appearance: none;
-  background: #fff;
-  border: 1px solid var(--line);
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   border-radius: 3px;
   box-shadow: 0 5px 18px rgba(15, 35, 58, 0.055);
   color: var(--ink);
@@ -151,10 +164,10 @@
 
 .cardCode {
   align-self: flex-start;
-  background: #f2f6f9;
-  border: 1px solid #d9e3ec;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
   border-radius: 999px;
-  color: #546578;
+  color: var(--dim);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.68rem;
   font-weight: 800;
@@ -164,8 +177,8 @@
 
 .cardIcon {
   align-items: center;
-  background: #f5f8fa;
-  border: 1px solid #e0e8ef;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
   display: flex;
   height: 58px;
   justify-content: center;
@@ -217,21 +230,21 @@
 }
 
 .success {
-  background: #effcf5;
-  border-color: #9bd8b6;
-  color: #12643b;
+  background: var(--settings-success-bg);
+  border-color: var(--settings-success-border);
+  color: var(--settings-success-text);
 }
 
 .error {
-  background: #fff2f2;
-  border-color: #efb2b2;
-  color: #9f2525;
+  background: var(--settings-error-bg);
+  border-color: var(--settings-error-border);
+  color: var(--settings-error-text);
 }
 
 .info {
-  background: #eef8fc;
-  border-color: #a9d8e7;
-  color: #12617a;
+  background: var(--settings-info-bg);
+  border-color: var(--settings-info-border);
+  color: var(--settings-info-text);
 }
 
 .detailNav {
@@ -242,8 +255,8 @@
 
 .formPanel,
 .apiPanel {
-  background: #fff;
-  border: 1px solid var(--line);
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   border-radius: 4px;
   box-shadow: 0 8px 24px rgba(15, 35, 58, 0.07);
   padding: 24px;
@@ -251,7 +264,7 @@
 
 .panelHeading {
   align-items: flex-start;
-  border-bottom: 1px solid #e5ebf1;
+  border-bottom: 1px solid var(--surface-soft);
   display: flex;
   gap: 20px;
   justify-content: space-between;
@@ -285,22 +298,22 @@
 }
 
 .codeBadge {
-  background: #f0f6f9;
-  border: 1px solid #cfe0e8;
-  color: #327087;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
+  color: var(--settings-info-text);
   letter-spacing: 0.05em;
 }
 
 .secretReady {
-  background: #edf9f2;
-  border: 1px solid #a9ddbe;
-  color: #167246;
+  background: var(--settings-success-bg);
+  border: 1px solid var(--settings-success-border);
+  color: var(--settings-success-text);
 }
 
 .secretMissing {
-  background: #fff7e8;
-  border: 1px solid #edd093;
-  color: #8c5c00;
+  background: var(--settings-warning-bg);
+  border: 1px solid var(--settings-warning-border);
+  color: var(--settings-warning-text);
 }
 
 .headingActions {
@@ -320,7 +333,7 @@
 .formGrid label,
 .modal label,
 .shiftRow label {
-  color: #334155;
+  color: var(--text);
   display: flex;
   flex-direction: column;
   font-size: 0.78rem;
@@ -332,12 +345,12 @@
 .modal input,
 .modal select,
 .shiftRow input {
-  background: #fff;
-  border: 1px solid #c7d3df;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   border-radius: 8px;
   color: var(--ink);
   font: inherit;
-  min-height: 42px;
+  min-height: var(--form-control-height);
   outline: none;
   padding: 9px 11px;
   width: 100%;
@@ -347,7 +360,7 @@
 .modal input:focus,
 .modal select:focus,
 .shiftRow input:focus {
-  border-color: #008daf;
+  border-color: var(--cyan);
   box-shadow: 0 0 0 3px rgba(0, 141, 175, 0.12);
 }
 
@@ -381,9 +394,9 @@
 }
 
 .primaryButton {
-  background: #dbeafe;
-  border: 1px solid #7dd3fc;
-  color: #075985;
+  background: var(--settings-info-bg);
+  border: 1px solid var(--cyan);
+  color: var(--settings-info-text);
   border-radius: 8px;
   font-size: 0.85rem;
   line-height: 1.2;
@@ -392,22 +405,22 @@
 }
 
 .primaryButton:hover {
-  background: #bae6fd;
-  border-color: #38bdf8;
-  color: #075985;
+  background: var(--settings-info-bg);
+  border-color: var(--cyan);
+  color: var(--settings-info-text);
 }
 
 .secondaryButton,
 .modalActions button {
-  background: #fff;
-  border: 1px solid #b9cad9;
-  color: #385269;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
+  color: var(--text);
 }
 
 .secondaryButton:hover,
 .modalActions button:hover {
-  border-color: #0089ad;
-  color: #007897;
+  border-color: var(--cyan);
+  color: var(--blue);
 }
 
 .primaryButton:disabled,
@@ -425,8 +438,8 @@
 
 .shiftRow {
   align-items: end;
-  background: #f8fafc;
-  border: 1px solid #dbe4ec;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
   display: grid;
   gap: 10px;
   grid-template-columns: 1.3fr 1fr 0.7fr 0.7fr;
@@ -434,13 +447,13 @@
 }
 
 .deleteButton {
-  background: #fff;
-  border: 1px solid #e2b1b1;
-  color: #a72b2b;
+  background: var(--panel);
+  border: 1px solid var(--settings-error-border);
+  color: var(--settings-error-text);
 }
 
 .deleteButton:hover {
-  background: #fff2f2;
+  background: var(--settings-error-bg);
 }
 
 .helperText,
@@ -460,7 +473,7 @@
 }
 
 .toggleGroup legend {
-  color: #334155;
+  color: var(--text);
   font-size: 0.8rem;
   font-weight: 800;
   margin-bottom: 10px;
@@ -468,8 +481,8 @@
 
 .toggleRow {
   align-items: center;
-  background: #f8fafc;
-  border: 1px solid #dbe4ec;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -484,7 +497,7 @@
 }
 
 .toggleRow strong {
-  color: #253448;
+  color: var(--text);
   font-size: 0.82rem;
 }
 
@@ -500,14 +513,14 @@
 }
 
 .thresholdGroup {
-  border: 1px solid #dbe4ec;
+  border: 1px solid var(--settings-line);
   border-radius: 7px;
   margin: 22px 0 0;
   padding: 16px;
 }
 
 .thresholdGroup legend {
-  color: #334155;
+  color: var(--text);
   font-size: 0.8rem;
   font-weight: 800;
   padding: 0 7px;
@@ -524,7 +537,7 @@
 }
 
 .thresholdGrid label {
-  color: #334155;
+  color: var(--text);
   display: grid;
   font-size: 0.76rem;
   font-weight: 750;
@@ -532,12 +545,12 @@
 }
 
 .thresholdGrid input {
-  background: #fff;
-  border: 1px solid #c7d3df;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   border-radius: 8px;
   color: var(--ink);
   font: inherit;
-  min-height: 42px;
+  min-height: var(--form-control-height);
   padding: 9px 11px;
   width: 100%;
 }
@@ -555,12 +568,12 @@
 }
 
 .departmentBranch {
-  border: 1px solid #dbe4ec;
+  border: 1px solid var(--settings-line);
 }
 
 .departmentRow {
   align-items: center;
-  background: #fff;
+  background: var(--panel);
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -569,16 +582,16 @@
 }
 
 .departmentRow + .departmentRow {
-  border-top: 1px solid #e5ebf1;
+  border-top: 1px solid var(--surface-soft);
 }
 
 .departmentChild {
-  background: #f8fafc;
+  background: var(--surface-soft);
   padding-left: 38px;
 }
 
 .departmentRow.inactive {
-  background: #f8fafc;
+  background: var(--surface-soft);
   opacity: 0.72;
 }
 
@@ -594,17 +607,17 @@
 }
 
 .departmentIdentity strong {
-  color: #172635;
+  color: var(--text);
   font-size: 0.94rem;
 }
 
 .departmentIdentity small {
-  color: #51657a;
+  color: var(--dim);
   font-size: 0.74rem;
 }
 
 .treeMark {
-  color: #8da4b8;
+  color: var(--dim);
   font-family: var(--head);
   font-size: 0.78rem;
   font-weight: 700;
@@ -612,10 +625,10 @@
 
 .treeToggle {
   align-items: center;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
   border-radius: 4px;
-  color: #334155;
+  color: var(--text);
   cursor: pointer;
   display: inline-flex;
   font-size: 0.7rem;
@@ -630,15 +643,15 @@
 }
 
 .treeToggle:hover {
-  background: #e2e8f0;
-  border-color: #0089ad;
-  color: #007897;
+  background: var(--surface-soft);
+  border-color: var(--cyan);
+  color: var(--blue);
 }
 
 .childCountBadge {
-  background: #e9eff5;
+  background: var(--surface-soft);
   border-radius: 10px;
-  color: #486581;
+  color: var(--dim);
   font-size: 0.72rem;
   font-weight: 600;
   margin-left: 6px;
@@ -654,13 +667,13 @@
 }
 
 .statusActive {
-  background: #ebfbee;
-  color: #1a7f37;
+  background: var(--settings-success-bg);
+  color: var(--settings-success-text);
 }
 
 .statusInactive {
-  background: #f1f3f5;
-  color: #637083;
+  background: var(--surface-soft);
+  color: var(--dim);
 }
 
 .rowActions {
@@ -670,9 +683,9 @@
 }
 
 .rowActions button {
-  background: #fff;
-  border: 1px solid #c9d8e4;
-  color: #243b53;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
+  color: var(--text);
   cursor: pointer;
   font-size: 0.76rem;
   font-weight: 700;
@@ -681,19 +694,19 @@
 }
 
 .rowActions button:hover {
-  border-color: #0089ad;
-  color: #007897;
+  border-color: var(--cyan);
+  color: var(--blue);
 }
 
 .rowActions .warnButton {
-  border-color: #e3b0b0;
-  color: #a52f2f;
+  border-color: var(--settings-error-border);
+  color: var(--settings-error-text);
 }
 
 .emptyState,
 .orphanGroup {
-  background: #f8fafc;
-  border: 1px dashed #bfcedb;
+  background: var(--surface-soft);
+  border: 1px dashed var(--settings-line);
   color: var(--muted);
   font-size: 0.82rem;
   padding: 22px;
@@ -713,14 +726,14 @@
 }
 
 .apiGrid article {
-  background: #f8fafc;
-  border: 1px solid #dbe4ec;
+  background: var(--surface-soft);
+  border: 1px solid var(--settings-line);
   padding: 18px;
 }
 
 .apiGrid h4,
 .integrationHeading h4 {
-  color: #243347;
+  color: var(--text);
   font-size: 0.98rem;
   margin: 0 0 14px;
 }
@@ -731,7 +744,7 @@
 }
 
 .definitionList > div {
-  border-bottom: 1px solid #e2e8ef;
+  border-bottom: 1px solid var(--settings-line);
   display: grid;
   gap: 10px;
   grid-template-columns: 122px minmax(0, 1fr);
@@ -743,7 +756,7 @@
 }
 
 .definitionList dt {
-  color: #51657a;
+  color: var(--dim);
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -755,14 +768,14 @@
 
 .definitionList code,
 .keyList code {
-  color: #006e8c;
+  color: var(--blue);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.72rem;
   overflow-wrap: anywhere;
 }
 
 .keyList {
-  color: #45586c;
+  color: var(--dim);
   display: grid;
   font-size: 0.79rem;
   gap: 10px;
@@ -773,9 +786,9 @@
 
 .webhookWarning {
   align-items: flex-start;
-  background: #fff7e6;
-  border: 1px solid #e8c981;
-  border-left: 4px solid #d89200;
+  background: var(--settings-warning-bg);
+  border: 1px solid var(--settings-warning-border);
+  border-left: 4px solid var(--amber);
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -784,12 +797,12 @@
 }
 
 .webhookWarning strong {
-  color: #805500;
+  color: var(--settings-warning-text);
   font-size: 0.82rem;
 }
 
 .webhookWarning span {
-  color: #745f35;
+  color: var(--settings-warning-text);
   font-size: 0.75rem;
   line-height: 1.55;
 }
@@ -818,8 +831,8 @@
 
 .integrationCard {
   align-items: flex-start;
-  background: #fff;
-  border: 1px solid #dbe4ec;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   display: flex;
   gap: 11px;
   min-height: 92px;
@@ -828,9 +841,9 @@
 
 .integrationCard > span {
   align-items: center;
-  background: #eaf5f8;
+  background: var(--settings-info-bg);
   border-radius: 4px;
-  color: #007896;
+  color: var(--blue);
   display: flex;
   flex: none;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -842,7 +855,7 @@
 }
 
 .integrationCard strong {
-  color: #28384c;
+  color: var(--text);
   font-size: 0.8rem;
 }
 
@@ -865,8 +878,8 @@
 }
 
 .modal {
-  background: #fff;
-  border: 1px solid #c9d5e0;
+  background: var(--panel);
+  border: 1px solid var(--settings-line);
   box-shadow: 0 24px 70px rgba(5, 18, 35, 0.28);
   display: grid;
   gap: 15px;
@@ -879,7 +892,7 @@
 
 .modalHeading {
   align-items: flex-start;
-  border-bottom: 1px solid #e2e8ef;
+  border-bottom: 1px solid var(--settings-line);
   display: flex;
   justify-content: space-between;
   margin-bottom: 2px;
@@ -887,7 +900,7 @@
 }
 
 .modalHeading span {
-  color: #0084a6;
+  color: var(--blue);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.68rem;
   font-weight: 800;
@@ -901,7 +914,7 @@
 .modalHeading > button {
   background: transparent;
   border: 0;
-  color: #718096;
+  color: var(--dim);
   cursor: pointer;
   font-size: 1.6rem;
   line-height: 1;
@@ -915,16 +928,16 @@
 }
 
 .modalActions .primaryButton {
-  background: #dbeafe;
-  border-color: #7dd3fc;
-  color: #075985;
+  background: var(--settings-info-bg);
+  border-color: var(--cyan);
+  color: var(--settings-info-text);
 }
 
 .denied {
-  background: #fff;
-  border: 1px solid #e3c4c4;
+  background: var(--panel);
+  border: 1px solid var(--settings-error-border);
   box-shadow: 0 8px 24px rgba(15, 35, 58, 0.07);
-  color: #5c3440;
+  color: var(--settings-error-text);
   margin: 48px auto;
   max-width: 620px;
   padding: 44px 28px;
@@ -932,7 +945,7 @@
 }
 
 .denied > span {
-  color: #c55353;
+  color: var(--settings-error-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.76rem;
   font-weight: 900;
@@ -940,19 +953,19 @@
 }
 
 .denied h2 {
-  color: #3f2b33;
+  color: var(--settings-error-text);
   margin: 10px 0 8px;
 }
 
 .denied p {
-  color: #7d6570;
+  color: var(--settings-error-text);
   margin: 0 0 20px;
 }
 
 .denied a {
-  background: #0089ad;
+  background: var(--settings-primary-bg);
   border-radius: 6px;
-  color: #fff;
+  color: var(--settings-primary-fg);
   display: inline-block;
   font-size: 0.82rem;
   font-weight: 750;

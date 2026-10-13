@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const widget = readFileSync(new URL('../app/weather-widget.tsx', import.meta.url), 'utf8');
+const widget = readFileSync(new URL('../app/weather-widget.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const layout = readFileSync(new URL('../app/weather-widget-layout.css', import.meta.url), 'utf8');
 const dashboard = readFileSync(new URL('../app/dashboard-client.tsx', import.meta.url), 'utf8');
 
