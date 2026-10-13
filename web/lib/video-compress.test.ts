@@ -57,6 +57,15 @@ test('accepts 192-byte M2TS packet alignment', async () => {
   assert.equal(result.type, 'video/mp2t');
 });
 
+test('recognizes the ASF header GUID and rejects the unrelated OLE compound-file signature', async () => {
+  const asf = Uint8Array.from([0x30, 0x26, 0xb2, 0x75, 0x8e, 0x66, 0xcf, 0x11, 0xa6, 0xd9, 0x00, 0xaa, 0x00, 0x62, 0xce, 0x6c]);
+  const result = await validateVideoInput(makeFile(asf, 'clip.wmv', 'video/x-ms-wmv'));
+  assert.equal(result.type, 'video/x-ms-wmv');
+
+  const ole = Uint8Array.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, ...new Array(8).fill(0)]);
+  await assert.rejects(validateVideoInput(makeFile(ole, 'payload.wmv', 'video/x-ms-wmv')), /內容格式無效/);
+});
+
 test('only accepts same-origin blob URLs for video preview', () => {
   assert.equal(validateVideoObjectUrl('blob:https://app.example/uuid', 'https://app.example'), 'blob:https://app.example/uuid');
   for (const value of ['javascript:alert(1)', 'data:text/html,<script/>', 'https://evil.example/video.mp4', 'blob:https://evil.example/id']) {
