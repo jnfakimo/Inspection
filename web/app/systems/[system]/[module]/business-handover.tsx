@@ -6,7 +6,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AdminHeader, AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { selectableActiveUsers } from '@/lib/user-visibility';
@@ -28,7 +27,7 @@ import {
 import { BusinessDutyModal } from './business-duty-modal';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
-import { HandoverIcon, HandoverSheetHeader, type IconName } from './handover-sheet';
+import { HandoverDateNavigation, HandoverIcon, HandoverReportHeading, HandoverReportOverview, HandoverSheetHeader, type IconName } from './handover-sheet';
 import { BusinessSignatures, BusinessConfirmModal, businessShiftName, businessTime, type BusinessShift, type BusinessConfirmation } from './business-handover-reconciliation';
 import './handover-sheet.css';
 import './business-handover.css';
@@ -586,6 +585,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
       <div className="hs-page">
         <AdminHeader
           module={module}
+          hideDescription
           busy={busy || savingChecks}
           note={note}
           onReload={load}
@@ -623,31 +623,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
           {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
             <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
               aria-pressed={market === code} disabled={busy} onClick={() => setMarket(code)}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
-          <div className="hs-date-nav">
-            <button
-              type="button"
-              className="secondary-btn compact"
-              aria-label="前一天"
-              onClick={() => setDate(current => moveDate(current, -1))}
-            >
-              ‹
-            </button>
-            <label>
-              交接日期
-              <LocalizedDateInput aria-label="交接日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} />
-            </label>
-            <button
-              type="button"
-              className="secondary-btn compact"
-              aria-label="後一天"
-              onClick={() => setDate(current => moveDate(current, 1))}
-            >
-              ›
-            </button>
-            <button type="button" className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>
-              回到今天
-            </button>
-          </div>
+          <HandoverDateNavigation id="business-handover-date" label="交接日期" value={date} onChange={setDate}
+            onPrevious={() => setDate(current => moveDate(current, -1))} onNext={() => setDate(current => moveDate(current, 1))} onToday={() => setDate(todayTaipei())} />
 
           <div className="hs-toolbar-right">
             {currentActiveShift && (
@@ -660,124 +637,6 @@ export function BusinessHandover({ system, module, profile }: Props) {
               <BusinessIcon name="calendar" size={15} />
               {rocDate(date)} · 3 個班別 · 共 {customEntries.length} 筆交接
             </span>
-          </div>
-        </section>
-
-        {/* 主管三級批核流程區塊 (一市場主任、營業部副理、營業部經理) */}
-        <section className="business-approval-section panel" aria-label="主管批核流程">
-          <div className="business-approval-head">
-            <div className="business-approval-title">
-              <span className="business-approval-emblem">
-                <BusinessIcon name="shield" size={20} />
-              </span>
-              <div>
-                <strong>📋 業管組主管批核流程</strong>
-                <span>逐級審核：{marketDirectorLabel} ➔ 營業部副理 ➔ 營業部經理（可輸入批核意見與簽核）</span>
-              </div>
-            </div>
-            <div className="business-approval-progress">
-              <span className={`business-approval-badge ${approvedCount === 3 ? 'is-all-approved' : 'is-partial'}`}>
-                {approvedCount === 3 ? '✓ 三級批核完成' : `批核進度：${approvedCount} / 3 階段`}
-              </span>
-            </div>
-          </div>
-
-          <div className="business-approval-stages-grid">
-            {approvalStages.map((stageItem, stageIdx) => {
-              const stageApproval = approvals.find(a => a.stage === stageItem.stage);
-              const isApproved = Boolean(stageApproval);
-              const stageAccess = approvalAccess[stageItem.stage];
-              const presentation = businessApprovalPresentation(isApproved, stageAccess);
-              const canApprove = presentation.canSubmit || presentation.canEditSaved;
-              const readOnlyReason = businessApprovalReadonlyReason(stageAccess);
-
-              return (
-                <div
-                  key={stageItem.stage}
-                  className={`business-approval-card ${isApproved ? 'is-approved' : 'is-pending'}`}
-                >
-                  <div className="business-stage-header">
-                    <span className="business-stage-idx">第 {stageIdx + 1} 階</span>
-                    <strong className="business-stage-name">{stageItem.label}</strong>
-                    <span className={`business-stage-status ${isApproved ? 'is-done' : 'is-wait'}`}>
-                      {isApproved ? '✓ 已批核' : '⏳ 待批核'}
-                    </span>
-                  </div>
-
-                  <p className="business-stage-desc">{stageItem.desc}</p>
-
-                  {isApproved && stageApproval ? (
-                    <div className="business-stage-approved-info">
-                      <div className="business-approver-row">
-                        <BusinessIcon name="users" size={14} />
-                        <span>批核主管：<b>{userName(stageApproval.approver_id)}</b></span>
-                      </div>
-                      <div className="business-approver-row">
-                        <BusinessIcon name="clock" size={14} />
-                        <small>批核時間：{activityTime(stageApproval.approved_at)}</small>
-                      </div>
-                      {stageApproval.note ? (
-                        <div className="business-approval-note-box">
-                          <b>簽核說明（已保存）：</b>
-                          <p>{stageApproval.note}</p>
-                        </div>
-                      ) : (
-                        <div className="business-approval-note-box is-empty">
-                          <small>簽核時未填寫說明</small>
-                        </div>
-                      )}
-                      {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
-                      <div className="business-stage-actions">
-                        <button
-                          type="button"
-                          className="secondary-btn compact"
-                          disabled={busy || !canApprove}
-                          title={readOnlyReason || undefined}
-                          onClick={() => {
-                            setApprovingStage(stageItem.stage);
-                            setModalApprovalNote(stageApproval.note || '');
-                          }}
-                        >
-                          <BusinessIcon name="pen" size={13} />
-                          修改簽核說明
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="business-stage-pending-info">
-                      <label className="business-note-input-label">
-                        <span>簽核說明（可留白）：</span>
-                        <input
-                          type="text"
-                          className="business-note-input"
-                          placeholder="例如：查核無誤、同意備查、請加強巡檢..."
-                          value={approvalStageNote[stageItem.stage]}
-                          readOnly={!canApprove || busy}
-                          aria-readonly={!canApprove || busy || undefined}
-                          onChange={e =>
-                            setApprovalStageNote(prev => ({
-                              ...prev,
-                              [stageItem.stage]: e.target.value,
-                            }))
-                          }
-                        />
-                      </label>
-                      {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
-                      <button
-                        type="button"
-                        className="primary-btn compact business-approve-btn"
-                        disabled={busy || !canApprove}
-                        title={readOnlyReason || undefined}
-                        onClick={() => void handleApproveStage(stageItem.stage)}
-                      >
-                        <BusinessIcon name="check" size={14} />
-                        {stageItem.label} 批核
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </section>
 
@@ -1072,6 +931,124 @@ export function BusinessHandover({ system, module, profile }: Props) {
           </div>
         </section>
 
+        {/* 主管三級批核流程區塊 (一市場主任、營業部副理、營業部經理) */}
+        <section className="business-approval-section panel" aria-label="主管批核流程">
+          <div className="business-approval-head">
+            <div className="business-approval-title">
+              <span className="business-approval-emblem">
+                <BusinessIcon name="shield" size={20} />
+              </span>
+              <div>
+                <strong>業管組主管批核流程</strong>
+                <span>三階段簽核（各階段依授權）：{marketDirectorLabel}／營業部副理／營業部經理（可輸入批核意見）</span>
+              </div>
+            </div>
+            <div className="business-approval-progress">
+              <span className={`business-approval-badge ${approvedCount === 3 ? 'is-all-approved' : 'is-partial'}`}>
+                {approvedCount === 3 ? '✓ 三級批核完成' : `批核進度：${approvedCount} / 3 階段`}
+              </span>
+            </div>
+          </div>
+
+          <div className="business-approval-stages-grid">
+            {approvalStages.map((stageItem, stageIdx) => {
+              const stageApproval = approvals.find(a => a.stage === stageItem.stage);
+              const isApproved = Boolean(stageApproval);
+              const stageAccess = approvalAccess[stageItem.stage];
+              const presentation = businessApprovalPresentation(isApproved, stageAccess);
+              const canApprove = presentation.canSubmit || presentation.canEditSaved;
+              const readOnlyReason = businessApprovalReadonlyReason(stageAccess);
+
+              return (
+                <div
+                  key={stageItem.stage}
+                  className={`business-approval-card ${isApproved ? 'is-approved' : 'is-pending'}`}
+                >
+                  <div className="business-stage-header">
+                    <span className="business-stage-idx">第 {stageIdx + 1} 階</span>
+                    <strong className="business-stage-name">{stageItem.label}</strong>
+                    <span className={`business-stage-status ${isApproved ? 'is-done' : 'is-wait'}`}>
+                      {isApproved ? '✓ 已批核' : '⏳ 待批核'}
+                    </span>
+                  </div>
+
+                  <p className="business-stage-desc">{stageItem.desc}</p>
+
+                  {isApproved && stageApproval ? (
+                    <div className="business-stage-approved-info">
+                      <div className="business-approver-row">
+                        <BusinessIcon name="users" size={14} />
+                        <span>批核主管：<b>{userName(stageApproval.approver_id)}</b></span>
+                      </div>
+                      <div className="business-approver-row">
+                        <BusinessIcon name="clock" size={14} />
+                        <small>批核時間：{activityTime(stageApproval.approved_at)}</small>
+                      </div>
+                      {stageApproval.note ? (
+                        <div className="business-approval-note-box">
+                          <b>簽核說明（已保存）：</b>
+                          <p>{stageApproval.note}</p>
+                        </div>
+                      ) : (
+                        <div className="business-approval-note-box is-empty">
+                          <small>簽核時未填寫說明</small>
+                        </div>
+                      )}
+                      {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
+                      <div className="business-stage-actions">
+                        <button
+                          type="button"
+                          className="secondary-btn compact"
+                          disabled={busy || !canApprove}
+                          title={readOnlyReason || undefined}
+                          onClick={() => {
+                            setApprovingStage(stageItem.stage);
+                            setModalApprovalNote(stageApproval.note || '');
+                          }}
+                        >
+                          <BusinessIcon name="pen" size={13} />
+                          修改簽核說明
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="business-stage-pending-info">
+                      <label className="business-note-input-label">
+                        <span>簽核說明（可留白）：</span>
+                        <input
+                          type="text"
+                          className="business-note-input"
+                          placeholder="例如：查核無誤、同意備查、請加強巡檢..."
+                          value={approvalStageNote[stageItem.stage]}
+                          readOnly={!canApprove || busy}
+                          aria-readonly={!canApprove || busy || undefined}
+                          onChange={e =>
+                            setApprovalStageNote(prev => ({
+                              ...prev,
+                              [stageItem.stage]: e.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
+                      <button
+                        type="button"
+                        className="primary-btn compact business-approve-btn"
+                        disabled={busy || !canApprove}
+                        title={readOnlyReason || undefined}
+                        onClick={() => void handleApproveStage(stageItem.stage)}
+                      >
+                        <BusinessIcon name="check" size={14} />
+                        {stageItem.label} 批核
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {/* 列印專用報表區 (A4精確排版) */}
         <section className="hs-print-sheet" aria-label="業管組每日列印報表">
           <BusinessReportContent
@@ -1247,22 +1224,28 @@ function BusinessReportContent({
 }) {
   // 將點檢項目拆分成左右兩欄，使高度減半，完美容納於單張 A4
   const mid = Math.ceil(dutyItems.length / 2);
+  const signedStageCount = APPROVAL_STAGES.filter(stage => approvals.some(approval => approval.stage === stage.stage)).length;
+  const activeEntryCount = entries.filter(row => !isDeleted(row) && !String(row.description || '').includes(CHECKLIST_TAG)).length;
+  const completedShiftCount = shiftReports.filter(report => Boolean(report.outgoing?.received_at)).length;
   const leftItems = dutyItems.slice(0, mid);
   const rightItems = dutyItems.slice(mid);
 
   return (
-    <div className="business-print-content">
-      <header className="business-print-header">
-        <h2>臺北農產運銷股份有限公司{HANDOVER_MARKETS[market].name} 業管組崗位勤務點檢與交接紀錄表</h2>
-        <div className="business-print-meta-line">
-          <span><b>交接日期：</b>{rocDate(date)}</span>
-          <span><b>點檢完成率：</b>{checkStats.percent}%（{checkStats.completed}/{checkStats.total}）</span>
-          <span><b>三班交接：</b>共 {entries.filter(r => !isDeleted(r) && !String(r.description || '').includes(CHECKLIST_TAG)).length} 筆紀錄</span>
-        </div>
-      </header>
+    <div className="business-print-content hs-report hs-daily-report">
+      <HandoverReportHeading kicker="業管組每日報表" site={HANDOVER_MARKETS[market].name}
+        organization={'臺北農產運銷股份有限公司' + HANDOVER_MARKETS[market].name} title="業管組值勤巡查及交接報告"
+        subtitle="巡查工作、交接事項與主管三階段簽核" date={rocDate(date)}
+        approved={signedStageCount === APPROVAL_STAGES.length} approvedLabel="主管簽核完成"
+        pendingLabel={'主管簽核進度 ' + signedStageCount + '/' + APPROVAL_STAGES.length} />
+      <HandoverReportOverview label="業管組日報摘要" metrics={[
+        { label: '巡查完成率', value: checkStats.percent + '%', detail: checkStats.completed + '/' + checkStats.total + ' 項' },
+        { label: '交接紀錄', value: String(activeEntryCount), detail: '筆' },
+        { label: '完成交接班', value: String(completedShiftCount), detail: '班／' + SHIFTS.length + ' 班' },
+        { label: '主管簽核', value: signedStageCount + '/' + APPROVAL_STAGES.length, detail: signedStageCount === APPROVAL_STAGES.length ? '全部完成' : '階段已簽' },
+      ]} />
 
       {/* 1. 崗位勤務時段點檢紀錄 (雙欄緊緻排版) */}
-      <div className="business-print-section-title">一、崗位勤務時段點檢紀錄（全日 7 時段 · {dutyItems.length} 項崗位職責）</div>
+      <div className="hs-report-section-title">一、崗位勤務時段點檢紀錄（全日 7 時段 · {dutyItems.length} 項崗位職責）</div>
       <div className="business-print-duty-cols">
         <div className="business-print-duty-col">
           <table className="business-print-table business-print-compact-table">
@@ -1318,10 +1301,10 @@ function BusinessReportContent({
       </div>
 
       {/* 2. 班別交接與出勤紀錄 */}
-      <div className="business-print-section-title" style={{ marginTop: '3mm' }}>
+      <div className="hs-report-section-title">
         二、班別交接事項與出勤狀況
       </div>
-      <table className="business-print-table business-print-shift-table">
+      <table className="business-print-table business-print-shift-table hs-report-shift">
         <thead>
           <tr>
             <th style={{ width: '18%' }}>班別時段</th>
@@ -1331,7 +1314,7 @@ function BusinessReportContent({
           </tr>
         </thead>
         <tbody>
-          {SHIFTS.map(shift => {
+          {SHIFTS.map((shift, shiftIndex) => {
             const report = shiftReports.find(item => item.shift_code === shift.code);
             const shiftRows = report?.items || [];
             const activeRows = shiftRows.filter(r => !isDeleted(r));
@@ -1339,8 +1322,8 @@ function BusinessReportContent({
             const absentSum = activeRows.filter(r => !r.carried).reduce((s, r) => s + Number(r.absent_attendance || 0), 0);
 
             return (
-              <tr key={shift.code}>
-                <td className="print-shift-name">
+              <tr key={shift.code} className={'hs-report-shift-row hs-report-shift-' + (shiftIndex + 1)}>
+                <td className="print-shift-name hs-report-shift-name">
                   <b>{shift.name}</b>
                   <br />
                   <small>{shift.label}</small>
@@ -1379,7 +1362,7 @@ function BusinessReportContent({
       </table>
 
       {/* 3. 主管批核紀錄 (三階批核：一市場主任、營業部副理、營業部經理) */}
-      <div className="business-print-section-title" style={{ marginTop: '3mm' }}>
+      <div className="hs-report-section-title">
         三、主管批核紀錄（{market === 'market_2' ? '二市場主任' : '一市場主任'} · 營業部副理 · 營業部經理）
       </div>
       <div className="business-print-approvals-grid">
@@ -1389,14 +1372,14 @@ function BusinessReportContent({
           const isApproved = Boolean(approval);
 
           return (
-            <div key={stageItem.stage} className="business-print-approval-box">
-              <div className="print-box-head">
+            <div key={stageItem.stage} className="business-print-approval-box hs-report-approval-stage">
+              <div className="print-box-head hs-report-approval-stage-heading">
                 <strong>{stageItem.label}</strong>
-                <span className={`print-box-status ${isApproved ? 'is-signed' : ''}`}>
+                <span className={`print-box-status hs-report-approval-stage-status ${isApproved ? 'is-signed' : ''}`}>
                   {isApproved ? '［已批核］' : '［未批核］'}
                 </span>
               </div>
-              <div className="print-box-body">
+              <div className="print-box-body hs-report-approval-stage-body">
                 <div>
                   <span>簽章／批核人：</span>
                   <b>{approval ? userName(approval.approver_id) : '　　　　'}</b>
@@ -1405,7 +1388,7 @@ function BusinessReportContent({
                   <span>批核時間：</span>
                   <small>{approval ? activityTime(approval.approved_at) : '　　年　月　日'}</small>
                 </div>
-                <div className="print-box-note">
+                <div className="print-box-note hs-report-approval-stage-note">
                   <span>簽核說明（已保存）：</span>
                   <p>{approval ? approval.note || '簽核時未填寫說明' : '尚未簽核'}</p>
                 </div>

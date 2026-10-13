@@ -13,6 +13,7 @@ assert.ok(component.includes("content.style.setProperty('--mechanical-print-scal
 assert.ok((component.match(/fitMechanicalPrint\(\);/g) ?? []).length >= 2, 'print preparation hooks must continue recalculating layout');
 assert.ok(css.includes('.mechanical-print-sheet.is-multipage{height:auto;min-height:297mm;overflow:visible;'), 'multi-page sheets must release fixed height and clipping');
 assert.ok(css.includes('.mechanical-print-sheet.is-multipage .mechanical-print-table thead{display:table-header-group}'), 'multi-page tables must repeat their header');
-assert.ok(css.includes('.mechanical-print-sheet.is-multipage .hs-report-footer,.mechanical-print-sheet.is-multipage .mechanical-report-handoffs{break-inside:avoid-page;page-break-inside:avoid}'), 'approval footer and handoff section must stay grouped');
+assert.ok(css.includes('.mechanical-print-sheet.is-multipage .mechanical-report-handoffs{break-inside:avoid-page;page-break-inside:avoid}'), 'handoff section must stay grouped across pages');
+assert.ok(!/\.mechanical-print-sheet\.is-multipage \.hs-report-footer/.test(css), 'approval footer must flow naturally across pages');
 
 console.log('Mechanical print integration check passed.');
