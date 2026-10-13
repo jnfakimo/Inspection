@@ -85,8 +85,8 @@ export function AdminModal({ title, children, onClose, className = '', backdropC
     <section className={`admin-modal ${className}`.trim()}><header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="關閉">×</button></header>{children}</section>
   </div>;
 }
-export function AdminHeader({ module, busy, note, onReload, action }: { module: ModuleDefinition; busy: boolean; note: string; onReload: () => void; action?: ReactNode }) {
-  return <div className="page-actions admin-page-actions"><div><p>{module.description}</p>{note && <span className={`inline-message ${note.startsWith('失敗') ? 'danger' : ''}`}>{note}</span>}</div><div>{action}<button className="secondary-btn" disabled={busy} onClick={onReload}>{busy ? '載入中…' : '重新載入'}</button></div></div>;
+export function AdminHeader({ module, busy, note, onReload, action, hideDescription = false }: { module: ModuleDefinition; busy: boolean; note: string; onReload: () => void; action?: ReactNode; hideDescription?: boolean }) {
+  return <div className="page-actions admin-page-actions"><div>{!hideDescription && <p>{module.description}</p>}{note && <span className={`inline-message ${note.startsWith('失敗') ? 'danger' : ''}`}>{note}</span>}</div><div>{action}<button className="secondary-btn" disabled={busy} onClick={onReload}>{busy ? '載入中…' : '重新載入'}</button></div></div>;
 }
 export function Pager({ page, total, onPage, pageSize = PAGE_SIZE }: { page: number; total: number; onPage: (page: number) => void; pageSize?: number }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));

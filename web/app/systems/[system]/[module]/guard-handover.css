@@ -209,7 +209,7 @@
 @media(max-width:550px){.guard-correction-grid{grid-template-columns:1fr}.guard-correction-change{grid-template-columns:1fr 18px 1fr}.guard-correction-change b{grid-column:1/-1}.guard-incident-search-controls,.guard-incident-person{grid-template-columns:1fr}}
 @media(max-width:520px){.admin-modal.guard-print-modal{width:100%}.guard-print-range{grid-template-columns:1fr;margin:14px 14px 0;padding:12px}.guard-print-hint,.guard-print-error,.guard-print-invalid{margin-inline:14px}.admin-modal.guard-print-modal>footer{margin-top:14px}}
 @media print{
-  @page{size:A4 portrait;margin:10mm}
+  @page{size:A4 portrait;margin:0}
   html:has(body.guard-printing),html:has(body.guard-printing) body.guard-printing{background:#fff!important;background-image:none!important}
   body.guard-printing>*:not(.guard-print-root){display:none!important}
   body.guard-printing>.guard-print-root{display:block!important;width:100%;margin:0;padding:0;background:#fff}

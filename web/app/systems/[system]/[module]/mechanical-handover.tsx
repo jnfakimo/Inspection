@@ -8,7 +8,7 @@ import { appendMechanicalWorkDetails, canApproveMechanicalDay, currentMechanical
 import { AppShell } from '@/components/AppShell';
 import {
   HandoverIcon, HandoverReportApprovalFooter, HandoverReportApprovalForm, HandoverReportHeading,
-  HandoverReportOverview, HandoverReportShiftCard, HandoverSheetHeader, type HandoverKpi,
+  HandoverDateNavigation, HandoverReportOverview, HandoverReportShiftCard, HandoverSheetHeader, type HandoverKpi,
 } from './handover-sheet';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { BlankSelectOption } from '@/components/BlankSelectOption';
@@ -371,15 +371,16 @@ export function MechanicalHandover({ system, module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
-      <AdminHeader module={module} busy={busy} note={note} onReload={load}
+      <AdminHeader module={module} busy={busy} note={note} onReload={load} hideDescription
         action={<>{canManageOptions && <button className="secondary-btn compact" disabled={busy} onClick={() => setOptionsOpen(true)}>管理工作選項</button>}<button className="secondary-btn compact" disabled={busy} onClick={() => { setPrintData(null); setPrintRequested(false); setPreviewOpen(true); }}>預覽本日報表</button><button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button></>} />
       <section className="panel hs-toolbar">
         {allowedMarkets.length > 1 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
           <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
             aria-pressed={market === code} disabled={busy} onClick={() => setMarket(code)}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
-        <div className="hs-date-nav"><button className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => shiftDate(current, -1))}>‹</button><label>報表日期<LocalizedDateInput aria-label="報表日期（年/月/日）" value={date} onChange={event => { if (/^\d{4}-\d{2}-\d{2}$/.test(event.target.value)) setDate(event.target.value); }} /></label><button className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => shiftDate(current, 1))}>›</button></div>
+        <HandoverDateNavigation id="mechanical-handover-date" label="報表日期" value={date}
+          onChange={value => { if (/^\d{4}-\d{2}-\d{2}$/.test(value)) setDate(value); }}
+          onPrevious={() => setDate(current => shiftDate(current, -1))} onNext={() => setDate(current => shiftDate(current, 1))} onToday={() => setDate(todayTaipei())} />
         <span>{rocDate(date)}</span>
-        <button className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
         <div className="mechanical-legend" aria-label="班別色彩說明"><b>班別</b><span className="legend-chip shift-0109">早班 01–09</span><span className="legend-chip shift-0917">中班 09–17</span><span className="legend-chip shift-1701">晚班 17–01</span><span className="legend-chip shift-current">目前當班</span></div>
       </section>
       {frequentItems.length > 0 && <section className="panel mechanical-frequent"><div><b>我的常用工作項目</b><small>依個人紀錄累計 3 次以上</small></div><div className="mechanical-frequent-list">{frequentItems.slice(0, 6).map(item => <button key={item} className="secondary-btn compact" onClick={() => { setEditingEntry(null); setCarrySource(null); setPresetItem(item); setEditingShift('01-09'); }}>{item}</button>)}</div></section>}
@@ -552,11 +553,11 @@ export function PrintSheet({ market, date, entries, signatures, shiftReports = [
         </table>
       </HandoverReportShiftCard>;
     })}
-    <div className="mechanical-print-total"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(validEntries))}</strong><span>費用未填 {validEntries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
-    <section className="mechanical-report-handoffs" aria-label="交接勾稽"><h3>交接勾稽</h3><div className="mechanical-report-handoff-grid">{SHIFTS.map((shift, index) => {
+    <div className="mechanical-print-total hs-report-summary-band"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(validEntries))}</strong><span>費用未填 {validEntries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
+    <section className="mechanical-report-handoffs" aria-label="交接勾稽"><h3 className="hs-report-section-title">交接勾稽</h3><div className="mechanical-report-handoff-grid">{SHIFTS.map((shift, index) => {
       const report = shiftReports.find(row => row.shift_code === shift.code);
       const legacy = userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id);
-      return <article key={shift.code}><span>{shiftNames[index]} · {shift.label}</span><strong>{report?.outgoing ? `${report.outgoing.handed_name} → ${report.outgoing.receiver_name}` : legacy}</strong><small>{report?.outgoing?.handed_at ? `交班 ${activityTime(report.outgoing.handed_at)} · 接班 ${activityTime(report.outgoing.received_at)}` : '尚未記錄交接勾稽'}</small></article>;
+      return <article key={shift.code} className={'hs-report-shift-row hs-report-shift-summary-card hs-report-shift-' + (index + 1)}><span className="hs-report-shift-summary-label">{shiftNames[index]} · {shift.label}</span><strong className="hs-report-shift-summary-names">{report?.outgoing ? `${report.outgoing.handed_name} → ${report.outgoing.receiver_name}` : legacy}</strong><small className="hs-report-shift-summary-time">{report?.outgoing?.handed_at ? `交班 ${activityTime(report.outgoing.handed_at)} · 接班 ${activityTime(report.outgoing.received_at)}` : '尚未記錄交接勾稽'}</small></article>;
     })}</div></section>
     <HandoverReportApprovalFooter signerLabel="課長簽核" signerName={approval ? userName(approval.approver_id) : '尚未簽核'}
       signedAt={approval?.approved_at ? activityTime(approval.approved_at) : ''} pendingTimeLabel="簽核後顯示課長與時間"
@@ -664,7 +665,7 @@ export function SupervisorCorrectionModal({ market, entry, corrections, canCorre
       <label>處理結果<select value={result} onChange={event => setResult(event.target.value)}>{RESULT_OPTIONS.map(value => <option key={value}>{value}</option>)}</select></label>
       <label className="wide">備註<input maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} /></label>
     </div>}
-    <section className="mechanical-correction-history" aria-label="主管修正歷程"><h3>修正歷程 · {corrections.length} 次</h3>
+    <section className="mechanical-correction-history" aria-label="主管修正歷程"><h3 className="hs-report-section-title">修正歷程 · {corrections.length} 次</h3>
       {corrections.length ? [...corrections].reverse().map(row => {
         const before = row.before_values || {}, after = row.after_values || {};
         return <article key={String(row.correction_id)}><strong>{activityTime(row.corrected_at)} · {userName(row.corrected_by)}</strong>

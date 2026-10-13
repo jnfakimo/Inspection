@@ -69,24 +69,30 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const rangeStart = scheduleDateOffset(monthStart, -7), rangeEnd = scheduleDateOffset(monthEnd, 8);
-    const client = getSupabase();
-    const [people, departments, schedule, scopes] = await Promise.all([
-      client.from('users').select('user_id,name,username,email,dept_id,status').eq('status', 'active').order('name').limit(1000),
-      client.from('departments').select('dept_id,name,level,status').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
-      client.from('mechanical_schedule_assignments').select('*').gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).order('duty_date').limit(5000),
-      client.from('mechanical_staff_market_scopes').select('user_id,market_code,is_active,updated_at').eq('is_active', true).limit(1000),
-    ]);
-    const failure = people.error || departments.error || schedule.error || scopes.error;
-    if (failure) { setNote(`失敗：${failure.message || '機電課排班資料載入失敗'}`); setBusy(false); return; }
-    const departmentIds = new Set((departments.data || []).map(row => String(row.dept_id)));
-    const staff = selectableActiveUsers(people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
-    const rows = schedule.data || [];
-    const nextDraft: Record<string, string> = {};
-    rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`) && isMechanicalWorkCode(row.duty_code))
-      .forEach(row => { nextDraft[keyOf(row.user_id, String(row.duty_date))] = String(row.duty_code || ''); });
-    setAllUsers(staff); setMarketScopes(scopes.data || []); setPersisted(rows); setDraft(nextDraft); setBusy(false);
+    try {
+      const rangeStart = scheduleDateOffset(monthStart, -7), rangeEnd = scheduleDateOffset(monthEnd, 8);
+      const client = getSupabase();
+      const [people, departments, schedule, scopes] = await Promise.all([
+        client.from('users').select('user_id,name,username,email,dept_id,status').eq('status', 'active').order('name').limit(1000),
+        client.from('departments').select('dept_id,name,level,status').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
+        client.from('mechanical_schedule_assignments').select('*').gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).order('duty_date').limit(5000),
+        client.from('mechanical_staff_market_scopes').select('user_id,market_code,is_active,updated_at').eq('is_active', true).limit(1000),
+      ]);
+      const failure = people.error || departments.error || schedule.error || scopes.error;
+      if (failure) { setNote(`失敗：${failure.message || '機電課排班資料載入失敗'}`); return; }
+      const departmentIds = new Set((departments.data || []).map(row => String(row.dept_id)));
+      const staff = selectableActiveUsers(people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
+      const rows = schedule.data || [];
+      const nextDraft: Record<string, string> = {};
+      rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`) && isMechanicalWorkCode(row.duty_code))
+        .forEach(row => { nextDraft[keyOf(row.user_id, String(row.duty_date))] = String(row.duty_code || ''); });
+      setAllUsers(staff); setMarketScopes(scopes.data || []); setPersisted(rows); setDraft(nextDraft);
+    } catch (error) {
+      setNote('失敗：' + errorMessage(error, '機電課排班資料載入失敗'));
+    } finally {
+      setBusy(false);
+    }
   }, [market, month, monthEnd, monthStart]);
 
   useEffect(() => { void load(); }, [load]);
@@ -163,15 +169,15 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     setCopying(true); setNote('');
     try {
       const client = getSupabase();
-      const { data, error } = await client.from('mechanical_schedule_assignments').select('user_id,duty_date,duty_code,market_code,is_active')
-        .eq('market_code', market).eq('is_active', true).gte('duty_date', `${sourceMonth}-01`).lt('duty_date', `${month}-01`).order('duty_date').limit(5000);
-      if (error) throw error;
-      const copiedDraft = copyPreviousMonthDraft(data || [], month, market, users.map(user => user.user_id));
-      const copiedCount = Object.keys(copiedDraft).length;
-      if (!copiedCount) { setNote(`${MARKET_LABELS[market]} ${monthTitle(sourceMonth)}尚無可複製的班表。`); return; }
-      setDraft(copiedDraft);
-      setSelectedDate(monthStart);
-      setNote(`已將${monthTitle(sourceMonth)}的 ${copiedCount} 筆排班複製為本月草稿；請確認勞基法檢核後再儲存。`);
+        const { data, error } = await client.from('mechanical_schedule_assignments').select('user_id,duty_date,duty_code,market_code,is_active')
+          .eq('market_code', market).eq('is_active', true).gte('duty_date', `${sourceMonth}-01`).lt('duty_date', `${month}-01`).order('duty_date').limit(5000);
+        if (error) throw error;
+        const copiedDraft = copyPreviousMonthDraft(data || [], month, market, users.map(user => user.user_id));
+        const copiedCount = Object.keys(copiedDraft).length;
+        if (!copiedCount) { setNote(`${MARKET_LABELS[market]} ${monthTitle(sourceMonth)}尚無可複製的班表。`); return; }
+        setDraft(copiedDraft);
+        setSelectedDate(monthStart);
+        setNote(`已將${monthTitle(sourceMonth)}的 ${copiedCount} 筆排班複製為本月草稿；請確認勞基法檢核後再儲存。`);
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     finally { setCopying(false); }
   };

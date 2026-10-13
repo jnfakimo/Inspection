@@ -5,6 +5,7 @@
 // 只放「沒有資料相依」的呈現元件，方便單獨渲染檢查版面。
 
 import type { ReactNode } from 'react';
+import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 
 const REPORT_SHIFT_CLASS = ['hs-report-shift-1', 'hs-report-shift-2', 'hs-report-shift-3', 'hs-report-shift-4'];
 
@@ -71,6 +72,19 @@ const ICON_PATHS: Record<IconName, ReactNode> = {
 export function HandoverIcon({ name, size = 16 }: { name: IconName; size?: number }) {
   return <svg className="hs-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{ICON_PATHS[name]}</svg>;
+}
+
+export function HandoverDateNavigation({ id, label, value, onChange, onPrevious, onNext, onToday, disabled = false }: {
+  id: string; label: string; value: string; onChange: (value: string) => void;
+  onPrevious: () => void; onNext: () => void; onToday: () => void; disabled?: boolean;
+}) {
+  return <div className="hs-date-nav" role="group" aria-label={`${label}日期導覽`}>
+    <label className="hs-date-label" htmlFor={id}>{label}</label>
+    <button type="button" className="secondary-btn compact hs-date-arrow" aria-label="前一天" disabled={disabled} onClick={onPrevious}><span aria-hidden="true">‹</span></button>
+    <LocalizedDateInput id={id} className="hs-date-input" aria-label={`${label}（年/月/日）`} value={value} disabled={disabled} onChange={event => onChange(event.target.value)} />
+    <button type="button" className="secondary-btn compact hs-date-arrow" aria-label="後一天" disabled={disabled} onClick={onNext}><span aria-hidden="true">›</span></button>
+    <button type="button" className="secondary-btn compact hs-date-today" disabled={disabled} onClick={onToday}>回到今天</button>
+  </div>;
 }
 
 export type HandoverKpi = { label: string; value: string; icon: IconName; tone: 'cyan' | 'green' | 'amber' | 'red' | 'violet' };
