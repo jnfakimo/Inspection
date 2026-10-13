@@ -39,7 +39,7 @@
 .weather-town-select:hover,.weather-town-select[aria-pressed="true"]{background:color-mix(in srgb,var(--cyan) 12%,transparent);color:var(--text)}
 .weather-town-select:focus-visible,.weather-map-panel svg [role="button"]:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 @media(max-width:900px){.weather-widget{grid-template-columns:minmax(0,1fr)}.weather-map-panel{grid-column:1;grid-row:1}.weather-info-container{grid-column:1;grid-row:2}.weather-map-container{height:min(54vh,480px);min-height:300px}}
-@media(max-width:640px){.weather-widget{gap:14px}.weather-map-container{height:42vh;min-height:260px}.weather-info-container>div[style*="background"]{padding:16px!important}.weather-town-select{min-height:40px}}
+@media(max-width:640px){.weather-widget{gap:14px}.weather-map-container{height:42vh;min-height:260px}.weather-info-container>div[style*="background"]{padding:16px!important}.weather-town-select{min-height:var(--form-control-height)}}
 
 .weather-map-caption{display:flex;align-items:flex-start;gap:8px;box-sizing:border-box;min-height:44px;margin:0;padding:10px 14px 12px;border-top:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
 .weather-map-caption__dot{flex:0 0 6px;width:6px;height:6px;margin-top:.45em;border-radius:50%;background:var(--cyan)}
@@ -55,3 +55,11 @@
 .weather-county-observation-title b{font-size:20px;white-space:nowrap}
 .weather-map-container svg .weather-marker-symbol{font-size:28px;fill:var(--text-hi);pointer-events:none}
 @media(max-width:480px){.weather-county-grid{grid-template-columns:minmax(0,1fr)}}
+
+.weather-map-container svg .weather-marker-surface{fill:var(--panel);stroke:var(--line);stroke-width:1;pointer-events:none}
+.weather-map-container svg .weather-marker-county{fill:var(--text-hi);font-size:11px;font-weight:700;pointer-events:none}
+.weather-map-container svg .weather-marker-known{cursor:pointer}
+.weather-map-container svg .weather-marker-known.is-stale .weather-marker-surface{stroke:var(--amber);stroke-dasharray:3 2}
+.weather-controls button,.weather-town-select{min-height:max(42px,var(--form-control-height,42px))}
+/* Keep named map labels readable; the approved 619:847 geometry is unchanged. */
+.weather-map-container{height:auto;min-height:0;aspect-ratio:619/847}
