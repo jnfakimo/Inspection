@@ -26,4 +26,28 @@ for (const file of personnelPickers) {
   if (!source.includes('selectableActiveUsers')) throw new Error(`${file} 的人員選單缺少離職／去識別化帳號排除規則`);
 }
 
+
+
+const globals = fs.readFileSync('web/app/globals.css', 'utf8');
+if (!/@media\s+screen\s*\{\s*:root\s*\{[^}]*--form-control-height\s*:\s*42px/s.test(globals)) {
+  throw new Error('共用表單欄位高度必須由 screen 專用 42px 主題 token 定義');
+}
+const layout = fs.readFileSync('web/app/layout.tsx', 'utf8');
+const buttonStandardImport = layout.indexOf("import './button-standard.css';");
+const controlStandardImport = layout.indexOf("import './control-standard.css';");
+if (buttonStandardImport < 0 || controlStandardImport <= buttonStandardImport) {
+  throw new Error('共用欄位樣式必須在共用按鈕樣式後載入');
+}
+const controlStandard = fs.readFileSync('web/app/control-standard.css', 'utf8');
+for (const required of ['@media screen', ':where(', 'height: var(--form-control-height)', 'min-height: var(--form-control-height)', ':not([type="checkbox"])', ':not([type="radio"])', ':not([type="file"])', ':not([type^="date"])', ':not([type^="time"])', ':not([type="month"])', ':not([type="week"])', ':not(.localized-date-native)']) {
+  if (!controlStandard.includes(required)) throw new Error('共用欄位樣式缺少必要規則：' + required);
+}
+const settingsStyle = fs.readFileSync('web/app/systems/admin/settings/settings.module.css', 'utf8');
+if (!settingsStyle.includes(':global(:root[data-theme="tech"]) .page') || !settingsStyle.includes('--settings-primary-bg: var(--blue)') || !settingsStyle.includes('--settings-primary-bg: var(--cyan)')) {
+  throw new Error('管理設定頁必須同時支援 light 與 tech 主題的主要動作色');
+}
+if (/#(?:[0-9a-f]{3,8})\b/i.test(settingsStyle)) {
+  throw new Error('管理設定頁不可保留硬編碼色碼，需使用主題 token');
+}
+
 console.log(`資料下拉空白列與 ${personnelPickers.length} 個人員選單檢查通過`);

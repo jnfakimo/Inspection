@@ -14,7 +14,7 @@
 .findtag-sync td{white-space:normal;overflow-wrap:anywhere}
 .tracking-filter{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;padding:16px}
 .tracking-filter>label{display:grid;gap:7px;min-width:220px;color:var(--dim);font-size:.86rem}
-.tracking-filter select,.tracking-filter input{min-height:42px}
+.tracking-filter select,.tracking-filter input{min-height:var(--form-control-height)}
 .tracking-periods{display:flex;gap:7px;flex-wrap:wrap;flex:1}
 .tracking-periods button{min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--text);font-weight:700;cursor:pointer}
 .tracking-periods button:hover,.tracking-periods button.is-active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,var(--panel));color:var(--cyan)}

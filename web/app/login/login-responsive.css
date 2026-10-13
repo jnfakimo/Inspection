@@ -37,7 +37,7 @@
 }
 
 .v1-login-card input {
-  min-height: clamp(38px, 5.8vh, 44px);
+  min-height: var(--form-control-height);
 }
 
 .v1-login-card .captcha-row {
@@ -116,7 +116,7 @@
   }
 
   .v1-login-card input {
-    min-height: 36px;
+    min-height: var(--form-control-height);
   }
 
   .v1-login-card .captcha-row img,
@@ -336,7 +336,7 @@
 }
 
 .v1-login-card input {
-  min-height: 32px;
+  min-height: var(--form-control-height);
 }
 
 /* Final owner dimensions for the white login frame. */

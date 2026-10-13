@@ -39,6 +39,17 @@ test('舊入口 redirect 可安全轉成 V2 網址，外部與登入網址一律
   assert.equal(resolvePostLoginDestination('/Inspection/v2/login/', sysadmin), '/Inspection/v2/systems/');
 });
 
+test('登入目的地固定為站內標準路徑，拒絕協定、外部 authority 與跳出應用根路徑', () => {
+  assert.equal(requestedPostLoginPath('?next=javascript%3Aalert(1)'), '');
+  assert.equal(requestedPostLoginPath('?next=%2F%2Fevil.example%2FInspection%2Fv2%2Fsystems%2F'), '');
+  assert.equal(requestedPostLoginPath('?redirect=https%3A%2F%2Fevil.example%2FInspection%2Fv2%2Fsystems%2F'), '');
+  assert.equal(resolvePostLoginDestination('/Inspection/v2/../login/', sysadmin), '/Inspection/v2/systems/');
+  assert.equal(
+    resolvePostLoginDestination('/Inspection/v2/systems/guardpatrol/records/?source=qr#today', inspector),
+    '/Inspection/v2/systems/guardpatrol/records/?source=qr#today',
+  );
+});
+
 test('QR 登入完成後保留巡邏點與掃描方式參數', () => {
   const target = '/Inspection/v2/systems/guardpatrol/checkins/?marker=11111111-1111-4111-8111-111111111111&source=qr';
   assert.equal(resolvePostLoginDestination(target, patrolOfficer), target);

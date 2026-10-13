@@ -18,7 +18,7 @@
 .mechanical-staff-market-grid>label{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:10px 14px;background:var(--panel)}
 .mechanical-staff-market-grid>label>span{display:grid;min-width:0}
 .mechanical-staff-market-grid>label small{overflow:hidden;color:var(--dim);font-size:11px;text-overflow:ellipsis;white-space:nowrap}
-.mechanical-staff-market-grid select{flex:0 1 220px;min-width:150px;height:38px;border:1px solid var(--line);border-radius:6px;padding:0 9px;background:var(--panel2);color:var(--text)}
+.mechanical-staff-market-grid select{flex:0 1 220px;min-width:150px;height:var(--form-control-height);border:1px solid var(--line);border-radius:6px;padding:0 9px;background:var(--panel2);color:var(--text)}
 .mechanical-schedule-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .mechanical-schedule-summary article{display:grid;gap:2px;padding:14px 16px;border:1px solid var(--line);border-top:4px solid var(--cyan);border-radius:8px;background:var(--panel)}
 .mechanical-schedule-summary small,.mechanical-schedule-summary span{color:var(--dim)}
@@ -61,7 +61,7 @@
 .mechanical-shift-editor-grid>article.duty-09-17{box-shadow:inset 0 4px 0 var(--green)}
 .mechanical-shift-editor-grid>article.duty-17-01{box-shadow:inset 0 4px 0 var(--amber)}
 .mechanical-shift-editor-grid label{display:grid;gap:5px;color:var(--dim);font-size:11px}
-.mechanical-shift-editor-grid select{min-width:0;width:100%;height:42px;border:1px solid var(--line);border-radius:6px;padding:0 10px;background:var(--panel2);color:var(--text);font-size:13.75px}
+.mechanical-shift-editor-grid select{min-width:0;width:100%;height:var(--form-control-height);border:1px solid var(--line);border-radius:6px;padding:0 10px;background:var(--panel2);color:var(--text);font-size:13.75px}
 .mechanical-assigned-people{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:32px}
 .mechanical-assigned-people>span{display:flex;align-items:center;gap:5px;padding:5px 5px 5px 9px;border:1px solid var(--line);border-radius:999px;background:var(--panel2)}
 .mechanical-assigned-people>span.is-invalid{border-color:var(--red);color:var(--red)}

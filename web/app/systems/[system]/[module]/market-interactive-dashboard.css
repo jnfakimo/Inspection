@@ -70,7 +70,7 @@
 }
 .mid-control-grid input,.mid-control-grid select,.mid-slicers input{
   width:100%;
-  min-height:40px;
+  min-height:var(--form-control-height);
   padding:8px 10px;
   border:1px solid var(--line);
   border-radius:7px;
