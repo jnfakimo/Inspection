@@ -103,3 +103,8 @@
 .dash-market-list strong{color:var(--text)}
 @media(max-width:760px){.dash-market-stock-legend small{width:100%;margin-left:0}}
 @media(max-width:430px){.dash-market-stock-legend{display:grid;grid-template-columns:1fr 1fr}.dash-market-stock-legend b,.dash-market-stock-legend small{grid-column:1/-1}.dash-market-kpis>div{min-width:0}}
+
+/* 大螢幕配置保留既有欄數；窄版改自然換行，不裁切內容或縮字。 */
+.tv-display,.tv-display-brand,.tv-display-brand>div,.tv-display-widget{min-width:0}
+@media(max-width:800px){.tv-display-header{flex-wrap:wrap;gap:12px}.tv-display-actions{flex-wrap:wrap;max-width:100%}}
+@media(max-width:600px){.tv-display-grid{grid-template-columns:minmax(0,1fr)!important}.tv-display-widget{grid-column:1/-1!important}}
