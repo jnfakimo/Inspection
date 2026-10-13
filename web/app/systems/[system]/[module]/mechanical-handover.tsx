@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { repairCostCents, repairCostTotal, formatRepairCost } from '@/lib/mechanical-cost';
-import { calculateMechanicalPrintFit } from '@/lib/mechanical-print-fit';
+
 import { appendMechanicalWorkDetails, canApproveMechanicalDay, currentMechanicalShift, mechanicalApprovalOpensOn, mechanicalWorkDetails } from '@/lib/mechanical-handover-flow';
 import { AppShell } from '@/components/AppShell';
 import {
@@ -419,7 +419,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
               </div>
             </div>
             <div className="hs-shift-body is-single">
-            <div className={`mechanical-scheduled-roster${scheduledNames.length ? '' : ' is-empty'}`}><span>二市排班表</span><b>{scheduledNames.length ? scheduledNames.join('、') : '本班尚未排定人員'}</b><a href="/Inspection/v2/systems/handover/mechanical-schedule/">開啟排班表</a></div>
+            <div className={`mechanical-scheduled-roster${scheduledNames.length ? '' : ' is-empty'}`}><span>{market ? HANDOVER_MARKETS[market].short : ""}排班表</span><b>{scheduledNames.length ? scheduledNames.join('、') : '本班尚未排定人員'}</b><a href="/Inspection/v2/systems/handover/mechanical-schedule/">開啟排班表</a></div>
             {carryRows.length > 0 && <div className="mechanical-carry-list" aria-label={`${shift.label}上班續辦工作`}>
               <div className="mechanical-carry-heading"><b>上班未完成 · 已自動帶入 {carryRows.length} 件</b><small>交接快照保留；處理後建立本班續辦紀錄，標示完成即停止帶入。</small></div>
               {carryRows.map(row => <article className="mechanical-carry-card" key={String(row.entry_id)}>
@@ -476,26 +476,17 @@ export function PrintRangeModal({ error, from, to, busy, onFrom, onTo, onClose, 
   return <AdminModal className="mechanical-modal mechanical-print-modal" title="列印機電交接報表" onClose={onClose}>
     <div className="mechanical-print-range"><label>開始日期<LocalizedDateInput aria-label="列印開始日期" value={from} onChange={event => onFrom(event.target.value)} /></label><span className="mechanical-print-range-arrow" aria-hidden="true">→</span><label>結束日期<LocalizedDateInput aria-label="列印結束日期" value={to} onChange={event => onTo(event.target.value)} /></label></div>
     {error && <p role="alert" className="mechanical-modal-message">{error}</p>}
-    <p className="mechanical-print-hint">每一天會產生一頁 A4 報表，最多可列印 31 天（目前 <strong>{pages}</strong> 頁）。</p>
+    <p className="mechanical-print-hint">每天另起 A4 報表，內容較多時自動續頁；最多可列印 31 天（目前 <strong>{pages}</strong> 天）。</p>
     {(!pages || pages > 31) && <p className="inline-message danger">請確認日期順序，且列印區間不可超過 31 天。</p>}
     <footer><button className="secondary-btn" onClick={onClose}>取消</button><button className="primary-btn compact" disabled={busy || !pages || pages > 31} onClick={onPrint}>{busy ? '準備中…' : '開始列印'}</button></footer>
   </AdminModal>;
 }
 
 export function fitMechanicalPrint() {
+  // Native pagination remains safe when the dialog changes paper size or beforeprint runs before fonts settle.
   document.querySelectorAll<HTMLElement>('.mechanical-print-preview .mechanical-print-sheet').forEach(sheet => {
-    const content = sheet.querySelector<HTMLElement>('.mechanical-print-content');
-    sheet.classList.remove('is-multipage');
-    content?.style.removeProperty('--mechanical-print-scale');
-    if (!content || !sheet.clientHeight || !content.scrollHeight) return;
-    const style = window.getComputedStyle(sheet);
-    const verticalPadding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
-    const fit = calculateMechanicalPrintFit(sheet.clientHeight - verticalPadding - 2, content.scrollHeight);
-    if (fit.mode === 'multipage') {
-      sheet.classList.add('is-multipage');
-      return;
-    }
-    content.style.setProperty('--mechanical-print-scale', String(fit.scale));
+    sheet.classList.add('is-multipage');
+    sheet.querySelector<HTMLElement>('.mechanical-print-content')?.style.removeProperty('--mechanical-print-scale');
   });
 }
 
@@ -541,6 +532,8 @@ export function PrintSheet({ market, date, entries, signatures, shiftReports = [
         name={shiftNames[index]} time={shift.label} status={status}
         statusTone={isReceived ? 'complete' : report?.outgoing ? 'progress' : 'pending'} longContent={longShift}>
         <p className="mechanical-report-shift-summary">有效紀錄 {validRows.length} 件 · 保留刪除紀錄 {deletedRows} 件</p>
+        <p className="mechanical-report-scroll-hint">左右滑動表格，可查看全部五欄內容。</p>
+        <div className="mechanical-report-table-scroll" role="region" aria-label={`${shiftNames[index]}養護明細，可左右捲動查看五欄`} tabIndex={0}>
         <table className="hs-report-shift mechanical-print-table">
           <thead><tr><th>維修養護工作內容</th><th>維修人員</th><th>處理結果</th><th>備註</th><th>費用（元）</th></tr></thead>
           <tbody className="mechanical-print-shift">{(rows.length ? rows : [null]).map((row, rowIndex) => <tr className={`${row && isDeleted(row) ? 'is-deleted' : ''}${row && [row.work_item, row.details, row.notes].some(value => String(value || '').length > 450) ? ' is-long-row' : ''}`} key={row ? String(row.entry_id) : 'empty'}>
@@ -548,12 +541,13 @@ export function PrintSheet({ market, date, entries, signatures, shiftReports = [
             <td>{row ? (Array.isArray(row.technician_ids) ? row.technician_ids : []).map(userName).join('、') || '—' : '—'}</td>
             <td>{row ? isDeleted(row) ? '已刪除' : String(row.result || '—') : '—'}</td>
             <td>{row ? <>{String(row.notes || '—')}{isDeleted(row) && <small className="mechanical-print-delete-time">刪除：{activityTime(row.deleted_at)}</small>}</> : '—'}</td>
-            <td>{row && !isDeleted(row) && row.repair_cost != null ? formatRepairCost(repairCostCents(row.repair_cost) || 0).replace('NT$ ', '') : row && isDeleted(row) ? '—' : '未填'}</td>
+            <td className="mechanical-report-amount">{row && !isDeleted(row) && row.repair_cost != null ? formatRepairCost(repairCostCents(row.repair_cost) || 0).replace('NT$ ', '') : row && isDeleted(row) ? '—' : '未填'}</td>
           </tr>)}</tbody>
         </table>
+        </div>
       </HandoverReportShiftCard>;
     })}
-    <div className="mechanical-print-total hs-report-summary-band"><strong>本日維修費用合計：{formatRepairCost(repairCostTotal(validEntries))}</strong><span>費用未填 {validEntries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
+    <div className="mechanical-print-total hs-report-summary-band"><strong>本日維修費用合計：<span className="mechanical-report-amount">{formatRepairCost(repairCostTotal(validEntries))}</span></strong><span>費用未填 {validEntries.filter(row => row.repair_cost == null).length} 件（不計入合計）</span></div>
     <section className="mechanical-report-handoffs" aria-label="交接勾稽"><h3 className="hs-report-section-title">交接勾稽</h3><div className="mechanical-report-handoff-grid">{SHIFTS.map((shift, index) => {
       const report = shiftReports.find(row => row.shift_code === shift.code);
       const legacy = userName(signatures.find(sign => sign.shift_code === shift.code)?.signer_id);

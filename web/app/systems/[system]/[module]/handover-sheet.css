@@ -250,9 +250,9 @@
   .hs-approval-icon,.hs-approval-status{background:#fff!important;color:#111!important;border:1px solid #111!important}
   .hs-approval-main strong,.hs-approval-detail{color:#111!important}
   .hs-approval-action,.hs-approval-action:hover:not(:disabled),.hs-approval-action:disabled{background:#fff!important;color:#111!important;border:1px solid #111!important;box-shadow:none!important;opacity:1;transform:none}
-  @page{size:A4 portrait;margin:0}
+  
   .hs-report{font-size:8.4pt;line-height:1.35}
-  .hs-daily-report{box-sizing:border-box;width:210mm;min-height:297mm;margin:0 auto;padding:9mm;background:#fff;color:#111;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  .hs-daily-report{box-sizing:border-box;width:100%;min-height:0;height:auto;overflow:visible;margin:0;padding:0;background:#fff;color:#111;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   .hs-daily-report .hs-report-heading{margin-bottom:3mm;padding-bottom:3mm;border-bottom-width:1px}
   .hs-daily-report .hs-report-heading h2{font-size:14pt;line-height:1.35}
   .hs-report-heading-top{margin-bottom:3mm;font-size:7pt}
@@ -280,3 +280,32 @@
 }
 @media(prefers-reduced-motion:reduce){.hs-state.is-active::before,.hs-pulse-dot{animation:none}.hs-shift{transition:none}}
 .hs-kpi.is-cyan{--tone:var(--cyan)}
+
+/* Keep date, currency and units legible on the screen without changing A4 geometry. */
+@media screen{
+  .hs-report-date{display:inline-block;white-space:nowrap}
+  .hs-report-overview>div{flex-wrap:wrap}
+  .hs-report-overview span{flex-basis:100%}
+  .hs-report-overview strong,.hs-report-overview small{white-space:nowrap}
+  .hs-report-shift-heading{min-width:0;flex-wrap:wrap}
+  .hs-report-summary-band{flex-wrap:wrap}
+}
+@media screen and (max-width:600px){.hs-report-overview{grid-template-columns:minmax(0,1fr)}}
+
+@media print {
+  .hs-report-overview > div { flex-wrap: wrap; }
+  .hs-report-overview span { flex-basis: 100%; }
+  .hs-report-overview strong, .hs-report-overview small { white-space: nowrap; }
+  .hs-report-overview strong { font-size: 10pt; }
+}
+
+@media print {
+  html:has(.hs-daily-report),body:has(.hs-daily-report){width:auto!important;min-width:0!important;height:auto!important;overflow:visible!important}
+  .hs-print-sheet{width:100%;min-height:0;height:auto;overflow:visible;margin:0;padding:0}
+  .hs-report-footer-heading{break-after:avoid-page}
+  .hs-report-footer.is-long .hs-report-approval-details{display:block}
+  .hs-report-approval-details>div{break-inside:auto;border-left:0}
+  .hs-report-generated{break-before:avoid-page}
+}
+
+@media print {html:has(.hs-daily-report),body:has(.hs-daily-report){background:#fff!important;background-image:none!important}.hs-report-footer:not(.is-long){break-inside:avoid-page;page-break-inside:avoid}}

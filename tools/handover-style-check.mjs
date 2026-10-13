@@ -160,9 +160,9 @@ for (const token of ['className="business-print-content hs-report hs-daily-repor
 for (const token of ['--hs-shift-color-1:#0284c7', '--hs-shift-color-2:#047857', '--hs-shift-color-3:#b45309', '.hs-report-approval-stage{border:1px solid #cbd5e1']) {
   if (!shared.includes(token)) errors.push(`handover-sheet.css 缺少共用設計 token：${token}`);
 }
-if (!printStyles.includes('@page{size:A4 portrait;margin:0}') || !printStyles.includes('width:210mm;min-height:297mm;margin:0 auto;padding:9mm')
+if (!read('handover-sheet.tsx').includes('size:A4') || !read('handover-sheet.tsx').includes('margin:14mm 9mm 12mm') || !printStyles.includes('width:100%;min-height:0;height:auto;overflow:visible')
   || !/\.hs-report-footer\{[^}]*break-inside:auto;page-break-inside:auto/.test(printStyles)) {
-  errors.push('三本日報需共用 A4／9mm 內距，並允許簽核摘要自然跨頁');
+  errors.push('三本日報需共用 A4／每頁留白，並允許簽核摘要自然跨頁');
 }
 if (/\.business-print-approvals-grid\{break-inside:avoid/.test(read('business-handover.css'))) {
   errors.push('業管組三級簽核區不可整組推頁，長說明須可自然跨頁');

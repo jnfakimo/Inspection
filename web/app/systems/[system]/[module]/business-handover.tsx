@@ -1322,7 +1322,7 @@ function BusinessReportContent({
             const absentSum = activeRows.filter(r => !r.carried).reduce((s, r) => s + Number(r.absent_attendance || 0), 0);
 
             return (
-              <tr key={shift.code} className={'hs-report-shift-row hs-report-shift-' + (shiftIndex + 1)}>
+              <tr key={shift.code} className={'hs-report-shift-row hs-report-shift-' + (shiftIndex + 1) + (activeRows.reduce((sum, row) => sum + String(row.description || '').length, 0) > 700 ? ' is-long-row' : '')}>
                 <td className="print-shift-name hs-report-shift-name">
                   <b>{shift.name}</b>
                   <br />
@@ -1372,7 +1372,7 @@ function BusinessReportContent({
           const isApproved = Boolean(approval);
 
           return (
-            <div key={stageItem.stage} className="business-print-approval-box hs-report-approval-stage">
+            <div key={stageItem.stage} className={`business-print-approval-box hs-report-approval-stage${(approval?.note?.length || 0) > 700 ? " is-long" : ""}`}>
               <div className="print-box-head hs-report-approval-stage-heading">
                 <strong>{stageItem.label}</strong>
                 <span className={`print-box-status hs-report-approval-stage-status ${isApproved ? 'is-signed' : ''}`}>

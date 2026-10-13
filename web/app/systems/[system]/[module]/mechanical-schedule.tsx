@@ -12,6 +12,7 @@ import {
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './mechanical-schedule.css';
+import { HandoverPrintPage } from './handover-sheet';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 type MarketCode = 'market_1' | 'market_2';
@@ -261,6 +262,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
         })}</div>
       </section>
 
+      <HandoverPrintPage title="機電課輪值月排班表" date={`${monthTitle(month)}｜${MARKET_LABELS[market]}`} selector=".mechanical-schedule-sheet" landscape />
       <section className="mechanical-schedule-sheet" aria-label={`${MARKET_LABELS[market]}列印月排班表`}>
         <header><div><small>臺北農產運銷股份有限公司</small><h2>管理部機電課輪值人員月排班表</h2></div><div><b>{monthTitle(month)}</b><span>{MARKET_LABELS[market]}</span></div></header>
         <div className="mechanical-schedule-legend">{WORK_SHIFTS.map(shift => <span className={`duty-${shift.code}`} key={shift.code}><i />{shift.name} {shift.time}</span>)}</div>
