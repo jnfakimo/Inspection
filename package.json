@@ -71,7 +71,7 @@
     "test:admin-api": "node tools/admin-api-check.mjs && node tools/admin-line-test-check.mjs && node --experimental-strip-types --test web/lib/user-visibility.test.ts web/lib/module-access.test.ts",
     "test:account-approval": "node tools/account-approval-default-password-check.mjs",
     "test:admin-rate-limit-release": "node tools/admin-rate-limit-release.test.mjs",
-    "test:weather-api": "node --test web/lib/weather-api.test.ts",
+    "test:weather-api": "node --test web/lib/weather-api.test.ts tools/cwa-weather-contract.test.mjs",
     "test:board-notices": "node --experimental-strip-types tools/board-notices-check.mjs",
     "test:official-timeout-errors": "node tools/official-document-timeout-error-check.mjs",
     "test:username-login": "node --experimental-strip-types --test web/lib/username-login-error.test.ts web/lib/username-login-routing.test.ts",

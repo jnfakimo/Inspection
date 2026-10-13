@@ -1,13 +1,15 @@
 'use client';
 
+import { WeatherMapMarkers } from './weather-map-markers';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PUBLIC_WEATHER_SERVICE, SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/config';
 import { createWeatherReader } from '@/lib/weather-api';
 import { createRequestSequence } from '@/lib/request-sequence';
 import { emptyTownForecastView, formatWeatherMetric, formatWeatherTextMetric, visibleTownForecastView, type TownForecastView } from '@/lib/weather-presentation';
-import { WEATHER_COUNTIES, observationTemperature, observationStatus, summaryExpired, weatherSymbol, weatherTime as localTime } from '@/lib/weather-observation';
+import { WEATHER_COUNTIES, observationTemperature, observationStatus, summaryExpired, weatherPresentation, weatherSymbol, weatherTime as localTime } from '@/lib/weather-observation';
 import { WeatherCountyObservations } from './weather-county-observations';
-import { WEATHER_MAP_V3_BADGE_RADIUS, WEATHER_MAP_V3_CANVAS, WEATHER_MAP_V3_MAP_MATRIX, WEATHER_MAP_V3_MARKERS, WEATHER_MAP_V3_TEMPERATURE_LABEL_OFFSET_Y, WEATHER_MAP_V3_VIEWBOX } from '@/lib/weather-map-v3';
+import { WEATHER_MAP_V3_CANVAS, WEATHER_MAP_V3_MAP_MATRIX, WEATHER_MAP_V3_VIEWBOX } from '@/lib/weather-map-v3';
 
 type Row = Record<string, any>;
 type MapCountyShape = { id: string; county: string; path: string; title: string };
@@ -126,13 +128,14 @@ export function WeatherWidget() {
   const current: Row = (summary?.counties || []).find((row: Row) => row.county.replace('台', '臺') === county) || {};
   const stem = county.replace(/[市縣]$/, '');
   const detail: Row = selectedTown || current;
+  const conditions = weatherPresentation(current, now);
   const detailPlace = selectedTown ? String(selectedTown.town) : county;
   const countyAlerts: Row[] = (summary?.alerts || []).filter((alert: Row) =>
     (alert.areas || []).some((area: unknown) => String(area).includes(stem)));
 
   return (
     <div className="weather-widget">
-      <section className="weather-map-panel" style={{ background: 'transparent' }} aria-label="台灣縣市天氣分布；溫度為測站觀測，晴雨圖示為縣市預報">
+      <section className="weather-map-panel" style={{ background: 'transparent' }} aria-label="台灣縣市天氣分布；溫度為測站觀測；圖示優先顯示測站觀測天氣，缺少時顯示縣市預報">
       <h3 className="weather-map-heading">台灣縣市天氣</h3>
       {/* 地圖區域 */}
       <div className="weather-map-container" style={{ background: 'transparent' }}>
@@ -141,18 +144,18 @@ export function WeatherWidget() {
         <svg viewBox={WEATHER_MAP_V3_VIEWBOX} style={{ width: '100%', height: '100%', display: 'block' }}>
           
           {/* 注入台灣地圖路徑，設定樣式 */}
-          <style>{`.weather-map-container svg .county { fill: transparent; stroke: transparent; stroke-width: 1.1px; pointer-events: all; transition: fill 0.2s, stroke 0.2s; }
-.weather-map-container svg .county.selected { fill: color-mix(in srgb, var(--cyan) 16%, transparent); stroke: color-mix(in srgb, var(--cyan) 58%, transparent); stroke-width: 2px; }
+          <style>{`.weather-map-container svg .county { fill: transparent; stroke: #000; stroke-width: 1.5px; stroke-linejoin: round; pointer-events: all; }
+.weather-map-container svg .county.selected { fill: transparent; stroke: #000; }
 .weather-map-container svg .county[role="button"] { cursor: pointer; }
-.weather-map-container svg .county[role="button"]:hover { fill: color-mix(in srgb, var(--cyan) 12%, transparent); }
-.weather-map-container svg .county[role="button"]:focus-visible { stroke: var(--cyan); stroke-width: 2.5px; }
+.weather-map-container svg .county[role="button"]:hover { fill: transparent; }
+.weather-map-container svg .county[role="button"]:focus-visible { stroke: #000; stroke-width: 2.5px; }
 .weather-map-container svg .weather-map-art, .weather-map-container svg .weather-icons-art { pointer-events: none; }
 .weather-map-container svg .weather-marker-hit { fill: transparent; stroke: transparent; pointer-events: all; }
 .weather-map-container svg .weather-marker-known.selected .weather-marker-hit { fill: color-mix(in srgb, var(--cyan) 8%, transparent); stroke: var(--cyan); stroke-width: 1.6px; }
 .weather-map-container svg .weather-marker-known:focus-visible .weather-marker-hit { stroke: var(--cyan); stroke-width: 2px; }
 .weather-map-container svg .weather-marker-temperature { fill: var(--text-hi); font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--panel); stroke-width: 1px; }
 .weather-map-container svg [role="button"]:focus-visible { outline: none; }`}</style>
-          {/* Blender V4 raster provides the approved map appearance; SVG paths remain the county hit regions. */}
+          {/* Retain Blender raster geometry and fill; its source county paths add opaque, non-scaling black boundaries. */}
           <image className="weather-map-art" href="/Inspection/v2/taiwan-weather-map-layer.png" x={0} y={0} width={WEATHER_MAP_V3_CANVAS.width} height={WEATHER_MAP_V3_CANVAS.height} preserveAspectRatio="none" aria-hidden="true" pointerEvents="none" />
           <g className="weather-county-hit-layer" transform={`matrix(${WEATHER_MAP_V3_MAP_MATRIX.join(' ')})`} fillRule="evenodd">
             {mapShapes.map(shape => {
@@ -175,6 +178,7 @@ export function WeatherWidget() {
                   } : undefined}
                   tabIndex={selectable ? 0 : undefined}
                   d={shape.path}
+                  vectorEffect="non-scaling-stroke"
                 >
                   <title>{shape.title}</title>
                 </path>
@@ -182,52 +186,13 @@ export function WeatherWidget() {
             })}
           </g>
 
-          <g className="weather-marker-layer">
-            {WEATHER_MAP_V3_MARKERS.map((marker, index) => {
-              const mappedCounty = marker.county;
-              const data = mappedCounty
-                ? (summary?.counties || []).find((row: Row) => String(row.county || '').replace('台', '臺') === mappedCounty) || {}
-                : {};
-              const isSelected = mappedCounty === county;
-              const temperature = mappedCounty ? observationTemperature(data.temperature) : '--°C';
-              const markerNumber = String(index + 1).padStart(2, '0');
-              const markerLabel = mappedCounty
-                ? `${mappedCounty}，觀測溫度 ${temperature}，預報 ${data.weather || '未提供'}`
-                : `位置 ${markerNumber}：縣市對應待確認，氣溫 ${temperature}`;
-              return (
-                <g
-                  key={marker.id}
-                  className={mappedCounty ? `weather-marker-known${isSelected ? ' selected' : ''}` : 'weather-marker-unknown'}
-                  transform={`translate(${marker.x} ${marker.y})`}
-                  role={mappedCounty ? 'button' : 'img'}
-                  aria-label={markerLabel}
-                  aria-pressed={mappedCounty ? isSelected : undefined}
-                  onClick={mappedCounty ? () => switchCounty(mappedCounty) : undefined}
-                  onKeyDown={mappedCounty ? event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      switchCounty(mappedCounty);
-                    }
-                  } : undefined}
-                  tabIndex={mappedCounty ? 0 : undefined}
-                  style={{ cursor: mappedCounty ? 'pointer' : 'default', outline: 'none' }}
-                >
-                  <title>{markerLabel}</title>
-                  <circle className="weather-marker-hit" r={WEATHER_MAP_V3_BADGE_RADIUS} />
-                  <text x={0} y={-8} textAnchor="middle" dominantBaseline="central" className="weather-marker-symbol" aria-hidden="true">{mappedCounty ? weatherSymbol(data.weather) : '？'}</text>
-                  <text x={0} y={WEATHER_MAP_V3_TEMPERATURE_LABEL_OFFSET_Y} textAnchor="middle" dominantBaseline="central" className="weather-marker-temperature">
-                    {temperature}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
+          <WeatherMapMarkers summary={summary} now={now} selectedCounty={county} onSelect={switchCounty} />
         </svg>
 
       </div>
         <p className="weather-map-caption" role="note">
           <span className="weather-map-caption__dot" aria-hidden="true" />
-          <span>溫度為測站觀測，晴雨圖示為縣市預報；問號表示資料或縣市對應待確認。完整 22 縣市資料列於下方。</span>
+          <span>溫度為測站觀測；圖示優先顯示測站觀測天氣，缺少時顯示縣市預報；問號表示晴雨資料未提供或無法辨識；星號表示快取、觀測或預報過期。點選縣市可查看測站、觀測時間與預報時間。離島資料保留於完整清單。</span>
         </p>
       </section>
 
@@ -278,10 +243,11 @@ export function WeatherWidget() {
         <div style={{ background: 'var(--panel2)', borderRadius: '12px', padding: '24px', border: '1px solid var(--border)' }}>
           <h3 style={{ margin: '0 0 20px 0', color: 'var(--cyan)', fontSize: '28px', borderBottom: '1px solid var(--border-hi)', paddingBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span>{detailPlace}</span>
-            <span style={{ color: 'var(--text-hi)', fontSize: '22px' }}>預報：{detail.weather || '未提供'}</span>
-            <span style={{ fontSize: '32px', marginLeft: 'auto' }}>{weatherSymbol(detail.weather)}</span>
+            <span style={{ color: 'var(--text-hi)', fontSize: '22px' }}>{selectedTown ? '鄉鎮預報' : conditions.label}：{selectedTown ? detail.weather || '未提供' : conditions.description}</span>
+            <span style={{ fontSize: '32px', marginLeft: 'auto' }}>{selectedTown ? weatherSymbol(detail.weather) : conditions.symbol}</span>
           </h3>
           {!selectedTown && <p className="weather-town-forecast-time">中央氣象署 · 測站：{current.stationName || '未提供'} · 觀測：{localTime(current.observedAt)} · {observationStatus(current.observedAt, current.temperature, now)}</p>}
+          {!selectedTown && <p className="weather-town-forecast-time"><span aria-hidden="true">{conditions.symbol}</span> {conditions.label}：{conditions.description} · {conditions.time} · {conditions.status}</p>}
           {selectedTown && <p className="weather-town-forecast-time">鄉鎮預報時間：{selectedTown.startsAt ? localTime(selectedTown.startsAt) : '未提供'}</p>}
           {selectedTown?.description && <p className="weather-town-description">{String(selectedTown.description)}</p>}
           <dl style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', margin: 0 }}>

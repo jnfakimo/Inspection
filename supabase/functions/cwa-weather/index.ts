@@ -79,6 +79,9 @@ type CountyWeather = {
   county: string;
   weather: string | null;
   weatherCode: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  observedWeather: string | null;
   minTemperature: number | null;
   maxTemperature: number | null;
   rainProbability: number | null;
@@ -172,24 +175,39 @@ function findArraysByKey(root: unknown, names: string[], depth = 0): unknown[][]
   return found;
 }
 
+// CWA forecast timestamps without an offset are Taiwan local time, not host local time.
+function countyWeatherTime(value: unknown): string | null {
+  const raw = textValue(value);
+  if (!raw) return null;
+  const normalized = raw.replace(" ", "T");
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(normalized)) return null;
+  const zoned = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(normalized) ? `${normalized}+08:00` : normalized;
+  return Number.isFinite(Date.parse(zoned)) ? zoned : null;
+}
+
+function observationWeather(value: unknown): string | null {
+  const text = textValue(value);
+  return !text || /^(?:X|[-+]?\d+(?:\.\d+)?|null|undefined)$/i.test(text) ? null : text;
+}
+
 function firstTime(element: unknown): JsonObject {
   const times = array(pick(element, ["time", "Time"])).map(record);
   if (!times.length) return {};
   const now = Date.now();
   return times.find((item) => {
-    const end = Date.parse(String(pick(item, ["endTime", "EndTime", "DataTime"]) || ""));
+    const end = Date.parse(countyWeatherTime(pick(item, ["endTime", "EndTime", "DataTime"])) || "");
     return !Number.isFinite(end) || end >= now;
   }) || times[0];
 }
 
-function forecastElementValue(element: unknown): { value: string | null; code: string | null } {
+function forecastElementValue(element: unknown): { value: string | null; code: string | null; startsAt: string | null; endsAt: string | null } {
   const time = firstTime(element);
   const parameter = pick(time, ["parameter", "Parameter"]);
   const elementValue = pick(time, ["elementValue", "ElementValue"]);
   const value = textValue(parameter) || textValue(elementValue) || textValue(time);
   const code = textValue(pick(record(parameter), ["parameterValue", "ParameterValue"])) ||
     textValue(pick(record(array(elementValue)[0]), ["WeatherCode", "value", "Value"]));
-  return { value, code };
+  return { value, code, startsAt: countyWeatherTime(pick(time, ["startTime", "StartTime"])), endsAt: countyWeatherTime(pick(time, ["endTime", "EndTime"])) };
 }
 
 function parseCountyForecast(data: unknown): Map<string, Partial<CountyWeather>> {
@@ -203,20 +221,22 @@ function parseCountyForecast(data: unknown): Map<string, Partial<CountyWeather>>
     const county = canonicalCounty(pick(location, ["locationName", "LocationName"]));
     const elements = array(pick(location, ["weatherElement", "WeatherElement"]));
     if (!elements.length) continue;
-    const byName = new Map<string, { value: string | null; code: string | null }>();
+    const byName = new Map<string, ReturnType<typeof forecastElementValue>>();
     for (const element of elements) {
       const name = String(pick(element, ["elementName", "ElementName"]) || "");
       byName.set(name, forecastElementValue(element));
     }
     const get = (...names: string[]) => {
       for (const name of names) if (byName.has(name)) return byName.get(name)!;
-      return { value: null, code: null };
+      return { value: null, code: null, startsAt: null, endsAt: null };
     };
     const weather = get("Wx", "天氣現象", "天氣");
     result.set(county, {
       county,
       weather: weather.value,
       weatherCode: weather.code,
+      startsAt: weather.startsAt,
+      endsAt: weather.endsAt,
       minTemperature: numberValue(get("MinT", "最低溫度").value),
       maxTemperature: numberValue(get("MaxT", "最高溫度").value),
       rainProbability: numberValue(get("PoP", "PoP12h", "降雨機率", "12小時降雨機率").value),
@@ -252,12 +272,13 @@ function parseObservations(data: unknown): Map<string, Partial<CountyWeather>> {
       pick(weather, ["Precipitation", "precipitation"]);
     result.set(county, {
       county,
+      observedWeather: observationWeather(pick(weather, ["Weather", "weather"])),
       temperature: numberValue(pick(weather, ["AirTemperature", "airTemperature"])),
       humidity: numberValue(pick(weather, ["RelativeHumidity", "relativeHumidity"])),
       windSpeed: numberValue(pick(weather, ["WindSpeed", "windSpeed"])),
       rainfall: numberValue(precipitation),
-      observedAt: textValue(pick(record(pick(station, ["ObsTime", "obsTime"])), ["DateTime", "dateTime"])) ||
-        textValue(pick(station, ["ObsTime", "obsTime"])),
+      observedAt: countyWeatherTime(pick(record(pick(station, ["ObsTime", "obsTime"])), ["DateTime", "dateTime"])) ||
+        countyWeatherTime(pick(station, ["ObsTime", "obsTime"])),
       stationName: textValue(pick(station, ["StationName", "stationName"])),
     });
   }
@@ -646,6 +667,9 @@ async function loadSummary() {
     county,
     weather: null,
     weatherCode: null,
+    startsAt: null,
+    endsAt: null,
+    observedWeather: null,
     minTemperature: null,
     maxTemperature: null,
     rainProbability: null,

@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { WEATHER_COUNTIES, observationTemperature, observationStatus, summaryExpired, weatherSymbol } from './weather-observation.ts';
+import { WEATHER_COUNTIES, observationTemperature, observationStatus, summaryExpired, weatherSymbol, taipeiWeatherNight, weatherPresentation } from './weather-observation.ts';
+
+test('Taipei night convention never displays a sun for clear or partly rainy descriptions', () => {
+  assert.equal(taipeiWeatherNight(Date.parse('2026-10-13T17:59:00+08:00')), false);
+  assert.equal(taipeiWeatherNight(Date.parse('2026-10-13T18:00:00+08:00')), true);
+  assert.equal(taipeiWeatherNight(Date.parse('2026-10-14T05:59:00+08:00')), true);
+  assert.equal(taipeiWeatherNight(Date.parse('2026-10-14T06:00:00+08:00')), false);
+  assert.equal(weatherSymbol('晴天', true), '🌙');
+  assert.equal(weatherSymbol('晴時多雲', true), '☁️');
+  assert.equal(weatherSymbol('多雲', true), '☁️');
+  assert.equal(weatherSymbol('晴時多雲短暫雨', true), '🌧️');
+  assert.equal(weatherSymbol('雷陣雨', true), '⛈️');
+  assert.equal(weatherSymbol(undefined, true), '？');
+});
 
 test('observations retain zero and negative values; reject CWA missing sentinels', () => {
   for (const value of [null, undefined, '', ' ', 'X', -99, '-99', -999, NaN, Infinity, true, [], {}]) {
@@ -34,4 +47,24 @@ test('all 22 named counties are available independently of the 19 map markers', 
   assert.equal(WEATHER_COUNTIES.length, 22);
   assert.equal(new Set(WEATHER_COUNTIES).size, 22);
   for (const county of ['南投縣','澎湖縣','金門縣','連江縣']) assert.ok(WEATHER_COUNTIES.includes(county));
+});
+
+test('weather presentation distinguishes station observation, forecast period and missing legacy fields', () => {
+  const now = Date.parse('2026-10-13T14:00:00+08:00');
+  const forecast = { weather: '晴天', startsAt: '2026-10-13T12:00:00+08:00', endsAt: '2026-10-13T18:00:00+08:00' };
+  assert.equal(weatherPresentation(forecast, now).status, '預報有效時段');
+  const observed = weatherPresentation({ ...forecast, observedWeather: '雨', observedAt: '2026-10-13T13:50:00+08:00' }, now);
+  assert.equal(observed.symbol, '🌧️');
+  assert.equal(observed.label, '測站觀測天氣');
+  assert.equal(observed.time, '2026-10-13 13:50');
+  assert.equal(observed.status, '最近觀測');
+  assert.equal(weatherPresentation(forecast, now + 4 * 3600000).stale, true);
+  assert.equal(weatherPresentation(forecast, now - 3 * 3600000).status, '預報尚未開始');
+  assert.equal(weatherPresentation({ weather: '晴天' }, now).status, '預報時段待確認');
+  assert.equal(weatherPresentation({}, now).symbol, '？');
+  assert.match(weatherPresentation({}, now).status, /晴雨資料未提供/);
+  for (const invalid of ['X', '-99', ' ', null]) {
+    assert.equal(weatherPresentation({ ...forecast, observedWeather: invalid }, now).label, '縣市預報');
+  }
+  assert.equal(weatherPresentation({ observedWeather: '晴', observedAt: '2026-10-13T10:00:00+08:00' }, now).stale, true);
 });
