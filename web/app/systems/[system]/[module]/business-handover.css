@@ -207,7 +207,7 @@
 /* A4 列印保留完整續辦與雙方簽認；內容較多時自然跨頁。         */
 /* ========================================================= */
 @media print{
-  @page{size:A4 portrait;margin:0}
+  
   body{background:#fff!important;margin:0!important;padding:0!important}
   .v1-navbar,.system-page-header,.admin-page-actions,.hs-toolbar,.business-approval-section,.business-tab-bar,.business-slot-filter-bar,.hs-sheet,.business-report-preview,.theme-toggle{display:none!important}
   .content.v1-content{padding:0!important;margin:0!important;max-width:none!important}
@@ -218,8 +218,10 @@
   .business-print-duty-cols{break-inside:auto!important;page-break-inside:auto!important}
   .business-print-approvals-grid{break-inside:auto!important;page-break-inside:auto!important}
   .business-print-approvals-grid{grid-template-columns:1fr;gap:2mm;margin-top:1.5mm}
-  .business-print-approval-box{break-inside:auto;page-break-inside:auto}
-  .business-print-shift-table tr,.business-print-shift-table td{break-inside:auto!important}
+  .business-print-approval-box{break-inside:avoid-page;page-break-inside:avoid}
+  .business-print-approval-box.is-long{break-inside:auto;page-break-inside:auto}
+  .business-print-shift-table tr,.business-print-shift-table td{break-inside:avoid-page!important;page-break-inside:avoid!important}
+  .business-print-shift-table tr.is-long-row,.business-print-shift-table tr.is-long-row>td{break-inside:auto!important;page-break-inside:auto!important}
   .business-print-shift-table thead{display:table-header-group}
   .print-entry-item,.business-print-reconciliation{break-inside:auto!important;page-break-inside:auto!important}
 }
@@ -251,3 +253,5 @@
   .guard-options-list li{flex-wrap:wrap}.guard-options-actions{justify-content:flex-start;width:100%}
 }
 
+
+@media print{.content.v1-content:has(.hs-print-sheet),.content.v1-content>.hs-page:has(.hs-print-sheet){width:100%!important;background:#fff!important}}

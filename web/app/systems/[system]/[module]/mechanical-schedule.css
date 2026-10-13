@@ -104,14 +104,14 @@
 @media(max-width:520px){.mechanical-schedule-summary{grid-template-columns:1fr 1fr;gap:8px}.mechanical-schedule-summary article{padding:11px}.mechanical-schedule-summary strong{font-size:22px}.mechanical-staff-market-scope>summary{align-items:flex-start;flex-direction:column;gap:5px}.mechanical-staff-market-grid>label{align-items:stretch;flex-direction:column}.mechanical-staff-market-grid select{flex:none;width:100%;min-width:0}.mechanical-schedule-checks p{grid-template-columns:1fr;gap:2px}.mechanical-day-editor>header{flex-direction:column;gap:8px}.mechanical-day-editor>header h2{font-size:18px}.mechanical-day-editor>header>span{align-self:flex-start}.mechanical-calendar-grid{grid-template-columns:1fr}.mechanical-calendar-day{min-height:0}.mechanical-calendar-shifts em{font-size:13.75px}.mechanical-schedule-month>.secondary-btn:last-child{flex-basis:100%}}
 
 @media print{
-  @page{size:A4 landscape;margin:6mm}
+  
   body.mechanical-schedule-printing{background:#fff!important;color:#111!important}
   body.mechanical-schedule-printing .v1-navbar,body.mechanical-schedule-printing .system-page-heading,body.mechanical-schedule-printing .theme-toggle{display:none!important}
   body.mechanical-schedule-printing .content.v1-content{max-width:none!important;margin:0!important;padding:0!important}
   body.mechanical-schedule-printing .mechanical-schedule-page{display:block!important}
   body.mechanical-schedule-printing .content.v1-content>.mechanical-schedule-page{width:100%!important;margin:0!important}
   body.mechanical-schedule-printing .mechanical-schedule-page>:not(.mechanical-schedule-sheet){display:none!important}
-  body.mechanical-schedule-printing .mechanical-schedule-sheet{display:block!important;width:285mm;border:1px solid #111;border-top:2mm solid #087fb4;background:#fff!important;color:#111!important}
+  body.mechanical-schedule-printing .mechanical-schedule-sheet{display:block!important;width:100%;border:1px solid #111;border-top:2mm solid #087fb4;background:#fff!important;color:#111!important}
   body.mechanical-schedule-printing .mechanical-schedule-sheet,body.mechanical-schedule-printing .mechanical-schedule-sheet *{visibility:visible!important}
   body.mechanical-schedule-printing .mechanical-schedule-sheet>header{display:flex;align-items:end;justify-content:space-between;padding:3mm 4mm 2mm}
   body.mechanical-schedule-printing .mechanical-schedule-sheet>header h2{margin:1mm 0 0;font-size:15pt}
@@ -124,9 +124,9 @@
   body.mechanical-schedule-printing .mechanical-schedule-legend .duty-01-09 i{border-color:#0284c7;background:#bae6fd!important}
   body.mechanical-schedule-printing .mechanical-schedule-legend .duty-09-17 i{border-color:#059669;background:#bbf7d0!important}
   body.mechanical-schedule-printing .mechanical-schedule-legend .duty-17-01 i{border-color:#b45309;background:#fed7aa!important}
-  body.mechanical-schedule-printing .mechanical-schedule-table-wrap{display:block}
+  body.mechanical-schedule-printing .mechanical-schedule-table-wrap{display:block;overflow:visible}
   body.mechanical-schedule-printing table{width:100%;border-collapse:collapse;table-layout:fixed}
-  body.mechanical-schedule-printing th,body.mechanical-schedule-printing td{height:4.7mm;padding:.3mm;border:1px solid #555;color:#111!important;background:#fff!important;font-size:6.8pt;text-align:center}
+  body.mechanical-schedule-printing th,body.mechanical-schedule-printing td{box-sizing:border-box;height:4.4mm;padding:.2mm;border:1px solid #555;color:#111!important;background:#fff!important;font-size:6.8pt;text-align:center}
   body.mechanical-schedule-printing thead th{height:7mm;background:#eef3f6!important;font-size:7.2pt}
   body.mechanical-schedule-printing thead th:first-child,body.mechanical-schedule-printing tbody th:first-child,body.mechanical-schedule-printing thead th:nth-child(2),body.mechanical-schedule-printing tbody th:nth-child(2){width:8mm}
   body.mechanical-schedule-printing tr.is-weekend th{color:#b42318!important}
@@ -135,3 +135,7 @@
   body.mechanical-schedule-printing td.duty-17-01{border-left:1.2mm solid #b45309;background:#ffedd5!important;color:#9a3412!important}
   body.mechanical-schedule-printing .mechanical-schedule-sheet>footer{display:flex;justify-content:space-between;padding:1.5mm 4mm;color:#333!important;font-size:6.5pt}
 }
+
+@media print{body.mechanical-schedule-printing{width:auto!important;min-width:0!important}.mechanical-schedule-sheet{height:auto;overflow:visible}.mechanical-schedule-sheet tr{break-inside:avoid-page}.mechanical-schedule-sheet thead{display:table-header-group}}
+
+@media print{html:has(body.mechanical-schedule-printing),body.mechanical-schedule-printing{background:#fff!important;background-image:none!important}.mechanical-schedule-sheet>footer{break-before:avoid-page}}

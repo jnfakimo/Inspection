@@ -74,15 +74,40 @@ test('short shifts stay together, long shifts and long signoff notes can flow', 
   assert.match(print, /\.hs-report-shift-card\.is-long,[^{]+\{break-inside:auto\}/);
   assert.match(print, /\.hs-report-footer\{[^}]*break-inside:auto;page-break-inside:auto/);
   assert.match(businessCss, /\.business-print-approvals-grid\{break-inside:auto!important;page-break-inside:auto!important\}/);
-  assert.match(businessCss, /\.business-print-approval-box\{break-inside:auto;page-break-inside:auto\}/);
+  assert.match(businessCss, /\.business-print-approval-box\.is-long\{break-inside:auto;page-break-inside:auto\}/);
 });
 
 test('A4 page boxes and batch report starts use one shared print geometry', () => {
   const print = sharedCss.slice(sharedCss.indexOf('@media print'));
-  assert.ok(print.includes('@page{size:A4 portrait;margin:0}'));
-  assert.ok(print.includes('width:210mm;min-height:297mm;margin:0 auto;padding:9mm'));
-  assert.ok(guardCss.includes('@page{size:A4 portrait;margin:0}'));
+  const heading = read('../web/app/systems/[system]/[module]/handover-sheet.tsx');
+  assert.ok(heading.includes('margin:14mm 9mm 12mm'));
+  assert.ok(heading.includes('counter(page)'));
+  assert.ok(heading.includes('counter(pages)'));
+  assert.ok(heading.includes('HandoverPrintPage'));
+  assert.ok(print.includes('width:100%;min-height:0;height:auto;overflow:visible'));
+  assert.ok(!guardCss.includes('@page{'));
   assert.ok(guardCss.includes('.guard-print-root .guard-print-day:not(.is-first){break-before:page;page-break-before:always}'));
   assert.ok(mechanicalCss.includes('break-after:page;page-break-after:always'));
-  assert.ok(mechanicalCss.includes('.mechanical-print-sheet.is-multipage{height:auto;min-height:297mm;overflow:visible;'));
+  assert.ok(mechanicalCss.includes('.mechanical-print-sheet.is-multipage{height:auto;min-height:0;overflow:visible;'));
+});
+
+test('mechanical market caption follows the market-scoped roster', () => {
+ assert.ok(mechanical.includes('market ? HANDOVER_MARKETS[market].short'));
+ assert.ok(!mechanical.includes('<span>二市排班表</span>'));
+ for (const table of ['mechanical_schedule_assignments','mechanical_staff_market_scopes']) {
+  const query=mechanical.slice(mechanical.indexOf("from('"+table+"')"),mechanical.indexOf("from('"+table+"')")+450);
+  assert.ok(query.includes(".eq('market_code', market)"), table);
+ }
+});
+test('mobile report scroll region preserves the printable table',()=>{
+ assert.ok(mechanical.includes('mechanical-report-table-scroll'));
+ assert.match(mechanicalCss, /overflow-x:\s*auto/);
+ assert.match(mechanicalCss, /display:\s*contents/);
+ assert.ok(mechanicalCss.includes('body:has(.mechanical-report-preview) .theme-toggle'));
+});
+
+test('business short rows stay whole while long rows may flow', () => {
+ assert.ok(businessCss.includes('.business-print-shift-table td{break-inside:avoid-page!important'));
+ assert.ok(businessCss.includes('.business-print-shift-table tr.is-long-row>td{break-inside:auto!important'));
+ assert.ok(business.includes("? ' is-long-row' : ''"));
 });

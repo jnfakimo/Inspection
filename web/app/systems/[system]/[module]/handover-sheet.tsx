@@ -108,14 +108,26 @@ export function HandoverSheetHeader({ org, title, dateLabel, emblem = 'shield', 
   </>;
 }
 
+
+/** 紙張邊界由 @page 管理，續頁也有留白與識別；不以螢幕高度裁切。 */
+export function HandoverPrintPage({ title, date, selector, landscape = false }: {
+  title: string; date: string; selector: string; landscape?: boolean;
+}) {
+  const pageName = 'handover-' + Array.from(title + date).map(char => char.codePointAt(0)!.toString(16)).join('-');
+  const label = JSON.stringify(`${title}｜${date}`).replace(/</g, '\\3c ');
+  return <style media="print">{`${selector}{page:${pageName}} @page ${pageName}{size:A4 ${landscape ? 'landscape' : 'portrait'};margin:14mm 9mm 12mm;@top-left{content:${label};font-size:8pt;color:#334155;vertical-align:middle}@bottom-right{content:"第 " counter(page) " 頁／共 " counter(pages) " 頁";font-size:8pt;color:#475569}}`}</style>;
+}
+
 export function HandoverReportHeading({ kicker, site, organization, title, subtitle, date, approved, approvedLabel, pendingLabel }: {
   kicker: string; site: string; organization: string; title: string; subtitle: string; date: string;
   approved: boolean; approvedLabel: string; pendingLabel: string;
 }) {
-  return <header className="hs-report-heading">
+  const printId = Array.from(title + date).map(char => char.codePointAt(0)!.toString(16)).join('-');
+  return <header className="hs-report-heading" data-print-id={printId}>
+    <HandoverPrintPage title={title} date={date} selector={`.hs-daily-report:has(.hs-report-heading[data-print-id="${printId}"])`} />
     <div className="hs-report-heading-top"><span>{kicker}</span><span>{site}</span></div>
     <h2>{organization}<br />{title}</h2>
-    <p>{subtitle} <span aria-hidden="true">／</span> {date}</p>
+    <p>{subtitle} <span aria-hidden="true">／</span> <span className="hs-report-date">{date}</span></p>
     <span className={`hs-report-state${approved ? ' is-approved' : ''}`}>{approved ? approvedLabel : pendingLabel}</span>
   </header>;
 }
@@ -147,7 +159,7 @@ export function HandoverReportApprovalFooter({ signerLabel, signerName, signedAt
   signerLabel: string; signerName: string; signedAt: string; pendingTimeLabel: string; noteLabel: string; note: string;
   controls?: ReactNode; readOnlyHint?: string; generatedAt: string;
 }) {
-  return <footer className="hs-report-footer">
+  return <footer className={`hs-report-footer${note.length > 700 ? ' is-long' : ''}`}>
     <div className="hs-report-footer-heading"><span>主管核閱與簽核</span><small>簽核紀錄與說明會隨報表一併列印</small></div>
     <div className="hs-report-approval-details">
       <div><span>{signerLabel}</span><strong>{signerName}</strong><small>{signedAt || pendingTimeLabel}</small></div>
