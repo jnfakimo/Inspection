@@ -82,10 +82,11 @@ test('widget uses the approved layers and leaves unknown locations without weath
   assert.ok(widget.includes('WEATHER_MAP_V3_MARKERS.map'));
   assert.ok(widget.includes('y={WEATHER_MAP_V3_TEMPERATURE_LABEL_OFFSET_Y}'));
   assert.ok(widget.includes('href="/Inspection/v2/taiwan-weather-map-layer.png"'));
-  assert.ok(widget.includes('href="/Inspection/v2/taiwan-weather-icons-layer.png"'));
+  assert.ok(!widget.includes('href="/Inspection/v2/taiwan-weather-icons-layer.png"'));
+  assert.ok(widget.includes('weatherSymbol(data.weather)'));
   assert.ok(widget.indexOf('taiwan-weather-map-layer.png') < widget.indexOf('weather-county-hit-layer'));
-  assert.ok(widget.indexOf('weather-county-hit-layer') < widget.indexOf('taiwan-weather-icons-layer.png'));
-  assert.ok(widget.includes('圖示為示意圖，非即時天氣'));
+  assert.ok(widget.indexOf('weather-county-hit-layer') < widget.indexOf('weather-marker-layer'));
+  assert.ok(widget.includes('溫度為測站觀測，晴雨圖示為縣市預報'));
   assert.ok(widget.includes('縣市對應待確認'));
   assert.ok(widget.includes('--°C'));
   assert.ok(!widget.includes('taiwan-weather-preview.png'));

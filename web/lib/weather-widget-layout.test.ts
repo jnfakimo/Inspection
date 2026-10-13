@@ -42,7 +42,7 @@ test('weather map note uses normal flow after the map canvas at desktop and narr
   const sectionEnd = widget.indexOf('</section>', captionStart);
   assert.ok(mapStart >= 0 && mapEnd > mapStart, 'caption must follow the closed map container');
   assert.ok(captionStart > mapEnd && sectionEnd > captionStart, 'caption must remain within the map panel but outside the canvas');
-  assert.match(widget.slice(captionStart, widget.indexOf('</p>', captionStart)), /圖示為示意圖，非即時天氣/);
+  assert.match(widget.slice(captionStart, widget.indexOf('</p>', captionStart)), /溫度為測站觀測，晴雨圖示為縣市預報/);
   const captionRule = layout.match(/\.weather-map-caption\{[^}]+\}/)?.[0];
   assert.ok(captionRule, 'caption needs a shared responsive layout rule');
   assert.match(captionRule, /display:flex/);
