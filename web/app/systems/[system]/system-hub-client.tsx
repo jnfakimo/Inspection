@@ -8,7 +8,6 @@ import { hasModuleAccess, type ModuleDefinition, type SystemDefinition } from '@
 import { zhModuleCode, zhSystemCode, zhValue } from '@/lib/zh-tw';
 import { useFleetRole } from '@/lib/fleet-role';
 import type { Profile } from '@/types/app';
-import { HandoverModules } from './[module]/handover-workspace';
 import { invokeAppApi } from '@/lib/supabase';
 
 const meetingroomModuleIcons: Record<string, string> = {
@@ -36,7 +35,9 @@ function WorkorderHub({ profile }: { profile: Profile }) {
       {hasModuleAccess(profile, 'workorder', 'requests') && <Link className="maintenance-card cyan" href="/systems/workorder/requests/"><span className="maintenance-badge">MAIN-01</span><img src="/Inspection/v2/assets/system-icons-v20260913/repair-request-icon.png" alt="報修與維修" /><h3>報修</h3><p>新增報修、案件查詢<br />維修進度與狀態管理</p><b>▶ 進入報修與維修</b></Link>}
       {hasModuleAccess(profile, 'workorder', 'dispatch') && <Link className="maintenance-card amber" href="/systems/workorder/dispatch/"><span className="maintenance-badge">MAIN-02</span><img src="/Inspection/v2/assets/system-icons-v20260913/dispatch-icon.png" alt="派工" /><h3>派工系統</h3><p>建立派工、承辦指派<br />工單處理進度追蹤</p><b>▶ 進入派工系統</b></Link>}
       {hasModuleAccess(profile, 'workorder', 'orders') && <Link className="maintenance-card green" href="/systems/workorder/orders/"><span className="maintenance-badge">MAIN-03</span><img src="/Inspection/v2/assets/system-icons-v20260913/repair-complete-icon.png" alt="維修完工回報" /><h3>維修完工回報</h3><p>填寫完工紀錄、照片回報<br />驗收及主管結案</p><b>▶ 進入完工回報</b></Link>}
-      {hasModuleAccess(profile, 'workorder', 'repairmap3d') && <Link className="maintenance-card cyan" href="/systems/workorder/repairmap3d/"><span className="maintenance-badge">MAIN-04</span><img src="/Inspection/v2/assets/system-icons-v20260913/repair-map3d-icon.png" alt="報修3D平面圖" /><h3>報修3D平面圖</h3><p>共用 3D 雲台圖資<br />查看報修點與空間位置</p><b>▶ 開啟圖面</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'attachments') && <Link className="maintenance-card cyan" href="/systems/workorder/attachments/"><span className="maintenance-badge">MAIN-04</span><img src="/Inspection/v2/assets/system-icons-v20260913/repair-request-icon.png" alt="" /><h3>維修附件</h3><p>檢視工單照片與附件檔案，快速掌握案件資料。</p><b>開啟維修附件 →</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'analytics') && <Link className="maintenance-card green" href="/systems/workorder/analytics/"><span className="maintenance-badge">MAIN-05</span><img src="/Inspection/v2/assets/system-icons-v20260913/market-analytics-icon.png" alt="" /><h3>維修分析</h3><p>查看案件處理統計、故障趨勢與設備排行。</p><b>查看維修分析 →</b></Link>}
+      {hasModuleAccess(profile, 'workorder', 'repairmap3d') && <Link className="maintenance-card cyan" href="/systems/workorder/repairmap3d/"><span className="maintenance-badge">MAIN-06</span><img src="/Inspection/v2/assets/system-icons-v20260913/repair-map3d-icon.png" alt="報修3D平面圖" /><h3>報修3D平面圖</h3><p>共用 3D 雲台圖資<br />查看報修點與空間位置</p><b>▶ 開啟圖面</b></Link>}
     </section>
   </AppShell>;
 }
@@ -130,11 +131,7 @@ export function SystemHubClient({ system }: { system: SystemDefinition }) {
   function Hub({ profile }: { profile: Profile }) {
     const allowed = profile.allowed_systems.includes('*') || profile.allowed_systems.includes(system.key);
     if (system.key === 'workorder' && allowed) return <WorkorderHub profile={profile} />;
-    if (system.key === 'handover' && allowed) {
-      const recordsModule = system.modules.find(module => module.key === 'records');
-      if (recordsModule) return <HandoverModules system={system} module={{ ...recordsModule, title: '交接紀錄' }} profile={profile} />;
-    }
-    if ((system.key === 'guardpatrol' || system.key === 'vehicle' || system.key === 'meetingroom' || system.key === 'officialdocs' || system.key === 'equipment' || system.key === 'structuremap') && allowed) return <OperationsHub system={system} profile={profile} />;
+    if ((system.key === 'handover' || system.key === 'guardpatrol' || system.key === 'vehicle' || system.key === 'meetingroom' || system.key === 'officialdocs' || system.key === 'equipment' || system.key === 'structuremap') && allowed) return <OperationsHub system={system} profile={profile} />;
     return <AppShell profile={profile} title={system.title}>{allowed ? <><section className={`module-hero ${system.key}-module-hero`}><div><span>{zhSystemCode(system.code)}</span><h2>{system.title}</h2><p>{system.description}</p></div><img src={system.icon} alt="" /></section><section className={`module-grid ${system.key}-module-grid`}>{system.modules.filter(module => hasModuleAccess(profile, system.key, module.key)).map((module: ModuleDefinition, index: number) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className={system.key === 'meetingroom' ? 'meetingroom-module-card' : undefined}>{system.key === 'meetingroom' && <img src={meetingroomModuleIcons[module.key]} alt="" aria-hidden="true" />}<span>{zhModuleCode(index)}</span><h3>{module.title}</h3><p>{module.description}</p><b>開啟子系統 →</b></Link>)}</section></> : <div className="notice danger">目前帳號沒有此系統權限，請由管理員開放。</div>}</AppShell>;
   }
   return <AuthGate>{profile => <Hub profile={profile} />}</AuthGate>;

@@ -40,14 +40,11 @@ assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaT
   '交接紀錄首頁必須使用模組名稱作為大標題');
 
 const systemHub = readFileSync('web/app/systems/[system]/system-hub-client.tsx', 'utf8');
-const handoverRootStart = systemHub.indexOf("if (system.key === 'handover' && allowed)");
-const otherOperationsHubStart = systemHub.indexOf("if ((system.key === 'guardpatrol'");
-assert.ok(handoverRootStart >= 0 && handoverRootStart < otherOperationsHubStart,
-  '電子交接簿根路由必須先於入口卡分派直接進入交接紀錄');
-const handoverRoot = systemHub.slice(handoverRootStart, otherOperationsHubStart);
-assert.match(handoverRoot, /module\.key === 'records'/);
-assert.match(handoverRoot, /HandoverModules/);
-assert.match(handoverRoot, /title: '交接紀錄'/);
+assert.match(systemHub, /if \(\(system\.key === 'handover' \|\| system\.key === 'guardpatrol'/,
+  'handover root keeps the requested seven-card module hub');
+assert.match(systemHub, /const cards = handover \? \[/);
+assert.match(systemHub, /system\.key === 'handover' && key === 'guard' && hasModuleAccess\(profile, 'handover', 'guard-approve'\)/);
+assert.match(systemHub, /cards\.filter\(\(\[key\]\) => canSeeModule\(key\)\)/);
 const handoverWorkspace = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
 assert.match(handoverWorkspace, /const allowedModules = profile\.allowed_handover_modules \|\| \[\]/);
 assert.match(handoverWorkspace, /allowedModules\.includes\(module\.key\)/);
