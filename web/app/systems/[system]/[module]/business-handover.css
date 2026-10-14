@@ -222,6 +222,7 @@
   .business-print-approval-box.is-long{break-inside:auto;page-break-inside:auto}
   .business-print-shift-table tr,.business-print-shift-table td{break-inside:avoid-page!important;page-break-inside:avoid!important}
   .business-print-shift-table tr.is-long-row,.business-print-shift-table tr.is-long-row>td{break-inside:auto!important;page-break-inside:auto!important}
+  .business-print-shift-section-title{break-before:page!important;page-break-before:always!important}
   .business-print-shift-table thead{display:table-header-group}
   .print-entry-item,.business-print-reconciliation{break-inside:auto!important;page-break-inside:auto!important}
 }

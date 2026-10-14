@@ -68,6 +68,11 @@ for (const fixture of shortAndLongStates) {
   });
 }
 
+test("business shift table starts on a fresh page", () => {
+  assert.ok(business.includes("business-print-shift-section-title"));
+  assert.match(businessCss, /\.business-print-shift-section-title\{break-before:page!important;page-break-before:always!important\}/);
+});
+
 test('short shifts stay together, long shifts and long signoff notes can flow', () => {
   const print = sharedCss.slice(sharedCss.indexOf('@media print'));
   assert.match(print, /\.hs-report-shift-card\{[^}]*break-inside:avoid-page/);

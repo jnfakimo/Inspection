@@ -1301,7 +1301,7 @@ function BusinessReportContent({
       </div>
 
       {/* 2. 班別交接與出勤紀錄 */}
-      <div className="hs-report-section-title">
+      <div className="hs-report-section-title business-print-shift-section-title">
         二、班別交接事項與出勤狀況
       </div>
       <table className="business-print-table business-print-shift-table hs-report-shift">
