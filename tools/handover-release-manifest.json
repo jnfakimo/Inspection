@@ -11,11 +11,11 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.tsx",
-      "sha256": "93069513C38A5E8D2D7BCB076891988003CDE74CD4FFC4538A4C7F898EE17613"
+      "sha256": "94FA32EEFA9B3E0651D425A890FFA094B9870B18551DBB29D853991FB3E0CE14"
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "3D3D0325DE4800735892AEEB7D92AA41AB4539F6AC98B4343A9849AE0674BD94"
+      "sha256": "3CDDF66D7BC35D240E8D2813ADDCF79610EC3957D5BBAA2DED87EA82159BA2DD"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
