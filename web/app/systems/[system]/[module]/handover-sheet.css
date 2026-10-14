@@ -232,7 +232,7 @@
 
 @media(max-width:1100px){.hs-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1000px){.hs-shift-body{grid-template-columns:1fr}}
-@media(max-width:800px){
+@media screen and (max-width:800px){
   .panel.hs-toolbar{align-items:stretch}
   .hs-date-nav{width:100%;gap:6px}.hs-date-label{flex:0 0 100%;min-height:24px}.hs-date-nav>.localized-date-input{flex:1 1 120px;width:auto;min-width:0;max-width:180px}.hs-date-nav>.hs-date-today{flex:0 0 auto}
   .hs-toolbar-right{width:100%}.hs-toolbar-summary,.hs-current-now{justify-content:center;width:100%}
@@ -257,7 +257,7 @@
   .hs-daily-report .hs-report-heading h2{font-size:14pt;line-height:1.35}
   .hs-report-heading-top{margin-bottom:3mm;font-size:7pt}
   .hs-report-overview{gap:2mm;margin-bottom:3mm}.hs-report-overview>div{padding:2mm;border-radius:2mm}.hs-report-overview strong{font-size:14pt}
-  .hs-report-section-title{margin:3mm 0 1.5mm;padding:1.5mm 2mm;border-left-width:1mm;font-size:9pt}
+  .hs-report-section-title{margin:3mm 0 1.5mm;padding:1.5mm 2mm;border-left-width:1mm;font-size:9pt;break-after:avoid-page;page-break-after:avoid}
   .hs-report-shift-card{margin-bottom:3mm;overflow:visible;break-inside:avoid-page;border-color:#94a3b8!important;border-left:2mm solid var(--report-shift)!important}
   .hs-report-shift-heading{min-width:0;padding:2mm 3mm;break-after:avoid;background:color-mix(in srgb,var(--report-shift) 10%,#fff)!important;border-bottom-color:#cbd5e1!important}.hs-report-shift-title h3{font-size:10pt}
   .hs-report-shift-no{background:var(--report-shift)!important;color:var(--report-shift-ink)!important;border:0}

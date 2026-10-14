@@ -41,3 +41,12 @@
 2026-09-17 16:38 · AntiGravity @ Windows
 · Git push：✅ 已推（`db1d28d6c`）
 
+
+
+### 2026-10-14 電子交接簿列印修正
+
+修正業管列印漏隱藏共用頁首所致的 named-page 空白首頁；區段標題與後續內容保持同頁。共用手機排列限於 screen，避免列印簽核改成單欄而增加分頁。公文條碼的全頁隱藏規則限於條碼視窗存在時，避免影響其他模組。保留既有字級、完整簽核及長文續頁。
+
+驗證：完整 OperationsWorkspace/AppShell、直接列印與預覽後列印，三本×Letter/A4 共 12 份 PDF（20 頁）；短／空／長文／長簽核及排班表回歸 32 份 PDF（104 頁），均無空白頁且末端標記完整。完整頁面假資料業管 3→2 頁、機電 2→1 頁、駐警維持 2 頁。19 項報表樣式回歸、共用版型／頁首檢查、型別與 Pages 建置通過。前次獨立 ReportContent fixture 缺少真實 AppShell 與跨模組 CSS，本次補兩個完整列印入口的驗證。
+
+限制：測試產物是 Edge/Skia PDF，現有 CSS A4 named page 適配 Letter/A4 輸出；使用者原件為 Adobe PDF／Distiller Letter，Adobe 原生重印與紙本仍未驗證。未操作正式資料庫、簽核、LINE 或天氣 API。發布僅含本批 CSS、回歸測試與此紀錄；建模與日期欄位候選不在範圍。

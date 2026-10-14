@@ -111,3 +111,23 @@ test('business short rows stay whole while long rows may flow', () => {
  assert.ok(businessCss.includes('.business-print-shift-table tr.is-long-row>td{break-inside:auto!important'));
  assert.ok(business.includes("? ' is-long-row' : ''"));
 });
+
+// Full AppShell print reproduction: hidden chrome before a named page creates a blank sheet.
+test('business printing removes the actual shared heading from layout', () => {
+  const heading = read('../web/components/SystemPageHeader.tsx');
+  assert.ok(heading.includes('system-page-heading'));
+  assert.match(businessCss.slice(businessCss.indexOf('@media print')), /\.system-page-heading[^{}]*\{display:none!important/);
+});
+
+test('mobile report grids are screen-only and section titles stay with content', () => {
+  const mobile = sharedCss.slice(sharedCss.indexOf('@media screen and (max-width:800px)'));
+  assert.ok(mobile.startsWith('@media screen and (max-width:800px)'));
+  assert.ok(mobile.slice(0, mobile.indexOf('@media print')).includes('.hs-report-approval-details{grid-template-columns:1fr}'));
+  assert.match(sharedCss.slice(sharedCss.indexOf('@media print')), /\.hs-report-section-title\{[^}]*break-after:avoid-page/);
+});
+
+test('official document QR printing cannot hide other workspaces', () => {
+  const css = read('../web/app/official-docs.css');
+  assert.ok(css.includes('body:has(.od-qr-modal) *{visibility:hidden}'));
+  assert.doesNotMatch(css, /body\s+\*\s*\{\s*visibility\s*:\s*hidden/);
+});
