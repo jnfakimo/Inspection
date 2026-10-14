@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.tsx",
-      "sha256": "3149B24C96C51B383268C8773522CC7A7B34510DE1BCCDDA91FF220B36264F5B"
+      "sha256": "34CA8F0F6D4562F279A4BA91DCC6639315A60741AE28B05774BAA4F419DFC19C"
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.css",
