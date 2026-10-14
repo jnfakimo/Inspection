@@ -11,11 +11,11 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.tsx",
-      "sha256": "AF746A01385B62A5982776EBD9E1D4273FB0CDE4957D2ECC307A3E6DC5804513"
+      "sha256": "016777E980E5BC24AB12E84C725472D4AC7DA5BD2D76EAFF8E3229943E65B3B3"
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "34C887DCA7654A33F50CCB148A21B40D1BC42498AF57975A4BA0E0EB0DB3AE74"
+      "sha256": "EA6830939B7776C7A7D500CD22EB6CF6DB59F08F7ED0DBE6D2032B5472148E7F"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
@@ -55,7 +55,7 @@
     },
     {
       "path": "tools/handover-report-style-fixtures.test.mjs",
-      "sha256": "BCA3E9B4A1D67D6B541F81DAA2AE2A1F9C220D3B6D6610B7F95E37301823DC7D"
+      "sha256": "21F48CDABD31F76E492FF29C764841F32A4F467C47DD476DC96A90298F213C70"
     },
     {
       "path": "web/components/admin/shared.tsx",
