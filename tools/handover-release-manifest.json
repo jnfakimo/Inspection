@@ -43,7 +43,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-schedule.tsx",
-      "sha256": "69542E788E3A164F8A36D4A9BAFE4A312CD05DF8202FF3B879D95158CCADFB5A"
+      "sha256": "2C7F7E11ADDC763959F844F67D7AF141B828DE82DBF8B30A9505D54B3AA50B72"
     },
     {
       "path": "tools/handover-style-check.mjs",
