@@ -15,7 +15,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "3CDDF66D7BC35D240E8D2813ADDCF79610EC3957D5BBAA2DED87EA82159BA2DD"
+      "sha256": "16C8B6443264C78941A06C13509E6530D02839082B65AB1CAB41F0B9F4B01353"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
