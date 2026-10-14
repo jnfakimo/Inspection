@@ -146,8 +146,9 @@
 .business-report-preview-bar strong{font-size:17px;color:var(--ink)}
 .business-report-preview-bar span{color:var(--muted);font-size:13px}
 .business-report-preview-actions{display:flex;align-items:center;gap:8px}
-.business-report-preview-scroll{min-width:0;overflow:auto;padding:20px 16px;display:flex;justify-content:center}
-.business-report-preview-page{box-sizing:border-box;width:210mm;max-width:100%;min-height:297mm;background:#fff;color:#111;padding:8mm 10mm;box-shadow:0 12px 32px rgba(0,0,0,.35);border-radius:2px;font-family:var(--font)}
+.business-report-preview-scroll{min-width:0;overflow:auto;padding:20px 16px;display:grid;grid-auto-rows:min-content;justify-items:center;align-content:start;gap:12mm}
+.business-report-preview-scroll>.business-print-content,.business-report-preview-sheet{display:contents}
+.business-report-preview-sheet.is-preview-page{display:block;box-sizing:border-box;width:210mm;max-width:100%;min-height:297mm;background:#fff;color:#111;padding:8mm 10mm;box-shadow:0 12px 32px rgba(0,0,0,.35);border-radius:2px;font-family:var(--font)}
 
 /* ========================================================= */
 /* A4 單頁精確排版 (預覽與列印共用，固定白底黑字)             */
@@ -196,7 +197,7 @@
   .business-audit{padding-top:10px;border-top:1px dashed var(--line)}
   .business-attendance-fields{grid-template-columns:1fr}
   .business-duty-table th:nth-child(2),.business-duty-table td:nth-child(2){display:none}
-  .business-report-preview-page{width:100%;min-height:auto;padding:12px 10px}
+  .business-report-preview-sheet.is-preview-page{width:100%;min-height:auto;padding:12px 10px}
 }
 
 @media(prefers-reduced-motion:reduce){
