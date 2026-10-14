@@ -1076,7 +1076,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           <div className="business-report-preview-bar">
             <div>
               <strong>本日報表預覽（A4版面）</strong>
-              <span>{rocDate(date)} · A4 直式排版，資料較多時自動跨頁，已整合雙欄點檢與三階批核簽章</span>
+              <span>{rocDate(date)} · A4 直式排版；預覽依章節分頁，實際列印依內容跨頁</span>
             </div>
             <div className="business-report-preview-actions">
               <button
@@ -1105,19 +1105,18 @@ export function BusinessHandover({ system, module, profile }: Props) {
               if (e.target === e.currentTarget) setPreviewOpen(false);
             }}
           >
-            <div className="business-report-preview-page">
-              <BusinessReportContent
-                market={market || 'market_1'}
-                date={date}
-                checkStats={checkStats}
-                checks={checks}
-                dutyItems={activeDutyItems}
-                entries={entries}
-                shiftReports={shiftReports}
-                approvals={approvals}
-                userName={userName}
-              />
-            </div>
+            <BusinessReportContent
+              market={market || 'market_1'}
+              date={date}
+              checkStats={checkStats}
+              checks={checks}
+              dutyItems={activeDutyItems}
+              entries={entries}
+              shiftReports={shiftReports}
+              approvals={approvals}
+              userName={userName}
+              previewPages
+            />
           </div>
         </div>
       )}
@@ -1200,7 +1199,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
   );
 }
 
-// 供列印與螢幕預覽共用的 A4報表內容元件 (精確控制在一頁內)
+// 列印與螢幕預覽共用的 A4 報表內容元件。
 function BusinessReportContent({
   market,
   date,
@@ -1211,6 +1210,7 @@ function BusinessReportContent({
   shiftReports,
   approvals,
   userName,
+  previewPages = false,
 }: {
   market: HandoverMarket;
   date: string;
@@ -1221,8 +1221,9 @@ function BusinessReportContent({
   shiftReports: BusinessShift[];
   approvals: BusinessApproval[];
   userName: (id: unknown) => string;
+  previewPages?: boolean;
 }) {
-  // 將點檢項目拆分成左右兩欄，使高度減半，完美容納於單張 A4
+  // 將點檢項目拆分成左右兩欄，減少第一頁所需高度。
   const mid = Math.ceil(dutyItems.length / 2);
   const signedStageCount = APPROVAL_STAGES.filter(stage => approvals.some(approval => approval.stage === stage.stage)).length;
   const activeEntryCount = entries.filter(row => !isDeleted(row) && !String(row.description || '').includes(CHECKLIST_TAG)).length;
@@ -1232,6 +1233,7 @@ function BusinessReportContent({
 
   return (
     <div className="business-print-content hs-report hs-daily-report">
+      <div className={`business-report-preview-sheet${previewPages ? ' is-preview-page' : ''}`}>
       <HandoverReportHeading kicker="業管組每日報表" site={HANDOVER_MARKETS[market].name}
         organization={'臺北農產運銷股份有限公司' + HANDOVER_MARKETS[market].name} title="業管組值勤巡查及交接報告"
         subtitle="巡查工作、交接事項與主管三階段簽核" date={rocDate(date)}
@@ -1300,7 +1302,10 @@ function BusinessReportContent({
         </div>
       </div>
 
+      </div>
+
       {/* 2. 班別交接與出勤紀錄 */}
+      <div className={`business-report-preview-sheet${previewPages ? ' is-preview-page' : ''}`}>
       <div className="hs-report-section-title business-print-shift-section-title">
         二、班別交接事項與出勤狀況
       </div>
@@ -1396,6 +1401,7 @@ function BusinessReportContent({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
