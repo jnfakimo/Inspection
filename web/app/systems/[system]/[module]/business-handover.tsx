@@ -619,7 +619,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
         />
 
         {/* 頂部日期導覽與當班工具列 */}
-        <section className="panel hs-toolbar">
+        <section className="panel hs-toolbar business-handover-toolbar">
           {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
             <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
               aria-pressed={market === code} disabled={busy} onClick={() => setMarket(code)}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
