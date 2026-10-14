@@ -1,8 +1,12 @@
 /* SYS-04 業管組電子交接簿「本簿特有」的樣式：三級批核、時段點檢表、工作卡片與 A4 報表。
    共同版型（工具列、表頭、指標、班別卡片、簽名、當班標示）一律在 handover-sheet.css。 */
 /* 主管三級批核流程區塊 (一市場主任、營業部副理、營業部經理) */
-.business-handover-toolbar>.hs-date-nav{margin-left:auto}
-.business-handover-toolbar>.hs-toolbar-right{flex-basis:100%}
+.panel.hs-toolbar.business-handover-toolbar{justify-content:flex-start;gap:8px}
+.business-handover-toolbar>.hs-toolbar-right{margin-left:auto}
+@media(min-width:801px){
+  .business-handover-toolbar>.hs-date-nav{gap:6px}
+  .business-handover-toolbar>.hs-date-nav>.localized-date-input{flex-basis:160px;width:160px}
+}
 
 .business-approval-section.panel{display:grid;gap:14px;padding:16px 20px;border:1px solid #CBD5E1;border-radius:14px;background:#F1F5F9;box-shadow:none}
 .business-approval-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px dashed #CBD5E1;padding-bottom:12px}
