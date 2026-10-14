@@ -1,5 +1,5 @@
 {
-  "sourceSnapshot": "Handover print repair candidate 2026-10-13 (unpublished)",
+  "sourceSnapshot": "Handover full-page print pagination repair 2026-10-14",
   "files": [
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.tsx",
@@ -15,7 +15,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "884033548EAED5AA1E81032C005B9D5B10B8F5925375915DBBFFBAF79184AB89"
+      "sha256": "34C887DCA7654A33F50CCB148A21B40D1BC42498AF57975A4BA0E0EB0DB3AE74"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
@@ -35,7 +35,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-sheet.css",
-      "sha256": "CFE7C1E35F507020199B45C4D6F27FFD4CCAEF34B129F461DB32DD770E7D1106"
+      "sha256": "4A9DD3A3981DE47D47C1B4E087C777B67E64576AD9BF8125C15834D8ADAC7119"
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-workspace.tsx",
@@ -55,7 +55,7 @@
     },
     {
       "path": "tools/handover-report-style-fixtures.test.mjs",
-      "sha256": "FF9B6E3E42B7422AA9CDC487690399075D0B0AC8F88003E46E9E1CA7E299D3EA"
+      "sha256": "BCA3E9B4A1D67D6B541F81DAA2AE2A1F9C220D3B6D6610B7F95E37301823DC7D"
     },
     {
       "path": "web/components/admin/shared.tsx",

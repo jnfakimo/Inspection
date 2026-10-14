@@ -209,7 +209,7 @@
 @media print{
   
   body{background:#fff!important;margin:0!important;padding:0!important}
-  .v1-navbar,.system-page-header,.admin-page-actions,.hs-toolbar,.business-approval-section,.business-tab-bar,.business-slot-filter-bar,.hs-sheet,.business-report-preview,.theme-toggle{display:none!important}
+  .v1-navbar,.system-page-heading,.system-page-header,.admin-page-actions,.hs-toolbar,.business-approval-section,.business-tab-bar,.business-slot-filter-bar,.hs-sheet,.business-report-preview,.theme-toggle{display:none!important}
   .content.v1-content{padding:0!important;margin:0!important;max-width:none!important}
   .hs-page{display:block!important;padding:0!important;margin:0!important}
   .hs-print-sheet,.hs-print-sheet *{visibility:visible!important}
