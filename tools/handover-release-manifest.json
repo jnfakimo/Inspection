@@ -7,7 +7,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.css",
-      "sha256": "EC6FD2BB9B01B89AD3FF700711A5C67B50C4366994933F84B5A0DCB1B3545A37"
+      "sha256": "60FA954B973BDE94A7147BC343FAA3D5F7851CBDAF97BE4E8516115737B847AE"
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.tsx",
