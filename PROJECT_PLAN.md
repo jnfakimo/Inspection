@@ -171,7 +171,7 @@
 ## 18. 資安告警存放與保存期限（2026-10-15，分支 codex/security-alert-store）
 
 - 調查結果：告警本體已在專用資料表 `security_alerts`（RLS 強制、僅管理員可讀、寫入只走 service role）；證據資料表有防刪除 trigger。真正的缺口是：(1) 通知中心副本複製了完整告警內容；(2) 副本沒有保存期限。
-- 修正：副本改為只放提示與告警編號；新增 `purge_expired_security_notices()`（90 天，僅 service role），由 `platform-log-alert` 每日（臺灣時間 03 點）呼叫。
+- 修正：副本改為只放提示與告警編號；新增 `redact_expired_security_notices()`（90 天後清除內容、不實體刪除，僅 service role），由 `platform-log-alert` 每日（臺灣時間 03 點）呼叫。
 - 刻意不做：證據資料表的自動刪除。這需要解除既有防刪除保護，屬政策決定，已列在 `docs/SECURITY_RECORD_RETENTION.md` 待決定項目。
 - 部署順序：migration 需先經 `apply-database-migration.yml` 套用；在套用前，`platform-log-alert` 呼叫清除函式只會記錄錯誤，不影響告警流程。
 - 守門：`npm run test:security-notice-minimal`。

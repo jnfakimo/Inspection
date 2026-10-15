@@ -10,7 +10,7 @@
 | 資安告警本體 | `security_alerts` | 類型、嚴重度、來源 IP、資源、事件數、細節 | 僅管理員（RLS 強制，`FORCE ROW LEVEL SECURITY`） | 不能（`trg_prevent_security_alert_removal`） |
 | 告警通知紀錄 | `security_alert_deliveries` | LINE 發送嘗試與結果 | 僅管理員 | 不能（append-only trigger，禁止改與刪） |
 | 工作階段封鎖紀錄 | `security_session_blocks` | 因大量讀取被封鎖的工作階段 | 僅管理員 | 不能（`trg_prevent_security_session_block_removal`） |
-| 通知中心提醒副本 | `notifications`（`event='security_alert'`） | 只有「請至後台資安告警查看」與告警編號 | 收件的管理員本人 | 可以，**保存 90 天後自動清除** |
+| 通知中心提醒副本 | `notifications`（`event='security_alert'`） | 只有「請至後台資安告警查看」與告警編號 | 收件的管理員本人 | 保存 90 天後**自動清除內容**（列保留） |
 
 寫入只透過 Edge Function 的 service role；瀏覽器端沒有寫入權限。
 
@@ -19,9 +19,9 @@
 1. **通知中心副本不再複製告警內容**。原本副本帶有告警標題與完整訊息（含流量次數、資源名稱），
    會被任何讀取 `notifications` 的程式一併帶出（市場看板跑馬燈就是這樣露出的，已於 PR #71 修正）。
    現在只放固定提示與告警編號，細節只在 `security_alerts`。
-2. **副本保存 90 天**：`purge_expired_security_notices()` 只刪 `notifications` 中 `event='security_alert'` 且超過 90 天的列。
-   函式僅 service role 可執行，且至少保存 7 天（避免誤傳 `now()` 清掉近期通知）。
-   由 `platform-log-alert` 在臺灣時間 03 點該小時內呼叫（監測排程每 10 分鐘一次，函式可重複執行）。
+2. **副本保存 90 天**：`redact_expired_security_notices()` 把 `notifications` 中 `event='security_alert'` 且超過 90 天的列「清除內容」（標題改為已清除、本文清空），**不實體刪除**——正式資料依規範只能追加、更新或停用，
+   而 `apply-database-migration` 流程也會拒絕含 `DELETE FROM` 的 migration。函式僅 service role 可執行，且至少保存 7 天（避免誤傳 `now()` 清掉近期通知）。
+   由 `platform-log-alert` 在臺灣時間 03 點該小時內呼叫（監測排程每 10 分鐘一次，函式可重複執行，已清除的列不會重複改寫）。
 3. 守門：`npm run test:security-notice-minimal` 確認副本不含告警內容、清除只動副本、證據資料表未被解除保護。
 
 ## 三、這次刻意沒做的事

@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     // 排程每 10 分鐘一次，只在臺灣時間 03 點的那一小時執行；清除函式可重複執行，不會重複刪除。
     const taipeiHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", hour12: false }).format(new Date()));
     if (taipeiHour === 3) {
-      const { error: purgeError } = await admin.rpc("purge_expired_security_notices");
+      const { error: purgeError } = await admin.rpc("redact_expired_security_notices");
       if (purgeError) console.error("Security notice retention failed", clean(purgeError.message, 200));
     }
     return reply({
