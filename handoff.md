@@ -24,8 +24,10 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## ➡️ 下一步
 
-1. **使用者執行**（2026-10-16 預覽已確認：3 筆 E2E 工單、對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`，執行步驟 2 預期 `hidden_orders = 3`、`hidden_requests = 0`）：在 Supabase SQL Editor 依 `docs/runbooks/hide-test-records.sql` 隱藏正式資料中的測試工單
-   （先跑預覽確認名單；Claude 的 Supabase 帳號沒有此專案權限，無法代為查詢）。
+1. **隱藏 3 筆 E2E 測試工單**（2026-10-16 預覽：3 筆工單與對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`）。
+   runbook 步驟 2 在 SQL Editor 會被保護觸發器擋下（沒有登入者，`can_manage_workorder()` 為 false），改用
+   `supabase/migrations/20261016090000_hide_e2e_test_workorders.sql`：CI 通過後以 `apply-database-migration.yml`（`--ref codex/ui-followup-20261016`）套用，再合併
+   （本機以 `npm run test:hide-e2e-migration` 驗證；套用正式庫需使用者當次授權）。
 2. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
 3. G 槽快照分支 `codex/g-worktree-snapshot-20261015`（151 個檔案，含 22 個 Edge Functions 與 5 個 migration）：
