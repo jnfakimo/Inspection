@@ -1,6 +1,5 @@
 'use client';
 
-import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
@@ -11,17 +10,17 @@ import styles from './admin-system-hub.module.css';
 const adminSystem = findSystem('admin');
 
 const cardVisuals = [
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/account-icon.png', accent: 'var(--icon-sky)' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/account-icon.png', accent: '#4f8cff' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-list-icon.png', accent: '#00c985' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/audit-icon.png', accent: '#9b70e8' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-icon.png', accent: '#ef5b87' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-line-push-icon.png', accent: '#e5a100' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/admin-icon.png', accent: 'var(--icon-sky)' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-schedule-icon.png', accent: '#00c985' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/audit-icon.png', accent: '#e5a100' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/admin-icon.png', accent: '#4f8cff' },
-  { icon: '/Inspection/v2/assets/system-icons-v20260901/settings-icon.png', accent: '#ef5b87' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/account-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/account-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-list-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/audit-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-line-push-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/admin-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/guardpatrol-schedule-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/audit-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/admin-icon.png' },
+  { icon: '/Inspection/v2/assets/system-icons-v20260901/settings-icon.png' },
 ] as const;
 
 function AdminHub({ profile }: { profile: Profile }) {
@@ -45,7 +44,6 @@ function AdminHub({ profile }: { profile: Profile }) {
             <Link
               className={styles.card}
               href="/systems/admin/settings/"
-              style={{ '--admin-card-accent': 'var(--icon-sky)' } as CSSProperties}
             >
               <span className={styles.badge}>系統設定</span>
               <span className={styles.icon} aria-hidden="true">
@@ -57,14 +55,12 @@ function AdminHub({ profile }: { profile: Profile }) {
             </Link>
             {adminSystem.modules.map((module, index) => {
               const visual = cardVisuals[index] ?? cardVisuals[0];
-              const cardStyle = { '--admin-card-accent': visual.accent } as CSSProperties;
 
               return (
                 <Link
                   key={module.key}
                   className={styles.card}
                   href={`/systems/admin/${module.key}/`}
-                  style={cardStyle}
                 >
                   <span className={styles.badge}>子系統 {String(index + 1).padStart(2, '0')}</span>
                   <span className={styles.icon} aria-hidden="true">

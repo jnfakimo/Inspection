@@ -45,7 +45,8 @@
   padding: 2px 7px;
   border: 1px solid var(--admin-card-accent);
   border-radius: 2px;
-  color: var(--admin-card-accent);
+  /* 文字用深色字；--admin-card-accent（--icon-sky）只當邊框與光暈，淺藍當字色在白底只有 1.67:1 */
+  color: var(--icon-sky-text);
   font: 600 10px var(--head);
   letter-spacing: .08em;
 }
@@ -86,7 +87,8 @@
 .card b {
   position: relative;
   margin-top: auto;
-  color: var(--admin-card-accent);
+  /* 文字用深色字；--admin-card-accent（--icon-sky）只當邊框與光暈，淺藍當字色在白底只有 1.67:1 */
+  color: var(--icon-sky-text);
   font-size: 13px;
 }
 

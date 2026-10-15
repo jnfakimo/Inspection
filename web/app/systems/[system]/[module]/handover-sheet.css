@@ -10,8 +10,8 @@
   --hs-shift-color-4:var(--pink);
   --hs-shift-foreground-1:var(--on-primary);
   --hs-shift-foreground-2:var(--on-solid);
-  --hs-shift-foreground-3:var(--on-solid);
-  --hs-shift-foreground-4:var(--on-solid);
+  --hs-shift-foreground-3:var(--on-bright);
+  --hs-shift-foreground-4:var(--on-bright);
   --hs-current-color:var(--live);
   --hs-current-ink:var(--live-solid);
 }
