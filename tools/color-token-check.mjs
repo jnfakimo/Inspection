@@ -81,6 +81,11 @@ for (const file of files.filter((f) => f.endsWith('.css'))) {
             errors.push(`${rel}:${line} 色碼不得硬編碼（${selector.slice(0, 50)} { ${prop} }），請改用 tokens.css 的 token`);
           }
           HEX.lastIndex = 0;
+          // 卡片上緣只能是統一的 --icon-sky（或邊線色），不得依位置（:nth-child）或系統分色。
+          if (!exempt && /(system-card|maintenance-card|operations-portal-card|module-grid a|quick-grid a)/.test(selector)
+            && /^border-top(-color)?$/.test(prop) && /var\(--/.test(val) && !/var\(--(icon-sky|line)\)/.test(val)) {
+            errors.push(`${rel}:${line} 卡片上緣色只能使用 --icon-sky（${selector.slice(0, 60)} { ${prop} }）`);
+          }
           const m = prop.match(/^--([\w-]+)$/);
           if (m && CORE_TOKENS.includes(m[1])) {
             errors.push(`${rel}:${line} 核心 token --${m[1]} 只能在 tokens.css 定義`);
