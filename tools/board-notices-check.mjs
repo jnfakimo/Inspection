@@ -12,7 +12,12 @@ const output = await build({ entryPoints: ['supabase/functions/admin-api/index.t
 process.env.SUPABASE_URL = 'https://fixture.invalid'; process.env.SUPABASE_ANON_KEY = 'fixture'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'fixture';
 const { handleAdminApiRequest } = await import(`data:text/javascript;base64,${Buffer.from(output.outputFiles[0].text).toString('base64')}`);
 const personalId = '10000000-0000-0000-0000-000000000001';
-let rows = [{ notif_id: personalId, recipient_id: 'person', event: 'new_repair', title: '個人通知', body: '私人內容' }];
+// 內部資訊：個人通知、沒有收件人的資安告警與監控異常。任何檢視（登入版或公開版）都不得出現在看板。
+let rows = [
+  { notif_id: personalId, recipient_id: 'person', event: 'new_repair', title: '個人通知', body: '私人內容' },
+  { notif_id: '30000000-0000-0000-0000-000000000003', recipient_id: null, event: 'security_alert', title: 'API Gateway／REST 流量突增', body: '告警編號 fixture' },
+  { notif_id: '30000000-0000-0000-0000-000000000004', recipient_id: null, event: null, title: 'synthetic probe 異常', body: '監控' },
+];
 let profile = { user_id: 'admin', auth_id: 'auth', rbac_role: 'sysadmin', role: 'admin', status: 'active' };
 let queries = [], audits = [], dbError = false;
 globalThis.boardDb = {
@@ -25,7 +30,6 @@ globalThis.boardDb = {
       eq(k, v) { filters.push(row => row[k] === v); return api; },
       is(k, v) { filters.push(row => (row[k] ?? null) === v); return api; },
       in(k, values) { filters.push(row => values.includes(row[k])); return api; },
-      or(expression) { assert.equal(expression, 'event.is.null,event.neq.board_notice_inactive'); filters.push(row => row.event !== 'board_notice_inactive'); return api; },
       update(value) { update = value; q.operation = 'update'; return api; },
       insert(value) { insert = value; q.operation = 'insert'; return api; },
       maybeSingle() { single = true; return api; },
@@ -59,19 +63,26 @@ assert.equal((await call(action, { ...values, title: ' ' })).status, 400);
 assert.equal((await call(action, { ...values, notif_id: personalId })).status, 404);
 assert.equal((await call('admin_toggle_board_notice', { notif_id: personalId, status: 'inactive' })).status, 404);
 assert.equal(rows[0].body, '私人內容');
+assert.equal((await readMarketBoardNotices(globalThis.boardDb, true)).data.length, 0, '尚無看板公告時，公開版不得帶出內部通知');
+assert.equal((await readMarketBoardNotices(globalThis.boardDb, false)).data.length, 0, '尚無看板公告時，登入版不得帶出內部通知（ISO 27001 最小揭露）');
 const created = await call(action, values); assert.equal(created.status, 200);
 const noticeId = created.body.data.notif_id;
 assert.equal(created.body.data.title, '公告'); assert.equal(created.body.data.recipient_id, null);
 assert.equal(audits.length, 1);
 assert.equal((await call('admin_list_board_notices')).body.data.length, 1);
 assert.equal((await readMarketBoardNotices(globalThis.boardDb, true)).data.length, 1);
+assert.equal((await readMarketBoardNotices(globalThis.boardDb, false)).data.length, 1, '登入版與公開版篩選一致');
+for (const view of [true, false]) {
+  const titles = (await readMarketBoardNotices(globalThis.boardDb, view)).data.map(row => row.title);
+  assert.deepEqual(titles, ['公告'], '只能出現明確標記給看板的公告');
+}
 assert.equal((await call('admin_toggle_board_notice', { notif_id: noticeId, status: 'invalid' })).status, 400);
 assert.equal((await call('admin_toggle_board_notice', { notif_id: noticeId, status: 'inactive' })).status, 200);
-assert.equal(rows.length, 2, '停用不可刪除歷史');
+assert.equal(rows.length, 4, '停用不可刪除歷史');
 assert.equal((await readMarketBoardNotices(globalThis.boardDb, true)).data.length, 0);
-assert.equal((await readMarketBoardNotices(globalThis.boardDb, false)).data.length, 1);
+assert.equal((await readMarketBoardNotices(globalThis.boardDb, false)).data.length, 0, '停用後登入版也不顯示，且不得退回顯示其他內部通知');
 assert.equal((await call(action, { ...values, notif_id: noticeId, body: '已修訂', publish_confirmed: false })).status, 200);
-assert.equal(rows[1].event, 'board_notice_inactive', '編輯停用公告不可自動重新公開');
+assert.equal(rows[3].event, 'board_notice_inactive', '編輯停用公告不可自動重新公開');
 assert.equal((await call('admin_toggle_board_notice', { notif_id: noticeId, status: 'active' })).status, 400);
 assert.equal((await call('admin_toggle_board_notice', { notif_id: noticeId, status: 'active', publish_confirmed: true })).status, 200);
 assert.equal((await readMarketBoardNotices(globalThis.boardDb, true)).data[0].body, '已修訂');

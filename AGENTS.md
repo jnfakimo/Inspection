@@ -128,6 +128,9 @@
 ## 7. 資料、權限與安全（摘要；細則見 `docs/DOMAIN_RULES.md`）
 
 - 資料只增、改、停用：不 reset 資料庫、不 truncate、不實體刪除人員（`status='inactive'`）。RLS 於 production 強制啟用。
+- **看板只顯示明確標記給看板的公告**（`notifications.event='board_notice'` 且不指定收件人；登入版與公開版相同）。
+  通知中心的資安告警、監控異常、派車提醒與個人通知屬內部資訊，依最小揭露與知悉必要原則（ISO/IEC 27001 A.5.15、A.8.3）
+  不得投到看板或任何大螢幕；要讓內部資訊可被看見，必須由具權限者另行發布為看板公告。`tools/board-notices-check.mjs` 把關。
 - **權限判斷失敗即拒絕**：權限表查詢失敗一律不放行（`test:permission-fail-closed`）。
 - 新 API 寫進 `supabase/functions/app-api/handlers/<業務>.ts`，不再加進 `index.ts`；每支 handler 附 `*.test.ts`。
 - 讀取稽核由根版面的 `access-audit.ts` 統一攔截 fetch，頁面不得自行補呼叫；`security_action` 回應必須強制登出。
