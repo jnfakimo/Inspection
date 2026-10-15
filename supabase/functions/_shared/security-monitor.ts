@@ -429,11 +429,13 @@ async function createAdminNotices(db: SecurityDb, alert: SavedIncident) {
     .or("role.eq.admin,rbac_role.eq.sysadmin,rbac_role.eq.admin")
     .limit(100);
   if (error) throw error;
+  // 通知中心只放「有新告警」的指標，不複製告警內容（IP、資源、事件數等）。
+  // 完整內容只存在 security_alerts（管理員專用、RLS 強制），以最小揭露原則降低外洩面。
   const rows = (admins || []).map((row: { user_id: string }) => ({
     recipient_id: row.user_id,
     event: "security_alert",
-    title: clean(alert.title, 300),
-    body: clean(`${alert.message}（告警編號 ${alert.alert_id}）`, 500),
+    title: "資安告警：請至後台「資安告警」查看處理",
+    body: clean(`告警編號 ${alert.alert_id}`, 120),
     is_read: false,
   }));
   if (!rows.length) return;
