@@ -36,6 +36,7 @@ import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
 import { CHART_SERIES_NEON } from '@/lib/chart-palette';
+import { REPAIR_STATUS_LABEL, computeRepairStats, countBy, taipeiDate } from '@/lib/dashboard-metrics';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
@@ -59,22 +60,6 @@ const CATALOG = [
   { key: 'weather_taiwan', title: '臺灣即時氣象', x: 0, y: 22, w: 12, h: 7, minW: 6, minH: 5 },
 ] as const;
 
-const DONE_ORDER = ['completed', 'closed'];
-const OPEN_REQUEST = ['pending', 'transferred', 'assigned', 'in_progress', 'waiting_parts', 'waiting_vendor', 'pending_review', 'overdue', 'returned', 'rejected'];
-const IN_PROGRESS_ORDER = ['accepted', 'in_progress', 'waiting_parts', 'waiting_vendor', 'assigned'];
-const STATUS_LABEL: Record<string, string> = {
-  pending: '待派工', transferred: '已轉派', assigned: '已派工', accepted: '已接單',
-  in_progress: '維修中', waiting_parts: '等待料件', waiting_vendor: '等待廠商',
-  pending_review: '待驗收', completed: '已完成', closed: '已結案',
-  returned: '已退回', rejected: '已拒絕', cancelled: '已取消', overdue: '已逾期',
-};
-
-const taipeiDate = (value: unknown) => {
-  if (!value) return null;
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-};
 const today = () => taipeiDate(new Date())!;
 const pad = (n: number) => String(n).padStart(2, '0');
 const ymd = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -82,13 +67,6 @@ const clampInt = (value: unknown, fallback: number, min: number, max: number) =>
   const parsed = parseInt(String(value), 10);
   return Math.max(min, Math.min(max, Number.isFinite(parsed) ? parsed : fallback));
 };
-const countBy = (rows: Row[], pick: (row: Row) => unknown): Array<[string, number]> => {
-  const map: Record<string, number> = {};
-  rows.forEach(row => { const key = String(pick(row) ?? '') || '未填'; map[key] = (map[key] || 0) + 1; });
-  return Object.entries(map).sort((a, b) => b[1] - a[1]);
-};
-const average = (list: number[]) => list.length ? list.reduce((a, b) => a + b, 0) / list.length : null;
-
 function normalizeLayout(rows: Row[]): LayoutItem[] {
   const byKey: Record<string, Row> = {};
   (Array.isArray(rows) ? rows : []).forEach(row => { if (row && CATALOG.some(item => item.key === row.widget_key)) byKey[row.widget_key] = row; });
@@ -234,34 +212,8 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   }, [from, to]);
   useEffect(() => { void load(); }, [load]);
 
-  const stats = useMemo(() => {
-    const day = today(), month = day.slice(0, 7), now = new Date();
-    const doneOrders = orders.filter(row => DONE_ORDER.includes(String(row.status)) && row.finish_time);
-    const onTime = doneOrders.filter(row => row.expected_finish ? new Date(String(row.finish_time)) <= new Date(String(row.expected_finish)) : true).length;
-    const mttr = average(doneOrders.filter(row => row.start_time)
-      .map(row => (Date.parse(String(row.finish_time)) - Date.parse(String(row.start_time))) / 3600000));
-    // MTBF：同一設備相鄰兩次報修的平均間隔天數，與 V1 相同。
-    const byEquipment: Record<string, number[]> = {};
-    requests.forEach(row => { if (row.equipment_id) (byEquipment[String(row.equipment_id)] ||= []).push(Date.parse(String(row.created_at))); });
-    const gaps: number[] = [];
-    Object.values(byEquipment).forEach(list => {
-      if (list.length < 2) return;
-      list.sort((a, b) => a - b);
-      for (let i = 1; i < list.length; i += 1) gaps.push((list[i] - list[i - 1]) / 86400000);
-    });
-    return {
-      todayNew: requests.filter(row => taipeiDate(row.created_at) === day).length,
-      todayDone: orders.filter(row => DONE_ORDER.includes(String(row.status)) && taipeiDate(row.finish_time) === day).length,
-      inProgress: orders.filter(row => IN_PROGRESS_ORDER.includes(String(row.status))).length,
-      overdue: orders.filter(row => !DONE_ORDER.includes(String(row.status)) && row.expected_finish && new Date(String(row.expected_finish)) < now).length
-        + requests.filter(row => OPEN_REQUEST.includes(String(row.status)) && row.desired_finish && new Date(String(row.desired_finish)) < now).length,
-      waitDispatch: requests.filter(row => row.status === 'pending').length,
-      monthCount: requests.filter(row => (taipeiDate(row.created_at) || '').slice(0, 7) === month).length,
-      doneCount: doneOrders.length,
-      sla: doneOrders.length ? Math.round(onTime / doneOrders.length * 100) : null,
-      mttr, mtbf: average(gaps),
-    };
-  }, [requests, orders]);
+  // 統計口徑與電視牆、後台版面預覽共用（lib/dashboard-metrics.ts）。
+  const stats = useMemo(() => computeRepairStats(requests, orders), [requests, orders]);
 
   const widget = (item: LayoutItem) => {
     switch (item.widget_key) {
@@ -294,7 +246,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
         <BarList entries={patrol.floors} empty="今日所有巡邏點都已完成打卡" />
       </>;
       case 'status': {
-        const counts = countBy(requests, row => STATUS_LABEL[String(row.status)] || '未知狀態');
+        const counts = countBy(requests, row => REPAIR_STATUS_LABEL[String(row.status)] || '未知狀態');
         if (!counts.length) return <p className="empty">區間內沒有報修案件</p>;
         const data = {
           labels: counts.map(c => c[0]),

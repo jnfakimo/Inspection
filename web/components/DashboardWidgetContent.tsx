@@ -1,676 +1,284 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+// 戰情版面元件的內容（電視牆與後台版面預覽共用）。2026-10-15 起全部讀真實資料：
+// 報修／巡邏／設備走 Supabase，行情走 app-api dashboard_market_rotation，天氣走 cwa-weather。
+// 沒有資料來源的元件（dataSource: 'unavailable'）只顯示「尚未介接資料來源」，不得再放模擬數字。
 
-export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string; desc?: string }) {
-  const [tick, setTick] = useState(0);
+import React from 'react';
+import { Chart as ChartJS, ArcElement, BarElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js';
+import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { WeatherWidget } from '@/app/weather-widget';
+import { CHART_SERIES } from '@/lib/chart-palette';
+import { DASHBOARD_WIDGET_CATALOG } from '@/lib/dashboard-widget-catalog';
+import {
+  REPAIR_STATUS_LABEL, OPEN_REQUEST, computeCategoryShare, computeEquipmentReadiness, computeGroupComparison, computeItemMoves,
+  computeMarketTotals, computeRepairStats, computeTopMovers, computeTurnoverTrend, computeVolatileItems, countBy,
+  type ItemMove, type Row,
+} from '@/lib/dashboard-metrics';
+import { useDashboardLiveData, type DashboardLiveState, type LiveSource } from '@/lib/dashboard-live-data';
+import '@/app/dashboard.css';
+import '@/app/weather-widget-layout.css';
+import './dashboard-widgets.css';
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTick(t => (t + 1) % 1000);
-    }, 2500);
-    return () => clearInterval(timer);
-  }, []);
+ChartJS.register(ArcElement, BarElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);
+
+const SOURCES: Record<string, LiveSource[]> = {
+  repair: ['repair'],
+  patrol: ['patrol'],
+  equipment: ['equipment', 'repair'],
+  market: ['market'],
+  weather: [],
+  unavailable: [],
+};
+
+const num = (value: number | null | undefined, digits = 0) => (
+  value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('zh-TW', { maximumFractionDigits: digits })
+);
+const signed = (value: number | null | undefined) => (value == null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)}%`);
+const moveClass = (value: number | null | undefined) => (value == null || value === 0 ? '' : value > 0 ? ' is-rise' : ' is-fall');
+
+const chartScales = { y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.12)' }, ticks: { color: 'gray' } }, x: { grid: { display: false }, ticks: { color: 'gray' } } };
+
+function Notice({ tone, children }: { tone?: 'error' | 'muted'; children: React.ReactNode }) {
+  return <p className={`dw-notice${tone === 'error' ? ' is-error' : ''}`}>{children}</p>;
+}
+
+function BarList({ entries, empty, unit = '' }: { entries: Array<[string, number]>; empty: string; unit?: string }) {
+  if (!entries.length) return <Notice>{empty}</Notice>;
+  const max = Math.max(...entries.map(entry => entry[1])) || 1;
+  return <div className="dw-bars">{entries.slice(0, 8).map(([name, value]) => <div className="dw-bar" key={name}>
+    <span className="dw-bar-name" title={name}>{name}</span>
+    <span className="dw-bar-track"><i style={{ width: `${Math.max(4, value / max * 100)}%` }} /></span>
+    <b>{num(value, 1)}{unit}</b>
+  </div>)}</div>;
+}
+
+function Tiles({ items }: { items: Array<{ label: string; value: string; note?: string; tone?: 'primary' | 'ok' | 'warn' | 'danger' | 'accent' }> }) {
+  return <div className="dw-tiles">{items.map(item => <div className={`dw-tile tone-${item.tone || 'primary'}`} key={item.label}>
+    <span>{item.label}</span><b>{item.value}</b>{item.note && <small>{item.note}</small>}
+  </div>)}</div>;
+}
+
+function MoveList({ moves, empty }: { moves: ItemMove[]; empty: string }) {
+  if (!moves.length) return <Notice>{empty}</Notice>;
+  return <ul className="dw-moves">{moves.slice(0, 8).map(move => <li key={`${move.market}-${move.item}`}>
+    <span>{move.item}<small>{move.market}{move.category}</small></span>
+    <b>{num(move.average, 1)}<small>元/公斤</small></b>
+    <em className={`dw-change${moveClass(move.changePct)}`}>{signed(move.changePct)}</em>
+  </li>)}</ul>;
+}
+
+function DateNote({ live }: { live: DashboardLiveState }) {
+  return live.market ? <p className="dw-foot">交易日 {live.market.latest_date}（比較 {live.market.previous_date}）</p> : null;
+}
+
+function renderWidget(widgetKey: string, live: DashboardLiveState): React.ReactNode {
+  const requests = live.requests || [];
+  const orders = live.orders || [];
+  const stats = computeRepairStats(requests, orders);
+  const market = live.market;
 
   switch (widgetKey) {
-    // ==========================================
-    // === 系統 10 (市場營運分析系統) ===
-    // ==========================================
-    case 'trading_kpi':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center', width: '100%' }}>
-          <div style={{ background: 'rgba(251,191,36,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.2)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>總交易量</div>
-            <b style={{ color: 'var(--amber)', fontSize: '16px', display: 'block', marginTop: '2px' }}>
-              {1480 + (tick % 7)} <small style={{ fontSize: '10px' }}>噸</small>
-            </b>
-          </div>
-          <div style={{ background: 'rgba(16,185,129,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>總成交額</div>
-            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '16px', display: 'block', marginTop: '2px' }}>
-              $4,820 <small style={{ fontSize: '10px' }}>萬</small>
-            </b>
-          </div>
-          <div style={{ background: 'rgba(56,189,248,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.2)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>交易品項</div>
-            <b style={{ color: 'var(--blue)', fontSize: '16px', display: 'block', marginTop: '2px' }}>
-              186 <small style={{ fontSize: '10px' }}>種</small>
-            </b>
-          </div>
-          <div style={{ background: 'rgba(168,85,247,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>成交率</div>
-            <b style={{ color: 'var(--violet)', fontSize: '16px', display: 'block', marginTop: '2px' }}>99.4%</b>
-          </div>
-        </div>
-      );
-
-    case 'price_comparison':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '48px', color: 'var(--dim)' }}>葉菜類</span>
-            <div style={{ flex: 1, height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${75 + (tick % 4)}%`, height: '100%', background: 'var(--blue)', transition: 'width 0.5s' }} />
-            </div>
-            <b style={{ color: 'var(--cyan-text,var(--cyan))', minWidth: '38px', textAlign: 'right' }}>$38.5</b>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '48px', color: 'var(--dim)' }}>瓜果類</span>
-            <div style={{ flex: 1, height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${60 - (tick % 3)}%`, height: '100%', background: 'var(--amber)', transition: 'width 0.5s' }} />
-            </div>
-            <b style={{ color: 'var(--amber)', minWidth: '38px', textAlign: 'right' }}>$52.0</b>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '48px', color: 'var(--dim)' }}>根莖類</span>
-            <div style={{ flex: 1, height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${45 + (tick % 5)}%`, height: '100%', background: 'var(--green-text,var(--green))', transition: 'width 0.5s' }} />
-            </div>
-            <b style={{ color: 'var(--green-text,var(--green))', minWidth: '38px', textAlign: 'right' }}>$29.0</b>
-          </div>
-        </div>
-      );
-
-    case 'weekly_trend':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--dim)' }}>
-            <span>📅 近 7 日批發總噸數 (日均 1,420 噸)</span>
-            <span style={{ color: 'var(--green-text,var(--green))' }}>本週累積 +4.8%</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '55px', padding: '0 4px' }}>
-            {[
-              { d: '一', v: 65, t: '1,380t' },
-              { d: '二', v: 80, t: '1,520t' },
-              { d: '三', v: 75, t: '1,460t' },
-              { d: '四', v: 70, t: '1,410t' },
-              { d: '五', v: 88, t: '1,610t' },
-              { d: '六', v: 95, t: '1,690t' },
-              { d: '日', v: 50, t: '1,120t' },
-            ].map((col, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', height: '100%' }}>
-                <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: `${col.v}%`,
-                      background: i === 5 ? 'linear-gradient(180deg, #38bdf8, #0284c7)' : 'rgba(56,189,248,0.35)',
-                      borderRadius: '2px 2px 0 0',
-                    }}
-                  />
-                </div>
-                <span style={{ fontSize: '9px', color: 'var(--dim)' }}>{col.d}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-
-    case 'market_allocation':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%', fontSize: '11px' }}>
-          <div style={{ background: 'rgba(2,132,199,0.1)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(2,132,199,0.2)' }}>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>場地滿載率</div>
-            <b style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '15px', display: 'block', marginTop: '2px' }}>82.4%</b>
-            <span style={{ color: 'var(--green-text,var(--green))', fontSize: '9px' }}>運作正常</span>
-          </div>
-          <div style={{ background: 'rgba(16,185,129,0.1)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>作業人員配置</div>
-            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '15px', display: 'block', marginTop: '2px' }}>142 人</b>
-            <span style={{ color: 'var(--dim)', fontSize: '9px' }}>在勤率 98%</span>
-          </div>
-          <div style={{ background: 'rgba(245,158,11,0.1)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.2)' }}>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>機具妥善率</div>
-            <b style={{ color: 'var(--amber)', fontSize: '15px', display: 'block', marginTop: '2px' }}>96.8%</b>
-            <span style={{ color: 'var(--dim)', fontSize: '9px' }}>拖車/堆高機</span>
-          </div>
-        </div>
-      );
-
-    case 'supplier_ranking':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: '3px solid #38bdf8' }}>
-            <span>1. 雲林西螺產區 (甘藍、蕹菜)</span>
-            <b style={{ color: 'var(--cyan-text,var(--cyan))' }}>420 噸 (28.4%)</b>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: '3px solid #34d399' }}>
-            <span>2. 彰化溪湖產區 (花椰菜、青蔥)</span>
-            <b style={{ color: 'var(--green-text,var(--green))' }}>310 噸 (20.9%)</b>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: '3px solid #fbbf24' }}>
-            <span>3. 屏東九如產區 (瓜果、檸檬)</span>
-            <b style={{ color: 'var(--amber)' }}>195 噸 (13.2%)</b>
-          </div>
-        </div>
-      );
-
-    case 'price_volatility':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(239,68,68,0.1)', borderRadius: '4px' }}>
-            <span style={{ color: 'var(--red)', fontWeight: 600 }}>⚠️ 青椒 (高波動)</span>
-            <span style={{ color: 'var(--red)', fontWeight: 700 }}>▲ +24.5% ($68/kg)</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(16,185,129,0.1)', borderRadius: '4px' }}>
-            <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 600 }}>🔻 小黃瓜 (量多回跌)</span>
-            <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>▼ -18.2% ($32/kg)</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-            <span style={{ color: 'var(--dim)' }}>牛番茄 (平穩區間)</span>
-            <span style={{ color: 'var(--text)' }}>+2.1% ($65/kg)</span>
-          </div>
-        </div>
-      );
-
-    case 'auction_efficiency':
-      return (
-        <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', width: '100%', fontSize: '11px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>第一拍賣場進度</div>
-            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '16px' }}>98.2%</b>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>均速 4.2 秒/批</div>
-          </div>
-          <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)' }} />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>第二拍賣場進度</div>
-            <b style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '16px' }}>96.5%</b>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>均速 4.8 秒/批</div>
-          </div>
-        </div>
-      );
-
-    case 'floor_congestion':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)' }}>
-            <span>大車卸貨泊位佔用 (28/32 席)</span>
-            <b style={{ color: 'var(--amber)' }}>87.5% 尖峰</b>
-          </div>
-          <div style={{ height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ width: '87.5%', height: '100%', background: 'linear-gradient(90deg, #10b981, #f59e0b)' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
-            <span>閘口等待車隊：4 輛</span>
-            <span>平均卸貨週轉：18 分鐘/車</span>
-          </div>
-        </div>
-      );
-
-    // ==========================================
-    // === 系統 11 (戰情儀表板／指揮中心) ===
-    // ==========================================
+    // ---- 報修／工單 ----
     case 'alerts':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%' }}>
-          <div
-            style={{
-              fontSize: '12px',
-              color: 'var(--red)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(239,68,68,0.12)',
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: '1px solid rgba(239,68,68,0.3)',
-            }}
-          >
-            <span
-              style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: 'var(--red)',
-                display: 'inline-block',
-                boxShadow: '0 0 8px #ef4444',
-              }}
-            />
-            <b>[即時警報]</b> 低溫冷鏈 B2 溫度異常 (-2.1°C) — 3 分鐘前通報
-          </div>
-          <div
-            style={{
-              fontSize: '12px',
-              color: 'var(--amber)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              background: 'rgba(245,158,11,0.1)',
-              padding: '6px 10px',
-              borderRadius: '6px',
-            }}
-          >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--amber)', display: 'inline-block' }} />
-            <b>[運作提示]</b> 第二拍賣場 月臺 3 卸貨排程延遲 15 分鐘
-          </div>
-        </div>
-      );
-
+      return <Tiles items={[
+        { label: '已逾期', value: num(stats.overdue), tone: stats.overdue ? 'danger' : 'ok' },
+        { label: '待派工', value: num(stats.waitDispatch), tone: stats.waitDispatch ? 'warn' : 'ok' },
+        { label: '本月報修', value: num(requests.length) },
+        { label: '已完成工單', value: num(stats.doneCount), tone: 'ok' },
+      ]} />;
     case 'kpis':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px', width: '100%', textAlign: 'center' }}>
-          <div style={{ background: 'rgba(0,212,255,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.2)' }}>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>今日進場車次</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--cyan-text,var(--cyan))', marginTop: '2px' }}>
-              {1280 + (tick % 5)} <small style={{ fontSize: '10px' }}>車</small>
-            </div>
-          </div>
-          <div style={{ background: 'rgba(168,85,247,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>巡檢達標率</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--violet)', marginTop: '2px' }}>94.2%</div>
-          </div>
-          <div style={{ background: 'rgba(239,68,68,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>待處理異常</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--red)', marginTop: '2px' }}>3 <small style={{ fontSize: '10px' }}>件</small></div>
-          </div>
-          <div style={{ background: 'rgba(16,185,129,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>在線設備率</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--green-text,var(--green))', marginTop: '2px' }}>99.8%</div>
-          </div>
-        </div>
-      );
-
-    case 'patrol':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)' }}>
-            <span>第一市場 巡邏動線 A (12/14 處打卡)</span>
-            <b style={{ color: 'var(--green-text,var(--green))' }}>85.7% (執勤中)</b>
-          </div>
-          <div style={{ height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ width: '85.7%', height: '100%', background: 'linear-gradient(90deg, #0284c7, #10b981)' }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
-            <span>在勤警衛：林○安 (定位正常)</span>
-            <span>下次打卡點：B1 配電室</span>
-          </div>
-        </div>
-      );
-
-    case 'repairs':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%' }}>
-          <div style={{ background: 'rgba(239,68,68,0.1)', padding: '6px', borderRadius: '6px' }}>
-            <div style={{ color: 'var(--red)', fontWeight: 800, fontSize: '17px' }}>1</div>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>緊急指派</div>
-          </div>
-          <div style={{ background: 'rgba(245,158,11,0.1)', padding: '6px', borderRadius: '6px' }}>
-            <div style={{ color: 'var(--amber)', fontWeight: 800, fontSize: '17px' }}>8</div>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>維修中</div>
-          </div>
-          <div style={{ background: 'rgba(16,185,129,0.1)', padding: '6px', borderRadius: '6px' }}>
-            <div style={{ color: 'var(--green-text,var(--green))', fontWeight: 800, fontSize: '17px' }}>24</div>
-            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>本日結案</div>
-          </div>
-        </div>
-      );
-
-    case 'equipment_status':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%', fontSize: '11px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ color: 'var(--cyan-text,var(--cyan))' }}>低溫冷鏈庫</div>
-            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '13px', display: 'block', marginTop: '2px' }}>99.2%</b>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ color: 'var(--cyan-text,var(--cyan))' }}>高壓變電所</div>
-            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '13px', display: 'block', marginTop: '2px' }}>100%</b>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ color: 'var(--cyan-text,var(--cyan))' }}>地下排風機</div>
-            <b style={{ color: 'var(--amber)', fontSize: '13px', display: 'block', marginTop: '2px' }}>97.5%</b>
-          </div>
-        </div>
-      );
-
-    case 'realtime_incident_map':
-      return (
-        <div style={{ width: '100%', minHeight: '80px', background: 'radial-gradient(circle, rgba(2,132,199,0.15) 0%, rgba(2,6,23,0.8) 100%)', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px' }}>
-          <span style={{ fontSize: '11px', color: 'var(--cyan-text,var(--cyan))' }}>🗺️ 全場 2D/3D 平面熱點圖資即時連線</span>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '4px', fontSize: '10px' }}>
-            <span style={{ color: 'var(--green-text,var(--green))' }}>● 第一拍賣場 正常</span>
-            <span style={{ color: 'var(--red)' }}>● 低溫冷鏈 B2 警報</span>
-          </div>
-        </div>
-      );
-
+      return <Tiles items={[
+        { label: '今日新增', value: num(stats.todayNew) },
+        { label: '今日完成', value: num(stats.todayDone), tone: 'ok' },
+        { label: '處理中', value: num(stats.inProgress) },
+        { label: 'SLA', value: stats.sla == null ? '—' : `${stats.sla}%`, tone: 'warn' },
+        { label: 'MTTR', value: stats.mttr == null ? '—' : `${stats.mttr.toFixed(1)}h` },
+        { label: 'MTBF', value: stats.mtbf == null ? '—' : `${stats.mtbf.toFixed(1)}d`, tone: 'accent' },
+        { label: '本月', value: num(stats.monthCount), tone: 'ok' },
+      ]} />;
+    case 'repairs': {
+      const counts = countBy(requests, row => REPAIR_STATUS_LABEL[String(row.status)] || '未知狀態');
+      return <>
+        <Tiles items={[
+          { label: '本月報修', value: num(requests.length) },
+          { label: '未結案', value: num(stats.openCount), tone: stats.openCount ? 'warn' : 'ok' },
+          { label: '完工率', value: stats.completionRate == null ? '—' : `${stats.completionRate}%`, tone: 'ok' },
+        ]} />
+        <BarList entries={counts} empty="本月沒有報修案件" />
+      </>;
+    }
     case 'sla_compliance':
-      return (
-        <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', width: '100%' }}>
-          <div>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>平均修復時間 (MTTR)</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--cyan-text,var(--cyan))' }}>1.4 <small style={{ fontSize: '10px' }}>小時</small></div>
-          </div>
-          <div style={{ height: '24px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <div>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>SLA 達標率</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--green-text,var(--green))' }}>98.5%</div>
-          </div>
-        </div>
-      );
+      return <Tiles items={[
+        { label: 'SLA 達標率', value: stats.sla == null ? '—' : `${stats.sla}%`, note: `已完成 ${stats.doneCount} 張工單`, tone: 'ok' },
+        { label: 'MTTR', value: stats.mttr == null ? '—' : `${stats.mttr.toFixed(1)} 小時`, note: '開工到完工平均' },
+        { label: '逾期件數', value: num(stats.overdue), tone: stats.overdue ? 'danger' : 'ok' },
+      ]} />;
+    case 'realtime_incident_map': {
+      const open = requests.filter(row => OPEN_REQUEST.includes(String(row.status)));
+      return <BarList entries={countBy(open, row => row.fault_location || (row.equipment as Row)?.location || '未填位置')} empty="目前沒有未結報修案件" />;
+    }
+    case 'rank_dept': return <BarList entries={countBy(requests, row => row.department)} empty="本月沒有報修案件" />;
+    case 'rank_equipment': return <BarList entries={countBy(requests, row => (row.equipment as Row)?.name || '未綁定設備')} empty="本月沒有報修案件" />;
+    case 'rank_technician': return <BarList entries={countBy(orders, row => (row.users as Row)?.name || '未指派')} empty="目前沒有維修工單" />;
+    case 'rank_fault': return <BarList entries={countBy(requests, row => row.fault_type || '未分類')} empty="本月沒有報修案件" />;
+    case 'trend': {
+      if (!live.trend) return <Notice tone="error">{live.errors.trend || '月趨勢統計尚未載入'}</Notice>;
+      const data = { labels: live.trend.map(m => m.label), datasets: [{ label: '報修件數', data: live.trend.map(m => m.value), borderColor: CHART_SERIES[0], backgroundColor: 'rgba(2,132,199,0.12)', borderWidth: 2, fill: true, tension: 0.35 }] };
+      return <div className="dw-chart"><Line data={data} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} /></div>;
+    }
 
-    case 'staff_duty_matrix':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-            <span>早班巡邏／駐衛警</span>
-            <b style={{ color: 'var(--green-text,var(--green))' }}>12/12 人到勤 (100%)</b>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-            <span>工務機電維修組</span>
-            <b style={{ color: 'var(--cyan-text,var(--cyan))' }}>8/8 人在崗 (100%)</b>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-            <span>夜班拍賣指揮組</span>
-            <b style={{ color: 'var(--violet)' }}>已預排 16 人</b>
-          </div>
-        </div>
-      );
+    // ---- 巡邏 ----
+    case 'patrol': {
+      const patrol = live.patrol;
+      if (!patrol) return null;
+      return <>
+        <Tiles items={[
+          { label: '當班', value: patrol.shift || '目前無進行中班別' },
+          { label: '已打卡', value: num(patrol.done), tone: 'ok' },
+          { label: '未打卡', value: num(Math.max(patrol.points - patrol.done, 0)), tone: patrol.points > patrol.done ? 'warn' : 'ok' },
+          { label: '巡邏點', value: num(patrol.points) },
+        ]} />
+        <BarList entries={patrol.floors} empty="今日所有巡邏點都已完成打卡" />
+      </>;
+    }
+    case 'staff_duty_matrix': {
+      const shifts = live.patrol?.shifts || [];
+      if (!shifts.length) return <Notice>今日沒有巡邏排班</Notice>;
+      return <ul className="dw-shifts">{shifts.map(shift => <li key={`${shift.name}-${shift.time}`} className={shift.current ? 'is-current' : ''}>
+        <b>{shift.name}</b><span>{shift.time}</span>{shift.current && <em>當班中</em>}
+      </li>)}</ul>;
+    }
 
-    case 'cctv_ipcam_grid':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', width: '100%', height: '100%', minHeight: '65px' }}>
-          {['拍賣一場 A 區 (CAM-01)', '冷鏈庫進貨口 (CAM-04)', '北側大車磅秤 (CAM-08)', '中控指揮室 (CAM-12)'].map((cam, i) => (
-            <div key={i} style={{ background: 'var(--panel2)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)', padding: '4px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)' }}>
-                <span>{cam}</span>
-                <span style={{ color: 'var(--red)' }}>● REC</span>
-              </div>
-              <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--panel2)', padding: '4px 0' }}>📹 即時串流</div>
-            </div>
-          ))}
-        </div>
-      );
+    // ---- 設備 ----
+    case 'equipment_status': {
+      if (!live.equipment) return null;
+      const result = computeEquipmentReadiness(live.equipment, requests);
+      return <>
+        <Tiles items={[
+          { label: '設備妥善率', value: result.readiness == null ? '—' : `${result.readiness}%`, tone: 'ok' },
+          { label: '啟用設備', value: num(result.active) },
+          { label: '有未結報修', value: num(result.withOpenRepair), tone: result.withOpenRepair ? 'warn' : 'ok' },
+        ]} />
+        <BarList entries={result.byCategory} empty="所有啟用設備都沒有未結報修" />
+      </>;
+    }
 
+    // ---- 天氣 ----
     case 'weather_taiwan':
     case 'weather_risk_radar':
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '20px' }}>⛅</span>
-            <div>
-              <div style={{ fontWeight: 700, color: 'var(--text)' }}>臺北萬華 26°C</div>
-              <div style={{ color: 'var(--dim)', fontSize: '10px' }}>濕度 68% · 降雨機率 10%</div>
-            </div>
-          </div>
-          <div style={{ color: 'var(--green-text,var(--green))', background: 'rgba(16,185,129,0.1)', padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            防汛整備：常態綠燈
-          </div>
-        </div>
-      );
-
-    case 'rank_dept':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          {[
-            { dept: '第一拍賣場', count: 38, percent: 85, color: 'var(--cyan-text,var(--cyan))' },
-            { dept: '低溫冷鏈庫', count: 26, percent: 60, color: 'var(--amber)' },
-            { dept: '第二拍賣場', count: 18, percent: 42, color: 'var(--green-text,var(--green))' },
-          ].map((d, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '70px', color: 'var(--dim)' }}>{d.dept}</span>
-              <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${d.percent}%`, height: '100%', background: d.color }} />
-              </div>
-              <b style={{ color: d.color, minWidth: '32px', textAlign: 'right' }}>{d.count} 件</b>
-            </div>
-          ))}
-        </div>
-      );
-
-    case 'rank_equipment':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          {[
-            { name: '低溫冷凍主機', count: 12, percent: 80, color: 'var(--red)' },
-            { name: '電動搬運堆高機', count: 8, percent: 55, color: 'var(--amber)' },
-            { name: '電子地磅磅秤', count: 5, percent: 35, color: 'var(--cyan-text,var(--cyan))' },
-          ].map((eq, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '85px', color: 'var(--dim)' }}>{eq.name}</span>
-              <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
-                <div style={{ width: `${eq.percent}%`, height: '100%', background: eq.color }} />
-              </div>
-              <b style={{ color: eq.color, minWidth: '32px', textAlign: 'right' }}>{eq.count} 次</b>
-            </div>
-          ))}
-        </div>
-      );
-
-    case 'rank_technician':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          {[
-            { name: '陳○霖 (機電組)', count: 15, rate: '100%', color: 'var(--green-text,var(--green))' },
-            { name: '林○宇 (冷凍組)', count: 12, rate: '92%', color: 'var(--cyan-text,var(--cyan))' },
-            { name: '黃○生 (儀表組)', count: 9, rate: '100%', color: 'var(--violet)' },
-          ].map((t, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-              <span>{t.name}</span>
-              <span style={{ color: t.color, fontWeight: 700 }}>{t.count} 件 · 完工率 {t.rate}</span>
-            </div>
-          ))}
-        </div>
-      );
-
-    case 'rank_fault':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
-            <span>⚡ 電氣系統 45%</span>
-            <span>⚙️ 機械結構 30%</span>
-            <span>💧 管路水電 25%</span>
-          </div>
-          <div style={{ height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-              <div style={{ width: '45%', height: '100%', background: 'var(--cyan-text,var(--cyan))' }} title="電氣系統 45%" />
-              <div style={{ width: '30%', height: '100%', background: 'var(--amber)' }} title="機械結構 30%" />
-              <div style={{ width: '25%', height: '100%', background: 'var(--green-text,var(--green))' }} title="管路水電 25%" />
-            </div>
-          </div>
-        </div>
-      );
-
-    case 'trend':
-      return (
-        <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', gap: '6px', height: '55px', padding: '0 6px' }}>
-          {[35, 42, 28, 55, 38, 48, 62, 45, 52, 39, 31, 24].map((h, i) => (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', height: '100%' }}>
-              <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${h}%`,
-                    background: i === 6 ? 'linear-gradient(180deg, #f87171, #ef4444)' : 'linear-gradient(180deg, #00d4ff, #0284c7)',
-                    borderRadius: '2px 2px 0 0',
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: '8px', color: 'var(--dim)' }}>{i + 1}月</span>
-            </div>
-          ))}
-        </div>
-      );
-
-    // ==========================================
-    // === 系統 12 (市場公開看板) ===
-    // ==========================================
-    case 'public_price_board':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
-            <span>初秋甘藍 (高麗菜)</span>
-            <b>$28.5 / kg</b>
-            <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>▲ +9.6%</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
-            <span>牛番茄</span>
-            <b>$65.0 / kg</b>
-            <span style={{ color: 'var(--red)', fontWeight: 700 }}>▼ -1.8%</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
-            <span>青花菜</span>
-            <b>$54.0 / kg</b>
-            <span style={{ color: 'var(--dim)' }}>— 持平</span>
-          </div>
-        </div>
-      );
-
-    case 'market_turnover':
-      return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 6px' }}>
-          <div>
-            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>本日批發成交總額</div>
-            <b style={{ fontSize: '18px', color: 'var(--cyan-text,var(--cyan))', fontWeight: 800 }}>$ 4,820 萬</b>
-          </div>
-          <div style={{ textAlign: 'right', fontSize: '10px', color: 'var(--dim)' }}>
-            <div>較昨日 <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>+ 3.8%</span></div>
-            <div>較同期 <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>+ 5.2%</span></div>
-          </div>
-        </div>
-      );
-
-    case 'commodity_ratio':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
-            <span style={{ color: 'var(--green-text,var(--green))' }}>🥬 葉菜類 42%</span>
-            <span style={{ color: 'var(--amber)' }}>🍉 瓜果類 31%</span>
-            <span style={{ color: 'var(--cyan-text,var(--cyan))' }}>🥕 根莖類 27%</span>
-          </div>
-          <div style={{ height: '7px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ width: '42%', height: '100%', background: 'var(--green-text,var(--green))' }} />
-            <div style={{ width: '31%', height: '100%', background: 'var(--amber)' }} />
-            <div style={{ width: '27%', height: '100%', background: 'var(--cyan-text,var(--cyan))' }} />
-          </div>
-        </div>
-      );
-
-    case 'realtime_ticker':
-      return (
-        <div
-          style={{
-            fontSize: '12px',
-            color: 'var(--cyan-text,var(--cyan))',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(2,132,199,0.15)',
-            padding: '6px 10px',
-            borderRadius: '6px',
-            width: '100%',
-            overflow: 'hidden',
-            border: '1px solid rgba(0,212,255,0.3)',
-          }}
-        >
-          <span style={{ fontSize: '15px' }}>📢</span>
-          <div style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-            <span style={{ display: 'inline-block', paddingLeft: '100%', animation: 'marqueeScroll 15s linear infinite' }}>
-              【即時成交廣播】05:42 批號 A-882 西螺甘藍 2,000kg $28.5 順利敲定 ｜ 05:41 批號 B-103 溪湖青蔥 800kg $85.0 成交 ｜ 05:40 批號 C-092 屏東檸檬 1,200kg $42.0 結標
-            </span>
-          </div>
-        </div>
-      );
-
-    case 'top_gainers_losers':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', width: '100%', fontSize: '11px' }}>
-          <div style={{ background: 'rgba(16,185,129,0.08)', padding: '5px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ color: 'var(--green-text,var(--green))', fontWeight: 700, fontSize: '10px', marginBottom: '2px' }}>🔥 漲幅排行</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
-              <span>巨峰葡萄</span><b style={{ color: 'var(--green-text,var(--green))' }}>+18.5%</b>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
-              <span>金針菇</span><b style={{ color: 'var(--green-text,var(--green))' }}>+12.3%</b>
-            </div>
-          </div>
-          <div style={{ background: 'rgba(239,68,68,0.08)', padding: '5px', borderRadius: '4px', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <div style={{ color: 'var(--red)', fontWeight: 700, fontSize: '10px', marginBottom: '2px' }}>❄️ 跌幅排行</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
-              <span>青花菜</span><b style={{ color: 'var(--red)' }}>-14.2%</b>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
-              <span>四季豆</span><b style={{ color: 'var(--red)' }}>-9.8%</b>
-            </div>
-          </div>
-        </div>
-      );
-
     case 'origin_weather_map':
-      return (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%', fontSize: '11px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px' }}>
-            <span style={{ fontSize: '14px' }}>☀️</span>
-            <div style={{ color: 'var(--text)', fontWeight: 700, marginTop: '2px' }}>西螺 28°C</div>
-            <span style={{ color: 'var(--green-text,var(--green))', fontSize: '9px' }}>到貨正常</span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px' }}>
-            <span style={{ fontSize: '14px' }}>⛅</span>
-            <div style={{ color: 'var(--text)', fontWeight: 700, marginTop: '2px' }}>溪湖 27°C</div>
-            <span style={{ color: 'var(--green-text,var(--green))', fontSize: '9px' }}>供貨充足</span>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px' }}>
-            <span style={{ fontSize: '14px' }}>🌦️</span>
-            <div style={{ color: 'var(--text)', fontWeight: 700, marginTop: '2px' }}>九如 30°C</div>
-            <span style={{ color: 'var(--amber)', fontSize: '9px' }}>局部短暫雨</span>
-          </div>
-        </div>
-      );
+      return <WeatherWidget />;
 
-    case 'historical_price_curve':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--dim)' }}>
-            <span>📈 大宗蔬菜 30 日均價趨勢 ($/kg)</span>
-            <span style={{ color: 'var(--cyan-text,var(--cyan))' }}>目前均價 $34.2</span>
-          </div>
-          <div style={{ width: '100%', height: '52px', position: 'relative' }}>
-            <svg viewBox="0 0 300 60" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-              <defs>
-                <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--cyan-text,var(--cyan))" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="var(--cyan-text,var(--cyan))" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M 0,45 Q 40,25 75,35 T 150,20 T 225,28 T 300,15 L 300,60 L 0,60 Z"
-                fill="url(#curveGradient)"
-              />
-              <path
-                d="M 0,45 Q 40,25 75,35 T 150,20 T 225,28 T 300,15"
-                fill="none"
-                stroke="var(--cyan-text,var(--cyan))"
-                strokeWidth="2.5"
-              />
-              <circle cx="300" cy="15" r="3.5" fill="var(--cyan-text,var(--cyan))" />
-            </svg>
-          </div>
-        </div>
-      );
-
-    case 'consumer_guide_board':
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(16,185,129,0.1)', borderRadius: '4px', borderLeft: '3px solid #34d399' }}>
-            <span>🛒 平價推薦：包心白菜</span>
-            <b style={{ color: 'var(--green-text,var(--green))' }}>$22 / kg (供應充裕)</b>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(2,132,199,0.1)', borderRadius: '4px', borderLeft: '3px solid #38bdf8' }}>
-            <span>🥕 平價推薦：本地胡蘿蔔</span>
-            <b style={{ color: 'var(--cyan-text,var(--cyan))' }}>$18 / kg (品質優良)</b>
-          </div>
-        </div>
-      );
+    // ---- 市場行情 ----
+    case 'trading_kpi': {
+      if (!market) return null;
+      const totals = computeMarketTotals(market);
+      return <>
+        <Tiles items={[
+          { label: '總成交量', value: `${num(totals.quantity / 1000, 1)} 公噸`, note: `較前日 ${signed(totals.quantityChange)}` },
+          { label: '量加權均價', value: `${num(totals.averagePrice, 1)} 元/公斤`, note: `較前日 ${signed(totals.priceChange)}`, tone: 'ok' },
+          { label: '成交品項', value: num(totals.itemCount), tone: 'accent' },
+        ]} />
+        <DateNote live={live} />
+      </>;
+    }
+    case 'price_comparison': {
+      if (!market) return null;
+      const groups = computeGroupComparison(market);
+      if (!groups.length) return <Notice>最新交易日沒有分類行情</Notice>;
+      const data = {
+        labels: groups.map(group => group.label),
+        datasets: [
+          { label: market.previous_date, data: groups.map(group => group.previous), backgroundColor: CHART_SERIES[3], borderRadius: 4 },
+          { label: market.latest_date, data: groups.map(group => group.current), backgroundColor: CHART_SERIES[0], borderRadius: 4 },
+        ],
+      };
+      return <div className="dw-chart"><Bar data={data} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' as const, labels: { color: 'gray' } } }, scales: chartScales }} /></div>;
+    }
+    case 'weekly_trend':
+    case 'historical_price_curve': {
+      if (!market) return null;
+      if (!market.trend.length) return <Notice>沒有近期交易日資料</Notice>;
+      const labels = market.trend.map(point => point.observed_on.slice(5));
+      const data = widgetKey === 'weekly_trend'
+        ? { labels, datasets: [{ label: '成交量（公噸）', data: market.trend.map(point => Math.round(point.quantity / 100) / 10), backgroundColor: CHART_SERIES[1], borderRadius: 4 }] }
+        : { labels, datasets: [{ label: '均價（元/公斤）', data: market.trend.map(point => point.average_price), borderColor: CHART_SERIES[2], backgroundColor: 'rgba(217,119,6,0.12)', borderWidth: 2, fill: true, tension: 0.3 }] };
+      return <div className="dw-chart">{widgetKey === 'weekly_trend'
+        ? <Bar data={data as never} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} />
+        : <Line data={data as never} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} />}</div>;
+    }
+    case 'market_turnover': {
+      if (!market) return null;
+      const points = computeTurnoverTrend(market);
+      if (!points.length) return <Notice>沒有近期交易日資料</Notice>;
+      const data = { labels: points.map(point => point.date.slice(5)), datasets: [{ label: '成交總額估算（萬元）', data: points.map(point => point.value == null ? null : Math.round(point.value / 1000) / 10), borderColor: CHART_SERIES[1], backgroundColor: 'rgba(5,150,105,0.12)', borderWidth: 2, fill: true, tension: 0.3 }] };
+      return <><div className="dw-chart"><Line data={data} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} /></div>
+        <p className="dw-foot">估算方式：每日成交量 × 量加權均價（萬元）</p></>;
+    }
+    case 'commodity_ratio': {
+      if (!market) return null;
+      const share = computeCategoryShare(market);
+      if (!share.length) return <Notice>最新交易日沒有成交量</Notice>;
+      const data = { labels: share.map(entry => entry[0]), datasets: [{ data: share.map(entry => entry[1]), backgroundColor: [...CHART_SERIES], borderWidth: 0 }] };
+      return <div className="dw-chart"><Doughnut data={data} options={{ responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { position: 'right' as const, labels: { color: 'gray' } } } }} /></div>;
+    }
+    case 'public_price_board':
+      return market ? <><MoveList moves={computeItemMoves(market)} empty="最新交易日沒有品項行情" /><DateNote live={live} /></> : null;
+    case 'price_volatility':
+      return market ? <><MoveList moves={computeVolatileItems(computeItemMoves(market))} empty="沒有單日漲跌超過 15% 的品項" /><DateNote live={live} /></> : null;
+    case 'consumer_guide_board': {
+      if (!market) return null;
+      const falling = computeItemMoves(market).filter(move => move.changePct != null && move.changePct < 0)
+        .sort((a, b) => (a.changePct as number) - (b.changePct as number));
+      return <><MoveList moves={falling} empty="最新交易日沒有均價下跌的品項" /><DateNote live={live} /></>;
+    }
+    case 'top_gainers_losers': {
+      if (!market) return null;
+      const top = computeTopMovers(computeItemMoves(market));
+      return <div className="dw-split">
+        <section><h3>漲幅前三</h3><MoveList moves={top.gainers} empty="沒有上漲品項" /></section>
+        <section><h3>跌幅前三</h3><MoveList moves={top.losers} empty="沒有下跌品項" /></section>
+      </div>;
+    }
+    case 'realtime_ticker': {
+      if (!market) return null;
+      const moves = computeItemMoves(market).filter(move => move.changePct != null);
+      if (!moves.length) return <Notice>最新交易日沒有可比較的品項</Notice>;
+      return <div className="dw-ticker" aria-label="品項漲跌輪播"><div className="dw-ticker-track">
+        {[...moves, ...moves].map((move, index) => <span key={`${move.item}-${index}`} className={`dw-change${moveClass(move.changePct)}`}>
+          {move.item} {num(move.average, 1)} 元 {signed(move.changePct)}
+        </span>)}
+      </div></div>;
+    }
 
     default:
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px', textAlign: 'center' }}>
-          <div style={{ color: 'var(--cyan-text,var(--cyan))', fontWeight: 600 }}>📊 即時數據模組 ({widgetKey})</div>
-          <div style={{ display: 'flex', justifyContent: 'space-around', color: 'var(--dim)', fontSize: '10px' }}>
-            <span>連線狀態：<b style={{ color: 'var(--green-text,var(--green))' }}>正常</b></span>
-            <span>更新週期：<b>60s</b></span>
-          </div>
-        </div>
-      );
+      return null;
   }
+}
+
+export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string; desc?: string }) {
+  const definition = DASHBOARD_WIDGET_CATALOG[widgetKey];
+  const dataSource = definition?.dataSource || 'unavailable';
+  const sources = SOURCES[dataSource];
+  const live = useDashboardLiveData(sources);
+
+  if (!definition) return <Notice tone="error">未知的版面元件：{widgetKey}</Notice>;
+  if (dataSource === 'unavailable') {
+    return <div className="dw-unavailable"><b>尚未介接資料來源</b><span>{desc || definition.desc}</span></div>;
+  }
+  const errors = sources.map(source => live.errors[source]).filter(Boolean);
+  if (errors.length) return <Notice tone="error">{errors.join('；')}</Notice>;
+  // 資料還沒回來前不計算，避免先閃一輪全是 0 的畫面被誤認為真實數字。
+  const ready = sources.every(source => (
+    source === 'repair' ? live.requests != null
+      : source === 'patrol' ? live.patrol != null
+        : source === 'equipment' ? live.equipment != null
+          : live.market != null));
+  const content = ready ? renderWidget(widgetKey, live) : null;
+  if (content == null) {
+    const loading = sources.some(source => live.loading[source] !== false);
+    return <Notice>{loading ? '資料載入中…' : '目前沒有資料'}</Notice>;
+  }
+  return <div className="dw-body">{content}</div>;
 }
