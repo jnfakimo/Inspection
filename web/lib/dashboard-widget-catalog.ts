@@ -41,11 +41,11 @@ export const DASHBOARD_WIDGET_CATALOG: Record<string, DashboardWidgetDefinition>
   rank_fault: { systemId: 11, systemName: '戰情指揮中心', defaultTitle: '故障類型分析', icon: '🔍', defaultWidth: 6, defaultHeight: 4, dataSource: 'repair', desc: '本月故障類型件數' },
   trend: { systemId: 11, systemName: '戰情指揮中心', defaultTitle: '各月份報修趨勢', icon: '📅', defaultWidth: 12, defaultHeight: 4, dataSource: 'repair', desc: '最近十二個月報修件數趨勢' },
   public_price_board: { systemId: 12, systemName: '市場公開看板', defaultTitle: '公開大宗即時報價看板', icon: '💹', defaultWidth: 6, defaultHeight: 5, dataSource: 'market', desc: '最新交易日各品項均價與漲跌' },
-  market_turnover: { systemId: 12, systemName: '市場公開看板', defaultTitle: '市場公開總成交額', icon: '🌾', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '近 7 個交易日成交總額估算（成交量 × 均價）' },
+  market_turnover: { systemId: 12, systemName: '市場公開看板', defaultTitle: '市場公開總成交額', icon: '🌾', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '近 8 個交易日成交總額估算（成交量 × 均價）' },
   commodity_ratio: { systemId: 12, systemName: '市場公開看板', defaultTitle: '品項交易佔比分佈', icon: '🥦', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '最新交易日各大類成交量佔比' },
   realtime_ticker: { systemId: 12, systemName: '市場公開看板', defaultTitle: '即時滾動跑馬燈行情', icon: '📢', defaultWidth: 12, defaultHeight: 2, dataSource: 'market', desc: '最新交易日品項漲跌輪播（非即時拍賣批次）' },
   top_gainers_losers: { systemId: 12, systemName: '市場公開看板', defaultTitle: '今日蔬果漲跌幅排行榜', icon: '📊', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '最新交易日漲幅與跌幅前三名品項' },
   origin_weather_map: { systemId: 12, systemName: '市場公開看板', defaultTitle: '主要產地天氣與供貨狀態', icon: '⛅', defaultWidth: 6, defaultHeight: 4, dataSource: 'weather', desc: '各縣市天氣（產地供貨狀態尚未介接）' },
-  historical_price_curve: { systemId: 12, systemName: '市場公開看板', defaultTitle: '30日/同季歷史價格曲線', icon: '📉', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '近 7 個交易日均價走勢' },
+  historical_price_curve: { systemId: 12, systemName: '市場公開看板', defaultTitle: '30日/同季歷史價格曲線', icon: '📉', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '近一個月（約 24 個交易日）均價走勢' },
   consumer_guide_board: { systemId: 12, systemName: '市場公開看板', defaultTitle: '平價蔬果專區與供應指引', icon: '🛒', defaultWidth: 6, defaultHeight: 4, dataSource: 'market', desc: '最新交易日均價下跌的品項' },
 };
