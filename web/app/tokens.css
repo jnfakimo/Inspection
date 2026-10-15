@@ -152,7 +152,7 @@
   --list-row-odd: #fff;
   --list-row-even: #eff6ff;
 
-  --cyan: #0369a1;
+  --cyan: #0371ac;
   --green: #047857;
   --amber: #a04607;
   --red: #c81e1e;
@@ -162,12 +162,12 @@
   --green-text: color-mix(in srgb, var(--green) 80%, black);
 
   /* 2026-10-15 對比調整：一般版小字在白底、斑馬列底與淡色底都要 ≥ 4.5:1
-     （主色 #0284c7→#0369a1、綠 #059669→#047857、次要文字 #64748b／#5f6f85→#5a6a80、
+     （主色 #0284c7→#0371ac（調整幅度的 70%，最低對比 4.6:1）、綠 #059669→#047857、次要文字 #64748b／#5f6f85→#5a6a80、
      琥珀 #b45309→#a04607、紅 #dc2626→#c81e1e）。實色底上的文字用 --on-primary／--on-bright。 */
   --live: #10b981;
   --live-ink: #047857;
   --live-solid: #047857;
-  --primary-solid: #0369a1;
+  --primary-solid: #0371ac;
   --on-primary-solid: #fff;
   --on-primary: #fff;
   --on-bright: #fff;
