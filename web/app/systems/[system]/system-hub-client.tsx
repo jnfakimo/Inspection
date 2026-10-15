@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { hasModuleAccess, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
-import { zhModuleCode, zhSystemCode, zhValue } from '@/lib/zh-tw';
+import { zhModuleCode, zhValue } from '@/lib/zh-tw';
 import { useFleetRole } from '@/lib/fleet-role';
 import type { Profile } from '@/types/app';
 import { invokeAppApi } from '@/lib/supabase';
@@ -132,7 +132,9 @@ export function SystemHubClient({ system }: { system: SystemDefinition }) {
     const allowed = profile.allowed_systems.includes('*') || profile.allowed_systems.includes(system.key);
     if (system.key === 'workorder' && allowed) return <WorkorderHub profile={profile} />;
     if ((system.key === 'handover' || system.key === 'guardpatrol' || system.key === 'vehicle' || system.key === 'meetingroom' || system.key === 'officialdocs' || system.key === 'equipment' || system.key === 'structuremap') && allowed) return <OperationsHub system={system} profile={profile} />;
-    return <AppShell profile={profile} title={system.title}>{allowed ? <><section className={`module-hero ${system.key}-module-hero`}><div><span>{zhSystemCode(system.code)}</span><h2>{system.title}</h2><p>{system.description}</p></div><img src={system.icon} alt="" /></section><section className={`module-grid ${system.key}-module-grid`}>{system.modules.filter(module => hasModuleAccess(profile, system.key, module.key)).map((module: ModuleDefinition, index: number) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className={system.key === 'meetingroom' ? 'meetingroom-module-card' : undefined}>{system.key === 'meetingroom' && <img src={meetingroomModuleIcons[module.key]} alt="" aria-hidden="true" />}<span>{zhModuleCode(index)}</span><h3>{module.title}</h3><p>{module.description}</p><b>開啟子系統 →</b></Link>)}</section></> : <div className="notice danger">目前帳號沒有此系統權限，請由管理員開放。</div>}</AppShell>;
+    // 三層標準版型：系統入口一律用共用頁首（SystemPageHeader），不再使用舊的 module-hero 大標題區。
+    const heading = allowed && system.modules[0] ? { system, module: system.modules[0], title: system.title, metaTitle: '系統入口', description: system.description } : undefined;
+    return <AppShell profile={profile} title={system.title} heading={heading}>{allowed ? <><section className={`module-grid ${system.key}-module-grid`}>{system.modules.filter(module => hasModuleAccess(profile, system.key, module.key)).map((module: ModuleDefinition, index: number) => <Link key={module.key} href={`/systems/${system.key}/${module.key}/`} className={system.key === 'meetingroom' ? 'meetingroom-module-card' : undefined}>{system.key === 'meetingroom' && <img src={meetingroomModuleIcons[module.key]} alt="" aria-hidden="true" />}<span>{zhModuleCode(index)}</span><h3>{module.title}</h3><p>{module.description}</p><b>開啟子系統 →</b></Link>)}</section></> : <div className="notice danger">目前帳號沒有此系統權限，請由管理員開放。</div>}</AppShell>;
   }
   return <AuthGate>{profile => <Hub profile={profile} />}</AuthGate>;
 }

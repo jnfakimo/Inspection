@@ -107,7 +107,7 @@ for (const file of files.filter((f) => /\.(tsx|ts)$/.test(f))) {
   src.split('\n').forEach((ln, i) => {
     if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
     const code = ln.replace(/\/\/.*$/, '');
-    if (HEX.test(code) && !/(href|src|url\(|&#|\bid=|#\w+['"]\s*[,)]?\s*$)/.test(code) && /(color|background|fill|stroke|border|shadow|style|tone)/i.test(code)) {
+    if (HEX.test(code) && !/(href|src|url\(|&#|\bid=|#\w+['"]\s*[,)]?\s*$)/.test(code) && /(color|background|fill|stroke|border|shadow|style|tone|accent)/i.test(code)) {
       errors.push(`${rel}:${i + 1} tsx 內不得硬編碼色碼，請改用 var(--token)，或將檔案列入 color-token-check 的 ALLOW_TSX 並說明理由`);
     }
     HEX.lastIndex = 0;
