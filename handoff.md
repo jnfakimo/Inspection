@@ -24,7 +24,10 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## ➡️ 下一步
 
-1. **隱藏 3 筆 E2E 測試工單**（2026-10-16 預覽：3 筆工單與對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`）。
+1. ✅ **已完成（2026-10-16 06:55 臺灣時間）隱藏 3 筆 E2E 測試工單**：分支 CI run 38820146953 全數通過後，以 apply-database-migration run 38820368083
+   套用到正式專案 `qztffronusdhgxhjjubt`（HTTP 201）。migration 內含事後驗證，未通過會回滾，所以 201 代表 3 筆工單與 3 筆報修案件皆已 `hidden = true`、保護觸發器已恢復。
+   尚待：合併此分支進 main（migration 檔需在 main 留存）。以下為當時背景：
+   （預覽：3 筆工單與對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`）。
    runbook 步驟 2 在 SQL Editor 會被保護觸發器擋下（沒有登入者，`can_manage_workorder()` 為 false），改用
    `supabase/migrations/20261016090000_hide_e2e_test_workorders.sql`：CI 通過後以 `apply-database-migration.yml`（`--ref codex/ui-followup-20261016`）套用，再合併
    （本機以 `npm run test:hide-e2e-migration` 驗證；套用正式庫需使用者當次授權）。
