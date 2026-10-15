@@ -24,7 +24,7 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## ➡️ 下一步
 
-1. **使用者執行**：在 Supabase SQL Editor 依 `docs/runbooks/hide-test-records.sql` 隱藏正式資料中的測試工單
+1. **使用者執行**（2026-10-16 預覽已確認：3 筆 E2E 工單、對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`，執行步驟 2 預期 `hidden_orders = 3`、`hidden_requests = 0`）：在 Supabase SQL Editor 依 `docs/runbooks/hide-test-records.sql` 隱藏正式資料中的測試工單
    （先跑預覽確認名單；Claude 的 Supabase 帳號沒有此專案權限，無法代為查詢）。
 2. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
@@ -32,6 +32,10 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
    尚未推送、尚未審查；repo 是公開的，**不要推到這個 repo**。本機備份在 `C:\Users\jnfa\Documents\Codex\backups\g-worktree-snapshot-20261015.bundle`。
    合併進 main 前必須逐項對照 main 的較新版本。
 4. 其餘待辦見 `PROJECT_PLAN.md`：全角色權限矩陣、資安 S1–S3、`Obsidian/04` 179 節審閱、`app-api` 拆檔。
+5. **待審閱／合併**（未 commit，在工作樹 `C:\Users\jnfa\Documents\Codex\wt-followup-20261016`，分支 `codex/ui-followup-20261016`，基底 `3a8f38229`）：
+   維修分析與位置分析不再計入 `hidden = true` 的列（`workorder-extras.tsx`、`LocationAnalysisAdmin.tsx`）、新增 `npm run test:hidden-record-filter`、
+   `PROJECT_PLAN.md` 修正 WS-4／WS-7 過時狀態並新增 §19。`app-api` 報修案件列表與標記挑選清單刻意未過濾，見 §19。
+6. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。`tone` 欄位與圖表色盤已完成。
 
 ## ⚠️ 注意事項
 
@@ -53,4 +57,4 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · Git push：見 PR（分支 `codex/handoff-security-store`）
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 本批變更尚未 commit／push（分支 `codex/ui-followup-20261016`）；上一批見 PR #74（分支 `codex/handoff-security-store`）

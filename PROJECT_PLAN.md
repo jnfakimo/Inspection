@@ -38,10 +38,10 @@
 | WS-1 | 單一 token 層 `tokens.css`；移除 `globals.css`、`v1-layout.css` 內重複的主題定義；補上科技版缺的 `--cyan-text`／`--green-text` | 完成 | 已驗證 |
 | WS-2 | CSS 硬編碼色碼遷移：UI 樣式 506 處改用 token（淺色值與原色碼逐一相同，一般版畫面不變；科技版改為正確深色對應） | 完成 | 已驗證（守門＋全測試） |
 | WS-3 | 紙本／列印例外隔離：`.hs-report*`、`@media print` 保持固定白底，班別色在 `.hs-report` 內固定，不隨科技版主色變動 | 完成 | 已驗證（fixtures 測試） |
-| WS-4 | 單一主色：移除 `.system-card`／`.maintenance-card`／`.quick-grid a` 的 amber／green／violet 變體；`modules.ts` 的 `tone` 欄位停用 | 完成（CSS）；`tone` 欄位尚未從資料與型別移除 | 靜態驗證 |
+| WS-4 | 單一主色：移除 `.system-card`／`.maintenance-card`／`.quick-grid a` 的 amber／green／violet 變體；`modules.ts` 的 `tone` 欄位停用 | 完成（CSS）；`modules.ts` 與 `mobile/page.tsx` 的 `tone` 已於 §9 移除 | 靜態驗證 |
 | WS-5 | 守門測試 `tools/color-token-check.mjs`（`npm run test:color-tokens`，已納入 `npm test`） | 完成 | 已驗證 |
 | WS-6 | 重寫 AGENTS.md；業務／資料規則搬到 `docs/DOMAIN_RULES.md` | 完成 | 靜態驗證 |
-| WS-7 | TSX 內聯色碼收斂：圖表色盤與 3D／圖面標記色在 `ALLOW_TSX` 白名單內，尚未集中成單一 palette 模組 | **待辦** | — |
+| WS-7 | TSX 內聯色碼收斂：圖表色盤與 3D／圖面標記色在 `ALLOW_TSX` 白名單內；圖表色盤已集中到 `web/lib/chart-palette.ts`（§10），3D／圖面標記色尚未集中 | 圖表色盤完成；標記色**待辦** | `test:color-tokens` |
 | WS-8 | 13 系統／67 子系統版型審查。已完成靜態審查：內容寬度統一為 `--content-width`（移除 `.operations-page` 1180px／640px 內縮、`.v1list-page` 1100px）；按鈕與頁首經查已符合標準。剩餘見第 8 節 | 進行中 | 靜態驗證 |
 | WS-9 | 瀏覽器實測：一般版／科技版對比 ≥ 4.5:1、A4 列印、手機 375／320px 無水平溢出 | **未驗證** | — |
 
@@ -64,7 +64,7 @@
 - 一般版畫面預期與遷移前一致（token 淺色值＝原色碼）；少數近似色合併（例如 `#eef2f7`→`--n-100`、`#dcfce7`→`--ok-soft`）
   有肉眼難辨的色差，**未做畫面比對**。
 - 科技版是主要受益者：原本寫死的淺色底（slate 系）現在會跟著主題反轉；實際視覺需瀏覽器確認（WS-9）。
-- `modules.ts` 仍含 `tone` 欄位；任何仍讀取它的新程式碼會違反單一主色決策。
+- `modules.ts` 的 `tone` 欄位已移除（§9）；新程式碼不得重新引入，也不得用它改卡片顏色。
 - 本批已分 4 組本機 commit（token 層、色碼遷移、守門測試、文件），未 push、未部署；被觸及的檔案內含先前未提交的既存修改，一併進入這些 commit。
 - `.git/packed-refs.lock` 為 2026-10-06 遺留的 0 位元組鎖檔，commit 時會印警告但不影響結果；確認沒有其他 git 程序後再清除。
 
@@ -72,8 +72,8 @@
 
 1. WS-8：逐系統版型審查，產出「不符三層標準的頁面清單」再分批修。
 2. WS-9：取得可用瀏覽器與測試帳號後做兩主題＋手機＋A4 視覺驗收。
-3. WS-7：建立 `web/lib/chart-palette.ts`，把圖表系列色與標記色集中，縮小 `ALLOW_TSX`。
-4. 移除 `modules.ts` 的 `tone` 欄位與相關型別、`mobile/page.tsx` 的 `tone` 類別。
+3. WS-7：圖表色盤已集中（`web/lib/chart-palette.ts`，§10）；剩 3D／圖面標記色（`structuremap-*`、`repair-map3d`、`patrol-map3d`、`modeler-client` 等）尚未集中，`ALLOW_TSX` 仍列這些檔。
+4. （已完成，§9）移除 `modules.ts` 的 `tone` 欄位與相關型別、`mobile/page.tsx` 的 `tone` 類別。
 5. 承接自舊計畫、尚未完成：全角色權限矩陣、資安 S1–S3 分階段驗證、Obsidian/04 的 179 節歷史索引人工審閱
    （細節在封存版 `PROJECT_PLAN.md`、`SECURITY_POSTURE.md`）。
 
@@ -175,3 +175,14 @@
 - 刻意不做：證據資料表的自動刪除。這需要解除既有防刪除保護，屬政策決定，已列在 `docs/SECURITY_RECORD_RETENTION.md` 待決定項目。
 - 部署順序：migration 需先經 `apply-database-migration.yml` 套用；在套用前，`platform-log-alert` 呼叫清除函式只會記錄錯誤，不影響告警流程。
 - 守門：`npm run test:security-notice-minimal`。
+
+## 19. 隱藏測試資料不計入統計（2026-10-16，分支 codex/ui-followup-20261016）
+
+- 起因：正式庫有 3 筆 2026-08-25 的 E2E 測試工單，對應報修案件已 `hidden = true`，工單仍 `hidden = false`（`docs/runbooks/hide-test-records.sql` 的步驟 1 預覽結果）。
+- 讀取端盤點（靜態，未查正式資料）：
+  - **已略過 hidden**：戰情儀表板（`dashboard-client.tsx`、`dashboard-live-data.ts`）、交接簿工作區報修查詢、`repair_monthly_counts` RPC。
+  - **本批補上**：`workorder-extras.tsx` 的維修分析（報修與工單）、`LocationAnalysisAdmin.tsx` 的位置分析，改用 `.or('hidden.is.null,hidden.eq.false')`（NULL 視同未隱藏）。守門：`npm run test:hidden-record-filter`，含反例斷言。
+  - **刻意未動**：`app-api` 的報修案件列表（`select('*')`）與 `structuremap-markerboard.tsx` 的報修挑選清單。前者是管理端列表，是否顯示隱藏列屬產品決定，且動到 `supabase/functions/**` 合併後會自動部署 Edge Function。
+- 注意：維修分析原本註明「逐項沿用 V1 analytics.html，確保兩邊數字一致」；V1 沒有過濾 hidden，所以 V2 與 V1 在測試資料上會有差異，V1 為維護模式，不再同步。
+- 處置：隱藏動作由使用者在 Supabase SQL Editor 執行 runbook 步驟 2（Claude 帳號沒有該專案權限，正式環境讀取也被權限分類器拒絕）。預期 `hidden_orders = 3`、`hidden_requests = 0`。
+- 本批沒有改：`LayoutsAdmin.tsx` 行內樣式（§11 已標示需登入後邊看畫面邊改）、`business-handover.tsx` 欄寬行內樣式（§9 已決定不動）。這兩項沒有帳號與瀏覽器就不應盲改。
