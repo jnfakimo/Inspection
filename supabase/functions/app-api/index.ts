@@ -724,8 +724,8 @@ async function buildMarketBoardPayload(
     .sort((left, right) => left.observed_on.localeCompare(right.observed_on))
     .slice(-24);
 
-  // 登入版跑馬燈沿用通知中心的最新內容（給現場人員看）。免登入公開版只顯示
-  // 明確標記給看板的訊息（event='board_notice'），不把內部派工／公文通知投到大螢幕。
+  // 登入版與公開版都只顯示明確標記給看板的公告（event='board_notice'）。通知中心的資安告警、
+  // 監控異常、派車提醒與個人通知屬內部資訊，不投到看板（見 market-board-notices.ts）。
   const noticeResult = await readMarketBoardNotices(admin, Boolean(options.publicView));
   if (noticeResult.error) console.warn('market board notices lookup failed:', noticeResult.error.message);
   const seenNotice = new Set<string>();
