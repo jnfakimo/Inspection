@@ -136,31 +136,11 @@
   color: var(--cyan);
 }
 
+/* 按鈕外觀走共用 .primary-btn／.secondary-btn；這裡只保留側欄內的版面。 */
 .modeler-button {
   width: 100%;
   margin-top: 6px;
-  padding: 10px;
-  border: 1px solid;
-  border-radius: 2px;
-  cursor: pointer;
-  font-family: var(--head);
-  font-size: .82rem;
-  letter-spacing: .05em;
-  text-transform: uppercase;
-  transition: background .2s;
 }
-
-.modeler-button-primary {
-  border-color: var(--modeler-pink);
-  background: color-mix(in srgb, var(--modeler-pink) 12%, transparent);
-  color: var(--modeler-pink);
-}
-
-.modeler-button-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--modeler-pink) 22%, transparent);
-}
-
-.modeler-button:disabled { cursor: not-allowed; opacity: .4; }
 
 .modeler-stat {
   color: var(--dim);

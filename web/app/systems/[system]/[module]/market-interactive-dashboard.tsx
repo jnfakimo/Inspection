@@ -23,6 +23,7 @@ import { MarketMovementBadge } from '@/components/MarketMovementBadge';
 import { invokeCachedAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import './market-interactive-dashboard.css';
+import { CHART_FALLBACK, CHART_SERIES } from '@/lib/chart-palette';
 
 ChartJS.register(
   ArcElement,
@@ -99,7 +100,7 @@ const KNOWN_FIELD_LABELS: Record<string, string> = {
   middle_price: '中價',
   low_price: '下價',
 };
-const PALETTE = ['#0284c7', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
+const PALETTE = CHART_SERIES;
 
 function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -193,10 +194,10 @@ function useChartTheme(): ChartTheme {
   return useMemo(() => {
     const style = getComputedStyle(document.documentElement);
     return {
-      text: style.getPropertyValue('--text').trim() || '#172033',
-      dim: style.getPropertyValue('--dim').trim() || '#64748b',
-      line: style.getPropertyValue('--line').trim() || '#cbd5e1',
-      panel: style.getPropertyValue('--panel').trim() || '#ffffff',
+      text: style.getPropertyValue('--text').trim() || CHART_FALLBACK.text,
+      dim: style.getPropertyValue('--dim').trim() || CHART_FALLBACK.dim,
+      line: style.getPropertyValue('--line').trim() || CHART_FALLBACK.line,
+      panel: style.getPropertyValue('--panel').trim() || CHART_FALLBACK.panel,
     };
   }, [revision]);
 }

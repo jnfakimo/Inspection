@@ -19,6 +19,7 @@ import { Chart } from 'react-chartjs-2';
 import { MarketMovementBadge } from '@/components/MarketMovementBadge';
 import { marketMovementPresentation } from '@/lib/market-movement';
 import './market-board.css';
+import { CHART_FALLBACK_TECH } from '@/lib/chart-palette';
 
 ChartJS.register(BarController, BarElement, CategoryScale, Filler, Legend, LineController, LineElement, LinearScale, PointElement, Tooltip);
 
@@ -72,16 +73,16 @@ const bounded = (value: unknown, fallback: number, minimum: number, maximum: num
 };
 
 function chartColors() {
-  if (typeof window === 'undefined') return { text: '#7893aa', line: '#173952', bar: 'rgba(0,212,255,.4)', barBorder: '#00d4ff', price: '#ffb300' };
+  if (typeof window === 'undefined') return { text: CHART_FALLBACK_TECH.dim, line: CHART_FALLBACK_TECH.line, bar: 'rgba(0,212,255,.4)', barBorder: CHART_FALLBACK_TECH.cyan, price: CHART_FALLBACK_TECH.amber };
   const style = getComputedStyle(document.documentElement);
   const read = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
-  const cyan = read('--cyan', '#00d4ff');
+  const cyan = read('--cyan', CHART_FALLBACK_TECH.cyan);
   return {
-    text: read('--dim', '#7893aa'),
-    line: read('--line', '#173952'),
+    text: read('--dim', CHART_FALLBACK_TECH.dim),
+    line: read('--line', CHART_FALLBACK_TECH.line),
     bar: `color-mix(in srgb, ${cyan} 38%, transparent)`,
     barBorder: cyan,
-    price: read('--amber', '#ffb300'),
+    price: read('--amber', CHART_FALLBACK_TECH.amber),
   };
 }
 

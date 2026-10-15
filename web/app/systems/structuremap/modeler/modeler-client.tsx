@@ -656,7 +656,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
             範圍：<b>{Math.round(parsedInfo.bbox.w)}</b> × <b>{Math.round(parsedInfo.bbox.h)}</b> mm
             {parsedInfo.usingRef && <><br /><span>已依標準框（B1）繪製，非本檔案原始比例</span></>}
           </div>}
-          <button className="modeler-button modeler-button-primary" disabled={!lastBlobRef.current || saving} onClick={() => void saveModel()}>▲ 更新模型</button>
+          <button className="primary-btn modeler-button" disabled={!lastBlobRef.current || saving} onClick={() => void saveModel()}>▲ 更新模型</button>
           <div className={`modeler-message ${message.tone}`} role="status">{message.text}</div>
 
           <h2 className="modeler-saved-title">已建立的樓層模型</h2>
@@ -673,7 +673,7 @@ export function ModelerClient({ profile }: { profile: Profile }) {
           {/* 既有樓層是在「上傳時產生衍生圖」這個功能之前建立的，按一次補齊即可，
               不必重新上傳 DXF。之後新上傳的樓層會自動附帶衍生圖。 */}
           {!savedError && !!savedModels?.length && <>
-            <button className="modeler-button" disabled={backfilling || saving}
+            <button className="secondary-btn modeler-button" disabled={backfilling || saving}
               onClick={() => void backfillDerivedPlans()}>
               {backfilling ? '補產生中…' : '⟳ 補產生衍生圖'}
             </button>

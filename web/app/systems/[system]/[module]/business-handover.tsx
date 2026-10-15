@@ -769,7 +769,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                                       <div className="business-check-toggle-group">
                                         <button
                                           type="button"
-                                          className={`business-check-btn complete-btn ${isDone ? 'active' : ''}`}
+                                          className="primary-btn compact business-check-btn"
+                                          aria-pressed={isDone}
                                           onClick={() => handleToggleCheck(item.id, 'completed')}
                                           aria-label={`${item.title} 標記為點檢完成`}
                                         >
@@ -777,7 +778,8 @@ export function BusinessHandover({ system, module, profile }: Props) {
                                         </button>
                                         <button
                                           type="button"
-                                          className={`business-check-btn uncomplete-btn ${!isDone ? 'active' : ''}`}
+                                          className="secondary-btn compact business-check-btn"
+                                          aria-pressed={!isDone}
                                           onClick={() => handleToggleCheck(item.id, 'uncompleted')}
                                           aria-label={`${item.title} 標記為未點檢`}
                                         >

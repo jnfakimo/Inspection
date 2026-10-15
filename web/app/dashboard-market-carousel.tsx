@@ -8,6 +8,7 @@ import { marketMovementPresentation } from '@/lib/market-movement';
 import { invokeCachedAppApi } from '@/lib/supabase';
 import './dashboard-market-prices.css';
 import './dashboard-market-carousel.css';
+import { CHART_FALLBACK } from '@/lib/chart-palette';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -101,15 +102,15 @@ const chunks = <T,>(values: T[], size: number) => (
 
 const chartColors = () => {
   if (typeof window === 'undefined') {
-    return { text: '#64748b', line: '#cbd5e1', current: '#0284c7', compare: '#d97706' };
+    return { text: CHART_FALLBACK.dim, line: CHART_FALLBACK.line, current: CHART_FALLBACK.cyan, compare: CHART_FALLBACK.amber };
   }
   const style = getComputedStyle(document.documentElement);
   const read = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
   return {
-    text: read('--dim', '#64748b'),
-    line: read('--line', '#cbd5e1'),
-    current: read('--cyan', '#0284c7'),
-    compare: read('--amber', '#d97706'),
+    text: read('--dim', CHART_FALLBACK.dim),
+    line: read('--line', CHART_FALLBACK.line),
+    current: read('--cyan', CHART_FALLBACK.cyan),
+    compare: read('--amber', CHART_FALLBACK.amber),
   };
 };
 

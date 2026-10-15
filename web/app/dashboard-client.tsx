@@ -35,6 +35,7 @@ import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
 import { Line, Doughnut } from 'react-chartjs-2';
+import { CHART_SERIES_NEON } from '@/lib/chart-palette';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
@@ -299,7 +300,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
           labels: counts.map(c => c[0]),
           datasets: [{
             data: counts.map(c => c[1]),
-            backgroundColor: ['#00d4ff', '#00ff9d', '#ffb300', '#ff3b3b', '#a855f7', '#3b82f6', '#ec4899', '#f97316'],
+            backgroundColor: [...CHART_SERIES_NEON],
             borderWidth: 0,
             hoverOffset: 4
           }]
@@ -317,7 +318,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
           datasets: [{
             label: '報修件數',
             data: trend.map(m => m.value),
-            borderColor: '#00d4ff',
+            borderColor: CHART_SERIES_NEON[0],
             backgroundColor: 'rgba(0, 212, 255, 0.1)',
             borderWidth: 2,
             fill: true,

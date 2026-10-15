@@ -18,15 +18,14 @@ const CORE_TOKENS = ['bg', 'panel', 'panel2', 'line', 'text', 'dim', 'muted', 'i
 
 // tsx／ts 中允許直接寫色碼的檔案：圖表系列色、3D／圖面標記、列印視窗、第三方地圖。
 const ALLOW_TSX = [
-  /market-analytics-workspace\.tsx$/, /market-interactive-dashboard\.tsx$/, /market-command-center\.tsx$/,
-  /MarketExecutiveBoard\.tsx$/, /dashboard-market-carousel\.tsx$/, /DashboardWidgetContent\.tsx$/,
+  /chart-palette\.ts$/, // 圖表系列色盤唯一正本（web/lib/chart-palette.ts）
+  /DashboardWidgetContent\.tsx$/, // 戰情元件動態版面，待評估
   /structuremap-viewers\.tsx$/, /structuremap-markerboard\.tsx$/, /structuremap-floor3d\.tsx$/,
   /floor-stack-3d\.tsx$/, /repair-map3d\.tsx$/, /patrol-map3d\.tsx$/, /modeler-client\.tsx$/,
   /vehicle-tracking-workspace\.tsx$/, /vehicle-workspace\.tsx$/, /patrol-status\.ts$/, /layout\.tsx$/,
   /official-docs-workspace\.tsx$/, // 條碼 SVG 固定黑色
   /handover-sheet\.tsx$/, // 列印 @page 邊角文字（紙本）
   /weather-widget\.tsx$/, // 縣市地圖 SVG 描邊
-  /dashboard-client\.tsx$/, // 圖表系列色盤
   /\.test\.(ts|tsx|mjs)$/,
 ];
 
