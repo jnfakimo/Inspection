@@ -6,8 +6,9 @@
 ## ⏯️ 目前做到哪
 
 全站版型與色彩統一、戰情元件改接真實資料、正式站驗收與修正、一般版主色幅度調整、資安告警存放與保存期限，
-都已合併上線（PR #62–#73）。最後完成：PR #73——通知中心的資安告警副本只留指標、90 天後清除內容；
-migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge Functions 已部署。
+都已合併上線（PR #62–#74）。最後完成：PR #75（`b655a19e6`，2026-10-16）——維修分析與位置分析不計入 `hidden = true` 的測試資料；
+正式庫 3 筆 2026-08-25 的 E2E 測試工單與其報修案件已以 migration `20261016090000_hide_e2e_test_workorders.sql` 隱藏
+（apply-database-migration run 38820368083，HTTP 201）。Pages 已部署，正式站 JS 已確認含新過濾條件。
 
 ## 🚦 目前狀態
 
@@ -24,23 +25,17 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## ➡️ 下一步
 
-1. ✅ **已完成（2026-10-16 06:55 臺灣時間）隱藏 3 筆 E2E 測試工單**：分支 CI run 38820146953 全數通過後，以 apply-database-migration run 38820368083
-   套用到正式專案 `qztffronusdhgxhjjubt`（HTTP 201）。migration 內含事後驗證，未通過會回滾，所以 201 代表 3 筆工單與 3 筆報修案件皆已 `hidden = true`、保護觸發器已恢復。
-   尚待：合併此分支進 main（migration 檔需在 main 留存）。以下為當時背景：
-   （預覽：3 筆工單與對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`）。
-   runbook 步驟 2 在 SQL Editor 會被保護觸發器擋下（沒有登入者，`can_manage_workorder()` 為 false），改用
-   `supabase/migrations/20261016090000_hide_e2e_test_workorders.sql`：CI 通過後以 `apply-database-migration.yml`（`--ref codex/ui-followup-20261016`）套用，再合併
-   （本機以 `npm run test:hide-e2e-migration` 驗證；套用正式庫需使用者當次授權）。
-2. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
+1. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
-3. G 槽快照分支 `codex/g-worktree-snapshot-20261015`（151 個檔案，含 22 個 Edge Functions 與 5 個 migration）：
+2. G 槽快照分支 `codex/g-worktree-snapshot-20261015`（151 個檔案，含 22 個 Edge Functions 與 5 個 migration）：
    尚未推送、尚未審查；repo 是公開的，**不要推到這個 repo**。本機備份在 `C:\Users\jnfa\Documents\Codex\backups\g-worktree-snapshot-20261015.bundle`。
    合併進 main 前必須逐項對照 main 的較新版本。
-4. 其餘待辦見 `PROJECT_PLAN.md`：全角色權限矩陣、資安 S1–S3、`Obsidian/04` 179 節審閱、`app-api` 拆檔。
-5. **待審閱／合併**（未 commit，在工作樹 `C:\Users\jnfa\Documents\Codex\wt-followup-20261016`，分支 `codex/ui-followup-20261016`，基底 `3a8f38229`）：
-   維修分析與位置分析不再計入 `hidden = true` 的列（`workorder-extras.tsx`、`LocationAnalysisAdmin.tsx`）、新增 `npm run test:hidden-record-filter`、
-   `PROJECT_PLAN.md` 修正 WS-4／WS-7 過時狀態並新增 §19。`app-api` 報修案件列表與標記挑選清單刻意未過濾，見 §19。
-6. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。`tone` 欄位與圖表色盤已完成。
+3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
+   動到 `supabase/functions/**` 合併後會自動部署 Edge Function）。
+4. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。
+5. 其餘待辦見 `PROJECT_PLAN.md`：全角色權限矩陣、資安 S1–S3、`Obsidian/04` 179 節審閱、`app-api` 拆檔。
+6. 日後若要隱藏新的正式測試資料：不要直接執行 `docs/runbooks/hide-test-records.sql` 步驟 2（會被保護觸發器擋下），
+   比照 `20261016090000_hide_e2e_test_workorders.sql` 另寫 migration，經 CI 後以 `apply-database-migration.yml` 套用。
 
 ## ⚠️ 注意事項
 
@@ -65,4 +60,4 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 本批變更尚未 commit／push（分支 `codex/ui-followup-20261016`）；上一批見 PR #74（分支 `codex/handoff-security-store`）
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · PR #75 已合併並部署（`b655a19e6`）；本交接更新見分支 `codex/handoff-after-pr75`
