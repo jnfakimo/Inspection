@@ -222,11 +222,7 @@ function axisOptions(label: string, theme: ChartTheme): ChartOptions<'bar'> {
   };
 }
 
-function InteractiveDashboard({
-  module,
-}: {
-  module: ModuleDefinition;
-}) {
+function InteractiveDashboard() {
   const [sources, setSources] = useState<Source[]>([]);
   const [dimensionOptions, setDimensionOptions] = useState<DimensionCatalog>({});
   const [sourceId, setSourceId] = useState('');
@@ -617,7 +613,6 @@ function InteractiveDashboard({
       <div>
         <span>市場情報 · 決策分析</span>
         <h2 id="market-interactive-title">每日市場交易行情</h2>
-        <p>{module.description}</p>
       </div>
       <dl>
         <div><dt>資料來源</dt><dd>{source?.source_name || '載入中'}</dd></div>
@@ -833,14 +828,13 @@ function InteractiveDashboard({
 
 export function MarketInteractiveDashboardWorkspace({
   system,
-  module,
 }: {
   system: SystemDefinition;
   module: ModuleDefinition;
 }) {
   return <AuthGate>{profile =>
     <AppShell profile={profile} title={system.title}>
-      <InteractiveDashboard module={module} />
+      <InteractiveDashboard />
     </AppShell>
   }</AuthGate>;
 }

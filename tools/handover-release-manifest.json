@@ -59,7 +59,7 @@
     },
     {
       "path": "web/components/admin/shared.tsx",
-      "sha256": "0347F4E7AD8CF27C3491F0DD6E2266D21CEA1E36F3C51DF0EF88F8B1995C5CFB"
+      "sha256": "BC9AA11267D97C7DD9B30586B536EFD8453291E251D5CFD4D2FDFAD1DD4ECA39"
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-schedule.css",
