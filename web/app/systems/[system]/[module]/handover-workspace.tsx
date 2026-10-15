@@ -129,24 +129,30 @@ function RecordsModule({ system, module, profile }: Props) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const client = getSupabase();
-    // 直接查表才拿得到 record_id／takeover_by／confirmed_at，接收流程才可能成立。
-    const [r, u, d, s] = await Promise.all([
-      client.from('handover_records').select('*').order('shift_date', { ascending: false }).order('created_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
-      client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
-      client.from('system_settings').select('value').eq('key', 'shifts').maybeSingle(),
-    ]);
-    if (r.error || u.error) setNote(`失敗：${errorMessage(r.error || u.error, '交接資料載入失敗')}`);
-    setRows(r.data || []); setUsers(selectableActiveUsers(u.data || [])); setDepartments(d.data || []);
-    // system_settings 為管理者專屬，讀不到就沿用與資料庫 handover_shift_end_at 相同的預設三班制。
     try {
-      const parsed = s.data?.value ? JSON.parse(String(s.data.value)) : null;
-      if (Array.isArray(parsed) && parsed.length) {
-        setShifts(parsed.map((item: Row) => ({ id: String(item.id), label: String(item.name || item.label || item.id), start: String(item.start || ''), end: String(item.end || '') })));
-      }
-    } catch { /* 設定格式異常時沿用預設 */ }
-    setBusy(false);
+      const client = getSupabase();
+      // 直接查表才拿得到 record_id／takeover_by／confirmed_at，接收流程才可能成立。
+      const [r, u, d, s] = await Promise.all([
+        client.from('handover_records').select('*').order('shift_date', { ascending: false }).order('created_at', { ascending: false }).limit(500),
+        client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
+        client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
+        client.from('system_settings').select('value').eq('key', 'shifts').maybeSingle(),
+      ]);
+      if (r.error || u.error || d.error) setNote(`失敗：${errorMessage(r.error || u.error || d.error, '交接資料載入失敗')}`);
+      setRows(r.data || []); setUsers(selectableActiveUsers(u.data || [])); setDepartments(d.data || []);
+      // system_settings 為管理者專屬，讀不到就沿用與資料庫 handover_shift_end_at 相同的預設三班制。
+      try {
+        const parsed = s.data?.value ? JSON.parse(String(s.data.value)) : null;
+        if (Array.isArray(parsed) && parsed.length) {
+          setShifts(parsed.map((item: Row) => ({ id: String(item.id), label: String(item.name || item.label || item.id), start: String(item.start || ''), end: String(item.end || '') })));
+        }
+      } catch { /* 設定格式異常時沿用預設 */ }
+    } catch (error) {
+      setRows([]); setUsers([]); setDepartments([]);
+      setNote('失敗：' + errorMessage(error, '交接資料載入失敗'));
+    } finally {
+      setBusy(false);
+    }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, status, shift, from, to]);
@@ -473,14 +479,21 @@ function CasesModule({ module, profile }: Props) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const client = getSupabase();
-    const [c, u, d] = await Promise.all([
-      client.from('handover_cases').select('*').order('created_at', { ascending: false }).limit(500),
-      client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
-      client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
-    ]);
-    if (c.error || u.error) setNote(`失敗：${errorMessage(c.error || u.error, '案件資料載入失敗')}`);
-    setRows(c.data || []); setUsers(selectableActiveUsers(u.data || [])); setDepartments(d.data || []); setBusy(false);
+    try {
+      const client = getSupabase();
+      const [c, u, d] = await Promise.all([
+        client.from('handover_cases').select('*').order('created_at', { ascending: false }).limit(500),
+        client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
+        client.from('departments').select('dept_id,parent_id,name,status').order('sort_order').limit(1000),
+      ]);
+      if (c.error || u.error || d.error) setNote(`失敗：${errorMessage(c.error || u.error || d.error, '案件資料載入失敗')}`);
+      setRows(c.data || []); setUsers(selectableActiveUsers(u.data || [])); setDepartments(d.data || []);
+    } catch (error) {
+      setRows([]); setUsers([]); setDepartments([]);
+      setNote('失敗：' + errorMessage(error, '案件資料載入失敗'));
+    } finally {
+      setBusy(false);
+    }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, status, category, from, to]);
@@ -498,18 +511,23 @@ function CasesModule({ module, profile }: Props) {
   const overdue = rows.filter(row => row.status !== 'closed' && row.due_date && String(row.due_date) < today).length;
 
   const loadAttachments = useCallback(async (caseId: unknown) => {
-    const { data } = await getSupabase().from('handover_case_attachments')
+    const { data, error } = await getSupabase().from('handover_case_attachments')
       .select('*').eq('case_id', caseId).order('uploaded_at', { ascending: false });
+    if (error) throw error;
     setAttachments(data || []);
   }, []);
 
   const openDetail = async (row: Row) => {
-    setDetail(row); setContent(''); setAssignee(String(row.assigned_to || '')); setLogs([]); setAttachments([]);
-    const { data } = await getSupabase().from('handover_case_logs').select('*').eq('case_id', row.case_id).order('created_at');
-    setLogs(data || []);
-    await loadAttachments(row.case_id);
-  };
-  const act = async (action: string, extra: Row = {}, success = '已完成') => {
+    setDetail(row); setContent(''); setAssignee(String(row.assigned_to || '')); setLogs([]); setAttachments([]); setNote('');
+    try {
+      const { data, error } = await getSupabase().from('handover_case_logs').select('*').eq('case_id', row.case_id).order('created_at');
+      if (error) throw error;
+      setLogs(data || []);
+      await loadAttachments(row.case_id);
+    } catch (error) {
+      setNote(`失敗：案件明細載入失敗，${errorMessage(error)}`);
+    }
+  };  const act = async (action: string, extra: Row = {}, success = '已完成') => {
     if (!detail) return;
     setBusy(true); setNote('');
     const { error } = await getSupabase().rpc('handover_case_action', {
@@ -562,7 +580,7 @@ function CasesModule({ module, profile }: Props) {
             <td>{fmt(row.title)}</td>
             <td>{fmtTime(row.incident_time)}<small>{fmt(row.incident_location)}</small></td>
             <td>{nameOf(row.assigned_to)}<small>{fmt(row.responsible_unit)}</small></td>
-            <td>{fmt(row.due_date)}{late ? <small style={{ color: '#b42318' }}>已逾期</small> : null}</td>
+            <td>{fmt(row.due_date)}{late ? <small style={{ color: 'var(--danger-text)' }}>已逾期</small> : null}</td>
             <td><Pill value={row.status} labels={CASE_STATUS} tones={CASE_TONE} /></td>
             <td><div className="admin-row-actions"><button onClick={() => void openDetail(row)}>詳細</button></div></td>
           </tr>;
@@ -827,11 +845,18 @@ function EquipmentOverview({ module, profile }: Props) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const { data, error } = await getSupabase().from('equipment')
-      .select('equipment_id,asset_code,qr_code,name,category,floor,location,status,next_maintenance_on,responsible_name')
-      .order('floor').order('name').limit(1000);
+    try {
+      const { data, error } = await getSupabase().from('equipment')
+        .select('equipment_id,asset_code,qr_code,name,category,floor,location,status,next_maintenance_on,responsible_name')
+        .order('floor').order('name').limit(1000);
     if (error) setNote(`失敗：${errorMessage(error, '設備概況載入失敗')}`);
-    setRows((data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) }))); setBusy(false);
+      setRows((data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })));
+    } catch (error) {
+      setRows([]);
+      setNote('失敗：' + errorMessage(error, '設備概況載入失敗'));
+    } finally {
+      setBusy(false);
+    }
   }, []);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => setPage(1), [query, status, floor]);
@@ -869,7 +894,7 @@ function EquipmentOverview({ module, profile }: Props) {
             <td>{fmt(row.name)}</td>
             <td>{fmt(row.floor)}<small>{fmt(row.location)}</small></td>
             <td>{fmt(row.responsible_name)}</td>
-            <td>{fmt(row.next_maintenance_on)}{late ? <small style={{ color: '#b42318' }}>已逾期</small> : null}</td>
+            <td>{fmt(row.next_maintenance_on)}{late ? <small style={{ color: 'var(--danger-text)' }}>已逾期</small> : null}</td>
             <td><Pill value={row.status} labels={EQUIPMENT_STATUS} tones={EQUIPMENT_TONE} /></td>
           </tr>;
         })}</tbody>

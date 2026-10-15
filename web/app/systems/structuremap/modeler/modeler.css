@@ -1,12 +1,12 @@
 .modeler-page {
-  --modeler-pink: #ff5ea0;
-  --modeler-glow: #5eeaff;
+  --modeler-pink: var(--pink);
+  --modeler-glow: var(--info-bright);
   width: 100%;
 }
 
 :root[data-theme='light'] .modeler-page {
-  --modeler-pink: #be185d;
-  --modeler-glow: #0284c7;
+  --modeler-pink: var(--pink-text);
+  --modeler-glow: var(--primary);
 }
 
 .modeler-local-nav {
@@ -260,7 +260,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background: #04101f;
+  background: var(--surface-deep);
 }
 
 .modeler-preview canvas {
@@ -273,7 +273,7 @@
 
 .modeler-placeholder {
   padding: 40px;
-  color: #8eb6cb;
+  color: var(--n-400);
   font-size: .82rem;
   text-align: center;
 }
@@ -295,4 +295,9 @@
   .modeler-drop,
   .modeler-button,
   .modeler-links a { transition: none; }
+}
+
+/* Match the shared 14px mobile content inset while keeping local navigation scrolling. */
+@media (max-width: 760px) {
+  .modeler-local-nav { margin-left: -14px; margin-right: -14px; }
 }

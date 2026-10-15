@@ -331,7 +331,7 @@
   margin: 10px auto;
   padding: 8px;
   border-radius: 4px;
-  background: #fff;
+  background: var(--paper);
 }
 
 .v1list-qr-body .qbox img {

@@ -600,10 +600,10 @@
   width: 16px;
   height: 16px;
   padding: 0;
-  border: 2px solid #fff;
+  border: 2px solid var(--paper);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, .45), 0 0 10px rgba(0, 212, 255, .5);
+  box-shadow: 0 0 0 1px color-mix(in srgb,var(--shadow-ink) 45%,transparent), 0 0 10px color-mix(in srgb,var(--primary) 50%,transparent);
 }
 
 .plan-marker:hover { transform: scale(1.25); }

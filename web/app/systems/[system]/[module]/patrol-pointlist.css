@@ -11,7 +11,7 @@
  */
 
 .v1list-page.pointlist-page {
-  --v1list-accent: #c77dff;
+  --v1list-accent: var(--violet);
   --v1list-floor-wash: color-mix(in srgb, var(--v1list-accent) 8%, transparent);
   --v1list-modal-anchor: center;
   --v1list-modal-inset: 16px;
@@ -19,7 +19,7 @@
 }
 
 :root[data-theme='light'] .pointlist-page {
-  --v1list-accent: #9333ea;
+  --v1list-accent: var(--violet);
 }
 
 /* ── 資料列 ─────────────────────────────────────────────────────────── */
