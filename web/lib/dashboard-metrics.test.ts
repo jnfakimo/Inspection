@@ -120,6 +120,8 @@ test('戰情元件不得再顯示模擬數字，且每個有資料來源的元�
   const { readFileSync } = await import('node:fs');
   const source = readFileSync(new URL('../components/DashboardWidgetContent.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /setInterval|Math\.random|\btick\b/, '元件內容不得用計時器或亂數產生數字');
+  assert.match(source, /market\.trend\.slice\(-7\)/, '每週交易趨勢只取最近 7 個交易日');
+  assert.match(source, /computeTurnoverTrend\(market\)\.slice\(-8\)/, '成交總額只取最近 8 個交易日');
   for (const [key, definition] of Object.entries(DASHBOARD_WIDGET_CATALOG)) {
     if (definition.dataSource === 'unavailable') continue;
     assert.match(source, new RegExp(`case '${key}':`), `${key} 缺少真實資料實作`);

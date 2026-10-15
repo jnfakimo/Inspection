@@ -199,18 +199,20 @@ function renderWidget(widgetKey: string, live: DashboardLiveState): React.ReactN
     case 'weekly_trend':
     case 'historical_price_curve': {
       if (!market) return null;
-      if (!market.trend.length) return <Notice>沒有近期交易日資料</Notice>;
-      const labels = market.trend.map(point => point.observed_on.slice(5));
+      // 看板資料的趨勢約含近 24 個交易日：週趨勢只取最近 7 個，歷史曲線畫全部。
+      const points = widgetKey === 'weekly_trend' ? market.trend.slice(-7) : market.trend;
+      if (!points.length) return <Notice>沒有近期交易日資料</Notice>;
+      const labels = points.map(point => point.observed_on.slice(5));
       const data = widgetKey === 'weekly_trend'
-        ? { labels, datasets: [{ label: '成交量（公噸）', data: market.trend.map(point => Math.round(point.quantity / 100) / 10), backgroundColor: CHART_SERIES[1], borderRadius: 4 }] }
-        : { labels, datasets: [{ label: '均價（元/公斤）', data: market.trend.map(point => point.average_price), borderColor: CHART_SERIES[2], backgroundColor: 'rgba(217,119,6,0.12)', borderWidth: 2, fill: true, tension: 0.3 }] };
+        ? { labels, datasets: [{ label: '成交量（公噸）', data: points.map(point => Math.round(point.quantity / 100) / 10), backgroundColor: CHART_SERIES[1], borderRadius: 4 }] }
+        : { labels, datasets: [{ label: '均價（元/公斤）', data: points.map(point => point.average_price), borderColor: CHART_SERIES[2], backgroundColor: 'rgba(217,119,6,0.12)', borderWidth: 2, fill: true, tension: 0.3 }] };
       return <div className="dw-chart">{widgetKey === 'weekly_trend'
         ? <Bar data={data as never} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} />
         : <Line data={data as never} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} />}</div>;
     }
     case 'market_turnover': {
       if (!market) return null;
-      const points = computeTurnoverTrend(market);
+      const points = computeTurnoverTrend(market).slice(-8);
       if (!points.length) return <Notice>沒有近期交易日資料</Notice>;
       const data = { labels: points.map(point => point.date.slice(5)), datasets: [{ label: '成交總額估算（萬元）', data: points.map(point => point.value == null ? null : Math.round(point.value / 1000) / 10), borderColor: CHART_SERIES[1], backgroundColor: 'rgba(5,150,105,0.12)', borderWidth: 2, fill: true, tension: 0.3 }] };
       return <><div className="dw-chart"><Line data={data} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: chartScales }} /></div>
