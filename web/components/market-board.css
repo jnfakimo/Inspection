@@ -91,7 +91,7 @@
 .market-board-stale b{color:var(--text)}
 
 /* 全螢幕公開播放：蓋掉共用導覽，適合大螢幕投放。 */
-.market-board-page[data-fullscreen=true]{position:fixed;inset:0;z-index:70;margin:0;padding:22px clamp(18px,3vw,40px) 28px;overflow:auto;background:var(--bg);background-image:radial-gradient(circle at 82% 0,rgba(0,212,255,.09),transparent 34%)}
+.market-board-page[data-fullscreen=true]{position:fixed;inset:0;z-index:70;margin:0;padding:22px clamp(18px,3vw,40px) 28px;overflow:auto;background:var(--bg);background-image:radial-gradient(circle at 82% 0,color-mix(in srgb,var(--primary) 9%,transparent),transparent 34%)}
 .market-board-page[data-fullscreen=true] .market-board-head h2{font-size:clamp(calc(24px * var(--board-type-scale,1)),calc(2.4vw * var(--board-type-scale,1)),calc(34px * var(--board-type-scale,1)))}
 .market-board-page[data-fullscreen=true] .market-board-stat>strong{font-size:clamp(calc(22px * var(--board-type-scale,1)),calc(2.4vw * var(--board-type-scale,1)),calc(34px * var(--board-type-scale,1)))}
 .market-board-page[data-fullscreen=true] .market-board-trend-canvas{height:clamp(300px,32vh,420px)}
@@ -101,7 +101,7 @@
 .market-board-ticker-page[data-fullscreen=true]{position:fixed;inset:0;z-index:70;padding:22px clamp(18px,3vw,40px) 28px;overflow:auto;background:var(--bg)}
 
 /* /board/ 免登入公開頁：滿版、無共用導覽，直接投放。 */
-.market-board-public-shell{min-height:100vh;padding:clamp(14px,2.4vw,30px);background:var(--bg);background-image:radial-gradient(circle at 84% 0,rgba(0,212,255,.08),transparent 34%)}
+.market-board-public-shell{min-height:100vh;padding:clamp(14px,2.4vw,30px);background:var(--bg);background-image:radial-gradient(circle at 84% 0,color-mix(in srgb,var(--primary) 8%,transparent),transparent 34%)}
 .market-board-public-shell footer{margin-top:16px;color:var(--dim);font-size:calc(11px * var(--board-type-scale,1));text-align:center}
 .market-board-page.market-board-public{gap:12px}
 .market-board-page.market-board-public .market-board-head h2{font-size:clamp(calc(20px * var(--board-type-scale,1)),calc(2vw * var(--board-type-scale,1)),calc(28px * var(--board-type-scale,1)))}
@@ -150,3 +150,6 @@
 .market-board-page .market-board-stat>span,.market-board-page .market-board-stat>strong small,.market-board-page .market-board-stat>em,.market-board-page .market-board-stat .market-movement-badge{color:var(--board-muted)}
 .market-board-public .market-board-trend-range button.active{color:color-mix(in srgb,var(--cyan) 55%,var(--text))}
 .market-board-public .market-board-head p,.market-board-public-shell footer{color:color-mix(in srgb,var(--dim) 80%,var(--text))}
+
+/* Keep long service errors readable without widening the public board. */
+.market-board-page>.notice{min-width:0;overflow-wrap:anywhere}

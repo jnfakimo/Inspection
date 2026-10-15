@@ -1,74 +1,76 @@
-# 交接檔 handoff
+# handoff.md — 交接快照
 
-> 這份只放「下次接手需要知道的事」。durable 的技術規範寫在 `AGENTS.md`，
-> 完整脈絡與踩坑細節寫在 `Obsidian/`，這裡不重複。
+> 目前狀態與下一步。標準在 `AGENTS.md`，進度與證據在 `PROJECT_PLAN.md`。
+> 舊版 994 行交接紀錄封存於 `docs/archive/2026-10-15-pre-unification/handoff.md`。
 
-## ⏯️ 目前做到哪
+## 最後更新
 
-**2026-09-17：全站文字修正（駐衛警巡檢 ➔ 駐衛警巡邏）與業管組交接簿崗位勤務時段點檢項目管理功能完成上線。**
+2026-10-15 · Claude Code。主題：全站版型與色彩統一（13 系統／67 子系統）。**分支 `codex/theme-unification` 已合併 origin/main（`294b97168`）並 push；尚未合併進 main、未部署、未開 PR。**
 
-本次已完成並驗證：
+## 這一批做了什麼
 
-- **全站 12 大系統及子系統命名統一**：全面將「駐衛警巡檢」修正為「駐衛警巡邏」（包含導覽列、模組定義、各系統文字標籤與頁面標題）。
-- **業管組交接簿（`/v2/systems/handover/business/`）點檢項目管理彈窗**（`BusinessDutyModal`）：
-  - 比照駐警隊管理版型，支援 7 大時段 Tabs 切換與數量 Badge。
-  - 支援點檢項目：新增、行內修改文字、刪除、同勤務時段內項次排序（`↑` / `↓`）、一鍵恢復預設 27 項。
-  - 當日點檢進度（如 `0/27`、完成率）與 A4 每日列印／預覽報表（雙欄平衡動態拆分）全站即時連動。
-  - 透過 `web/lib/business-duty-checklist.ts` 保持向下相容性與稽核紀錄（更新者、更新時間）。
-- **自動化測試與規範檢查**：
-  - `web/lib/business-duty-checklist.test.ts` 4 項單元測試全數通過。
-  - 通過交接簿樣式一致性、按鈕標準（`.primary-btn` / `.secondary-btn`）、下拉選單空白列與資安檢核。
+- 新增 `web/app/tokens.css`：全站色彩／字型／尺寸 token 唯一正本（科技版 `:root`、一般版 `:root[data-theme="light"]`）。
+- `globals.css`、`v1-layout.css`：移除重複的主題定義，`globals.css` 開頭 `@import './tokens.css'`。
+- 26 個 CSS 檔的硬編碼 hex 改成 token（506 處）；紙本／列印區刻意保留固定色。
+- 移除 `.system-card`／`.maintenance-card`／`.quick-grid a` 的 amber／green／violet 變體（單一主色決策）。
+- `tools/color-token-check.mjs` 新增並納入 `npm test`（`npm run test:color-tokens`）。
+- 因 token 搬家而調整的檢查：`font-token-check`、`input-select-standard-check`、`metric-card-standard-check`、
+  `handover-style-check`、`handover-report-style-fixtures.test`。
+- TSX 小改：`handover-workspace.tsx`（`var(--danger-text)`）、`LayoutsAdmin.tsx`（`var(--on-primary)`）、
+  `AuditAdminV2.tsx`；`settings.module.css` 的局部 `--ink`／`--muted` 改名為 `--settings-ink`／`--settings-muted`。
+- 文件：重寫 `AGENTS.md`、`PROJECT_PLAN.md`、`handoff.md`；新增 `docs/DOMAIN_RULES.md`；舊版在 `docs/archive/2026-10-15-pre-unification/`。
+- `package.json` 新增 `test:color-tokens` 並接在 `test:button-standard` 之後。
 
-## 🚦 目前狀態
+## WS-8 後續變更（內容寬度、派車頁行內樣式）
 
-- 正式站正常：最新推送 Commit `db1d28d6c`，GitHub `origin/main` 已同步，GitHub Pages 自動部署中。
-- 工作區狀態：乾淨（Working tree clean）。
+- 派車頁 `vehicle-workspace.tsx` 行內樣式全部改為 class（規則在 `admin-workspace.css`），移除對應的 `!important`。
+- `tokens.css` 新增 `--content-width`；`v1-layout.css`、`operations.css`、`v1-listpage.css` 移除各頁自訂寬度；
+  `tools/system-page-heading-check.mjs` 新增寬度斷言；`AGENTS.md`、`PROJECT_PLAN.md`（第 8 節）、`handoff.md` 同步。
+- 已在 C 執行副本驗證：`typecheck:v2` 與 `npm test` 皆 exit 0。這批尚未 commit。
 
-## ➡️ 下一步
+## 驗證狀態
 
-1. 繼續 app-api 拆檔：巡檢 → 設備 → 報修 → 公文 → 市場 → 交接簿（參考 `AGENTS.md` 拆檔指引）。
-2. 每日行情匯入遇「代碼集合有變」時自動通知並列出品項（防重複計量保護）。
-3. 評估北農官網連線逾時重試或排程調整機制。
+- 已驗證：全部變更（含單一主色、三份新文件）同步到 C 執行副本後，`npm run typecheck:v2` 與完整 `npm test` 皆 exit 0。
+- 未驗證：任何瀏覽器畫面（兩主題對比、手機寬度、A4 列印）。瀏覽器啟動曾被環境政策阻擋。
 
-## ⚠️ 注意事項
+## 怎麼驗證（重要）
 
-- **三本交接簿規範一致性**：機電、業管、駐警隊三大電子交接簿必須遵守 `handover-sheet.css`（`hs-*`）共用版型標準。
-- **資料下拉選單規範**：可留白的資料下拉首列必須為空值，按鈕遵循共用 V2 標準。
-- **Windows 寫檔勿帶 BOM**；敏感資訊（API key、token、真名）嚴禁 commit。
+G 槽 `node_modules` 不完整，不能在 G 跑 `npm test`／`tsc`。
 
-## 🕐 最後更新
+```bash
+# 1. G → C 單向同步（PowerShell；排除相依套件與建置輸出）
+robocopy "G:\我的雲端硬碟\AI\Codex\北農巡檢系統" "C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime" /E /R:1 /W:1 /MT:8 /NFL /NDL /NP /NJH /XD node_modules .next .git _pgbackup _pginfo Clipping 創作庫 知識庫 dist_floorplans scratch outputs _site __pycache__ design archive
+# 2. 在 C 執行
+cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run typecheck:v2 && npm test
+```
 
-2026-09-17 16:38 · AntiGravity @ Windows
-· Git push：✅ 已推（`db1d28d6c`）
+注意：robocopy 不會刪除 C 內「G 已不存在」的檔案；若守門測試抱怨 C 內的陌生檔案，先確認不在 G 再刪除（上次是
+`web/components/CommandCenterNavigation.css`）。
 
+## 下一步（接手者從這裡開始）
 
+1. WS-8 續：依 `PROJECT_PLAN.md` 第 8 節處理行內版面樣式最多的檔案（`LayoutsAdmin.tsx`、`business-handover.tsx`、`vehicle-workspace.tsx`），改為 class。
+2. 若能開瀏覽器：一般版／科技版各看一輪代表頁（入口、系統入口、子系統表格頁、交接簿、列印預覽）。
+3. 清掉 `modules.ts` 的 `tone` 欄位與 `mobile/page.tsx` 的 `tone` 類別。
+4. 集中圖表／標記色盤，縮小 `color-token-check.mjs` 的 `ALLOW_TSX`。
 
-### 2026-10-14 電子交接簿列印修正
+## 接手規則
 
-修正業管列印漏隱藏共用頁首所致的 named-page 空白首頁；區段標題與後續內容保持同頁。共用手機排列限於 screen，避免列印簽核改成單欄而增加分頁。公文條碼的全頁隱藏規則限於條碼視窗存在時，避免影響其他模組。保留既有字級、完整簽核及長文續頁。
+- 一次只有一個寫入者；換手先在這份檔案寫明，並重查 `git status` 與要改檔案的 hash。
+- 只動本次相關檔案；不 `git add .`、不 reset／force-push；commit、push、deploy 需使用者明確授權。
+- 新增顏色先改 `tokens.css`（兩主題一起），不要在元件裡寫 hex；要例外先改守門檢查並說明理由。
+- 不讀或寫入 secret、不連 production、不停啟使用中的 server。
 
-驗證：完整 OperationsWorkspace/AppShell、直接列印與預覽後列印，三本×Letter/A4 共 12 份 PDF（20 頁）；短／空／長文／長簽核及排班表回歸 32 份 PDF（104 頁），均無空白頁且末端標記完整。完整頁面假資料業管 3→2 頁、機電 2→1 頁、駐警維持 2 頁。19 項報表樣式回歸、共用版型／頁首檢查、型別與 Pages 建置通過。前次獨立 ReportContent fixture 缺少真實 AppShell 與跨模組 CSS，本次補兩個完整列印入口的驗證。
+## 本批備份
 
-限制：測試產物是 Edge/Skia PDF，現有 CSS A4 named page 適配 Letter/A4 輸出；使用者原件為 Adobe PDF／Distiller Letter，Adobe 原生重印與紙本仍未驗證。未操作正式資料庫、簽核、LINE 或天氣 API。發布僅含本批 CSS、回歸測試與此紀錄；建模與日期欄位候選不在範圍。
+- 遷移前的 CSS 備份在本機暫存區（工作階段結束後可能消失）；正式還原依據是 Git 差異與
+  `docs/archive/2026-10-15-pre-unification/` 內的舊文件。
 
-### 2026-10-14 業管組交接報表分頁修正
+## 合併 origin/main（2026-10-15）
 
-修正列印版第二章班別交接表被切在早班列後的問題；「班別交接事項與出勤狀況」改由新頁開始，保留表格重複欄名與長內容續頁。
-
-驗證：業管組報表版型 fixture 20 項全通過；三本交接簿共用版型與資料錯誤檢查通過。
-
-
-### 2026-10-15 行動端相依安全修補
-
-僅更新 mobile/vehicle-tracker 的 compression 1.8.2、shell-quote 1.12.0、source-map-js 1.2.2，保留 uuid 11.1.1。CI 新增鎖檔安裝、型別檢查、相依樹及 Android/iOS Hermes bundle 驗證；打包使用離線假設定，不讀寫正式服務。
-
-本機 npm ci、行動端 typecheck、相依樹、BLE 8/8 測試及雙平台 bundle 通過；build:pages 通過。完整測試與發布門檻以本 PR 的 CI/CodeQL 結果為準。原生設備、Adobe 及紙本未驗證；業管末尾空白頁及隔離 Supabase 安裝維持使用者暫緩。braces 與 node-forge 的既有無修補版本警示不在本批宣稱解決範圍。
-
-G/runtime 已先備份，再逐檔同步 PR58 已發布交接來源與 manifest，保留其他未提交工作；本 PR 不重複發布該批程式。
-
-
-### 2026-10-15 共用視窗鍵盤操作修正
-
-AdminModal 開啟時原本把鍵盤焦點留在背景，也無法使用 Escape 返回。本批加入開窗聚焦、Tab／Shift+Tab 循環、最上層 Escape 關閉與關閉後焦點還原，保留既有 onClose 流程、巢狀視窗及輸入法保護。
-
-實際元件配合完整 build CSS 的離線驗證：雙主題、320／390／768／1280px 共 8 組，每組 3 次取消／關閉／重開與巢狀返回通過；整頁無溢出，文字對比 14.63:1／16.41:1。型別、頁首、按鈕、安全稽核與 Pages 建置通過。正式帳號、實體裝置及螢幕閱讀器未驗證；本批沒有正式資料／LINE／天氣呼叫。僅本批視窗修正獲使用者部署授權，分頁元件的新重現工作未納入。
+- 在乾淨 worktree `C:UsersjnfaDocumentsCodexwt-merge-main-20261015` 建立 `codex/theme-unification`，合併 origin/main 的 36 個 commit（PR #55–#61）。G 槽工作樹與其 167 個未提交修改沒有被動到。
+- 19 個衝突檔的解法：先取 main 版本，再用腳本重新套用本批轉換（token 遷移、單一主色、內容寬度、派車頁 class、測試斷言）。main 的修改全部保留。
+- `package.json` 以 main 為準，只補回目標檔存在的 `test:metric-card-standard`、`test:font-tokens`、`test:color-tokens`；`test:module-card-standard`、`test:css-source-balance`、`test:request-sequence`、`test:async-load-safety` 的檔案只在 G 槽未追蹤，沒有加入。
+- main 原本的 `PROJECT_PLAN.md`、`handoff.md` 封存為 `docs/archive/2026-10-15-pre-unification/*.origin-main.md`。
+- 已知問題（main 既有，未處理）：`Obsidian/04-開發與部署.md` 第 1995 行有殘留的 `<<<<<<< HEAD` 合併標記。
+- G 槽目前仍在 `codex/html-daily-report-preview`；之後要在 G 繼續工作，需先處理 G 的未提交修改再切到 `codex/theme-unification`。

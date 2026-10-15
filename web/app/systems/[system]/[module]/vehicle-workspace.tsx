@@ -364,50 +364,50 @@ function RequestsModule({ module, profile }: Props) {
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
 
     {/* 申請、兩層核准、派車與回報的五步驟流程 */}
-    <div className="vehicle-flow-grid" style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--cyan)' }}>
-        <b style={{ color: 'var(--cyan)', fontSize: '0.85rem' }}>1. 申請人填單</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>線上填寫用車日期、地點、人數與事由</div>
+    <div className="vehicle-flow-grid">
+      <div className="vehicle-step tone-cyan">
+        <b>1. 申請人填單</b>
+        <div>線上填寫用車日期、地點、人數與事由</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--amber)' }}>
-        <b style={{ color: 'var(--amber)', fontSize: '0.85rem' }}>2. 課長核准</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>申請人所屬課長審核或退回</div>
+      <div className="vehicle-step tone-amber">
+        <b>2. 課長核准</b>
+        <div>申請人所屬課長審核或退回</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--violet)' }}>
-        <b style={{ color: 'var(--violet)', fontSize: '0.85rem' }}>3. 部門經理核准</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>部門經理完成第二層審核</div>
+      <div className="vehicle-step tone-violet">
+        <b>3. 部門經理核准</b>
+        <div>部門經理完成第二層審核</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--green)' }}>
-        <b style={{ color: 'var(--green)', fontSize: '0.85rem' }}>4. 派車人員派車</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>兩層核准完成後指派車號與駕駛</div>
+      <div className="vehicle-step tone-green">
+        <b>4. 派車人員派車</b>
+        <div>兩層核准完成後指派車號與駕駛</div>
       </div>
-      <div style={{ padding: '12px 14px', background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', borderLeft: '3px solid var(--blue)' }}>
-        <b style={{ color: 'var(--blue)', fontSize: '0.85rem' }}>5. 司機接單與回報</b>
-        <div style={{ color: 'var(--dim)', fontSize: '0.72rem', marginTop: '3px' }}>司機於用車當日接單、實際里程與加油紀錄回報</div>
+      <div className="vehicle-step tone-blue">
+        <b>5. 司機接單與回報</b>
+        <div>司機於用車當日接單、實際里程與加油紀錄回報</div>
       </div>
     </div>
 
     {/* 兩層核准與派車 KPI */}
-    <div className="vehicle-kpi-grid" style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--amber)' }}>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--amber)', lineHeight: 1 }}>{kApprovalCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待課長核准</div>
+    <div className="vehicle-kpi-grid">
+      <div className="vehicle-kpi tone-amber">
+        <div className="vehicle-kpi-value">{kApprovalCount}</div>
+        <div className="vehicle-kpi-label">待課長核准</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--violet)' }}>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--violet)', lineHeight: 1 }}>{kManagerApprovalCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待部門經理核准</div>
+      <div className="vehicle-kpi tone-violet">
+        <div className="vehicle-kpi-value">{kManagerApprovalCount}</div>
+        <div className="vehicle-kpi-label">待部門經理核准</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--blue)' }}>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--blue)', lineHeight: 1 }}>{kDispatchCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待車管派車</div>
+      <div className="vehicle-kpi tone-blue">
+        <div className="vehicle-kpi-value">{kDispatchCount}</div>
+        <div className="vehicle-kpi-label">待車管派車</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--violet)' }}>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--violet)', lineHeight: 1 }}>{kTodayCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>今日已派行程</div>
+      <div className="vehicle-kpi tone-violet">
+        <div className="vehicle-kpi-value">{kTodayCount}</div>
+        <div className="vehicle-kpi-label">今日已派行程</div>
       </div>
-      <div style={{ background: 'var(--panel)', border: '1px solid var(--line)', borderRadius: '8px', padding: '12px 14px', borderLeft: '3px solid var(--green)' }}>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--green)', lineHeight: 1 }}>{kDriverCount}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--dim)', marginTop: '6px' }}>待司機回報</div>
+      <div className="vehicle-kpi tone-green">
+        <div className="vehicle-kpi-value">{kDriverCount}</div>
+        <div className="vehicle-kpi-label">待司機回報</div>
       </div>
     </div>
 
@@ -423,24 +423,24 @@ function RequestsModule({ module, profile }: Props) {
     </div>}
 
     {/* V1 四大頁籤（帶計數） */}
-    <div className="vehicle-request-tabs" style={{ gap: '4px', borderBottom: '1px solid var(--line)', marginBottom: '12px' }}>
-      <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('mine')}>
-        我的申請 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,212,255,0.15)', fontSize: '0.68rem' }}>{mineRows.length}</span>
+    <div className="vehicle-request-tabs">
+      <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} onClick={() => setTab('mine')}>
+        我的申請 <span className="vehicle-tab-count is-mine">{mineRows.length}</span>
       </button>
-      {isDriver && <button className={`secondary-btn ${tab === 'driverToday' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('driverToday')}>
-        今日派車 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(0,255,157,0.15)', fontSize: '0.68rem' }}>{driverTodayRows.length}</span>
+      {isDriver && <button className={`secondary-btn ${tab === 'driverToday' ? 'primary-btn' : ''}`} onClick={() => setTab('driverToday')}>
+        今日派車 <span className="vehicle-tab-count is-driver">{driverTodayRows.length}</span>
       </button>}
-      <button className={`secondary-btn ${tab === 'todo' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('todo')}>
-        待我處理 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(255,179,0,0.15)', fontSize: '0.68rem' }}>{todoRows.length}</span>
+      <button className={`secondary-btn ${tab === 'todo' ? 'primary-btn' : ''}`} onClick={() => setTab('todo')}>
+        待我處理 <span className="vehicle-tab-count is-todo">{todoRows.length}</span>
       </button>
-      <button className={`secondary-btn ${tab === 'all' ? 'primary-btn' : ''}`} style={{ borderRadius: '4px 4px 0 0' }} onClick={() => setTab('all')}>
-        派車總覽 <span style={{ marginLeft: '4px', padding: '1px 6px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', fontSize: '0.68rem' }}>{rows.length}</span>
+      <button className={`secondary-btn ${tab === 'all' ? 'primary-btn' : ''}`} onClick={() => setTab('all')}>
+        派車總覽 <span className="vehicle-tab-count is-all">{rows.length}</span>
       </button>
     </div>
 
     {/* 工具列 */}
     <section className="panel admin-panel vehicle-request-table-panel">
-      <div className="admin-toolbar vehicle-request-toolbar" style={{ gap: '8px' }}>
+      <div className="admin-toolbar vehicle-request-toolbar">
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">全部狀態</option>
           {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -610,41 +610,41 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
   };
 
   return <AdminModal title="公務車派車報表" onClose={onClose}>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', marginBottom: '12px' }}>
-      <label style={{ fontSize: '0.7rem' }}>開始日期<LocalizedDateInput aria-label="報表開始日期（年/月/日）" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></label>
-      <label style={{ fontSize: '0.7rem' }}>結束日期<LocalizedDateInput aria-label="報表結束日期（年/月/日）" value={reportTo} onChange={e => setReportTo(e.target.value)} /></label>
-      <label style={{ fontSize: '0.7rem' }}>狀態<select value={reportStatus} onChange={e => setReportStatus(e.target.value)}>
+    <div className="vehicle-report-filters">
+      <label>開始日期<LocalizedDateInput aria-label="報表開始日期（年/月/日）" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></label>
+      <label>結束日期<LocalizedDateInput aria-label="報表結束日期（年/月/日）" value={reportTo} onChange={e => setReportTo(e.target.value)} /></label>
+      <label>狀態<select value={reportStatus} onChange={e => setReportStatus(e.target.value)}>
         <option value="">全部狀態</option>
         {Object.entries(STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
       </select></label>
-      <label style={{ fontSize: '0.7rem' }}>關鍵字<input value={reportQuery} onChange={e => setReportQuery(e.target.value)} placeholder="搜尋地點、車號、人員…" /></label>
+      <label>關鍵字<input value={reportQuery} onChange={e => setReportQuery(e.target.value)} placeholder="搜尋地點、車號、人員…" /></label>
     </div>
 
     {/* 報表 KPI 統計 */}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '12px' }}>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>申請單數</div>
-        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.count} 筆</div>
+    <div className="vehicle-report-kpis">
+      <div className="vehicle-report-kpi">
+        <div>申請單數</div>
+        <div>{metrics.count} 筆</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>乘車人次</div>
-        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.passengers} 人</div>
+      <div className="vehicle-report-kpi">
+        <div>乘車人次</div>
+        <div>{metrics.passengers} 人</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>完成里程</div>
-        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.mileage.toFixed(1)} km</div>
+      <div className="vehicle-report-kpi">
+        <div>完成里程</div>
+        <div>{metrics.mileage.toFixed(1)} km</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>加油費用</div>
-        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--cyan)' }}>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
+      <div className="vehicle-report-kpi">
+        <div>加油費用</div>
+        <div>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
       </div>
-      <div style={{ padding: '8px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '8px' }}>
-        <div style={{ fontSize: '0.62rem', color: 'var(--dim)' }}>異常通報</div>
-        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: metrics.abnormal > 0 ? 'var(--red)' : 'var(--cyan)' }}>{metrics.abnormal} 件</div>
+      <div className={`vehicle-report-kpi${metrics.abnormal > 0 ? ' is-alert' : ''}`}>
+        <div>異常通報</div>
+        <div>{metrics.abnormal} 件</div>
       </div>
     </div>
 
-    <div className="responsive-table" style={{ maxHeight: '45vh', overflow: 'auto' }}><table>
+    <div className="responsive-table vehicle-modal-table"><table>
       <thead><tr><th>日期／時段</th><th>單號／狀態</th><th>單位／申請人</th><th>起訖地點</th><th>用途</th><th>車號／司機</th><th>里程</th><th>加油</th><th>異常</th></tr></thead>
       <tbody>{filtered.map(r => <tr key={r.request_id}>
         <td>{String(r.trip_date)}<small>{timeText(r.planned_departure_time)}–{timeText(r.planned_return_time)}</small></td>
@@ -655,7 +655,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
         <td>{fmt(r.plate_no || '待派')}<small>{fmt(r.driver_name || '—')}</small></td>
         <td>{r.total_mileage != null ? `${Number(r.total_mileage).toFixed(1)} km` : '—'}</td>
         <td>{r.refueled ? `${Number(r.refuel_cost || 0).toLocaleString('zh-TW')} 元` : '否'}</td>
-        <td>{r.has_abnormality ? <span style={{ color: 'var(--red)' }}>有｜{fmt(r.abnormality_note)}</span> : '無'}</td>
+        <td>{r.has_abnormality ? <span className="vehicle-abnormal-text">有｜{fmt(r.abnormality_note)}</span> : '無'}</td>
       </tr>)}</tbody>
     </table></div>
     {filtered.length === 0 && <p className="empty">無符合條件的派車資料</p>}
@@ -705,11 +705,11 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
   };
 
   return <AdminModal title="公務車主檔管理" onClose={onClose}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+    <div className="vehicle-modal-head">
       <span>共 {vehicles.length} 台車輛</span>
       <button className="primary-btn compact" onClick={() => setEditing({ status: 'active', seats: 5, current_odometer: 0 })}>＋ 新增車輛</button>
     </div>
-    <div className="responsive-table" style={{ maxHeight: '45vh', overflow: 'auto' }}><table>
+    <div className="responsive-table vehicle-modal-table"><table>
       <thead><tr><th>車號</th><th>車名</th><th>廠牌／型號</th><th>座位</th><th>目前里程</th><th>狀態</th><th>操作</th></tr></thead>
       <tbody>{vehicles.map(v => <tr key={String(v.vehicle_id)}>
         <td><strong>{fmt(v.plate_no)}</strong></td>

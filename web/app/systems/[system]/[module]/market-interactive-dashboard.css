@@ -253,9 +253,9 @@
 }
 .mid-chart-legend span{display:inline-flex;align-items:center;gap:5px}
 .mid-chart-legend i{display:inline-block;width:15px;height:7px;border-radius:2px}
-.mid-chart-legend i.volume,.mid-chart-legend i.current{background:#0284c7}
-.mid-chart-legend i.price{height:0;border-top:2px solid #d97706;border-radius:0}
-.mid-chart-legend i.compare{background:#7c3aed}
+.mid-chart-legend i.volume,.mid-chart-legend i.current{background:var(--primary)}
+.mid-chart-legend i.price{height:0;border-top:2px solid var(--amber);border-radius:0}
+.mid-chart-legend i.compare{background:var(--violet)}
 .mid-chart-legend small{margin-left:auto}
 .mid-chart-canvas{position:relative;height:360px;min-width:0}
 .mid-secondary-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:12px}

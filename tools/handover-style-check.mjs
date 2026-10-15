@@ -113,7 +113,7 @@ for (const token of ['簽核說明（可留白）', '簽核說明（已保存）
 }
 if (business.includes('<strong>📋 業管組主管批核流程</strong>')) errors.push('業管組：主管簽核標題不可再重複使用 emoji 圖示');
 const businessCss = read('business-handover.css');
-for (const token of ['.business-approval-section.panel{', 'border:1px solid #CBD5E1', 'background:#F1F5F9', 'background:#E2E8F0;color:#475569', 'color:#334155']) {
+for (const token of ['.business-approval-section.panel{', 'border:1px solid var(--n-300)', 'background:var(--n-100)', 'background:var(--n-200);color:var(--n-600)', 'color:var(--n-700)']) {
   if (!businessCss.includes(token)) errors.push(`業管組：主管簽核區缺少共用藍灰色系 ${token}`);
 }
 // SYS-04 七個頁面模組的資料載入失敗必須顯示訊息，並解除 busy 狀態。
@@ -157,7 +157,7 @@ const businessReportSource = read('business-handover.tsx');
 for (const token of ['className="business-print-content hs-report hs-daily-report"', 'HandoverReportHeading', 'HandoverReportOverview', 'hs-report-shift-row', 'hs-report-approval-stage']) {
   if (!businessReportSource.includes(token)) errors.push(`業管組日報未沿用共用報表樣式：${token}`);
 }
-for (const token of ['--hs-shift-color-1:#0284c7', '--hs-shift-color-2:#047857', '--hs-shift-color-3:#b45309', '.hs-report-approval-stage{border:1px solid #cbd5e1']) {
+for (const token of ['--hs-shift-color-1:var(--primary)', '--hs-shift-color-2:var(--live-solid)', '--hs-shift-color-3:var(--amber)', '.hs-report-approval-stage{border:1px solid #cbd5e1']) {
   if (!shared.includes(token)) errors.push(`handover-sheet.css 缺少共用設計 token：${token}`);
 }
 if (!read('handover-sheet.tsx').includes('size:A4') || !read('handover-sheet.tsx').includes('margin:14mm 9mm 12mm') || !printStyles.includes('width:100%;min-height:0;height:auto;overflow:visible')

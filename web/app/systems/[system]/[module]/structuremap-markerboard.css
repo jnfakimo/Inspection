@@ -474,7 +474,7 @@
   border: 1px solid var(--cyan);
   border-radius: 6px;
   background: var(--panel);
-  box-shadow: 0 0 26px rgba(0, 0, 0, .6);
+  box-shadow: 0 0 26px color-mix(in srgb,var(--shadow-ink) 60%,transparent);
 }
 
 .mb-detail .dt-head {
@@ -621,7 +621,7 @@
 
 /* 選中時底色換成該類型的識別色，文字固定深色才讀得到（五個識別色都偏亮）。 */
 .mb-modal .kind-row .kbtn.on {
-  color: #022;
+  color: var(--surface-deep);
   font-weight: 700;
 }
 

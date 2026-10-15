@@ -1,5 +1,5 @@
 {
-  "sourceSnapshot": "Handover full-page print pagination repair 2026-10-14",
+  "sourceSnapshot": "Handover full-page print pagination repair 2026-10-14 + theme token unification 2026-10-15",
   "files": [
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.tsx",
@@ -7,7 +7,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.css",
-      "sha256": "60FA954B973BDE94A7147BC343FAA3D5F7851CBDAF97BE4E8516115737B847AE"
+      "sha256": "053A3BDE6BED18B05904CF8B1C5C7C5FD97FA20C2E2FBFBEFDBF45584B29E27F"
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.tsx",
@@ -15,7 +15,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "16C8B6443264C78941A06C13509E6530D02839082B65AB1CAB41F0B9F4B01353"
+      "sha256": "CC7C59542F1C95CD301A0D30D7B7B651FC7F3F039EB5831131F73CBDC0E587EF"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
@@ -23,7 +23,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.css",
-      "sha256": "7495EC7C034D450D6DB10222DD04CD36CCA57610AB1F56854F1597D8BB2505BD"
+      "sha256": "AC1E92A73BB1ECCE59C461AE23EC803354FDDA39456926E80449C7FBB12DE9A1"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover-view.tsx",
@@ -35,11 +35,11 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-sheet.css",
-      "sha256": "4A9DD3A3981DE47D47C1B4E087C777B67E64576AD9BF8125C15834D8ADAC7119"
+      "sha256": "395CAB156D4E03035B3994CAE3F881B8FE5D680CA8F0E5DBF75EE7B1E4809D88"
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-workspace.tsx",
-      "sha256": "3CF7B0DB96BA4A72D28E7DA368BB7A92345D9B28B595FB1AB182970909A76ACA"
+      "sha256": "CAE41841A5608D8DE8C2D8FA82FB9F6B79B2D1DF374AEEEAB125D6AD781F2C1A"
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-schedule.tsx",
@@ -47,7 +47,7 @@
     },
     {
       "path": "tools/handover-style-check.mjs",
-      "sha256": "8EC868C5E0D7255AEEBAA252B20EB7913291C20BAA37DFA9C6DBDC99035BFF0E"
+      "sha256": "42A41DEECCC85E5F89FEEC16BD494660B56FB3777245F7EE77FDFF891A7366D1"
     },
     {
       "path": "tools/mechanical-print-fit-check.mjs",
@@ -55,7 +55,7 @@
     },
     {
       "path": "tools/handover-report-style-fixtures.test.mjs",
-      "sha256": "21F48CDABD31F76E492FF29C764841F32A4F467C47DD476DC96A90298F213C70"
+      "sha256": "3642B3729B0AEE9306B671648B8FAC36A902930562A6DAF1D4C7CD8242A093F4"
     },
     {
       "path": "web/components/admin/shared.tsx",

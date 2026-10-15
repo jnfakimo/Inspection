@@ -42,9 +42,9 @@
   width: calc(9px * var(--pin-scale, 1));
   height: calc(9px * var(--pin-scale, 1));
   margin: 0 auto;
-  border: 1px solid #fff;
+  border: 1px solid var(--paper);
   border-radius: 50% 50% 50% 0;
-  box-shadow: 0 0 4px rgba(0, 0, 0, .6);
+  box-shadow: 0 0 4px color-mix(in srgb,var(--shadow-ink) 60%,transparent);
   transform: rotate(-45deg);
   transition: transform .12s;
 }
@@ -62,7 +62,7 @@
   top: 50%;
   width: var(--llen, 0);
   height: 1px;
-  background: #00b39c;
+  background: var(--live);
   opacity: 0;
   transform-origin: 0 50%;
   transform: rotate(var(--lang, 0deg));
@@ -74,10 +74,10 @@
   left: calc(50% + var(--lx, 0px));
   top: var(--ly, -3px);
   padding: 1px 6px;
-  border: 1px solid rgba(255, 255, 255, .42);
+  border: 1px solid color-mix(in srgb,var(--n-0) 42%,transparent);
   border-radius: 3px;
-  background: #000;
-  color: #fff;
+  background: var(--shadow-ink);
+  color: var(--on-solid);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;

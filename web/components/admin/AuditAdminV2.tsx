@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { AdminHeader, AdminModal, type AdminProps, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from './shared';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { auditSafeValue } from '@/lib/security-audit-sanitize';
+import { createRequestSequence } from '@/lib/request-sequence';
 
 const RESOURCE_LABELS: Record<string, string> = {
   system_usage: '系統／功能使用', users: '帳號', roles: '系統角色', role_permissions: '角色權限',
@@ -108,7 +109,7 @@ function renderAuditFlow(row: Row) {
 
   return (
     <div className="audit-flow-box" style={{ padding: '15px', background: 'var(--panel2)', borderRadius: '8px', marginBottom: '15px' }}>
-      <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan, #00d4ff)' }}>操作摘要</h4>
+      <h4 style={{ margin: '0 0 10px 0', color: 'var(--cyan)' }}>操作摘要</h4>
       <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.6' }}>
         <li><strong>行為：</strong>{summary}</li>
         {ip && <li><strong>來源 IP：</strong>{ip}</li>}
@@ -123,6 +124,7 @@ export function AuditAdminV2({ profile, module }: AdminProps) {
   const [openAlertCount, setOpenAlertCount] = useState(0);
   const [actors, setActors] = useState<Array<{ id: string; label: string }>>([]);
   const [query, setQuery] = useState(''), [actor, setActor] = useState(''), [actorId, setActorId] = useState(''), [resource, setResource] = useState(''), [resourceText, setResourceText] = useState(''), [action, setAction] = useState(''), [actionText, setActionText] = useState(''), [from, setFrom] = useState(''), [to, setTo] = useState(''), [page, setPage] = useState(1), [detail, setDetail] = useState<Row | null>(null);
+  const loadSequence = useRef(createRequestSequence());
 
   useEffect(() => {
     void getSupabase().from('users').select('user_id,name,username').order('name').limit(1000).then(({ data, error }) => {
@@ -135,6 +137,7 @@ export function AuditAdminV2({ profile, module }: AdminProps) {
   }, []);
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
     setBusy(true); setNote('');
     try {
       if (from && to && from > to) {
@@ -163,6 +166,7 @@ export function AuditAdminV2({ profile, module }: AdminProps) {
         request,
         getSupabase().from('security_alerts').select('alert_id', { count: 'exact', head: true }).eq('status', 'open'),
       ]);
+      if (!loadSequence.current.isCurrent(sequence)) return;
       const { data, error, count } = logResult;
       if (!alertResult.error) setOpenAlertCount(alertResult.count || 0);
       if (error) {
@@ -178,11 +182,16 @@ export function AuditAdminV2({ profile, module }: AdminProps) {
         return;
       }
       setLogs(data || []); setTotal(nextTotal);
-    } catch (error) { setLogs([]); setTotal(0); setNote(`失敗：${errorMessage(error, '稽核紀錄載入失敗')}`); }
-    finally { setBusy(false); }
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return;
+      setLogs([]); setTotal(0); setNote('載入失敗：' + errorMessage(error, '稽核紀錄讀取失敗'));
+    } finally { if (loadSequence.current.isCurrent(sequence)) setBusy(false); }
   }, [action, actor, actorId, from, page, query, resource, to]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
   const changeFilter = (setter: (value: string) => void, value: string) => { setter(value); setPage(1); };
   const changeActor = (value: string) => { setActor(value); setActorId(actors.find(item => item.label === value)?.id || ''); setPage(1); };
   const changeResource = (value: string) => { setResourceText(value); setResource(RESOURCES.find(([, label]) => label === value)?.[0] || ''); setPage(1); };

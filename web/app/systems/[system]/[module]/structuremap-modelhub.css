@@ -14,21 +14,21 @@
 
 .modelhub-page {
   /* 科技版沿用原有的識別色，HUB-06 復用平面圖的青色。 */
-  --modelhub-pink: #ff5ea0;
-  --modelhub-cyan: #00d4ff;
-  --modelhub-purple: #c77dff;
-  --modelhub-green: #00ff9d;
-  --modelhub-amber: #ffb300;
+  --modelhub-pink: var(--pink);
+  --modelhub-cyan: var(--primary);
+  --modelhub-purple: var(--violet);
+  --modelhub-green: var(--green);
+  --modelhub-amber: var(--amber);
   /* V2 未載入 V1 的 'Share Tech Mono'，退回系統等寬字，字距與行高不受影響。 */
   --modelhub-mono: ui-monospace, 'Share Tech Mono', SFMono-Regular, Menlo, monospace;
 }
 
 :root[data-theme='light'] .modelhub-page {
-  --modelhub-pink: #be185d;
-  --modelhub-cyan: #0284c7;
-  --modelhub-purple: #7c3aed;
-  --modelhub-green: #047857;
-  --modelhub-amber: #b45309;
+  --modelhub-pink: var(--pink-text);
+  --modelhub-cyan: var(--primary);
+  --modelhub-purple: var(--violet);
+  --modelhub-green: var(--live-solid);
+  --modelhub-amber: var(--amber);
 }
 
 /* ── 頁面標頭 ─────────────────────────────────────────────────────────── */
@@ -87,7 +87,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(0, 212, 255, .32));
+  filter: drop-shadow(0 0 8px color-mix(in srgb,var(--primary) 32%,transparent));
 }
 
 /* ── 卡片列 ───────────────────────────────────────────────────────────── */
@@ -155,7 +155,7 @@
   border-color: var(--modelhub-accent);
   background: color-mix(in srgb, var(--cyan) 4%, var(--panel));
   transform: translateY(-3px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .4), 0 0 0 1px var(--modelhub-accent) inset;
+  box-shadow: 0 8px 28px color-mix(in srgb,var(--shadow-ink) 40%,transparent), 0 0 0 1px var(--modelhub-accent) inset;
 }
 
 .modelhub-card-badge {

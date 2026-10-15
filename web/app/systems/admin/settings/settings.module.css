@@ -1,7 +1,7 @@
 /* 管理設定頁跟隨全站 light/tech 主題。狀態底色、文字與邊框都由主題 token 計算。 */
 .page {
-  --ink: var(--text);
-  --muted: var(--dim);
+  --settings-ink: var(--text);
+  --settings-muted: var(--dim);
   --settings-line: var(--line);
   --soft: var(--surface-soft);
   --accent: var(--cyan);
@@ -20,7 +20,7 @@
   --settings-warning-text: color-mix(in srgb, var(--amber) 70%, var(--text));
   --settings-primary-bg: var(--blue);
   --settings-primary-fg: var(--panel);
-  color: var(--ink);
+  color: var(--settings-ink);
   min-height: 100%;
   padding-bottom: 48px;
 }
@@ -32,7 +32,7 @@
 
 .breadcrumbs {
   align-items: center;
-  color: var(--muted);
+  color: var(--settings-muted);
   display: flex;
   font-size: 0.78rem;
   gap: 8px;
@@ -49,7 +49,7 @@
 }
 
 .breadcrumbs strong {
-  color: var(--ink);
+  color: var(--settings-ink);
   font-weight: 700;
 }
 
@@ -59,7 +59,7 @@
     linear-gradient(120deg, color-mix(in srgb, var(--cyan) 8%, transparent), transparent 48%), var(--panel);
   border: 1px solid var(--settings-line);
   border-left: 5px solid var(--accent);
-  box-shadow: 0 10px 28px rgba(15, 35, 58, 0.07);
+  box-shadow: 0 10px 28px color-mix(in srgb,var(--shadow-ink) 7%,transparent);
   display: flex;
   justify-content: space-between;
   margin-bottom: 20px;
@@ -78,14 +78,14 @@
 }
 
 .hero h2 {
-  color: var(--ink);
+  color: var(--settings-ink);
   font-size: clamp(1.55rem, 3vw, 2.1rem);
   line-height: 1.15;
   margin: 0;
 }
 
 .hero p {
-  color: var(--muted);
+  color: var(--settings-muted);
   line-height: 1.7;
   margin: 9px 0 0;
   max-width: 720px;
@@ -129,8 +129,8 @@
   background: var(--panel);
   border: 1px solid var(--settings-line);
   border-radius: 3px;
-  box-shadow: 0 5px 18px rgba(15, 35, 58, 0.055);
-  color: var(--ink);
+  box-shadow: 0 5px 18px color-mix(in srgb,var(--shadow-ink) 6%,transparent);
+  color: var(--settings-ink);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -157,7 +157,7 @@
 .card:hover,
 .card:focus-visible {
   border-color: var(--settings-accent);
-  box-shadow: 0 12px 28px rgba(15, 35, 58, 0.12);
+  box-shadow: 0 12px 28px color-mix(in srgb,var(--shadow-ink) 12%,transparent);
   outline: none;
   transform: translateY(-3px);
 }
@@ -193,7 +193,7 @@
 }
 
 .card h3 {
-  color: var(--ink);
+  color: var(--settings-ink);
   font-size: 1.05rem;
   margin: 0;
 }
@@ -208,7 +208,7 @@
 }
 
 .card p {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.82rem;
   line-height: 1.65;
   margin: 10px 0 16px;
@@ -258,7 +258,7 @@
   background: var(--panel);
   border: 1px solid var(--settings-line);
   border-radius: 4px;
-  box-shadow: 0 8px 24px rgba(15, 35, 58, 0.07);
+  box-shadow: 0 8px 24px color-mix(in srgb,var(--shadow-ink) 7%,transparent);
   padding: 24px;
 }
 
@@ -273,13 +273,13 @@
 }
 
 .panelHeading h3 {
-  color: var(--ink);
+  color: var(--settings-ink);
   font-size: 1.25rem;
   margin: 0;
 }
 
 .panelHeading p {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.84rem;
   line-height: 1.6;
   margin: 6px 0 0;
@@ -348,7 +348,7 @@
   background: var(--panel);
   border: 1px solid var(--settings-line);
   border-radius: 8px;
-  color: var(--ink);
+  color: var(--settings-ink);
   font: inherit;
   min-height: var(--form-control-height);
   outline: none;
@@ -365,7 +365,7 @@
 }
 
 .formGrid label small {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.7rem;
   font-weight: 500;
   line-height: 1.5;
@@ -458,7 +458,7 @@
 
 .helperText,
 .securityNote {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.72rem;
   line-height: 1.6;
   margin: 12px 0 0;
@@ -502,7 +502,7 @@
 }
 
 .toggleRow small {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.7rem;
 }
 
@@ -548,7 +548,7 @@
   background: var(--panel);
   border: 1px solid var(--settings-line);
   border-radius: 8px;
-  color: var(--ink);
+  color: var(--settings-ink);
   font: inherit;
   min-height: var(--form-control-height);
   padding: 9px 11px;
@@ -556,7 +556,7 @@
 }
 
 .thresholdGrid small {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.68rem;
   font-weight: 500;
   line-height: 1.45;
@@ -707,7 +707,7 @@
 .orphanGroup {
   background: var(--surface-soft);
   border: 1px dashed var(--settings-line);
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.82rem;
   padding: 22px;
   text-align: center;
@@ -819,7 +819,7 @@
 }
 
 .integrationHeading span {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.7rem;
 }
 
@@ -860,7 +860,7 @@
 }
 
 .integrationCard p {
-  color: var(--muted);
+  color: var(--settings-muted);
   font-size: 0.7rem;
   line-height: 1.55;
   margin: 4px 0 0;
@@ -907,7 +907,7 @@
 }
 
 .modalHeading h3 {
-  color: var(--ink);
+  color: var(--settings-ink);
   margin: 4px 0 0;
 }
 
@@ -936,7 +936,7 @@
 .denied {
   background: var(--panel);
   border: 1px solid var(--settings-error-border);
-  box-shadow: 0 8px 24px rgba(15, 35, 58, 0.07);
+  box-shadow: 0 8px 24px color-mix(in srgb,var(--shadow-ink) 7%,transparent);
   color: var(--settings-error-text);
   margin: 48px auto;
   max-width: 620px;

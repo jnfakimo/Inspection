@@ -580,7 +580,7 @@ function CasesModule({ module, profile }: Props) {
             <td>{fmt(row.title)}</td>
             <td>{fmtTime(row.incident_time)}<small>{fmt(row.incident_location)}</small></td>
             <td>{nameOf(row.assigned_to)}<small>{fmt(row.responsible_unit)}</small></td>
-            <td>{fmt(row.due_date)}{late ? <small style={{ color: '#b42318' }}>已逾期</small> : null}</td>
+            <td>{fmt(row.due_date)}{late ? <small style={{ color: 'var(--danger-text)' }}>已逾期</small> : null}</td>
             <td><Pill value={row.status} labels={CASE_STATUS} tones={CASE_TONE} /></td>
             <td><div className="admin-row-actions"><button onClick={() => void openDetail(row)}>詳細</button></div></td>
           </tr>;
@@ -894,7 +894,7 @@ function EquipmentOverview({ module, profile }: Props) {
             <td>{fmt(row.name)}</td>
             <td>{fmt(row.floor)}<small>{fmt(row.location)}</small></td>
             <td>{fmt(row.responsible_name)}</td>
-            <td>{fmt(row.next_maintenance_on)}{late ? <small style={{ color: '#b42318' }}>已逾期</small> : null}</td>
+            <td>{fmt(row.next_maintenance_on)}{late ? <small style={{ color: 'var(--danger-text)' }}>已逾期</small> : null}</td>
             <td><Pill value={row.status} labels={EQUIPMENT_STATUS} tones={EQUIPMENT_TONE} /></td>
           </tr>;
         })}</tbody>

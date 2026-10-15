@@ -112,23 +112,23 @@
 
 /* 本日報表預覽：螢幕使用可捲動的 HTML 報表；A4 尺寸只套用於列印樣式。 */
 /* 本日報表預覽：螢幕使用可捲動的 HTML 報表；A4 尺寸只套用於列印樣式。 */
-.mechanical-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.72)}
-.mechanical-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,.22)}
+.mechanical-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:color-mix(in srgb,var(--surface-deep) 72%,transparent)}
+.mechanical-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--text);box-shadow:0 6px 20px color-mix(in srgb,var(--shadow-ink) 22%,transparent)}
 .mechanical-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .mechanical-report-preview-bar strong{font-size:17px}
 .mechanical-report-preview-bar span{color:var(--dim);font-size:13px}
 .mechanical-report-preview-bar .mechanical-report-edit-hint{flex-basis:100%;color:var(--cyan);font-weight:600}
-.mechanical-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:#eef2f7}
-.mechanical-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:0 auto;padding:clamp(18px,3vw,40px);background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.16)}
+.mechanical-report-preview-scroll{min-width:0;overflow:auto;padding:clamp(12px,3vw,32px);background:var(--n-100)}
+.mechanical-report-preview-page{box-sizing:border-box;width:min(100%,1200px);margin:0 auto;padding:clamp(18px,3vw,40px);background:var(--paper);box-shadow:0 8px 28px color-mix(in srgb,var(--shadow-ink) 16%,transparent)}
 .mechanical-report-preview .mechanical-print-sheet{position:static;box-sizing:border-box;width:100%;height:auto;min-height:0;overflow:visible;padding:0;background:#fff;color:#1e293b;font-family:var(--font);box-shadow:none}
 .mechanical-report-preview .mechanical-print-content{width:100%;transform:none}
 .mechanical-report-row-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
 .mechanical-report-edit-action{min-height:30px}
-.mechanical-report-preview .mechanical-report-add-action{border-color:#db2777;background:rgb(251 207 232 / 80%);color:#831843;font-weight:700}
+.mechanical-report-preview .mechanical-report-add-action{border-color:var(--pink);background:var(--pink-soft);color:var(--pink-text);font-weight:700}
 .mechanical-report-preview .mechanical-report-add-action:not(:disabled):hover,
-.mechanical-report-preview .mechanical-report-add-action:focus-visible{border-color:#be185d;background:rgb(249 168 212 / 80%);color:#701a3e;box-shadow:0 4px 12px rgba(219,39,119,.2)}
-.mechanical-report-row-actions small{color:#64748b;font-size:12px}
-.mechanical-report-correction-mark{display:block;margin-top:8px;color:#075985;font-size:11px;font-weight:700}
+.mechanical-report-preview .mechanical-report-add-action:focus-visible{border-color:var(--pink-text);background:var(--pink-border);color:var(--pink-text);box-shadow:0 4px 12px color-mix(in srgb,var(--pink) 20%,transparent)}
+.mechanical-report-row-actions small{color:var(--n-500);font-size:12px}
+.mechanical-report-correction-mark{display:block;margin-top:8px;color:var(--info-deep);font-size:11px;font-weight:700}
 .mechanical-correction-modal{width:min(800px,calc(100vw - 24px))}
 .mechanical-correction-intro{margin:16px 20px 0;padding:10px 12px;border-left:4px solid var(--cyan);background:color-mix(in srgb,var(--cyan) 7%,var(--panel2));font-size:13px;line-height:1.6}
 .mechanical-correction-form{padding:18px 20px 4px}
@@ -153,9 +153,9 @@
 .mechanical-print-sheet.hs-daily-report{color:#1e293b}
 .mechanical-print-table{min-width:780px}
 .mechanical-print-table th:nth-child(1){width:34%}.mechanical-print-table th:nth-child(2){width:18%}.mechanical-print-table th:nth-child(3){width:14%}.mechanical-print-table th:nth-child(4){width:20%}.mechanical-print-table th:nth-child(5){width:14%}
-.mechanical-report-shift-summary{margin:0;padding:8px 12px;border-bottom:1px solid #cbd5e1;background:#f1f5f9;color:#334155;font-size:12px;font-weight:700}
+.mechanical-report-shift-summary{margin:0;padding:8px 12px;border-bottom:1px solid var(--n-300);background:var(--n-100);color:var(--n-700);font-size:12px;font-weight:700}
 .mechanical-print-total{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:-18px;margin-bottom:18px}
-.mechanical-report-handoffs{margin:18px 0 0;padding:14px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc}
+.mechanical-report-handoffs{margin:18px 0 0;padding:14px;border:1px solid var(--n-300);border-radius:10px;background:var(--n-50)}
 .mechanical-report-handoffs h3{margin:0 0 10px}
 .mechanical-report-handoff-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .mechanical-report-handoff-grid article{display:grid;align-content:start;gap:5px;min-width:0;padding:10px 12px;border-radius:8px;overflow-wrap:anywhere}
@@ -210,6 +210,6 @@
   body:has(.mechanical-report-preview) .theme-toggle{display:none}
 }
 @media screen and (max-width:900px){
-  .mechanical-report-scroll-hint{display:block;margin:0;padding:8px 12px;background:#eff6ff;color:#1e3a5f;font-size:13px;line-height:1.5}
+  .mechanical-report-scroll-hint{display:block;margin:0;padding:8px 12px;background:var(--list-row-even);color:var(--info-deep);font-size:13px;line-height:1.5}
 }
 @media print{.mechanical-report-table-scroll{display:contents}.mechanical-report-scroll-hint{display:none!important}}

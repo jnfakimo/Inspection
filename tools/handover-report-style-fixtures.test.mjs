@@ -46,7 +46,7 @@ test('all three reports share the daily heading, overview, palette and approval 
   assert.ok(mechanical.includes('HandoverReportShiftCard'));
   assert.ok(business.includes('hs-report-shift-row'));
   assert.ok(business.includes('hs-report-approval-stage'));
-  for (const color of ['--hs-shift-color-1:#0284c7', '--hs-shift-color-2:#047857', '--hs-shift-color-3:#b45309']) {
+  for (const color of ['--hs-shift-color-1:var(--primary)', '--hs-shift-color-2:var(--live-solid)', '--hs-shift-color-3:var(--amber)']) {
     assert.ok(sharedCss.includes(color), `missing shared shift color ${color}`);
   }
   assert.ok(sharedCss.includes('.hs-report-approval-stage{border:1px solid #cbd5e1'));

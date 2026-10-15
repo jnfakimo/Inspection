@@ -1,0 +1,208 @@
+/* ============================================================================
+   tokens.css — 全站色彩、字型與尺寸 token 的唯一正本（2026-10-15 統一）
+
+   規則
+   1. 全站只有兩個主題：預設的科技版（:root）與一般版（:root[data-theme="light"]）。
+      每個 token 在這個檔案裡必須兩邊都有值；其他 CSS／TSX 不得再定義或覆寫核心 token。
+   2. 元件只引用 token，不寫 hex。例外只有：紙本列印區（@media print、.hs-report*）
+      固定白底黑字不隨主題；以及第三方 vendor CSS。tools/color-token-check.mjs 會擋下。
+   3. 要新增顏色先看有沒有合用的語意 token；沒有就在這裡加，兩個主題一起補。
+   4. 全站只有一個品牌主色（--primary，等同舊名 --cyan）。系統之間不用顏色區分；
+      綠／黃／紅只表示狀態語意（正常／注意／異常），--live 專指「目前當班」。
+
+   舊名稱（--cyan、--green、--dim、--ink、--muted、--surface…）全部保留，
+   舊程式不必改；新程式請優先使用下方的語意名稱。
+   ========================================================================== */
+
+/* ---- 科技版（預設）------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+
+  /* 字型、尺寸 */
+  --font: 'Noto Sans TC', 'Microsoft JhengHei UI', 'Microsoft JhengHei', sans-serif;
+  /* 內容區寬度：所有子系統頁共用，桌面 85% 置中（≤760px 滿版），不得各頁自訂上限 */
+  --content-width: 85%;
+  --head: 'Rajdhani', 'Noto Sans TC', 'Segoe UI', 'Microsoft JhengHei UI', 'Microsoft JhengHei', sans-serif;
+
+  /* 核心：頁面底、卡片、邊線、文字 */
+  --bg: #020b18;
+  --panel: #071526;
+  --panel2: #0a1d31;
+  --line: #173952;
+  --text: #e7f4ff;
+  --dim: #7893aa;
+  --muted: var(--dim);
+  --ink: var(--text);
+
+  --surface: #071526;
+  --surface-soft: #0a1d31;
+  --surface-muted: #10283d;
+  --surface-deep: #061222;
+  --list-row-odd: var(--panel);
+  --list-row-even: #0d2b46;
+
+  /* 品牌主色與狀態色（舊名稱） */
+  --cyan: #00d4ff;
+  --green: #00ff9d;
+  --amber: #ffb300;
+  --red: #ff3b3b;
+  --violet: #a78bfa;
+  --blue: #4f8cff;
+  --cyan-text: var(--cyan);
+  --green-text: var(--green);
+
+  /* 語意別名（新程式使用） */
+  --primary: var(--cyan);
+  --on-solid: #fff;
+  --on-primary: #001018;
+
+  /* 第三方品牌色（Google 登入／日曆標誌），固定不隨主題 */
+  --g-blue: #4285f4;
+  --g-green: #34a853;
+  --g-yellow: #fbbc05;
+  --g-red: #ea4335;
+
+  /* 程式碼／原始資料區塊（成對固定，兩主題皆為深底淺字） */
+  --code-bg: #071526;
+  --code-ink: #d9efff;
+  --live: #10b981;
+  --live-ink: #34d399;
+  --live-solid: #047857;
+
+  /* 固定白底（不隨主題）：驗證碼、QR、列印預覽頁、圖面標記外框 */
+  --paper: #fff;
+  --paper-ink: #111;
+
+  /* 色調家族：text＝在底色上可讀的字、soft＝淡底、border＝邊框、bright＝高亮 */
+  --info-text: #7dd3fc;
+  --info-deep: #bae6fd;
+  --info-bright: #38bdf8;
+  --info-soft: color-mix(in srgb, var(--cyan) 14%, var(--panel));
+  --info-border: color-mix(in srgb, var(--cyan) 45%, var(--panel));
+
+  --ok-bright: #34d399;
+  --ok-soft: color-mix(in srgb, var(--green) 14%, var(--panel));
+  --ok-border: color-mix(in srgb, var(--green) 45%, var(--panel));
+
+  --warn-soft: color-mix(in srgb, var(--amber) 14%, var(--panel));
+  --warn-border: color-mix(in srgb, var(--amber) 45%, var(--panel));
+
+  --danger-text: #ff8a8a;
+  --danger-soft: color-mix(in srgb, var(--red) 14%, var(--panel));
+  --danger-border: color-mix(in srgb, var(--red) 45%, var(--panel));
+
+  --accent-soft: color-mix(in srgb, var(--violet) 16%, var(--panel));
+  --accent-border: color-mix(in srgb, var(--violet) 45%, var(--panel));
+
+  --pink: #f472b6;
+  --pink-text: #f9a8d4;
+  --pink-soft: color-mix(in srgb, var(--pink) 16%, var(--panel));
+  --pink-border: color-mix(in srgb, var(--pink) 45%, var(--panel));
+
+  /* 中性色階：0 最靠近卡片底、900 最靠近文字。科技版會反轉，
+     所以用 --n-* 寫的灰階在兩個主題都自然可讀，不用再寫第二份覆寫。 */
+  --n-0: #071526;
+  --n-50: #0a1d31;
+  --n-100: #10283d;
+  --n-200: #173952;
+  --n-300: #2a4f6b;
+  --n-400: #7893aa;
+  --n-500: #93aabd;
+  --n-600: #b4c7d6;
+  --n-700: #cfdeea;
+  --n-800: #e7f4ff;
+  --n-900: #f4faff;
+
+  /* 陰影與遮罩 */
+  --shadow-ink: #000;
+  --scrim: rgba(2, 11, 24, .62);
+
+  /* 圖示底色（系統 Logo 的天空藍襯底） */
+  --icon-sky: #7dd3fc;
+  --icon-sky-text: #bae6fd;
+}
+
+/* 一般表單欄位高度只在螢幕輸出使用，列印不套用（control-standard.css 以此 token 為準）。 */
+@media screen {
+  :root { --form-control-height: 42px; }
+}
+
+/* ---- 一般版 -------------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #f4f6fa;
+  --panel: #fff;
+  --panel2: #fff;
+  --line: #dbe4ee;
+  --text: #1e293b;
+  --dim: #5f6f85;
+  --muted: #64748b;
+  --ink: #1e293b;
+
+  --surface: #fff;
+  --surface-soft: #f6f9fd;
+  --surface-muted: #f1f5f9;
+  --surface-deep: #eef4f8;
+  --list-row-odd: #fff;
+  --list-row-even: #eff6ff;
+
+  --cyan: #0284c7;
+  --green: #059669;
+  --amber: #b45309;
+  --red: #dc2626;
+  --violet: #7c3aed;
+  --blue: #0959a8;
+  --cyan-text: color-mix(in srgb, var(--cyan) 80%, black);
+  --green-text: color-mix(in srgb, var(--green) 80%, black);
+
+  --live: #10b981;
+  --live-ink: #047857;
+  --live-solid: #047857;
+
+  --paper: #fff;
+  --paper-ink: #111;
+
+  --info-text: #0369a1;
+  --info-deep: #075985;
+  --info-bright: #38bdf8;
+  --info-soft: #e0f2fe;
+  --info-border: #7dd3fc;
+
+  --ok-bright: #34d399;
+  --ok-soft: #d1fae5;
+  --ok-border: #6ee7b7;
+
+  --warn-soft: #ffedd5;
+  --warn-border: #fdba74;
+
+  --danger-text: #b42318;
+  --danger-soft: #fee2e2;
+  --danger-border: #fca5a5;
+
+  --accent-soft: #f3e8ff;
+  --accent-border: #c4b5fd;
+
+  --pink: #db2777;
+  --pink-text: #be185d;
+  --pink-soft: #fce7f3;
+  --pink-border: #f9a8d4;
+
+  --n-0: #fff;
+  --n-50: #f8fafc;
+  --n-100: #f1f5f9;
+  --n-200: #e2e8f0;
+  --n-300: #cbd5e1;
+  --n-400: #94a3b8;
+  --n-500: #64748b;
+  --n-600: #475569;
+  --n-700: #334155;
+  --n-800: #1e293b;
+  --n-900: #0f172a;
+
+  --shadow-ink: #0f172a;
+  --scrim: rgba(15, 23, 42, .5);
+
+  --icon-sky: #7dd3fc;
+  --icon-sky-text: #0369a1;
+}

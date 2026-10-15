@@ -8,12 +8,12 @@
   .business-handover-toolbar>.hs-date-nav>.localized-date-input{flex-basis:160px;width:160px}
 }
 
-.business-approval-section.panel{display:grid;gap:14px;padding:16px 20px;border:1px solid #CBD5E1;border-radius:14px;background:#F1F5F9;box-shadow:none}
-.business-approval-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px dashed #CBD5E1;padding-bottom:12px}
+.business-approval-section.panel{display:grid;gap:14px;padding:16px 20px;border:1px solid var(--n-300);border-radius:14px;background:var(--n-100);box-shadow:none}
+.business-approval-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px dashed var(--n-300);padding-bottom:12px}
 .business-approval-title{display:flex;align-items:center;gap:12px}
-.business-approval-emblem{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#E2E8F0;color:#475569}
-.business-approval-title strong{font-size:16px;color:#334155;display:block}
-.business-approval-title span{font-size:12.5px;color:#475569;display:block;margin-top:2px}
+.business-approval-emblem{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:var(--n-200);color:var(--n-600)}
+.business-approval-title strong{font-size:16px;color:var(--n-700);display:block}
+.business-approval-title span{font-size:12.5px;color:var(--n-600);display:block;margin-top:2px}
 .business-approval-badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:700}
 .business-approval-badge.is-all-approved{background:color-mix(in srgb,var(--green) 15%,var(--panel));color:var(--green);border:1px solid color-mix(in srgb,var(--green) 40%,transparent)}
 .business-approval-badge.is-partial{background:color-mix(in srgb,var(--amber) 15%,var(--panel));color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 40%,transparent)}
@@ -71,28 +71,28 @@
 .business-filter-label{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap}
 .business-slot-chip{padding:5px 12px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);font-size:12.5px;cursor:pointer;transition:all .15s ease;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
 .business-slot-chip:hover{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
-.business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:#fff;font-weight:700}
+.business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:var(--on-solid);font-weight:700}
 .business-slot-chip.is-done{border-color:color-mix(in srgb,var(--green) 45%,var(--line));color:var(--green)}
-.business-slot-chip.active.is-done{background:var(--green);color:#fff}
-.business-slot-chip.is-live-slot{border-color:#10b981;background:color-mix(in srgb,#10b981 14%,var(--panel));color:var(--ink);box-shadow:0 0 8px color-mix(in srgb,#10b981 30%,transparent)}
-.business-live-text{background:#10b981;color:#fff;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
+.business-slot-chip.active.is-done{background:var(--green);color:var(--on-solid)}
+.business-slot-chip.is-live-slot{border-color:var(--live);background:color-mix(in srgb,var(--live) 14%,var(--panel));color:var(--ink);box-shadow:0 0 8px color-mix(in srgb,var(--live) 30%,transparent)}
+.business-live-text{background:var(--live);color:var(--on-solid);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
 
 /* 時段點檢卡片清單 */
 .business-slots-grid{display:grid;gap:14px}
-.business-slot-card{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04);transition:all .2s ease}
-.business-slot-card.is-active-slot-card{border:2px solid #10b981;box-shadow:0 4px 18px color-mix(in srgb,#10b981 20%,transparent)}
+.business-slot-card{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;box-shadow:0 1px 4px color-mix(in srgb,var(--shadow-ink) 4%,transparent);transition:all .2s ease}
+.business-slot-card.is-active-slot-card{border:2px solid var(--live);box-shadow:0 4px 18px color-mix(in srgb,var(--live) 20%,transparent)}
 .business-slot-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:color-mix(in srgb,var(--panel2) 70%,var(--panel));border-bottom:1px solid var(--line);flex-wrap:wrap}
-.business-slot-card.is-active-slot-card .business-slot-head{background:color-mix(in srgb,#10b981 12%,var(--panel));border-bottom-color:color-mix(in srgb,#10b981 35%,var(--line))}
+.business-slot-card.is-active-slot-card .business-slot-head{background:color-mix(in srgb,var(--live) 12%,var(--panel));border-bottom-color:color-mix(in srgb,var(--live) 35%,var(--line))}
 .business-slot-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .business-slot-badge{display:inline-block;padding:3px 9px;border-radius:6px;background:color-mix(in srgb,var(--cyan) 15%,var(--panel));color:var(--cyan);font-size:13px;font-weight:700}
-.business-slot-badge.is-live{background:#10b981;color:#fff}
-.business-active-now-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#10b981;color:#fff;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(16,185,129,.35)}
+.business-slot-badge.is-live{background:var(--live);color:var(--on-solid)}
+.business-active-now-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--live);color:var(--on-solid);font-size:12px;font-weight:700;box-shadow:0 1px 4px color-mix(in srgb,var(--live) 35%,transparent)}
 .business-slot-stat{font-size:13px;color:var(--muted)}
 .business-slot-stat b{color:var(--green)}
 .business-slot-quick-actions{display:flex;align-items:center;gap:6px}
 .business-quick-btn{padding:4px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s ease}
 .business-quick-btn.done{background:color-mix(in srgb,var(--green) 12%,var(--panel));color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,var(--line))}
-.business-quick-btn.done:hover{background:var(--green);color:#fff}
+.business-quick-btn.done:hover{background:var(--green);color:var(--on-solid)}
 .business-quick-btn.reset{background:var(--panel2);color:var(--muted)}
 .business-quick-btn.reset:hover{background:color-mix(in srgb,var(--red) 12%,var(--panel));color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,var(--line))}
 
@@ -108,17 +108,17 @@
 .business-duty-text{margin:0;font-size:14px;line-height:1.55;color:var(--ink);font-weight:500}
 .business-duty-meta{display:block;margin-top:4px;font-size:11px;color:var(--muted)}
 
-.business-check-toggle-group{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel2);box-shadow:0 1px 2px rgba(0,0,0,.03)}
+.business-check-toggle-group{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel2);box-shadow:0 1px 2px color-mix(in srgb,var(--shadow-ink) 3%,transparent)}
 .business-check-btn{padding:7px 14px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;white-space:nowrap}
 .business-check-btn:hover{background:color-mix(in srgb,var(--ink) 8%,transparent)}
-.business-check-btn.complete-btn.active{background:#059669;color:#fff;font-weight:700}
-.business-check-btn.uncomplete-btn.active{background:#64748b;color:#fff;font-weight:700}
+.business-check-btn.complete-btn.active{background:var(--green);color:var(--on-solid);font-weight:700}
+.business-check-btn.uncomplete-btn.active{background:var(--n-500);color:var(--on-solid);font-weight:700}
 
 .hs-pill.is-count{border-color:color-mix(in srgb,var(--shift) 35%,var(--line));background:color-mix(in srgb,var(--shift) 10%,var(--panel));color:var(--ink)}
 .business-entry-list{display:grid;gap:12px}
 .business-entry{display:grid;grid-template-columns:minmax(0,1.3fr) 200px 260px;gap:16px;align-items:center;padding:14px 18px;border:1px solid var(--line);border-radius:12px;background:var(--panel);cursor:pointer;transition:all .18s ease}
-.business-entry:hover,.business-entry:focus-visible{background:color-mix(in srgb,var(--shift) 8%,var(--panel));border-color:color-mix(in srgb,var(--shift) 40%,var(--line));outline:none;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.04)}
-.hs-shift.is-current .business-entry:hover{background:color-mix(in srgb,#10b981 8%,var(--panel));border-color:color-mix(in srgb,#10b981 40%,var(--line))}
+.business-entry:hover,.business-entry:focus-visible{background:color-mix(in srgb,var(--shift) 8%,var(--panel));border-color:color-mix(in srgb,var(--shift) 40%,var(--line));outline:none;transform:translateY(-1px);box-shadow:0 4px 12px color-mix(in srgb,var(--shadow-ink) 4%,transparent)}
+.hs-shift.is-current .business-entry:hover{background:color-mix(in srgb,var(--live) 8%,var(--panel));border-color:color-mix(in srgb,var(--live) 40%,var(--line))}
 .business-entry.is-deleted{text-decoration:line-through;opacity:.55;background:var(--panel2)}
 .business-entry-main{display:grid;gap:6px}
 .business-entry-category{display:flex;align-items:center;gap:8px}
@@ -147,15 +147,15 @@
 .business-history>b{width:100%;color:var(--ink)}
 
 /* 螢幕預覽 A4 報表彈窗 */
-.business-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(8,20,40,.75);backdrop-filter:blur(3px)}
-.business-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink);box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.business-report-preview{position:fixed;inset:0;z-index:1250;display:grid;grid-template-rows:auto minmax(0,1fr);background:color-mix(in srgb,var(--surface-deep) 75%,transparent);backdrop-filter:blur(3px)}
+.business-report-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink);box-shadow:0 4px 16px color-mix(in srgb,var(--shadow-ink) 20%,transparent)}
 .business-report-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .business-report-preview-bar strong{font-size:17px;color:var(--ink)}
 .business-report-preview-bar span{color:var(--muted);font-size:13px}
 .business-report-preview-actions{display:flex;align-items:center;gap:8px}
 .business-report-preview-scroll{min-width:0;overflow:auto;padding:20px 16px;display:grid;grid-auto-rows:min-content;justify-items:center;align-content:start;gap:12mm}
 .business-report-preview-scroll>.business-print-content,.business-report-preview-sheet{display:contents}
-.business-report-preview-sheet.is-preview-page{display:block;box-sizing:border-box;width:210mm;max-width:100%;min-height:297mm;background:#fff;color:#111;padding:8mm 10mm;box-shadow:0 12px 32px rgba(0,0,0,.35);border-radius:2px;font-family:var(--font)}
+.business-report-preview-sheet.is-preview-page{display:block;box-sizing:border-box;width:210mm;max-width:100%;min-height:297mm;background:var(--paper);color:var(--paper-ink);padding:8mm 10mm;box-shadow:0 12px 32px color-mix(in srgb,var(--shadow-ink) 35%,transparent);border-radius:2px;font-family:var(--font)}
 
 /* ========================================================= */
 /* A4 單頁精確排版 (預覽與列印共用，固定白底黑字)             */

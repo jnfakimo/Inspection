@@ -4,6 +4,19 @@
    各交接簿只在自己的 css 放「本簿特有」的區塊（例如駐衛警的巡邏打卡與附件、
    業管組的點檢表、機電課的工作卡片），不得在這裡以外重新定義 hs-* 的外觀。 */
 :root{
+  --hs-shift-color-1:var(--primary);
+  --hs-shift-color-2:var(--live-solid);
+  --hs-shift-color-3:var(--amber);
+  --hs-shift-color-4:var(--pink);
+  --hs-shift-foreground-1:var(--on-primary);
+  --hs-shift-foreground-2:var(--on-solid);
+  --hs-shift-foreground-3:var(--on-solid);
+  --hs-shift-foreground-4:var(--on-solid);
+  --hs-current-color:var(--live);
+  --hs-current-ink:var(--live-solid);
+}
+/* 日報是紙本：班別色固定，不跟著科技版的霓虹主色走（列印與預覽一律白底） */
+.hs-report,.hs-daily-report{
   --hs-shift-color-1:#0284c7;
   --hs-shift-color-2:#047857;
   --hs-shift-color-3:#b45309;
@@ -12,8 +25,6 @@
   --hs-shift-foreground-2:#fff;
   --hs-shift-foreground-3:#fff;
   --hs-shift-foreground-4:#fff;
-  --hs-current-color:#10b981;
-  --hs-current-ink:#047857;
 }
 .hs-page{display:grid;gap:16px}
 .hs-icon{display:block;flex:none}
@@ -40,26 +51,26 @@
 .hs-header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 
 /* 主管簽核 */
-.hs-approval{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid #CBD5E1;border-radius:14px;background:#F1F5F9}
+.hs-approval{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;border:1px solid var(--n-300);border-radius:14px;background:var(--n-100)}
 .hs-approval-main{display:flex;align-items:center;gap:14px}.hs-approval-main>div{display:grid;gap:4px}
-.hs-approval-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:13px;background:#E2E8F0;color:#475569}
-.hs-approval-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hs-approval-main strong{color:#334155;font-size:17px}
-.hs-approval-status{display:inline-flex;align-items:center;min-height:24px;padding:3px 8px;border:1px solid #CBD5E1;border-radius:999px;background:#E2E8F0;color:#334155;font:700 12px/1 var(--font);white-space:nowrap}
-.hs-approval-status.is-approved{background:#fff;border-color:#94A3B8}
-.hs-approval-detail{color:#475569;font-size:13px;line-height:1.5}
+.hs-approval-icon{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:13px;background:var(--n-200);color:var(--n-600)}
+.hs-approval-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hs-approval-main strong{color:var(--n-700);font-size:17px}
+.hs-approval-status{display:inline-flex;align-items:center;min-height:24px;padding:3px 8px;border:1px solid var(--n-300);border-radius:999px;background:var(--n-200);color:var(--n-700);font:700 12px/1 var(--font);white-space:nowrap}
+.hs-approval-status.is-approved{background:var(--n-0);border-color:var(--n-400)}
+.hs-approval-detail{color:var(--n-600);font-size:13px;line-height:1.5}
 .hs-approval-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.hs-approval-actions input{min-width:260px}
-.hs-approval-action{border-color:#334155!important;background:#334155!important;color:#fff!important}
-.hs-approval-action:hover:not(:disabled){border-color:#475569!important;background:#475569!important;color:#fff!important}
-.hs-approval-action:focus-visible{border-color:#334155!important;background:#334155!important;color:#fff!important;outline:3px solid #0284C7;outline-offset:2px;box-shadow:0 0 0 2px #fff!important;transform:none}
-.hs-approval-action:disabled{border-color:#CBD5E1!important;background:#E2E8F0!important;color:#475569!important;opacity:1;cursor:not-allowed;transform:none;box-shadow:none}
+.hs-approval-action{border-color:var(--n-700)!important;background:var(--n-700)!important;color:var(--on-solid)!important}
+.hs-approval-action:hover:not(:disabled){border-color:var(--n-600)!important;background:var(--n-600)!important;color:var(--on-solid)!important}
+.hs-approval-action:focus-visible{border-color:var(--n-700)!important;background:var(--n-700)!important;color:var(--on-solid)!important;outline:3px solid var(--primary);outline-offset:2px;box-shadow:0 0 0 2px var(--n-0)!important;transform:none}
+.hs-approval-action:disabled{border-color:var(--n-300)!important;background:var(--n-200)!important;color:var(--n-600)!important;opacity:1;cursor:not-allowed;transform:none;box-shadow:none}
 .hs-approval-seal{display:inline-grid;place-items:center;padding:8px 16px;border:2px solid var(--green);border-radius:10px;color:var(--green);font-size:17px;font-weight:800;letter-spacing:.18em}
 
 /* 交接紀錄表外框、表頭與今日指標 */
-.hs-sheet{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow,0 12px 32px rgba(15,23,42,.08))}
+.hs-sheet{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow,0 12px 32px color-mix(in srgb,var(--shadow-ink) 8%,transparent))}
 .hs-sheet-head{position:relative;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:24px 26px 20px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--violet) 13%,var(--panel)) 0%,color-mix(in srgb,var(--cyan) 9%,var(--panel)) 55%,var(--panel) 100%)}
 .hs-sheet-head::before{content:'';position:absolute;inset:0 0 auto;height:5px;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--green))}
 .hs-sheet-title{display:flex;align-items:center;gap:16px}
-.hs-sheet-emblem{display:grid;place-items:center;flex:none;width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,var(--violet),var(--cyan));color:#fff;box-shadow:0 10px 22px color-mix(in srgb,var(--violet) 28%,transparent)}
+.hs-sheet-emblem{display:grid;place-items:center;flex:none;width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,var(--violet),var(--cyan));color:var(--on-solid);box-shadow:0 10px 22px color-mix(in srgb,var(--violet) 28%,transparent)}
 .hs-sheet-title small{color:var(--muted);letter-spacing:.06em}
 .hs-sheet-title h2{margin:4px 0 0;color:var(--ink);font-size:28px;letter-spacing:.08em}
 .hs-date-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border:1px solid color-mix(in srgb,var(--violet) 32%,var(--line));border-radius:999px;background:var(--panel);color:var(--ink);font-size:16px;white-space:nowrap;box-shadow:0 2px 8px color-mix(in srgb,var(--violet) 12%,transparent)}
@@ -98,12 +109,12 @@
 .hs-pill.is-received{border-color:color-mix(in srgb,var(--green) 45%,var(--line));background:color-mix(in srgb,var(--green) 12%,var(--panel));color:var(--ink)}.hs-pill.is-received::before{background:var(--green);opacity:1}
 
 /* 當班狀態由綠色外框、光暈與文字標示；班別色保持不變。 */
-.hs-shift.is-current{border:2px solid #10b981;box-shadow:0 0 0 4px color-mix(in srgb,#10b981 16%,transparent),0 14px 30px color-mix(in srgb,#10b981 20%,transparent)}
-.hs-current-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;background:#047857;color:#fff;font-size:12.5px;font-weight:700;box-shadow:0 2px 8px color-mix(in srgb,#10b981 40%,transparent)}
-.hs-pulse-dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:#34d399;animation:hs-live 1.8s infinite}
+.hs-shift.is-current{border:2px solid var(--live);box-shadow:0 0 0 4px color-mix(in srgb,var(--live) 16%,transparent),0 14px 30px color-mix(in srgb,var(--live) 20%,transparent)}
+.hs-current-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;background:var(--live-solid);color:var(--on-solid);font-size:12.5px;font-weight:700;box-shadow:0 2px 8px color-mix(in srgb,var(--live) 40%,transparent)}
+.hs-pulse-dot{display:inline-block;flex:none;width:8px;height:8px;border-radius:50%;background:var(--ok-bright);animation:hs-live 1.8s infinite}
 @keyframes hs-live{0%{box-shadow:0 0 0 0 rgba(16,185,129,.65)}70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
-.hs-chip.is-now{border-color:#10b981;background:color-mix(in srgb,#10b981 16%,var(--panel));font-weight:700}.hs-chip.is-now .hs-icon{color:#10b981}
-.hs-current-now{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid #10b981;border-radius:999px;background:color-mix(in srgb,#10b981 14%,var(--panel));color:var(--ink);font-size:13px;font-weight:700}
+.hs-chip.is-now{border-color:var(--live);background:color-mix(in srgb,var(--live) 16%,var(--panel));font-weight:700}.hs-chip.is-now .hs-icon{color:var(--live)}
+.hs-current-now{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border:1px solid var(--live);border-radius:999px;background:color-mix(in srgb,var(--live) 14%,var(--panel));color:var(--ink);font-size:13px;font-weight:700}
 
 /* 卡片內容區塊 */
 .hs-shift-body{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;padding:16px 18px}
@@ -141,7 +152,7 @@
 .hs-sign{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px dashed color-mix(in srgb,var(--muted) 45%,var(--line));border-radius:12px;background:var(--panel)}
 .hs-sign.is-signed{border-style:solid;border-color:color-mix(in srgb,var(--green) 45%,var(--line));background:color-mix(in srgb,var(--green) 7%,var(--panel))}
 .hs-sign-icon{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:var(--panel2);color:var(--muted)}
-.hs-sign.is-signed .hs-sign-icon{background:var(--green);color:#fff}
+.hs-sign.is-signed .hs-sign-icon{background:var(--green);color:var(--on-solid)}
 .hs-sign>div{display:grid;gap:1px;min-width:0}.hs-sign>div>span{color:var(--muted);font-size:12px}.hs-sign b{color:var(--ink);font-size:15px}.hs-sign small{color:var(--muted);font-size:11.5px}
 .hs-sign:not(.is-signed) b{color:var(--muted);font-weight:500}
 .hs-sign select{min-width:0}
@@ -223,7 +234,7 @@
 .hs-report-approval-readonly{margin:0;padding:12px 16px;border-top:1px solid #d9e2e9;background:#f5f9fb;color:#526579;font-size:12px;line-height:1.6}
 .hs-report-generated{margin:0;padding:9px 16px;border-top:1px solid #d9e2e9;color:#64748b;font-size:11px;text-align:right}
 
-.hs-preview{position:fixed;inset:0;z-index:1200;display:grid;grid-template-rows:auto minmax(0,1fr);background:rgba(15,23,42,.66)}
+.hs-preview{position:fixed;inset:0;z-index:1200;display:grid;grid-template-rows:auto minmax(0,1fr);background:color-mix(in srgb,var(--shadow-ink) 66%,transparent)}
 .hs-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel);color:var(--ink)}
 .hs-preview-bar>div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .hs-preview-bar span{color:var(--muted);font-size:13px}

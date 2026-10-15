@@ -86,6 +86,13 @@ assert.match(css, /\.workorder-summary\{display:grid;grid-template-columns:repea
 assert.match(css, /\.workorder-summary article\{width:108px;height:52px/,
   '維修入口七張統計小卡必須固定為 108×52px');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);
+// 內容區寬度只有一個來源（--content-width，tokens.css）；子系統頁不得各自設定寬度上限。
+assert.match(css, /\.content\.v1-content> :not\(\.system-page-heading\)\{width:var\(--content-width\)/,
+  '一般子系統頁內容寬度必須使用 --content-width');
+assert.ok(!/\.operations-page\{[^}]*width:/.test(css) && !/\.operations-page\{[^}]*width:/.test(operationsCss),
+  '維修／交接等入口頁不得自訂 .operations-page 寬度');
+assert.ok(!/\.v1list-page\s*\{[^}]*max-width/.test(readFileSync('web/app/systems/[system]/[module]/v1-listpage.css', 'utf8')),
+  '清單頁不得自訂內容寬度上限');
 assert.match(css, /\.content\.v1-content:has\(>\.system-page-heading\)\{padding-top:20px\}/);
 assert.match(css, /\.system-page-heading h1\{[^}]*color:var\(--cyan\)[^}]*font-size:26px/);
 assert.match(css, /\.system-page-heading>img\{[^}]*width:42px;height:42px/);

@@ -23,7 +23,6 @@
   --v1list-accent: var(--cyan);
   --v1list-glow: none;
   --v1list-floor-wash: color-mix(in srgb, var(--v1list-accent) 6%, transparent);
-  max-width: 1100px;
   margin: 0 auto;
 }
 
@@ -331,7 +330,7 @@
   margin: 10px auto;
   padding: 8px;
   border-radius: 4px;
-  background: #fff;
+  background: var(--paper);
 }
 
 .v1list-qr-body .qbox img {

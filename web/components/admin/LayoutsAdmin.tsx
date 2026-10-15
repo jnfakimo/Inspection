@@ -972,7 +972,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 borderRadius: '6px',
                 border: 'none',
                 background: viewMode === 'visual' ? 'var(--cyan)' : 'transparent',
-                color: viewMode === 'visual' ? '#000' : 'var(--text)',
+                color: viewMode === 'visual' ? 'var(--on-primary)' : 'var(--text)',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '13px',
@@ -989,7 +989,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                 borderRadius: '6px',
                 border: 'none',
                 background: viewMode === 'table' ? 'var(--cyan)' : 'transparent',
-                color: viewMode === 'table' ? '#000' : 'var(--text)',
+                color: viewMode === 'table' ? 'var(--on-primary)' : 'var(--text)',
                 cursor: 'pointer',
                 fontWeight: 600,
                 fontSize: '13px',
@@ -1218,7 +1218,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       borderRadius: '4px',
                       border: '1px solid var(--line)',
                       background: selectedSystemFilter === 'all' ? 'var(--cyan)' : 'transparent',
-                      color: selectedSystemFilter === 'all' ? '#000' : 'var(--text)',
+                      color: selectedSystemFilter === 'all' ? 'var(--on-primary)' : 'var(--text)',
                       fontSize: '11px',
                       cursor: 'pointer',
                     }}
@@ -1233,7 +1233,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       borderRadius: '4px',
                       border: '1px solid var(--line)',
                       background: selectedSystemFilter === 10 ? 'var(--amber)' : 'rgba(245,158,11,0.1)',
-                      color: selectedSystemFilter === 10 ? '#000' : 'var(--amber)',
+                      color: selectedSystemFilter === 10 ? 'var(--on-primary)' : 'var(--amber)',
                       fontSize: '11px',
                       cursor: 'pointer',
                     }}
@@ -1263,7 +1263,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
                       borderRadius: '4px',
                       border: '1px solid var(--line)',
                       background: selectedSystemFilter === 12 ? 'var(--green-text,var(--green))' : 'rgba(34,197,94,0.1)',
-                      color: selectedSystemFilter === 12 ? '#000' : 'var(--green-text,var(--green))',
+                      color: selectedSystemFilter === 12 ? 'var(--on-primary)' : 'var(--green-text,var(--green))',
                       fontSize: '11px',
                       cursor: 'pointer',
                     }}
@@ -2055,7 +2055,7 @@ export function LayoutsAdmin({ profile, module }: AdminProps) {
             </button>
             <button
               className="primary-btn compact"
-              style={{ background: 'var(--green)', color: '#000', fontWeight: 700 }}
+              style={{ background: 'var(--green)', color: 'var(--on-primary)', fontWeight: 700 }}
               disabled={busy}
               onClick={() =>
                 window.confirm('確定建立新版本並立即發布至大螢幕看板？') && void rpc(true)
