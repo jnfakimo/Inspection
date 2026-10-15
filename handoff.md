@@ -24,14 +24,23 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## ➡️ 下一步
 
-1. **使用者執行**：在 Supabase SQL Editor 依 `docs/runbooks/hide-test-records.sql` 隱藏正式資料中的測試工單
-   （先跑預覽確認名單；Claude 的 Supabase 帳號沒有此專案權限，無法代為查詢）。
+1. ✅ **已完成（2026-10-16 06:55 臺灣時間）隱藏 3 筆 E2E 測試工單**：分支 CI run 38820146953 全數通過後，以 apply-database-migration run 38820368083
+   套用到正式專案 `qztffronusdhgxhjjubt`（HTTP 201）。migration 內含事後驗證，未通過會回滾，所以 201 代表 3 筆工單與 3 筆報修案件皆已 `hidden = true`、保護觸發器已恢復。
+   尚待：合併此分支進 main（migration 檔需在 main 留存）。以下為當時背景：
+   （預覽：3 筆工單與對應 3 筆報修案件皆 closed；報修案件已 `hidden = true`、工單仍 `hidden = false`）。
+   runbook 步驟 2 在 SQL Editor 會被保護觸發器擋下（沒有登入者，`can_manage_workorder()` 為 false），改用
+   `supabase/migrations/20261016090000_hide_e2e_test_workorders.sql`：CI 通過後以 `apply-database-migration.yml`（`--ref codex/ui-followup-20261016`）套用，再合併
+   （本機以 `npm run test:hide-e2e-migration` 驗證；套用正式庫需使用者當次授權）。
 2. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
 3. G 槽快照分支 `codex/g-worktree-snapshot-20261015`（151 個檔案，含 22 個 Edge Functions 與 5 個 migration）：
    尚未推送、尚未審查；repo 是公開的，**不要推到這個 repo**。本機備份在 `C:\Users\jnfa\Documents\Codex\backups\g-worktree-snapshot-20261015.bundle`。
    合併進 main 前必須逐項對照 main 的較新版本。
 4. 其餘待辦見 `PROJECT_PLAN.md`：全角色權限矩陣、資安 S1–S3、`Obsidian/04` 179 節審閱、`app-api` 拆檔。
+5. **待審閱／合併**（未 commit，在工作樹 `C:\Users\jnfa\Documents\Codex\wt-followup-20261016`，分支 `codex/ui-followup-20261016`，基底 `3a8f38229`）：
+   維修分析與位置分析不再計入 `hidden = true` 的列（`workorder-extras.tsx`、`LocationAnalysisAdmin.tsx`）、新增 `npm run test:hidden-record-filter`、
+   `PROJECT_PLAN.md` 修正 WS-4／WS-7 過時狀態並新增 §19。`app-api` 報修案件列表與標記挑選清單刻意未過濾，見 §19。
+6. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。`tone` 欄位與圖表色盤已完成。
 
 ## ⚠️ 注意事項
 
@@ -46,6 +55,9 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 - **在 shell 的 `node -e` 內寫含反斜線的 regex 會被吃掉**（`\s` 變成 `s`），斷言會變成永遠通過。regex 請用編輯工具寫進檔案，並加反例斷言證明它會失敗（CodeQL 的 `js/useless-regexp-character-escape` 會抓到）。
 - **合併**：這個 repo 不允許 GitHub auto-merge，合併需使用者明確指示；合併 main 會自動部署 GitHub Pages，
   動到 `supabase/functions/**` 會同時自動部署 Edge Functions。
+- **推送新分支**：G 槽 repo 是 partial clone，`remote.origin.fetch` 只對應 `main`，所以 `git push -u` 推得上去卻綁不了 upstream（「is not a branch」）。
+  先加該分支的 refspec 再綁：`git config --add remote.origin.fetch +refs/heads/<分支>:refs/remotes/origin/<分支>`，接著 `git branch --set-upstream-to=origin/<分支>`。
+  不要改成 `+refs/heads/*` 萬用字元，會把所有分支都抓下來。
 - **部署後快取**：GitHub Pages 有約 10 分鐘快取，驗收時網址加 `?v=<commit>` 或按 Ctrl+F5。
 - **行情資料慢**：首次載入約 10–20 秒（Render Node API 5 秒逾時後才改走 Supabase），偶爾日期查詢會回 503，重試即可。
 - **大量讀取保護**：短時間連開多個資料頁可能被強制登出；驗收時一頁一頁慢慢看。
@@ -53,4 +65,4 @@ migration 已透過 `apply-database-migration` 套用到正式資料庫，Edge F
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · Git push：見 PR（分支 `codex/handoff-security-store`）
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 本批變更尚未 commit／push（分支 `codex/ui-followup-20261016`）；上一批見 PR #74（分支 `codex/handoff-security-store`）

@@ -7,6 +7,14 @@
 --   1. 先只執行「步驟 1」確認清單，確認每一列都是測試資料。
 --   2. 再執行「步驟 2」。整段包在交易內，最後會印出受影響筆數；數字不符就 ROLLBACK。
 --   3. 「已離職人員-xxxx」是去識別化的離職帳號，屬法定保存資料，不要隱藏。
+--
+-- ⚠️ 2026-10-16 更正：「步驟 2」在 SQL Editor 會失敗。SQL Editor 以 postgres 執行、沒有登入者，
+--   public.can_manage_workorder() 為 false，trg_protect_technician_order_columns 與
+--   trg_protect_repair_request_columns 會拒絕更新（order update is not allowed for this role），整筆回滾。
+--   2026-08-25 那 3 筆 E2E 測試工單改用 migration 處理：
+--   supabase/migrations/20261016090000_hide_e2e_test_workorders.sql（只動指定 3 組、交易內暫停並恢復觸發器，
+--   以 apply-database-migration.yml 套用；測試：npm run test:hide-e2e-migration）。
+--   日後若有新的測試資料，請比照該檔另寫一支 migration，不要直接執行下方步驟 2。
 
 -- ===== 步驟 1：預覽（唯讀） =====
 select o.order_id, o.status, o.created_at, o.hidden, u.name as assignee, u.status as assignee_status

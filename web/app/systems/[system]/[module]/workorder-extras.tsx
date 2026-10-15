@@ -143,10 +143,12 @@ function AnalyticsModule({ module, profile }: Props) {
     const client = getSupabase();
     const toEnd = `${to}T23:59:59+08:00`, fromStart = `${from}T00:00:00+08:00`;
     const [r, o, c] = await Promise.all([
+      // 正式資料中被隱藏的測試資料（hidden = true，見 docs/runbooks/hide-test-records.sql）不計入統計；
+      // hidden 為 NULL 的舊資料視同未隱藏，所以用 or 而不是 eq('hidden', false)。
       client.from('repair_requests').select('request_id,req_no,department,fault_type,urgency,status,created_at,equipment(name)')
-        .gte('created_at', fromStart).lte('created_at', toEnd).limit(1000),
+        .or('hidden.is.null,hidden.eq.false').gte('created_at', fromStart).lte('created_at', toEnd).limit(1000),
       client.from('maintenance_orders').select('order_id,request_id,status,labor_hours,start_time,finish_time,expected_finish,created_at,assignee_id,users!maintenance_orders_assignee_id_fkey(name)')
-        .gte('created_at', fromStart).lte('created_at', toEnd).limit(1000),
+        .or('hidden.is.null,hidden.eq.false').gte('created_at', fromStart).lte('created_at', toEnd).limit(1000),
       client.from('cost_records').select('cost_id,cost_type,amount,vendor,cost_date,equipment(name)')
         .gte('cost_date', from).lte('cost_date', to).limit(1000),
     ]);
