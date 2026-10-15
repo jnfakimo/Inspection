@@ -131,6 +131,9 @@
 - **看板只顯示明確標記給看板的公告**（`notifications.event='board_notice'` 且不指定收件人；登入版與公開版相同）。
   通知中心的資安告警、監控異常、派車提醒與個人通知屬內部資訊，依最小揭露與知悉必要原則（ISO/IEC 27001 A.5.15、A.8.3）
   不得投到看板或任何大螢幕；要讓內部資訊可被看見，必須由具權限者另行發布為看板公告。`tools/board-notices-check.mjs` 把關。
+- **資安告警只在 `security_alerts` 留內容**：通知中心只放提示與告警編號，不複製 IP、資源、事件數；副本保存 90 天。
+  證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）維持 append-only，不得解除防刪除 trigger。
+  詳見 `docs/SECURITY_RECORD_RETENTION.md`；`npm run test:security-notice-minimal` 把關。
 - **權限判斷失敗即拒絕**：權限表查詢失敗一律不放行（`test:permission-fail-closed`）。
 - 新 API 寫進 `supabase/functions/app-api/handlers/<業務>.ts`，不再加進 `index.ts`；每支 handler 附 `*.test.ts`。
 - 讀取稽核由根版面的 `access-audit.ts` 統一攔截 fetch，頁面不得自行補呼叫；`security_action` 回應必須強制登出。

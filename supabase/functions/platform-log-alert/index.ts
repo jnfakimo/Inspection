@@ -126,6 +126,13 @@ Deno.serve(async (req) => {
         delivery_status: result.delivery.status,
       });
     }
+    // 保存期限：通知中心內的資安告警副本只留 90 天（證據留在 security_alerts，不受影響）。
+    // 排程每 10 分鐘一次，只在臺灣時間 03 點的那一小時執行；清除函式可重複執行，不會重複刪除。
+    const taipeiHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Taipei", hour: "2-digit", hour12: false }).format(new Date()));
+    if (taipeiHour === 3) {
+      const { error: purgeError } = await admin.rpc("purge_expired_security_notices");
+      if (purgeError) console.error("Security notice retention failed", clean(purgeError.message, 200));
+    }
     return reply({
       ok: true,
       state: outcomes.length ? "alerted" : "healthy",

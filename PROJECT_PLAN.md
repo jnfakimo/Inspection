@@ -148,11 +148,11 @@
 ## 15. 看板內部資訊外洩修正（2026-10-15，分支 codex/board-notice-allowlist）
 
 - 使用者在正式站看到市場看板跑馬燈出現「API Gateway 流量突增」「synthetic probe 異常」（含告警編號）與派車提醒（含單號），並要求依 ISO/IEC 27001 處理。
-- 原因：登入版跑馬燈沿用通知中心「全部通知」（event 為空或非停用公告），且以 service role 查詢、不分收件人，會帶出資安告警、監控異常與他人通知；公開版原本已限制為 `board_notice`。
+- 原因：登入版跑馬燈沿用通知中心「全部通知」（event 為空或非停用公告），且以 service role 查詢、不分收件人，會帶出每位管理員收到的資安告警副本（含告警內容）與他人通知；公開版原本已限制為 `board_notice`。
 - 修正：兩種檢視都只讀 `event='board_notice'` 且無收件人的公告（`market-board-notices.ts`）。`board-notices-check` 新增案例，確認資安告警、監控異常與個人通知在兩種檢視都不會出現，停用公告後不得退回顯示其他通知。
 - 行為變更：登入版跑馬燈不再顯示一般通知；現場人員要看這些通知請用通知中心。需要在看板顯示的訊息，由具權限者在後台「看板公告」發布。
 - 部署：此變更在 Edge Function（`app-api`），合併進 main 後由 `deploy-edge-functions.yml` 自動部署。
-- 尚未處理（建議另案）：大量資安告警寫入 `notifications` 且沒有收件人，目前只有後台通知中心可讀；是否改存專用資料表、並限制 RLS 與保存期限，需另行評估。
+- 後續處理：見第 18 節。原先寫的「告警寫入 notifications 且沒有收件人」不正確：告警本體一直存在專用的 `security_alerts`（RLS 強制、僅管理員），通知中心的是每位管理員一份的副本（有收件人）。
 
 ## 16. 一般版色彩 token 對比調整（2026-10-15，分支 codex/token-contrast）
 
@@ -167,3 +167,11 @@
 - 使用者覺得 PR #70 的主色略重，要求「調整 70%」。解讀為：主色採原值 `#0284c7` 到 `#0369a1` 的 70% 位置。
 - `--cyan`、`--primary-solid`：`#0369a1` → `#0371ac`。對比：白底 5.3、斑馬列底 4.9、淡藍底 4.6，仍全數 ≥ 4.5:1。
 - 小字用的 `--info-text`（#0369a1）維持不變。若要更淺，淺於 `#0377b4` 就會在淡色底低於 4.5:1。
+
+## 18. 資安告警存放與保存期限（2026-10-15，分支 codex/security-alert-store）
+
+- 調查結果：告警本體已在專用資料表 `security_alerts`（RLS 強制、僅管理員可讀、寫入只走 service role）；證據資料表有防刪除 trigger。真正的缺口是：(1) 通知中心副本複製了完整告警內容；(2) 副本沒有保存期限。
+- 修正：副本改為只放提示與告警編號；新增 `purge_expired_security_notices()`（90 天，僅 service role），由 `platform-log-alert` 每日（臺灣時間 03 點）呼叫。
+- 刻意不做：證據資料表的自動刪除。這需要解除既有防刪除保護，屬政策決定，已列在 `docs/SECURITY_RECORD_RETENTION.md` 待決定項目。
+- 部署順序：migration 需先經 `apply-database-migration.yml` 套用；在套用前，`platform-log-alert` 呼叫清除函式只會記錄錯誤，不影響告警流程。
+- 守門：`npm run test:security-notice-minimal`。
