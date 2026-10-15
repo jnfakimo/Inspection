@@ -1,43 +1,60 @@
-# 交接檔 handoff
+# handoff.md — 交接快照
 
-> 這份只放「下次接手需要知道的事」。durable 的技術規範寫在 `AGENTS.md`，
-> 完整脈絡與踩坑細節寫在 `Obsidian/`，這裡不重複。
+> 目前狀態與下一步。標準在 `AGENTS.md`，進度與證據在 `PROJECT_PLAN.md`。
+> 舊版 994 行交接紀錄封存於 `docs/archive/2026-10-15-pre-unification/handoff.md`。
 
-## ⏯️ 目前做到哪
+## 最後更新
 
-**2026-09-17：全站文字修正（駐衛警巡檢 ➔ 駐衛警巡邏）與業管組交接簿崗位勤務時段點檢項目管理功能完成上線。**
+2026-10-15 · Claude Code。主題：全站版型與色彩統一（13 系統／67 子系統）。**已分組 commit 到本機分支 `codex/html-daily-report-preview`（aad615e56、fe0a8b985、134050142 與本文件 commit）；未 push、未部署。**
 
-本次已完成並驗證：
+## 這一批做了什麼
 
-- **全站 12 大系統及子系統命名統一**：全面將「駐衛警巡檢」修正為「駐衛警巡邏」（包含導覽列、模組定義、各系統文字標籤與頁面標題）。
-- **業管組交接簿（`/v2/systems/handover/business/`）點檢項目管理彈窗**（`BusinessDutyModal`）：
-  - 比照駐警隊管理版型，支援 7 大時段 Tabs 切換與數量 Badge。
-  - 支援點檢項目：新增、行內修改文字、刪除、同勤務時段內項次排序（`↑` / `↓`）、一鍵恢復預設 27 項。
-  - 當日點檢進度（如 `0/27`、完成率）與 A4 每日列印／預覽報表（雙欄平衡動態拆分）全站即時連動。
-  - 透過 `web/lib/business-duty-checklist.ts` 保持向下相容性與稽核紀錄（更新者、更新時間）。
-- **自動化測試與規範檢查**：
-  - `web/lib/business-duty-checklist.test.ts` 4 項單元測試全數通過。
-  - 通過交接簿樣式一致性、按鈕標準（`.primary-btn` / `.secondary-btn`）、下拉選單空白列與資安檢核。
+- 新增 `web/app/tokens.css`：全站色彩／字型／尺寸 token 唯一正本（科技版 `:root`、一般版 `:root[data-theme="light"]`）。
+- `globals.css`、`v1-layout.css`：移除重複的主題定義，`globals.css` 開頭 `@import './tokens.css'`。
+- 26 個 CSS 檔的硬編碼 hex 改成 token（506 處）；紙本／列印區刻意保留固定色。
+- 移除 `.system-card`／`.maintenance-card`／`.quick-grid a` 的 amber／green／violet 變體（單一主色決策）。
+- `tools/color-token-check.mjs` 新增並納入 `npm test`（`npm run test:color-tokens`）。
+- 因 token 搬家而調整的檢查：`font-token-check`、`input-select-standard-check`、`metric-card-standard-check`、
+  `handover-style-check`、`handover-report-style-fixtures.test`。
+- TSX 小改：`handover-workspace.tsx`（`var(--danger-text)`）、`LayoutsAdmin.tsx`（`var(--on-primary)`）、
+  `AuditAdminV2.tsx`；`settings.module.css` 的局部 `--ink`／`--muted` 改名為 `--settings-ink`／`--settings-muted`。
+- 文件：重寫 `AGENTS.md`、`PROJECT_PLAN.md`、`handoff.md`；新增 `docs/DOMAIN_RULES.md`；舊版在 `docs/archive/2026-10-15-pre-unification/`。
+- `package.json` 新增 `test:color-tokens` 並接在 `test:button-standard` 之後。
 
-## 🚦 目前狀態
+## 驗證狀態
 
-- 正式站正常：最新推送 Commit `db1d28d6c`，GitHub `origin/main` 已同步，GitHub Pages 自動部署中。
-- 工作區狀態：乾淨（Working tree clean）。
+- 已驗證：全部變更（含單一主色、三份新文件）同步到 C 執行副本後，`npm run typecheck:v2` 與完整 `npm test` 皆 exit 0。
+- 未驗證：任何瀏覽器畫面（兩主題對比、手機寬度、A4 列印）。瀏覽器啟動曾被環境政策阻擋。
 
-## ➡️ 下一步
+## 怎麼驗證（重要）
 
-1. 繼續 app-api 拆檔：巡檢 → 設備 → 報修 → 公文 → 市場 → 交接簿（參考 `AGENTS.md` 拆檔指引）。
-2. 每日行情匯入遇「代碼集合有變」時自動通知並列出品項（防重複計量保護）。
-3. 評估北農官網連線逾時重試或排程調整機制。
+G 槽 `node_modules` 不完整，不能在 G 跑 `npm test`／`tsc`。
 
-## ⚠️ 注意事項
+```bash
+# 1. G → C 單向同步（PowerShell；排除相依套件與建置輸出）
+robocopy "G:\我的雲端硬碟\AI\Codex\北農巡檢系統" "C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime" /E /R:1 /W:1 /MT:8 /NFL /NDL /NP /NJH /XD node_modules .next .git _pgbackup _pginfo Clipping 創作庫 知識庫 dist_floorplans scratch outputs _site __pycache__ design archive
+# 2. 在 C 執行
+cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run typecheck:v2 && npm test
+```
 
-- **三本交接簿規範一致性**：機電、業管、駐警隊三大電子交接簿必須遵守 `handover-sheet.css`（`hs-*`）共用版型標準。
-- **資料下拉選單規範**：可留白的資料下拉首列必須為空值，按鈕遵循共用 V2 標準。
-- **Windows 寫檔勿帶 BOM**；敏感資訊（API key、token、真名）嚴禁 commit。
+注意：robocopy 不會刪除 C 內「G 已不存在」的檔案；若守門測試抱怨 C 內的陌生檔案，先確認不在 G 再刪除（上次是
+`web/components/CommandCenterNavigation.css`）。
 
-## 🕐 最後更新
+## 下一步（接手者從這裡開始）
 
-2026-09-17 16:38 · AntiGravity @ Windows
-· Git push：✅ 已推（`db1d28d6c`）
+1. WS-8：逐系統版型審查（見 `PROJECT_PLAN.md` 第 4 節），列出不符三層標準的頁面再分批修。
+2. 若能開瀏覽器：一般版／科技版各看一輪代表頁（入口、系統入口、子系統表格頁、交接簿、列印預覽）。
+3. 清掉 `modules.ts` 的 `tone` 欄位與 `mobile/page.tsx` 的 `tone` 類別。
+4. 集中圖表／標記色盤，縮小 `color-token-check.mjs` 的 `ALLOW_TSX`。
 
+## 接手規則
+
+- 一次只有一個寫入者；換手先在這份檔案寫明，並重查 `git status` 與要改檔案的 hash。
+- 只動本次相關檔案；不 `git add .`、不 reset／force-push；commit、push、deploy 需使用者明確授權。
+- 新增顏色先改 `tokens.css`（兩主題一起），不要在元件裡寫 hex；要例外先改守門檢查並說明理由。
+- 不讀或寫入 secret、不連 production、不停啟使用中的 server。
+
+## 本批備份
+
+- 遷移前的 CSS 備份在本機暫存區（工作階段結束後可能消失）；正式還原依據是 Git 差異與
+  `docs/archive/2026-10-15-pre-unification/` 內的舊文件。
