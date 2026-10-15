@@ -631,13 +631,13 @@ export function ModuleWorkspace({ system, module }: { system: SystemDefinition; 
     const workflowIndex = detailStatus === 'closed' ? 5 : detailStatus === 'completed' ? 5 : detailStatus === 'pending_review' ? 4 : detailStatus === 'in_progress' ? 3 : detailStatus === 'assigned' && detailOrderStatus === 'accepted' ? 3 : detailStatus === 'assigned' ? 2 : 1;
 
     return <AppShell profile={profile} title={module.title}>
-      <div className="page-actions">
-        <div><p>{module.description}</p>{error && <span className="inline-message danger">{error}</span>}</div>
+      {(!isRepairTableModule || Boolean(error)) && <div className="page-actions">
+        <div>{error && <span className="inline-message danger">{error}</span>}</div>
         {!isRepairTableModule && <div className="action-cluster">
           {module.legacy && <a className="secondary-btn" href={`${LEGACY_BASE}/${module.legacy}`}>專業圖臺／進階作業</a>}
           <button className="primary-btn compact" onClick={load} disabled={syncing}>{syncing ? '同步中…' : '重新同步'}</button>
         </div>}
-      </div>
+      </div>}
       <div className="realtime-state"><i /> 已啟用資料庫即時更新；存取仍受帳號角色與資料列權限保護。</div>
       {data?.summary && (
         <section className={`mini-metrics ${isRepairTableModule ? 'workorder-summary' : ''}`}>

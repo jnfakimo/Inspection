@@ -327,5 +327,5 @@ function CommandCenter({ system, module, profile }: { system: SystemDefinition; 
 }
 
 export function MarketCommandCenterWorkspace({ system, module }: { system: SystemDefinition; module: ModuleDefinition }) {
-  return <AuthGate>{profile => <AppShell profile={profile} title={system.title}><div className="page-actions"><div><p>{module.description}</p></div><div className="action-cluster"><a className="secondary-btn compact" href="/Inspection/v2/systems/marketanalytics/overview/">進階分析工作台</a></div></div><CommandCenter system={system} module={module} profile={profile} /></AppShell>}</AuthGate>;
+  return <AuthGate>{profile => <AppShell profile={profile} title={system.title}><div className="page-actions"><div /><div className="action-cluster"><a className="secondary-btn compact" href="/Inspection/v2/systems/marketanalytics/overview/">進階分析工作台</a></div></div><CommandCenter system={system} module={module} profile={profile} /></AppShell>}</AuthGate>;
 }

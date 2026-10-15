@@ -131,7 +131,6 @@ export function ModelHubModule({ module, profile }: Props) {
           </span>
           {module.title}
         </h2>
-        <p>{module.description}</p>
       </header>
 
       {note && <p className="inline-message danger" role="status">{note}</p>}
