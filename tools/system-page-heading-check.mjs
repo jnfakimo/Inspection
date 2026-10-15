@@ -7,7 +7,10 @@ assert.equal(systems.length, 13, '系統標題稽核必須涵蓋 13 大系統');
 assert.equal(moduleCount, 67, '系統標題稽核必須涵蓋 67 個子系統');
 
 for (const system of systems) {
-  const iconPath = `.${system.icon.replace('/Inspection', '')}`;
+  const publicAssetPrefix = '/Inspection/v2/';
+  assert.ok(system.icon.startsWith(publicAssetPrefix),
+    `${system.key} Logo URL 必須包含 V2 basePath：${system.icon}`);
+  const iconPath = `web/public/${system.icon.slice(publicAssetPrefix.length)}`;
   assert.ok(existsSync(iconPath), `${system.key} 的正式 Logo 不存在：${iconPath}`);
   // 系統 Logo 最大顯示尺寸是入口圖卡的 88px，來源一律收在 320px 以內（見 AGENTS.md）。
   // 2026-08-28 曾有 1254px、1MB 以上的 PNG 直接上線，入口頁光圖示就要載 2.6MB。
@@ -37,6 +40,16 @@ assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaT
   '交接紀錄首頁必須使用模組名稱作為大標題');
 
 const systemHub = readFileSync('web/app/systems/[system]/system-hub-client.tsx', 'utf8');
+assert.match(systemHub, /if \(\(system\.key === 'handover' \|\| system\.key === 'guardpatrol'/,
+  'handover root keeps the requested seven-card module hub');
+assert.match(systemHub, /const cards = handover \? \[/);
+assert.match(systemHub, /system\.key === 'handover' && key === 'guard' && hasModuleAccess\(profile, 'handover', 'guard-approve'\)/);
+assert.match(systemHub, /cards\.filter\(\(\[key\]\) => canSeeModule\(key\)\)/);
+const handoverWorkspace = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
+assert.match(handoverWorkspace, /const allowedModules = profile\.allowed_handover_modules \|\| \[\]/);
+assert.match(handoverWorkspace, /allowedModules\.includes\(module\.key\)/);
+assert.match(handoverWorkspace, /module\.key === 'guard' && allowedModules\.includes\('guard-approve'\)/);
+assert.match(handoverWorkspace, /if \(!allowed\) return/);
 assert.match(systemHub, /metaTitle: '系統入口', description: system\.description/,
   '駐衛警系統入口必須使用共用標題與系統說明');
 const operationsCss = readFileSync('web/app/systems/[system]/[module]/operations.css', 'utf8');
@@ -63,6 +76,13 @@ assert.match(css, /\.workorder-summary\{display:grid;grid-template-columns:repea
 assert.match(css, /\.workorder-summary article\{width:108px;height:52px/,
   '維修入口七張統計小卡必須固定為 108×52px');
 assert.match(css, /\.system-page-heading\{[^}]*padding:2px 0 16px/);
+// 內容區寬度只有一個來源（--content-width，tokens.css）；子系統頁不得各自設定寬度上限。
+assert.match(css, /\.content\.v1-content> :not\(\.system-page-heading\)\{width:var\(--content-width\)/,
+  '一般子系統頁內容寬度必須使用 --content-width');
+assert.ok(!/\.operations-page\{[^}]*width:/.test(css) && !/\.operations-page\{[^}]*width:/.test(operationsCss),
+  '維修／交接等入口頁不得自訂 .operations-page 寬度');
+assert.ok(!/\.v1list-page\s*\{[^}]*max-width/.test(readFileSync('web/app/systems/[system]/[module]/v1-listpage.css', 'utf8')),
+  '清單頁不得自訂內容寬度上限');
 assert.match(css, /\.content\.v1-content:has\(>\.system-page-heading\)\{padding-top:20px\}/);
 assert.match(css, /\.system-page-heading h1\{[^}]*color:var\(--cyan\)[^}]*font-size:26px/);
 assert.match(css, /\.system-page-heading>img\{[^}]*width:42px;height:42px/);

@@ -20,6 +20,8 @@
 
   /* 字型、尺寸 */
   --font: 'Noto Sans TC', 'Microsoft JhengHei UI', 'Microsoft JhengHei', sans-serif;
+  /* 內容區寬度：所有子系統頁共用，桌面 85% 置中（≤760px 滿版），不得各頁自訂上限 */
+  --content-width: 85%;
   --head: 'Rajdhani', 'Noto Sans TC', 'Segoe UI', 'Microsoft JhengHei UI', 'Microsoft JhengHei', sans-serif;
 
   /* 核心：頁面底、卡片、邊線、文字 */
