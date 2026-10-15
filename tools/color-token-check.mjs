@@ -65,6 +65,11 @@ for (const file of files.filter((f) => f.endsWith('.css'))) {
       if (!isAt && !isTokens) {
         const themeScoped = /data-theme/.test(selector);
         const exempt = inPrint || themeScoped || PAPER.test(selector) || /@keyframes|@font-face/.test(stack.join(' '));
+        // 亮色實心底配 --on-solid（固定白字）在科技版對比不足（白字配 #00d4ff 只有 1.77:1）；改用 --on-bright 或 --on-primary-solid。
+        if (!exempt && /background(-color)?\s*:\s*var\(--(cyan|primary|green|amber|violet|live|blue|red)\)/.test(buf)
+          && /(^|;)\s*color\s*:\s*var\(--on-solid\)/.test(buf)) {
+          errors.push(`${rel}:${line} 亮色實心底不得配 --on-solid（${selector.slice(0, 50)}），請改用 --on-bright`);
+        }
         for (const decl of buf.split(';')) {
           const idx = decl.indexOf(':');
           if (idx < 0) continue;

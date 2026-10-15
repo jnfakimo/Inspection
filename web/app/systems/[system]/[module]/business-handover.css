@@ -71,11 +71,11 @@
 .business-filter-label{font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap}
 .business-slot-chip{padding:5px 12px;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink);font-size:12.5px;cursor:pointer;transition:all .15s ease;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
 .business-slot-chip:hover{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
-.business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:var(--on-solid);font-weight:700}
+.business-slot-chip.active{border-color:var(--cyan);background:var(--cyan);color:var(--on-bright);font-weight:700}
 .business-slot-chip.is-done{border-color:color-mix(in srgb,var(--green) 45%,var(--line));color:var(--green)}
-.business-slot-chip.active.is-done{background:var(--green);color:var(--on-solid)}
+.business-slot-chip.active.is-done{background:var(--green);color:var(--on-bright)}
 .business-slot-chip.is-live-slot{border-color:var(--live);background:color-mix(in srgb,var(--live) 14%,var(--panel));color:var(--ink);box-shadow:0 0 8px color-mix(in srgb,var(--live) 30%,transparent)}
-.business-live-text{background:var(--live);color:var(--on-solid);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
+.business-live-text{background:var(--live);color:var(--on-bright);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;line-height:1.2}
 
 /* 時段點檢卡片清單 */
 .business-slots-grid{display:grid;gap:14px}
@@ -85,14 +85,14 @@
 .business-slot-card.is-active-slot-card .business-slot-head{background:color-mix(in srgb,var(--live) 12%,var(--panel));border-bottom-color:color-mix(in srgb,var(--live) 35%,var(--line))}
 .business-slot-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .business-slot-badge{display:inline-block;padding:3px 9px;border-radius:6px;background:color-mix(in srgb,var(--cyan) 15%,var(--panel));color:var(--cyan);font-size:13px;font-weight:700}
-.business-slot-badge.is-live{background:var(--live);color:var(--on-solid)}
-.business-active-now-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--live);color:var(--on-solid);font-size:12px;font-weight:700;box-shadow:0 1px 4px color-mix(in srgb,var(--live) 35%,transparent)}
+.business-slot-badge.is-live{background:var(--live);color:var(--on-bright)}
+.business-active-now-badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--live);color:var(--on-bright);font-size:12px;font-weight:700;box-shadow:0 1px 4px color-mix(in srgb,var(--live) 35%,transparent)}
 .business-slot-stat{font-size:13px;color:var(--muted)}
 .business-slot-stat b{color:var(--green)}
 .business-slot-quick-actions{display:flex;align-items:center;gap:6px}
 .business-quick-btn{padding:4px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;cursor:pointer;transition:all .15s ease}
 .business-quick-btn.done{background:color-mix(in srgb,var(--green) 12%,var(--panel));color:var(--green);border-color:color-mix(in srgb,var(--green) 30%,var(--line))}
-.business-quick-btn.done:hover{background:var(--green);color:var(--on-solid)}
+.business-quick-btn.done:hover{background:var(--green);color:var(--on-bright)}
 .business-quick-btn.reset{background:var(--panel2);color:var(--muted)}
 .business-quick-btn.reset:hover{background:color-mix(in srgb,var(--red) 12%,var(--panel));color:var(--red);border-color:color-mix(in srgb,var(--red) 30%,var(--line))}
 
@@ -111,7 +111,7 @@
 .business-check-toggle-group{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel2);box-shadow:0 1px 2px color-mix(in srgb,var(--shadow-ink) 3%,transparent)}
 .business-check-btn{padding:7px 14px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s ease;white-space:nowrap}
 .business-check-btn:hover{background:color-mix(in srgb,var(--ink) 8%,transparent)}
-.business-check-btn.complete-btn.active{background:var(--green);color:var(--on-solid);font-weight:700}
+.business-check-btn.complete-btn.active{background:var(--green);color:var(--on-bright);font-weight:700}
 .business-check-btn.uncomplete-btn.active{background:var(--n-500);color:var(--on-solid);font-weight:700}
 
 .hs-pill.is-count{border-color:color-mix(in srgb,var(--shift) 35%,var(--line));background:color-mix(in srgb,var(--shift) 10%,var(--panel));color:var(--ink)}

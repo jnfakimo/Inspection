@@ -152,7 +152,7 @@
 .hs-sign{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px dashed color-mix(in srgb,var(--muted) 45%,var(--line));border-radius:12px;background:var(--panel)}
 .hs-sign.is-signed{border-style:solid;border-color:color-mix(in srgb,var(--green) 45%,var(--line));background:color-mix(in srgb,var(--green) 7%,var(--panel))}
 .hs-sign-icon{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:var(--panel2);color:var(--muted)}
-.hs-sign.is-signed .hs-sign-icon{background:var(--green);color:var(--on-solid)}
+.hs-sign.is-signed .hs-sign-icon{background:var(--green);color:var(--on-bright)}
 .hs-sign>div{display:grid;gap:1px;min-width:0}.hs-sign>div>span{color:var(--muted);font-size:12px}.hs-sign b{color:var(--ink);font-size:15px}.hs-sign small{color:var(--muted);font-size:11.5px}
 .hs-sign:not(.is-signed) b{color:var(--muted);font-weight:500}
 .hs-sign select{min-width:0}

@@ -55,6 +55,11 @@
   --primary: var(--cyan);
   --on-solid: #fff;
   --on-primary: #001018;
+  /* 實心主色按鈕（登入等主要行動）：底色與其上文字成對使用，兩主題皆 ≥ 4.5:1 */
+  --primary-solid: var(--cyan);
+  --on-primary-solid: #001018;
+  /* 亮色實心底（--cyan／--green／--live／--red 等）上的文字：一般版白字、科技版深色字 */
+  --on-bright: #001018;
 
   /* 第三方品牌色（Google 登入／日曆標誌），固定不隨主題 */
   --g-blue: #4285f4;
@@ -159,6 +164,9 @@
   --live: #10b981;
   --live-ink: #047857;
   --live-solid: #047857;
+  --primary-solid: #0369a1;
+  --on-primary-solid: #fff;
+  --on-bright: #fff;
 
   --paper: #fff;
   --paper-ink: #111;
