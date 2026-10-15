@@ -63,6 +63,8 @@
 - **系統標題**由 `AppShell` 自動插入 `SystemPageHeader`：距頂列 22px、26px、`var(--cyan)`（=`--primary`）、Logo 固定
   42×42px 且來源只能是 `modules.ts` 的 `icon`；內容區左右內距桌面 24px／手機 14px。工作區不得再手寫系統級 `<h1>`，
   功能區標題只用 `<h2>` 以下。
+- **內容寬度**只有一個來源 `--content-width`（`tokens.css`，桌面 85% 置中、≤760px 滿版）。子系統頁不得各自設定寬度或
+  `max-width`；`test:page-headings` 會擋 `.operations-page`、`.v1list-page` 重新加上寬度。
 - **系統入口卡片**一律 269×200px 並置中，窄版恢復彈性寬度、禁止水平溢出。維修／派工入口另有 7 張統計小卡與 3 張流程主卡，
   駐衛警入口 4 張、交接紀錄入口 7 張，規格同上。
 - **三個全螢幕圖資工具頁**（`structuremap/floor2d`、`structuremap/floor3d`、`guardpatrol/map3d`）是唯一版型例外：

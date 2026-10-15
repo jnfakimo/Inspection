@@ -21,6 +21,13 @@
 - 文件：重寫 `AGENTS.md`、`PROJECT_PLAN.md`、`handoff.md`；新增 `docs/DOMAIN_RULES.md`；舊版在 `docs/archive/2026-10-15-pre-unification/`。
 - `package.json` 新增 `test:color-tokens` 並接在 `test:button-standard` 之後。
 
+## WS-8 後續變更（內容寬度、派車頁行內樣式）
+
+- 派車頁 `vehicle-workspace.tsx` 行內樣式全部改為 class（規則在 `admin-workspace.css`），移除對應的 `!important`。
+- `tokens.css` 新增 `--content-width`；`v1-layout.css`、`operations.css`、`v1-listpage.css` 移除各頁自訂寬度；
+  `tools/system-page-heading-check.mjs` 新增寬度斷言；`AGENTS.md`、`PROJECT_PLAN.md`（第 8 節）、`handoff.md` 同步。
+- 已在 C 執行副本驗證：`typecheck:v2` 與 `npm test` 皆 exit 0。這批尚未 commit。
+
 ## 驗證狀態
 
 - 已驗證：全部變更（含單一主色、三份新文件）同步到 C 執行副本後，`npm run typecheck:v2` 與完整 `npm test` 皆 exit 0。
@@ -42,7 +49,7 @@ cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run type
 
 ## 下一步（接手者從這裡開始）
 
-1. WS-8：逐系統版型審查（見 `PROJECT_PLAN.md` 第 4 節），列出不符三層標準的頁面再分批修。
+1. WS-8 續：依 `PROJECT_PLAN.md` 第 8 節處理行內版面樣式最多的檔案（`LayoutsAdmin.tsx`、`business-handover.tsx`、`vehicle-workspace.tsx`），改為 class。
 2. 若能開瀏覽器：一般版／科技版各看一輪代表頁（入口、系統入口、子系統表格頁、交接簿、列印預覽）。
 3. 清掉 `modules.ts` 的 `tone` 欄位與 `mobile/page.tsx` 的 `tone` 類別。
 4. 集中圖表／標記色盤，縮小 `color-token-check.mjs` 的 `ALLOW_TSX`。
