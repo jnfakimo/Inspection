@@ -74,3 +74,10 @@ cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run type
 - main 原本的 `PROJECT_PLAN.md`、`handoff.md` 封存為 `docs/archive/2026-10-15-pre-unification/*.origin-main.md`。
 - 已知問題（main 既有，未處理）：`Obsidian/04-開發與部署.md` 第 1995 行有殘留的 `<<<<<<< HEAD` 合併標記。
 - G 槽目前仍在 `codex/html-daily-report-preview`；之後要在 G 繼續工作，需先處理 G 的未提交修改再切到 `codex/theme-unification`。
+
+## 2026-10-15 統一化後續（分支 codex/unification-followups）
+
+- 修正科技版亮色實心底配白字的對比問題（登入按鈕與 9 處標籤、徽章），新增 `--primary-solid`／`--on-primary-solid`／`--on-bright`，並加入守門規則。
+- 移除 `tone` 欄位；清除 Obsidian 殘留合併標記；Dependabot 2 項無修補版本，列為已知風險。
+- 交接簿雜湊鎖檔 `tools/handover-release-manifest.json` 已隨 `business-handover.css`、`handover-sheet.css` 更新。
+- 下一步：登入後頁面的畫面驗收（需使用者登入瀏覽器）、`LayoutsAdmin.tsx` 行內樣式、整理 G 槽未提交修改。
