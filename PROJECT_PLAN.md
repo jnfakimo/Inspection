@@ -187,3 +187,25 @@
 - 處置：runbook 步驟 2 在 SQL Editor 會被 `trg_protect_technician_order_columns`／`trg_protect_repair_request_columns` 擋下（postgres 身分沒有登入者，`can_manage_workorder()` 為 false），這也解釋了為何報修案件已隱藏而工單沒有。改用 migration `20261016090000_hide_e2e_test_workorders.sql`：只動以 `request_id` 核對過的 3 組、交易內暫停並恢復兩個保護觸發器、只改 `hidden`、事後驗證；空資料庫略過、資料不符整筆回滾。守門 `npm run test:hide-e2e-migration`（PGlite，含根因重現與「不暫停觸發器就失敗」的反例）。套用走 `apply-database-migration.yml`。
 - 套用結果（2026-10-16）：分支 CI run 38820146953（5 個 job）通過後，apply-database-migration run 38820368083 套用到正式專案 `qztffronusdhgxhjjubt`，HTTP 201。目標工單確實存在於該專案（使用者截圖），migration 不會走「略過」路徑；事後驗證未通過會回滾，所以 201 代表 6 筆皆已隱藏、觸發器已恢復。Management API 不回傳 NOTICE，筆數未直接讀回。
 - 本批沒有改：`LayoutsAdmin.tsx` 行內樣式（§11 已標示需登入後邊看畫面邊改）、`business-handover.tsx` 欄寬行內樣式（§9 已決定不動）。這兩項沒有帳號與瀏覽器就不應盲改。
+
+## 20. G 槽快照分類與正式環境落差（2026-10-16，分支 codex/handoff-snapshot-triage）
+
+- 快照 commit `9363fb870`（151 檔）以分岔點 `05c99c619`、目前 main 與 main 歷史上所有版本做三方比對，並忽略 CRLF／行尾空白：
+  - 已在 main 或只是舊版本：12 檔（5 檔只差換行、7 檔是 main 歷史上的舊版）。
+  - **新檔 91**：天氣地圖 Blender 原始檔 48（11.8 MiB，含 `.blend`／`.glb`）、`supabase/functions` 22、migration 5、`web/app` 7、`tools` 4、`web/lib` 3、`docs` 2。
+  - **實質修改 48**：多數是 Edge Function（`app-api`、`admin-api`、`line-notify`）、後台元件與文件。
+- 主要的未發布功能群：(1) 車輛 LINE 個人通知（migration 5 支、`vehicle-line-dispatch-worker`、`_shared/vehicle-*`、`admin-api` 個人 LINE 管理、`/systems/vehicle/notification-preview`）；
+  (2) 繁中 404 頁（`web/app/not-found.tsx`，10-15 曾離線驗證）；(3) 設備營運／能源元件 `equipment-operations-energy.tsx`；(4) `async-load-safety`、`request-sequence` 測試；(5) 天氣地圖設計原始檔。
+- **正式環境落差**：(1) 的 Edge Functions 與 migration 於 10-08 從 G 直接部署（`app-api` v118、`admin-api` v53／v54、`line-notify` v31、worker v1），原始碼從未進 main。
+  10-15 `deploy-edge-functions` run 38748430358（PR #71 改 `app-api`）與 run 38771047188（PR #73 改 `_shared`）以 main 版重新部署
+  `admin-api, app-api, audit-event, error-threshold-check, patrol-checkin, patrol-timeout-check, platform-log-alert, username-login`，
+  因此正式環境的 `app-api`／`admin-api` 已不含 LINE 個人通知；`line-notify`、worker 未被重新部署，6 張相關資料表仍在。
+  10-08 紀錄為功能開關全關、outbox／cron 為 0；開關現況需要正式庫讀取權限才能重查，本批未查。
+- 處置：146 個未發布檔案匯出到 `G:\我的雲端硬碟\AI\Codex\_backups\g-snapshot-20261015-unpublished\`（zip、`manifest.tsv` 分類清單、bundle、G 槽 Obsidian 本機修改 patch），
+  之後 G 槽以 `checkout -f -B main origin/main` 切回 main（未提交的 143 項與 main 位元組相同）。快照分支保留在本機，不推到公開 repo。
+- 同批清理：移除 17 個 `AppData\Local\Temp` 暫存 worktree（檔案已被系統清空，只剩刪除狀態，無修改或新增檔；分支全部保留）、
+  移除 `wt-followup-20261016` 與舊日常副本 `wt-merge-main-20261015`（皆先拆 `node_modules` junction，執行副本 `node_modules` 前後皆 140 項），
+  刪除已合併的 `codex/ui-followup-20261016`、`codex/handoff-after-pr75`、`codex/handoff-security-store`（遠端與本機）。
+  其餘 worktree 保留：`C:\projects\Inspection`、`.codex` 與 `Documents\Codex\2026-10-10`／`2026-10-13` 的 Codex 工作目錄（可能仍由 Codex 使用）。
+- **待決定**：車輛 LINE 個人通知要 (a) 恢復上線——以 main 為基底重新整合 (1)，補測試後經 PR 部署；還是 (b) 放棄——至少把 5 支已套用的 migration 補進 main 作為 schema 紀錄。
+  (2)～(5) 可在決定後逐項以獨立 PR 帶回。

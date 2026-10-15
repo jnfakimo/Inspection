@@ -27,9 +27,12 @@
 
 1. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
-2. G 槽快照分支 `codex/g-worktree-snapshot-20261015`（151 個檔案，含 22 個 Edge Functions 與 5 個 migration）：
-   尚未推送、尚未審查；repo 是公開的，**不要推到這個 repo**。本機備份在 `C:\Users\jnfa\Documents\Codex\backups\g-worktree-snapshot-20261015.bundle`。
-   合併進 main 前必須逐項對照 main 的較新版本。
+2. **待決定：車輛 LINE 個人通知要恢復上線還是放棄**（見 `PROJECT_PLAN.md` §20）。2026-10-08 這批從 G 槽直接部署到正式環境
+   （5 支 migration、`app-api` v118、`admin-api` v53／v54、`line-notify` v31、`vehicle-line-dispatch-worker` v1），原始碼從未進 main；
+   10-15 PR #71／#73 合併時，自動部署已用 main 版覆蓋 `app-api`、`admin-api` 等 8 個 function，所以正式環境的這兩支已不含 LINE 個人通知，
+   `line-notify`、worker 與 6 張資料表仍是 10-08 版本。當時功能開關全關、outbox／cron 為 0，預期使用者無感，但開關現況未重查。
+   原始碼備份：`G:\我的雲端硬碟\AI\Codex\_backups\g-snapshot-20261015-unpublished\snapshot-9363fb870-unpublished.zip`（146 檔，含分類清單 `manifest.tsv` 與 bundle）。
+   G 槽快照分支仍在本機，repo 是公開的，**不要推到這個 repo**。
 3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
    動到 `supabase/functions/**` 合併後會自動部署 Edge Function）。
 4. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。
@@ -39,8 +42,9 @@
 
 ## ⚠️ 注意事項
 
-- **工作位置**：G 槽工作樹在分支 `codex/g-worktree-snapshot-20261015`，不要在 G 直接開發。
-  日常工作用乾淨副本 `C:\Users\jnfa\Documents\Codex\wt-merge-main-20261015`（git worktree，`node_modules` 以 junction 連到 C 執行副本）。
+- **工作位置**：G 槽已於 2026-10-16 切回乾淨的 `main`（與 `origin/main` 一致）。開發與測試仍在 C 槽另建 worktree：
+  `git worktree add -b <分支> C:\Users\jnfa\Documents\Codex\<資料夾> origin/main`，再以 junction 連 `node_modules` 到 C 執行副本；
+  移除 worktree 前**先單獨刪掉 junction**（PowerShell `(Get-Item <路徑>\node_modules).Delete()`），避免連帶刪到執行副本的 `node_modules`。
 - **驗證**：在上述副本執行 `npm run typecheck:v2` 與 `npm test`；G 槽的 `node_modules` 不完整，不能在 G 跑。Edge Function 另用 `deno check <入口檔>`（本機已安裝 deno），跑完會改動 `deno.lock`，不要提交。
 - **資料庫 migration**：用 `apply-database-migration.yml`（workflow_dispatch，可指定 `--ref` 為 PR 分支）。該流程拒絕含 `DROP TABLE`、`DELETE FROM`、`TRUNCATE` 的 migration，
   且必須以 `BEGIN;`／`COMMIT;` 包住；保存期限等需求請用 UPDATE 清除內容，不要實體刪除。套用順序：CI 通過 → 套用 migration → 合併。
@@ -60,4 +64,4 @@
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · PR #75 已合併並部署（`b655a19e6`）；本交接更新見分支 `codex/handoff-after-pr75`
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · G 槽切回 main、快照內容備份與分類、清理 19 個 worktree 與 3 條已合併分支（分支 `codex/handoff-snapshot-triage`）
