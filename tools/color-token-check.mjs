@@ -19,7 +19,6 @@ const CORE_TOKENS = ['bg', 'panel', 'panel2', 'line', 'text', 'dim', 'muted', 'i
 // tsx／ts 中允許直接寫色碼的檔案：圖表系列色、3D／圖面標記、列印視窗、第三方地圖。
 const ALLOW_TSX = [
   /chart-palette\.ts$/, // 圖表系列色盤唯一正本（web/lib/chart-palette.ts）
-  /DashboardWidgetContent\.tsx$/, // 戰情元件動態版面，待評估
   /structuremap-viewers\.tsx$/, /structuremap-markerboard\.tsx$/, /structuremap-floor3d\.tsx$/,
   /floor-stack-3d\.tsx$/, /repair-map3d\.tsx$/, /patrol-map3d\.tsx$/, /modeler-client\.tsx$/,
   /vehicle-tracking-workspace\.tsx$/, /vehicle-workspace\.tsx$/, /patrol-status\.ts$/, /layout\.tsx$/,

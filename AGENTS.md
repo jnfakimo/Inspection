@@ -120,6 +120,10 @@
 - **電子交接簿**（機電課、業管組、駐警隊）共用 `handover-sheet.css`／`.tsx` 的 `hs-*` 版型，各簿只放自己特有的區塊，
   不得重新定義 `hs-*` 外觀或自備圖示表；紙本列印區（A4）才可各自覆寫。`test:handover-style` 把關。
 - **報修統計卡**只在 `app-api` 的 `repairRequestSummary()` 定義一次，前端不得另算。
+- **戰情元件不得顯示模擬數字**：元件清單正本是 `web/lib/dashboard-widget-catalog.ts`（後台戰情版面設定與電視牆共用），
+  統計口徑在 `web/lib/dashboard-metrics.ts`（戰情儀表板、電視牆、版面預覽共用），資料載入在 `web/lib/dashboard-live-data.ts`。
+  沒有資料來源的元件標 `dataSource: 'unavailable'`，畫面只顯示「尚未介接資料來源」；`desc` 必須寫實際顯示的內容。
+  `test:dashboard-metrics` 會擋下計時器／亂數產生的數字，以及缺少實作的元件。
 
 ## 7. 資料、權限與安全（摘要；細則見 `docs/DOMAIN_RULES.md`）
 

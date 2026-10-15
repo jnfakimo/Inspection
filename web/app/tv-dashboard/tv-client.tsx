@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import type { Profile } from '@/types/app';
 import { getSupabase } from '@/lib/supabase';
 import { DashboardWidgetContent } from '@/components/DashboardWidgetContent';
+import { DASHBOARD_WIDGET_CATALOG } from '@/lib/dashboard-widget-catalog';
 import '../dashboard.css';
 
 type TvClientProps = { profile: Profile };
@@ -24,48 +25,8 @@ type LayoutItem = {
   };
 };
 
-const WIDGET_CATALOG: Record<
-  string,
-  {
-    systemId: number;
-    systemName: string;
-    icon: string;
-    desc: string;
-  }
-> = {
-  alerts: { systemId: 11, systemName: '戰情系統', icon: '🚨', desc: '即時重大警報、設備異常跑馬燈' },
-  kpis: { systemId: 11, systemName: '戰情系統', icon: '⚡', desc: '進場車次、出勤率、在線率、異常件數' },
-  patrol: { systemId: 11, systemName: '戰情系統', icon: '🛡️', desc: '巡檢點打卡進度、排班執勤狀況' },
-  repairs: { systemId: 11, systemName: '戰情系統', icon: '🔧', desc: '各區報修處理進度與完工率' },
-  equipment_status: { systemId: 11, systemName: '戰情系統', icon: '⚙️', desc: '冷凍設備、電力系統妥善率' },
-  realtime_incident_map: { systemId: 11, systemName: '戰情系統', icon: '🗺️', desc: '全市場熱點分佈與緊急案件定位' },
-  sla_compliance: { systemId: 11, systemName: '戰情系統', icon: '⏱️', desc: 'MTTR 與 SLA 達標統計' },
-  staff_duty_matrix: { systemId: 11, systemName: '戰情系統', icon: '👥', desc: '在勤人力配置與即時簽到' },
-  cctv_ipcam_grid: { systemId: 11, systemName: '戰情系統', icon: '📹', desc: '攝影機即時監控畫面' },
-  weather_risk_radar: { systemId: 11, systemName: '戰情系統', icon: '🌧️', desc: '氣象特報與防汛應變' },
-  weather_taiwan: { systemId: 11, systemName: '戰情系統', icon: '🌦️', desc: '臺灣即時氣象特報' },
-  rank_dept: { systemId: 11, systemName: '戰情系統', icon: '📊', desc: '各單位報修排行' },
-  rank_equipment: { systemId: 11, systemName: '戰情系統', icon: '🛠️', desc: '各設備故障排行' },
-  rank_technician: { systemId: 11, systemName: '戰情系統', icon: '👷', desc: '維修人員案件數' },
-  rank_fault: { systemId: 11, systemName: '戰情系統', icon: '🔍', desc: '故障類型分析' },
-  trend: { systemId: 11, systemName: '戰情系統', icon: '📅', desc: '各月份報修趨勢' },
-  trading_kpi: { systemId: 10, systemName: '市場營運', icon: '📦', desc: '今日交易量、金額、品項數' },
-  price_comparison: { systemId: 10, systemName: '市場營運', icon: '📈', desc: '蔬果價格同期比較' },
-  weekly_trend: { systemId: 10, systemName: '市場營運', icon: '📉', desc: '每週交易趨勢走勢' },
-  market_allocation: { systemId: 10, systemName: '市場營運', icon: '🎯', desc: '配置與妥善率儀表' },
-  supplier_ranking: { systemId: 10, systemName: '市場營運', icon: '🚛', desc: '主要產地／供應商進貨排行' },
-  price_volatility: { systemId: 10, systemName: '市場營運', icon: '⚠️', desc: '行情波動與異常價位警示' },
-  auction_efficiency: { systemId: 10, systemName: '市場營運', icon: '⚡', desc: '拍賣場次交易進度與速度' },
-  floor_congestion: { systemId: 10, systemName: '市場營運', icon: '🅿️', desc: '卸貨場區滿載率與車流動態' },
-  public_price_board: { systemId: 12, systemName: '公開看板', icon: '💹', desc: '公開大宗即時報價看板' },
-  market_turnover: { systemId: 12, systemName: '公開看板', icon: '🌾', desc: '市場公開總成交額' },
-  commodity_ratio: { systemId: 12, systemName: '公開看板', icon: '🥦', desc: '品項交易佔比分佈' },
-  realtime_ticker: { systemId: 12, systemName: '公開看板', icon: '📢', desc: '即時滾動跑馬燈行情' },
-  top_gainers_losers: { systemId: 12, systemName: '公開看板', icon: '📊', desc: '今日蔬果漲跌幅排行榜' },
-  origin_weather_map: { systemId: 12, systemName: '公開看板', icon: '⛅', desc: '主要產地天氣與供貨狀態' },
-  historical_price_curve: { systemId: 12, systemName: '公開看板', icon: '📉', desc: '30日/同季歷史價格曲線' },
-  consumer_guide_board: { systemId: 12, systemName: '公開看板', icon: '🛒', desc: '平價蔬果專區與供應指引' },
-};
+// 元件清單正本在 lib/dashboard-widget-catalog.ts（後台版面設定與電視牆共用）。
+const WIDGET_CATALOG = DASHBOARD_WIDGET_CATALOG;
 
 const DEFAULT_ITEMS: LayoutItem[] = [
   { widget_key: 'alerts', title: '重要提醒與異常警報', width: 12, height: 2, visible: true },

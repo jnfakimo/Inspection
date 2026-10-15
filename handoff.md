@@ -88,3 +88,9 @@ cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run type
 - 已刪除 `.git/packed-refs.lock`。G 槽盤點報告在 `docs/G_WORKTREE_INVENTORY_20261015.md`，未刪除任何檔案。
 - 待使用者決定：電視牆模擬數字的處理方式；G 槽 57＋92 個檔案的保留方式。
 - 待登入：`LayoutsAdmin.tsx` 行內樣式。
+
+## 2026-10-15 戰情元件改接真實資料（分支 codex/dashboard-live-data）
+
+- `DashboardWidgetContent.tsx` 全部改寫：27 種讀真實資料、5 種顯示「尚未介接資料來源」，行內樣式改為 `web/components/dashboard-widgets.css`。
+- 元件清單、統計口徑、資料載入各只有一份（見 AGENTS.md 共用元件標準）。
+- 未驗證：電視牆與後台版面預覽的實際畫面（需登入）；市場元件需要帳號有讀取行情看板的權限，否則會照實顯示錯誤。
