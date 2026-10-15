@@ -94,3 +94,8 @@ cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run type
 - `DashboardWidgetContent.tsx` 全部改寫：27 種讀真實資料、5 種顯示「尚未介接資料來源」，行內樣式改為 `web/components/dashboard-widgets.css`。
 - 元件清單、統計口徑、資料載入各只有一份（見 AGENTS.md 共用元件標準）。
 - 未驗證：電視牆與後台版面預覽的實際畫面（需登入）；市場元件需要帳號有讀取行情看板的權限，否則會照實顯示錯誤。
+
+## 2026-10-15 正式站驗收（分支 codex/card-tone-cleanup）
+
+- 修正維修／派工入口卡片顏色不一致（PR #62 遺留的 `:not()` 排除條件），並加守門規則。
+- 驗收進度：主入口、電視牆、維修／派工入口已在正式站實測；其餘系統入口、子系統表格、交接簿、列印預覽、科技版與手機寬度仍待驗。

@@ -63,6 +63,10 @@ for (const file of files.filter((f) => f.endsWith('.css'))) {
       if (!isAt && !isTokens) {
         const themeScoped = /data-theme/.test(selector);
         const exempt = inPrint || themeScoped || PAPER.test(selector) || /@keyframes|@font-face/.test(stack.join(' '));
+        // 全站單一主色：系統卡、維修入口卡、手機快捷卡不得再以 amber／green／violet 區分（含 :not() 排除寫法）。
+        if (/\.(system-card|maintenance-card)(\.|:not\(\.)(amber|green|violet)\b|\.quick-grid a(\.|:not\(\.)(amber|green|violet)\b/.test(selector)) {
+          errors.push(`${rel}:${line} 卡片不得依系統分色（${selector.slice(0, 60)}），全站單一主色`);
+        }
         // 亮色實心底配 --on-solid（固定白字）在科技版對比不足（白字配 #00d4ff 只有 1.77:1）；改用 --on-bright 或 --on-primary-solid。
         if (!exempt && /background(-color)?\s*:\s*var\(--(cyan|primary|green|amber|violet|live|blue|red)\)/.test(buf)
           && /(^|;)\s*color\s*:\s*var\(--on-solid\)/.test(buf)) {
