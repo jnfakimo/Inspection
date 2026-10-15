@@ -25,6 +25,7 @@ import { invokeCachedAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './market-analytics.css';
+import { CHART_SERIES } from '@/lib/chart-palette';
 
 ChartJS.register(ArcElement, BarController, BarElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);
 
@@ -49,7 +50,7 @@ type Analysis = {
 const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei' }).format(new Date());
 const MODE_LABELS: Record<PeriodMode, string> = { day: '日', week: '週', month: '月', quarter: '季', year: '年' };
 const CHART_LABELS: Record<ChartMode, string> = { trend: '趨勢', bar: '長條', kline: 'K 線', pie: '圓餅', doughnut: '甜甜圈', pareto: '柏拉圖', table: '明細' };
-const PALETTE = ['#0284c7', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2', '#65a30d', '#db2777'];
+const PALETTE = CHART_SERIES;
 
 function isoDate(value: Date) { return value.toISOString().slice(0, 10); }
 function addDays(value: string, amount: number) {

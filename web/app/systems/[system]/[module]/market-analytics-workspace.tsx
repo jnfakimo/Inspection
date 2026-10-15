@@ -26,6 +26,7 @@ import { marketMovementPresentation } from '@/lib/market-movement';
 import { invokeAppApi, invokeCachedAppApi } from '@/lib/supabase';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import { CHART_FALLBACK, CHART_SERIES, CHART_TOKEN_FALLBACK, MARKET_DEFAULT_CUSTOM_COLORS, MARKET_PALETTE_PRESETS } from '@/lib/chart-palette';
 import './market-analytics.css';
 
 ChartJS.register(ArcElement, BarController, BarElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);
@@ -138,13 +139,9 @@ const CHART_TYPE_LABELS: Record<ChartType, string> = {
 const CHART_TYPE_OPTIONS = Object.entries(CHART_TYPE_LABELS) as Array<[ChartType, string]>;
 const CHART_TYPE_IDS = new Set<ChartType>(CHART_TYPE_OPTIONS.map(([value]) => value));
 const SOURCE_TYPE_LABELS: Record<string, string> = { csv: 'CSV 檔案', json: 'JSON 資料', api: '外部 API', manual: '手動輸入' };
-const DEFAULT_CUSTOM_COLORS = ['#0284c7', '#059669', '#d97706', '#7c3aed', '#dc2626', '#0891b2'];
+const DEFAULT_CUSTOM_COLORS = MARKET_DEFAULT_CUSTOM_COLORS;
 const PALETTES: PaletteDefinition[] = [
-  { id: 'market', label: '市場藍綠', colors: ['--cyan', '--green', '--amber', '--violet', '--red', '#0891b2'] },
-  { id: 'produce', label: '蔬果鮮彩', colors: ['#15803d', '#0d9488', '#65a30d', '#f59e0b', '#ea580c', '#db2777'] },
-  { id: 'cool', label: '冷色專業', colors: ['#0369a1', '#2563eb', '#4f46e5', '#7c3aed', '#0f766e', '#0891b2'] },
-  { id: 'warm', label: '暖色行情', colors: ['#b45309', '#ea580c', '#d97706', '#dc2626', '#be123c', '#9333ea'] },
-  { id: 'accessible', label: '高對比友善', colors: ['#0072b2', '#e69f00', '#009e73', '#cc79a7', '#d55e00', '#56b4e9'] },
+  ...(MARKET_PALETTE_PRESETS as PaletteDefinition[]),
   { id: 'custom', label: '自訂色卡', colors: DEFAULT_CUSTOM_COLORS },
 ];
 const PALETTE_IDS = new Set<PaletteId>(PALETTES.map(palette => palette.id));
@@ -395,16 +392,16 @@ function useResolvedPalette(paletteId: PaletteId, customColors: string[]) {
   }, []);
   return useMemo(() => {
     const style = typeof window === 'undefined' ? null : getComputedStyle(document.documentElement);
-    const fallbacks: Record<string, string> = { '--cyan': '#0284c7', '--green': '#059669', '--amber': '#d97706', '--violet': '#7c3aed', '--red': '#dc2626' };
+    const fallbacks = CHART_TOKEN_FALLBACK;
     const definition = PALETTES.find(palette => palette.id === paletteId) || PALETTES[0];
     const selected = paletteId === 'custom' ? normalizeCustomColors(customColors) : definition.colors;
-    const colors = selected.map(color => color.startsWith('--') ? style?.getPropertyValue(color).trim() || fallbacks[color] || '#64748b' : color);
+    const colors = selected.map(color => color.startsWith('--') ? style?.getPropertyValue(color).trim() || fallbacks[color] || CHART_FALLBACK.dim : color);
     return {
       colors,
-      text: style?.getPropertyValue('--text').trim() || '#172033',
-      dim: style?.getPropertyValue('--dim').trim() || '#64748b',
-      grid: style?.getPropertyValue('--line').trim() || '#cbd5e1',
-      panel: style?.getPropertyValue('--panel').trim() || '#ffffff',
+      text: style?.getPropertyValue('--text').trim() || CHART_FALLBACK.text,
+      dim: style?.getPropertyValue('--dim').trim() || CHART_FALLBACK.dim,
+      grid: style?.getPropertyValue('--line').trim() || CHART_FALLBACK.line,
+      panel: style?.getPropertyValue('--panel').trim() || CHART_FALLBACK.panel,
       current: colors[0],
       comparison: colors[1 % colors.length],
       rise: style?.getPropertyValue('--red').trim() || fallbacks['--red'],
@@ -1280,8 +1277,8 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
   const yoyChartData = useMemo(() => ({
     labels: yoyData.map(month => month.label),
     datasets: [
-      { label: '本年', data: yoyData.map(month => month.current), backgroundColor: '#0284c7', borderRadius: 5 },
-      { label: '去年同月', data: yoyData.map(month => month.previous), backgroundColor: '#7c3aed', borderRadius: 5 },
+      { label: '本年', data: yoyData.map(month => month.current), backgroundColor: CHART_SERIES[0], borderRadius: 5 },
+      { label: '去年同月', data: yoyData.map(month => month.previous), backgroundColor: CHART_SERIES[3], borderRadius: 5 },
     ],
   }), [yoyData]);
   const yoyChartOptions: ChartOptions<'bar'> = {
@@ -1361,7 +1358,7 @@ function ComparisonWorkspace({ sources }: { sources: Source[] }) {
       {yoyError && <p className="market-inline-message" role="alert">{yoyError}</p>}
       {yoyData.length ? <>
         <div className="market-command-chart-frame">
-          <div className="market-chart-legend-row"><span><i style={{ background: '#0284c7' }} />本年</span><span><i style={{ background: '#7c3aed' }} />去年同月</span><small>單位：{yoyField?.unit || ''}</small></div>
+          <div className="market-chart-legend-row"><span><i style={{ background: CHART_SERIES[0] }} />本年</span><span><i style={{ background: CHART_SERIES[3] }} />去年同月</span><small>單位：{yoyField?.unit || ''}</small></div>
           <div className="market-command-chart"><Bar data={yoyChartData} options={yoyChartOptions} /></div>
         </div>
         <div className="market-comparison-yoy-rates">{yoyData.map(month => <div key={month.label}><span>{month.label}</span><MarketMovementBadge value={changePercent(month.current, month.previous)} /></div>)}</div>

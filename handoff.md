@@ -81,3 +81,10 @@ cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run type
 - 移除 `tone` 欄位；清除 Obsidian 殘留合併標記；Dependabot 2 項無修補版本，列為已知風險。
 - 交接簿雜湊鎖檔 `tools/handover-release-manifest.json` 已隨 `business-handover.css`、`handover-sheet.css` 更新。
 - 下一步：登入後頁面的畫面驗收（需使用者登入瀏覽器）、`LayoutsAdmin.tsx` 行內樣式、整理 G 槽未提交修改。
+
+## 2026-10-15 第三輪（分支 codex/unification-round3）
+
+- 按鈕：建模頁、業管組點檢切換收進共用按鈕標準。當班徽章改深綠底。圖表色盤集中到 `web/lib/chart-palette.ts`。
+- 已刪除 `.git/packed-refs.lock`。G 槽盤點報告在 `docs/G_WORKTREE_INVENTORY_20261015.md`，未刪除任何檔案。
+- 待使用者決定：電視牆模擬數字的處理方式；G 槽 57＋92 個檔案的保留方式。
+- 待登入：`LayoutsAdmin.tsx` 行內樣式。
