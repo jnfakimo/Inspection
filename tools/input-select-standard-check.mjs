@@ -27,6 +27,7 @@ for (const file of personnelPickers) {
 }
 
 
+
 const globals = fs.readFileSync('web/app/tokens.css', 'utf8');
 if (!/@media\s+screen\s*\{\s*:root\s*\{[^}]*--form-control-height\s*:\s*42px/s.test(globals)) {
   throw new Error('共用表單欄位高度必須由 screen 專用 42px 主題 token 定義');

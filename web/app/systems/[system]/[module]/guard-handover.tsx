@@ -14,7 +14,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppShell } from '@/components/AppShell';
-import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { AdminHeader, AdminModal, errorMessage } from '@/components/admin/shared';
 import { BlankSelectOption } from '@/components/BlankSelectOption';
@@ -29,6 +28,7 @@ import {
   activityTime, fileSizeLabel, hhmm, liveState, moveDate, newIncidentId, previewKind, rocDate, todayTaipei,
   type Attachment, type GuardContext, type GuardLog, type GuardOptionList, type GuardShift, type Incident, type Item,
 } from './guard-handover-shared';
+import { HandoverDateNavigation, HandoverReportApprovalForm } from './handover-sheet';
 import { AttachmentChips, GuardDailyReport, GuardIcon, GuardShiftCard, GuardSheetHeader, type GuardKpi } from './guard-handover-view';
 import { GuardCorrectionModal } from './guard-handover-correction';
 import { GuardIncidentSearch } from './guard-incident-search';
@@ -198,7 +198,7 @@ export function GuardHandover({ system, module, profile }: Props) {
         onClick={() => setReceiving(shift)}>本人核對並確認接班</button> : null)}
   </>;
 
-  const report = { market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length };
+  const report = { market, date, shifts, approval, logFor, nameOf, namesOf, attachmentCount: (shiftName: string, incidentId: string) => attachmentsFor(shiftName, incidentId).length, correctionCount: (logId: string) => correctionsFor(logId).length };
   const editReportShift = (shift: GuardShift) => {
     const log = logFor(shift.name);
     if (log && context?.can_correct) setCorrecting(shift);
@@ -208,18 +208,14 @@ export function GuardHandover({ system, module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
-      <AdminHeader module={module} busy={busy || acting} note={note} onReload={load}
-        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} aria-expanded={searchOpen} onClick={() => setSearchOpen(value => !value)}>{searchOpen ? '關閉異常事件搜尋' : '搜尋異常事件'}</button><button type="button" className="secondary-btn compact" disabled={!context} onClick={openDailyReport}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印本日報表</button></>} />
+      <AdminHeader module={module} busy={busy || acting} note={note} onReload={load} hideDescription
+        action={<>{canManageOptions && <button type="button" className="secondary-btn compact" onClick={() => setOptionsList('incident_category')}>管理下拉選單</button>}<button type="button" className="secondary-btn compact" disabled={!context} aria-expanded={searchOpen} onClick={() => setSearchOpen(value => !value)}>{searchOpen ? '關閉異常事件搜尋' : '搜尋異常事件'}</button><button type="button" className="secondary-btn compact" disabled={!context} onClick={openDailyReport}>預覽日報表</button><button type="button" className="primary-btn compact" disabled={!context} onClick={() => window.print()}>列印日報表</button></>} />
       <section className="panel hs-toolbar">
         {allowedMarkets.length > 0 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
           <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
             aria-pressed={market === code} disabled={busy || acting} onClick={() => { setContext(null); setMarket(code); }}>{HANDOVER_MARKETS[code].short}</button>)}</div>}
-        <div className="hs-date-nav">
-          <button type="button" className="secondary-btn compact" aria-label="前一天" onClick={() => setDate(current => moveDate(current, -1))}>‹</button>
-          <label>值班日期<LocalizedDateInput aria-label="值班日期（年/月/日）" value={date} onChange={event => setDate(event.target.value)} /></label>
-          <button type="button" className="secondary-btn compact" aria-label="後一天" onClick={() => setDate(current => moveDate(current, 1))}>›</button>
-          <button type="button" className="secondary-btn compact" onClick={() => setDate(todayTaipei())}>回到今天</button>
-        </div>
+        <HandoverDateNavigation id="guard-handover-date" label="值班日期" value={date} onChange={setDate}
+          onPrevious={() => setDate(current => moveDate(current, -1))} onNext={() => setDate(current => moveDate(current, 1))} onToday={() => setDate(todayTaipei())} />
         <div className="hs-toolbar-right">
           {currentShift && <span className="hs-current-now"><i className="hs-pulse-dot" aria-hidden="true" />目前當班：{currentShift.name}（{hhmm(currentShift.shift_start)}–{hhmm(currentShift.shift_end)}）</span>}
           <span className="hs-toolbar-summary"><GuardIcon name="calendar" size={15} />{rocDate(date)} · {shifts.length} 個班別 · 已接班 {receivedCount} 班</span>
@@ -227,6 +223,19 @@ export function GuardHandover({ system, module, profile }: Props) {
       </section>
 
       {searchOpen && market && context && <GuardIncidentSearch market={market} canSearchPersonal={Boolean(context.can_approve)} />}
+
+      <section className="hs-sheet" aria-label="駐警隊電子交接簿">
+        <GuardSheetHeader market={market} date={date} kpis={context ? kpis : []} />
+        <div className="hs-shifts">
+          {busy && !context ? <p className="hs-empty">載入中…</p>
+            : !shifts.length ? <p className="hs-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡邏系統 → 巡檢排班」設定班別。</p>
+              : shifts.map((shift, index) => {
+                const log = logFor(shift.name);
+                return <GuardShiftCard key={shift.name} index={index} shift={shift} log={log} nameOf={nameOf} namesOf={namesOf}
+                  actions={actionsFor(shift, log)} canEdit={canEdit} attachmentsFor={attachmentsFor} onPreview={setFilePreview} now={now} />;
+              })}
+        </div>
+      </section>
 
       {context && <section className={`hs-approval${approval ? ' is-approved' : canApproveNow ? ' is-ready' : ''}`} aria-label="主管簽核">
         <div className="hs-approval-main">
@@ -242,36 +251,23 @@ export function GuardHandover({ system, module, profile }: Props) {
         </div>}
       </section>}
 
-      <section className="hs-sheet" aria-label="駐警隊電子交接簿">
-        <GuardSheetHeader market={market} date={date} kpis={context ? kpis : []} />
-        <div className="hs-shifts">
-          {busy && !context ? <p className="hs-empty">載入中…</p>
-            : !shifts.length ? <p className="hs-empty">巡檢排班沒有任何啟用中的班別範本，請先至「駐衛警巡邏系統 → 巡檢排班」設定班別。</p>
-              : shifts.map((shift, index) => {
-                const log = logFor(shift.name);
-                return <GuardShiftCard key={shift.name} index={index} shift={shift} log={log} nameOf={nameOf} namesOf={namesOf}
-                  actions={actionsFor(shift, log)} canEdit={canEdit} attachmentsFor={attachmentsFor} onPreview={setFilePreview} now={now} />;
-              })}
-        </div>
-      </section>
-
       {mounted && context && createPortal(<div className="guard-print-root"><GuardDailyReport {...report} /></div>, document.body)}
       {mounted && previewOpen && context && createPortal(<div className="guard-report-preview" role="dialog" aria-modal="true" aria-label="駐警隊交接日報表預覽">
         <div className="guard-report-preview-bar">
           <div><strong>本日報表預覽</strong><span>{rocDate(date)} · HTML 網頁報表</span>
             {previewEditing && <span className="guard-report-edit-hint">{context.can_correct ? '主管可修正勤務概況、重要交辦、異常事件與物品點交；每次修正保留紀錄。' : '按班別內的按鈕修改交接；已鎖定的內容可查看主管修正紀錄。'}</span>}</div>
           <div><button type="button" className={previewEditing ? 'primary-btn compact' : 'secondary-btn compact'} aria-pressed={previewEditing} onClick={() => setPreviewEditing(value => !value)}>{previewEditing ? '完成編輯' : '編輯內容'}</button>
-            <button type="button" className="primary-btn compact" onClick={() => window.print()}>列印本日報表</button>
+            <button type="button" className="primary-btn compact" onClick={() => window.print()}>列印日報表</button>
             <button type="button" className="secondary-btn compact" onClick={() => { setPreviewEditing(false); setPreviewOpen(false); }}>關閉預覽</button></div>
         </div>
         <div className="guard-report-preview-scroll"><div className="guard-report-preview-page"><GuardDailyReport {...report} editing={previewEditing}
           canCorrect={Boolean(context.can_correct)} canEdit={canEdit} correctionCount={logId => correctionsFor(logId).length} onEditShift={editReportShift}
-          approvalControls={!approval && context.can_approve ? <div className="guard-report-approve-form">
-            <label htmlFor="guard-report-approval-note">簽核說明<textarea id="guard-report-approval-note" value={approvalNote} maxLength={500}
-              onChange={event => setApprovalNote(event.target.value)} placeholder={missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '可填寫當日案件處理與核閱說明（選填）'} /></label>
-            <div><p>{approvalHint}</p><button type="button" className="primary-btn" disabled={acting || !canApproveNow}
-              onClick={() => void approveDailyReport()}>主管簽核並產製日報表</button></div>
-          </div> : undefined} /></div></div>
+          approvalControls={!approval ? <HandoverReportApprovalForm id="guard-report-approval-note" label="簽核說明"
+            value={approvalNote} maxLength={500} onChange={setApprovalNote}
+            placeholder={!context.can_approve ? '目前帳號僅可檢視' : missingCount > 0 ? `有 ${missingCount} 班未建立交接，請填寫說明` : '可填寫當日案件處理與核閱說明（選填）'}
+            hint={approvalHint} buttonLabel="主管簽核並產製日報表" inputDisabled={acting} inputReadOnly={!context.can_approve}
+            submitDisabled={acting || !context.can_approve || !canApproveNow}
+            onSubmit={() => void approveDailyReport()} /> : undefined} /></div></div>
       </div>, document.body)}
     </div>
     {mounted && editing && context && market && createPortal(<GuardLogModal market={market} date={date} shift={editing} log={rawLogFor(editing.name)} staff={context.staff} people={context.people}

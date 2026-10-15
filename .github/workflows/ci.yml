@@ -89,6 +89,37 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'tools/inspect-local-cutover.ps1'), [ref]$parseTokens, [ref]$parseErrors) | Out-Null
           if ($parseErrors.Count -gt 0) { throw 'Cutover collector PowerShell syntax failed.' }
 
+  mobile-vehicle-tracker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: mobile/vehicle-tracker
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mobile/vehicle-tracker/package-lock.json
+      - name: Install locked mobile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Typecheck mobile application
+        run: npm run typecheck
+      - name: Verify mobile dependency tree
+        run: npm ls compression shell-quote source-map-js uuid
+      - name: Bundle Android and iOS with synthetic configuration
+        run: |
+          npx --no-install expo export --platform android --output-dir dist-smoke/android --max-workers 2
+          npx --no-install expo export --platform ios --output-dir dist-smoke/ios --max-workers 2
+        env:
+          CI: '1'
+          EXPO_OFFLINE: '1'
+          EXPO_NO_TELEMETRY: '1'
+          EXPO_NO_DOTENV: '1'
+          EXPO_PUBLIC_SUPABASE_URL: https://example.invalid
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: offline-synthetic-placeholder
+
   build:
     runs-on: ubuntu-latest
     steps:

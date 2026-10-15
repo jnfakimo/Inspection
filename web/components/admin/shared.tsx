@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { permissionModules, systemPermissionKey, systems, type ModuleDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -81,12 +81,52 @@ export function StatusPill({ value }: { value: unknown }) {
   return <span className={`status-pill ${tone}`}>{label}</span>;
 }
 export function AdminModal({ title, children, onClose, className = '', backdropClassName = '' }: { title: string; children: ReactNode; onClose: () => void; className?: string; backdropClassName?: string }) {
-  return <div className={`admin-modal-backdrop ${backdropClassName}`.trim()} role="dialog" aria-modal="true" aria-label={title}>
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const openerRef = useRef(typeof document !== 'undefined' && document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const opener = openerRef.current;
+    const isTop = () => Array.from(document.querySelectorAll('[data-admin-modal]')).at(-1) === dialog;
+    const controls = () => Array.from(dialog.querySelectorAll<HTMLElement>('a[href],button,input,select,textarea,[tabindex]'))
+      .filter(element => element.closest('[data-admin-modal]') === dialog && element.tabIndex >= 0
+        && !element.matches(':disabled,[hidden]') && element.getClientRects().length > 0
+        && getComputedStyle(element).visibility !== 'hidden');
+    const focusFirst = () => (controls()[0] || dialog).focus();
+    if (!dialog.contains(document.activeElement)) focusFirst();
+    const keydown = (event: KeyboardEvent) => {
+      if (!isTop() || event.isComposing || event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeRef.current();
+      } else if (event.key === 'Tab') {
+        const items = controls();
+        const first = items[0], last = items.at(-1);
+        if (!first || (event.shiftKey ? document.activeElement === first : document.activeElement === last)
+          || !dialog.contains(document.activeElement)) {
+          event.preventDefault();
+          (event.shiftKey ? last || dialog : first || dialog).focus();
+        }
+      }
+    };
+    const focusin = () => { if (isTop() && !dialog.contains(document.activeElement)) focusFirst(); };
+    document.addEventListener('keydown', keydown);
+    document.addEventListener('focusin', focusin);
+    return () => {
+      document.removeEventListener('keydown', keydown);
+      document.removeEventListener('focusin', focusin);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, []);
+  return <div ref={dialogRef} data-admin-modal tabIndex={-1} className={`admin-modal-backdrop ${backdropClassName}`.trim()} role="dialog" aria-modal="true" aria-label={title}>
     <section className={`admin-modal ${className}`.trim()}><header><h2>{title}</h2><button type="button" onClick={onClose} aria-label="關閉">×</button></header>{children}</section>
   </div>;
 }
-export function AdminHeader({ module, busy, note, onReload, action }: { module: ModuleDefinition; busy: boolean; note: string; onReload: () => void; action?: ReactNode }) {
-  return <div className="page-actions admin-page-actions"><div><p>{module.description}</p>{note && <span className={`inline-message ${note.startsWith('失敗') ? 'danger' : ''}`}>{note}</span>}</div><div>{action}<button className="secondary-btn" disabled={busy} onClick={onReload}>{busy ? '載入中…' : '重新載入'}</button></div></div>;
+export function AdminHeader({ module, busy, note, onReload, action, hideDescription = true }: { module: ModuleDefinition; busy: boolean; note: string; onReload: () => void; action?: ReactNode; hideDescription?: boolean }) {
+  return <div className="page-actions admin-page-actions"><div>{!hideDescription && <p>{module.description}</p>}{note && <span className={`inline-message ${note.startsWith('失敗') ? 'danger' : ''}`}>{note}</span>}</div><div>{action}<button className="secondary-btn" disabled={busy} onClick={onReload}>{busy ? '載入中…' : '重新載入'}</button></div></div>;
 }
 export function Pager({ page, total, onPage, pageSize = PAGE_SIZE }: { page: number; total: number; onPage: (page: number) => void; pageSize?: number }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));

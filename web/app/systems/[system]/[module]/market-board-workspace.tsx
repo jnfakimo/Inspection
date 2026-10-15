@@ -25,12 +25,12 @@ function ExecutiveBoardModule({ module }: { module: ModuleDefinition }) {
   />;
 }
 
-function TickerModule({ module }: { module: ModuleDefinition }) {
+function TickerModule() {
   const [fullscreen, setFullscreen] = useState(false);
   useProjection(fullscreen);
   return <div className="market-board-ticker-page" data-fullscreen={fullscreen}>
     <div className="page-actions">
-      <div><p>{module.description}</p></div>
+      <div />
       <div className="action-cluster"><ProjectionButton active={fullscreen} onToggle={() => setFullscreen(value => !value)} /></div>
     </div>
     <DashboardMarketCarousel />
@@ -41,7 +41,7 @@ function BoardShell({ system, module, profile }: { system: SystemDefinition; mod
   const allowed = profile.allowed_systems.includes('*') || profile.allowed_systems.includes('marketboard');
   return <AppShell profile={profile} title={system.title}>
     {allowed
-      ? (module.key === 'ticker' ? <TickerModule module={module} /> : <ExecutiveBoardModule module={module} />)
+      ? (module.key === 'ticker' ? <TickerModule /> : <ExecutiveBoardModule module={module} />)
       : <div className="notice danger">目前角色沒有市場公開看板系統權限，請由管理員開放。</div>}
   </AppShell>;
 }

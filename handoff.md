@@ -5,7 +5,7 @@
 
 ## 最後更新
 
-2026-10-15 · Claude Code。主題：全站版型與色彩統一（13 系統／67 子系統）。**已分組 commit 到本機分支 `codex/html-daily-report-preview`（aad615e56、fe0a8b985、134050142 與本文件 commit）；未 push、未部署。**
+2026-10-15 · Claude Code。主題：全站版型與色彩統一（13 系統／67 子系統）。**分支 `codex/theme-unification` 已合併 origin/main（`294b97168`）並 push；尚未合併進 main、未部署、未開 PR。**
 
 ## 這一批做了什麼
 
@@ -65,3 +65,12 @@ cd C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime && npm run type
 
 - 遷移前的 CSS 備份在本機暫存區（工作階段結束後可能消失）；正式還原依據是 Git 差異與
   `docs/archive/2026-10-15-pre-unification/` 內的舊文件。
+
+## 合併 origin/main（2026-10-15）
+
+- 在乾淨 worktree `C:UsersjnfaDocumentsCodexwt-merge-main-20261015` 建立 `codex/theme-unification`，合併 origin/main 的 36 個 commit（PR #55–#61）。G 槽工作樹與其 167 個未提交修改沒有被動到。
+- 19 個衝突檔的解法：先取 main 版本，再用腳本重新套用本批轉換（token 遷移、單一主色、內容寬度、派車頁 class、測試斷言）。main 的修改全部保留。
+- `package.json` 以 main 為準，只補回目標檔存在的 `test:metric-card-standard`、`test:font-tokens`、`test:color-tokens`；`test:module-card-standard`、`test:css-source-balance`、`test:request-sequence`、`test:async-load-safety` 的檔案只在 G 槽未追蹤，沒有加入。
+- main 原本的 `PROJECT_PLAN.md`、`handoff.md` 封存為 `docs/archive/2026-10-15-pre-unification/*.origin-main.md`。
+- 已知問題（main 既有，未處理）：`Obsidian/04-開發與部署.md` 第 1995 行有殘留的 `<<<<<<< HEAD` 合併標記。
+- G 槽目前仍在 `codex/html-daily-report-preview`；之後要在 G 繼續工作，需先處理 G 的未提交修改再切到 `codex/theme-unification`。

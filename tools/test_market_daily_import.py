@@ -177,9 +177,81 @@ class MarketBackupSourceTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, '人工確認'):
             moa_scope([moa_row('ZZ99', '新品名-新品種')], DAY, '1', 'V', self.CODE_ITEMS)
 
-    def test_wrong_market_or_date_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, '市場或日期'):
-            moa_scope([moa_row('FK41', '甜椒-彩色種', market='台北二')], DAY, '1', 'V', self.CODE_ITEMS)
+    def test_wrong_market_or_date_is_rejected_with_scope_context(self):
+        wrong_market = moa_row('FK41', '甜椒-彩色種', market='台北二')
+        wrong_date = moa_row('FK41', '甜椒-彩色種')
+        wrong_date['TransDate'] = '115.09.01'
+        for record in (wrong_market, wrong_date):
+            with self.subTest(record=record['MarketName'], date=record['TransDate']), self.assertRaisesRegex(ValueError, '市場或日期') as caught:
+                moa_scope([record], DAY, '1', 'V', self.CODE_ITEMS)
+            message = str(caught.exception)
+            self.assertIn('MOA 資料列 1', message)
+            self.assertIn('2026-09-02', message)
+            self.assertIn('市場=第一市場', message)
+            self.assertIn('品類=蔬菜', message)
+            self.assertIn('CropCode 型別=str', message)
+
+    def test_invalid_codes_with_nonzero_trade_fail_closed_and_diagnose_safely(self):
+        missing = object()
+        invalid_codes = [('', 'str'), ('   ', 'str'), ('FK-41', 'str'), (None, 'NoneType'),
+                         (True, 'bool'), ({'private': 'DO_NOT_LEAK'}, 'dict'), (missing, 'missing')]
+        for code, expected_type in invalid_codes:
+            record = moa_row(code, 'PRIVATE_ITEM_NAME')
+            if code is missing:
+                del record['CropCode']
+            record['private_note'] = 'DO_NOT_LEAK'
+            with self.subTest(code_type=expected_type), self.assertRaises(ValueError) as caught:
+                # 預設量價均非零，代號異常不得被當成休市佔位列忽略。
+                moa_scope([record], DAY, '1', 'V', self.CODE_ITEMS)
+            message = str(caught.exception)
+            self.assertIn('MOA 資料列 1', message)
+            self.assertIn('日期=2026-09-02', message)
+            self.assertIn('市場=第一市場', message)
+            self.assertIn('品類=蔬菜', message)
+            self.assertIn(f'CropCode 型別={expected_type}', message)
+            self.assertIn('CropCode repr=', message)
+            self.assertNotIn('DO_NOT_LEAK', message)
+            self.assertNotIn('PRIVATE_ITEM_NAME', message)
+
+    def test_long_invalid_code_diagnostic_repr_is_truncated(self):
+        code = 'X' * 200 + '!'
+        with self.assertRaises(ValueError) as caught:
+            moa_scope([moa_row(code, '未知')], DAY, '1', 'V', self.CODE_ITEMS)
+        message = str(caught.exception)
+        self.assertIn('...<truncated; length=201>', message)
+        self.assertNotIn(code, message)
+        self.assertLess(len(message), 400)
+
+    def test_legal_numeric_codes_are_preserved(self):
+        code_items = {
+            ('第一市場', '蔬菜', '72'): '小番茄',
+            ('第一市場', '蔬菜', '0072'): '小番茄',
+        }
+        for raw_code, expected in (('72', '72'), (72, '72'), ('0072', '0072')):
+            with self.subTest(raw_code=raw_code):
+                rows, stats = moa_scope([moa_row(raw_code, '小番茄-測試')], DAY, '1', 'V', code_items)
+                self.assertEqual([row['code'] for row in rows], [expected])
+                self.assertEqual(stats['status'], 'ready')
+
+    def test_unknown_code_error_has_context_without_record_dump(self):
+        record = moa_row('ZZ99', 'PRIVATE_ITEM_NAME')
+        record['private_note'] = 'DO_NOT_LEAK'
+        with self.assertRaisesRegex(RuntimeError, '人工確認') as caught:
+            moa_scope([record], DAY, '1', 'V', self.CODE_ITEMS)
+        message = str(caught.exception)
+        self.assertIn('MOA 資料列 1', message)
+        self.assertIn('CropCode 型別=str', message)
+        self.assertIn("CropCode repr='ZZ99'", message)
+        self.assertNotIn('DO_NOT_LEAK', message)
+        self.assertNotIn('PRIVATE_ITEM_NAME', message)
+
+    def test_duplicate_code_conflict_is_rejected_with_row_context(self):
+        first = moa_row('FK41', '甜椒-彩色種')
+        second = moa_row('FK41', '甜椒-彩色種', qty='200')
+        with self.assertRaisesRegex(ValueError, '互相衝突') as caught:
+            moa_scope([first, second], DAY, '1', 'V', self.CODE_ITEMS)
+        self.assertIn('MOA 資料列 2', str(caught.exception))
+        self.assertIn('CropCode 型別=str', str(caught.exception))
 
     def test_duplicate_code_is_not_double_counted(self):
         rows, stats = moa_scope([moa_row('FK41', '甜椒-彩色種'), moa_row('FK41', '甜椒-彩色種')], DAY, '1', 'V', self.CODE_ITEMS)

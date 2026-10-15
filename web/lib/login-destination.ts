@@ -9,6 +9,7 @@ type AccessProfile = {
 };
 
 export const DEFAULT_POST_LOGIN_PATH = '/Inspection/v2/systems/';
+const POST_LOGIN_URL_ORIGIN = 'https://post-login.invalid';
 
 export function canOpenAdminModule(profile: AccessProfile, moduleKey: string) {
   if (moduleKey === 'notices') return true;
@@ -18,9 +19,22 @@ export function canOpenAdminModule(profile: AccessProfile, moduleKey: string) {
 function normalizeRequestedPath(requested: string | null | undefined) {
   const value = String(requested || '').trim();
   if (!value || value.includes('\\') || value.includes('\u0000')) return '';
-  if (value.startsWith('/systems/')) return `/Inspection/v2${value}`;
-  if (value.startsWith('/Inspection/v2/') || value.startsWith('/word-cloud/v2/')) return value;
-  return '';
+  let candidate = '';
+  if (value.startsWith('/systems/')) candidate = `/Inspection/v2${value}`;
+  else if (value.startsWith('/Inspection/v2/') || value.startsWith('/word-cloud/v2/')) candidate = value;
+  else return '';
+
+  // Keep navigation on the current site. Returning URL components also removes any
+  // URL authority or scheme from a query-controlled value before it reaches location.replace.
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate, POST_LOGIN_URL_ORIGIN);
+  } catch {
+    return '';
+  }
+  if (parsed.origin !== POST_LOGIN_URL_ORIGIN) return '';
+  if (!parsed.pathname.startsWith('/Inspection/v2/') && !parsed.pathname.startsWith('/word-cloud/v2/')) return '';
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 
 export function requestedPostLoginPath(search: string) {

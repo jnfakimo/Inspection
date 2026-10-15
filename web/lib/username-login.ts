@@ -1,11 +1,11 @@
 'use client';
 
 import { getSupabase } from './supabase';
-import { SUPABASE_ANON_KEY } from './config';
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';
+import { captchaFailureDiagnostic } from './username-login-error';
+import { shouldUseSameOriginUsernameLogin } from './username-login-routing';
 
 const USERNAME_LOGIN_TIMEOUT_MS = 15_000;
-
-const isIpAddress = (hostname: string) => /^(?:\d{1,3}\.){3}\d{1,3}$/u.test(hostname);
 
 async function invokeSameOrigin(body: Record<string, unknown>) {
   const controller = new AbortController();
@@ -33,7 +33,41 @@ async function invokeSameOrigin(body: Record<string, unknown>) {
   }
 }
 
-async function localizedFunctionError(error: unknown, fallback: string) {
+async function invokePublicLogin(body: Record<string, unknown>) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), USERNAME_LOGIN_TIMEOUT_MS);
+  try {
+    const response = await fetch(SUPABASE_URL + '/functions/v1/username-login', {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error('登入服務回應 ' + response.status) as Error & { status?: number };
+      error.status = response.status;
+      throw error;
+    }
+    return payload;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      const timeoutError = new Error('驗證服務回應逾時，請稍後再試');
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+async function localizedFunctionError(error: unknown, fallback: string, isCaptcha: boolean) {
+  if (isCaptcha) return captchaFailureDiagnostic(error, fallback);
+
   const context = (error as { context?: unknown } | null)?.context;
   if (typeof Response !== 'undefined' && context instanceof Response) {
     try {
@@ -52,26 +86,37 @@ export async function invokeUsernameLogin<T>(
   fallback: string,
   options?: { retries?: number }
 ): Promise<T> {
-  const maxRetries = options?.retries ?? (body.action === 'captcha' ? 2 : 0);
+  const isCaptcha = body.action === 'captcha';
+  // CAPTCHA requests insert a challenge row, so they must never be replayed automatically.
+  const maxRetries = isCaptcha ? 0 : options?.retries ?? 0;
   let attempt = 0;
   let lastError: unknown;
 
   while (attempt <= maxRetries) {
     attempt++;
     try {
-      // Self-hosted deployments are commonly opened by IP with a router port
-      // (e.g. https://1.34.250.22:5057). Try same-origin first, then cloud failover if 5xx / network error.
-      if (typeof window !== 'undefined' && (isIpAddress(window.location.hostname)
-        || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      // CAPTCHA is public; bypass the Auth-aware Functions transport so an old session cannot block its request.
+      if (body.action === 'captcha') {
+        try {
+          return await invokePublicLogin(body) as T;
+        } catch (error) {
+          throw new Error(await localizedFunctionError(error, fallback, true));
+        }
+      }
+      // Non-loopback IPv4 hosts may be self-hosted reverse proxies.
+      // Loopback development uses the already configured Supabase Functions client.
+      if (typeof window !== 'undefined' && shouldUseSameOriginUsernameLogin(window.location.hostname)) {
         try {
           return await invokeSameOrigin(body) as T;
         } catch (error) {
           const status = (error as Error & { status?: number }).status;
           // Do not fallback or retry on deliberate 4xx client errors (e.g. 400 bad captcha, 401 wrong password, 429 rate limit).
           if (typeof status === 'number' && status >= 400 && status < 500) {
-            throw new Error(await localizedFunctionError(error, fallback));
+            throw new Error(await localizedFunctionError(error, fallback, isCaptcha));
           }
-          // On same-origin connection/server failure (5xx or fetch error), attempt cloud fallback
+          // A 5xx or lost response may still have inserted a challenge; do not send it again elsewhere.
+          if (isCaptcha) throw new Error(await localizedFunctionError(error, fallback, true));
+          // On same-origin connection/server failure (5xx or fetch error), use the configured Supabase Functions client
           try {
             const { data: cloudData, error: cloudError } = await getSupabase().functions.invoke('username-login', {
               body,
@@ -88,11 +133,7 @@ export async function invokeUsernameLogin<T>(
         timeout: USERNAME_LOGIN_TIMEOUT_MS,
       });
       if (error) {
-        const context = (error as { context?: unknown } | null)?.context;
-        if (typeof Response !== 'undefined' && context instanceof Response && context.status >= 400 && context.status < 500) {
-          throw new Error(await localizedFunctionError(error, fallback));
-        }
-        throw new Error(await localizedFunctionError(error, fallback));
+        throw new Error(await localizedFunctionError(error, fallback, isCaptcha));
       }
       return data as T;
     } catch (err) {
@@ -107,5 +148,5 @@ export async function invokeUsernameLogin<T>(
     }
   }
 
-  throw new Error(await localizedFunctionError(lastError, fallback));
+  throw new Error(await localizedFunctionError(lastError, fallback, isCaptcha));
 }

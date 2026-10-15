@@ -20,26 +20,26 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', textAlign: 'center', width: '100%' }}>
           <div style={{ background: 'rgba(251,191,36,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(251,191,36,0.2)' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8' }}>總交易量</div>
-            <b style={{ color: '#fbbf24', fontSize: '16px', display: 'block', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>總交易量</div>
+            <b style={{ color: 'var(--amber)', fontSize: '16px', display: 'block', marginTop: '2px' }}>
               {1480 + (tick % 7)} <small style={{ fontSize: '10px' }}>噸</small>
             </b>
           </div>
           <div style={{ background: 'rgba(16,185,129,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8' }}>總成交額</div>
-            <b style={{ color: '#34d399', fontSize: '16px', display: 'block', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>總成交額</div>
+            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '16px', display: 'block', marginTop: '2px' }}>
               $4,820 <small style={{ fontSize: '10px' }}>萬</small>
             </b>
           </div>
           <div style={{ background: 'rgba(56,189,248,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(56,189,248,0.2)' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8' }}>交易品項</div>
-            <b style={{ color: '#60a5fa', fontSize: '16px', display: 'block', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>交易品項</div>
+            <b style={{ color: 'var(--blue)', fontSize: '16px', display: 'block', marginTop: '2px' }}>
               186 <small style={{ fontSize: '10px' }}>種</small>
             </b>
           </div>
           <div style={{ background: 'rgba(168,85,247,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8' }}>成交率</div>
-            <b style={{ color: '#a78bfa', fontSize: '16px', display: 'block', marginTop: '2px' }}>99.4%</b>
+            <div style={{ fontSize: '11px', color: 'var(--dim)' }}>成交率</div>
+            <b style={{ color: 'var(--violet)', fontSize: '16px', display: 'block', marginTop: '2px' }}>99.4%</b>
           </div>
         </div>
       );
@@ -48,25 +48,25 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '48px', color: '#94a3b8' }}>葉菜類</span>
+            <span style={{ width: '48px', color: 'var(--dim)' }}>葉菜類</span>
             <div style={{ flex: 1, height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${75 + (tick % 4)}%`, height: '100%', background: '#3b82f6', transition: 'width 0.5s' }} />
+              <div style={{ width: `${75 + (tick % 4)}%`, height: '100%', background: 'var(--blue)', transition: 'width 0.5s' }} />
             </div>
-            <b style={{ color: '#38bdf8', minWidth: '38px', textAlign: 'right' }}>$38.5</b>
+            <b style={{ color: 'var(--cyan-text,var(--cyan))', minWidth: '38px', textAlign: 'right' }}>$38.5</b>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '48px', color: '#94a3b8' }}>瓜果類</span>
+            <span style={{ width: '48px', color: 'var(--dim)' }}>瓜果類</span>
             <div style={{ flex: 1, height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${60 - (tick % 3)}%`, height: '100%', background: '#f59e0b', transition: 'width 0.5s' }} />
+              <div style={{ width: `${60 - (tick % 3)}%`, height: '100%', background: 'var(--amber)', transition: 'width 0.5s' }} />
             </div>
-            <b style={{ color: '#fbbf24', minWidth: '38px', textAlign: 'right' }}>$52.0</b>
+            <b style={{ color: 'var(--amber)', minWidth: '38px', textAlign: 'right' }}>$52.0</b>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ width: '48px', color: '#94a3b8' }}>根莖類</span>
+            <span style={{ width: '48px', color: 'var(--dim)' }}>根莖類</span>
             <div style={{ flex: 1, height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${45 + (tick % 5)}%`, height: '100%', background: '#10b981', transition: 'width 0.5s' }} />
+              <div style={{ width: `${45 + (tick % 5)}%`, height: '100%', background: 'var(--green-text,var(--green))', transition: 'width 0.5s' }} />
             </div>
-            <b style={{ color: '#34d399', minWidth: '38px', textAlign: 'right' }}>$29.0</b>
+            <b style={{ color: 'var(--green-text,var(--green))', minWidth: '38px', textAlign: 'right' }}>$29.0</b>
           </div>
         </div>
       );
@@ -74,9 +74,9 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'weekly_trend':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--dim)' }}>
             <span>📅 近 7 日批發總噸數 (日均 1,420 噸)</span>
-            <span style={{ color: '#34d399' }}>本週累積 +4.8%</span>
+            <span style={{ color: 'var(--green-text,var(--green))' }}>本週累積 +4.8%</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '55px', padding: '0 4px' }}>
             {[
@@ -99,7 +99,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
                     }}
                   />
                 </div>
-                <span style={{ fontSize: '9px', color: '#64748b' }}>{col.d}</span>
+                <span style={{ fontSize: '9px', color: 'var(--dim)' }}>{col.d}</span>
               </div>
             ))}
           </div>
@@ -110,19 +110,19 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%', fontSize: '11px' }}>
           <div style={{ background: 'rgba(2,132,199,0.1)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(2,132,199,0.2)' }}>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>場地滿載率</div>
-            <b style={{ color: '#38bdf8', fontSize: '15px', display: 'block', marginTop: '2px' }}>82.4%</b>
-            <span style={{ color: '#34d399', fontSize: '9px' }}>運作正常</span>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>場地滿載率</div>
+            <b style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '15px', display: 'block', marginTop: '2px' }}>82.4%</b>
+            <span style={{ color: 'var(--green-text,var(--green))', fontSize: '9px' }}>運作正常</span>
           </div>
           <div style={{ background: 'rgba(16,185,129,0.1)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>作業人員配置</div>
-            <b style={{ color: '#34d399', fontSize: '15px', display: 'block', marginTop: '2px' }}>142 人</b>
-            <span style={{ color: '#94a3b8', fontSize: '9px' }}>在勤率 98%</span>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>作業人員配置</div>
+            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '15px', display: 'block', marginTop: '2px' }}>142 人</b>
+            <span style={{ color: 'var(--dim)', fontSize: '9px' }}>在勤率 98%</span>
           </div>
           <div style={{ background: 'rgba(245,158,11,0.1)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(245,158,11,0.2)' }}>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>機具妥善率</div>
-            <b style={{ color: '#fbbf24', fontSize: '15px', display: 'block', marginTop: '2px' }}>96.8%</b>
-            <span style={{ color: '#94a3b8', fontSize: '9px' }}>拖車/堆高機</span>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>機具妥善率</div>
+            <b style={{ color: 'var(--amber)', fontSize: '15px', display: 'block', marginTop: '2px' }}>96.8%</b>
+            <span style={{ color: 'var(--dim)', fontSize: '9px' }}>拖車/堆高機</span>
           </div>
         </div>
       );
@@ -132,15 +132,15 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: '3px solid #38bdf8' }}>
             <span>1. 雲林西螺產區 (甘藍、蕹菜)</span>
-            <b style={{ color: '#38bdf8' }}>420 噸 (28.4%)</b>
+            <b style={{ color: 'var(--cyan-text,var(--cyan))' }}>420 噸 (28.4%)</b>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: '3px solid #34d399' }}>
             <span>2. 彰化溪湖產區 (花椰菜、青蔥)</span>
-            <b style={{ color: '#34d399' }}>310 噸 (20.9%)</b>
+            <b style={{ color: 'var(--green-text,var(--green))' }}>310 噸 (20.9%)</b>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', borderLeft: '3px solid #fbbf24' }}>
             <span>3. 屏東九如產區 (瓜果、檸檬)</span>
-            <b style={{ color: '#fbbf24' }}>195 噸 (13.2%)</b>
+            <b style={{ color: 'var(--amber)' }}>195 噸 (13.2%)</b>
           </div>
         </div>
       );
@@ -149,16 +149,16 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(239,68,68,0.1)', borderRadius: '4px' }}>
-            <span style={{ color: '#f87171', fontWeight: 600 }}>⚠️ 青椒 (高波動)</span>
-            <span style={{ color: '#f87171', fontWeight: 700 }}>▲ +24.5% ($68/kg)</span>
+            <span style={{ color: 'var(--red)', fontWeight: 600 }}>⚠️ 青椒 (高波動)</span>
+            <span style={{ color: 'var(--red)', fontWeight: 700 }}>▲ +24.5% ($68/kg)</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(16,185,129,0.1)', borderRadius: '4px' }}>
-            <span style={{ color: '#4ade80', fontWeight: 600 }}>🔻 小黃瓜 (量多回跌)</span>
-            <span style={{ color: '#4ade80', fontWeight: 700 }}>▼ -18.2% ($32/kg)</span>
+            <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 600 }}>🔻 小黃瓜 (量多回跌)</span>
+            <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>▼ -18.2% ($32/kg)</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
-            <span style={{ color: '#94a3b8' }}>牛番茄 (平穩區間)</span>
-            <span style={{ color: '#e2e8f0' }}>+2.1% ($65/kg)</span>
+            <span style={{ color: 'var(--dim)' }}>牛番茄 (平穩區間)</span>
+            <span style={{ color: 'var(--text)' }}>+2.1% ($65/kg)</span>
           </div>
         </div>
       );
@@ -167,15 +167,15 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', width: '100%', fontSize: '11px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>第一拍賣場進度</div>
-            <b style={{ color: '#34d399', fontSize: '16px' }}>98.2%</b>
-            <div style={{ color: '#64748b', fontSize: '10px' }}>均速 4.2 秒/批</div>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>第一拍賣場進度</div>
+            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '16px' }}>98.2%</b>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>均速 4.2 秒/批</div>
           </div>
           <div style={{ width: '1px', height: '32px', background: 'rgba(255,255,255,0.1)' }} />
           <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>第二拍賣場進度</div>
-            <b style={{ color: '#38bdf8', fontSize: '16px' }}>96.5%</b>
-            <div style={{ color: '#64748b', fontSize: '10px' }}>均速 4.8 秒/批</div>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>第二拍賣場進度</div>
+            <b style={{ color: 'var(--cyan-text,var(--cyan))', fontSize: '16px' }}>96.5%</b>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>均速 4.8 秒/批</div>
           </div>
         </div>
       );
@@ -183,14 +183,14 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'floor_congestion':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)' }}>
             <span>大車卸貨泊位佔用 (28/32 席)</span>
-            <b style={{ color: '#fbbf24' }}>87.5% 尖峰</b>
+            <b style={{ color: 'var(--amber)' }}>87.5% 尖峰</b>
           </div>
           <div style={{ height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
             <div style={{ width: '87.5%', height: '100%', background: 'linear-gradient(90deg, #10b981, #f59e0b)' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
             <span>閘口等待車隊：4 輛</span>
             <span>平均卸貨週轉：18 分鐘/車</span>
           </div>
@@ -206,7 +206,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
           <div
             style={{
               fontSize: '12px',
-              color: '#f87171',
+              color: 'var(--red)',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -221,7 +221,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
                 width: '8px',
                 height: '8px',
                 borderRadius: '50%',
-                background: '#ef4444',
+                background: 'var(--red)',
                 display: 'inline-block',
                 boxShadow: '0 0 8px #ef4444',
               }}
@@ -231,7 +231,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
           <div
             style={{
               fontSize: '12px',
-              color: '#fbbf24',
+              color: 'var(--amber)',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -240,7 +240,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
               borderRadius: '6px',
             }}
           >
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--amber)', display: 'inline-block' }} />
             <b>[運作提示]</b> 第二拍賣場 月臺 3 卸貨排程延遲 15 分鐘
           </div>
         </div>
@@ -250,22 +250,22 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '8px', width: '100%', textAlign: 'center' }}>
           <div style={{ background: 'rgba(0,212,255,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.2)' }}>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>今日進場車次</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#38bdf8', marginTop: '2px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>今日進場車次</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--cyan-text,var(--cyan))', marginTop: '2px' }}>
               {1280 + (tick % 5)} <small style={{ fontSize: '10px' }}>車</small>
             </div>
           </div>
           <div style={{ background: 'rgba(168,85,247,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>巡檢達標率</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#c084fc', marginTop: '2px' }}>94.2%</div>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>巡檢達標率</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--violet)', marginTop: '2px' }}>94.2%</div>
           </div>
           <div style={{ background: 'rgba(239,68,68,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>待處理異常</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#f87171', marginTop: '2px' }}>3 <small style={{ fontSize: '10px' }}>件</small></div>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>待處理異常</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--red)', marginTop: '2px' }}>3 <small style={{ fontSize: '10px' }}>件</small></div>
           </div>
           <div style={{ background: 'rgba(16,185,129,0.08)', padding: '8px 4px', borderRadius: '6px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>在線設備率</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#34d399', marginTop: '2px' }}>99.8%</div>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>在線設備率</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--green-text,var(--green))', marginTop: '2px' }}>99.8%</div>
           </div>
         </div>
       );
@@ -273,14 +273,14 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'patrol':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)' }}>
             <span>第一市場 巡邏動線 A (12/14 處打卡)</span>
-            <b style={{ color: '#34d399' }}>85.7% (執勤中)</b>
+            <b style={{ color: 'var(--green-text,var(--green))' }}>85.7% (執勤中)</b>
           </div>
           <div style={{ height: '7px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
             <div style={{ width: '85.7%', height: '100%', background: 'linear-gradient(90deg, #0284c7, #10b981)' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748b', fontSize: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
             <span>在勤警衛：林○安 (定位正常)</span>
             <span>下次打卡點：B1 配電室</span>
           </div>
@@ -291,16 +291,16 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%' }}>
           <div style={{ background: 'rgba(239,68,68,0.1)', padding: '6px', borderRadius: '6px' }}>
-            <div style={{ color: '#ef4444', fontWeight: 800, fontSize: '17px' }}>1</div>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>緊急指派</div>
+            <div style={{ color: 'var(--red)', fontWeight: 800, fontSize: '17px' }}>1</div>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>緊急指派</div>
           </div>
           <div style={{ background: 'rgba(245,158,11,0.1)', padding: '6px', borderRadius: '6px' }}>
-            <div style={{ color: '#f59e0b', fontWeight: 800, fontSize: '17px' }}>8</div>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>維修中</div>
+            <div style={{ color: 'var(--amber)', fontWeight: 800, fontSize: '17px' }}>8</div>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>維修中</div>
           </div>
           <div style={{ background: 'rgba(16,185,129,0.1)', padding: '6px', borderRadius: '6px' }}>
-            <div style={{ color: '#10b981', fontWeight: 800, fontSize: '17px' }}>24</div>
-            <div style={{ color: '#94a3b8', fontSize: '10px' }}>本日結案</div>
+            <div style={{ color: 'var(--green-text,var(--green))', fontWeight: 800, fontSize: '17px' }}>24</div>
+            <div style={{ color: 'var(--dim)', fontSize: '10px' }}>本日結案</div>
           </div>
         </div>
       );
@@ -309,16 +309,16 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%', fontSize: '11px' }}>
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ color: '#38bdf8' }}>低溫冷鏈庫</div>
-            <b style={{ color: '#4ade80', fontSize: '13px', display: 'block', marginTop: '2px' }}>99.2%</b>
+            <div style={{ color: 'var(--cyan-text,var(--cyan))' }}>低溫冷鏈庫</div>
+            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '13px', display: 'block', marginTop: '2px' }}>99.2%</b>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ color: '#38bdf8' }}>高壓變電所</div>
-            <b style={{ color: '#4ade80', fontSize: '13px', display: 'block', marginTop: '2px' }}>100%</b>
+            <div style={{ color: 'var(--cyan-text,var(--cyan))' }}>高壓變電所</div>
+            <b style={{ color: 'var(--green-text,var(--green))', fontSize: '13px', display: 'block', marginTop: '2px' }}>100%</b>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ color: '#38bdf8' }}>地下排風機</div>
-            <b style={{ color: '#facc15', fontSize: '13px', display: 'block', marginTop: '2px' }}>97.5%</b>
+            <div style={{ color: 'var(--cyan-text,var(--cyan))' }}>地下排風機</div>
+            <b style={{ color: 'var(--amber)', fontSize: '13px', display: 'block', marginTop: '2px' }}>97.5%</b>
           </div>
         </div>
       );
@@ -326,10 +326,10 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'realtime_incident_map':
       return (
         <div style={{ width: '100%', minHeight: '80px', background: 'radial-gradient(circle, rgba(2,132,199,0.15) 0%, rgba(2,6,23,0.8) 100%)', borderRadius: '6px', border: '1px solid rgba(0,212,255,0.2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6px' }}>
-          <span style={{ fontSize: '11px', color: '#38bdf8' }}>🗺️ 全場 2D/3D 平面熱點圖資即時連線</span>
+          <span style={{ fontSize: '11px', color: 'var(--cyan-text,var(--cyan))' }}>🗺️ 全場 2D/3D 平面熱點圖資即時連線</span>
           <div style={{ display: 'flex', gap: '10px', marginTop: '4px', fontSize: '10px' }}>
-            <span style={{ color: '#4ade80' }}>● 第一拍賣場 正常</span>
-            <span style={{ color: '#f87171' }}>● 低溫冷鏈 B2 警報</span>
+            <span style={{ color: 'var(--green-text,var(--green))' }}>● 第一拍賣場 正常</span>
+            <span style={{ color: 'var(--red)' }}>● 低溫冷鏈 B2 警報</span>
           </div>
         </div>
       );
@@ -338,13 +338,13 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', width: '100%' }}>
           <div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>平均修復時間 (MTTR)</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#38bdf8' }}>1.4 <small style={{ fontSize: '10px' }}>小時</small></div>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>平均修復時間 (MTTR)</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--cyan-text,var(--cyan))' }}>1.4 <small style={{ fontSize: '10px' }}>小時</small></div>
           </div>
           <div style={{ height: '24px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>SLA 達標率</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#34d399' }}>98.5%</div>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>SLA 達標率</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--green-text,var(--green))' }}>98.5%</div>
           </div>
         </div>
       );
@@ -354,15 +354,15 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
             <span>早班巡邏／駐衛警</span>
-            <b style={{ color: '#34d399' }}>12/12 人到勤 (100%)</b>
+            <b style={{ color: 'var(--green-text,var(--green))' }}>12/12 人到勤 (100%)</b>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
             <span>工務機電維修組</span>
-            <b style={{ color: '#38bdf8' }}>8/8 人在崗 (100%)</b>
+            <b style={{ color: 'var(--cyan-text,var(--cyan))' }}>8/8 人在崗 (100%)</b>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
             <span>夜班拍賣指揮組</span>
-            <b style={{ color: '#a78bfa' }}>已預排 16 人</b>
+            <b style={{ color: 'var(--violet)' }}>已預排 16 人</b>
           </div>
         </div>
       );
@@ -371,12 +371,12 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px', width: '100%', height: '100%', minHeight: '65px' }}>
           {['拍賣一場 A 區 (CAM-01)', '冷鏈庫進貨口 (CAM-04)', '北側大車磅秤 (CAM-08)', '中控指揮室 (CAM-12)'].map((cam, i) => (
-            <div key={i} style={{ background: '#090f1d', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)', padding: '4px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: '#64748b' }}>
+            <div key={i} style={{ background: 'var(--panel2)', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.08)', padding: '4px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--dim)' }}>
                 <span>{cam}</span>
-                <span style={{ color: '#ef4444' }}>● REC</span>
+                <span style={{ color: 'var(--red)' }}>● REC</span>
               </div>
-              <div style={{ textAlign: 'center', fontSize: '12px', color: '#1e293b', padding: '4px 0' }}>📹 即時串流</div>
+              <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--panel2)', padding: '4px 0' }}>📹 即時串流</div>
             </div>
           ))}
         </div>
@@ -389,11 +389,11 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '20px' }}>⛅</span>
             <div>
-              <div style={{ fontWeight: 700, color: '#f8fafc' }}>臺北萬華 26°C</div>
-              <div style={{ color: '#94a3b8', fontSize: '10px' }}>濕度 68% · 降雨機率 10%</div>
+              <div style={{ fontWeight: 700, color: 'var(--text)' }}>臺北萬華 26°C</div>
+              <div style={{ color: 'var(--dim)', fontSize: '10px' }}>濕度 68% · 降雨機率 10%</div>
             </div>
           </div>
-          <div style={{ color: '#34d399', background: 'rgba(16,185,129,0.1)', padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.2)' }}>
+          <div style={{ color: 'var(--green-text,var(--green))', background: 'rgba(16,185,129,0.1)', padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.2)' }}>
             防汛整備：常態綠燈
           </div>
         </div>
@@ -403,12 +403,12 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           {[
-            { dept: '第一拍賣場', count: 38, percent: 85, color: '#38bdf8' },
-            { dept: '低溫冷鏈庫', count: 26, percent: 60, color: '#fbbf24' },
-            { dept: '第二拍賣場', count: 18, percent: 42, color: '#34d399' },
+            { dept: '第一拍賣場', count: 38, percent: 85, color: 'var(--cyan-text,var(--cyan))' },
+            { dept: '低溫冷鏈庫', count: 26, percent: 60, color: 'var(--amber)' },
+            { dept: '第二拍賣場', count: 18, percent: 42, color: 'var(--green-text,var(--green))' },
           ].map((d, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '70px', color: '#94a3b8' }}>{d.dept}</span>
+              <span style={{ width: '70px', color: 'var(--dim)' }}>{d.dept}</span>
               <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style={{ width: `${d.percent}%`, height: '100%', background: d.color }} />
               </div>
@@ -422,12 +422,12 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           {[
-            { name: '低溫冷凍主機', count: 12, percent: 80, color: '#ef4444' },
-            { name: '電動搬運堆高機', count: 8, percent: 55, color: '#f59e0b' },
-            { name: '電子地磅磅秤', count: 5, percent: 35, color: '#38bdf8' },
+            { name: '低溫冷凍主機', count: 12, percent: 80, color: 'var(--red)' },
+            { name: '電動搬運堆高機', count: 8, percent: 55, color: 'var(--amber)' },
+            { name: '電子地磅磅秤', count: 5, percent: 35, color: 'var(--cyan-text,var(--cyan))' },
           ].map((eq, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ width: '85px', color: '#94a3b8' }}>{eq.name}</span>
+              <span style={{ width: '85px', color: 'var(--dim)' }}>{eq.name}</span>
               <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
                 <div style={{ width: `${eq.percent}%`, height: '100%', background: eq.color }} />
               </div>
@@ -441,9 +441,9 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           {[
-            { name: '陳○霖 (機電組)', count: 15, rate: '100%', color: '#34d399' },
-            { name: '林○宇 (冷凍組)', count: 12, rate: '92%', color: '#38bdf8' },
-            { name: '黃○生 (儀表組)', count: 9, rate: '100%', color: '#a78bfa' },
+            { name: '陳○霖 (機電組)', count: 15, rate: '100%', color: 'var(--green-text,var(--green))' },
+            { name: '林○宇 (冷凍組)', count: 12, rate: '92%', color: 'var(--cyan-text,var(--cyan))' },
+            { name: '黃○生 (儀表組)', count: 9, rate: '100%', color: 'var(--violet)' },
           ].map((t, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px' }}>
               <span>{t.name}</span>
@@ -456,16 +456,16 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'rank_fault':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
             <span>⚡ 電氣系統 45%</span>
             <span>⚙️ 機械結構 30%</span>
             <span>💧 管路水電 25%</span>
           </div>
           <div style={{ height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-              <div style={{ width: '45%', height: '100%', background: '#38bdf8' }} title="電氣系統 45%" />
-              <div style={{ width: '30%', height: '100%', background: '#fbbf24' }} title="機械結構 30%" />
-              <div style={{ width: '25%', height: '100%', background: '#34d399' }} title="管路水電 25%" />
+              <div style={{ width: '45%', height: '100%', background: 'var(--cyan-text,var(--cyan))' }} title="電氣系統 45%" />
+              <div style={{ width: '30%', height: '100%', background: 'var(--amber)' }} title="機械結構 30%" />
+              <div style={{ width: '25%', height: '100%', background: 'var(--green-text,var(--green))' }} title="管路水電 25%" />
             </div>
           </div>
         </div>
@@ -486,7 +486,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
                   }}
                 />
               </div>
-              <span style={{ fontSize: '8px', color: '#64748b' }}>{i + 1}月</span>
+              <span style={{ fontSize: '8px', color: 'var(--dim)' }}>{i + 1}月</span>
             </div>
           ))}
         </div>
@@ -501,17 +501,17 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
             <span>初秋甘藍 (高麗菜)</span>
             <b>$28.5 / kg</b>
-            <span style={{ color: '#4ade80', fontWeight: 700 }}>▲ +9.6%</span>
+            <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>▲ +9.6%</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
             <span>牛番茄</span>
             <b>$65.0 / kg</b>
-            <span style={{ color: '#f87171', fontWeight: 700 }}>▼ -1.8%</span>
+            <span style={{ color: 'var(--red)', fontWeight: 700 }}>▼ -1.8%</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 6px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px' }}>
             <span>青花菜</span>
             <b>$54.0 / kg</b>
-            <span style={{ color: '#94a3b8' }}>— 持平</span>
+            <span style={{ color: 'var(--dim)' }}>— 持平</span>
           </div>
         </div>
       );
@@ -520,12 +520,12 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '0 6px' }}>
           <div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>本日批發成交總額</div>
-            <b style={{ fontSize: '18px', color: '#38bdf8', fontWeight: 800 }}>$ 4,820 萬</b>
+            <div style={{ fontSize: '10px', color: 'var(--dim)' }}>本日批發成交總額</div>
+            <b style={{ fontSize: '18px', color: 'var(--cyan-text,var(--cyan))', fontWeight: 800 }}>$ 4,820 萬</b>
           </div>
-          <div style={{ textAlign: 'right', fontSize: '10px', color: '#94a3b8' }}>
-            <div>較昨日 <span style={{ color: '#34d399', fontWeight: 700 }}>+ 3.8%</span></div>
-            <div>較同期 <span style={{ color: '#34d399', fontWeight: 700 }}>+ 5.2%</span></div>
+          <div style={{ textAlign: 'right', fontSize: '10px', color: 'var(--dim)' }}>
+            <div>較昨日 <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>+ 3.8%</span></div>
+            <div>較同期 <span style={{ color: 'var(--green-text,var(--green))', fontWeight: 700 }}>+ 5.2%</span></div>
           </div>
         </div>
       );
@@ -533,15 +533,15 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'commodity_ratio':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '100%', fontSize: '11px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: '10px' }}>
-            <span style={{ color: '#34d399' }}>🥬 葉菜類 42%</span>
-            <span style={{ color: '#fbbf24' }}>🍉 瓜果類 31%</span>
-            <span style={{ color: '#38bdf8' }}>🥕 根莖類 27%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--dim)', fontSize: '10px' }}>
+            <span style={{ color: 'var(--green-text,var(--green))' }}>🥬 葉菜類 42%</span>
+            <span style={{ color: 'var(--amber)' }}>🍉 瓜果類 31%</span>
+            <span style={{ color: 'var(--cyan-text,var(--cyan))' }}>🥕 根莖類 27%</span>
           </div>
           <div style={{ height: '7px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ width: '42%', height: '100%', background: '#34d399' }} />
-            <div style={{ width: '31%', height: '100%', background: '#fbbf24' }} />
-            <div style={{ width: '27%', height: '100%', background: '#38bdf8' }} />
+            <div style={{ width: '42%', height: '100%', background: 'var(--green-text,var(--green))' }} />
+            <div style={{ width: '31%', height: '100%', background: 'var(--amber)' }} />
+            <div style={{ width: '27%', height: '100%', background: 'var(--cyan-text,var(--cyan))' }} />
           </div>
         </div>
       );
@@ -551,7 +551,7 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
         <div
           style={{
             fontSize: '12px',
-            color: '#38bdf8',
+            color: 'var(--cyan-text,var(--cyan))',
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
@@ -576,21 +576,21 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
       return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', width: '100%', fontSize: '11px' }}>
           <div style={{ background: 'rgba(16,185,129,0.08)', padding: '5px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <div style={{ color: '#34d399', fontWeight: 700, fontSize: '10px', marginBottom: '2px' }}>🔥 漲幅排行</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e2e8f0', fontSize: '10px' }}>
-              <span>巨峰葡萄</span><b style={{ color: '#4ade80' }}>+18.5%</b>
+            <div style={{ color: 'var(--green-text,var(--green))', fontWeight: 700, fontSize: '10px', marginBottom: '2px' }}>🔥 漲幅排行</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
+              <span>巨峰葡萄</span><b style={{ color: 'var(--green-text,var(--green))' }}>+18.5%</b>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e2e8f0', fontSize: '10px' }}>
-              <span>金針菇</span><b style={{ color: '#4ade80' }}>+12.3%</b>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
+              <span>金針菇</span><b style={{ color: 'var(--green-text,var(--green))' }}>+12.3%</b>
             </div>
           </div>
           <div style={{ background: 'rgba(239,68,68,0.08)', padding: '5px', borderRadius: '4px', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <div style={{ color: '#f87171', fontWeight: 700, fontSize: '10px', marginBottom: '2px' }}>❄️ 跌幅排行</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e2e8f0', fontSize: '10px' }}>
-              <span>青花菜</span><b style={{ color: '#f87171' }}>-14.2%</b>
+            <div style={{ color: 'var(--red)', fontWeight: 700, fontSize: '10px', marginBottom: '2px' }}>❄️ 跌幅排行</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
+              <span>青花菜</span><b style={{ color: 'var(--red)' }}>-14.2%</b>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e2e8f0', fontSize: '10px' }}>
-              <span>四季豆</span><b style={{ color: '#f87171' }}>-9.8%</b>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text)', fontSize: '10px' }}>
+              <span>四季豆</span><b style={{ color: 'var(--red)' }}>-9.8%</b>
             </div>
           </div>
         </div>
@@ -601,18 +601,18 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', textAlign: 'center', width: '100%', fontSize: '11px' }}>
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px' }}>
             <span style={{ fontSize: '14px' }}>☀️</span>
-            <div style={{ color: '#f8fafc', fontWeight: 700, marginTop: '2px' }}>西螺 28°C</div>
-            <span style={{ color: '#34d399', fontSize: '9px' }}>到貨正常</span>
+            <div style={{ color: 'var(--text)', fontWeight: 700, marginTop: '2px' }}>西螺 28°C</div>
+            <span style={{ color: 'var(--green-text,var(--green))', fontSize: '9px' }}>到貨正常</span>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px' }}>
             <span style={{ fontSize: '14px' }}>⛅</span>
-            <div style={{ color: '#f8fafc', fontWeight: 700, marginTop: '2px' }}>溪湖 27°C</div>
-            <span style={{ color: '#34d399', fontSize: '9px' }}>供貨充足</span>
+            <div style={{ color: 'var(--text)', fontWeight: 700, marginTop: '2px' }}>溪湖 27°C</div>
+            <span style={{ color: 'var(--green-text,var(--green))', fontSize: '9px' }}>供貨充足</span>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: '6px 4px', borderRadius: '6px' }}>
             <span style={{ fontSize: '14px' }}>🌦️</span>
-            <div style={{ color: '#f8fafc', fontWeight: 700, marginTop: '2px' }}>九如 30°C</div>
-            <span style={{ color: '#fbbf24', fontSize: '9px' }}>局部短暫雨</span>
+            <div style={{ color: 'var(--text)', fontWeight: 700, marginTop: '2px' }}>九如 30°C</div>
+            <span style={{ color: 'var(--amber)', fontSize: '9px' }}>局部短暫雨</span>
           </div>
         </div>
       );
@@ -620,16 +620,16 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     case 'historical_price_curve':
       return (
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', gap: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#94a3b8' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--dim)' }}>
             <span>📈 大宗蔬菜 30 日均價趨勢 ($/kg)</span>
-            <span style={{ color: '#38bdf8' }}>目前均價 $34.2</span>
+            <span style={{ color: 'var(--cyan-text,var(--cyan))' }}>目前均價 $34.2</span>
           </div>
           <div style={{ width: '100%', height: '52px', position: 'relative' }}>
             <svg viewBox="0 0 300 60" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
               <defs>
                 <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
+                  <stop offset="0%" stopColor="var(--cyan-text,var(--cyan))" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="var(--cyan-text,var(--cyan))" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
               <path
@@ -639,10 +639,10 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
               <path
                 d="M 0,45 Q 40,25 75,35 T 150,20 T 225,28 T 300,15"
                 fill="none"
-                stroke="#38bdf8"
+                stroke="var(--cyan-text,var(--cyan))"
                 strokeWidth="2.5"
               />
-              <circle cx="300" cy="15" r="3.5" fill="#00d4ff" />
+              <circle cx="300" cy="15" r="3.5" fill="var(--cyan-text,var(--cyan))" />
             </svg>
           </div>
         </div>
@@ -653,11 +653,11 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(16,185,129,0.1)', borderRadius: '4px', borderLeft: '3px solid #34d399' }}>
             <span>🛒 平價推薦：包心白菜</span>
-            <b style={{ color: '#34d399' }}>$22 / kg (供應充裕)</b>
+            <b style={{ color: 'var(--green-text,var(--green))' }}>$22 / kg (供應充裕)</b>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 6px', background: 'rgba(2,132,199,0.1)', borderRadius: '4px', borderLeft: '3px solid #38bdf8' }}>
             <span>🥕 平價推薦：本地胡蘿蔔</span>
-            <b style={{ color: '#38bdf8' }}>$18 / kg (品質優良)</b>
+            <b style={{ color: 'var(--cyan-text,var(--cyan))' }}>$18 / kg (品質優良)</b>
           </div>
         </div>
       );
@@ -665,9 +665,9 @@ export function DashboardWidgetContent({ widgetKey, desc }: { widgetKey: string;
     default:
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', fontSize: '11px', textAlign: 'center' }}>
-          <div style={{ color: '#38bdf8', fontWeight: 600 }}>📊 即時數據模組 ({widgetKey})</div>
-          <div style={{ display: 'flex', justifyContent: 'space-around', color: '#94a3b8', fontSize: '10px' }}>
-            <span>連線狀態：<b style={{ color: '#34d399' }}>正常</b></span>
+          <div style={{ color: 'var(--cyan-text,var(--cyan))', fontWeight: 600 }}>📊 即時數據模組 ({widgetKey})</div>
+          <div style={{ display: 'flex', justifyContent: 'space-around', color: 'var(--dim)', fontSize: '10px' }}>
+            <span>連線狀態：<b style={{ color: 'var(--green-text,var(--green))' }}>正常</b></span>
             <span>更新週期：<b>60s</b></span>
           </div>
         </div>

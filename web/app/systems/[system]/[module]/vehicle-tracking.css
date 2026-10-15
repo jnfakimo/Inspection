@@ -1,4 +1,4 @@
-.vehicle-tracking-page{display:grid;gap:16px}
+.vehicle-tracking-page{display:grid;gap:16px;min-width:0}
 .findtag-sync{min-width:0}
 .findtag-sync p{font-size:.875rem;line-height:1.65;overflow-wrap:anywhere}
 .findtag-sync h2{font-size:1.2rem;margin:0;color:var(--text)}
@@ -14,7 +14,7 @@
 .findtag-sync td{white-space:normal;overflow-wrap:anywhere}
 .tracking-filter{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;padding:16px}
 .tracking-filter>label{display:grid;gap:7px;min-width:220px;color:var(--dim);font-size:.86rem}
-.tracking-filter select,.tracking-filter input{min-height:42px}
+.tracking-filter select,.tracking-filter input{min-height:var(--form-control-height)}
 .tracking-periods{display:flex;gap:7px;flex-wrap:wrap;flex:1}
 .tracking-periods button{min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--text);font-weight:700;cursor:pointer}
 .tracking-periods button:hover,.tracking-periods button.is-active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 12%,var(--panel));color:var(--cyan)}
@@ -39,7 +39,8 @@
 .tracking-dot.online{background:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
 .tracking-dot.stale{background:var(--amber);box-shadow:0 0 0 4px color-mix(in srgb,var(--amber) 14%,transparent)}
 .tracking-dot.offline{background:var(--red);box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 14%,transparent)}
-.tracking-table-panel{padding:16px}
+.tracking-table-panel{padding:16px;min-width:0;max-width:100%}
+.tracking-table-panel .responsive-table{min-width:0;max-width:100%;overflow-x:auto}
 .tracking-table-panel table{min-width:920px}
 .tracking-table-panel td small{display:block;margin-top:4px;color:var(--dim)}
 .tracking-severity{display:inline-flex;padding:4px 9px;border:1px solid var(--line);border-radius:999px;font-size:.75rem;font-weight:800}
@@ -72,4 +73,14 @@
   .tracking-map-layout{min-height:0}
   .vehicle-tracking-map{min-height:430px}
   .tracking-vehicle-list{padding:12px}
+}
+
+/* Tracking keeps comparable columns on phones; scrolling stays inside the panel. */
+@media(max-width:640px){
+  .tracking-table-panel .responsive-table table{display:table}
+  .tracking-table-panel .responsive-table thead{display:table-header-group}
+  .tracking-table-panel .responsive-table tbody{display:table-row-group;width:auto}
+  .tracking-table-panel .responsive-table tr{display:table-row;width:auto;margin:0;padding:0;border:0;border-radius:0}
+  .tracking-table-panel .responsive-table td{display:table-cell;width:auto;padding:11px;text-align:left}
+  .tracking-table-panel .responsive-table td::before{content:none}
 }

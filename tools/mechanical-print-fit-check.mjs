@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+const component = read('../web/app/systems/[system]/[module]/mechanical-handover.tsx');
+const css = read('../web/app/systems/[system]/[module]/mechanical-handover.css');
+assert.ok(!component.includes('calculateMechanicalPrintFit('), 'paper-size changes must not depend on a measured A4 viewport');
+assert.ok(component.includes("style.removeProperty('--mechanical-print-scale')"));
+assert.ok((component.match(/fitMechanicalPrint\(\);/g) ?? []).length >= 2);
+assert.ok(!css.includes('height:297mm;overflow:hidden'), 'print content must never be clipped to one fixed A4 sheet');
+assert.ok(css.includes('width:100%;height:auto;min-height:0;overflow:visible'));
+assert.ok(css.includes('.mechanical-print-sheet.is-multipage .mechanical-print-table thead{display:table-header-group}'));
+assert.ok(css.includes('.mechanical-print-sheet.is-multipage .mechanical-report-handoffs{break-inside:avoid-page;page-break-inside:avoid}'));
+console.log('Mechanical natural-pagination integration check passed.');

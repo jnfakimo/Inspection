@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import './dashboard.css';
+import './weather-widget-layout.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';

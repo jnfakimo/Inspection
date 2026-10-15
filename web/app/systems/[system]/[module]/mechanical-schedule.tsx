@@ -12,6 +12,7 @@ import {
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import './mechanical-schedule.css';
+import { HandoverPrintPage } from './handover-sheet';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 type MarketCode = 'market_1' | 'market_2';
@@ -69,24 +70,30 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
 
   const load = useCallback(async () => {
     setBusy(true); setNote('');
-    const rangeStart = scheduleDateOffset(monthStart, -7), rangeEnd = scheduleDateOffset(monthEnd, 8);
-    const client = getSupabase();
-    const [people, departments, schedule, scopes] = await Promise.all([
-      client.from('users').select('user_id,name,username,email,dept_id,status').eq('status', 'active').order('name').limit(1000),
-      client.from('departments').select('dept_id,name,level,status').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
-      client.from('mechanical_schedule_assignments').select('*').gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).order('duty_date').limit(5000),
-      client.from('mechanical_staff_market_scopes').select('user_id,market_code,is_active,updated_at').eq('is_active', true).limit(1000),
-    ]);
-    const failure = people.error || departments.error || schedule.error || scopes.error;
-    if (failure) { setNote(`失敗：${failure.message || '機電課排班資料載入失敗'}`); setBusy(false); return; }
-    const departmentIds = new Set((departments.data || []).map(row => String(row.dept_id)));
-    const staff = selectableActiveUsers(people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
-      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
-    const rows = schedule.data || [];
-    const nextDraft: Record<string, string> = {};
-    rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`) && isMechanicalWorkCode(row.duty_code))
-      .forEach(row => { nextDraft[keyOf(row.user_id, String(row.duty_date))] = String(row.duty_code || ''); });
-    setAllUsers(staff); setMarketScopes(scopes.data || []); setPersisted(rows); setDraft(nextDraft); setBusy(false);
+    try {
+      const rangeStart = scheduleDateOffset(monthStart, -7), rangeEnd = scheduleDateOffset(monthEnd, 8);
+      const client = getSupabase();
+      const [people, departments, schedule, scopes] = await Promise.all([
+        client.from('users').select('user_id,name,username,email,dept_id,status').eq('status', 'active').order('name').limit(1000),
+        client.from('departments').select('dept_id,name,level,status').eq('name', '機電課').eq('level', 2).eq('status', 'active').limit(20),
+        client.from('mechanical_schedule_assignments').select('*').gte('duty_date', rangeStart).lt('duty_date', rangeEnd).eq('is_active', true).order('duty_date').limit(5000),
+        client.from('mechanical_staff_market_scopes').select('user_id,market_code,is_active,updated_at').eq('is_active', true).limit(1000),
+      ]);
+      const failure = people.error || departments.error || schedule.error || scopes.error;
+      if (failure) { setNote(`失敗：${failure.message || '機電課排班資料載入失敗'}`); return; }
+      const departmentIds = new Set((departments.data || []).map(row => String(row.dept_id)));
+      const staff = selectableActiveUsers(people.data || []).filter(row => departmentIds.has(String(row.dept_id)))
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-TW'));
+      const rows = schedule.data || [];
+      const nextDraft: Record<string, string> = {};
+      rows.filter(row => row.market_code === market && String(row.duty_date).startsWith(`${month}-`) && isMechanicalWorkCode(row.duty_code))
+        .forEach(row => { nextDraft[keyOf(row.user_id, String(row.duty_date))] = String(row.duty_code || ''); });
+      setAllUsers(staff); setMarketScopes(scopes.data || []); setPersisted(rows); setDraft(nextDraft);
+    } catch (error) {
+      setNote('失敗：' + errorMessage(error, '機電課排班資料載入失敗'));
+    } finally {
+      setBusy(false);
+    }
   }, [market, month, monthEnd, monthStart]);
 
   useEffect(() => { void load(); }, [load]);
@@ -163,15 +170,15 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
     setCopying(true); setNote('');
     try {
       const client = getSupabase();
-      const { data, error } = await client.from('mechanical_schedule_assignments').select('user_id,duty_date,duty_code,market_code,is_active')
-        .eq('market_code', market).eq('is_active', true).gte('duty_date', `${sourceMonth}-01`).lt('duty_date', `${month}-01`).order('duty_date').limit(5000);
-      if (error) throw error;
-      const copiedDraft = copyPreviousMonthDraft(data || [], month, market, users.map(user => user.user_id));
-      const copiedCount = Object.keys(copiedDraft).length;
-      if (!copiedCount) { setNote(`${MARKET_LABELS[market]} ${monthTitle(sourceMonth)}尚無可複製的班表。`); return; }
-      setDraft(copiedDraft);
-      setSelectedDate(monthStart);
-      setNote(`已將${monthTitle(sourceMonth)}的 ${copiedCount} 筆排班複製為本月草稿；請確認勞基法檢核後再儲存。`);
+        const { data, error } = await client.from('mechanical_schedule_assignments').select('user_id,duty_date,duty_code,market_code,is_active')
+          .eq('market_code', market).eq('is_active', true).gte('duty_date', `${sourceMonth}-01`).lt('duty_date', `${month}-01`).order('duty_date').limit(5000);
+        if (error) throw error;
+        const copiedDraft = copyPreviousMonthDraft(data || [], month, market, users.map(user => user.user_id));
+        const copiedCount = Object.keys(copiedDraft).length;
+        if (!copiedCount) { setNote(`${MARKET_LABELS[market]} ${monthTitle(sourceMonth)}尚無可複製的班表。`); return; }
+        setDraft(copiedDraft);
+        setSelectedDate(monthStart);
+        setNote(`已將${monthTitle(sourceMonth)}的 ${copiedCount} 筆排班複製為本月草稿；請確認勞基法檢核後再儲存。`);
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); }
     finally { setCopying(false); }
   };
@@ -192,10 +199,10 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="mechanical-schedule-page">
-      <AdminHeader module={module} busy={busy} note={note} onReload={() => void load()} action={<><button className="secondary-btn compact" disabled={busy || saving || copying} onClick={() => void copyPreviousMonth()}>{copying ? '複製中…' : '複製上月班表'}</button><button className="secondary-btn compact" disabled={busy} onClick={print}>列印本月班表</button><button className="primary-btn compact" disabled={busy || saving || copying || errors.length > 0} onClick={() => void save()}>{saving ? '儲存中…' : openShiftCount ? '儲存草稿' : '儲存班表'}</button></>} />
+      <AdminHeader module={module} hideDescription busy={busy} note={note} onReload={() => void load()} action={<><button className="secondary-btn compact" disabled={busy || saving || copying} onClick={() => void copyPreviousMonth()}>{copying ? '複製中…' : '複製上月班表'}</button><button className="secondary-btn compact" disabled={busy} onClick={print}>列印本月班表</button><button className="primary-btn compact" disabled={busy || saving || copying || errors.length > 0} onClick={() => void save()}>{saving ? '儲存中…' : openShiftCount ? '儲存草稿' : '儲存班表'}</button></>} />
 
       <section className="panel mechanical-schedule-toolbar">
-        <div className="mechanical-schedule-month"><button className="secondary-btn compact" aria-label="前一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, -1))}>‹</button><div><small>萬年曆月份</small><b>{monthTitle(month)}</b></div><button className="secondary-btn compact" aria-label="後一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, 1))}>›</button><button className="secondary-btn compact" onClick={() => { setMonth(todayMonth()); setSelectedDate(todayISO()); }}>本月</button></div>
+        <div className="mechanical-schedule-month"><button className="secondary-btn compact" aria-label="前一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, -1))}>‹</button><div><b>{monthTitle(month)}</b></div><button className="secondary-btn compact" aria-label="後一個月" onClick={() => setMonth(current => shiftScheduleMonth(current, 1))}>›</button><button className="secondary-btn compact" onClick={() => { setMonth(todayMonth()); setSelectedDate(todayISO()); }}>本月</button></div>
         <div className="mechanical-market-tabs" role="group" aria-label="市場別"><button className={market === 'market_1' ? 'is-active' : ''} aria-pressed={market === 'market_1'} onClick={() => setMarket('market_1')}>一市</button><button className={market === 'market_2' ? 'is-active' : ''} aria-pressed={market === 'market_2'} onClick={() => setMarket('market_2')}>二市</button></div>
       </section>
 
@@ -255,6 +262,7 @@ export function MechanicalSchedule({ system, module, profile }: Props) {
         })}</div>
       </section>
 
+      <HandoverPrintPage title="機電課輪值月排班表" date={`${monthTitle(month)}｜${MARKET_LABELS[market]}`} selector=".mechanical-schedule-sheet" landscape />
       <section className="mechanical-schedule-sheet" aria-label={`${MARKET_LABELS[market]}列印月排班表`}>
         <header><div><small>臺北農產運銷股份有限公司</small><h2>管理部機電課輪值人員月排班表</h2></div><div><b>{monthTitle(month)}</b><span>{MARKET_LABELS[market]}</span></div></header>
         <div className="mechanical-schedule-legend">{WORK_SHIFTS.map(shift => <span className={`duty-${shift.code}`} key={shift.code}><i />{shift.name} {shift.time}</span>)}</div>

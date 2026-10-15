@@ -1,0 +1,11 @@
+/* 一般網頁／平板／手機文字、數值與下拉欄位共用 42px 高度；列印不套用。 */
+@media screen {
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([hidden]):not([type="range"]):not([type="color"]):not([type="image"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type^="date"]):not([type^="time"]):not([type="month"]):not([type="week"]):not(.localized-date-native),
+    select
+  ) {
+    box-sizing: border-box;
+    height: var(--form-control-height);
+    min-height: var(--form-control-height);
+  }
+}

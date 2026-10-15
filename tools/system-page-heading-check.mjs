@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
@@ -34,6 +34,16 @@ const shell = readFileSync('web/components/AppShell.tsx', 'utf8');
 assert.match(shell, /<SystemPageHeader system=\{headingSystem\} module=\{headingModule\}/);
 assert.match(shell, /admin-v2-content">\{pageHeading\}\{children\}/);
 assert.match(shell, /v1-content">\{pageHeading\}\{children\}/);
+
+const adminHeader = readFileSync('web/components/admin/shared.tsx', 'utf8');
+assert.match(adminHeader, /hideDescription = true/,
+  '共用 AdminHeader 不應重複顯示標準頁首已有的模組說明');
+const moduleWorkspaceDir = 'web/app/systems/[system]/[module]';
+for (const file of readdirSync(moduleWorkspaceDir).filter(name => name.endsWith('.tsx'))) {
+  const source = readFileSync(`${moduleWorkspaceDir}/${file}`, 'utf8');
+  assert.doesNotMatch(source, /<p>\s*\{module\.description\}\s*<\/p>/,
+    `${file} 不應重複顯示標準頁首已有的模組說明`);
+}
 
 const handover = readFileSync('web/app/systems/[system]/[module]/handover-workspace.tsx', 'utf8');
 assert.match(handover, /heading=\{\{ system, module, title: module\.title, metaTitle: system\.title \}\}/,

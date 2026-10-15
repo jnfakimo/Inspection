@@ -118,11 +118,10 @@
 .request-detail-timeline li{position:relative;padding:0 0 18px;border-left:1px solid var(--line)}
 .request-detail-timeline li::before{position:absolute;top:4px;left:-6px;width:11px;height:11px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px color-mix(in srgb,var(--primary) 55%,transparent);content:''}
 .localized-date-input{position:relative;display:inline-block;width:100%}.localized-date-input>input[aria-invalid="true"]{border-color:var(--red)}.localized-date-error{display:block;margin-top:4px;color:var(--red);font-size:12px;line-height:1.4}
-.localized-date-picker-button{position:absolute;z-index:1;top:50%;right:5px;display:grid;width:24px;height:24px;place-items:center;box-sizing:border-box;padding:0;border:0;background:transparent;color:var(--muted);transform:translateY(-50%);cursor:pointer}
-.localized-date-picker-button:disabled{cursor:not-allowed;opacity:.55}.localized-date-picker-button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
-.localized-date-native::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none;opacity:0}
+/* 原生 date 欄位預設隱藏（只當 showPicker 的載體）；觸控裝置改為透明覆蓋層，
+   點欄位就直接叫出系統日曆，不再依賴 iOS 上會丟例外的 showPicker()。 */
 .localized-date-native{position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
-@media (pointer:coarse){.localized-date-native:not(:disabled){inset:0;width:100%;height:100%;min-height:0;pointer-events:auto;z-index:2;background:transparent;color:transparent;-webkit-appearance:none;appearance:none}.localized-date-native:disabled{pointer-events:none!important}}
+@media (pointer:coarse){.localized-date-native{inset:0;width:100%;height:100%;min-height:0;pointer-events:auto;z-index:2;background:transparent;color:transparent;-webkit-appearance:none;appearance:none}}
 .localized-datetime-input{display:flex;gap:8px;align-items:center;width:100%}
 .localized-datetime-input>span{flex:1 1 60%;min-width:0}
 .localized-datetime-input>select{flex:0 1 40%;min-width:0}

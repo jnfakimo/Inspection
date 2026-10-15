@@ -10,7 +10,7 @@
 // /Inspection/system/login.html 不同，必須在 Supabase Auth 的 Redirect URLs
 // 白名單另外加上，否則信中的連結會被拒絕。
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
@@ -19,6 +19,7 @@ import { clearProfile, saveProfile } from '@/lib/profile-cache';
 import { requestedPostLoginPath, resolvePostLoginDestination } from '@/lib/login-destination';
 import { PATROL_IDLE_LOGOUT_MESSAGE_KEY, startPatrolSession } from '@/lib/patrol-session';
 import { invokeUsernameLogin } from '@/lib/username-login';
+import { parseCaptchaPayload } from '@/lib/username-login-error';
 import type { Profile } from '@/types/app';
 
 // 只涵蓋這頁會遇到的幾種回應，不把後台那份大表拉進登入頁的 bundle。
@@ -44,6 +45,8 @@ function withTimeout<T>(task: Promise<T>, ms: number, message: string): Promise<
 export default function LoginPage() {
   const passwordPolicy = usePasswordPolicy();
   const [captcha, setCaptcha] = useState<{ id: string; image: string } | null>(null);
+  const captchaInFlight = useRef(false);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
   const [view, setView] = useState<'login' | 'forgot' | 'reset'>('login');
   const [resetReady, setResetReady] = useState(false);
   const [message, setMessage] = useState('');
@@ -56,21 +59,27 @@ export default function LoginPage() {
     return resolvePostLoginDestination(requestedPostLoginPath(window.location.search), profile);
   }
   async function loadCaptcha() {
+    if (captchaInFlight.current) return;
+    captchaInFlight.current = true;
+    setCaptchaLoading(true);
     setCaptcha(null);
     try {
-      const data = await invokeUsernameLogin<{ challenge_id?: string; image?: string; message?: string }>(
+      const data = await invokeUsernameLogin<unknown>(
         { action: 'captcha' },
-        '驗證碼載入失敗，請確認網路後重試',
-        { retries: 2 }
+        '驗證碼載入失敗，請稍後再試'
       );
-      if (!data?.challenge_id || !data.image) {
-        setMessage(data?.message || '驗證碼載入失敗，請點擊 [重新產生]');
+      const captchaPayload = parseCaptchaPayload(data);
+      if (!captchaPayload) {
+        setMessage('驗證碼載入失敗（代碼 captcha_invalid_response），請稍後再試');
         return;
       }
       setMessage('');
-      setCaptcha({ id: data.challenge_id, image: data.image });
+      setCaptcha(captchaPayload);
     } catch (err) {
-      setMessage(friendlyError(err, '驗證碼載入失敗，請確認網路後重新整理'));
+      setMessage(err instanceof Error ? err.message : '驗證碼載入失敗（代碼 captcha_unknown），請稍後再試');
+    } finally {
+      captchaInFlight.current = false;
+      setCaptchaLoading(false);
     }
   }
 
@@ -209,7 +218,7 @@ export default function LoginPage() {
   }
 
   const brand = <>
-    <img className="v1-login-logo" src="/Inspection/system/assets/logo-title.png" alt="臺北農產第一果菜市場" />
+    <img className="v1-login-logo" src="/Inspection/v2/system/assets/logo-title.png" alt="臺北農產第一果菜市場" />
     <h1>臺北農產公司</h1>
     <p className="v1-login-sub">第一果菜市場 設備巡檢維修系統</p>
   </>;
@@ -248,13 +257,13 @@ export default function LoginPage() {
       <label>密碼<input name="password" type="password" required autoComplete="current-password" placeholder="••••••••" /></label>
       <label>安全驗證碼（六位數字）
         <div className="captcha-row">
-          {captcha ? <img src={captcha.image} alt="六位數驗證碼" onClick={loadCaptcha} /> : <button type="button" onClick={loadCaptcha}>重新載入</button>}
-          <button type="button" onClick={loadCaptcha} aria-label="重新產生驗證碼">↻ 重新產生</button>
+          {captcha ? <img src={captcha.image} alt="六位數驗證碼" onClick={loadCaptcha} /> : <button type="button" onClick={loadCaptcha} disabled={captchaLoading}>{captchaLoading ? '驗證碼載入中…' : '重新載入'}</button>}
+          <button type="button" onClick={loadCaptcha} disabled={captchaLoading} aria-label="重新產生驗證碼">↻ 重新產生</button>
         </div>
         <input name="captcha" inputMode="numeric" pattern="[0-9]*" maxLength={6} required placeholder="輸入圖中六位數字" />
       </label>
       {message && <p className="form-error">{message}</p>}
-      <button className="primary-btn" disabled={busy}>{busy ? '登入中…' : '登入'}</button>
+      <button className="primary-btn" disabled={busy || !captcha || captchaLoading}>{busy ? '登入中…' : '登入'}</button>
       <button type="button" className="forgot-link" onClick={() => { setView('forgot'); setMessage(''); setNotice(''); }}>忘記密碼？</button>
       <Link className="forgot-link" href="/account-apply/">申請帳號</Link>
     </form>
