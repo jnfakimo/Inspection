@@ -21,10 +21,21 @@ const sql = readFileSync(new URL(`../supabase/migrations/${retention}`, import.m
 assert.match(sql, /purge_expired_security_notices/);
 assert.match(sql, /grant execute on function public\.purge_expired_security_notices\(timestamptz\) to service_role/);
 assert.match(sql, /revoke all on function public\.purge_expired_security_notices\(timestamptz\) from public, anon, authenticated/);
+
 // 只能清除通知副本；證據資料表維持 append-only，保存政策不得改動它們。
-for (const evidence of ['security_alerts', 'security_alert_deliveries', 'security_session_blocks']) {
-  assert.ok(!new RegExp(`delete\s+from\s+public\.${evidence}|drop\s+trigger[^;]*${evidence}`, 'i').test(sql), `保存政策不得刪除或解除保護：${evidence}`);
-}
+// 以明確的 regex 常值列出（不動態組字串），並在下方以反例證明斷言真的會失敗。
+const evidenceTamper = [
+  /delete\s+from\s+(public\.)?security_alerts\b/i,
+  /delete\s+from\s+(public\.)?security_alert_deliveries\b/i,
+  /delete\s+from\s+(public\.)?security_session_blocks\b/i,
+  /drop\s+trigger[^;]*security_(alerts|alert_deliveries|session_blocks)\b/i,
+  /disable\s+trigger[^;]*security_(alerts|alert_deliveries|session_blocks)\b/i,
+];
+const tampers = text => evidenceTamper.some(pattern => pattern.test(text));
+assert.equal(tampers('delete from public.security_alerts where true;'), true, '反例：刪除證據必須被偵測');
+assert.equal(tampers('DELETE  FROM security_session_blocks;'), true, '反例：大小寫與空白變化也必須被偵測');
+assert.equal(tampers('drop trigger trg_prevent_security_alert_removal on public.security_alerts;'), true, '反例：解除防護必須被偵測');
+assert.equal(tampers(sql), false, '保存政策不得刪除或解除證據資料表的保護');
 
 const alertFn = readFileSync(new URL('../supabase/functions/platform-log-alert/index.ts', import.meta.url), 'utf8');
 assert.match(alertFn, /rpc\("purge_expired_security_notices"\)/, '排程函式必須呼叫保存期限清除');
