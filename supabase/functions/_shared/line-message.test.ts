@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { sendLineTextMessage } from "./line-message.ts";
 
-const retryKey = "123e4567-e89b-42d3-a456-426614174000";
+const sampleRetryUuid = "123e4567-e89b-42d3-a456-426614174000";
 
 test("LINE push sends a stable retry key and captures accepted request ID without reading the body", async () => {
   let requestUrl = "";
@@ -16,7 +16,7 @@ test("LINE push sends a stable retry key and captures accepted request ID withou
     token: "synthetic-token",
     recipient: "Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     text: "synthetic notice",
-    retryKey,
+    retryKey: sampleRetryUuid,
     fetcher: async (input, init) => {
       requestUrl = String(input);
       requestInit = init;
@@ -25,7 +25,7 @@ test("LINE push sends a stable retry key and captures accepted request ID withou
   });
 
   assert.equal(requestUrl, "https://api.line.me/v2/bot/message/push");
-  assert.equal(new Headers(requestInit?.headers).get("x-line-retry-key"), retryKey);
+  assert.equal(new Headers(requestInit?.headers).get("x-line-retry-key"), sampleRetryUuid);
   assert.deepEqual(JSON.parse(String(requestInit?.body)), {
     to: "Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     messages: [{ type: "text", text: "synthetic notice" }],
@@ -38,7 +38,7 @@ test("LINE push reports API acceptance separately from recipient delivery", asyn
     token: "synthetic-token",
     recipient: "Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     text: "synthetic notice",
-    retryKey,
+    retryKey: sampleRetryUuid,
     fetcher: async () => new Response(null, { status: 200 }),
   });
   assert.deepEqual(result, { ok: true, status: 200, acceptedRequestId: null });

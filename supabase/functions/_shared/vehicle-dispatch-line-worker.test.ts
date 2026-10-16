@@ -12,14 +12,14 @@ import { classifyLineAttempt } from "./vehicle-dispatch-line-retry.ts";
 
 const cronSecret = "synthetic-cron-secret";
 const lineUserId = "Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const retryKey = "123e4567-e89b-42d3-a456-426614174000";
+const sampleRetryUuid = "123e4567-e89b-42d3-a456-426614174000";
 const fixedNow = new Date("2026-10-08T08:00:00.000Z");
 
 function prepared(overrides: Record<string, unknown> = {}) {
   return {
     outcome: "ready",
     line_user_id: lineUserId,
-    retry_key: retryKey,
+    retry_key: sampleRetryUuid,
     message_text: VEHICLE_DISPATCH_NOTICE_TEXT,
     attempts: 1,
     first_attempt_at: fixedNow.toISOString(),
@@ -99,7 +99,7 @@ test("request body cannot choose a recipient, message or work item", async () =>
   assert.deepEqual(calls.claimed[0], { limit: 20, leaseSeconds: 90, now: fixedNow.toISOString() });
   assert.equal(sent?.recipient, lineUserId);
   assert.equal(sent?.text, VEHICLE_DISPATCH_NOTICE_TEXT);
-  assert.equal(sent?.retryKey, retryKey);
+  assert.equal(sent?.retryKey, sampleRetryUuid);
   assert.equal(calls.finished[0] && (calls.finished[0] as { resolution: string }).resolution, "accepted");
   const body = await response.json();
   assert.equal(body.data.accepted, 1);
@@ -155,7 +155,7 @@ test("test mode claims exactly one synthetic run and never touches production cl
   assert.deepEqual(calls.testPrepared, [{ testRunId, leaseToken: "test-lease-synthetic", now: fixedNow.toISOString() }]);
   assert.equal(sent?.recipient, lineUserId);
   assert.equal(sent?.text, VEHICLE_LINE_NOTIFICATION_TEST_TEXT);
-  assert.equal(sent?.retryKey, retryKey);
+  assert.equal(sent?.retryKey, sampleRetryUuid);
   assert.equal(calls.finished.length, 0);
   assert.equal((calls.testFinished[0] as { resolution: string }).resolution, "accepted");
   assert.deepEqual(await response.json().then((body) => body.data), {
