@@ -9,7 +9,7 @@
 // 寫入統一走 app-api 的 equipment_save（後端驗證系統權限、依表別欄位白名單清洗並
 // 寫入稽核），不再由前端直接操作資料表；readOnly 的監控事件確認亦經同一 action。
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
@@ -17,6 +17,8 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
+import { createRequestSequence } from '@/lib/request-sequence';
+import { firstQueryError } from '@/lib/async-load-safety';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -347,9 +349,13 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [query, setQuery] = useState(''), [equipmentFilter, setEquipmentFilter] = useState(''), [page, setPage] = useState(1);
   const [editor, setEditor] = useState<Row | null>(null);
+  // 載入以序號丟棄過期回應（切換頁面或重新載入時），並在任一查詢失敗時清空清單。
+  const loadSequence = useRef(createRequestSequence());
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
     setBusy(true); setNote('');
+    try {
     const client = getSupabase();
     const jobs: Array<PromiseLike<any>> = [
       client.from(spec.table).select(spec.select || '*').order(spec.orderBy, { ascending: spec.ascending ?? false, nullsFirst: false }).limit(1000),
@@ -361,10 +367,28 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
       ? client.from('material_categories').select('category_id,name,code,status').order('sort_order')
       : Promise.resolve({ data: [], error: null }));
     const [main, eq, cat] = await Promise.all(jobs);
-    if (main.error || eq.error || cat.error) setNote(`失敗：${errorMessage(main.error || eq.error || cat.error, '資料載入失敗')}`);
-    setRows(main.data || []); setEquipment(eq.data || []); setCategories(cat.data || []); setBusy(false);
+    if (!loadSequence.current.isCurrent(sequence)) return false;
+    const queryError = firstQueryError(main, eq, cat);
+    if (queryError) {
+      setNote(`失敗：${errorMessage(queryError, '資料載入失敗')}`);
+      setRows([]); setEquipment([]); setCategories([]);
+      return false;
+    }
+    setRows(main.data || []); setEquipment(eq.data || []); setCategories(cat.data || []);
+    return true;
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return false;
+      setNote(`載入失敗：${errorMessage(error, '資料讀取失敗')}`);
+      setRows([]); setEquipment([]); setCategories([]);
+      return false;
+    } finally {
+      if (loadSequence.current.isCurrent(sequence)) setBusy(false);
+    }
   }, [spec]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
   useEffect(() => { setPage(1); }, [query, equipmentFilter]);
 
   const ctx: Ctx = useMemo(() => ({
@@ -421,7 +445,9 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
       await invokeAppApi('equipment_save', id
         ? { kind: 'save', table: spec.table, id, payload }
         : { kind: 'save', table: spec.table, payload });
-      setEditor(null); await load(); setNote(id ? '資料已更新' : '資料已新增');
+      setEditor(null);
+      const refreshed = await load();
+      setNote(refreshed ? (id ? '資料已更新' : '資料已新增') : '資料已儲存，但清單更新失敗，請重新載入');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
@@ -430,7 +456,8 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
     setBusy(true); setNote('');
     try {
       await invokeAppApi('equipment_save', { kind: 'ack_event', event_id: row.event_id });
-      await load(); setNote('事件已確認');
+      const refreshed = await load();
+      setNote(refreshed ? '事件已確認' : '事件已確認，但清單更新失敗，請重新載入');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
 
@@ -462,7 +489,7 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
           </div></td>}
         </tr>)}</tbody>
       </table></div>
-      {!busy && paged.length === 0 && <p className="empty">{spec.emptyText}</p>}
+      {!busy && !note && paged.length === 0 && <p className="empty">{spec.emptyText}</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
 
