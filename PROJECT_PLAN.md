@@ -209,3 +209,21 @@
   其餘 worktree 保留：`C:\projects\Inspection`、`.codex` 與 `Documents\Codex\2026-10-10`／`2026-10-13` 的 Codex 工作目錄（可能仍由 Codex 使用）。
 - **待決定**：車輛 LINE 個人通知要 (a) 恢復上線——以 main 為基底重新整合 (1)，補測試後經 PR 部署；還是 (b) 放棄——至少把 5 支已套用的 migration 補進 main 作為 schema 紀錄。
   (2)～(5) 可在決定後逐項以獨立 PR 帶回。
+
+## 21. 公務車個人 LINE 派車通知重新上線（2026-10-16，PR #78）
+
+- 背景：見 §20。使用者決定恢復上線，並說明正式站目前沒有這個功能。
+- 整合方式：以 main 為基底，從快照只取車輛 LINE 相關檔案——新檔 26 個（Edge Function 相關 20、migration 5、規格文件 1）；既有檔中 `admin-api/index.ts`、
+  `app-api/handlers/vehicle.ts`、`line-notify/index.ts`、`config.toml`、`tools/admin-line-test-check.mjs` 採快照版（逐段確認差異都屬此功能，main 自分岔點後未改這些檔）。
+  `app-api/index.ts`、`system-access.ts`、`permission-fail-closed-check.mjs` 的快照差異屬另一批權限重構或較舊內容，刻意不帶入；假資料示意頁不帶入。
+- 修正：`_shared/vehicle-line-webhook.ts` 的 `flatMap` 型別錯誤（`deno check line-notify` 原本失敗，部署前檢查會擋下）。
+- 新做前端（快照中沒有可用介面）：`web/components/VehicleLineLinkSection.tsx`（個人設定綁定，僅公務車系統權限者）、
+  `web/app/systems/admin/settings/vehicle-line-personal-panel.tsx`（後台開關與測試，真實訊息需二次確認）；`vehicle_line_*` 列入只走 Edge 的動作。
+- 排程：`.github/workflows/vehicle-line-dispatch-worker.yml` 每 5 分鐘，沿用 repo secrets `CRON_SECRET`／`SUPABASE_ANON_KEY`，不使用 pg_cron／Vault。
+- 測試：`npm run test:vehicle-line-notifications`（單元 46、前端 13、PGlite／路由 28，共 87 項）接入 `npm test`；gitleaks 兩筆測試 UUID 誤判以指紋白名單＋變數改名處理。
+- 上線紀錄：PR CI run 38828543746 通過 → apply-database-migration run 38828829292、38828859064、38828892955、38828933713、38828963343 依序套用五支 migration（皆 HTTP 201）
+  → 合併 `875b7215d`。自動部署 run 38829051295 因 `config.toml` 變更觸發全量部署，型別檢查在 `ipcam-proxy` 的 `npm:md5` 失敗（CI 無 node_modules），
+  未部署任何 function；改以 workflow_dispatch run 38829266322 只部署 `admin-api app-api line-notify vehicle-line-dispatch-worker`，成功。
+  手動觸發 worker 排程 run 38829377581 回傳 `{"ok":true,"data":{"claimed":0,...}}`，代表 `CRON_SECRET`、資料庫 RPC 皆正常；Pages 已含新介面。
+- 後續修正：部署流程型別檢查加上 `DENO_NO_PACKAGE_JSON=1`，本機重現失敗並驗證 18 支 function 全數通過（分支 `codex/deploy-check-and-handoff`）。
+- 未驗證：登入後畫面、真實 LINE 綁定與送達（需司機本人）、`LINE_CHANNEL_SECRET` 與 LINE webhook 設定是否就緒（無正式環境讀取權限）。

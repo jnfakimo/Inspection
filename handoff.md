@@ -5,10 +5,9 @@
 
 ## ⏯️ 目前做到哪
 
-全站版型與色彩統一、戰情元件改接真實資料、正式站驗收與修正、一般版主色幅度調整、資安告警存放與保存期限，
-都已合併上線（PR #62–#74）。最後完成：PR #75（`b655a19e6`，2026-10-16）——維修分析與位置分析不計入 `hidden = true` 的測試資料；
-正式庫 3 筆 2026-08-25 的 E2E 測試工單與其報修案件已以 migration `20261016090000_hide_e2e_test_workorders.sql` 隱藏
-（apply-database-migration run 38820368083，HTTP 201）。Pages 已部署，正式站 JS 已確認含新過濾條件。
+最後完成：PR #78（`875b7215d`，2026-10-16）——**公務車個人 LINE 派車通知重新上線**。五支 migration 已以 apply-database-migration 套用到正式庫，
+`admin-api`、`app-api`、`line-notify`、`vehicle-line-dispatch-worker` 已部署，前端（個人設定綁定、後台開關）已上線，worker 排程每 5 分鐘執行。
+所有個人通知開關仍是預設關閉，尚未送出任何訊息。之前：PR #75（統計不計入隱藏測試資料、隱藏 3 筆 E2E 工單）、PR #77（G 槽快照分類與 worktree 清理）。
 
 ## 🚦 目前狀態
 
@@ -27,12 +26,12 @@
 
 1. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
-2. **待決定：車輛 LINE 個人通知要恢復上線還是放棄**（見 `PROJECT_PLAN.md` §20）。2026-10-08 這批從 G 槽直接部署到正式環境
-   （5 支 migration、`app-api` v118、`admin-api` v53／v54、`line-notify` v31、`vehicle-line-dispatch-worker` v1），原始碼從未進 main；
-   10-15 PR #71／#73 合併時，自動部署已用 main 版覆蓋 `app-api`、`admin-api` 等 8 個 function，所以正式環境的這兩支已不含 LINE 個人通知，
-   `line-notify`、worker 與 6 張資料表仍是 10-08 版本。當時功能開關全關、outbox／cron 為 0，預期使用者無感，但開關現況未重查。
-   原始碼備份：`G:\我的雲端硬碟\AI\Codex\_backups\g-snapshot-20261015-unpublished\snapshot-9363fb870-unpublished.zip`（146 檔，含分類清單 `manifest.tsv` 與 bundle）。
-   G 槽快照分支仍在本機，repo 是公開的，**不要推到這個 repo**。
+2. **車輛 LINE 個人通知啟用步驟（需使用者／管理員操作）**：
+   (a) LINE Developers Console 的 Messaging API channel：webhook URL 設為 `https://qztffronusdhgxhjjubt.supabase.co/functions/v1/line-notify`、按 Verify、開啟 Use webhook；
+   Edge Function Secrets 的 `LINE_CHANNEL_SECRET` 需與同一 channel 相符（未核實是否已設定；缺少時綁定無法完成）。
+   (b) 測試帳號 022443 本人在「個人資料設定 → LINE 派車通知」產生代碼，傳給官方帳號並點綁定連結。
+   (c) 管理員在「系統設定 → LINE 推播 → 公務車個人 LINE 通知」開「測試模式」→ 儲存 → 發送個人測試訊息，確認 022443 收到。
+   (d) 確認後再開「啟用個人通知」「指派通知」「取消指派通知」。其他司機各自完成綁定才會收到。
 3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
    動到 `supabase/functions/**` 合併後會自動部署 Edge Function）。
 4. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。
@@ -64,4 +63,4 @@
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · G 槽切回 main、快照內容備份與分類、清理 19 個 worktree 與 3 條已合併分支（分支 `codex/handoff-snapshot-triage`）
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 車輛 LINE 個人通知上線（PR #78）；部署前型別檢查修正（分支 `codex/deploy-check-and-handoff`）

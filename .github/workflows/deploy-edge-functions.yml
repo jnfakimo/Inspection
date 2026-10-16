@@ -130,6 +130,11 @@ jobs:
 
       - name: Type-check before deploying
         if: steps.changed.outputs.slugs != ''
+        env:
+          # repo 根目錄的 package.json 會讓 deno 改從 node_modules 找 npm: 套件；CI 沒裝前端相依，
+          # ipcam-proxy 的 npm:md5 因此在全量部署（config.toml／_shared 變更）時失敗。Edge Function
+          # 不使用前端的 package.json，檢查時忽略它，讓 npm: 依 import 指定的版本解析。
+          DENO_NO_PACKAGE_JSON: "1"
         run: |
           set -eu
           for slug in ${{ steps.changed.outputs.slugs }}; do
