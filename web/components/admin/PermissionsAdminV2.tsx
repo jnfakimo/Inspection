@@ -30,6 +30,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [editor, setEditor] = useState<Row | null>(null);
   const [tab, setTab] = useState<PermissionTab>('people');
   const [busy, setBusy] = useState(true);
+  const [loadBlocked, setLoadBlocked] = useState(true);
   const [note, setNote] = useState('');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -39,7 +40,7 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const [showUnauthorized, setShowUnauthorized] = useState(false);
 
   const load = useCallback(async () => {
-    setBusy(true); setNote('');
+    setBusy(true); setNote(''); setLoadBlocked(true);
     try {
       const client = getSupabase();
       const [rolesResult, permissionResult, usersResult, systemResult, moduleResult, roleModuleResult] = await Promise.all([
@@ -50,15 +51,17 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
         client.from('user_module_access').select('user_id,system_key,module_key,mode,updated_at').limit(66000),
         client.from('role_module_access').select('role_id,system_key,module_key,mode,updated_at').limit(5000),
       ]);
-      // 角色子系統範本是後加的資料表，migration 未套用時不讓整頁失敗，改當成「全部沿用大系統」。
+      // 任一授權資料來源查詢失敗時，封鎖編輯畫面，避免把缺漏資料當成沿用權限。
       if (roleModuleResult.error) console.error('role module access lookup failed:', roleModuleResult.error.message);
-      const failure = rolesResult.error || permissionResult.error || usersResult.error || systemResult.error || moduleResult.error;
+      const failure = rolesResult.error || permissionResult.error || usersResult.error || systemResult.error || moduleResult.error || roleModuleResult.error;
       if (failure) setNote(`失敗：${errorMessage(failure, '角色與個人權限載入失敗')}`);
+      if (failure) { setLoadBlocked(true); return; }
+      setLoadBlocked(false);
       setRoles((rolesResult.data || []).filter(row => row.role_id !== 'mgmt_supervisor'));
       setPermissions(permissionResult.data || []); setUsers(visibleManagedUsers(usersResult.data || []));
       setSystemAccess(systemResult.data || []); setModuleAccess(moduleResult.data || []);
       setRoleModuleAccess(roleModuleResult.data || []);
-    } catch (error) { setNote(`失敗：${errorMessage(error, '角色與個人權限載入失敗')}`); }
+    } catch (error) { setLoadBlocked(true); setNote(`失敗：${errorMessage(error, '角色與個人權限載入失敗')}`); }
     finally { setBusy(false); }
   }, []);
 
@@ -232,6 +235,13 @@ export function PermissionsAdminV2({ profile, module }: AdminProps) {
   const selectTab = (next: PermissionTab) => {
     setTab(next); setQuery(''); setPage(1); setExpandedSystem(''); setShowUnauthorized(false); setSelectedRoleId('');
   };
+
+  if (loadBlocked) {
+    return <AppShell profile={profile} title={module.title}>
+      <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+      <section className="panel admin-panel"><p role="alert">{busy ? '權限資料載入中…' : '權限來源無法完整載入，請重新載入後再修改權限。'}</p></section>
+    </AppShell>;
+  }
 
   return <AppShell profile={profile} title={module.title}>
     <AdminHeader module={module} busy={busy} note={note} onReload={load} action={<button className="primary-btn compact" onClick={() => setEditor({ is_edit: false })}>＋ 新增角色</button>}/>

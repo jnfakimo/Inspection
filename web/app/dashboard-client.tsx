@@ -23,7 +23,7 @@
 // KPI／提醒的計算逐項沿用 V1 render() 的公式（SLA、MTTR、MTBF、逾期、待派工），
 // 曆日一律以台北時區為準——timestamptz 回傳的是 UTC，直接 slice(0,10) 會跨日算錯。
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './dashboard.css';
 import './weather-widget-layout.css';
 import { AppShell } from '@/components/AppShell';
@@ -31,6 +31,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { getPatrolShiftsForDate, isDeletedShift, isNightShiftName, patrolDateOffset, shiftRange } from '@/lib/patrol-status';
 import { canonicalFloor } from '@/lib/floor';
+import { createRequestSequence } from '@/lib/request-sequence';
 import { WeatherWidget } from './weather-widget';
 import type { Profile } from '@/types/app';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
@@ -106,6 +107,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   const [from, setFrom] = useState(() => { const now = new Date(); return ymd(new Date(now.getFullYear(), now.getMonth(), 1)); });
   const [to, setTo] = useState(() => ymd(new Date()));
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [updatedAt, setUpdatedAt] = useState('');
+  const loadSequence = useRef(createRequestSequence());
 
   const applyQuickRange = (key: 'today' | 'month' | 'year') => {
     const now = new Date();
@@ -130,7 +132,9 @@ export function DashboardClient({ profile }: { profile: Profile }) {
   }, []);
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
     setBusy(true); setError('');
+    try {
     const client = getSupabase();
     const rangeStart = `${from}T00:00:00+08:00`, rangeEnd = `${to}T23:59:59+08:00`;
     const now = new Date();
@@ -151,6 +155,7 @@ export function DashboardClient({ profile }: { profile: Profile }) {
       getPatrolShiftsForDate(client, patrolDateOffset(day, -1)),
       getPatrolShiftsForDate(client, day),
     ]);
+    if (!loadSequence.current.isCurrent(sequence)) return;
 
     if (requestResult.error || orderResult.error) {
       setError(`資料載入失敗：${(requestResult.error || orderResult.error)?.message || '請稍後再試'}`);
@@ -209,8 +214,18 @@ export function DashboardClient({ profile }: { profile: Profile }) {
 
     setUpdatedAt(new Date().toLocaleTimeString('zh-TW', { hour12: false }));
     setBusy(false);
+    } catch (loadError) {
+      if (loadSequence.current.isCurrent(sequence)) {
+        setError(`資料載入失敗：${loadError instanceof Error ? loadError.message : '請稍後重試'}`);
+      }
+    } finally {
+      if (loadSequence.current.isCurrent(sequence)) setBusy(false);
+    }
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
 
   // 統計口徑與電視牆、後台版面預覽共用（lib/dashboard-metrics.ts）。
   const stats = useMemo(() => computeRepairStats(requests, orders), [requests, orders]);

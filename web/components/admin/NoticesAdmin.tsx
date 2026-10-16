@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
 import { BoardNoticesAdmin } from './BoardNoticesAdmin';
 import { AdminHeader, type AdminProps, errorMessage, fmtTime, PAGE_SIZE, Pager, type Row } from './shared';
+import { createRequestSequence } from '@/lib/request-sequence';
 
 const NOTICE_EVENT_LABELS: Record<string, string> = {
   new_repair: '新報修', dispatch: '已派工', return: '退件', overdue: '逾期提醒',
@@ -16,14 +17,21 @@ const NOTICE_EVENT_LABELS: Record<string, string> = {
 
 export function NoticesAdmin({ profile, module }: AdminProps) {
   const [notices, setNotices] = useState<Row[]>([]), [busy, setBusy] = useState(true), [note, setNote] = useState(''), [tab, setTab] = useState<'all' | 'unread' | 'read'>('all'), [query, setQuery] = useState(''), [page, setPage] = useState(1);
+  const loadSequence = useRef(createRequestSequence());
   const load = useCallback(async (options: { preserveNote?: boolean } = {}) => {
+    const sequence = loadSequence.current.begin();
     setBusy(true); if (!options.preserveNote) setNote('');
     try {
       const { data, error } = await getSupabase().from('notifications').select('*').eq('recipient_id', profile.user_id).order('created_at', { ascending: false }).limit(1000);
+      if (!loadSequence.current.isCurrent(sequence)) return false;
       if (error) setNote(`失敗：${errorMessage(error, '通知載入失敗')}`);
-      setNotices(data || []);
-    } catch (error) { setNote(`失敗：${errorMessage(error, '通知載入失敗')}`); }
-    finally { setBusy(false); }
+      if (!error) setNotices(data || []);
+      return !error;
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return false;
+      setNote(`失敗：${errorMessage(error, '通知載入失敗')}`);
+      return false;
+    } finally { if (loadSequence.current.isCurrent(sequence)) setBusy(false); }
   }, [profile.user_id]);
   useEffect(() => {
     void load();
@@ -31,7 +39,10 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
     const channel = client.channel(`v2-notices-${profile.user_id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${profile.user_id}` }, () => { void load({ preserveNote: true }); })
       .subscribe();
-    return () => { void client.removeChannel(channel); };
+    return () => {
+      loadSequence.current.invalidate();
+      void client.removeChannel(channel);
+    };
   }, [load, profile.user_id]);
   const rows = useMemo(() => notices.filter(row => {
     const q = query.trim().toLowerCase(); const read = Boolean(row.is_read);
@@ -45,8 +56,8 @@ export function NoticesAdmin({ profile, module }: AdminProps) {
     setBusy(true); setNote('');
     try {
       await invokeAdminApi('admin_mark_notice', notifId ? { notif_id: notifId } : {});
-      await load({ preserveNote: true });
-      setNote(notifId ? '通知已標記為已讀' : '全部通知已標記為已讀');
+      const refreshed = await load({ preserveNote: true });
+      setNote(refreshed ? (notifId ? '通知已標記為已讀' : '全部通知已標記為已讀') : '已完成標記，但通知清單更新失敗，請重新載入。');
     } catch (error) { setNote(`失敗：${errorMessage(error)}`); setBusy(false); }
   };
   const unread = notices.filter(row => !row.is_read).length;

@@ -6,6 +6,7 @@ import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { AppShell } from '@/components/AppShell';
 import { AuthGate } from '@/components/AuthGate';
 import { invokeAppApi } from '@/lib/supabase';
+import { createRequestSequence } from '@/lib/request-sequence';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -342,6 +343,7 @@ function OfficialDocsPage({ profile, system, module }: { profile: Profile; syste
   const [targetUnit, setTargetUnit] = useState('');
   const [timelinePage, setTimelinePage] = useState(1);
   const [documentPage, setDocumentPage] = useState(1);
+  const loadSequence = useRef(createRequestSequence());
   const selected = data?.documents.find(document => document.document_id === selectedId) || data?.documents[0] || null;
   // 公文頁本身已由 SYS-09 存取權限保護；具此權限的人員可以建立公文，
   // 並在自己所屬或已參與的流程範圍內選擇下一個第一階部／室。
@@ -361,17 +363,26 @@ function OfficialDocsPage({ profile, system, module }: { profile: Profile; syste
   const peopleRoleOptions: string[] = [];
 
   const load = useCallback(async (search = '') => {
+    const sequence = loadSequence.current.begin();
     setLoading(true);
     try {
       const result = await invokeAppApi<OfficialData>('official_documents', { lookup: search });
+      if (!loadSequence.current.isCurrent(sequence)) return false;
       setData(result);
       setDocumentPage(1);
       setSelectedId(current => result.documents.some(document => document.document_id === current) ? current : result.documents[0]?.document_id || '');
       setNote('');
-    } catch (error) { setNote(error instanceof Error ? error.message : '公文資料載入失敗'); }
-    finally { setLoading(false); }
+      return true;
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return false;
+      setNote(error instanceof Error ? error.message : '公文資料載入失敗');
+      return false;
+    } finally { if (loadSequence.current.isCurrent(sequence)) setLoading(false); }
   }, []);
-  useEffect(() => { void load(''); }, [load]);
+  useEffect(() => {
+    void load('');
+    return () => loadSequence.current.invalidate();
+  }, [load]);
 
   const departmentOptions = useMemo(() => {
     const rows = [...(data?.departments || []), ...(data?.scope_root_departments || []), ...(data?.current_root_department ? [data.current_root_department] : [])];
