@@ -227,3 +227,8 @@
   手動觸發 worker 排程 run 38829377581 回傳 `{"ok":true,"data":{"claimed":0,...}}`，代表 `CRON_SECRET`、資料庫 RPC 皆正常；Pages 已含新介面。
 - 後續修正：部署流程型別檢查加上 `DENO_NO_PACKAGE_JSON=1`，本機重現失敗並驗證 18 支 function 全數通過（分支 `codex/deploy-check-and-handoff`）。
 - 未驗證：登入後畫面、真實 LINE 綁定與送達（需司機本人）、`LINE_CHANNEL_SECRET` 與 LINE webhook 設定是否就緒（無正式環境讀取權限）。
+- 2026-10-16 追加（PR #80，`06f027bb7`）：發現 Codex 於 10-08 寫好但未進 main 的前端（舊 C 副本 `Documents\Codex\2026-10-05\task-2\Inspection`：
+  `vehicle-line-binding-panel.tsx`、`vehicle-line-personal-settings.tsx`、`web/lib/vehicle-line-binding.ts`）。使用者決定維持現行介面，整合 Codex 的
+  回應驗證、代碼格式檢查、防連點動作鎖、錯誤分類與測試；修正分類規則漏判 app-api 實際訊息「駕駛名單」「駕駛綁定資格」，並以讀取伺服器原始碼的測試防止脫節。
+  派車申請頁加入同一綁定元件（僅駕駛名冊人員顯示）。`test:vehicle-line-notifications` 共 100 項。
+- 正式環境進度：LINE webhook Verify 成功、022443 已綁定；待管理員發送測試後逐項開啟個人通知。

@@ -27,9 +27,8 @@
 1. **待公司決定**：資安證據資料表（`security_alerts`、`security_alert_deliveries`、`security_session_blocks`）的保存年限。
    目前等同永久保存，因為專案以 trigger 禁止刪改；要設年限需先決定封存方式（見 `docs/SECURITY_RECORD_RETENTION.md`）。
 2. **車輛 LINE 個人通知啟用步驟（需使用者／管理員操作）**：
-   (a) LINE Developers Console 的 Messaging API channel：webhook URL 設為 `https://qztffronusdhgxhjjubt.supabase.co/functions/v1/line-notify`、按 Verify、開啟 Use webhook；
-   Edge Function Secrets 的 `LINE_CHANNEL_SECRET` 需與同一 channel 相符（未核實是否已設定；缺少時綁定無法完成）。
-   (b) 測試帳號 022443 本人在「個人資料設定 → LINE 派車通知」產生代碼，傳給官方帳號並點綁定連結。
+   (a) ✅ 2026-10-16 已確認：webhook URL 正確、Use webhook 開啟、Verify 成功（`LINE_CHANNEL_SECRET` 相符）；官方帳號 ID `@ltb9602a`。自動回應訊息仍開啟（使用者決定暫不關閉）。
+   (b) ✅ 022443 已完成本人綁定。其他司機可在「個人資料設定 → LINE 派車通知」或「公務車 → 派車申請」頁（僅駕駛名冊人員顯示）自行綁定。
    (c) 管理員在「系統設定 → LINE 推播 → 公務車個人 LINE 通知」開「測試模式」→ 儲存 → 發送個人測試訊息，確認 022443 收到。
    (d) 確認後再開「啟用個人通知」「指派通知」「取消指派通知」。其他司機各自完成綁定才會收到。
 3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
@@ -63,4 +62,4 @@
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 車輛 LINE 個人通知上線（PR #78）；部署前型別檢查修正（分支 `codex/deploy-check-and-handoff`）
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 車輛 LINE 綁定整合 Codex 防呆邏輯並加入派車申請頁入口（PR #80）；下一步為 (c) 發送測試
