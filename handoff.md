@@ -5,6 +5,9 @@
 
 ## ⏯️ 目前做到哪
 
+最新：PR #83（繁中 404 頁發布到網站根目錄、設備頁載入防呆，正式站已實測不存在網址顯示繁中頁）、PR #84（戰情、會議室、公文、駐警打卡、
+維修分析、後台告警／通知／權限、AuthGate 的非同步載入防呆，自 G 槽快照整合 Codex 的修正）。
+
 最後完成：**公務車個人 LINE 派車通知正式啟用**（2026-10-16）。PR #78 上線程式與資料庫，PR #80 整合 Codex 的綁定防呆邏輯並加入派車申請頁入口；
 LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊息後，管理員已開啟「啟用個人通知」與「指派通知」。
 「取消指派通知」維持關閉，「測試模式」維持開啟。派車指派給已綁定的司機時，worker 排程約 5 分鐘內送出個人通知。
@@ -34,6 +37,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
    動到 `supabase/functions/**` 合併後會自動部署 Edge Function）。
 4. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。
+4a. **待決定：設備營運／能源面板**（`equipment-operations-energy`，在 G 槽快照與舊 C 副本）。目前只接上監控告警；4 項能源數字、設備運轉狀態、
+    工單／巡檢／結案追溯都沒有資料來源（畫面會標「待介接」）。是否在資料接通前就放上中央監控頁，待使用者決定。
 5. 其餘待辦見 `PROJECT_PLAN.md`：全角色權限矩陣、資安 S1–S3、`Obsidian/04` 179 節審閱、`app-api` 拆檔。
 6. 日後若要隱藏新的正式測試資料：不要直接執行 `docs/runbooks/hide-test-records.sql` 步驟 2（會被保護觸發器擋下），
    比照 `20261016090000_hide_e2e_test_workorders.sql` 另寫 migration，經 CI 後以 `apply-database-migration.yml` 套用。
@@ -62,4 +67,4 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 車輛 LINE 個人通知正式啟用（個人通知、指派通知開啟；022443 測試已收到）
+2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 繁中 404 頁與非同步載入防呆上線（PR #83、#84）

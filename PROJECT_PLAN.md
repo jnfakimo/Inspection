@@ -234,3 +234,13 @@
 - 正式環境進度：LINE webhook Verify 成功、022443 已綁定；待管理員發送測試後逐項開啟個人通知。
 - 2026-10-16 正式啟用：管理員於後台送出個人測試訊息（回應「測試通知已由 LINE API 接受」），022443 確認收到；隨後開啟「啟用個人通知」「指派通知」並儲存，
   伺服器讀回狀態一致。「取消指派通知」關閉、「測試模式」開啟（皆維持原狀）。未驗證：真實派車指派觸發的通知送達（需實際派車）。
+
+## 22. 繁中 404 頁與非同步載入防呆（2026-10-16，PR #83、#84）
+
+- 404：正式站不存在的網址原本顯示 GitHub 預設英文頁。帶入快照的 `web/app/not-found.tsx`，並讓 `build-hardened-pages.mjs` 在加上 CSP 與來源指紋之後、
+  簽章之前把 `v2/404.html` 複製為網站根目錄 `404.html`（GitHub Pages 只讀根目錄），且確認內容為繁中頁。PR CI 的 Commercial readiness 建置紀錄
+  「根目錄 404 頁：v2/404.html → 404.html」，產物驗證通過；合併後實測 `/Inspection/v2/<不存在>/` 與 `/Inspection/<不存在>` 皆回 HTTP 404 並顯示繁中頁。
+- 載入防呆：自快照整合 Codex 10-10 的修正，共 11 個畫面——設備頁（#83）、戰情、會議室、公文、駐警打卡、維修分析、後台告警／通知（#84）以
+  `request-sequence` 丟棄過期回應並於卸載時作廢；查詢失敗不顯示假的空清單；權限頁任一授權來源失敗即封鎖編輯；AuthGate 過期回應不得清除登入者。
+  `dashboard-client`、`workorder-extras` 以三方合併保留 main 的後續修改。測試：`async-load-safety.test.ts`（Codex 完整版＋補充）、`request-sequence.test.ts`、`not-found-page.test.mjs`。
+- 待決定：設備營運／能源面板（見 handoff 4a）。未驗證：登入後畫面。
