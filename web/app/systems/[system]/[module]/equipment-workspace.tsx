@@ -19,6 +19,7 @@ import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { createRequestSequence } from '@/lib/request-sequence';
 import { firstQueryError } from '@/lib/async-load-safety';
+import { EquipmentOperationsEnergy, type EquipmentOperationalAsset } from './equipment-operations-energy';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 
@@ -352,6 +353,58 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
   // 載入以序號丟棄過期回應（切換頁面或重新載入時），並在任一查詢失敗時清空清單。
   const loadSequence = useRef(createRequestSequence());
 
+  // 中央監控頁上方的「設備營運與能源」面板：目前只接上監控告警；能源讀值、運轉狀態與工單／巡檢／結案追溯
+  // 尚無資料來源，元件會標示「待介接」，不推定為正常。
+  const equipmentOverview = useMemo(() => {
+    if (spec.table !== 'equipment_monitor_events') return null;
+    const alarmsByEquipment = new Map<string, Array<{
+      eventId: string; title: string; severityLabel: string; occurredAt: string | null; receivedAt: string | null;
+    }>>();
+    for (const event of rows) {
+      if (event.event_state !== 'open' && event.event_state !== 'acknowledged') continue;
+      const equipmentId = String(event.equipment_id || '');
+      const eventId = String(event.event_id || '');
+      if (!equipmentId || !eventId) continue;
+      const alarms = alarmsByEquipment.get(equipmentId) || [];
+      alarms.push({
+        eventId,
+        title: String(event.title || event.event_code || '監控事件'),
+        severityLabel: String(event.severity || 'unknown'),
+        occurredAt: typeof event.occurred_at === 'string' ? event.occurred_at : null,
+        receivedAt: typeof event.received_at === 'string' ? event.received_at : null,
+      });
+      alarmsByEquipment.set(equipmentId, alarms);
+    }
+    const assets: EquipmentOperationalAsset[] = equipment.map(asset => {
+      const equipmentId = String(asset.equipment_id || '');
+      return {
+        equipmentId,
+        assetCode: String(asset.asset_code || asset.qr_code || equipmentId),
+        name: String(asset.name || '未命名設備'),
+        floorName: typeof asset.floor === 'string' ? asset.floor : null,
+        // Master inventory status is not a live operational signal.
+        operationalState: 'unknown',
+        sourceName: null,
+        sourceObservedAt: null,
+        receivedAt: null,
+        trace: {
+          alarms: { state: 'available', items: alarmsByEquipment.get(equipmentId) || [] },
+          workOrders: { state: 'pending', items: [] },
+          inspections: { state: 'pending', items: [] },
+          closureEvidence: { state: 'pending', items: [] },
+        },
+      };
+    });
+    const capped = rows.length >= 1000 || equipment.length >= 1000;
+    return {
+      assets,
+      feed: busy ? 'loading' as const
+        : note ? 'error' as const
+          : capped ? 'truncated' as const
+            : assets.length ? 'ready' as const : 'empty' as const,
+    };
+  }, [busy, equipment, note, rows, spec.table]);
+
   const load = useCallback(async () => {
     const sequence = loadSequence.current.begin();
     setBusy(true); setNote('');
@@ -463,6 +516,11 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
 
   const canEdit = !spec.readOnly;
   return <AppShell profile={profile} title={module.title}>
+    {equipmentOverview && <EquipmentOperationsEnergy
+      equipmentFeed={equipmentOverview.feed}
+      equipment={equipmentOverview.assets}
+      errorMessage={note || undefined}
+    />}
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={canEdit ? <button className="primary-btn compact" onClick={() => setEditor(blank())}>＋ 新增</button> : undefined} />
     <section className="panel admin-panel">
