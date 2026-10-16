@@ -73,3 +73,6 @@ ee9353ebbd987aa8c7ca646f14186c954bd050a6:system/patrollist.html:jwt:117
 f31522cd799879ab33dcd42cde112c51f50cea52:system/guardpatrol.html:jwt:133
 f31522cd799879ab33dcd42cde112c51f50cea52:system/patrolshifts.html:jwt:167
 fe290bc9f9bae59ac5821e90a9e7a5c68aa6567f:system/app.html:jwt:698
+# 2026-10-16 複核：以下兩筆是 LINE 重試鍵（X-Line-Retry-Key）測試用的固定 UUID，變數名含 Key 被通用規則誤判，非密鑰。
+95d5c31641ec217181c30e513763624e9f8c3b8f:supabase/functions/_shared/line-message.test.ts:generic-api-key:5
+95d5c31641ec217181c30e513763624e9f8c3b8f:supabase/functions/_shared/vehicle-dispatch-line-worker.test.ts:generic-api-key:15
