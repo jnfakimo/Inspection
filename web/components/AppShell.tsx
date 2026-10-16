@@ -11,7 +11,8 @@ import type { Profile } from '@/types/app';
 import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
 import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile } from '@/lib/profile-cache';
-import { findModule, findSystem, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
+import { findModule, findSystem, hasSystemAccess, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
+import VehicleLineLinkSection from '@/components/VehicleLineLinkSection';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
 import { resolveAppBackHref } from '@/lib/app-navigation';
 
@@ -256,8 +257,10 @@ export function AppShell({ profile, title, children, heading }: {
             {calendarMessage && <p className="profile-message">{calendarMessage}</p>}
           </section>
 
+          {hasSystemAccess(profile, 'vehicle') && <VehicleLineLinkSection index="03" />}
+
           <form className="profile-section profile-section-security" onSubmit={changePassword}>
-            <div className="profile-section-title"><span>03</span><div><b>登入安全</b><small>{passwordPolicy.hint}</small></div></div>
+            <div className="profile-section-title"><span>{hasSystemAccess(profile, 'vehicle') ? '04' : '03'}</span><div><b>登入安全</b><small>{passwordPolicy.hint}</small></div></div>
             <div className="profile-form-grid"><label>新密碼<input type="password" name="password" {...passwordInputProps(passwordPolicy)} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" {...passwordInputProps(passwordPolicy)} required autoComplete="new-password" /></label></div>
             {passwordMessage && <p className="profile-message">{passwordMessage}</p>}
             <div className="profile-actions"><button className="primary-btn compact">更新密碼</button></div>

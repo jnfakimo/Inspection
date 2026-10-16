@@ -1,4 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
+import { sendLineTextMessage } from "../_shared/line-message.ts";
+import { createVehicleLineWebhookHandler, type VehicleLineWebhookStore } from "../_shared/vehicle-line-webhook.ts";
+import { verifyLineWebhookSignature } from "../_shared/vehicle-line-link.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -20,22 +23,74 @@ function safeEqual(a: string, b: string) {
 }
 
 async function validLineSignature(rawBody: string, signature: string | null) {
-  const secret = Deno.env.get("LINE_CHANNEL_SECRET") || "";
-  if (!secret || !signature) return false;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const digest = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody)),
-  );
-  let binary = "";
-  digest.forEach((byte) => binary += String.fromCharCode(byte));
-  return safeEqual(btoa(binary), signature);
+  return verifyLineWebhookSignature(rawBody, signature, Deno.env.get("LINE_CHANNEL_SECRET") || "");
 }
+
+const fetcher = fetch;
+
+function createServiceClient() {
+  const url = Deno.env.get("SUPABASE_URL") || "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!url || !serviceKey) throw new Error("Notification service unavailable");
+  return createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetcher },
+  });
+}
+
+const lineWebhook = createVehicleLineWebhookHandler({
+  channelSecret: () => Deno.env.get("LINE_CHANNEL_SECRET") || "",
+  fetcher,
+  createStore: async (): Promise<VehicleLineWebhookStore> => {
+    const db = createServiceClient();
+    return {
+      async ensureLinkSchema() {
+        for (const [table, column] of [
+          ["vehicle_driver_line_bindings", "user_id"],
+          ["vehicle_line_link_intents", "intent_id"],
+          ["vehicle_line_account_link_nonces", "nonce_id"],
+        ]) {
+          const { error } = await db.from(table).select(column).limit(0);
+          if (error) throw error;
+        }
+      },
+      async loadChannelAccessToken() {
+        const { data, error } = await db.from("system_settings")
+          .select("value").eq("key", "line_channel_token").maybeSingle();
+        if (error) throw error;
+        return typeof data?.value === "string" && data.value ? data.value : null;
+      },
+      async saveGroupId(groupId) {
+        const { error } = await db.from("system_settings").upsert(
+          [{ key: "line_group_id", value: groupId }], { onConflict: "key" },
+        );
+        if (error) throw error;
+      },
+      async consumeLinkIntent(input) {
+        const { data, error } = await db.rpc("consume_vehicle_line_link_intent", {
+          p_code_hash: input.codeHash,
+          p_line_user_id_hash: input.lineUserIdHash,
+          p_nonce_hash: input.nonceHash,
+          p_now: input.now,
+        });
+        if (error) throw error;
+        const row = Array.isArray(data) ? data[0] : data;
+        return row && typeof row === "object" ? row as { outcome: string; userId?: string | null } : { outcome: "invalid_request" };
+      },
+      async completeAccountLink(input) {
+        const { data, error } = await db.rpc("complete_vehicle_line_account_link", {
+          p_nonce_hash: input.nonceHash,
+          p_line_user_id_hash: input.lineUserIdHash,
+          p_line_user_id: input.lineUserId,
+          p_link_result: input.result,
+          p_now: input.now,
+        });
+        if (error) throw error;
+        return typeof data === "string" ? data : "invalid_request";
+      },
+    };
+  },
+});
 
 type ActiveProfile = {
   user_id: string;
@@ -80,11 +135,17 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: CORS_HEADERS, status: 204 });
   }
 
+  // The signed LINE route consumes the exact body before JSON parsing or DB setup.
+  if (req.headers.has("x-line-signature")) return await lineWebhook(req);
+  const webhookSecret = Deno.env.get("LINE_NOTIFY_WEBHOOK_SECRET") || "";
+  const suppliedWebhookSecret = req.headers.get("x-webhook-secret") || "";
+  const trustedNotificationWebhook = !!webhookSecret && safeEqual(webhookSecret, suppliedWebhookSecret);
+  if (!req.headers.get("authorization") && !trustedNotificationWebhook) {
+    return json({ ok: false, msg: "Unauthorized" }, 401);
+  }
+
   try {
-    const db = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const db = createServiceClient();
 
     const rawBody = await req.text();
     const payload = JSON.parse(rawBody || "{}");
@@ -199,25 +260,16 @@ Deno.serve(async (req) => {
     if (!text) return json({ ok: true, msg: "skip" });
 
     // ── Send LINE push ────────────────────────────────────────────────────────
-    const lineRes = await fetch("https://api.line.me/v2/bot/message/push", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ to: groupId, messages: [{ type: "text", text }] }),
-    });
+    const lineRes = await sendLineTextMessage({ token, recipient: groupId, text });
 
     if (!lineRes.ok) {
-      const errBody = await lineRes.text();
-      console.error("LINE push error:", lineRes.status, errBody);
+      console.error("LINE push failed:", lineRes.status);
       return json({ ok: false, msg: "LINE delivery failed" }, 502);
     }
 
     return json({ ok: true });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("Edge function error:", msg);
+  } catch {
+    console.error("Edge function error");
     return json({ ok: false, msg: "Notification service unavailable" }, 500);
   }
 });

@@ -3,12 +3,120 @@
 import type { AppApiContext } from '../context.ts';
 import { text, validISODate } from '../validate.ts';
 import { writeAudit } from '../audit.ts';
+import { createVehicleLineLinkCode, sha256Hex } from '../../_shared/vehicle-line-link.ts';
 
-export const VEHICLE_ACTIONS = new Set(['save_official_vehicle', 'vehicle_create_request', 'vehicle_roster_update', 'vehicle_roster_remove_all']);
+export const VEHICLE_ACTIONS = new Set([
+  'save_official_vehicle', 'vehicle_create_request', 'vehicle_roster_update', 'vehicle_roster_remove_all',
+  'vehicle_line_link_start', 'vehicle_line_link_status', 'vehicle_line_unlink',
+]);
+
+const LINK_SERVICE_UNAVAILABLE = 'LINE 綁定服務尚未就緒，請稍後再試。';
+
+function isLinkSchemaUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = String((error as { code?: unknown }).code || '');
+  return ['PGRST202', 'PGRST204', 'PGRST205', '42883', '42P01'].includes(code);
+}
+
+function rpcRow(data: unknown): Record<string, unknown> | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  return row && typeof row === 'object' ? row as Record<string, unknown> : null;
+}
+
+function isoTimestamp(value: unknown): string | null {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return null;
+  return new Date(value).toISOString();
+}
 
 /** 處理公務車相關 action；不屬於本業務時回傳 null，由 index.ts 繼續往下分派。 */
 export async function handleVehicleAction(action: string, ctx: AppApiContext): Promise<Response | null> {
-  const { req, body, profile, userDb, reply, can, canModule, isAdmin } = ctx;
+  const { req, body, profile, admin, userDb, reply, can, canModule, isAdmin } = ctx;
+
+  if (action === 'vehicle_line_link_start') {
+    if (!can('vehicle')) return reply(req, { ok: false, message: '目前沒有公務車系統權限。' }, 403);
+    if (body.consent !== true) return reply(req, { ok: false, message: '請先同意 LINE 帳號綁定說明。' }, 400);
+
+    const { data: driver, error: driverError } = await userDb.from('vehicle_dispatch_drivers')
+      .select('user_id').eq('user_id', profile.user_id).eq('active', true).maybeSingle();
+    if (driverError) {
+      if (isLinkSchemaUnavailable(driverError)) return reply(req, { ok: false, message: LINK_SERVICE_UNAVAILABLE }, 503);
+      throw driverError;
+    }
+    if (!driver) return reply(req, { ok: false, message: '此帳號尚未列入有效駕駛名單。' }, 403);
+
+    const now = new Date().toISOString();
+    const code = createVehicleLineLinkCode();
+    const codeHash = await sha256Hex(code);
+    const { data, error } = await admin.rpc('create_vehicle_line_link_intent', {
+      p_user_id: profile.user_id,
+      p_code_hash: codeHash,
+      p_consented_at: now,
+      p_now: now,
+    });
+    if (error) {
+      if (isLinkSchemaUnavailable(error)) return reply(req, { ok: false, message: LINK_SERVICE_UNAVAILABLE }, 503);
+      throw error;
+    }
+    const result = rpcRow(data);
+    const expiresAt = isoTimestamp(result?.expires_at);
+    if (result?.outcome === 'created' && expiresAt) {
+      await writeAudit(userDb, profile.user_id, 'vehicle_line_link_intents', profile.user_id, 'insert', null, {
+        state: 'pending', consented_at: now, expires_at: expiresAt,
+      });
+      return reply(req, { ok: true, data: { code, expires_at: expiresAt } });
+    }
+    if (result?.outcome === 'already_linked') {
+      return reply(req, { ok: false, message: '此帳號已綁定 LINE；請先解除綁定，再開始新的綁定。' }, 409);
+    }
+    if (result?.outcome === 'driver_inactive' || result?.outcome === 'user_inactive') {
+      return reply(req, { ok: false, message: '此帳號目前不符合駕駛綁定資格。' }, 403);
+    }
+    if (result?.outcome === 'invalid_request') return reply(req, { ok: false, message: '綁定資料無效，請重新操作。' }, 400);
+    return reply(req, { ok: false, message: LINK_SERVICE_UNAVAILABLE }, 503);
+  }
+
+  if (action === 'vehicle_line_link_status') {
+    const { data: binding, error: bindingError } = await admin.from('vehicle_driver_line_bindings')
+      .select('state,linked_at').eq('user_id', profile.user_id).maybeSingle();
+    if (bindingError) {
+      if (isLinkSchemaUnavailable(bindingError)) return reply(req, { ok: false, message: LINK_SERVICE_UNAVAILABLE }, 503);
+      throw bindingError;
+    }
+    const { data: pending, error: intentError } = await admin.from('vehicle_line_link_intents')
+      .select('expires_at').eq('user_id', profile.user_id).eq('state', 'pending')
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (intentError) {
+      if (isLinkSchemaUnavailable(intentError)) return reply(req, { ok: false, message: LINK_SERVICE_UNAVAILABLE }, 503);
+      throw intentError;
+    }
+    const linked = binding?.state === 'linked';
+    const pendingExpiry = isoTimestamp(pending?.expires_at);
+    const expiry = pendingExpiry && Date.parse(pendingExpiry) > Date.now() ? pendingExpiry : null;
+    const linkedAt = linked ? isoTimestamp(binding?.linked_at) : null;
+    return reply(req, { ok: true, data: {
+      linked,
+      linked_at: linkedAt,
+      pending_expires_at: linked ? null : expiry,
+    } });
+  }
+
+  if (action === 'vehicle_line_unlink') {
+    // Unlink is always available to the active session owner, including after driver access is removed.
+    const { data, error } = await admin.rpc('unlink_vehicle_line_account', { p_user_id: profile.user_id });
+    if (error) {
+      if (isLinkSchemaUnavailable(error)) return reply(req, { ok: false, message: LINK_SERVICE_UNAVAILABLE }, 503);
+      throw error;
+    }
+    const unlinked = data === true;
+    if (unlinked) {
+      await writeAudit(userDb, profile.user_id, 'vehicle_driver_line_bindings', profile.user_id, 'status_change', null, {
+        state: 'unlinked',
+      });
+    }
+    return reply(req, { ok: true, data: { unlinked } });
+  }
+
   if (action === 'save_official_vehicle') {
     if (!can('vehicle')) return reply(req, { ok: false, message: '目前角色沒有車輛主檔權限' }, 403);
     if (!canModule('vehicle', 'vehicles')) return reply(req, { ok: false, message: '目前帳號未開放公務車輛子系統' }, 403);
