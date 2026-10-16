@@ -2,7 +2,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.2';
 import { enforceDurableRateLimit, recordRateLimitDenial, securityRequestId } from '../_shared/security-monitor.ts';
 import { passwordPolicyMessage } from '../_shared/password-policy.ts';
 import { canonicalFloor } from '../_shared/floor.ts';
+import { sendLineTextMessage } from '../_shared/line-message.ts';
 import { BOARD_NOTICE_ACTIONS, handleBoardNotices } from './board-notices.ts';
+import { executeLineGroupTestAction, LINE_GROUP_TEST_ACTION } from './line-group-test.ts';
+import { executeVehicleLinePersonalAdminAction, VEHICLE_LINE_PERSONAL_ACTIONS } from './vehicle-line-personal.ts';
 
 type PortableRuntime = {
   env?: { get: (name: string) => string | undefined };
@@ -163,7 +166,7 @@ export async function handleAdminApiRequest(req: Request) {
     const roleId = profile.rbac_role || (profile.role === 'admin' ? 'sysadmin' : profile.role);
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
     const action = clean(body.action, 50);
-    if (!['admin_get_settings', 'admin_get_contract', 'admin_list_board_notices'].includes(action)) {
+    if (!['admin_get_settings', 'admin_get_contract', 'admin_list_board_notices', 'admin_get_vehicle_line_personal_settings'].includes(action)) {
       const writeRate = await enforceDurableRateLimit(admin, req, {
         subject: authData.user.id,
         scope: 'admin-api:write',
@@ -194,6 +197,94 @@ export async function handleAdminApiRequest(req: Request) {
       const { error } = await admin.from('audit_logs').insert({ table_name: tableName, record_id: clean(recordId, 200) || 'unknown', action: auditAction, changes: safeDetails(changes), operator_id: profile.user_id, source: 'v2-admin' });
       if (error) console.warn('admin audit skipped:', error.message);
     };
+    if (VEHICLE_LINE_PERSONAL_ACTIONS.has(action)) {
+      const result = await executeVehicleLinePersonalAdminAction(action, body, {
+        isAdmin,
+        actorId: String(profile.user_id),
+        readPreferences: async () => {
+          const { data, error } = await admin.from('vehicle_line_notification_settings')
+            .select('personal_enabled,assignment_enabled,assignment_revoked_enabled,test_enabled,test_recipient_user_id')
+            .eq('singleton_id', true).maybeSingle();
+          if (error) throw error;
+          return data ? {
+            personal_enabled: data.personal_enabled === true,
+            assignment_enabled: data.assignment_enabled === true,
+            assignment_revoked_enabled: data.assignment_revoked_enabled === true,
+            test_enabled: data.test_enabled === true,
+            test_recipient_user_id: typeof data.test_recipient_user_id === 'string' ? data.test_recipient_user_id : null,
+          } : null;
+        },
+        resolveTestRecipient: async () => {
+          const { data: user, error: userError } = await admin.from('users')
+            .select('user_id,username,name,status').eq('username', '022443').maybeSingle();
+          if (userError) throw userError;
+          if (!user || user.status !== 'active') return null;
+          const { data: driver, error: driverError } = await admin.from('vehicle_dispatch_drivers')
+            .select('active').eq('user_id', user.user_id).maybeSingle();
+          if (driverError) throw driverError;
+          if (driver?.active !== true) return null;
+          return { userId: String(user.user_id), username: String(user.username), name: String(user.name || '') };
+        },
+        readTestRecipient: async (userId) => {
+          const { data: user, error: userError } = await admin.from('users')
+            .select('user_id,username,name,status').eq('user_id', userId).maybeSingle();
+          if (userError) throw userError;
+          if (!user) return null;
+          const { data: driver, error: driverError } = await admin.from('vehicle_dispatch_drivers')
+            .select('active').eq('user_id', userId).maybeSingle();
+          if (driverError) throw driverError;
+          const { data: binding, error: bindingError } = await admin.from('vehicle_driver_line_bindings')
+            .select('state').eq('user_id', userId).maybeSingle();
+          if (bindingError) throw bindingError;
+          return {
+            username: String(user.username || ''), name: String(user.name || ''),
+            active: user.status === 'active', driver_active: driver?.active === true,
+            linked: binding?.state === 'linked',
+          };
+        },
+        savePreferences: async (input) => {
+          const { error } = await admin.rpc('save_vehicle_line_notification_settings', {
+            p_personal_enabled: input.personal_enabled,
+            p_assignment_enabled: input.assignment_enabled,
+            p_assignment_revoked_enabled: input.assignment_revoked_enabled,
+            p_test_enabled: input.test_enabled,
+            p_test_recipient_user_id: input.test_recipient_user_id,
+            p_updated_by: input.updatedBy,
+          });
+          if (error) throw error;
+        },
+        createTestRun: async (actorId) => {
+          const { data, error } = await admin.rpc('create_vehicle_line_notification_test', { p_created_by: actorId });
+          if (error) throw error;
+          const runId = typeof data === 'string' ? data
+            : Array.isArray(data) && typeof data[0]?.create_vehicle_line_notification_test === 'string'
+              ? data[0].create_vehicle_line_notification_test : '';
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(runId)) {
+            throw new Error('test_run_unavailable');
+          }
+          return runId;
+        },
+        runTestWorker: async (testRunId) => {
+          const cronSecret = denoRuntime?.env?.get('CRON_SECRET') || nodeEnvironment?.CRON_SECRET || '';
+          if (!cronSecret) return false;
+          try {
+            const response = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/vehicle-line-dispatch-worker`, {
+              method: 'POST',
+              signal: AbortSignal.timeout(12_000),
+              headers: { 'content-type': 'application/json', 'apikey': ANON_KEY, 'x-cron-secret': cronSecret },
+              body: JSON.stringify({ mode: 'test', test_run_id: testRunId }),
+            });
+            const result = await response.json().catch(() => null);
+            return response.ok && result?.ok === true
+              && result?.data?.claimed === 1 && result?.data?.accepted === 1;
+          } catch {
+            return false;
+          }
+        },
+        audit: async (recordId, changes) => audit('vehicle_line_notification_settings', recordId, 'status_change', changes),
+      });
+      if (result) return reply(req, result.body, result.status);
+    }
     if (BOARD_NOTICE_ACTIONS.has(action)) {
       const result = await handleBoardNotices(admin, action, body, audit);
       return reply(req, result.body, result.status);
@@ -401,39 +492,24 @@ export async function handleAdminApiRequest(req: Request) {
       return reply(req, { ok: true, data: { line_token_configured: true } });
     }
 
-    if (action === 'admin_test_line_notification') {
-      try {
-        // Reuse line-notify's admin-only test path and its stored LINE credentials.
-        // Forward the user's JWT, never the service-role key or channel token.
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/line-notify`, {
-          method: 'POST',
-          signal: AbortSignal.timeout(10000),
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ test: true }),
-        });
-        const result = await response.json().catch(() => null);
-        const delivered = response.ok && result?.ok === true;
-        await audit('system_settings', 'line_test', 'status_change', {
-          result: delivered ? '送出' : '失敗',
-          http_status: response.status,
-        });
-        if (!delivered) {
-          const message = result?.msg === 'LINE not configured'
-            ? '尚未設定 LINE Channel Token 或群組 ID'
-            : result?.msg === 'LINE delivery failed'
-              ? 'LINE 平台拒絕推播，請檢查 Channel Token、群組 ID 及 Bot 是否在群組內'
-              : 'LINE 測試通知服務未能完成推播，請稍後再試';
-          return reply(req, { ok: false, message }, 502);
-        }
-        return reply(req, { ok: true, message: 'LINE 測試訊息已送出' });
-      } catch (error) {
-        await audit('system_settings', 'line_test', 'status_change', { result: '失敗', reason: '通知服務連線異常' });
-        console.error('LINE test notification failed:', error instanceof Error ? error.name : 'UnknownError');
-        return reply(req, { ok: false, message: 'LINE 測試通知服務連線逾時或無法使用' }, 502);
+    if (action === LINE_GROUP_TEST_ACTION) {
+      const result = await executeLineGroupTestAction(body, {
+        readSettings: async () => {
+          const { data, error } = await admin.from('system_settings')
+            .select('key,value').in('key', ['line_channel_token', 'line_group_id']);
+          if (error) throw new Error('line_settings_unavailable');
+          const settings = Object.fromEntries((data || []).map(row => [String(row.key), String(row.value ?? '')]));
+          return {
+            token: clean(settings.line_channel_token, 1000) || null,
+            groupId: clean(settings.line_group_id, 200) || null,
+          };
+        },
+        sendMessage: (token, groupId, text) => sendLineTextMessage({ token, recipient: groupId, text }),
+      });
+      if (result.audit) {
+        await audit('system_settings', 'line_group_test', 'status_change', result.audit);
       }
+      return reply(req, result.body, result.status);
     }
 
     if (action === 'admin_test_error_threshold_notification') {

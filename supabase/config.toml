@@ -33,3 +33,7 @@ verify_jwt = false
 # Scheduled worker accepts only the server-side CRON_SECRET.
 [functions.google-calendar-worker]
 verify_jwt = false
+
+# The vehicle dispatch worker authenticates every invocation with the server-side CRON_SECRET.
+[functions.vehicle-line-dispatch-worker]
+verify_jwt = false

@@ -33,7 +33,11 @@ const READ_ACTION_LABELS: Record<string, string> = {
 };
 
 // 公文流程動作固定走同源地端 app-api；名稱保留供既有路由相容。
-const EDGE_ONLY_ACTIONS = new Set(['official_document_create', 'official_document_action', 'business_handover_action', 'mechanical_handover_action']);
+// 車輛 LINE 綁定只在 Edge Function 實作（需讀寫伺服器端私有表），不經 Node 後端。
+const EDGE_ONLY_ACTIONS = new Set([
+  'official_document_create', 'official_document_action', 'business_handover_action', 'mechanical_handover_action',
+  'vehicle_line_link_start', 'vehicle_line_link_status', 'vehicle_line_unlink',
+]);
 
 const recordAppRead = (action: string) => {
   const label = READ_ACTION_LABELS[action];

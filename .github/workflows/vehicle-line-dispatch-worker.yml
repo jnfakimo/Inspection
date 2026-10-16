@@ -1,0 +1,36 @@
+name: Vehicle dispatch LINE worker
+
+# 每 5 分鐘處理一次公務車個人 LINE 通知佇列（指派／取消指派）。
+# 佇列只在後台「公務車個人 LINE 通知」開啟時才會有資料；開關關閉時 worker 不會送出任何訊息。
+# 呼叫方式與其他排程相同：x-cron-secret 由 Edge Function 端的 CRON_SECRET 驗證。
+on:
+  schedule:
+    # Offset from the top of the hour to avoid GitHub's busiest scheduler minute.
+    - cron: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: vehicle-dispatch-line-worker
+  cancel-in-progress: false
+
+jobs:
+  drain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger vehicle dispatch LINE worker
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --retry 2 --retry-all-errors \
+            --max-time 45 \
+            -X POST \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"mode":"production"}' \
+            https://qztffronusdhgxhjjubt.supabase.co/functions/v1/vehicle-line-dispatch-worker

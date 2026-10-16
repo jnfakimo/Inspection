@@ -10,6 +10,7 @@ import { invokeAdminApi } from '@/lib/admin-api';
 import { getSupabase } from '@/lib/supabase';
 import type { Profile } from '@/types/app';
 import styles from './settings.module.css';
+import VehicleLinePersonalPanel from './vehicle-line-personal-panel';
 
 type SectionKey = 'identity' | 'departments' | 'shifts' | 'line' | 'api';
 type Notice = { kind: 'success' | 'error' | 'info'; text: string } | null;
@@ -1047,7 +1048,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
         {section === 'identity' ? renderIdentity() : null}
         {section === 'departments' ? renderDepartments() : null}
         {section === 'shifts' ? renderShifts() : null}
-        {section === 'line' ? renderLine() : null}
+        {section === 'line' ? <>{renderLine()}<VehicleLinePersonalPanel onNotice={setNotice} /></> : null}
         {section === 'api' ? renderApiDocs() : null}
       </>
     );
