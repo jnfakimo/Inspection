@@ -30,11 +30,14 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
         const returnTo = `${location.pathname}${location.search}${location.hash}`;
         const patrolQrRoute = isPatrolQrDestination(returnTo);
         const { data } = await client.auth.getSession();
+        if (!active) return;
         const session = patrolQrRoute
           ? await ensurePatrolQrSession(client, data.session)
           : data.session;
+        if (!active) return;
         if (!session) {
           if (data.session) await client.auth.signOut({ scope: 'local' }).catch(() => {});
+          if (!active) return;
           clearProfile();
           setErrorTrackerUser(null);
           setSecurityAuditProfile(null);
@@ -62,6 +65,7 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
         }
         if (active) setProfile(current);
       } catch (error) {
+        if (!active) return;
         clearProfile();
         setErrorTrackerUser(null);
         setSecurityAuditProfile(null);

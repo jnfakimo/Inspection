@@ -11,12 +11,13 @@
 //   匯出統一為 .xlsx（與 2026-08-17 全站統一匯入匯出格式的決定一致），
 //   ExcelJS 以動態 import 載入，只有按下匯出時才下載該套件。
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase } from '@/lib/supabase';
+import { createRequestSequence } from '@/lib/request-sequence';
 import { recordSecurityAudit } from '@/lib/security-audit';
 import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
@@ -137,9 +138,12 @@ function AnalyticsModule({ module, profile }: Props) {
   const [reports, setReports] = useState<Report[]>([]);
   const [kpis, setKpis] = useState<Array<[string, string]>>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
+  const loadSequence = useRef(createRequestSequence());
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
     setBusy(true); setNote('');
+    try {
     const client = getSupabase();
     const toEnd = `${to}T23:59:59+08:00`, fromStart = `${from}T00:00:00+08:00`;
     const [r, o, c] = await Promise.all([
@@ -152,6 +156,7 @@ function AnalyticsModule({ module, profile }: Props) {
       client.from('cost_records').select('cost_id,cost_type,amount,vendor,cost_date,equipment(name)')
         .gte('cost_date', from).lte('cost_date', to).limit(1000),
     ]);
+    if (!loadSequence.current.isCurrent(sequence)) return;
     if (r.error || o.error || c.error) { setNote(`失敗：${errorMessage(r.error || o.error || c.error, '分析資料載入失敗')}`); setBusy(false); return; }
     const reqs = (r.data || []) as Row[], ords = (o.data || []) as Row[], costs = (c.data || []) as Row[];
 
@@ -221,8 +226,18 @@ function AnalyticsModule({ module, profile }: Props) {
       },
     ]);
     setBusy(false);
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return;
+      setNote(`載入失敗：${errorMessage(error, '分析資料讀取失敗')}`);
+      setReports([]); setKpis([]);
+    } finally {
+      if (loadSequence.current.isCurrent(sequence)) setBusy(false);
+    }
   }, [from, to]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
 
   // ExcelJS 以動態 import 載入，只有實際匯出時才下載該套件。
   const exportXlsx = async () => {

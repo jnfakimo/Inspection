@@ -6,6 +6,7 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { getSupabase } from '@/lib/supabase';
 import { invokeAdminApi } from '@/lib/admin-api';
 import { AdminHeader, type AdminProps, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row, StatusPill } from './shared';
+import { createRequestSequence } from '@/lib/request-sequence';
 
 const POLL_INTERVAL_MS = 45_000;
 const ACCOUNT_APPLICATION_RATE_LIMIT_SCOPE = 'username-login:account_application';
@@ -145,9 +146,11 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
   const [openCount, setOpenCount] = useState(0);
   const [updatedAt, setUpdatedAt] = useState('');
   const latestOpenSignal = useRef<string | null>(null);
+  const loadSequence = useRef(createRequestSequence());
   const isSystemAdmin = profile.rbac_role === 'sysadmin' || profile.role === 'admin';
 
   const load = useCallback(async (silent = false) => {
+    const sequence = loadSequence.current.begin();
     if (!silent) setBusy(true);
     if (!silent) setNote('');
     try {
@@ -181,6 +184,7 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
           .order('last_seen_at', { ascending: false })
           .limit(1),
       ]);
+      if (!loadSequence.current.isCurrent(sequence)) return;
       if (result.error) throw result.error;
       if (openProbe.error) throw openProbe.error;
 
@@ -200,6 +204,7 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
       }).filter(Boolean).map(String)));
       if (ids.length) {
         const userResult = await getSupabase().from('users').select('user_id,name,username').in('user_id', ids);
+        if (!loadSequence.current.isCurrent(sequence)) return;
         if (!userResult.error) {
           setUsers(Object.fromEntries((userResult.data || []).map(user => [String(user.user_id), `${user.name || '未命名'}${user.username ? `（${user.username}）` : ''}`])));
         }
@@ -217,14 +222,18 @@ export function AlertsAdminV2({ profile, module }: AdminProps) {
       setOpenCount(nextOpenCount);
       setUpdatedAt(new Date().toISOString());
     } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return;
       if (!silent) setAlerts([]);
       setNote(`失敗：${errorMessage(error, '資安告警載入失敗')}`);
     } finally {
-      if (!silent) setBusy(false);
+      if (loadSequence.current.isCurrent(sequence)) setBusy(false);
     }
   }, [alertType, from, ip, page, query, severity, status, to]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
   useEffect(() => {
     const timer = window.setInterval(() => { if (!document.hidden) void load(true); }, POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);

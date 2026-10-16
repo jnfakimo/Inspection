@@ -13,7 +13,7 @@
 //   create_meeting_booking_change_request / respond_meeting_booking_change_request /
 //   app-api 的 meeting_check_in 與 meeting_save_room
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import '@/app/meetingroom-v1.css';
@@ -23,6 +23,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { canonicalFloor } from '@/lib/floor';
 import { invokeGoogleCalendar, openPersonalProfile, type GoogleCalendarStatus } from '@/lib/google-calendar';
 import { selectableActiveUsers } from '@/lib/user-visibility';
+import { createRequestSequence } from '@/lib/request-sequence';
 import { AdminHeader, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -160,13 +161,16 @@ function MeetingRoomPage({ module, profile }: Props) {
   const [changeFor, setChangeFor] = useState<Row | null>(null);
   const [roomAdmin, setRoomAdmin] = useState(module.key === 'rooms');
   const [tick, setTick] = useState(Date.now());
+  const loadSequence = useRef(createRequestSequence());
 
   useEffect(() => { const t = window.setInterval(() => setTick(Date.now()), 60_000); return () => window.clearInterval(t); }, []);
 
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
 
   const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
     setBusy(true); setNote('');
+    try {
     const client = getSupabase();
     const from = isoDate(days[0]), to = isoDate(days[6]);
     const [r, w, mine, req, u, me] = await Promise.all([
@@ -181,7 +185,9 @@ function MeetingRoomPage({ module, profile }: Props) {
       client.from('users').select('user_id,name,username,email,department,status').eq('status', 'active').order('name').limit(1000),
       client.from('users').select('phone').eq('user_id', profile.user_id).maybeSingle(),
     ]);
+    if (!loadSequence.current.isCurrent(sequence)) return;
     if (r.error || w.error) setNote(`失敗：${errorMessage(r.error || w.error, '會議室資料載入失敗')}`);
+    if (mine.error || req.error || u.error || me.error) setNote(`部分資料載入失敗：${errorMessage(mine.error || req.error || u.error || me.error, '會議資料讀取失敗')}`);
     setRooms((r.data || []).map(row => ({ ...row, floor: canonicalFloor(row.floor) })));
     setWeekBookings(w.data || []);
     setMyBookings((mine.data || []).map(row => {
@@ -191,8 +197,18 @@ function MeetingRoomPage({ module, profile }: Props) {
     setRequests(req.data || []); setUsers(selectableActiveUsers(u.data || []));
     setMyPhone(String((me.data as Row)?.phone || ''));
     setBusy(false);
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return;
+      setNote(`載入失敗：${errorMessage(error, '會議室資料讀取失敗')}`);
+      setRooms([]); setWeekBookings([]); setMyBookings([]); setRequests([]); setUsers([]); setMyPhone('');
+    } finally {
+      if (loadSequence.current.isCurrent(sequence)) setBusy(false);
+    }
   }, [days, profile.user_id]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
   const loadCalendarStatus = useCallback(async () => {
     try { setCalendarStatus(await invokeGoogleCalendar<GoogleCalendarStatus>('status')); }
     catch { setCalendarStatus(null); }

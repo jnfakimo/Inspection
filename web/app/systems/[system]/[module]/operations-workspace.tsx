@@ -12,6 +12,7 @@ import type { Profile } from '@/types/app';
 import { PatrolWorkspace } from './patrol-workspace';
 import { HandoverModules } from './handover-workspace';
 import { canonicalFloor, floorOrder } from '@/lib/floor';
+import { createRequestSequence } from '@/lib/request-sequence';
 import { formatTaipeiCheckinAt, patrolCheckinConfirmation, type PatrolCheckinResult } from '@/lib/patrol-checkin';
 
 type Row = Record<string, any>;
@@ -30,8 +31,35 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
   const [qrTarget, setQrTarget] = useState<{ markerId: string; source: 'qr' | 'nfc' } | null>(null);
   const autoCheckinRef = useRef('');
   // 與「巡邏點」頁共用啟用中的 plan_markers 作為唯一母數；停用點只保留歷史打卡，不進入當日矩陣。
-  const load = useCallback(async () => { setBusy(true); try { const [data, markerResult, scheduleResult, floorResult] = await Promise.all([invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }), client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label').limit(1000), getPatrolShiftsForDate(client, date), client.from('floor_models').select('floor_id,name,level').limit(200)]); setRows((data.rows || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setPoints((markerResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setFloorModels((floorResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) }))); setSchedules(scheduleResult.filter(row => !isDeletedShift(row.name))); } catch (error) { setNote(error instanceof Error ? error.message : '巡檢資料載入失敗'); } finally { setBusy(false); setLoaded(true); } }, [client, date]);
-  useEffect(() => { void load(); }, [load]);
+  const loadSequence = useRef(createRequestSequence());
+  const load = useCallback(async () => {
+    const sequence = loadSequence.current.begin();
+    setBusy(true); setNote('');
+    try {
+      const [data, markerResult, scheduleResult, floorResult] = await Promise.all([
+        invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }),
+        client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label').limit(1000),
+        getPatrolShiftsForDate(client, date),
+        client.from('floor_models').select('floor_id,name,level').limit(200),
+      ]);
+      if (!loadSequence.current.isCurrent(sequence)) return;
+      const queryError = markerResult.error || floorResult.error;
+      if (queryError) setNote('部分資料載入失敗：' + (queryError.message || '請稍後重試'));
+      setRows((data.rows || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
+      setPoints((markerResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
+      setFloorModels((floorResult.data || []).map(row => ({ ...row, floor_id: canonicalFloor(row.floor_id) })));
+      setSchedules(scheduleResult.filter(row => !isDeletedShift(row.name)));
+    } catch (error) {
+      if (!loadSequence.current.isCurrent(sequence)) return;
+      setNote(error instanceof Error ? '巡檢資料載入失敗：' + error.message : '巡檢資料載入失敗，請稍後重試');
+    } finally {
+      if (loadSequence.current.isCurrent(sequence)) { setBusy(false); setLoaded(true); }
+    }
+  }, [client, date]);
+  useEffect(() => {
+    void load();
+    return () => loadSequence.current.invalidate();
+  }, [load]);
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const markerId = params.get('marker')?.trim() || '';
