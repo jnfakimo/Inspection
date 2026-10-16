@@ -244,3 +244,6 @@
   `request-sequence` 丟棄過期回應並於卸載時作廢；查詢失敗不顯示假的空清單；權限頁任一授權來源失敗即封鎖編輯；AuthGate 過期回應不得清除登入者。
   `dashboard-client`、`workorder-extras` 以三方合併保留 main 的後續修改。測試：`async-load-safety.test.ts`（Codex 完整版＋補充）、`request-sequence.test.ts`、`not-found-page.test.mjs`。
 - 待決定：設備營運／能源面板（見 handoff 4a）。未驗證：登入後畫面。
+- 2026-10-16 追加（PR #86）：使用者決定能源面板先上線。中央監控（`equipment_monitor_events`）頁上方顯示 Codex 的 `equipment-operations-energy`；
+  已接上監控告警，其餘標示「待介接」。Codex 元件測試 9 項接入 `npm test`，並改對應色彩統一後的 token、以實體檔案載入取代 `new Function`（Semgrep 規則）。
+  正式站已部署（Pages run 38878399649），未登入實測畫面。
