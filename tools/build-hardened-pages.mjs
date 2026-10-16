@@ -132,6 +132,25 @@ async function copyRuntimeFiles() {
   }
 }
 
+// GitHub Pages 只讀取網站根目錄的 404.html；Next 匯出的繁中 404 頁在 v2/ 底下，
+// 必須在加上 CSP 與來源指紋之後、簽章之前複製到根目錄，否則不存在的網址會顯示 GitHub 預設英文頁。
+// 頁內資源與「返回首頁」都是 /Inspection/v2/ 開頭的絕對路徑，放在根目錄也能正常載入。
+async function publishRootNotFoundPage() {
+  const candidates = [path.join(outputV2Root, '404.html'), path.join(outputV2Root, '404', 'index.html')];
+  for (const candidate of candidates) {
+    try {
+      const html = await readFile(candidate, 'utf8');
+      if (!html.includes('找不到頁面')) throw new Error(`${toPosix(path.relative(outputRoot, candidate))} 不是繁中 404 頁，請確認 web/app/not-found.tsx`);
+      await cp(candidate, path.join(outputRoot, '404.html'));
+      console.log(`根目錄 404 頁：${toPosix(path.relative(outputRoot, candidate))} → 404.html`);
+      return;
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  throw new Error('Next 匯出結果缺少 404 頁（web/app/not-found.tsx），無法發布根目錄 404.html');
+}
+
 async function rewriteV2BasePaths() {
   const files = await listFiles(outputV2Root);
   const textExtensions = new Set(['.html', '.css', '.js', '.json', '.webmanifest']);
@@ -419,6 +438,7 @@ await mkdir(outputSystemRoot, { recursive: true });
 await copyRuntimeFiles();
 await rewriteV2BasePaths();
 await minifyRuntimeCode();
+await publishRootNotFoundPage();
 await writeFile(path.join(outputRoot, '.nojekyll'), '', 'utf8');
 // 專案路徑內的 robots.txt 僅作輔助；正式爬蟲規則仍須由網域根路徑提供。
 await writeFile(
