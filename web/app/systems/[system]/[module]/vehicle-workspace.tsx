@@ -23,6 +23,7 @@ import { useFleetRole } from '@/lib/fleet-role';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
+import VehicleLineLinkSection from '@/components/VehicleLineLinkSection';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
@@ -362,6 +363,9 @@ function RequestsModule({ module, profile }: Props) {
     <div className="vehicle-request-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
+
+    {/* 駕駛本人的 LINE 個人派車通知綁定入口（與個人資料設定共用同一元件） */}
+    {isDriver && <VehicleLineLinkSection index="LINE" />}
 
     {/* 申請、兩層核准、派車與回報的五步驟流程 */}
     <div className="vehicle-flow-grid">
