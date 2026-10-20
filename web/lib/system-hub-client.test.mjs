@@ -4,8 +4,8 @@ import test from 'node:test';
 
 const source = readFileSync(new URL('../app/systems/[system]/system-hub-client.tsx', import.meta.url), 'utf8');
 
-test('handover root renders all seven permission-filtered subsystem cards', () => {
-  const keys = ['records', 'mechanical', 'business', 'guard', 'open-items', 'equipment', 'mechanical-schedule'];
+test('handover root renders all eight permission-filtered subsystem cards', () => {
+  const keys = ['records', 'mechanical', 'business', 'fruit', 'guard', 'open-items', 'equipment', 'mechanical-schedule'];
   assert.match(source, /system\.key === 'handover' \|\| system\.key === 'guardpatrol'/);
   assert.match(source, /const handover = system\.key === 'handover';/);
   for (const key of keys) assert.match(source, new RegExp("\\['" + key + "',"));

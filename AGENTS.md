@@ -27,7 +27,7 @@
   C 內不在 G 的舊檔（例如已刪除的 CSS）會被守門測試掃到，同步後要先清掉。
 - 不啟停使用中的 server（C runtime 的 Node 監聽 127.0.0.1:3000）、不 build、不連 production，除非使用者明確授權。
 
-## 3. 資訊架構：1 個主入口、13 大系統、67 個子系統
+## 3. 資訊架構：1 個主入口、13 大系統、68 個子系統
 
 唯一正本：`web/lib/modules.ts`（`m()` 有頁面的子系統、`mp()` 只有權限沒有頁面的項目）。
 新增大系統流程見 `docs/DOMAIN_RULES.md`「權限四層與系統清單的唯一正本」。
@@ -37,7 +37,7 @@
 | SYS-01 | admin | 後台管理系統 | 11 |
 | SYS-02 | workorder | 報修／派工／完工 | 6 |
 | SYS-03 | guardpatrol | 駐衛警巡邏系統 | 6 |
-| SYS-04 | handover | 電子交接簿 | 7 |
+| SYS-04 | handover | 電子交接簿 | 8 |
 | SYS-05 | equipment | 設備建置系統 | 8 |
 | SYS-06 | structuremap | 專案關係與設備圖臺 | 6 |
 | SYS-07 | vehicle | 公務車派車管理 | 5 |

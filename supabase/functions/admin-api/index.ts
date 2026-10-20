@@ -32,7 +32,7 @@ const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_sup
 // 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
 const ADMIN_CONTRACT_VERSION = 2;
 const PERMISSIONS = new Set(['create', 'update', 'delete', 'read', 'dispatch', 'close', 'sign', 'export', 'admin', 'sys_admin', 'sys_workorder', 'sys_guardpatrol', 'sys_handover', 'sys_equipment', 'sys_equipment_manage', 'sys_structuremap', 'sys_vehicle', 'sys_meetingroom', 'sys_officialdocs', 'sys_marketanalytics', 'sys_dashboard', 'sys_marketboard', 'sys_vehicletracking', 'marketanalytics_manage']);
-const HANDOVER_MODULES = new Set(['records', 'mechanical', 'business', 'guard', 'guard-approve', 'open-items', 'equipment', 'mechanical-schedule']);
+const HANDOVER_MODULES = new Set(['records', 'mechanical', 'business', 'fruit', 'guard', 'guard-approve', 'open-items', 'equipment', 'mechanical-schedule']);
 const SYSTEM_MODULES: Record<string, ReadonlySet<string>> = {
   admin: new Set(['users', 'permissions', 'locations', 'audit', 'alerts', 'notices', 'layouts', 'cycles', 'costs', 'locanalysis', 'health']),
   workorder: new Set(['requests', 'dispatch', 'orders', 'attachments', 'analytics', 'repairmap3d']),
