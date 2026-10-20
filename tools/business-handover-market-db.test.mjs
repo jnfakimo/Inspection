@@ -86,7 +86,7 @@ try {
   };
   for (const stage of ['deputy_director', 'director', 'deputy_manager', 'manager']) {
     await assertApproval(sysadmin, 'market_1', stage, true, `sysadmin can approve ${stage} in market_1`);
-    await assertApproval(sysadmin, 'market_2', stage, true, `sysadmin can approve ${stage} in market_2`);
+    await assertApproval(sysadmin, 'market_2', stage, stage !== 'deputy_director', `sysadmin ${stage === 'deputy_director' ? 'cannot approve the stage that market 2 does not have' : `can approve ${stage}`} in market_2`);
     await assertApproval(one, 'market_1', stage, false, `reporter cannot approve ${stage}`);
     await assertApproval(inactiveSupervisor, 'market_1', stage, false, `inactive supervisor cannot approve ${stage}`);
     await assertApproval(deidentifiedSupervisor, 'market_1', stage, false, `deidentified supervisor cannot approve ${stage}`);
@@ -105,10 +105,23 @@ try {
   await assertApproval(marketOneGrandchild, 'market_1', 'deputy_manager', false, 'only one level below → no deputy-manager stage');
   await assertApproval(marketOneSupervisor, 'market_1', 'manager', true, 'three-level chain (Leaf) → manager stage');
   await assertApproval(marketOneChild, 'market_1', 'manager', false, 'only two levels below → no manager stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_director', true, 'market 2 supervisor can approve its deputy-director stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'director', false, 'market 2 supervisor without direct report cannot approve director stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_manager', false, 'market 2 supervisor without two-level chain cannot approve deputy-manager stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'manager', false, 'market 2 supervisor without three-level chain cannot approve manager stage');
+  // 二市場尚未啟用副主任關卡：維持原三階（主任＝該市場主管、副理＝往下 1 層、經理＝往下 2 層），沒有副主任這一階。
+  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_director', false, 'market 2 has no deputy-director stage yet');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'director', true, 'market 2 supervisor can approve the director stage exactly as before');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_manager', false, 'market 2 supervisor without direct report cannot approve deputy-manager stage');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'manager', false, 'market 2 supervisor without two-level chain cannot approve manager stage');
+  // 二市場三階鏈：新增 Boss（有一位直屬部屬是二市場主管）與 Top（再往上一層），與原本的三階判斷相同。
+  await query(`insert into users(user_id,name,status,username,department,rbac_role,role,supervisor_id)
+    values('00000000-0000-0000-0000-00000000000b','二市中階','active','m2-mid','market_2','unit_supervisor','supervisor',null),
+      ('00000000-0000-0000-0000-00000000000c','二市高階','active','m2-top','market_2','unit_supervisor','supervisor',null)`);
+  await query(`update users set supervisor_id='00000000-0000-0000-0000-00000000000b' where user_id=$1`, [marketTwoSupervisor]);
+  await query(`update users set supervisor_id='00000000-0000-0000-0000-00000000000c' where user_id='00000000-0000-0000-0000-00000000000b'`);
+  // 鏈：Top > Mid > marketTwoSupervisor（Mid、Top 的單位也是二市場，所以同樣算二市場主管）。
+  const m2Mid = '00000000-0000-0000-0000-00000000000b', m2Top = '00000000-0000-0000-0000-00000000000c';
+  await assertApproval(m2Mid, 'market_2', 'deputy_manager', true, 'market 2: a direct report who is a market supervisor → deputy-manager stage (unchanged)');
+  await assertApproval(m2Mid, 'market_2', 'manager', false, 'market 2: only one level below → not the manager stage');
+  await assertApproval(m2Top, 'market_2', 'deputy_manager', true, 'market 2: Top supervises Mid, a market supervisor → deputy-manager stage');
+  await assertApproval(m2Top, 'market_2', 'manager', true, 'market 2: two-level chain (Mid → marketTwoSupervisor) → manager stage (unchanged)');
   await assertApproval(marketOneSupervisor, 'market_1', 'unknown_stage', false, 'unknown approval stage is denied');
   await actor(one);
   await query(`insert into business_handover_entries(market_code,handover_date,shift_code,description,created_by,updated_by)
@@ -171,20 +184,20 @@ try {
     }
     // 副主任關卡：主任須在同市場、同日的副主任批核之後才能批核；關卡生效日之前的歷史日期不受限。
     await query('reset role');
-    const effective = (await query(`select public.business_deputy_director_effective_date()::text d`)).rows[0].d;
-    assert.equal(effective, '2026-10-21');
+    const effectiveOf = async market => (await query(`select public.business_deputy_director_effective_date($1)::text d`, [market])).rows[0].d;
+    assert.equal(await effectiveOf('market_1'), '2026-10-21');
+    assert.equal(await effectiveOf('market_2'), 'infinity', '二市場尚未啟用副主任關卡');
+    assert.equal(await effectiveOf('market_3'), 'infinity', '沒有列出的市場一律不啟用');
     const gateDay = '2026-10-22';
     const gateInsert = (market, stage, approver, day = gateDay) => query(
       `insert into business_handover_approvals(market_code,handover_date,stage,stage_label,approver_id) values($1,$2,$3,$4,$5)`,
       [market, day, stage, stage, approver]);
     await assert.rejects(gateInsert('market_1', 'director', marketOneSupervisor), /請先由一市場副主任批核，一市場主任才能批核/,
       '沒有副主任批核時，主任不能批核');
-    await assert.rejects(gateInsert('market_2', 'director', marketTwoSupervisor), /請先由二市場副主任批核，二市場主任才能批核/,
-      '二市場同樣要先經副主任，訊息帶二市場');
+    await gateInsert('market_2', 'director', marketTwoSupervisor).catch(() => { throw new Error('二市場尚未啟用副主任關卡，主任不應被擋下'); });
     await gateInsert('market_1', 'deputy_director', marketOneLeaf);
     await gateInsert('market_1', 'director', marketOneSupervisor);
-    await assert.rejects(gateInsert('market_2', 'director', marketTwoSupervisor), /二市場副主任/,
-      '一市場的副主任批核不能讓二市場的主任通過');
+    // 二市場的主任批核與一市場的副主任批核互不影響（上面已先寫入二市場主任，這裡確認一市場的批核不會誤擋）。
     await gateInsert('market_1', 'deputy_manager', marketOneSupervisor);
     await assert.rejects(gateInsert('market_1', 'unknown_stage', marketOneSupervisor), /business_handover_stage_check/, '階段檢查只接受四個階段');
     await gateInsert('market_1', 'director', marketOneSupervisor, '2026-10-20').catch(() => { throw new Error('生效日之前的歷史日期不應受副主任關卡限制'); });

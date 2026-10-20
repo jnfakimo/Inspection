@@ -64,10 +64,10 @@ export const APPROVAL_STAGES: { stage: ApprovalStage; label: string; title: stri
   { stage: 'manager', label: '營業部經理', title: '營業部經理批核', desc: '營業部經理決行核定' },
 ];
 
-/** 該交接日要顯示的批核階段（依序），標籤帶入所屬市場；生效日之前的歷史日期不含副主任。 */
+/** 該市場與交接日要顯示的批核階段（依序），標籤帶入所屬市場；尚未啟用副主任關卡的市場（二市場）與啟用日之前的歷史日期維持三階。 */
 export function approvalStageItems(market: HandoverMarket, date: string, approvals: Array<{ stage: string }>) {
   const name = businessMarketName(market);
-  return businessApprovalStagesFor(date, approvals.map(approval => approval.stage)).map(stage => {
+  return businessApprovalStagesFor(market, date, approvals.map(approval => approval.stage)).map(stage => {
     const base = APPROVAL_STAGES.find(item => item.stage === stage) as (typeof APPROVAL_STAGES)[number];
     if (stage === 'deputy_director') return { ...base, label: name + '副主任', title: name + '副主任批核', desc: HANDOVER_MARKETS[market].name + '副主任初核點檢與交接事項' };
     if (stage === 'director') return { ...base, label: name + '主任', title: name + '主任批核', desc: HANDOVER_MARKETS[market].name + '主任查核點檢與交接事項' };
