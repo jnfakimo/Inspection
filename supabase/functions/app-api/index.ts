@@ -3986,14 +3986,16 @@ export async function handleAppApiRequest(req: Request) {
         const stage = text(body.stage, 30);
         const noteText = text(body.note, 1000) || null;
         if (!validISODate(handoverDate)) return reply(req, { ok: false, message: '交接日期格式無效' }, 400);
-        if (!['director', 'deputy_manager', 'manager'].includes(stage)) {
+        if (!['deputy_director', 'director', 'deputy_manager', 'manager'].includes(stage)) {
           return reply(req, { ok: false, message: '批核階段無效' }, 400);
         }
         const { data: approvalAllowed, error: approvalAccessError } = await userDb.rpc('business_market_can_approve', { p_market: businessMarket, p_stage: stage });
         if (approvalAccessError) throw approvalAccessError;
         if (approvalAllowed !== true) return reply(req, { ok: false, message: '目前帳號不在所選市場的本階主管組織鍊，無法批核' }, 403);
+        const marketName = businessMarket === 'market_2' ? '二市場' : '一市場';
         const stageLabels: Record<string, string> = {
-          director: businessMarket === 'market_2' ? '二市場主任' : '一市場主任',
+          deputy_director: marketName + '副主任',
+          director: marketName + '主任',
           deputy_manager: '營業部副理',
           manager: '營業部經理',
         };

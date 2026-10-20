@@ -1,7 +1,7 @@
 'use client';
 
 // SYS-04 業管組電子交接簿。
-// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表、三級主管批核（一市場主任、營業部副理、營業部經理）與每日 A4精準列印／預覽報表。
+// 包含：三班交接事項、出勤摘要、異動時間紀錄、崗位時段勤務點檢表、四階主管批核（市場副主任、市場主任、營業部副理、營業部經理）與每日 A4精準列印／預覽報表。
 // 風格與駐警隊交接簿統一，支援當班時段光暈閃爍提示與點檢表預設收合展開。
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -11,8 +11,11 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { selectableActiveUsers } from '@/lib/user-visibility';
 import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import {
+  businessApprovalGateReason,
   businessApprovalPresentation,
   businessApprovalReadonlyReason,
+  businessApprovalStagesFor,
+  businessMarketName,
   emptyBusinessApprovalAccess,
   type BusinessApprovalAccess,
   type BusinessApprovalStage,
@@ -55,10 +58,22 @@ export type ApprovalStage = BusinessApprovalStage;
 type ApprovalAccessState = BusinessApprovalAccess;
 
 export const APPROVAL_STAGES: { stage: ApprovalStage; label: string; title: string; desc: string }[] = [
+  { stage: 'deputy_director', label: '市場副主任', title: '市場副主任批核', desc: '所屬市場副主任初核點檢與交接事項' },
   { stage: 'director', label: '市場主任', title: '市場主任批核', desc: '所屬市場主任查核點檢與交接事項' },
   { stage: 'deputy_manager', label: '營業部副理', title: '營業部副理批核', desc: '營業部副理複核業務執行狀況' },
   { stage: 'manager', label: '營業部經理', title: '營業部經理批核', desc: '營業部經理決行核定' },
 ];
+
+/** 該市場與交接日要顯示的批核階段（依序），標籤帶入所屬市場；尚未啟用副主任關卡的市場（二市場）與啟用日之前的歷史日期維持三階。 */
+export function approvalStageItems(market: HandoverMarket, date: string, approvals: Array<{ stage: string }>) {
+  const name = businessMarketName(market);
+  return businessApprovalStagesFor(market, date, approvals.map(approval => approval.stage)).map(stage => {
+    const base = APPROVAL_STAGES.find(item => item.stage === stage) as (typeof APPROVAL_STAGES)[number];
+    if (stage === 'deputy_director') return { ...base, label: name + '副主任', title: name + '副主任批核', desc: HANDOVER_MARKETS[market].name + '副主任初核點檢與交接事項' };
+    if (stage === 'director') return { ...base, label: name + '主任', title: name + '主任批核', desc: HANDOVER_MARKETS[market].name + '主任查核點檢與交接事項' };
+    return base;
+  });
+}
 
 export type BusinessApproval = {
   approval_id?: string;
@@ -201,11 +216,10 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
 
   // 批核意見暫存與彈窗狀態
-  const [approvalStageNote, setApprovalStageNote] = useState<Record<ApprovalStage, string>>({
-    director: '',
-    deputy_manager: '',
-    manager: '',
-  });
+  // 點選「批核」會先開啟報表預覽，在預覽中填說明並確認批核。
+  const [approvalPreviewStage, setApprovalPreviewStage] = useState<ApprovalStage | null>(null);
+  const [previewApprovalNote, setPreviewApprovalNote] = useState('');
+  const [previewApprovalError, setPreviewApprovalError] = useState('');
   const [approvingStage, setApprovingStage] = useState<ApprovalStage | null>(null);
   const [modalApprovalNote, setModalApprovalNote] = useState('');
 
@@ -514,13 +528,21 @@ export function BusinessHandover({ system, module, profile }: Props) {
     if (!stageItem) return;
     if (approvalAccess[stage] !== 'allowed') {
       setNote(businessApprovalReadonlyReason(approvalAccess[stage]));
+      setPreviewApprovalError(businessApprovalReadonlyReason(approvalAccess[stage]));
+      return;
+    }
+    const gateReason = businessApprovalGateReason(stage, date, approvals.map(approval => approval.stage), market);
+    if (gateReason) {
+      setNote(gateReason);
+      setPreviewApprovalError(gateReason);
       return;
     }
     if (approvalSubmitRef.current) return;
     approvalSubmitRef.current = true;
-    const noteContent = customNote !== undefined ? customNote : approvalStageNote[stage] || '';
+    const noteContent = customNote ?? '';
     setBusy(true);
     setNote('');
+    setPreviewApprovalError('');
 
     try {
       await invokeAppApi('handover_save', {
@@ -533,9 +555,13 @@ export function BusinessHandover({ system, module, profile }: Props) {
 
       setApprovingStage(null);
       setModalApprovalNote('');
+      setApprovalPreviewStage(null);
+      setPreviewApprovalNote('');
       await load();
     } catch (err) {
-      setNote(`失敗：批核未儲存，${errorMessage(err)}`);
+      const failure = `失敗：批核未儲存，${errorMessage(err)}`;
+      setNote(failure);
+      setPreviewApprovalError(failure);
     } finally {
       approvalSubmitRef.current = false;
       setBusy(false);
@@ -568,11 +594,23 @@ export function BusinessHandover({ system, module, profile }: Props) {
     window.print();
   };
 
-  const approvedCount = approvals.length;
-  const marketDirectorLabel = market === 'market_2' ? '二市場主任' : '一市場主任';
-  const approvalStages = APPROVAL_STAGES.map(stage => stage.stage === 'director'
-    ? { ...stage, label: marketDirectorLabel, title: `${marketDirectorLabel}批核`, desc: `${HANDOVER_MARKETS[market || 'market_1'].name}主任查核點檢與交接事項` }
-    : stage);
+  const approvalStages = approvalStageItems(market || 'market_1', date, approvals);
+  const approvedCount = approvalStages.filter(item => approvals.some(approval => approval.stage === item.stage)).length;
+  const approvalStageTotal = approvalStages.length;
+  const approvedStageKeys = approvals.map(approval => approval.stage);
+  const openApprovalPreview = (stage: ApprovalStage) => {
+    setPreviewApprovalNote('');
+    setPreviewApprovalError('');
+    setApprovalPreviewStage(stage);
+  };
+  const closePreview = () => {
+    setPreviewOpen(false);
+    setApprovalPreviewStage(null);
+    setPreviewApprovalError('');
+  };
+  const previewStageItem = approvalPreviewStage ? approvalStages.find(item => item.stage === approvalPreviewStage) ?? null : null;
+  const previewGateReason = approvalPreviewStage ? businessApprovalGateReason(approvalPreviewStage, date, approvedStageKeys, market) : '';
+  const previewCanApprove = Boolean(approvalPreviewStage) && approvalAccess[approvalPreviewStage as ApprovalStage] === 'allowed' && !previewGateReason;
 
   const isItemCompleted = useCallback((id: string) => checks[id]?.status === 'completed', [checks]);
   const visibleSlots = useMemo(
@@ -933,7 +971,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
           </div>
         </section>
 
-        {/* 主管三級批核流程區塊 (一市場主任、營業部副理、營業部經理) */}
+        {/* 主管四階批核流程區塊（市場副主任、市場主任、營業部副理、營業部經理；歷史日期維持三階） */}
         <section className="business-approval-section panel" aria-label="主管批核流程">
           <div className="business-approval-head">
             <div className="business-approval-title">
@@ -942,23 +980,24 @@ export function BusinessHandover({ system, module, profile }: Props) {
               </span>
               <div>
                 <strong>業管組主管批核流程</strong>
-                <span>三階段簽核（各階段依授權）：{marketDirectorLabel}／營業部副理／營業部經理（可輸入批核意見）</span>
+                <span>{approvalStageTotal} 階段簽核（依序、各階段依授權）：{approvalStages.map(item => item.label).join('／')}（批核前會先預覽本日報表，可輸入批核意見）</span>
               </div>
             </div>
             <div className="business-approval-progress">
-              <span className={`business-approval-badge ${approvedCount === 3 ? 'is-all-approved' : 'is-partial'}`}>
-                {approvedCount === 3 ? '✓ 三級批核完成' : `批核進度：${approvedCount} / 3 階段`}
+              <span className={`business-approval-badge ${approvedCount === approvalStageTotal ? 'is-all-approved' : 'is-partial'}`}>
+                {approvedCount === approvalStageTotal ? '✓ 批核全部完成' : `批核進度：${approvedCount} / ${approvalStageTotal} 階段`}
               </span>
             </div>
           </div>
 
-          <div className="business-approval-stages-grid">
+          <div className={`business-approval-stages-grid${approvalStageTotal === 4 ? ' is-four' : ''}`}>
             {approvalStages.map((stageItem, stageIdx) => {
               const stageApproval = approvals.find(a => a.stage === stageItem.stage);
               const isApproved = Boolean(stageApproval);
               const stageAccess = approvalAccess[stageItem.stage];
               const presentation = businessApprovalPresentation(isApproved, stageAccess);
-              const canApprove = presentation.canSubmit || presentation.canEditSaved;
+              const gateReason = isApproved ? '' : businessApprovalGateReason(stageItem.stage, date, approvedStageKeys, market);
+              const canApprove = (presentation.canSubmit && !gateReason) || presentation.canEditSaved;
               const readOnlyReason = businessApprovalReadonlyReason(stageAccess);
 
               return (
@@ -1015,30 +1054,15 @@ export function BusinessHandover({ system, module, profile }: Props) {
                     </div>
                   ) : (
                     <div className="business-stage-pending-info">
-                      <label className="business-note-input-label">
-                        <span>簽核說明（可留白）：</span>
-                        <input
-                          type="text"
-                          className="business-note-input"
-                          placeholder="例如：查核無誤、同意備查、請加強巡檢..."
-                          value={approvalStageNote[stageItem.stage]}
-                          readOnly={!canApprove || busy}
-                          aria-readonly={!canApprove || busy || undefined}
-                          onChange={e =>
-                            setApprovalStageNote(prev => ({
-                              ...prev,
-                              [stageItem.stage]: e.target.value,
-                            }))
-                          }
-                        />
-                      </label>
+                      <p className="business-stage-preview-hint">點選後先預覽本日報表，確認內容後再批核。</p>
                       {readOnlyReason && <p className="business-approval-readonly" role="status">{readOnlyReason}</p>}
+                      {!readOnlyReason && gateReason && <p className="business-approval-readonly" role="status">{gateReason}</p>}
                       <button
                         type="button"
                         className="primary-btn compact business-approve-btn"
                         disabled={busy || !canApprove}
-                        title={readOnlyReason || undefined}
-                        onClick={() => void handleApproveStage(stageItem.stage)}
+                        title={readOnlyReason || gateReason || undefined}
+                        onClick={() => openApprovalPreview(stageItem.stage)}
                       >
                         <BusinessIcon name="check" size={14} />
                         {stageItem.label} 批核
@@ -1068,16 +1092,16 @@ export function BusinessHandover({ system, module, profile }: Props) {
       </div>
 
       {/* 螢幕上預覽本日報表彈窗 (與 A4 列印完全一致) */}
-      {previewOpen && (
+      {(previewOpen || approvalPreviewStage) && (
         <div
-          className="business-report-preview"
+          className={`business-report-preview${previewStageItem ? ' has-approval' : ''}`}
           role="dialog"
           aria-modal="true"
-          aria-label="業管組交接本日報表預覽"
+          aria-label={previewStageItem ? `${previewStageItem.label}批核前預覽` : '業管組交接本日報表預覽'}
         >
           <div className="business-report-preview-bar">
             <div>
-              <strong>本日報表預覽（A4版面）</strong>
+              <strong>{previewStageItem ? `${previewStageItem.label}批核前預覽（A4版面）` : '本日報表預覽（A4版面）'}</strong>
               <span>{rocDate(date)} · A4 直式排版；預覽依章節分頁，實際列印依內容跨頁</span>
             </div>
             <div className="business-report-preview-actions">
@@ -1085,7 +1109,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 type="button"
                 className="primary-btn compact"
                 onClick={() => {
-                  setPreviewOpen(false);
+                  closePreview();
                   setTimeout(() => window.print(), 100);
                 }}
               >
@@ -1095,16 +1119,50 @@ export function BusinessHandover({ system, module, profile }: Props) {
               <button
                 type="button"
                 className="secondary-btn compact"
-                onClick={() => setPreviewOpen(false)}
+                onClick={closePreview}
+                disabled={busy && Boolean(previewStageItem)}
               >
-                關閉預覽
+                {previewStageItem ? '取消批核' : '關閉預覽'}
               </button>
             </div>
           </div>
+          {previewStageItem && (
+            <div className="business-report-approval-panel" role="group" aria-label={`${previewStageItem.label}批核`}>
+              <div className="business-report-approval-copy">
+                <strong>{previewStageItem.label} 批核</strong>
+                <span>請先檢視下方報表，確認無誤後按「確認批核」；批核會記錄您的姓名與時間。</span>
+              </div>
+              <label className="business-report-approval-note">
+                <span>簽核說明（可留白）</span>
+                <input
+                  type="text"
+                  className="business-note-input"
+                  maxLength={500}
+                  placeholder="例如：查核無誤、同意備查、請加強巡檢..."
+                  value={previewApprovalNote}
+                  disabled={busy || !previewCanApprove}
+                  onChange={event => setPreviewApprovalNote(event.target.value)}
+                />
+              </label>
+              <div className="business-report-approval-actions">
+                <button
+                  type="button"
+                  className="primary-btn compact"
+                  disabled={busy || !previewCanApprove}
+                  title={previewGateReason || undefined}
+                  onClick={() => void handleApproveStage(approvalPreviewStage, previewApprovalNote)}
+                >
+                  <BusinessIcon name="check" size={14} />
+                  {busy ? '批核中…' : '確認批核'}
+                </button>
+              </div>
+              {(previewApprovalError || previewGateReason) && <p className="business-approval-readonly business-report-approval-error" role="alert">{previewApprovalError || previewGateReason}</p>}
+            </div>
+          )}
           <div
             className="business-report-preview-scroll"
             onClick={e => {
-              if (e.target === e.currentTarget) setPreviewOpen(false);
+              if (e.target === e.currentTarget && !previewStageItem) closePreview();
             }}
           >
             <BusinessReportContent
@@ -1227,7 +1285,9 @@ function BusinessReportContent({
 }) {
   // 將點檢項目拆分成左右兩欄，減少第一頁所需高度。
   const mid = Math.ceil(dutyItems.length / 2);
-  const signedStageCount = APPROVAL_STAGES.filter(stage => approvals.some(approval => approval.stage === stage.stage)).length;
+  const stageItems = approvalStageItems(market, date, approvals);
+  const signedStageCount = stageItems.filter(stage => approvals.some(approval => approval.stage === stage.stage)).length;
+  const stageCountLabel = ['', '一', '二', '三', '四'][stageItems.length] || String(stageItems.length);
   const activeEntryCount = entries.filter(row => !isDeleted(row) && !String(row.description || '').includes(CHECKLIST_TAG)).length;
   const completedShiftCount = shiftReports.filter(report => Boolean(report.outgoing?.received_at)).length;
   const leftItems = dutyItems.slice(0, mid);
@@ -1238,14 +1298,14 @@ function BusinessReportContent({
       <div className={`business-report-preview-sheet${previewPages ? ' is-preview-page' : ''}`}>
       <HandoverReportHeading kicker="業管組每日報表" site={HANDOVER_MARKETS[market].name}
         organization={'臺北農產運銷股份有限公司' + HANDOVER_MARKETS[market].name} title="業管組值勤巡查及交接報告"
-        subtitle="巡查工作、交接事項與主管三階段簽核" date={rocDate(date)}
-        approved={signedStageCount === APPROVAL_STAGES.length} approvedLabel="主管簽核完成"
-        pendingLabel={'主管簽核進度 ' + signedStageCount + '/' + APPROVAL_STAGES.length} />
+        subtitle={'巡查工作、交接事項與主管' + stageCountLabel + '階段簽核'} date={rocDate(date)}
+        approved={signedStageCount === stageItems.length} approvedLabel="主管簽核完成"
+        pendingLabel={'主管簽核進度 ' + signedStageCount + '/' + stageItems.length} />
       <HandoverReportOverview label="業管組日報摘要" metrics={[
         { label: '巡查完成率', value: checkStats.percent + '%', detail: checkStats.completed + '/' + checkStats.total + ' 項' },
         { label: '交接紀錄', value: String(activeEntryCount), detail: '筆' },
         { label: '完成交接班', value: String(completedShiftCount), detail: '班／' + SHIFTS.length + ' 班' },
-        { label: '主管簽核', value: signedStageCount + '/' + APPROVAL_STAGES.length, detail: signedStageCount === APPROVAL_STAGES.length ? '全部完成' : '階段已簽' },
+        { label: '主管簽核', value: signedStageCount + '/' + stageItems.length, detail: signedStageCount === stageItems.length ? '全部完成' : '階段已簽' },
       ]} />
 
       {/* 1. 崗位勤務時段點檢紀錄 (雙欄緊緻排版) */}
@@ -1368,13 +1428,12 @@ function BusinessReportContent({
         </tbody>
       </table>
 
-      {/* 3. 主管批核紀錄 (三階批核：一市場主任、營業部副理、營業部經理) */}
+      {/* 3. 主管批核紀錄（四階：市場副主任、市場主任、營業部副理、營業部經理；歷史日期為三階） */}
       <div className="hs-report-section-title">
-        三、主管批核紀錄（{market === 'market_2' ? '二市場主任' : '一市場主任'} · 營業部副理 · 營業部經理）
+        三、主管批核紀錄（{stageItems.map(item => item.label).join(' · ')}）
       </div>
-      <div className="business-print-approvals-grid">
-        {APPROVAL_STAGES.map(baseStage => {
-          const stageItem = baseStage.stage === 'director' ? { ...baseStage, label: market === 'market_2' ? '二市場主任' : '一市場主任' } : baseStage;
+      <div className={`business-print-approvals-grid${stageItems.length === 4 ? ' is-four' : ''}`}>
+        {stageItems.map(stageItem => {
           const approval = approvals.find(a => a.stage === stageItem.stage);
           const isApproved = Boolean(approval);
 

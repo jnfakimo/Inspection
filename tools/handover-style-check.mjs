@@ -99,17 +99,17 @@ if (guardSheetStart < 0 || guardSheetEnd < 0 || guardApprovalCard <= guardSheetE
 }
 if (guardReportForm < 0) errors.push('駐警隊：日報 footer 的實際主管簽核表單不可移除');
 
-// 業管組的三階段主管簽核區須位於交接內容下方；列印摘要仍由 A4 報表內容呈現。
+// 業管組的四階段主管簽核區（市場副主任、市場主任、營業部副理、營業部經理）須位於交接內容下方；列印摘要仍由 A4 報表內容呈現。
 const business = read('business-handover.tsx');
 const businessSheetStart = business.indexOf('<section className="hs-sheet"');
 const businessApprovalStart = business.indexOf('<section className="business-approval-section panel"');
 const businessPrintStart = business.indexOf('<section className="hs-print-sheet"');
 if (businessSheetStart < 0 || businessApprovalStart <= businessSheetStart || businessPrintStart <= businessApprovalStart
-  || !/<section className="hs-sheet"[\s\S]*<\/section>\s*\{\/\* 主管三級批核流程區塊/u.test(business)) {
-  errors.push('業管組：三階段主管簽核區必須放在交接內容之後、列印報表區之前');
+  || !/<section className="hs-sheet"[\s\S]*<\/section>\s*\{\/\* 主管四階批核流程區塊/u.test(business)) {
+  errors.push('業管組：四階段主管簽核區必須放在交接內容之後、列印報表區之前');
 }
-for (const token of ['簽核說明（可留白）', '簽核說明（已保存）', 'business-print-approvals-grid', 'APPROVAL_STAGES.map']) {
-  if (!business.includes(token)) errors.push(`業管組：三階段簽核說明／列印摘要缺少 ${token}`);
+for (const token of ['簽核說明（可留白）', '簽核說明（已保存）', 'business-print-approvals-grid', 'approvalStageItems', 'business-report-approval-panel']) {
+  if (!business.includes(token)) errors.push(`業管組：四階段簽核說明／列印摘要缺少 ${token}`);
 }
 if (business.includes('<strong>📋 業管組主管批核流程</strong>')) errors.push('業管組：主管簽核標題不可再重複使用 emoji 圖示');
 const businessCss = read('business-handover.css');
@@ -165,7 +165,7 @@ if (!read('handover-sheet.tsx').includes('size:A4') || !read('handover-sheet.tsx
   errors.push('三本日報需共用 A4／每頁留白，並允許簽核摘要自然跨頁');
 }
 if (/\.business-print-approvals-grid\{break-inside:avoid/.test(read('business-handover.css'))) {
-  errors.push('業管組三級簽核區不可整組推頁，長說明須可自然跨頁');
+  errors.push('業管組四階簽核區不可整組推頁，長說明須可自然跨頁');
 }
 if (errors.length) {
   console.error(`電子交接簿版型一致性檢查失敗（${errors.length} 項）：`);

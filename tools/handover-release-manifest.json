@@ -11,11 +11,11 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.tsx",
-      "sha256": "23672793BF9FEC418506BE6EF5B77CB9964D0E7ED9CC971FB6F4F7C2A7799567"
+      "sha256": "EFA3B146B3AEC79C34463846AE1E066298164475AD65B3B2B3EB4E6BD8863422"
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "63C5043AB825E440B912596A5FD1398B4208B0B7983BB265484212C45B89A92E"
+      "sha256": "A0425973970069B8B02B9ABBCB880223A8DDEC7518997CC9FC44758DB7678D39"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
@@ -47,7 +47,7 @@
     },
     {
       "path": "tools/handover-style-check.mjs",
-      "sha256": "42A41DEECCC85E5F89FEEC16BD494660B56FB3777245F7EE77FDFF891A7366D1"
+      "sha256": "239E5D299F1DAADA9AC6B1081DCFDDEBA4BF3ABF466DAF5AEEDCC25949239236"
     },
     {
       "path": "tools/mechanical-print-fit-check.mjs",
