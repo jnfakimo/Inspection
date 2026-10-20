@@ -7,6 +7,7 @@ import {
   readVisitStack,
   resolveAppBackHref,
   resolveBackTarget,
+  safeInternalPath,
   writeVisitStack,
 } from './app-navigation.ts';
 
@@ -83,6 +84,21 @@ test('軌跡讀寫：壞資料、外部網址與儲存空間失敗都退回空�
   assert.deepEqual(readVisitStack(null), []);
   assert.doesNotThrow(() => writeVisitStack({ getItem: () => null, setItem: () => { throw new Error('quota'); } }, ['/a/']));
   assert.doesNotThrow(() => writeVisitStack(undefined, ['/a/']));
+});
+
+test('連結目的地白名單：只接受站內相對路徑與安全字元，協定、外部來源與錨點一律拒絕', () => {
+  assert.equal(safeInternalPath('/systems/handover/fruit/'), '/systems/handover/fruit/');
+  assert.equal(safeInternalPath('/systems/guardpatrol/checkins/?marker=abc-1&source=qr'), '/systems/guardpatrol/checkins/?marker=abc-1&source=qr');
+  assert.equal(safeInternalPath('/'), '/');
+  for (const bad of ['javascript:alert(1)', '//evil.example/x', 'https://evil.example/', '/\\evil.example', '/a/../b?x=1#h', '/a b/', 'systems/x/', '', null, 42]) {
+    assert.equal(safeInternalPath(bad), '', String(bad));
+  }
+  assert.equal(safeInternalPath(`/${'a'.repeat(401)}`), '', '過長一律拒絕');
+  // 查詢字串中的標籤與引號會被百分比編碼，輸出不含原始的 < > ' "。
+  assert.doesNotMatch(safeInternalPath('/a?x=<script>"\''), /[<>'"]/);
+  assert.notEqual(safeInternalPath('/a?x=<script>'), '/a?x=<script>');
+  // 軌跡裡被竄改的上一頁不會成為連結目的地，退回依階層返回。
+  assert.equal(resolveBackTarget(['javascript:alert(1)', '/systems/handover/'], '/systems/handover/'), '/systems/');
 });
 
 test('共用頁首的上頁連結來自站內軌跡 hook，不使用瀏覽器歷史，也不會跳出站外', () => {

@@ -67,12 +67,31 @@ export function pushVisit(stack: readonly string[], entry: string) {
 export function resolveBackTarget(stack: readonly string[], pathname: string, search = '') {
   const current = appVisitEntry(pathname, search);
   const previous = current && stack.length >= 2 && stack[stack.length - 1] === current ? stack[stack.length - 2] : '';
-  return previous && previous !== current ? previous : resolveAppBackHref(pathname);
+  const safePrevious = safeInternalPath(previous);
+  return safePrevious && safePrevious !== current ? safePrevious : resolveAppBackHref(pathname);
 }
 
 type VisitStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
-const validEntry = (value: unknown): value is string => typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') && value.length <= 400;
+const SAFE_PATH = /^\/[A-Za-z0-9/_.-]*$/;
+const SAFE_QUERY = /^\?[A-Za-z0-9=&%_.,:+@~-]*$/;
+const SAFE_ORIGIN = 'https://app.invalid';
+
+/**
+ * 站內相對路徑的白名單檢查：以固定的假來源解析，只用解析後的路徑與查詢字串重組，
+ * 路徑與查詢字串只允許安全字元（不含冒號開頭的協定、斜線開頭的外部來源或反斜線）。
+ * sessionStorage 取回的值必須先經過這裡，才可以成為連結的目的地。
+ */
+export function safeInternalPath(value: unknown) {
+  if (typeof value !== 'string' || value.length > 400 || !value.startsWith('/') || value.startsWith('//')) return '';
+  let url: URL;
+  try { url = new URL(value, SAFE_ORIGIN); } catch { return ''; }
+  if (url.origin !== SAFE_ORIGIN || url.hash) return '';
+  if (!SAFE_PATH.test(url.pathname) || (url.search && !SAFE_QUERY.test(url.search))) return '';
+  return `${url.pathname}${url.search}`;
+}
+
+const validEntry = (value: unknown): value is string => safeInternalPath(value) === value;
 
 export function readVisitStack(storage: VisitStorage | null | undefined): string[] {
   try {
