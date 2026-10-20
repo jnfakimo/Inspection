@@ -8,6 +8,7 @@ const { PGlite } = await import(packageUrl);
 const migration = readFileSync(new URL('../supabase/migrations/20260916132000_business_handover_market.sql', import.meta.url), 'utf8');
 const policyGrants = readFileSync(new URL('../supabase/migrations/20260916170000_business_handover_market_policy_grants.sql', import.meta.url), 'utf8');
 const completeRule = readFileSync(new URL('../supabase/migrations/20260916190000_business_handover_complete_without_receipt.sql', import.meta.url), 'utf8');
+const deputyDirectorStage = readFileSync(new URL('../supabase/migrations/20261020090000_business_handover_deputy_director_stage.sql', import.meta.url), 'utf8');
 const db = new PGlite();
 const one = '00000000-0000-0000-0000-000000000001';
 const two = '00000000-0000-0000-0000-000000000002';
@@ -18,6 +19,7 @@ const marketTwoSupervisor = '00000000-0000-0000-0000-000000000006';
 const inactiveSupervisor = '00000000-0000-0000-0000-000000000007';
 const deidentifiedSupervisor = '00000000-0000-0000-0000-000000000008';
 const sysadmin = '00000000-0000-0000-0000-000000000009';
+const marketOneLeaf = '00000000-0000-0000-0000-00000000000a';
 const query = (sql, args = []) => db.query(sql, args);
 const actor = who => query(`select set_config('test.actor',$1,false)`, [who]);
 
@@ -62,6 +64,8 @@ try {
   await db.exec(policyGrants);
   await db.exec(completeRule);
   await db.exec(completeRule);
+  await db.exec(deputyDirectorStage);
+  await db.exec(deputyDirectorStage);
   await query(`insert into users(user_id,name,status,username,department,rbac_role,role,supervisor_id)
     values($1,'一市主管','active','m1-supervisor','market_1','unit_supervisor','supervisor',null),
       ($2,'一市副主管','active','m1-child','market_1','unit_supervisor','supervisor',$1),
@@ -69,16 +73,18 @@ try {
       ($4,'二市主管','active','m2-supervisor','market_2','unit_supervisor','supervisor',null),
       ($5,'停用主管','inactive','inactive-supervisor','market_1','unit_supervisor','supervisor',null),
       ($6,'去識別主管','active','deidentified-test','market_1','unit_supervisor','supervisor',null),
-      ($7,'系統管理員','active','sysadmin','market_2','sysadmin','admin',null)`, [
+      ($7,'系統管理員','active','sysadmin','market_2','sysadmin','admin',null),
+      ($8,'一市末端主管','active','m1-leaf','market_1','unit_supervisor','supervisor',$4)`, [
     marketOneSupervisor, marketOneChild, marketOneGrandchild, marketTwoSupervisor,
-    inactiveSupervisor, deidentifiedSupervisor, sysadmin,
+    inactiveSupervisor, deidentifiedSupervisor, sysadmin, marketOneLeaf,
   ]);
+  await query(`update users set supervisor_id=$1 where user_id=$2`, [marketOneGrandchild, marketOneLeaf]);
   const assertApproval = async (userId, market, stage, expected, label) => {
     await actor(userId);
     const result = await query(`select public.business_market_can_approve($1,$2) allowed`, [market, stage]);
     assert.equal(result.rows[0].allowed, expected, label);
   };
-  for (const stage of ['director', 'deputy_manager', 'manager']) {
+  for (const stage of ['deputy_director', 'director', 'deputy_manager', 'manager']) {
     await assertApproval(sysadmin, 'market_1', stage, true, `sysadmin can approve ${stage} in market_1`);
     await assertApproval(sysadmin, 'market_2', stage, true, `sysadmin can approve ${stage} in market_2`);
     await assertApproval(one, 'market_1', stage, false, `reporter cannot approve ${stage}`);
@@ -86,15 +92,23 @@ try {
     await assertApproval(deidentifiedSupervisor, 'market_1', stage, false, `deidentified supervisor cannot approve ${stage}`);
     await assertApproval(marketOneSupervisor, 'market_2', stage, false, `cross-market supervisor cannot approve ${stage}`);
   }
-  await assertApproval(marketOneSupervisor, 'market_1', 'director', true, 'market supervisor can approve the director stage in its market');
-  await assertApproval(marketOneSupervisor, 'market_1', 'deputy_manager', true, 'active direct-report supervisor enables deputy-manager stage');
-  await assertApproval(marketOneSupervisor, 'market_1', 'manager', true, 'active two-level supervisor chain enables manager stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'director', true, 'market 2 supervisor can approve its director stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_manager', false, 'market 2 supervisor without direct report cannot approve deputy-manager stage');
-  await assertApproval(marketTwoSupervisor, 'market_2', 'manager', false, 'market 2 supervisor without two-level chain cannot approve manager stage');
-  await assertApproval(marketOneChild, 'market_1', 'director', true, 'direct-report supervisor can approve director stage for its market');
-  await assertApproval(marketOneChild, 'market_1', 'deputy_manager', true, 'active direct-report supervisor enables deputy-manager stage');
-  await assertApproval(marketOneChild, 'market_1', 'manager', false, 'no two-level chain means no manager stage');
+  // 組織鏈：Sup > Child > Grandchild > Leaf（市場一）。各階依「往下幾層仍有該市場主管」判斷。
+  for (const [who, name] of [[marketOneSupervisor, 'Sup'], [marketOneChild, 'Child'], [marketOneGrandchild, 'Grandchild'], [marketOneLeaf, 'Leaf']]) {
+    await assertApproval(who, 'market_1', 'deputy_director', true, `${name}: market supervisor can approve the deputy-director stage`);
+  }
+  await assertApproval(marketOneSupervisor, 'market_1', 'director', true, 'Sup has a market supervisor as direct report → director stage');
+  await assertApproval(marketOneChild, 'market_1', 'director', true, 'Child has a market supervisor as direct report → director stage');
+  await assertApproval(marketOneGrandchild, 'market_1', 'director', true, 'Grandchild has Leaf as direct report → director stage');
+  await assertApproval(marketOneLeaf, 'market_1', 'director', false, 'Leaf has no direct reports → no director stage');
+  await assertApproval(marketOneSupervisor, 'market_1', 'deputy_manager', true, 'two-level chain (Grandchild) → deputy-manager stage');
+  await assertApproval(marketOneChild, 'market_1', 'deputy_manager', true, 'two-level chain (Leaf) → deputy-manager stage');
+  await assertApproval(marketOneGrandchild, 'market_1', 'deputy_manager', false, 'only one level below → no deputy-manager stage');
+  await assertApproval(marketOneSupervisor, 'market_1', 'manager', true, 'three-level chain (Leaf) → manager stage');
+  await assertApproval(marketOneChild, 'market_1', 'manager', false, 'only two levels below → no manager stage');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_director', true, 'market 2 supervisor can approve its deputy-director stage');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'director', false, 'market 2 supervisor without direct report cannot approve director stage');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'deputy_manager', false, 'market 2 supervisor without two-level chain cannot approve deputy-manager stage');
+  await assertApproval(marketTwoSupervisor, 'market_2', 'manager', false, 'market 2 supervisor without three-level chain cannot approve manager stage');
   await assertApproval(marketOneSupervisor, 'market_1', 'unknown_stage', false, 'unknown approval stage is denied');
   await actor(one);
   await query(`insert into business_handover_entries(market_code,handover_date,shift_code,description,created_by,updated_by)
@@ -149,12 +163,33 @@ try {
     const transfers = await query(`select market_code from business_handover_transfers where handover_date='2020-01-01'`);
     assert.deepEqual(transfers.rows.map(row => row.market_code), ['market_1'], '一般使用者只能讀到自己市場的交班');
     await actor(marketOneSupervisor);
-    for (const stage of ['director', 'deputy_manager', 'manager']) {
+    for (const stage of ['deputy_director', 'director', 'deputy_manager', 'manager']) {
       assert.equal((await query(`select public.business_market_can_approve('market_1',$1) allowed`, [stage])).rows[0].allowed, true,
         `authenticated callers can check their own allowed ${stage} capability`);
       assert.equal((await query(`select public.business_market_can_approve('market_2',$1) allowed`, [stage])).rows[0].allowed, false,
         `authenticated callers cannot broaden their ${stage} capability to another market`);
     }
+    // 副主任關卡：主任須在同市場、同日的副主任批核之後才能批核；關卡生效日之前的歷史日期不受限。
+    await query('reset role');
+    const effective = (await query(`select public.business_deputy_director_effective_date()::text d`)).rows[0].d;
+    assert.equal(effective, '2026-10-21');
+    const gateDay = '2026-10-22';
+    const gateInsert = (market, stage, approver, day = gateDay) => query(
+      `insert into business_handover_approvals(market_code,handover_date,stage,stage_label,approver_id) values($1,$2,$3,$4,$5)`,
+      [market, day, stage, stage, approver]);
+    await assert.rejects(gateInsert('market_1', 'director', marketOneSupervisor), /請先由一市場副主任批核，一市場主任才能批核/,
+      '沒有副主任批核時，主任不能批核');
+    await assert.rejects(gateInsert('market_2', 'director', marketTwoSupervisor), /請先由二市場副主任批核，二市場主任才能批核/,
+      '二市場同樣要先經副主任，訊息帶二市場');
+    await gateInsert('market_1', 'deputy_director', marketOneLeaf);
+    await gateInsert('market_1', 'director', marketOneSupervisor);
+    await assert.rejects(gateInsert('market_2', 'director', marketTwoSupervisor), /二市場副主任/,
+      '一市場的副主任批核不能讓二市場的主任通過');
+    await gateInsert('market_1', 'deputy_manager', marketOneSupervisor);
+    await assert.rejects(gateInsert('market_1', 'unknown_stage', marketOneSupervisor), /business_handover_stage_check/, '階段檢查只接受四個階段');
+    await gateInsert('market_1', 'director', marketOneSupervisor, '2026-10-20').catch(() => { throw new Error('生效日之前的歷史日期不應受副主任關卡限制'); });
+    // 以一般登入使用者身分繼續
+    await query('set role authenticated');
     await actor(one);
     assert.equal((await query(`select public.business_market_can_approve('market_1','director') allowed`)).rows[0].allowed, false,
       'authenticated callers can only check their own stage capability, which stays denied for reporters');
