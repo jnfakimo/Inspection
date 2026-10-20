@@ -5,6 +5,12 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-10-20）：**水果組電子交接簿上線**（PR #90，SYS-04 子系統 `fruit`，一市場）。三班沿用業管組（01-09／09-17／17-01），現場移交事項為自由文字；
+交班與接班雙方本人確認、未完成事項續帶；批核三階：組(副)長 → 市場副主任 → 市場主任（後一階須在前一階之後，當日或隔日皆可）。
+副主任與主任沿用業管組同一市場的同一批人（`business_market_approval_allowed`），組長為水果組內的單位主管。
+migration `20261021090000_produce_handover_fruit.sql` 已套用到正式庫（讀回：4 張表、17 個函式、7 個角色預設拒絕），Pages 與 Edge Functions 已部署，main 的 CI、CodeQL 皆成功。
+**尚未做**：在權限頁把組員、組(副)長、副主任、主任設為「允許」水果組（預設拒絕，不設則看不到入口）；登入後實際畫面與 A4 列印未驗證。
+
 最新（2026-10-20）：**業管組電子交接簿批核改為四階並上線**（PR #88）。一市場：市場副主任（莊宗坤）→ 市場主任（簡文財）→ 營業部副理 → 營業部經理，
 市場主任須在同日副主任批核後才能批核；二市場先維持原三階（副主任的上下級資料尚未備妥）。按「批核」改為先開本日報表預覽，在預覽內填說明並確認批核。
 migration `20261020090000` 已套用到正式庫（HTTP 201），`app-api` 與 Pages 已部署，main 的 CI、CodeQL 皆成功。
@@ -26,6 +32,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
   - 市場看板跑馬燈（登入版與公開版）只顯示 `event='board_notice'` 的公告。
   - 資安告警：本體在 `security_alerts`（RLS 強制、僅管理員、append-only）；通知中心副本只放提示與告警編號，
     超過 90 天由 `redact_expired_security_notices()` 清除內容（`platform-log-alert` 每日臺灣時間 03 點呼叫，不實體刪除）。
+- **水果組電子交接簿**（一市場）：值勤紀錄、班次交接、三階批核、A4 預覽與列印。資料表 `produce_handover_*` 以 `group_code`／`market_code` 區分，
+    啟用清單在資料庫 `produce_group_enabled` 與前端 `web/lib/produce-handover.ts` 的 `PRODUCE_ENABLED_MARKETS`（有測試比對，須同步改）。業管組的表與函式沒動。
 - **未驗證**：其餘約 50 個子系統頁的逐頁畫面（共用元件與守門測試已涵蓋）。
 - **未實測**：保存期限函式要等到有超過 90 天的副本才會有實際清除量；可在 03 點後看 `platform-log-alert` 日誌確認沒有錯誤。
 
@@ -42,6 +50,13 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
     再補一支小 migration 在 `business_deputy_director_effective_date(p_market)` 加 `market_2` 的啟用日，並同步前端 `BUSINESS_DEPUTY_DIRECTOR_EFFECTIVE_DATES`（有測試逐市場比對）；
     (b) 副主任階段目前「該市場所有主管」都有資格（含簡文財），若要限定只有莊宗坤能批，需另加「指定名單」；
     (c) 登入後實際畫面與 A4 列印分頁（一市場多一個批核欄位）尚未驗證。
+3b. **水果組／蔬菜組後續**（紙本表單 5 張在 `C:\Users\jnfa\OneDrive\Desktop\巡檢系統\蔬菜水果組交接簿`）：
+    (a) **先在權限頁開放**水果組給組員、組(副)長、副主任、主任，並請現場實測；
+    (b) 還沒做的分頁：存貨交接明細（HOL-2-09，一式三份 A4 橫式）、報廢報告（HEM-2-11，五道簽名：拍賣員→檢驗員→小組長→組(副)長→主(副)任）、運回放行單（三聯、單號）。
+    開工前待使用者確認：拍賣員與檢驗員是否為系統人員（否則先以輸入姓名代替）、品名與供應代號先自由輸入並記住歷史、放行單單號是否接續紙本（001485）、存貨交接「已送核算小組／已呈業務部」兩個勾選；
+    (c) 待售品交接（區與柱）使用者決定**先不做**；
+    (d) 二市場水果組目前**沒有任何人員帳號**、尚未啟用：要啟用須先建人員與主管鏈、二市場副主任與主任，再改 `produce_group_enabled` 與 `PRODUCE_ENABLED_MARKETS`；
+    (e) 蔬菜組：值勤紀錄與班次交接與水果組相同，之後以 `group="vegetable"` 加入（需放寬 `user_handover_module_key_check`、兩支 Edge Function 的子系統清單、modules.ts、入口圖卡）；圖示 `handover-vegetable-icon.png` 已備、尚未使用。
 3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
    動到 `supabase/functions/**` 合併後會自動部署 Edge Function）。
 4. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。
@@ -58,6 +73,9 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 - **工作位置**：G 槽已於 2026-10-16 切回乾淨的 `main`（與 `origin/main` 一致）。開發與測試仍在 C 槽另建 worktree：
   `git worktree add -b <分支> C:\Users\jnfa\Documents\Codex\<資料夾> origin/main`，再以 junction 連 `node_modules` 到 C 執行副本；
   移除 worktree 前**先單獨刪掉 junction**（PowerShell `(Get-Item <路徑>\node_modules).Delete()`），避免連帶刪到執行副本的 `node_modules`。
+- **本次水果組的做法**：worktree 建在 G 槽 `G:\我的雲端硬碟\AI\Codex\Inspection-fruit-handover`；驗證則 robocopy 到 C 槽 `...\Codex\2026-10-21\Inspection-fruit-verify`（排除 node_modules、.git），
+  `node_modules` 以 junction 連 `Inspection-G-runtime`；跑 `npm test` 時要設 `HANDOVER_TEST_PGLITE_PATH` 指向 runtime 的 `@electric-sql/pglite/dist/index.js`，且須把雜湊鎖檔的 16 個檔案換成 LF 版本（`git show :<path>`）才會通過。
+- **生圖**：`draw` 技能要用有 `openai` 套件的 Python（`%LOCALAPPDATA%\Microsoft\WindowsApps\python3`），Programs 底下的 Python312 沒有。
 - **驗證**：在上述副本執行 `npm run typecheck:v2` 與 `npm test`；G 槽的 `node_modules` 不完整，不能在 G 跑。Edge Function 另用 `deno check <入口檔>`（本機已安裝 deno），跑完會改動 `deno.lock`，不要提交。
 - **資料庫 migration**：用 `apply-database-migration.yml`（workflow_dispatch，可指定 `--ref` 為 PR 分支）。該流程拒絕含 `DROP TABLE`、`DELETE FROM`、`TRUNCATE` 的 migration，
   且必須以 `BEGIN;`／`COMMIT;` 包住；保存期限等需求請用 UPDATE 清除內容，不要實體刪除。套用順序：CI 通過 → 套用 migration → 合併。
@@ -77,4 +95,4 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## 🕐 最後更新
 
-2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 業管組四階批核上線（PR #88）；本交接更新見分支 `codex/handoff-business-four-stage`
+2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 水果組電子交接簿上線（PR #90）；本交接更新見分支 `codex/handoff-fruit-handover`
