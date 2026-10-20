@@ -1,0 +1,76 @@
+/* SYS-04 水果組（日後蔬菜組）電子交接簿第二批單據的樣式：單據清單、明細編輯表、詳細與簽核、紙本格式預覽與列印。
+   共同版型（工具列、預覽視窗、當班標示）一律在 handover-sheet.css；紙本格式的選擇器名稱含 print，供色彩守門檢查辨識為紙本。 */
+.produce-tabs{margin:0 0 12px;flex-wrap:wrap}
+.produce-doc-panel{display:grid;gap:12px}
+.produce-doc-toolbar{align-items:center}
+.produce-doc-toolbar .produce-doc-new{margin-left:auto}
+.produce-doc-panel tr.is-void td{opacity:.6;text-decoration:line-through}
+.produce-doc-panel td small{display:block;color:var(--muted)}
+
+/* 明細編輯表 */
+.produce-doc-modal{width:min(820px,calc(100vw - 28px))}
+.produce-doc-modal.is-wide{width:min(1280px,calc(100vw - 28px))}
+.produce-lines-wrap{display:grid;gap:8px;padding:0 20px 8px;min-width:0}
+.produce-lines{width:100%;border-collapse:collapse;font-size:13px}
+.produce-lines th{padding:6px 6px;text-align:left;color:var(--muted);font-weight:700;white-space:nowrap}
+.produce-lines td{padding:3px 4px;vertical-align:middle}
+.produce-lines td.num{color:var(--muted);text-align:center}
+.produce-lines input{width:100%;min-width:72px;box-sizing:border-box;padding:6px 8px}
+.produce-lines td.is-wide input{min-width:180px}
+.produce-lines .localized-date-input{min-width:128px}
+.produce-lines-wrap{overflow-x:auto}
+.produce-lines-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.produce-lines-foot b{color:var(--ink)}
+
+/* 單據詳細與簽核 */
+.produce-doc-detail{display:grid;gap:14px;padding:16px 20px;color:var(--ink)}
+.produce-doc-meta{margin:0;color:var(--muted);font-size:12px}
+.produce-doc-sheetwrap{overflow:auto;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.produce-doc-chain{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.produce-doc-chain li{display:flex;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.produce-doc-chain li.is-signed{border-color:color-mix(in srgb,var(--green) 55%,var(--line))}
+.produce-doc-chain li span{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.produce-doc-sign{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px}
+.produce-doc-sign label,.produce-doc-void{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.produce-doc-sign input,.produce-doc-void input{width:100%;box-sizing:border-box}
+.produce-doc-hint{grid-column:1/-1;margin:0;padding:7px 9px;border-left:3px solid var(--amber);background:var(--panel2);color:var(--ink);font-size:12px}
+.produce-doc-distribute{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.produce-doc-distribute span{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+
+/* 紙本格式（預覽與列印共用，固定白底黑字） */
+.produce-doc-paper.is-landscape{width:297mm;min-height:0}
+.produce-print-form{position:relative;box-sizing:border-box;color:#111;background:#fff;font-size:10pt;line-height:1.4}
+.produce-print-copy{position:absolute;top:0;right:0;padding:1px 8px;border:1px solid #111;font-size:9pt;font-weight:700}
+.produce-print-head{display:grid;gap:4px;margin:0 0 6px;text-align:center}
+.produce-print-head h2{margin:0;font-size:15pt;line-height:1.35;color:#111}
+.produce-print-head>div{display:flex;justify-content:space-between;gap:12px;font-size:9.5pt;text-align:left}
+.produce-print-serial{font-weight:800;font-size:12pt;color:#b00020}
+.produce-print-table{width:100%;border-collapse:collapse;table-layout:auto;margin:0 0 6px}
+.produce-print-table th,.produce-print-table td{padding:3px 5px;border:1px solid #111;color:#111;background:#fff;font-size:9.5pt;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+.produce-print-table thead th,.produce-print-table tfoot th{text-align:center;font-weight:700}
+.produce-print-table td.num{text-align:right}
+.produce-print-table tbody tr{break-inside:avoid}
+.produce-print-table.is-slip th{width:28%;text-align:center}
+.produce-print-table.is-slip td{height:11mm;vertical-align:middle}
+.produce-print-remark{margin:0 0 6px;font-size:9.5pt}
+.produce-print-signs{display:grid;gap:0;border:1px solid #111;border-right:0;margin:0 0 4px}
+.produce-print-signs.is-three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.produce-print-signs.is-five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.produce-print-sign-cell{display:grid;gap:2px;min-height:16mm;padding:3px 6px;border-right:1px solid #111;font-size:9pt;align-content:start}
+.produce-print-sign-cell b{font-size:11pt}
+.produce-print-sign-cell small{font-size:8pt}
+.produce-print-foot{margin:0;font-size:8.5pt}
+.produce-print-form.is-slip{max-width:150mm;margin:0 auto}
+.produce-print-copyblock{break-after:page;page-break-after:always;padding-bottom:2mm}
+.produce-print-copyblock:last-child{break-after:auto;page-break-after:auto}
+
+@media(max-width:900px){
+  .produce-doc-sign{grid-template-columns:1fr}
+  .produce-print-signs.is-five{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media print{
+  .produce-tabs,.produce-doc-panel,.produce-doc-preview,.produce-doc-modal{display:none!important}
+  .produce-doc-print{display:block!important}
+  .produce-doc-print .produce-print-form{font-size:9pt}
+}

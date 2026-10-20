@@ -33,6 +33,7 @@ import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import { HandoverDateNavigation, HandoverIcon, HandoverReportHeading, HandoverReportOverview, HandoverSheetHeader } from './handover-sheet';
 import { BusinessSignatures, businessTime, type BusinessShift } from './business-handover-reconciliation';
+import { ProduceScrapPanel, ProduceSlipPanel, ProduceStockPanel } from './produce-documents';
 import './handover-sheet.css';
 import './produce-handover.css';
 
@@ -42,6 +43,11 @@ type ProduceApproval = {
   approver_id: string; approver_name: string; approved_at: string; note?: string | null;
 };
 type Confirmation = { operation: 'submit' | 'receive' | 'complete'; shift: BusinessShift; entry?: Row };
+type Tab = 'duty' | 'stock' | 'scrap' | 'slip';
+const TABS: ReadonlyArray<{ key: Tab; label: string }> = [
+  { key: 'duty', label: '值勤紀錄' }, { key: 'stock', label: '存貨交接明細' },
+  { key: 'scrap', label: '報廢報告' }, { key: 'slip', label: '運回放行單' },
+];
 
 const ENTRY_MAX = 2000;
 const APPROVAL_NOTE_MAX = 500;
@@ -81,6 +87,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [editing, setEditing] = useState<{ shiftCode: string; entry: Row | null } | null>(null);
+  const [tab, setTab] = useState<Tab>('duty');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewStage, setPreviewStage] = useState<ProduceApprovalStage | null>(null);
   const [previewNote, setPreviewNote] = useState('');
@@ -183,7 +190,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
 
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
-      <AdminHeader module={module} hideDescription busy={busy} note={note} onReload={load} action={
+      <AdminHeader module={module} hideDescription busy={busy} note={note} onReload={load} action={tab !== 'duty' ? undefined :
         <div className="hs-header-actions">
           <button type="button" className="secondary-btn compact" onClick={() => setPreviewOpen(true)} title="在畫面上預覽 A4 報表">
             <HandoverIcon name="eye" size={14} />預覽本日報表</button>
@@ -191,7 +198,15 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
             <HandoverIcon name="printer" size={14} />列印本日報表</button>
         </div>} />
 
-      <section className="panel hs-toolbar produce-toolbar">
+      {market && <div className="hs-market-switch produce-tabs" role="tablist" aria-label={`${groupName}交接簿單據`}>{TABS.map(item =>
+        <button key={item.key} type="button" role="tab" className={`secondary-btn compact${tab === item.key ? ' is-active' : ''}`} aria-selected={tab === item.key}
+          onClick={() => setTab(item.key)}>{item.label}</button>)}</div>}
+
+      {market && tab === 'stock' && <ProduceStockPanel group={group} market={market} profile={profile} />}
+      {market && tab === 'scrap' && <ProduceScrapPanel group={group} market={market} profile={profile} />}
+      {market && tab === 'slip' && <ProduceSlipPanel group={group} market={market} profile={profile} />}
+
+      {tab === 'duty' && <section className="panel hs-toolbar produce-toolbar">
         {enabledMarkets.length > 1 && <div className="hs-market-switch" role="group" aria-label="市場別">{enabledMarkets.map(code =>
           <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`} aria-pressed={market === code}
             disabled={busy} onClick={() => setMarket(code)}>{PRODUCE_MARKET_NAMES[code].short}</button>)}</div>}
@@ -201,11 +216,11 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
           {currentShift && <span className="hs-current-now"><span className="hs-pulse-dot" />目前當班：{currentShift.name}（{currentShift.label}）</span>}
           <span className="hs-toolbar-summary"><HandoverIcon name="calendar" size={15} />{rocDate(date)} · 3 個班別 · 共 {activeEntryCount} 筆交接</span>
         </div>
-      </section>
+      </section>}
 
       {!market && <section className="panel notice danger"><h2>尚未開放</h2><p>{groupName}電子交接簿尚未開放使用，請洽系統管理員。</p></section>}
 
-      {market && <section className="hs-sheet" aria-label={`${groupName}電子交接簿`}>
+      {market && tab === 'duty' && <section className="hs-sheet" aria-label={`${groupName}電子交接簿`}>
         <HandoverSheetHeader org={`臺北農產運銷股份有限公司　${marketInfo.name}`} title={`${groupName}現場值勤交接紀錄表`} dateLabel={rocDate(date)} emblem="clipboard" />
         <div className="hs-shifts">
           {PRODUCE_SHIFTS.map((shift, shiftIndex) => {
@@ -263,7 +278,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
         </div>
       </section>}
 
-      {market && <section className="produce-approval-section panel" aria-label="主管批核流程">
+      {market && tab === 'duty' && <section className="produce-approval-section panel" aria-label="主管批核流程">
         <div className="produce-approval-head">
           <div><strong>{groupName}主管批核流程</strong>
             <span>{stages.length} 階段簽核（依序）：{stages.map(item => item.label).join('／')}；當日或隔日皆可批核，批核前會先預覽本日報表。</span></div>
@@ -297,12 +312,12 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
         })}</div>
       </section>}
 
-      {market && <section className="hs-print-sheet" aria-label={`${groupName}每日列印報表`}>
+      {market && tab === 'duty' && <section className="hs-print-sheet" aria-label={`${groupName}每日列印報表`}>
         <ProduceReport group={group} market={market} date={date} shifts={shifts} approvals={approvals} />
       </section>}
     </div>
 
-    {(previewOpen || previewStage) && market && <div className="hs-preview" role="dialog" aria-modal="true" aria-label={previewStageItem ? `${previewStageItem.label}批核前預覽` : `${groupName}交接本日報表預覽`}>
+    {tab === 'duty' && (previewOpen || previewStage) && market && <div className="hs-preview" role="dialog" aria-modal="true" aria-label={previewStageItem ? `${previewStageItem.label}批核前預覽` : `${groupName}交接本日報表預覽`}>
       <div className="hs-preview-bar">
         <div><strong>{previewStageItem ? `${previewStageItem.label}批核前預覽（A4 版面）` : '本日報表預覽（A4 版面）'}</strong><span>{rocDate(date)} · A4 直式排版</span></div>
         <div>
