@@ -5,6 +5,10 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-10-20）：**業管組電子交接簿批核改為四階並上線**（PR #88）。一市場：市場副主任（莊宗坤）→ 市場主任（簡文財）→ 營業部副理 → 營業部經理，
+市場主任須在同日副主任批核後才能批核；二市場先維持原三階（副主任的上下級資料尚未備妥）。按「批核」改為先開本日報表預覽，在預覽內填說明並確認批核。
+migration `20261020090000` 已套用到正式庫（HTTP 201），`app-api` 與 Pages 已部署，main 的 CI、CodeQL 皆成功。
+
 最新：PR #83（繁中 404 頁發布到網站根目錄、設備頁載入防呆，正式站已實測不存在網址顯示繁中頁）、PR #84（戰情、會議室、公文、駐警打卡、
 維修分析、後台告警／通知／權限、AuthGate 的非同步載入防呆，自 G 槽快照整合 Codex 的修正）。
 
@@ -34,6 +38,10 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
    (b) ✅ 022443 已完成本人綁定。其他司機可在「個人資料設定 → LINE 派車通知」或「公務車 → 派車申請」頁（僅駕駛名冊人員顯示）自行綁定。
    (c) ✅ 2026-10-16 管理員已送出個人測試訊息（LINE API 接受），022443 確認收到。
    (d) ✅ 已開啟「啟用個人通知」「指派通知」（伺服器讀回一致）。尚未開啟「取消指派通知」；「測試模式」仍開啟，可視需要關閉。其他司機各自完成綁定才會收到。
+3a. **業管組批核後續**：(a) 二市場要啟用副主任這一關時，先在人員帳號設好「二市場副主任 → 簡文財同級的二市場主任」的直屬主管關係，
+    再補一支小 migration 在 `business_deputy_director_effective_date(p_market)` 加 `market_2` 的啟用日，並同步前端 `BUSINESS_DEPUTY_DIRECTOR_EFFECTIVE_DATES`（有測試逐市場比對）；
+    (b) 副主任階段目前「該市場所有主管」都有資格（含簡文財），若要限定只有莊宗坤能批，需另加「指定名單」；
+    (c) 登入後實際畫面與 A4 列印分頁（一市場多一個批核欄位）尚未驗證。
 3. **產品決定**：`app-api` 報修案件列表與 `structuremap-markerboard.tsx` 的報修挑選清單是否也略過 hidden（見 `PROJECT_PLAN.md` §19；
    動到 `supabase/functions/**` 合併後會自動部署 Edge Function）。
 4. 色彩統一剩餘項目都需要登入與瀏覽器：`LayoutsAdmin.tsx` 行內樣式、WS-9 兩主題／手機／A4 視覺驗收。
@@ -45,6 +53,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## ⚠️ 注意事項
 
+- **業管組批核資格依 `users.supervisor_id` 組織鏈**：已啟用副主任關卡的市場，副主任＝該市場主管、主任＝其直屬上司、副理與經理各再往上一層；未啟用的市場維持原三階。
+  改人員的「直屬主管」會直接改變誰能批哪一階；一市場需維持 莊宗坤 → 簡文財 → 營業部副理 → 營業部經理。系統管理員可批核任一階（二市場沒有副主任階段）。
 - **工作位置**：G 槽已於 2026-10-16 切回乾淨的 `main`（與 `origin/main` 一致）。開發與測試仍在 C 槽另建 worktree：
   `git worktree add -b <分支> C:\Users\jnfa\Documents\Codex\<資料夾> origin/main`，再以 junction 連 `node_modules` 到 C 執行副本；
   移除 worktree 前**先單獨刪掉 junction**（PowerShell `(Get-Item <路徑>\node_modules).Delete()`），避免連帶刪到執行副本的 `node_modules`。
@@ -67,4 +77,4 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## 🕐 最後更新
 
-2026-10-16 · Claude Code @ DESKTOP-0CFB6UK · 中央監控頁上線設備營運與能源面板（PR #86）
+2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 業管組四階批核上線（PR #88）；本交接更新見分支 `codex/handoff-business-four-stage`

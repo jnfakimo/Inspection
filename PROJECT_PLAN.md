@@ -247,3 +247,16 @@
 - 2026-10-16 追加（PR #86）：使用者決定能源面板先上線。中央監控（`equipment_monitor_events`）頁上方顯示 Codex 的 `equipment-operations-energy`；
   已接上監控告警，其餘標示「待介接」。Codex 元件測試 9 項接入 `npm test`，並改對應色彩統一後的 token、以實體檔案載入取代 `new Function`（Semgrep 規則）。
   正式站已部署（Pages run 38878399649），未登入實測畫面。
+
+## 23. 業管組批核四階與批核前預覽（2026-10-20，PR #88）
+
+- 需求：一市場主任之前多一關副主任；點選批核時先預覽報表再批核（比照機電課、駐警隊）。
+- 決定：副主任身分依 `users.supervisor_id` 組織鏈判斷（不另設名單）；一市場啟用、二市場先維持三階（二市場副主任資料未備妥）。一市場人員：副主任莊宗坤、主任簡文財。
+- 規則：已啟用的市場整體上移一層（副主任＝該市場主管 0 層、主任 1 層、副理 2 層、經理 3 層），未啟用的市場與原三階完全相同；
+  主任須在同市場、同交接日的副主任批核之後才能批核（資料庫觸發器，回中文訊息）；關卡自 2026-10-21 起，歷史日期維持三階、不補批。
+  系統管理員可批核任一階，但二市場沒有副主任階段。啟用日在 migration 與前端各一份，有測試逐市場比對。
+- 實作：migration `20261020090000_business_handover_deputy_director_stage.sql`（`business_supervisor_within` 層數判斷、啟用日函式、關卡觸發器、階段檢查加入 `deputy_director`）、
+  `app-api` `business_approve`、`web/lib/business-handover-approval.ts`、`business-handover.tsx`／`.css`（預覽內批核、四欄版面）；交接簿雜湊鎖檔同步三個檔案。
+- 驗證：PGlite 測試涵蓋一市場四階矩陣、二市場原三階矩陣與無關卡；前端判斷與畫面契約 11 項；typecheck、完整 npm test、gitleaks、Semgrep、deno check、CI 與 Commercial readiness 皆通過。
+- 上線：使用者先建好莊宗坤 → 簡文財的上下級並以唯讀查詢確認組織鏈 → apply-database-migration run 39371394023（HTTP 201）→ 合併 `31fbc3446` → `app-api` 與 Pages 部署成功。
+- 未驗證：登入後實際畫面、A4 列印分頁、副主任階段的名單限制（目前該市場所有主管皆有資格）。
