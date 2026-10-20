@@ -5,6 +5,18 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-10-20）：**頂端列「上頁」改為回到上一個動作、登入後不進戰情儀表板**（PR #94，已合併並部署，CI／CodeQL／Pages 皆成功）。
+「上頁」回到本分頁上一個站內頁面（軌跡存 `sessionStorage`，`web/components/useAppBackHref.ts` 與 `web/lib/app-navigation.ts`；不使用 `history.back()`、不記登入類頁面與含憑證字樣的查詢字串），沒有上一個才依階層回父層；
+從 `sessionStorage` 取回的路徑必須先過 `safeInternalPath` 白名單才能當連結目的地（否則 CodeQL `js/xss` 會失敗）。登入目的地若是根路徑（戰情儀表板）一律改進 `/systems/`（`resolvePostLoginDestination`）。
+**未驗證**：登入後實際逐頁點「上頁」；「請到開放系統」是理解為登入後落在只列有權限系統的入口，若使用者另有意思需再確認。
+
+最新（2026-10-20）：**水果組第二批上線**（PR #92）：存貨交接明細表（HOL-2-09）、果菜報廢報告表（HEM-2-11）、果菜產地運回放行單，頁面加上四個頁籤（值勤紀錄／存貨交接明細／報廢報告／運回放行單）。
+存貨交接：填表人員送出（內容鎖定）→ 小組長 → 組(副)長，另記「已送核算小組」「已呈業務部」，A4 橫式一式三份列印；報廢報告：拍賣員、檢驗員先輸入姓名，小組長 → 組(副)長 → 主(副)任依序簽核、不限當日；
+放行單：系統流水號 `F1-民國年-序號`（例如 F1-115-00001）加可手填紙本單號，開立後不可改、只能作廢並留原因，三聯列印。小組長＝水果組內填表人以外的任一位同仁；組(副)長、主(副)任沿用第一批的批核資格。
+品名與供應代號自由輸入，由近一年歷史提供建議；明細以 jsonb 存放、不實體刪除，草稿可作廢。
+migration `20261022090000_produce_handover_documents.sql` 先以 `apply-database-migration.yml --ref codex/produce-documents` 套用到正式庫（讀回：5 張表、10 個函式、4 條讀取政策、RLS 全部強制），再合併；Pages 部署與 CI、CodeQL 皆成功。
+資料庫測試抓到並修正「副主任可登記存貨交接送出」的漏洞（plpgsql 的 `if not (a = b or c)` 遇 NULL 不成立，須用 coalesce）。**登入後實際畫面、列印分頁與三聯排版未驗證。**
+
 最新（2026-10-20）：**水果組電子交接簿上線**（PR #90，SYS-04 子系統 `fruit`，一市場）。三班沿用業管組（01-09／09-17／17-01），現場移交事項為自由文字；
 交班與接班雙方本人確認、未完成事項續帶；批核三階：組(副)長 → 市場副主任 → 市場主任（後一階須在前一階之後，當日或隔日皆可）。
 副主任與主任沿用業管組同一市場的同一批人（`business_market_approval_allowed`），組長為水果組內的單位主管。
@@ -32,7 +44,7 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
   - 市場看板跑馬燈（登入版與公開版）只顯示 `event='board_notice'` 的公告。
   - 資安告警：本體在 `security_alerts`（RLS 強制、僅管理員、append-only）；通知中心副本只放提示與告警編號，
     超過 90 天由 `redact_expired_security_notices()` 清除內容（`platform-log-alert` 每日臺灣時間 03 點呼叫，不實體刪除）。
-- **水果組電子交接簿**（一市場）：值勤紀錄、班次交接、三階批核、A4 預覽與列印。資料表 `produce_handover_*` 以 `group_code`／`market_code` 區分，
+- **水果組電子交接簿**（一市場）：值勤紀錄、班次交接、三階批核、A4 預覽與列印；第二批的存貨交接明細、報廢報告、運回放行單（表 `produce_stock_handovers`、`produce_scrap_reports`、`produce_document_signatures`、`produce_release_slips`）。資料表 `produce_handover_*` 以 `group_code`／`market_code` 區分，
     啟用清單在資料庫 `produce_group_enabled` 與前端 `web/lib/produce-handover.ts` 的 `PRODUCE_ENABLED_MARKETS`（有測試比對，須同步改）。業管組的表與函式沒動。
 - **未驗證**：其餘約 50 個子系統頁的逐頁畫面（共用元件與守門測試已涵蓋）。
 - **未實測**：保存期限函式要等到有超過 90 天的副本才會有實際清除量；可在 03 點後看 `platform-log-alert` 日誌確認沒有錯誤。
@@ -50,10 +62,11 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
     再補一支小 migration 在 `business_deputy_director_effective_date(p_market)` 加 `market_2` 的啟用日，並同步前端 `BUSINESS_DEPUTY_DIRECTOR_EFFECTIVE_DATES`（有測試逐市場比對）；
     (b) 副主任階段目前「該市場所有主管」都有資格（含簡文財），若要限定只有莊宗坤能批，需另加「指定名單」；
     (c) 登入後實際畫面與 A4 列印分頁（一市場多一個批核欄位）尚未驗證。
+3c. **PR 與驗收狀態**：PR #93（本檔的更新）若仍開著就合併；水果組（第一、二批）與「上頁」都**尚未經人實測**——請先在權限頁把水果組設為「允許」，再請組員、組長各走一遍
+    值勤紀錄、存貨交接、報廢報告、放行單與列印；使用者曾反映看不到四個頁籤，正式站程式已確認含頁籤，疑為瀏覽器快取，請 Ctrl+F5 後仍無再查。
 3b. **水果組／蔬菜組後續**（紙本表單 5 張在 `C:\Users\jnfa\OneDrive\Desktop\巡檢系統\蔬菜水果組交接簿`）：
     (a) **先在權限頁開放**水果組給組員、組(副)長、副主任、主任，並請現場實測；
-    (b) 還沒做的分頁：存貨交接明細（HOL-2-09，一式三份 A4 橫式）、報廢報告（HEM-2-11，五道簽名：拍賣員→檢驗員→小組長→組(副)長→主(副)任）、運回放行單（三聯、單號）。
-    開工前待使用者確認：拍賣員與檢驗員是否為系統人員（否則先以輸入姓名代替）、品名與供應代號先自由輸入並記住歷史、放行單單號是否接續紙本（001485）、存貨交接「已送核算小組／已呈業務部」兩個勾選；
+    (b) ✅ 存貨交接明細、報廢報告、運回放行單已於第二批上線（PR #92）；請現場實測紙本格式與三聯列印，並確認小組長（填表人以外任一位同仁）的認定是否合用，需要改成管理員指定名單時另做；
     (c) 待售品交接（區與柱）使用者決定**先不做**；
     (d) 二市場水果組目前**沒有任何人員帳號**、尚未啟用：要啟用須先建人員與主管鏈、二市場副主任與主任，再改 `produce_group_enabled` 與 `PRODUCE_ENABLED_MARKETS`；
     (e) 蔬菜組：值勤紀錄與班次交接與水果組相同，之後以 `group="vegetable"` 加入（需放寬 `user_handover_module_key_check`、兩支 Edge Function 的子系統清單、modules.ts、入口圖卡）；圖示 `handover-vegetable-icon.png` 已備、尚未使用。
@@ -75,6 +88,9 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
   移除 worktree 前**先單獨刪掉 junction**（PowerShell `(Get-Item <路徑>\node_modules).Delete()`），避免連帶刪到執行副本的 `node_modules`。
 - **本次水果組的做法**：worktree 建在 G 槽 `G:\我的雲端硬碟\AI\Codex\Inspection-fruit-handover`；驗證則 robocopy 到 C 槽 `...\Codex\2026-10-21\Inspection-fruit-verify`（排除 node_modules、.git），
   `node_modules` 以 junction 連 `Inspection-G-runtime`；跑 `npm test` 時要設 `HANDOVER_TEST_PGLITE_PATH` 指向 runtime 的 `@electric-sql/pglite/dist/index.js`，且須把雜湊鎖檔的 16 個檔案換成 LF 版本（`git show :<path>`）才會通過。
+- **新增畫面時先跑 `npm run security:audit`**：它不在 `npm test` 內，只有 CI 的 static-audit 會跑；原生 `datetime-local`、`time`、`date` 欄位會被擋，一律用 `LocalizedDateTimeInput`／`TimeSelect`／`LocalizedDateInput`（時間 30 分鐘級距，預設值要先捨去到級距）。
+- **plpgsql**：`IF` 條件內不能含 `CASE … THEN`（會把 CASE 的 THEN 當成 IF 的 THEN），先算進變數；migration 不可含 `DELETE FROM`／`DROP TABLE`，所以明細存 jsonb、草稿用狀態作廢。
+- **git**：G 槽 `.git` 偶爾留下 0 位元組的 `config.lock`，會讓 `git switch -c`、`git config --add`、`push -u` 失敗；確認沒有 git 程序在跑再刪。建分支後務必 `git status -sb` 確認真的在新分支上（這次曾因此把 commit 做在舊分支，再用 `git branch -f` 搬回）。
 - **生圖**：`draw` 技能要用有 `openai` 套件的 Python（`%LOCALAPPDATA%\Microsoft\WindowsApps\python3`），Programs 底下的 Python312 沒有。
 - **驗證**：在上述副本執行 `npm run typecheck:v2` 與 `npm test`；G 槽的 `node_modules` 不完整，不能在 G 跑。Edge Function 另用 `deno check <入口檔>`（本機已安裝 deno），跑完會改動 `deno.lock`，不要提交。
 - **資料庫 migration**：用 `apply-database-migration.yml`（workflow_dispatch，可指定 `--ref` 為 PR 分支）。該流程拒絕含 `DROP TABLE`、`DELETE FROM`、`TRUNCATE` 的 migration，
@@ -95,4 +111,4 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## 🕐 最後更新
 
-2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 水果組電子交接簿上線（PR #90）；本交接更新見分支 `codex/handoff-fruit-handover`
+2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 收工：水果組第二批（PR #92）與上頁／登入導向（PR #94）已上線；本交接更新見分支 `codex/handoff-produce-documents`（PR #93）。Git push：✅ 已推（4441bf36a，其後的回填 commit 見 PR #93）
