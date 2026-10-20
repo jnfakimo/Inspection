@@ -13,6 +13,7 @@ const read = name => fs.readFileSync(path.join(dir, name), 'utf8');
 const SHEETS = [
   { name: '機電課', tsx: 'mechanical-handover.tsx', css: 'mechanical-handover.css' },
   { name: '業管組', tsx: 'business-handover.tsx', css: 'business-handover.css' },
+  { name: '水果組', tsx: 'produce-handover.tsx', css: 'produce-handover.css' },
   { name: '駐警隊', tsx: 'guard-handover.tsx', css: 'guard-handover.css', view: 'guard-handover-view.tsx' },
 ];
 

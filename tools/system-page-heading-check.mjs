@@ -4,7 +4,7 @@ import { systems } from '../web/lib/modules.ts';
 
 const moduleCount = systems.reduce((total, system) => total + system.modules.length, 0);
 assert.equal(systems.length, 13, '系統標題稽核必須涵蓋 13 大系統');
-assert.equal(moduleCount, 67, '系統標題稽核必須涵蓋 67 個子系統');
+assert.equal(moduleCount, 68, '系統標題稽核必須涵蓋 68 個子系統');
 
 for (const system of systems) {
   const publicAssetPrefix = '/Inspection/v2/';

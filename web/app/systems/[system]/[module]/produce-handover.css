@@ -1,0 +1,98 @@
+/* SYS-04 水果組（日後蔬菜組）電子交接簿「本簿特有」的樣式：事項清單、三階批核與列印報表。
+   共同版型（工具列、表頭、班別卡片、簽名、當班標示、預覽視窗）一律在 handover-sheet.css。 */
+.panel.hs-toolbar.produce-toolbar{justify-content:flex-start;gap:8px}
+.produce-toolbar>.hs-toolbar-right{margin-left:auto}
+
+/* 班別內的事項清單 */
+.produce-entry-list{display:grid;gap:12px}
+.produce-entry{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr);gap:16px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.produce-entry.is-deleted{opacity:.7}
+.produce-entry.is-deleted .produce-entry-main p{text-decoration:line-through}
+.produce-entry-main{display:grid;gap:6px;align-content:start;min-width:0}
+.produce-entry-main p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.produce-entry-main small,.produce-entry-audit{color:var(--muted);font-size:12px}
+.produce-entry-audit{display:grid;align-content:start;gap:3px}
+.produce-entry-audit b{color:var(--ink)}
+.produce-entry-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:6px}
+
+/* 確認視窗與事項視窗 */
+.produce-modal{width:min(720px,calc(100vw - 28px))}
+.produce-form{display:grid;gap:14px;padding:20px}
+.produce-history{display:grid;gap:3px;margin:16px 20px 0;padding:10px 12px;border-radius:8px;background:var(--panel2);color:var(--muted);font-size:12px}
+.produce-history b{color:var(--ink)}
+.produce-confirm{display:grid;gap:14px;padding:16px;color:var(--ink)}
+.produce-confirm>label{display:grid;gap:8px}
+.produce-confirm-items{max-height:45vh;overflow:auto;padding-left:24px}
+.produce-confirm-items li{padding:10px;margin-bottom:8px;background:var(--panel2);border-radius:8px}
+.produce-confirm-items p{white-space:pre-wrap;overflow-wrap:anywhere}
+.produce-confirm-actions{display:flex;justify-content:flex-end;gap:8px}
+
+/* 三階批核 */
+.produce-approval-section.panel{display:grid;gap:14px;padding:16px 20px;border:1px solid var(--n-300);border-radius:14px;background:var(--n-100);box-shadow:none}
+.produce-approval-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px dashed var(--n-300)}
+.produce-approval-head>div{display:grid;gap:3px}
+.produce-approval-head span{color:var(--muted);font-size:13px}
+.produce-approval-badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;background:color-mix(in srgb,var(--amber) 18%,var(--panel));color:var(--ink);font-size:13px;font-weight:700}
+.produce-approval-badge.is-all{background:color-mix(in srgb,var(--green) 18%,var(--panel))}
+.produce-approval-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.produce-approval-card{display:flex;flex-direction:column;gap:8px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.produce-approval-card.is-approved{border-color:color-mix(in srgb,var(--green) 55%,var(--line))}
+.produce-approval-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.produce-approval-card-head span{padding:2px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);font-size:11px;font-weight:700}
+.produce-approval-card-head strong{color:var(--ink);font-size:15px}
+.produce-approval-card-head em{padding:2px 8px;border-radius:999px;font-size:12px;font-style:normal;font-weight:700;background:color-mix(in srgb,var(--amber) 18%,var(--panel));color:var(--ink)}
+.produce-approval-card-head em.is-done{background:color-mix(in srgb,var(--green) 18%,var(--panel))}
+.produce-approval-card>p{margin:0;color:var(--muted);font-size:12px;line-height:1.4}
+.produce-approval-info{display:grid;gap:6px;margin-top:auto;color:var(--ink);font-size:13px}
+.produce-approval-info small{color:var(--muted)}
+.produce-approval-info blockquote{margin:0;padding:8px 10px;border-left:3px solid var(--line);background:var(--panel2);overflow-wrap:anywhere;white-space:pre-wrap}
+.produce-approval-hint{margin:0;padding:7px 9px;border-left:3px solid var(--amber);background:var(--panel2);color:var(--ink);font-size:12px}
+
+/* 批核前預覽的操作列 */
+.produce-approval-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,1.2fr) auto;align-items:end;gap:12px;box-sizing:border-box;width:210mm;max-width:100%;margin:0 auto 12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+.produce-approval-panel>div{display:grid;gap:3px}
+.produce-approval-panel>div span{color:var(--muted);font-size:12px}
+.produce-approval-panel label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.produce-approval-panel input{width:100%;box-sizing:border-box}
+.produce-approval-panel .produce-approval-hint{grid-column:1/-1}
+
+/* A4 報表（預覽與列印共用，固定白底黑字） */
+.produce-print-content{box-sizing:border-box;max-width:100%}
+.produce-print-table{width:100%;margin-bottom:0}
+.produce-print-table th,.produce-print-table td{vertical-align:top;overflow-wrap:anywhere}
+.produce-print-entries{margin:0 0 6px;padding-left:1.4em;display:grid;gap:1.2mm}
+.produce-print-entries li{line-height:1.4}
+.produce-print-entries span{white-space:pre-wrap}
+.produce-print-muted{font-style:italic}
+.produce-print-sign{margin-top:4px;padding-top:4px;border-top:1px dashed #cbd5e1;font-size:.9em}
+.produce-print-sign p{margin:0}
+.produce-print-approvals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3.5mm;margin-top:1.5mm}
+.hs-print-sheet{display:none}
+
+@media(max-width:1100px){
+  .produce-approval-grid{grid-template-columns:1fr}
+  .produce-approval-panel{grid-template-columns:1fr;align-items:stretch}
+}
+@media(max-width:900px){
+  .produce-entry{grid-template-columns:1fr;padding:14px;gap:10px}
+  .produce-entry-audit{padding-top:10px;border-top:1px dashed var(--line)}
+  .produce-print-approvals{grid-template-columns:1fr}
+}
+
+/* A4 列印：只印報表區，內容較多時自然跨頁。 */
+@media print{
+  body{background:#fff!important;margin:0!important;padding:0!important}
+  .v1-navbar,.system-page-heading,.system-page-header,.admin-page-actions,.hs-toolbar,.produce-approval-section,.hs-sheet,.hs-preview,.theme-toggle{display:none!important}
+  .content.v1-content{padding:0!important;margin:0!important;max-width:none!important}
+  .hs-page{display:block!important;padding:0!important;margin:0!important}
+  .hs-print-sheet,.hs-print-sheet *{visibility:visible!important}
+  .hs-print-sheet{display:block!important;color:#111!important;background:#fff!important;font-family:var(--font)!important;break-inside:auto!important}
+  .produce-print-approvals{grid-template-columns:1fr;gap:2mm}
+  .produce-print-approvals .hs-report-approval-stage{break-inside:avoid-page;page-break-inside:avoid}
+  .produce-print-table tr{break-inside:auto}
+  .produce-print-table thead{display:table-header-group}
+  .produce-print-entries li,.produce-print-sign{break-inside:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  .hs-pulse-dot{animation:none}
+}

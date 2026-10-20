@@ -79,7 +79,7 @@ const MECHANICAL_SHIFT_CODES = ['01-09', '09-17', '17-01'] as const;
 const MECHANICAL_RESULTS = ['正常', '已完成', '處理中', '待料', '待廠商', '交下班續辦', '無法處理'] as const;
 const MECHANICAL_RESULT_SET = new Set<string>(MECHANICAL_RESULTS);
 const MECHANICAL_UNFINISHED_RESULTS = new Set<string>(['處理中', '待料', '待廠商', '交下班續辦', '無法處理']);
-const HANDOVER_MODULE_KEYS = ['records', 'mechanical', 'business', 'guard', 'guard-approve', 'open-items', 'equipment', 'mechanical-schedule'] as const;
+const HANDOVER_MODULE_KEYS = ['records', 'mechanical', 'business', 'fruit', 'guard', 'guard-approve', 'open-items', 'equipment', 'mechanical-schedule'] as const;
 const SYSTEM_MODULE_KEYS: Record<string, readonly string[]> = {
   admin: ['users', 'permissions', 'locations', 'audit', 'alerts', 'notices', 'layouts', 'cycles', 'costs', 'locanalysis', 'health'],
   workorder: ['requests', 'dispatch', 'orders', 'attachments', 'analytics', 'repairmap3d'],

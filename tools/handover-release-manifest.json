@@ -39,7 +39,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-workspace.tsx",
-      "sha256": "CAE41841A5608D8DE8C2D8FA82FB9F6B79B2D1DF374AEEEAB125D6AD781F2C1A"
+      "sha256": "D5E6139DF30379466BF40B53093F26003634D7D781748EBFB8AB1442B51E28CA"
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-schedule.tsx",
@@ -47,7 +47,7 @@
     },
     {
       "path": "tools/handover-style-check.mjs",
-      "sha256": "239E5D299F1DAADA9AC6B1081DCFDDEBA4BF3ABF466DAF5AEEDCC25949239236"
+      "sha256": "4917399795DFEAE50A078146D8E0910B8E39D3E91289A6D6F9314C0C3467FFBC"
     },
     {
       "path": "tools/mechanical-print-fit-check.mjs",
