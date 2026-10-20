@@ -14,7 +14,7 @@ import { clearProfile } from '@/lib/profile-cache';
 import { findModule, findSystem, hasSystemAccess, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import VehicleLineLinkSection from '@/components/VehicleLineLinkSection';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
-import { resolveAppBackHref } from '@/lib/app-navigation';
+import { useAppBackHref } from './useAppBackHref';
 
 
 function taipeiClock() {
@@ -49,7 +49,7 @@ export function AppShell({ profile, title, children, heading }: {
   const routeModule = routeSystem ? findModule(routeSystem.key, pathParts[systemsIndex + 2] || '') : undefined;
   const headingSystem = heading?.system || routeSystem;
   const headingModule = heading?.module || routeModule;
-  const backHref = resolveAppBackHref(pathname);
+  const backHref = useAppBackHref(pathname);
   const pageHeading = headingSystem && headingModule
     ? <SystemPageHeader system={headingSystem} module={headingModule} title={heading?.title} metaTitle={heading?.metaTitle} description={heading?.description} />
     : null;

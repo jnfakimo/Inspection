@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { resolveAppBackHref } from '@/lib/app-navigation';
+import { useAppBackHref } from '@/components/useAppBackHref';
 import { clearProfile } from '@/lib/profile-cache';
 import { getSupabase } from '@/lib/supabase';
 
 /** 共用於 3D／平面全螢幕圖資頁的帳號與圖面導覽。 */
 export function StructuremapTopbarActions({ planeHref, label = '切換平面圖' }: { planeHref: string; label?: string }) {
   const pathname = usePathname();
-  const backHref = resolveAppBackHref(pathname);
+  const backHref = useAppBackHref(pathname);
 
   async function logout() {
     try { await getSupabase().auth.signOut({ scope: 'local' }); }

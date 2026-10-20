@@ -50,6 +50,17 @@ test('登入目的地固定為站內標準路徑，拒絕協定、外部 authori
   );
 });
 
+test('登入後不進戰情儀表板（根路徑），一律進開放的系統入口；系統入口本身與有權限的子系統照舊', () => {
+  for (const root of ['/Inspection/v2/', '/Inspection/v2', '/Inspection/v2/?v=a1238e9e3', '/word-cloud/v2/']) {
+    assert.equal(resolvePostLoginDestination(root, inspector), '/Inspection/v2/systems/', root);
+    assert.equal(resolvePostLoginDestination(root, sysadmin), '/Inspection/v2/systems/', root);
+  }
+  assert.equal(resolvePostLoginDestination('', inspector), '/Inspection/v2/systems/');
+  assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/', inspector), '/Inspection/v2/systems/');
+  assert.equal(resolvePostLoginDestination('/Inspection/v2/systems/handover/guard/', inspector), '/Inspection/v2/systems/handover/guard/');
+  assert.equal(requestedPostLoginPath('?next=%2FInspection%2Fv2%2F'), '/Inspection/v2/');
+});
+
 test('QR 登入完成後保留巡邏點與掃描方式參數', () => {
   const target = '/Inspection/v2/systems/guardpatrol/checkins/?marker=11111111-1111-4111-8111-111111111111&source=qr';
   assert.equal(resolvePostLoginDestination(target, patrolOfficer), target);
