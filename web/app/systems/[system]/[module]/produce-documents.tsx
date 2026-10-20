@@ -9,12 +9,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AdminModal, errorMessage, type Row } from '@/components/admin/shared';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
+import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { getSupabase } from '@/lib/supabase';
 import { PRODUCE_MARKET_NAMES, type ProduceGroup, type ProduceMarket } from '@/lib/produce-handover';
 import {
   LINE_LIMIT, PRODUCE_DOC_STAGES, PRODUCE_DOC_STAGE_LABELS, PRODUCE_DOC_STATUS_LABELS, SCRAP_FORM_NO, SLIP_COPIES,
   STOCK_COPIES, STOCK_FORM_NO, blankScrapLine, blankStockLine, compactLines, docGateReason, docProgressLabel, lineProblem,
-  monthDay, nextDocStage, rocDateLabel, slipTimeLabel, sumLines, taipeiLocalToIso, taipeiNowLocal,
+  monthDay, nextDocStage, rocDateLabel, slipTimeLabel, sumLines, taipeiLocalToIso, taipeiNowHalfHour, taipeiNowLocal,
   type ProduceDocStage, type ProduceDocStatus, type ProduceDocType, type ScrapLine, type StockLine,
 } from '@/lib/produce-documents';
 import type { Profile } from '@/types/app';
@@ -628,7 +629,7 @@ export function ProduceSlipPanel({ group, market }: PanelProps) {
 }
 
 function SlipForm({ group, market, suggestions, onClose, onIssued }: Scope & { suggestions: Suggestions; onClose: () => void; onIssued: (slip: Row) => void | Promise<void> }) {
-  const [form, setForm] = useState({ paper_no: '', processed_at: taipeiNowLocal(), vehicle: '', product_name: '', supplier_unit: '', qty_weight: '', receiver_name: '', remark: '' });
+  const [form, setForm] = useState({ paper_no: '', processed_at: taipeiNowHalfHour(), vehicle: '', product_name: '', supplier_unit: '', qty_weight: '', receiver_name: '', remark: '' });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const set = (key: keyof typeof form, value: string) => setForm(prev => ({ ...prev, [key]: value }));
@@ -649,7 +650,7 @@ function SlipForm({ group, market, suggestions, onClose, onIssued }: Scope & { s
   return <AdminModal className="produce-doc-modal" title="開立運回放行單" onClose={onClose}>
     <Suggest suggestions={suggestions} />
     <div className="admin-form-grid produce-form">
-      <label>處理時間（必填）<input type="datetime-local" value={form.processed_at} onChange={event => set('processed_at', event.target.value)} /></label>
+      <label>處理時間（必填）<LocalizedDateTimeInput ariaLabel="處理時間" value={form.processed_at} onChange={value => set('processed_at', value)} /></label>
       <label>紙本單號（選填，例如 001485）<input value={form.paper_no} maxLength={30} onChange={event => set('paper_no', event.target.value)} /></label>
       <label>車行、車號<input value={form.vehicle} maxLength={80} onChange={event => set('vehicle', event.target.value)} /></label>
       <label>品名（必填）<input list="produce-products" value={form.product_name} maxLength={80} onChange={event => set('product_name', event.target.value)} /></label>

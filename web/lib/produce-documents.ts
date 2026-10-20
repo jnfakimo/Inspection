@@ -140,6 +140,13 @@ export function taipeiNowLocal(now = new Date()) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
+/** 目前台灣時間，分鐘無條件捨去到 30 分鐘級距（與 LocalizedDateTimeInput 的時間下拉一致，預設值才選得到）。 */
+export function taipeiNowHalfHour(now = new Date()) {
+  const [date, time] = taipeiNowLocal(now).split('T');
+  const [hour, minute] = time.split(':').map(Number);
+  return `${date}T${String(hour).padStart(2, '0')}:${minute >= 30 ? '30' : '00'}`;
+}
+
 /** 放行單處理時間顯示：民國年月日時分。 */
 export function slipTimeLabel(value: unknown) {
   if (!value) return '';

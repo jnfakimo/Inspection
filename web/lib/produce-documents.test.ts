@@ -21,6 +21,7 @@ import {
   slipTimeLabel,
   sumLines,
   taipeiLocalToIso,
+  taipeiNowHalfHour,
   taipeiNowLocal,
 } from './produce-documents.ts';
 
@@ -100,6 +101,9 @@ test('日期與時間顯示：月/日、民國年、台灣時間', () => {
   assert.equal(taipeiLocalToIso('2026-10-15'), '');
   assert.equal(taipeiNowLocal(new Date('2026-10-15T02:30:00Z')), '2026-10-15T10:30');
   assert.equal(taipeiNowLocal(new Date('2026-10-15T16:30:00Z')), '2026-10-16T00:30', '跨日以台灣時間為準');
+  assert.equal(taipeiNowHalfHour(new Date('2026-10-15T02:47:00Z')), '2026-10-15T10:30', '無條件捨去到 30 分鐘');
+  assert.equal(taipeiNowHalfHour(new Date('2026-10-15T02:05:00Z')), '2026-10-15T10:00');
+  assert.equal(taipeiNowHalfHour(new Date('2026-10-15T16:10:00Z')), '2026-10-16T00:00');
   assert.equal(slipTimeLabel('2026-10-15T02:30:00Z'), '115 年 10 月 15 日 10:30');
   assert.equal(slipTimeLabel(''), '');
   assert.equal(slipTimeLabel('not-a-date'), '');
