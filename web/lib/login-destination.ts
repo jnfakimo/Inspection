@@ -49,7 +49,9 @@ export function resolvePostLoginDestination(requested: string | null | undefined
   const parsed = new URL(destination, 'https://local.invalid');
   const appPath = parsed.pathname.replace(/^\/(?:Inspection|word-cloud)\/v2/, '') || '/';
   if (appPath === '/login' || appPath.startsWith('/login/')) return DEFAULT_POST_LOGIN_PATH;
-  if (appPath === '/systems' || appPath === '/systems/' || appPath === '/') return destination;
+  // 登入後一律進「開放的系統」入口；戰情儀表板（根路徑）不作為登入目的地。
+  if (appPath === '/') return DEFAULT_POST_LOGIN_PATH;
+  if (appPath === '/systems' || appPath === '/systems/') return destination;
 
   const route = appPath.match(/^\/systems\/([^/]+)(?:\/([^/]+))?\/?$/);
   if (!route) return DEFAULT_POST_LOGIN_PATH;
