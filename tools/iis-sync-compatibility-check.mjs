@@ -88,6 +88,16 @@ if (process.platform !== 'win32') {
     const harness = String.raw`
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if ($env:IIS_TEST_GIT_TAR) {
+  function tar {
+    $converted = @($args | ForEach-Object {
+      if ($_ -match '^([A-Za-z]):\\(.*)$') {
+        '/' + $Matches[1].ToLowerInvariant() + '/' + $Matches[2].Replace('\', '/')
+      } else { $_ }
+    })
+    & $env:IIS_TEST_GIT_TAR --force-local @converted
+  }
+}
 function gh {
   $Arguments = @($args)
   $global:LASTEXITCODE = 0
@@ -103,6 +113,13 @@ function gh {
 & (Join-Path $env:IIS_TEST_PROJECT 'tools\sync-iis-cloud-site.ps1') -SiteRoot $env:IIS_TEST_SITE -StateRoot $env:IIS_TEST_STATE -ExpectedCommit $env:IIS_TEST_COMMIT -Apply
 `;
     const childEnv = { ...process.env, IIS_TEST_ARCHIVE: archive, IIS_TEST_PROJECT: project, IIS_TEST_SITE: site, IIS_TEST_STATE: state, IIS_TEST_COMMIT: 'test-commit' };
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      // Hosted Windows tar.exe cannot reliably read this UTF-8/PAX fixture.
+      // Use the runner's real Git-for-Windows tar for the integration test.
+      const gitTarDirectory = path.join(process.env.ProgramFiles, 'Git', 'usr', 'bin');
+      assert.ok(fs.existsSync(path.join(gitTarDirectory, 'tar.exe')), 'Git-for-Windows tar is required on the hosted runner');
+      childEnv.IIS_TEST_GIT_TAR = path.join(gitTarDirectory, 'tar.exe');
+    }
     // Do not pass a PowerShell 7 module search path into Windows PowerShell 5.1.
     for (const key of Object.keys(childEnv)) if (key.toLowerCase() === 'psmodulepath') delete childEnv[key];
     const rejected = spawnSync(path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
