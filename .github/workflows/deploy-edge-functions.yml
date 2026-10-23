@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 # 同時間只跑一個部署，避免兩個 push 交錯把舊版蓋回去。
 concurrency:
@@ -32,13 +33,25 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Wait for independent security checks before using deployment credentials
+        run: node tools/deployment-security-gate.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Require access token
         env:
@@ -150,6 +163,12 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
+
+      - name: Recheck exact commit before deploying functions
+        if: steps.changed.outputs.slugs != ''
+        run: node tools/deployment-security-gate.mjs --once
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Deploy
         if: steps.changed.outputs.slugs != ''

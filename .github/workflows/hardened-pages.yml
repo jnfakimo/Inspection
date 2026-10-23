@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -15,7 +16,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  security-gate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Wait for CI, CodeQL and dependency security checks for this commit
+        run: node tools/deployment-security-gate.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
   build:
+    needs: security-gate
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -61,6 +80,17 @@ jobs:
     outputs:
       page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Recheck exact commit immediately before publishing
+        run: node tools/deployment-security-gate.mjs --once
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Deploy restricted artifact
         id: deployment
         uses: actions/deploy-pages@v5

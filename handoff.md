@@ -5,6 +5,15 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-10-24）：**資安前三項修補與 ISO 導入基礎，由 Codex 接手完成本機實作；尚未提交／推送／部署。**
+使用者選擇先建立巡檢系統符合要求的基礎，接著明確指定修正 Next.js、certifi、主分支與部署管制。
+G 槽已保留既有 `.claude/` 與本批修改並 fast-forward 至 `9da92415f`。Next.js 更新 16.4.3；certifi 更新 2026.10.19 並設下限。
+main 保護已在線上設定並讀回：PR、8 個必要檢查、strict、enforce_admins、禁止 force push／刪除；不強制第二人 review。
+網站與 Edge Functions 的同 SHA CI／CodeQL／Commercial readiness gate 已寫入工作樹；CI 新增 Python 服務檢查與 gate／掃描器回歸。
+**重要**：線上目前已有新的必要檢查名稱，但新 workflow 尚未發布；須依本回合後續授權提交分支／建立 PR，待檢查全通過再合併，不能取消保護來繞過。
+隔離測試在 `C:\projects\Inspection-security-audit-20261024`，使用獨立相依與 venv；未啟停既有 3000 服務。Next 型別、靜態建置、136 HTML 發布產物稽核及 Python 正式相依 audit 均通過。
+原始證據在 `C:\AI\_logs\inspection-security-20261024`；完整狀態見 `docs/ISO27001_BASELINE.md`。正式部署版本尚未更新／驗證，其他密碼、手機與 CSP 風險維持待辦。
+
 最新（2026-10-20）：**頂端列「上頁」改為回到上一個動作、登入後不進戰情儀表板**（PR #94，已合併並部署，CI／CodeQL／Pages 皆成功）。
 「上頁」回到本分頁上一個站內頁面（軌跡存 `sessionStorage`，`web/components/useAppBackHref.ts` 與 `web/lib/app-navigation.ts`；不使用 `history.back()`、不記登入類頁面與含憑證字樣的查詢字串），沒有上一個才依階層回父層；
 從 `sessionStorage` 取回的路徑必須先過 `safeInternalPath` 白名單才能當連結目的地（否則 CodeQL `js/xss` 會失敗）。登入目的地若是根路徑（戰情儀表板）一律改進 `/systems/`（`resolvePostLoginDestination`）。

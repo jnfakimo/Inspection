@@ -18,6 +18,10 @@ dev = ["pytest>=8,<10", "ruff>=0.11,<1", "mypy>=1.15,<3", "bandit>=1.8,<2", "pip
 pythonpath = ["."]
 testpaths = ["tests"]
 
+[tool.uv]
+# 安全基線：避免重新解鎖時回到受影響的 CA 信任庫。
+constraint-dependencies = ["certifi>=2026.10.19"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
