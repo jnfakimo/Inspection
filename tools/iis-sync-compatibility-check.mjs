@@ -5,6 +5,48 @@ import path from 'node:path';
 import { generateKeyPairSync, sign, createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
+function writeTestTar(sourceRoot, names, archive) {
+  const blocks = [];
+  const octal = (header, offset, length, value) => {
+    Buffer.from(value.toString(8).padStart(length - 1, '0') + '\0').copy(header, offset);
+  };
+  const append = (name, content, type) => {
+    const header = Buffer.alloc(512);
+    const encodedName = Buffer.from(name, 'utf8');
+    assert.ok(encodedName.length <= 100, `tar fixture path too long: ${name}`);
+    encodedName.copy(header);
+    octal(header, 100, 8, 0o644);
+    octal(header, 108, 8, 0);
+    octal(header, 116, 8, 0);
+    octal(header, 124, 12, content.length);
+    octal(header, 136, 12, 0);
+    header.fill(0x20, 148, 156);
+    header.write(type, 156, 'ascii');
+    header.write('ustar\0', 257, 'ascii');
+    header.write('00', 263, 'ascii');
+    const checksum = header.reduce((sum, byte) => sum + byte, 0);
+    Buffer.from(checksum.toString(8).padStart(6, '0') + '\0 ').copy(header, 148);
+    blocks.push(header, content, Buffer.alloc((512 - content.length % 512) % 512));
+  };
+  for (const [index, name] of names.entries()) {
+    const content = fs.readFileSync(path.join(sourceRoot, name));
+    const tarName = name.replaceAll('\\', '/');
+    if (!/^[\x00-\x7F]*$/.test(tarName)) {
+      const record = `path=${tarName}\n`;
+      let length = Buffer.byteLength(record) + 2;
+      while (length !== Buffer.byteLength(record) + String(length).length + 1) {
+        length = Buffer.byteLength(record) + String(length).length + 1;
+      }
+      append(`PaxHeader-${index}`, Buffer.from(`${length} ${record}`), 'x');
+      append(`file-${index}`, content, '0');
+    } else {
+      append(tarName, content, '0');
+    }
+  }
+  blocks.push(Buffer.alloc(1024));
+  fs.writeFileSync(archive, Buffer.concat(blocks));
+}
+
 const source = fs.readFileSync('tools/sync-iis-cloud-site.ps1');
 assert.deepEqual([...source.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'Windows PowerShell 5.1 requires the UTF-8 BOM');
 if (process.platform !== 'win32') {
@@ -39,7 +81,9 @@ if (process.platform !== 'win32') {
     write(path.join(site, 'v2/_next/old.js'), 'keep old chunk');
     write(path.join(site, 'web.config'), 'keep IIS config');
     const archive = path.join(root, 'artifact.tar');
-    run('tar.exe', ['-cf', archive, '-C', release, '.']);
+    // Construct the fixture without the hosted Windows tar.exe creation bug;
+    // the sync script still lists and extracts the archive with the real tar.
+    writeTestTar(release, [...files.map(file => file.path), 'provenance.json', 'provenance.sig'], archive);
     // Only GitHub transport is mocked; extraction, signature checks, backup and copy are real.
     const harness = String.raw`
 $ErrorActionPreference = 'Stop'

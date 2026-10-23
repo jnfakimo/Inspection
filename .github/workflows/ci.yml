@@ -66,9 +66,7 @@ jobs:
         run: node --test tools/deployment-security-gate.test.mjs
 
   iis-powershell-compatibility:
-    # Windows Server 2025 runner currently crashes in the built-in tar.exe
-    # before the PowerShell 5.1 compatibility fixture can run.
-    runs-on: windows-2022
+    runs-on: windows-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
