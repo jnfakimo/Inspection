@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash, createPublicKey, sign as signPayload, verify as verifySignature } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { parse } from 'parse5';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -175,8 +176,8 @@ function provenanceMarker(relativePath) {
 // 手寫的 http-equiv 不會出現在產出的 HTML；Next 的 metadata.other 也會被濾掉。
 // 兩種寫法都是「看起來有防護、產出裡卻沒有」，因此改在建置階段注入，並且只有一份定義。
 //
-// Next 靜態匯出的 hydration script 是 inline 且內容每次建置都不同，無法用 hash 白名單，
-// script-src 只能留 unsafe-inline。真正的防線是 connect-src 與 img-src：
+// Next 靜態匯出的 hydration script 內容每次建置可能不同；對每個輸出頁面即時計算 hash，
+// 避免把任意內嵌 script 全部放行。connect-src 與 img-src 另限制資料外傳目標：
 // 即使發生 XSS，也只能連回本站、Supabase 與建置時明確設定的 Node API。
 // Node API 僅取 NEXT_PUBLIC_APP_API_URL 的 HTTPS origin，不把路徑或任意字串帶入 CSP。
 // frame-ancestors 只認 HTTP header，在 meta 形式無效，故不列入以免產生主控台警告。
@@ -189,7 +190,8 @@ const v2ConnectSources = [
 ].join(' ');
 const v2ContentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self'",
+  "script-src-attr 'none'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   // data: 供 QR 標籤、blob: 供 3D 貼圖，圖片外部來源僅限 Storage 公開桶。
@@ -203,6 +205,23 @@ const v2ContentSecurityPolicy = [
   "base-uri 'self'",
   "form-action 'self'",
 ].join('; ');
+
+function withInlineScriptHashes(policy, html) {
+  const hashes = new Set();
+  const visit = node => {
+    if (node.tagName === 'script' && !node.attrs?.some(attr => attr.name === 'src')) {
+      const start = node.sourceCodeLocation?.startTag?.endOffset;
+      const end = node.sourceCodeLocation?.endTag?.startOffset;
+      if (Number.isInteger(start) && Number.isInteger(end) && end > start) {
+        hashes.add(`'sha256-${createHash('sha256').update(html.slice(start, end), 'utf8').digest('base64')}'`);
+      }
+    }
+    for (const child of node.childNodes || []) visit(child);
+  };
+  visit(parse(html, { sourceCodeLocationInfo: true }));
+  const missing = [...hashes].filter(hash => !cspDirectiveSources(policy, 'script-src').includes(hash));
+  return policy.replace("script-src 'self'", `script-src 'self' ${missing.join(' ')}`.trim());
+}
 
 function addHtmlDirectives(html, relativePath) {
   const directives = [];
@@ -221,7 +240,8 @@ function addHtmlDirectives(html, relativePath) {
   // 保留 V1 自帶的 CDN 白名單；已改成 V2 跳轉的舊入口仍需要 CSP。
   // CSP 必須早於任何受限資源，所以排在最前面。
   if (!/http-equiv\s*=\s*["']content-security-policy["']/i.test(html)) {
-    directives.unshift(`<meta http-equiv="Content-Security-Policy" content="${v2ContentSecurityPolicy}">`);
+    const policy = relativePath.startsWith('v2/') ? withInlineScriptHashes(v2ContentSecurityPolicy, html) : v2ContentSecurityPolicy;
+    directives.unshift(`<meta http-equiv="Content-Security-Policy" content="${policy}">`);
   }
   if (!directives.length) return html;
   return html.replace(/<head(?:\s[^>]*)?>/i, `$&${directives.join('')}`);
@@ -405,9 +425,16 @@ async function verifyArtifact() {
       throw new Error(`正式頁面缺少隱藏來源指紋：${relative}`);
     }
     if (relative.startsWith('v2/') && relative.endsWith('.html')) {
-      const connectSources = cspDirectiveSources(contentSecurityPolicy(text), 'connect-src');
+      const policy = contentSecurityPolicy(text);
+      const connectSources = cspDirectiveSources(policy, 'connect-src');
       if (!connectSources.length) {
         throw new Error(`V2 正式頁面缺少 connect-src 防護：${relative}`);
+      }
+      if (cspDirectiveSources(policy, 'script-src').includes("'unsafe-inline'")) {
+        throw new Error(`V2 正式頁面放行任意內嵌 script：${relative}`);
+      }
+      if (withInlineScriptHashes(policy, text) !== policy) {
+        throw new Error(`V2 正式頁面的內嵌 script hash 不完整：${relative}`);
       }
       if (nodeAppApiOrigin && !connectSources.includes(nodeAppApiOrigin)) {
         throw new Error(`V2 正式頁面未允許設定的 Node API：${relative}`);

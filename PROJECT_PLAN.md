@@ -7,7 +7,7 @@
 ## 1. 目標
 
 2026-10-24 追加目標：先建立巡檢系統的 ISO/IEC 27001 導入與證據基礎；使用者指定優先修正 Next.js、certifi、主分支／發布管制。
-本機修補、測試及線上分支保護完成情形見 [ISO27001_BASELINE.md](docs/ISO27001_BASELINE.md)；程式與 workflow 尚未提交／發布，不宣稱正式系統已完成修補或符合 ISO。
+前三項的 GitHub 發布、測試與讀回證據見 [ISO27001_BASELINE.md](docs/ISO27001_BASELINE.md)。後續風險與候選控制見 [ISO27001_RISK_REGISTER.md](docs/ISO27001_RISK_REGISTER.md)；正式主機與組織制度仍需獨立驗證，不宣稱已符合 ISO。
 
 開發初期沒有先定義好主系統、各系統、子系統的版型與色彩規範，導致畫面不一致。本計畫把它們收斂成**單一標準**：
 

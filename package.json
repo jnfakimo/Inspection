@@ -85,7 +85,7 @@
     "test:weather-api": "node --test web/lib/weather-api.test.ts tools/cwa-weather-contract.test.mjs",
     "test:board-notices": "node --experimental-strip-types tools/board-notices-check.mjs",
     "test:official-timeout-errors": "node tools/official-document-timeout-error-check.mjs",
-    "test:username-login": "node --experimental-strip-types --test web/lib/username-login-error.test.ts web/lib/username-login-routing.test.ts",
+    "test:username-login": "node --experimental-strip-types --test web/lib/username-login-error.test.ts web/lib/username-login-routing.test.ts supabase/functions/_shared/client-ip.test.ts",
     "test:mechanical-print-fit": "node --experimental-strip-types --test web/lib/mechanical-print-fit.test.ts && node tools/mechanical-print-fit-check.mjs",
     "test:weather-widget-layout": "node --experimental-strip-types --test web/lib/weather-widget-layout.test.ts",
     "test:weather-map-v3": "node --experimental-strip-types --test web/lib/weather-map-v3.test.ts",

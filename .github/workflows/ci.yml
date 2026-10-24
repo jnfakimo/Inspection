@@ -134,6 +134,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Typecheck mobile application
         run: npm run typecheck
+      - name: Verify encrypted mobile storage and retention
+        run: npm run test:storage
       - name: Verify mobile dependency tree
         run: npm ls compression shell-quote source-map-js uuid
       - name: Bundle Android and iOS with synthetic configuration

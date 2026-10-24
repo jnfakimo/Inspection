@@ -9,12 +9,17 @@ export const normalizeProxyIp = (value: unknown) => {
   if (!candidate) return null;
 
   const bracketedIpv6 = candidate.match(/^\[([0-9a-f:.]+)\](?::\d+)?$/i);
-  if (bracketedIpv6) return bracketedIpv6[1];
+  const unwrapped = bracketedIpv6?.[1] || candidate;
 
-  const ipv4WithPort = candidate.match(/^((?:\d{1,3}\.){3}\d{1,3}):\d+$/);
-  if (ipv4WithPort) return ipv4WithPort[1];
-
-  return candidate;
+  const ipv4WithPort = unwrapped.match(/^((?:\d{1,3}\.){3}\d{1,3}):\d+$/);
+  const address = ipv4WithPort?.[1] || unwrapped;
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(address)) {
+    const octets = address.split('.').map(Number);
+    return octets.every(octet => octet >= 0 && octet <= 255) ? address : null;
+  }
+  if (!/^[0-9a-f:]+$/i.test(address) || !address.includes(':')) return null;
+  try { return new URL(`http://[${address}]/`).hostname.slice(1, -1); }
+  catch { return null; }
 };
 
 export const clientIpFromRequest = (req: Request) => {
@@ -23,5 +28,7 @@ export const clientIpFromRequest = (req: Request) => {
     req.headers.get("x-forwarded-for") ||
     req.headers.get("fly-client-ip") ||
     "";
+  // Only the first hop may represent a client. The gateway must replace any caller-supplied
+  // forwarding headers; otherwise these fields are untrusted and cannot protect rate limits.
   return normalizeProxyIp(raw.split(",")[0]);
 };

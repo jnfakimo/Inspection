@@ -2,6 +2,7 @@
 
 更新：2026-10-24。目標由使用者確認為「先讓巡檢系統符合要求，建立日後驗證基礎」。
 本文件不是驗證證書或完整適用性聲明（SoA），不宣稱組織已符合標準。
+風險與候選控制工作底稿見 [ISO27001_RISK_REGISTER.md](ISO27001_RISK_REGISTER.md)，其中明列已驗證與尚缺的正式環境證據。
 
 ## 範圍與證據管理
 
@@ -57,6 +58,16 @@
 ## 後續步驟
 
 確認 Python 訊號服務是否在其他主機安裝；若有，依新鎖檔更新環境並重驗 certifi。主分支目前由必要檢查及發布 gate 保護；後續改動仍須在同一 commit 通過檢查。
-其餘帳號、手機、CSP、代理與組織制度控制維持待辦，未列為本批已修正。
+其餘帳號、手機、CSP、代理與組織制度控制當時維持待辦；後續程式處理與仍缺證據見下節。
+
+## 2026-10-24 後續處理與邊界
+
+- 帳號申請核准不再建立所有人可猜到的共用初始密碼；使用者只能由本人信箱收到的啟用連結設密碼。離線回歸已通過。現行 8 位純數字密碼政策、既有帳號及雲端／地端 Auth 設定仍需協調遷移與正式驗證。
+- 手機登入資料、勤務狀態與 GPS 佇列以 AES-GCM 加密，金鑰由 SecureStore 保存，`expo-crypto` 升至 SDK 57 建議修補版 57.0.4。遷移舊資料採「先寫密文、再刪明文」；大型密文分段並在全部寫完後切換索引；GPS 保存 7 天，最多 10,000 筆，並行寫入序列化。Android 自動備份停用，避免密文與 Keystore 金鑰分離。型別、四項功能測試、Android／iOS 離線 bundle 通過；實機升級、背景定位及安全儲存服務尚未驗證。
+- V2 CSP 改為逐頁內嵌 script hash，停用任意 inline script 與 inline handler；138 頁隔離建置及產物檢查通過。由於網站是靜態匯出，IIS 或其他正式入口的 `frame-ancestors` 等 HTTP 回應標頭仍需在實際站台核對。
+- 共用 IP 解析器拒絕無效位址，`audit-event` 與其他 Edge Functions 共用；兩項單元測試通過。代理是否清除／覆蓋外部送入的轉送標頭，無正式環境讀回，故限流信任邊界尚不能結案。
+- `braces` 的 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) 於 2026-10-23 撤回，Dependabot #15 已附理由結案。`node-forge` 的 [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) 仍有效且沒有修補版本，依賴來自 Expo CLI／簽章工具。Android bundle source map 無此套件，但建置鏈風險保留，不能標為已修補。另有 `zod` 高風險公告，需追蹤上游相依更新。
+- 本機沒有訊號服務正式安裝，已知地端主機本次網路不可達；遠端 `certifi`、IIS 實際路徑與版本都維持未驗證。
+- [風險與候選控制工作底稿](ISO27001_RISK_REGISTER.md) 已建立；正式範圍、風險所有人、完整 SoA、恢復演練、內部稽核、管理審查與接受紀錄仍需組織執行。
 
 參考：[ISO 標準說明](https://www.iso.org/standard/27001)、[2024 修訂](https://www.iso.org/standard/88435.html)。

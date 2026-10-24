@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "tw.com.tapmc.vehicletracker",
+      "allowBackup": false,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -26,6 +27,7 @@
       ]
     },
     "plugins": [
+      ["expo-secure-store", { "configureAndroidBackup": true }],
       [
         "expo-location",
         {
