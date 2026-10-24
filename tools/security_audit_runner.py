@@ -1,6 +1,6 @@
 """
-北農中央戰情室暨巡檢系統 - ISO 27001 資安合規與弱點綜合掃描器
-整合：Bandit (SAST 程式弱點) + pip-audit (SCA 相依套件 CVE) + detect-secrets (憑證與金鑰外洩)
+北農中央戰情室暨巡檢系統 - 技術資安掃描（不判定 ISO/IEC 27001 符合性）
+整合：Bandit、pip-audit 與內建機密規則；不代表完整弱點掃描或 ISMS 稽核。
 """
 
 from __future__ import annotations
@@ -12,15 +12,32 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
 class SecurityAuditRunner:
-    """ISO 27001 資安自動化稽核執行器"""
+    """技術掃描證據產生器；工具失敗不得視為通過。"""
 
     def __init__(self, project_root: str):
         self.project_root = os.path.abspath(project_root)
         self.report_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    def _run_json(self, cmd):
+        proc = subprocess.run(cmd, cwd=self.project_root, capture_output=True,
+                              text=True, encoding="utf-8", timeout=600)
+        if proc.returncode not in (0, 1) or not proc.stdout.strip():
+            raise ValueError("工具未產生有效結果；請確認安裝、網路與權限")
+        return proc.returncode, json.loads(proc.stdout)
+
+    @staticmethod
+    def overall_status(*results):
+        if not results or any(r.get("status") not in ("passed", "warning") for r in results):
+            return "incomplete"
+        counts = ("high_issues", "medium_issues", "low_issues", "vulnerabilities_count", "secrets_count")
+        if any(r.get("status") == "warning" or any(r.get(k, 0) > 0 for k in counts) for r in results):
+            return "warning"
+        return "passed"
 
     def run_bandit_sast(self, target_dirs: List[str]) -> Dict[str, Any]:
         """執行 Bandit 靜態程式碼安全分析 (SAST)"""
@@ -36,6 +53,8 @@ class SecurityAuditRunner:
         
         valid_dirs = [d for d in target_dirs if os.path.exists(os.path.join(self.project_root, d))]
         if not valid_dirs:
+            results["status"] = "incomplete"
+            results["error_message"] = "沒有可掃描的目錄"
             return results
 
         cmd = [
@@ -44,10 +63,15 @@ class SecurityAuditRunner:
             "-f", "json"
         ]
         
-        proc = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True, encoding="utf-8")
         try:
-            output_json = json.loads(proc.stdout) if proc.stdout else {}
-            metrics = output_json.get("metrics", {}).get("_totals", {})
+            exit_code, output_json = self._run_json(cmd)
+            metrics = output_json["metrics"]["_totals"]
+            if output_json.get("errors") or not isinstance(output_json.get("results"), list):
+                raise ValueError("Bandit 結果不完整")
+            if metrics.get("loc", 0) <= 0:
+                raise ValueError("Bandit 未掃描任何程式碼")
+            if exit_code == 1 and not output_json["results"]:
+                raise ValueError("Bandit 非成功結束且沒有問題明細")
             results["high_issues"] = metrics.get("SEVERITY.HIGH", 0)
             results["medium_issues"] = metrics.get("SEVERITY.MEDIUM", 0)
             results["low_issues"] = metrics.get("SEVERITY.LOW", 0)
@@ -62,11 +86,11 @@ class SecurityAuditRunner:
                     "line": item.get("line_number")
                 })
                 
-            if results["high_issues"] > 0 or results["medium_issues"] > 0:
+            if any(results[k] > 0 for k in ("high_issues", "medium_issues", "low_issues")):
                 results["status"] = "warning"
-        except Exception as exc:
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
             results["status"] = "error"
-            results["error_message"] = str(exc)
+            results["error_message"] = "Bandit 未完成；不可據此判定零弱點"
 
         return results
 
@@ -81,43 +105,35 @@ class SecurityAuditRunner:
         }
         
         cmd = [sys.executable, "-m", "pip_audit", "-f", "json"]
-        proc = subprocess.run(cmd, cwd=self.project_root, capture_output=True, text=True, encoding="utf-8")
-        
         try:
-            if proc.stdout:
-                audit_data = json.loads(proc.stdout)
-                # 遍歷回傳之套件漏洞
-                if isinstance(audit_data, list):
-                    for pkg in audit_data:
-                        vulns = pkg.get("vulns", [])
-                        if vulns:
-                            for v in vulns:
-                                results["vulnerabilities_count"] += 1
-                                results["vulnerabilities"].append({
-                                    "package": pkg.get("name"),
-                                    "version": pkg.get("version"),
-                                    "id": v.get("id"),
-                                    "fix_versions": v.get("fix_versions", []),
-                                    "description": v.get("description", "")
-                                })
-                elif isinstance(audit_data, dict) and "dependencies" in audit_data:
-                    for pkg in audit_data["dependencies"]:
-                        vulns = pkg.get("vulns", [])
-                        if vulns:
-                            for v in vulns:
-                                results["vulnerabilities_count"] += 1
-                                results["vulnerabilities"].append({
-                                    "package": pkg.get("name"),
-                                    "version": pkg.get("version"),
-                                    "id": v.get("id"),
-                                    "fix_versions": v.get("fix_versions", [])
-                                })
-
+            exit_code, audit_data = self._run_json(cmd)
+            packages = audit_data if isinstance(audit_data, list) else audit_data["dependencies"]
+            if not isinstance(packages, list) or not packages:
+                raise ValueError("pip-audit 未提供套件清單")
+            skipped = []
+            for pkg in packages:
+                if pkg.get("skip_reason"):
+                    skipped.append(pkg.get("name", "unknown"))
+                    continue
+                if not isinstance(pkg.get("vulns"), list):
+                    raise ValueError("pip-audit 套件結果缺少漏洞欄位")
+                for v in pkg["vulns"]:
+                    results["vulnerabilities_count"] += 1
+                    results["vulnerabilities"].append({
+                        "package": pkg.get("name"), "version": pkg.get("version"),
+                        "id": v.get("id"), "fix_versions": v.get("fix_versions", [])
+                    })
             if results["vulnerabilities_count"] > 0:
                 results["status"] = "warning"
-        except Exception as exc:
+            elif exit_code != 0:
+                raise ValueError("pip-audit 非成功結束且沒有問題明細")
+            if skipped:
+                results["status"] = "incomplete"
+                results["skipped_packages"] = skipped
+                results["error_message"] = "部分套件未完成檢查"
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
             results["status"] = "error"
-            results["error_message"] = str(exc)
+            results["error_message"] = "pip-audit 未完成；不可據此判定零弱點"
 
         return results
 
@@ -125,10 +141,12 @@ class SecurityAuditRunner:
         """執行密鑰外洩偵測 (Secret Scan)"""
         print("🔍 [3/3] 正在執行全專案密鑰與敏感憑證外洩偵測...")
         results = {
-            "tool": "detect-secrets",
+            "tool": "builtin-secret-rules",
             "status": "passed",
             "secrets_count": 0,
-            "findings": []
+            "findings": [],
+            "files_scanned": 0,
+            "read_errors": 0,
         }
         
         # 內建嚴格檢查規則（排除正規表示式取代語法，精確偵測真實金鑰）
@@ -142,21 +160,27 @@ class SecurityAuditRunner:
         
         import re
         scan_dirs = ["web", "system", "backend", "tools", "supabase"]
-        extensions = {".html", ".js", ".jsx", ".ts", ".tsx", ".py", ".json", ".sql", ".env"}
+        extensions = {".html", ".js", ".jsx", ".ts", ".tsx", ".py", ".json", ".sql"}
         
         for sdir in scan_dirs:
             full_dir = os.path.join(self.project_root, sdir)
             if not os.path.exists(full_dir):
                 continue
-            for root, _, files in os.walk(full_dir):
+            def walk_error(_error):
+                results["read_errors"] += 1
+            for root, _, files in os.walk(full_dir, onerror=walk_error):
                 if any(ignored in root for ignored in [".next", "node_modules", ".temp", "__pycache__", "dist"]):
                     continue
                 for fname in files:
+                    if fname.startswith(".env"):
+                        continue
                     ext = os.path.splitext(fname)[1].lower()
                     if ext in extensions:
                         fpath = os.path.join(root, fname)
+                        if os.path.islink(fpath):
+                            continue
                         try:
-                            with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                            with open(fpath, "r", encoding="utf-8") as f:
                                 for line_no, line in enumerate(f, 1):
                                     for rule_name, pat in forbidden_patterns:
                                         if re.search(pat, line):
@@ -166,30 +190,32 @@ class SecurityAuditRunner:
                                                 "file": os.path.relpath(fpath, self.project_root),
                                                 "line": line_no
                                             })
-                        except Exception:
-                            pass
+                            results["files_scanned"] += 1
+                        except (OSError, UnicodeError):
+                            results["read_errors"] += 1
 
         if results["secrets_count"] > 0:
             results["status"] = "warning"
+        if results["read_errors"] or results["files_scanned"] == 0:
+            results["status"] = "incomplete"
+            results["error_message"] = "部分來源無法讀取或沒有掃描檔案"
 
         return results
 
     def generate_markdown_report(self, sast_res: Dict[str, Any], sca_res: Dict[str, Any], secret_res: Dict[str, Any]) -> str:
-        """產出 ISO 27001 Markdown 稽核報告"""
-        is_all_clean = (
-            sast_res.get("high_issues", 0) == 0 and
-            sast_res.get("medium_issues", 0) == 0 and
-            sca_res.get("vulnerabilities_count", 0) == 0 and
-            secret_res.get("secrets_count", 0) == 0
-        )
-        
-        status_badge = "🟢 **合規 (COMPLIANT)**" if is_all_clean else "🟡 **需關注 (ACTION REQUIRED)**"
+        """產出技術掃描報告；未完成項目必須顯示，不推導 ISO 符合性。"""
+        labels = {"passed": "本次範圍未檢出問題", "warning": "有發現，待評估處理", "incomplete": "未完成，不可判定通過", "error": "工具失敗，不可判定通過"}
+        status_badge = labels[self.overall_status(sast_res, sca_res, secret_res)]
+        def label(result):
+            return labels.get(result.get("status"), labels["incomplete"])
         
         lines = [
-            "# ISO 27001 全專案資安稽核報告 (Security Audit Report)",
+            "# 技術資安掃描報告",
             f"- **稽核時間**：`{self.report_time}`",
             f"- **專案名稱**：臺北農產 中央戰情室暨巡檢系統",
             f"- **總體狀態**：{status_badge}",
+            "- **符合性界線**：本報告不判定 ISO/IEC 27001 符合性，也不構成認證或完整 ISMS 稽核。",
+            "- **範圍限制**：pip-audit 檢查執行此工具的 Python 環境，不代表專案鎖檔、npm、Deno 或正式部署套件。機密檢查使用內建規則，不讀取 .env 類檔案。",
             "",
             "---",
             "",
@@ -197,18 +223,20 @@ class SecurityAuditRunner:
             "",
             "| 檢測維度 | 檢測工具 | 檢測範圍 | 結果 | 風險狀態 |",
             "| :--- | :--- | :--- | :--- | :--- |",
-            f"| **SAST 靜態代碼分析** | Bandit v1.9.4 | `backend/`, `tools/` | High: {sast_res.get('high_issues', 0)}, Med: {sast_res.get('medium_issues', 0)}, Low: {sast_res.get('low_issues', 0)} | {'✅ 通過' if sast_res.get('high_issues', 0) == 0 else '⚠️ 需修復'} |",
-            f"| **SCA 相依套件檢測** | pip-audit v2.10.1 | Python 第三方環境套件 | 發現 CVE 漏洞數: {sca_res.get('vulnerabilities_count', 0)} | {'✅ 安全' if sca_res.get('vulnerabilities_count', 0) == 0 else '⚠️ 需升級'} |",
-            f"| **Secret 憑證防外洩** | detect-secrets | `web/`, `backend/`, `tools/`, `system/` | 敏感金鑰殘留: {secret_res.get('secrets_count', 0)} 筆 | {'✅ 乾淨' if secret_res.get('secrets_count', 0) == 0 else '🚨 立即排除'} |",
+            f"| SAST | Bandit（實際安裝版本） | `backend/`, `tools/` | High: {sast_res.get('high_issues', 0)}, Med: {sast_res.get('medium_issues', 0)}, Low: {sast_res.get('low_issues', 0)} | {label(sast_res)} |",
+            f"| SCA | pip-audit（實際安裝版本） | 目前 Python 環境 | 已回報弱點: {sca_res.get('vulnerabilities_count', 0)} | {label(sca_res)} |",
+            f"| 機密規則 | builtin-secret-rules | `web/`, `system/`, `backend/`, `tools/`, `supabase/` | 已回報命中: {secret_res.get('secrets_count', 0)} | {label(secret_res)} |",
             "",
             "---",
             "",
-            "## 🛡️ ISO 27001 安全控制對應說明 (Annex A Controls)",
-            "- **A.8.25 安全開發生命週期 (Secure Development Lifecycle)**：已於代碼庫整合 Bandit SAST 靜態分析，杜絕注入攻擊與硬編碼漏洞。",
-            "- **A.8.28 安全編碼 (Secure Coding)**：落實敏感資料去識別化、密鑰自環境變數注入與嚴格型別校驗。",
-            "- **A.8.30 外部套件安全 (Security in Third-Party Components)**：透過 pip-audit 定期比對 CVE 漏洞庫，防範供應鏈攻擊。",
+            "## 證據用途",
+            "- 可作為弱點管理、安全開發與安全測試的部分證據；控制適用性、實施與有效性仍須另行評估。",
+            "- 掃描未檢出不代表杜絕注入、機密外洩或其他攻擊；應另保留審查、修補、重測與正式環境驗證紀錄。",
             ""
         ]
+        for result in (sast_res, sca_res, secret_res):
+            if result.get("error_message"):
+                lines.append(f"- 未完成說明（{result.get('tool', 'unknown')}）：{result['error_message']}")
         
         if sast_res.get("findings"):
             lines.append("### 🔍 SAST 程式弱點清單")
@@ -219,7 +247,7 @@ class SecurityAuditRunner:
         if sca_res.get("vulnerabilities"):
             lines.append("### ⚠️ SCA 套件弱點清單")
             for v in sca_res["vulnerabilities"]:
-                lines.append(f"- **{v['package']} (v{v['version']})** - CVE: `{v['id']}` (建議升級至: {', '.join(v.get('fix_versions', [])) or '最新版本'})")
+                lines.append(f"- **{v['package']} (v{v['version']})** - 公告: `{v['id']}` (已知修補版本: {', '.join(v.get('fix_versions', [])) or '未提供，需追蹤上游與評估緩解措施'})")
             lines.append("")
 
         if secret_res.get("findings"):
@@ -240,6 +268,8 @@ class SecurityAuditRunner:
         md_content = self.generate_markdown_report(sast, sca, secret)
         json_content = {
             "generated_at": self.report_time,
+            "overall_status": self.overall_status(sast, sca, secret),
+            "iso27001_conformance": "not_assessed",
             "sast": sast,
             "sca": sca,
             "secret_scan": secret
@@ -256,7 +286,7 @@ class SecurityAuditRunner:
             
         elapsed_sec = time.perf_counter() - start_t
         print("\n" + "=" * 60)
-        print(f"✅ ISO 27001 資安綜合稽核完成！耗時: {elapsed_sec:.2f} 秒")
+        print(f"技術掃描結果：{json_content['overall_status']}；ISO 符合性未評估。耗時: {elapsed_sec:.2f} 秒")
         print(f"📄 Markdown 報告已產出: {md_file}")
         print(f"📊 JSON 稽核報告已產出: {json_file}")
         print("=" * 60)
@@ -266,8 +296,7 @@ class SecurityAuditRunner:
         print(f"• pip-audit SCA: {sca.get('vulnerabilities_count', 0)} 個 CVE 漏洞")
         print(f"• Secret Scan: {secret.get('secrets_count', 0)} 筆未排除金鑰")
         
-        has_critical = (sast.get("high_issues", 0) > 0 or sca.get("vulnerabilities_count", 0) > 0 or secret.get("secrets_count", 0) > 0)
-        return 1 if has_critical else 0
+        return 0 if json_content["overall_status"] == "passed" else 1
 
 
 def main():
