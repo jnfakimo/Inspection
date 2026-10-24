@@ -42,21 +42,21 @@
 5. `security_audit_runner.py` 不再從技術掃描推導 ISO 合規；空輸出、執行失敗、不完整回應及漏掃會回傳非成功。
    正確標示內建規則與 Python 執行環境範圍；保留歷史報告並更正結論。14 項離線回歸通過。
 
-### 本機驗證及發布界線
+### 驗證及發布證據
 
 - 隔離測試：`C:\projects\Inspection-security-audit-20261024`，使用獨立 npm 相依及 Python venv，不改動使用中的開發服務。
 - Next.js 型別、靜態匯出、hardened artifact 與 Commercial readiness 均通過；9 項部署 gate 測試通過。
 - 首輪 npm test 在交接簿檔案雜湊因 Windows CRLF 差異中止；確認內容僅換行差異後，將執行副本還原為 Git blob 位元組，16 檔雜湊檢查與後續測試通過；未更改 manifest 或正式程式以略過測試。
 - 最後重新執行完整 `npm test` 已以 exit 0 通過，紀錄為 `next-full-tests-final.log`；YAML 語法／流程依賴、`git diff --check` 及本機 IIS 相容測試亦通過。
-- 主分支保護已透過 GitHub API 寫入並讀回。新檢查名稱與部署流程須隨本批程式發布後才開始產生遠端證據；目前不得以本機測試代替新的 GitHub CI 結果。
-- 本批未提交、推送或部署。正式站 Next.js 產物及遠端 Python 執行環境版本尚未確認更新；本機沒有找到執行中的 signal-service 程序，不能據此推論其他主機未部署。
+- 主分支保護已透過 GitHub API 寫入並讀回。PR [#95](https://github.com/jnfakimo/Inspection/pull/95) 的 8 項必要檢查全部成功後合併，版本為 `83eb3b2b52f5ba358356bd100ef4481e44d60533`。
+- 合併版 [CI](https://github.com/jnfakimo/Inspection/actions/runs/40042849592)、[CodeQL](https://github.com/jnfakimo/Inspection/actions/runs/40042849517)、[Commercial readiness](https://github.com/jnfakimo/Inspection/actions/runs/40042849539) 均成功；[Hardened Pages](https://github.com/jnfakimo/Inspection/actions/runs/40042849467) 的閘門、封裝、部署及部署後全頁掃描均成功。
+- 線上 `provenance.json` 的簽章標記及 commit 已讀回一致，`/v2/login/` 回應 HTTP 200。本批沒有變更 Edge Function 原始碼，因此未觸發 Edge Functions 重新部署；已發布其後續使用的安全 gate。
+- Python 訊號服務文件目前定位為未接正式設備／戰情室的本機原型；本機未發現常駐程序或正式 venv。若其他主機有獨立安裝，仍須盤點其版本並更新，不能用 Git 鎖檔推論遠端執行環境已修補。
 - 原始驗證紀錄：`C:\AI\_logs\inspection-security-20261024`。含相依掃描、建置、測試及分支保護讀回；不含秘密值。
 
 ## 後續步驟
 
-依專案 AGENTS.md 的明確授權流程，提交修補分支、推送並建立 PR；必要檢查通過才能合併。
-若遠端 IIS 相容測試仍發生歷史的 tar.exe crash，必須排除原因，不能略過必要檢查。
-合併後驗證網站／API 自動部署 gate 與實際版本；Python 服務需確認正式部署位置後更新環境及重驗。
+確認 Python 訊號服務是否在其他主機安裝；若有，依新鎖檔更新環境並重驗 certifi。主分支目前由必要檢查及發布 gate 保護；後續改動仍須在同一 commit 通過檢查。
 其餘帳號、手機、CSP、代理與組織制度控制維持待辦，未列為本批已修正。
 
 參考：[ISO 標準說明](https://www.iso.org/standard/27001)、[2024 修訂](https://www.iso.org/standard/88435.html)。
