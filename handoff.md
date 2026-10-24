@@ -120,6 +120,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## 🕐 最後更新
 
-2026-10-24 · Codex · ISO 後續強化進行中：分支 `fix/inspection-iso-hardening-20261024`；帳號核准不設初始密碼，行動權杖／GPS 加密與 7 天期限，V2 CSP script hash，IP 格式檢查，ISO 風險工作底稿。隔離 Android／iOS bundle、V2 138 頁建置通過；正式主機、行動實機、代理覆蓋、恢復演練與組織核定仍無證據。`node-forge` 無修補版，維持待追蹤。合併／部署狀態以後續 GitHub 檢查及正式讀回為準。
+2026-10-24 · Codex · 使用者決定預設密碼暫不更動；在 `fix/inspection-security-followup-20261024` 恢復原本帳號核准密碼流程，風險 R-01／R-04 維持未結案。隔離副本完整 `npm test`、V2 型別檢查、`deno check admin-api`、138 頁 hardened 建置通過；`security:audit` 0 錯誤、3 個既有警告。其他已完成的行動儲存、CSP 與 IP 格式檢查仍保留；正式主機 443／445 不通，行動實機、代理覆蓋、恢復演練與組織核定仍需證據。`node-forge` 無修補版，`zod` 上游尚未提供相容修補；都維持待追蹤。以下上一筆是當時狀態，不能當作目前結案證據。
+
+2026-10-24 · Codex · ISO 後續強化當時狀態：分支 `fix/inspection-iso-hardening-20261024`；帳號核准不設初始密碼，行動權杖／GPS 加密與 7 天期限，V2 CSP script hash，IP 格式檢查，ISO 風險工作底稿。隔離 Android／iOS bundle、V2 138 頁建置通過；正式主機、行動實機、代理覆蓋、恢復演練與組織核定仍無證據。`node-forge` 無修補版，維持待追蹤。合併／部署狀態以後續 GitHub 檢查及正式讀回為準。
 
 2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 收工：水果組第二批（PR #92）與上頁／登入導向（PR #94）已上線；本交接更新見分支 `codex/handoff-produce-documents`（PR #93）。Git push：✅ 已推（4441bf36a，其後的回填 commit 見 PR #93）
