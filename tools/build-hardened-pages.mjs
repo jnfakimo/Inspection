@@ -1,6 +1,7 @@
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash, createPublicKey, sign as signPayload, verify as verifySignature } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { parse } from 'parse5';
 import path from 'node:path';
 import process from 'node:process';
 
@@ -207,10 +208,17 @@ const v2ContentSecurityPolicy = [
 
 function withInlineScriptHashes(policy, html) {
   const hashes = new Set();
-  for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
-    if (/\bsrc\s*=/.test(match[1]) || !match[2]) continue;
-    hashes.add(`'sha256-${createHash('sha256').update(match[2], 'utf8').digest('base64')}'`);
-  }
+  const visit = node => {
+    if (node.tagName === 'script' && !node.attrs?.some(attr => attr.name === 'src')) {
+      const start = node.sourceCodeLocation?.startTag?.endOffset;
+      const end = node.sourceCodeLocation?.endTag?.startOffset;
+      if (Number.isInteger(start) && Number.isInteger(end) && end > start) {
+        hashes.add(`'sha256-${createHash('sha256').update(html.slice(start, end), 'utf8').digest('base64')}'`);
+      }
+    }
+    for (const child of node.childNodes || []) visit(child);
+  };
+  visit(parse(html, { sourceCodeLocationInfo: true }));
   const missing = [...hashes].filter(hash => !cspDirectiveSources(policy, 'script-src').includes(hash));
   return policy.replace("script-src 'self'", `script-src 'self' ${missing.join(' ')}`.trim());
 }
