@@ -7,16 +7,18 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:storage": "node --test test/storage.test.cjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "2.116.0",
     "expo": "57.0.20",
     "expo-constants": "57.0.17",
-    "expo-crypto": "57.0.2",
+    "expo-crypto": "57.0.4",
     "expo-dev-client": "~57.0.18",
     "expo-location": "57.0.16",
+    "expo-secure-store": "57.0.4",
     "expo-system-ui": "~57.0.3",
     "expo-task-manager": "57.0.16",
     "react": "19.2.3",

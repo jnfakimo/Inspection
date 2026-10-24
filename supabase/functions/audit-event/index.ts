@@ -4,6 +4,7 @@ import {
   recordRateLimitDenial,
   securityRequestId,
 } from "../_shared/security-monitor.ts";
+import { clientIpFromRequest } from "../_shared/client-ip.ts";
 
 const PROD_ORIGIN = "https://jnfakimo.github.io";
 // 自架站常見於內網 IP（RFC1918）；放行反射 CORS。
@@ -80,11 +81,7 @@ const cleanValue = (value: unknown, depth = 0): unknown => {
   return cleanText(value);
 };
 
-const clientIp = (req: Request) => {
-  const raw = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for") || req.headers.get("fly-client-ip") || "";
-  return cleanText(raw.split(",")[0], 80) || null;
-};
+const clientIp = clientIpFromRequest;
 
 type AuditProfile = {
   user_id: string;

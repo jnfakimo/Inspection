@@ -120,4 +120,6 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 
 ## 🕐 最後更新
 
+2026-10-24 · Codex · ISO 後續強化進行中：分支 `fix/inspection-iso-hardening-20261024`；帳號核准不設初始密碼，行動權杖／GPS 加密與 7 天期限，V2 CSP script hash，IP 格式檢查，ISO 風險工作底稿。隔離 Android／iOS bundle、V2 138 頁建置通過；正式主機、行動實機、代理覆蓋、恢復演練與組織核定仍無證據。`node-forge` 無修補版，維持待追蹤。合併／部署狀態以後續 GitHub 檢查及正式讀回為準。
+
 2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 收工：水果組第二批（PR #92）與上頁／登入導向（PR #94）已上線；本交接更新見分支 `codex/handoff-produce-documents`（PR #93）。Git push：✅ 已推（4441bf36a，其後的回填 commit 見 PR #93）
