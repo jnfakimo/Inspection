@@ -24,7 +24,8 @@ import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import '@/app/admin-workspace.css';
 import { AppShell } from '@/components/AppShell';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { isDeletedShift, isNightShiftName } from '@/lib/patrol-status';
+import { DEFAULT_PATROL_MARKET, isDeletedShift, isNightShiftName } from '@/lib/patrol-status';
+import { HANDOVER_MARKETS, type HandoverMarket } from '@/lib/handover-market';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { TimeSelect } from '@/components/TimeSelect';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
@@ -190,6 +191,10 @@ type StaffConfig = {
 
 function ShiftsModule({ module, profile }: Props) {
   const [date, setDate] = useState(taipeiToday());
+  // 兩市各有一組同名範本；每次只顯示、套用、清除一個市場，避免互相覆蓋。
+  // 排班人員與通報時段設定（patrol_shift_staff）與停用當日班表目前只屬一市。
+  const [market, setMarket] = useState<HandoverMarket>(DEFAULT_PATROL_MARKET);
+  const marketOne = market === 'market_1';
   const [shifts, setShifts] = useState<Row[]>([]);
   const [templates, setTemplates] = useState<Row[]>([]);
   const [users, setUsers] = useState<Row[]>([]);
@@ -208,12 +213,12 @@ function ShiftsModule({ module, profile }: Props) {
     const client = getSupabase();
     const overnightStorageDate = shiftDate(date, 1);
     const [s, t, u, c, d, dayStatus] = await Promise.all([
-      client.from('patrol_shifts').select('*').in('shift_date', [date, overnightStorageDate]).order('sort_order').order('start_time'),
-      client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
+      client.from('patrol_shifts').select('*').eq('market_code', market).in('shift_date', [date, overnightStorageDate]).order('sort_order').order('start_time'),
+      client.from('patrol_shift_template').select('*').eq('market_code', market).neq('status', 'inactive').order('sort_order'),
       client.from('users').select('user_id,name,username,email,department,dept_id,status').eq('status', 'active').order('name').limit(1000),
-      client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
+      marketOne ? client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle() : Promise.resolve({ data: null, error: null }),
       client.from('departments').select('dept_id,name').limit(1000),
-      client.from('patrol_shift_day_status').select('status,reason').eq('duty_date', date).maybeSingle(),
+      marketOne ? client.from('patrol_shift_day_status').select('status,reason').eq('duty_date', date).maybeSingle() : Promise.resolve({ data: null, error: null }),
     ]);
     if (s.error || t.error || u.error || dayStatus.error) setNote(`失敗：${errorMessage(s.error || t.error || u.error || dayStatus.error, '排班資料載入失敗')}`);
     setDaySuspended(dayStatus.data?.status === 'suspended');
@@ -238,7 +243,7 @@ function ShiftsModule({ module, profile }: Props) {
     // system_settings 為 admin-only，非管理者讀不到；此時通報時段留白即可，不擋畫面。
     try { setConfig(c.data?.value ? JSON.parse(String(c.data.value)) : null); } catch { setConfig(null); }
     setBusy(false);
-  }, [date]);
+  }, [date, market, marketOne]);
   useEffect(() => { void load(); }, [load]);
 
   // 單位以 dept_id 對 departments 為準、users.department 只當後備：後台那張表就是
@@ -280,8 +285,10 @@ function ShiftsModule({ module, profile }: Props) {
       p_start_time: editor.start_time, p_end_time: editor.end_time,
       p_sort_order: Number(editor.sort_order ?? 0) || 0,
       p_staff: staff,
-      p_work_start: String(editor.work_start || '').trim() || null,
-      p_work_end: String(editor.work_end || '').trim() || null,
+      // 二市的通報時段沒有存放位置，送空值；資料庫端也只替一市寫入 patrol_shift_staff。
+      p_work_start: marketOne ? String(editor.work_start || '').trim() || null : null,
+      p_work_end: marketOne ? String(editor.work_end || '').trim() || null : null,
+      p_market: market,
     };
     const storageDate = String(editor.__newDateRow && isNightShiftName(editor.name) ? shiftDate(date, 1) : (editor.__storageDate || date));
     const { error } = isTemplate
@@ -347,9 +354,10 @@ function ShiftsModule({ module, profile }: Props) {
       const result = await invokeAppApi<{ templates?: number; days?: number; rows?: number }>('patrol_shift_apply_all_templates', {
         from_date: applyRange.from,
         to_date: applyRange.to,
+        market_code: market,
       });
       setApplyAll(false); await load();
-      setNote(`已將 ${Number(result?.templates || 0)} 個班別範本套用到 ${applyRange.from} ～ ${applyRange.to}，共建立或更新 ${Number(result?.rows || 0)} 筆班別`);
+      setNote(`已將${HANDOVER_MARKETS[market].short} ${Number(result?.templates || 0)} 個班別範本套用到 ${applyRange.from} ～ ${applyRange.to}，共建立或更新 ${Number(result?.rows || 0)} 筆班別`);
     } catch (error) { setNote(`套用失敗：${errorMessage(error)}`); }
     setBusy(false);
   };
@@ -360,17 +368,20 @@ function ShiftsModule({ module, profile }: Props) {
       setNote(`清除失敗：只能從今天（${today}）或未來日期開始，過去班表必須保留`);
       return;
     }
-    if (!confirm(`確定清除值班日 ${date}（含）之後的全部班別嗎？\n\n過去班表與班別範本會保留，清除後可由下方範本重新套用。`)) return;
+    if (!confirm(`確定清除${HANDOVER_MARKETS[market].short}值班日 ${date}（含）之後的全部班別嗎？\n\n只清除${HANDOVER_MARKETS[market].short}；過去班表與班別範本會保留，清除後可由下方範本重新套用。`)) return;
     setBusy(true); setNote('');
     try {
       const result = await invokeAppApi<{ count?: number; suspended_days?: number }>('patrol_shift_delete_from_date', {
         from_date: date,
+        market_code: market,
         // 夜班新資料存於隔日；帶入畫面上屬於本值班日的識別碼，後端才不會
         // 把前一值班日存於界線日期的夜班誤判成這一天。
         duty_shift_ids: shifts.map(row => String(row.shift_id || '')).filter(Boolean),
       });
       await load();
-      setNote(`已清除 ${date}（含）之後 ${Number(result?.count || 0)} 個班別，並停用 ${Number(result?.suspended_days || 0)} 個值班日；班別範本仍保留，可重新套用`);
+      setNote(marketOne
+        ? `已清除 ${date}（含）之後 ${Number(result?.count || 0)} 個班別，並停用 ${Number(result?.suspended_days || 0)} 個值班日；班別範本仍保留，可重新套用`
+        : `已清除二市 ${date}（含）之後 ${Number(result?.count || 0)} 個班別；班別範本仍保留，可重新套用`);
     } catch (error) { setNote(`清除失敗：${errorMessage(error)}`); }
     setBusy(false);
   };
@@ -397,6 +408,14 @@ function ShiftsModule({ module, profile }: Props) {
       action={<button className="primary-btn compact" onClick={() => openEditor({ name: '', start_time: '', end_time: '', sort_order: shifts.length, assigned_user_ids: [] }, 'date')}>＋ 新增當日班別</button>} />
 
     <div className="patrol-shift-shell">
+      <div className="patrol-market-bar">
+        <div className="patrol-market-switch" role="group" aria-label="市場別">{(Object.keys(HANDOVER_MARKETS) as HandoverMarket[]).map(code =>
+          <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
+            aria-pressed={market === code} disabled={busy} onClick={() => setMarket(code)}>{HANDOVER_MARKETS[code].short}</button>)}</div>
+        <small>{marketOne
+          ? '目前顯示一市的每日班別與範本。'
+          : '目前顯示二市的每日班別與範本；二市尚無通報時段與停用當日班表設定，通報時段以班別時段計算。'}</small>
+      </div>
       <section className="panel admin-panel">
         <div className="admin-toolbar patrol-shift-toolbar">
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, -1))}>◀ 前一天</button>
@@ -404,7 +423,8 @@ function ShiftsModule({ module, profile }: Props) {
           <button className="secondary-btn" onClick={() => setDate(d => shiftDate(d, 1))}>後一天 ▶</button>
           <button className="secondary-btn" onClick={() => setDate(taipeiToday())}>今天</button>
           <button className="danger-btn compact" disabled={busy || date < taipeiToday()} onClick={() => void clearFromDate()}>清除當日及未來班別</button>
-          <button className={daySuspended ? 'primary-btn compact' : 'danger-btn compact'} disabled={busy || date < taipeiToday()}
+          <button className={daySuspended ? 'primary-btn compact' : 'danger-btn compact'} disabled={busy || date < taipeiToday() || !marketOne}
+            title={marketOne ? undefined : '停用當日班表目前只適用一市'}
             onClick={() => setDayStatusEditor({ suspended: !daySuspended, reason: '' })}>{daySuspended ? '恢復當日班表' : '停用當日班表'}</button>
           <span>值班日 {date}｜{shifts.length} 個班別（夜班歸前一日隔夜）</span>
         </div>
@@ -427,7 +447,7 @@ function ShiftsModule({ module, profile }: Props) {
 
     <section className="panel admin-panel">
       <div className="admin-toolbar patrol-template-toolbar">
-        <span>班別範本（固定班別，供每日套用）</span>
+        <span>{HANDOVER_MARKETS[market].short}班別範本（固定班別，供每日套用）</span>
         <button className="primary-btn compact" disabled={busy || templates.length === 0}
           onClick={() => { setApplyRange({ from: date, to: date }); setApplyAll(true); }}>重新套用全部範本</button>
       </div>
@@ -455,8 +475,10 @@ function ShiftsModule({ module, profile }: Props) {
         <label>排序<input type="number" value={String(editor.sort_order ?? 0)} onChange={e => setEditor({ ...editor, sort_order: e.target.value })} /></label>
         <label>班別開始<TimeSelect value={String(editor.start_time || '')} onChange={e => setEditor({ ...editor, start_time: e.target.value })} /></label>
         <label>班別結束<TimeSelect value={String(editor.end_time || '')} onChange={e => setEditor({ ...editor, end_time: e.target.value })} /></label>
-        <label>通報開始<TimeSelect value={String(editor.work_start || '')} onChange={e => setEditor({ ...editor, work_start: e.target.value })} /></label>
-        <label>通報結束<TimeSelect value={String(editor.work_end || '')} onChange={e => setEditor({ ...editor, work_end: e.target.value })} /></label>
+        {marketOne && <>
+          <label>通報開始<TimeSelect value={String(editor.work_start || '')} onChange={e => setEditor({ ...editor, work_start: e.target.value })} /></label>
+          <label>通報結束<TimeSelect value={String(editor.work_end || '')} onChange={e => setEditor({ ...editor, work_end: e.target.value })} /></label>
+        </>}
       </div>
       <div className="detail-timeline">
         <h3>排定人員（{Array.isArray(editor.assigned_user_ids) ? editor.assigned_user_ids.length : 0} 人）</h3>
@@ -474,7 +496,9 @@ function ShiftsModule({ module, profile }: Props) {
           找不到單位含「{PATROL_UNIT_KEYWORDS.join('」或「')}」的啟用中人員。請到後台的人員管理確認駐警隊同仁的單位設定。
         </p>}
       </div>
-      <p className="inline-message">班別時段與通報時段是兩組獨立的值：前者存在班別資料表，後者存在排班設定的 workTimes；夜班資料列存於隔日，但歸屬前一日值班日。</p>
+      <p className="inline-message">{marketOne
+        ? '班別時段與通報時段是兩組獨立的值：前者存在班別資料表，後者存在排班設定的 workTimes；夜班資料列存於隔日，但歸屬前一日值班日。'
+        : '二市尚無通報時段設定，逾期判斷以班別時段計算；夜班資料列存於隔日，但歸屬前一日值班日。'}</p>
       <footer>
         <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
         <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
@@ -506,7 +530,7 @@ function ShiftsModule({ module, profile }: Props) {
           onChange={e => setApplyRange(prev => ({ ...prev, to: e.target.value }))} /></label>
       </div>
       <p className="inline-message">
-        目前 {templates.length} 個啟用中的班別範本會一次套用到期間內每一天；同名班別會更新為範本內容。
+        {HANDOVER_MARKETS[market].short}目前 {templates.length} 個啟用中的班別範本會一次套用到期間內每一天；同市場的同名班別會更新為範本內容，另一個市場不受影響。
         整批作業與稽核在同一交易內完成，一次最多 366 天。
       </p>
       <footer>

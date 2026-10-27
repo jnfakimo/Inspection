@@ -11,6 +11,9 @@ export async function handlePatrolShiftAction(action: string, ctx: AppApiContext
 
   const fromDate = text(body.from_date, 10);
   if (!validISODate(fromDate)) return reply(req, { ok: false, message: '起始值班日期格式無效' }, 400);
+  // 兩市各有一組同名範本；未帶市場的舊呼叫端一律視為一市，行為與修改前相同。
+  const market = body.market_code == null || body.market_code === '' ? 'market_1' : text(body.market_code, 20);
+  if (market !== 'market_1' && market !== 'market_2') return reply(req, { ok: false, message: '市場代碼無效' }, 400);
   const todayInTaipei = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
   if (fromDate < todayInTaipei) return reply(req, { ok: false, message: '只能從今天或未來日期調整班別，過去班表必須保留' }, 400);
 
@@ -21,12 +24,15 @@ export async function handlePatrolShiftAction(action: string, ctx: AppApiContext
     const { data, error } = await userDb.rpc('apply_all_patrol_shift_templates_and_activate', {
       p_from: fromDate,
       p_to: toDate,
+      p_market: market,
     });
     if (error) throw error;
     return reply(req, { ok: true, data: data || { templates: 0, days: 0, rows: 0 } });
   }
 
   if (action === 'patrol_shift_set_day_status') {
+    // patrol_shift_day_status 主鍵只有 duty_date，目前只代表一市。
+    if (market !== 'market_1') return reply(req, { ok: false, message: '停用當日班表目前只適用一市' }, 400);
     const suspended = body.suspended === true;
     const reason = text(body.reason, 500);
     if (suspended && !reason) return reply(req, { ok: false, message: '停用當日班表時必須填寫原因' }, 400);
@@ -47,6 +53,7 @@ export async function handlePatrolShiftAction(action: string, ctx: AppApiContext
   const { data, error } = await userDb.rpc('reset_patrol_shifts_from_date', {
     p_from: fromDate,
     p_duty_shift_ids: dutyShiftIds,
+    p_market: market,
   });
   if (error) throw error;
   return reply(req, { ok: true, data: data || { count: 0, from_date: fromDate, suspended_days: 0 } });

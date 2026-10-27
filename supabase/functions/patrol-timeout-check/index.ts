@@ -104,8 +104,10 @@ Deno.serve(async req=>{
     const dayBeforeYesterday=previousDate(yesterday);
     const weekday=new Date(`${today}T12:00:00+08:00`).getDay();
     const [{data:templates,error:templateError},{data:dailyShifts,error:dailyShiftError}]=await Promise.all([
-      db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").neq("status","inactive").order("sort_order"),
-      db.from("patrol_shifts").select("shift_date,name,start_time,end_time").in("shift_date",[dayBeforeYesterday,yesterday,today,tomorrow]),
+      // 逾時規則、排班人員與通報時段設定都只屬一市；二市的同名範本若一起讀入，
+      // 會產生 rule_id 相同的第二條規則，只是被 already processed 擋下。
+      db.from("patrol_shift_template").select("name,start_time,end_time,sort_order").eq("market_code","market_1").neq("status","inactive").order("sort_order"),
+      db.from("patrol_shifts").select("shift_date,name,start_time,end_time").eq("market_code","market_1").in("shift_date",[dayBeforeYesterday,yesterday,today,tomorrow]),
     ]);
     if(templateError)throw templateError;
     if(dailyShiftError)throw dailyShiftError;
@@ -155,9 +157,9 @@ Deno.serve(async req=>{
       const startIso=iso(storageDate,effectiveStart),endIso=iso(endDay,effectiveEnd);
       const {data:existing}=await db.from("patrol_timeout_notifications").select("notification_id,status").eq("rule_id",rule.id).eq("shift_date",shiftDate).maybeSingle();
       if(existing){results.push({rule:rule.id,msg:"already processed"});continue;}
-      const {data:markers,error:markerError}=await db.from("plan_markers").select("marker_id,floor_id,label").eq("kind","patrol").eq("status","active");
+      const {data:markers,error:markerError}=await db.from("plan_markers").select("marker_id,floor_id,label").eq("market_code","market_1").eq("kind","patrol").eq("status","active");
       if(markerError)throw markerError;
-      const {data:logs,error:logError}=await db.from("checkin_logs").select("target_id,user_id,user_name,checkin_at").eq("target_type","marker").gte("checkin_at",startIso).lte("checkin_at",endIso);
+      const {data:logs,error:logError}=await db.from("checkin_logs").select("target_id,user_id,user_name,checkin_at").eq("market_code","market_1").eq("target_type","marker").gte("checkin_at",startIso).lte("checkin_at",endIso);
       if(logError)throw logError;
       const checkedIds=new Set((logs||[]).map((x:{target_id:string})=>x.target_id));
       const unchecked=(markers||[]).filter((m:{marker_id:string})=>!checkedIds.has(m.marker_id));

@@ -55,15 +55,36 @@ test('批次清除只把有效識別碼交給交易式資料庫函式', async ()
   assert.deepEqual(calls, [['reset_patrol_shifts_from_date', {
     p_from: '2099-01-02',
     p_duty_shift_ids: ['11111111-1111-1111-1111-111111111111'],
+    p_market: 'market_1',
   }]]);
 });
 
-test('全部範本可一次套用到日期區間', async () => {
+test('全部範本可一次套用到日期區間；未帶市場時為一市', async () => {
   const { ctx, calls } = request({ body: { from_date: '2099-01-02', to_date: '2099-01-03' } });
   const result = response(await handlePatrolShiftAction('patrol_shift_apply_all_templates', ctx));
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.data, { templates: 5, days: 2, rows: 10 });
-  assert.deepEqual(calls, [['apply_all_patrol_shift_templates_and_activate', { p_from: '2099-01-02', p_to: '2099-01-03' }]]);
+  assert.deepEqual(calls, [['apply_all_patrol_shift_templates_and_activate', { p_from: '2099-01-02', p_to: '2099-01-03', p_market: 'market_1' }]]);
+});
+
+test('套用與清除只作用於指定市場，市場代碼錯誤時拒絕', async () => {
+  const apply = request({ body: { from_date: '2099-01-02', to_date: '2099-01-03', market_code: 'market_2' } });
+  assert.equal(response(await handlePatrolShiftAction('patrol_shift_apply_all_templates', apply.ctx)).status, 200);
+  assert.deepEqual(apply.calls, [['apply_all_patrol_shift_templates_and_activate', { p_from: '2099-01-02', p_to: '2099-01-03', p_market: 'market_2' }]]);
+
+  const reset = request({ body: { from_date: '2099-01-02', market_code: 'market_2' } });
+  assert.equal(response(await handlePatrolShiftAction('patrol_shift_delete_from_date', reset.ctx)).status, 200);
+  assert.equal(reset.calls[0][1].p_market, 'market_2');
+
+  const invalid = request({ body: { from_date: '2099-01-02', to_date: '2099-01-03', market_code: 'market_3' } });
+  assert.equal(response(await handlePatrolShiftAction('patrol_shift_apply_all_templates', invalid.ctx)).status, 400);
+  assert.deepEqual(invalid.calls, []);
+});
+
+test('停用當日班表只接受一市', async () => {
+  const { ctx, calls } = request({ body: { from_date: '2099-01-02', suspended: true, reason: '休場', market_code: 'market_2' } });
+  assert.equal(response(await handlePatrolShiftAction('patrol_shift_set_day_status', ctx)).status, 400);
+  assert.deepEqual(calls, []);
 });
 
 test('停用值班日必須填原因，恢復與停用都走交易式狀態函式', async () => {
