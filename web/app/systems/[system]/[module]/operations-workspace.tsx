@@ -5,7 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
-import { checkinRange, getPatrolShiftsForDate, isDeletedShift, isNightShiftName, notificationRange, shiftRange, type PatrolShift } from '@/lib/patrol-status';
+import { checkinRange, DEFAULT_PATROL_MARKET, getPatrolShiftsForDate, isDeletedShift, isNightShiftName, notificationRange, shiftRange, type PatrolShift } from '@/lib/patrol-status';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import type { Profile } from '@/types/app';
@@ -38,8 +38,8 @@ function GuardPatrolWorkspace({ system, module, profile }: { system: SystemDefin
     try {
       const [data, markerResult, scheduleResult, floorResult] = await Promise.all([
         invokeAppApi<{ rows: Row[] }>('module_data', { system: 'guardpatrol', module: 'checkins' }),
-        client.from('plan_markers').select('marker_id,floor_id,label,note').eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label').limit(1000),
-        getPatrolShiftsForDate(client, date),
+        client.from('plan_markers').select('marker_id,floor_id,label,note').eq('market_code', DEFAULT_PATROL_MARKET).eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label').limit(1000),
+        getPatrolShiftsForDate(client, date, DEFAULT_PATROL_MARKET),
         client.from('floor_models').select('floor_id,name,level').limit(200),
       ]);
       if (!loadSequence.current.isCurrent(sequence)) return;

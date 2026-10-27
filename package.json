@@ -35,7 +35,7 @@
     "test:patrol-session": "node --experimental-strip-types --test web/lib/patrol-session.test.ts web/lib/patrol-checkin.test.ts",
     "test:create-refresh": "node --experimental-strip-types --test web/lib/create-refresh.test.ts",
     "test:repair-detail-refresh": "node --experimental-strip-types --test web/lib/repair-detail-refresh.test.ts",
-    "test:patrol-shift-reset": "node --test tools/patrol-shift-bulk-reset-db.test.mjs",
+    "test:patrol-shift-reset": "node --test tools/patrol-shift-bulk-reset-db.test.mjs tools/patrol-market-scope-db.test.mjs",
     "test:patrol-timeout-secret": "node tools/patrol-timeout-secret-check.mjs",
     "test:page-headings": "node --experimental-strip-types tools/system-page-heading-check.mjs",
     "test:button-standard": "node tools/v2-button-standard-check.mjs",

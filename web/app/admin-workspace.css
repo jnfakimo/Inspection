@@ -267,6 +267,11 @@ html[data-theme="tech"] .handover-submit-btn{background:var(--info-soft);color:v
    2. 前一天／日期／後一天／今天四個控制項壓成同一列，「值班日 …」說明另起一行。 */
 .patrol-shift-shell{max-width:85%;margin:0 auto}
 .patrol-template-toolbar>span{margin-right:auto}
+/* 一市／二市切換：與駐警隊交接簿的 hs-market-switch 同一個外觀。 */
+.patrol-market-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.patrol-market-switch{display:inline-flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
+.patrol-market-switch .secondary-btn.is-active{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 14%,var(--panel));color:var(--ink);box-shadow:0 0 0 2px color-mix(in srgb,var(--cyan) 12%,transparent)}
+.patrol-market-bar>small{color:var(--muted)}
 @media (max-width:800px){
   .patrol-shift-shell{max-width:100%}
   .patrol-shift-toolbar{gap:6px}

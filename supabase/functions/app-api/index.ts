@@ -3111,7 +3111,7 @@ export async function handleAppApiRequest(req: Request) {
         if (readError) throw readError;
         if (!before) return reply(req, { ok: false, message: '找不到指定的班別' }, 404);
         // patrol_shifts 受資料庫保護無法 DELETE 且無 status 欄位，故以名稱前綴隱藏（與前端同規則）。
-        // 名稱加上隨機後綴，避免同日同班別重複刪除時撞 idx_patrol_shifts_date_name 唯一索引。
+        // 名稱加上隨機後綴，避免同市場同日同班別重複刪除時撞 idx_patrol_shifts_market_date_name 唯一索引。
         const hiddenName = `[已刪除] ${before.name} ${nextRequestRequestId().slice(0, 8)}`;
         const { error } = await userDb.from('patrol_shifts').update({ name: hiddenName, assigned_user_ids: [] }).eq('shift_id', shiftId);
         if (error) throw error;

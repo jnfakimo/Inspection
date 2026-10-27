@@ -12,8 +12,17 @@
 // 讓該點由紅轉綠，因此接受打卡的區間取兩者的聯集。
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { HandoverMarket } from './handover-market';
 
 export type PatrolState = 'ok' | 'pending' | 'overdue';
+
+/**
+ * 班別範本、每日班別、巡邏點與打卡紀錄都以 market_code 區分一市與二市。
+ * 2026-10-01 起兩市各有一組同名範本，讀取時不篩市場就會把兩組疊在一起。
+ * system_settings 的 patrol_shift_staff／patrol_timeout_rules 與 patrol_shift_day_status
+ * 目前只屬一市，與 app-api 的 guardShiftContext 相同。
+ */
+export const DEFAULT_PATROL_MARKET: HandoverMarket = 'market_1';
 
 /**
  * 巡檢班別的「刪除」是軟刪除：`a06f2ce` 把名稱前綴成 `[已刪除] 原名`，資料列保留。
@@ -97,46 +106,49 @@ export function dateStrOf(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-// 同一個工作階段內重複呼叫時共用結果；班別樣板與巡邏點清單都不常變動。
-let baseDataPromise: Promise<{ templates: any[]; setting: any; timeoutRules: any }> | null = null;
-let markerPromise: Promise<PatrolMarker[]> | null = null;
+// 同一個工作階段內重複呼叫時共用結果；班別樣板與巡邏點清單都不常變動。快取一律以市場分開。
+const baseDataPromises = new Map<HandoverMarket, Promise<{ templates: any[]; setting: any; timeoutRules: any }>>();
+const markerPromises = new Map<HandoverMarket, Promise<PatrolMarker[]>>();
 const overridePromises = new Map<string, Promise<any[]>>();
 
-function getBaseData(client: Client) {
-  if (!baseDataPromise) {
-    baseDataPromise = Promise.all([
+function getBaseData(client: Client, market: HandoverMarket) {
+  if (!baseDataPromises.has(market)) {
+    // 排班人員與通報時段設定只屬一市，二市不讀，否則會套用一市同名班別的時窗。
+    const marketOneOnly = market === 'market_1';
+    baseDataPromises.set(market, Promise.all([
       // 已軟刪除的範本不得再產生通報時窗，過濾規則要與排班頁一致。
-      client.from('patrol_shift_template').select('*').neq('status', 'inactive').order('sort_order'),
-      client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle(),
-      client.from('system_settings').select('value').eq('key', 'patrol_timeout_rules').maybeSingle(),
+      client.from('patrol_shift_template').select('*').eq('market_code', market).neq('status', 'inactive').order('sort_order'),
+      marketOneOnly ? client.from('system_settings').select('value').eq('key', 'patrol_shift_staff').maybeSingle() : Promise.resolve({ data: null }),
+      marketOneOnly ? client.from('system_settings').select('value').eq('key', 'patrol_timeout_rules').maybeSingle() : Promise.resolve({ data: null }),
     ]).then(([templateResult, settingResult, timeoutRuleResult]) => ({
       templates: templateResult.data || [], setting: settingResult.data, timeoutRules: timeoutRuleResult.data,
-    }));
+    })));
   }
-  return baseDataPromise;
+  return baseDataPromises.get(market)!;
 }
 
-function getOverrides(client: Client, dateStr: string) {
-  if (!overridePromises.has(dateStr)) {
+function getOverrides(client: Client, dateStr: string, market: HandoverMarket) {
+  const key = `${market}:${dateStr}`;
+  if (!overridePromises.has(key)) {
     // Supabase 的查詢建構器回傳 PromiseLike，包一層才是完整的 Promise。
-    overridePromises.set(dateStr, (async () => {
-      const result = await client.from('patrol_shifts').select('*').eq('shift_date', dateStr);
+    overridePromises.set(key, (async () => {
+      const result = await client.from('patrol_shifts').select('*').eq('market_code', market).eq('shift_date', dateStr);
       // 已軟刪除的班別不得覆寫樣板時段，否則通報時窗會沿用一個已經不存在的班。
       return (result.data || []).filter(row => !isDeletedShift(row.name));
     })());
   }
-  return overridePromises.get(dateStr)!;
+  return overridePromises.get(key)!;
 }
 
-function getMarkers(client: Client) {
-  if (!markerPromise) {
-    markerPromise = (async () => {
+function getMarkers(client: Client, market: HandoverMarket) {
+  if (!markerPromises.has(market)) {
+    markerPromises.set(market, (async () => {
       const result = await client.from('plan_markers').select('marker_id,floor_id,label')
-        .eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label');
+        .eq('market_code', market).eq('kind', 'patrol').eq('status', 'active').order('floor_id').order('label');
       return (result.data || []) as PatrolMarker[];
-    })();
+    })());
   }
-  return markerPromise;
+  return markerPromises.get(market)!;
 }
 
 /**
@@ -144,7 +156,7 @@ function getMarkers(client: Client) {
  * 反映在狀態計算裡（V1 的 invalidateMarkers 就是為此存在）。
  */
 export function invalidatePatrolMarkers() {
-  markerPromise = null;
+  markerPromises.clear();
 }
 
 /**
@@ -153,10 +165,13 @@ export function invalidatePatrolMarkers() {
  * 指定日期設定，沒有設定時才退回班別時段。
  * 夜班欄位是前一日值班日的隔夜延續，因此查詢 duty date 時要讀下一日的實際資料列。
  */
-export async function getPatrolShiftsForDate(client: Client, dateStr: string): Promise<PatrolShift[]> {
+export async function getPatrolShiftsForDate(client: Client, dateStr: string, market: HandoverMarket = DEFAULT_PATROL_MARKET): Promise<PatrolShift[]> {
   const [{ templates, setting, timeoutRules }, overrides, overnightOverrides, dayStatus] = await Promise.all([
-    getBaseData(client), getOverrides(client, dateStr), getOverrides(client, patrolDateOffset(dateStr, 1)),
-    client.from('patrol_shift_day_status').select('status').eq('duty_date', dateStr).maybeSingle(),
+    getBaseData(client, market), getOverrides(client, dateStr, market), getOverrides(client, patrolDateOffset(dateStr, 1), market),
+    // 停用當日班表的主鍵只有 duty_date，目前只代表一市。
+    market === 'market_1'
+      ? client.from('patrol_shift_day_status').select('status').eq('duty_date', dateStr).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
   if (dayStatus.error) throw dayStatus.error;
   if (dayStatus.data?.status === 'suspended') return [];
@@ -221,16 +236,16 @@ export type PatrolComputeResult = {
  * 回傳每個啟用中巡邏點的三色狀態。找不到當班班別時回傳空的 map（圖釘維持原色）。
  * 取班規則與 V1 相同：先找此刻進行中的班，沒有的話取最近一個已結束的班。
  */
-export async function computePatrolStatus(client: Client, dateStr?: string): Promise<PatrolComputeResult> {
+export async function computePatrolStatus(client: Client, dateStr?: string, market: HandoverMarket = DEFAULT_PATROL_MARKET): Promise<PatrolComputeResult> {
   const now = new Date();
   const day = dateStr || dateStrOf(now);
   const dayBase = new Date(`${day}T00:00:00`);
   const yesterdayBase = new Date(dayBase.getTime() - 24 * 3600 * 1000);
 
   const [shiftsToday, shiftsYesterday, markers] = await Promise.all([
-    getPatrolShiftsForDate(client, day),
-    getPatrolShiftsForDate(client, dateStrOf(yesterdayBase)),
-    getMarkers(client),
+    getPatrolShiftsForDate(client, day, market),
+    getPatrolShiftsForDate(client, dateStrOf(yesterdayBase), market),
+    getMarkers(client, market),
   ]);
 
   const allShifts: ShiftWithBase[] = [
@@ -260,7 +275,7 @@ export async function computePatrolStatus(client: Client, dateStr?: string): Pro
   const statusRange = notificationRange(relevant, relevant.base);
   const accepted = checkinRange(relevant, relevant.base);
   const { data: checkins } = await client.from('checkin_logs').select('target_id,checkin_at')
-    .eq('target_type', 'marker')
+    .eq('market_code', market).eq('target_type', 'marker')
     .gte('checkin_at', accepted.start.toISOString())
     .lte('checkin_at', accepted.end.toISOString());
 
