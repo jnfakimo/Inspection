@@ -8,7 +8,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test:storage": "node --test test/storage.test.cjs"
+    "test:storage": "node --test test/storage.test.cjs",
+    "postinstall": "node scripts/patch-deepmerge.cjs",
+    "test:security-deps": "node scripts/patch-deepmerge.cjs --check && node --test test/security-deps.test.cjs",
+    "pretypecheck": "node scripts/patch-deepmerge.cjs --check"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -31,6 +34,9 @@
     "typescript": "~6.0.3"
   },
   "overrides": {
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "@expo/cli": {
+      "zod": "4.6.7"
+    }
   }
 }

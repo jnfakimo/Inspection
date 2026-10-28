@@ -1,3 +1,4 @@
+import { scannerOutcome } from './scanner-outcome.mjs';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -71,10 +72,6 @@ try {
   fs.rmSync(staging, { recursive: true, force: true });
 }
 
-if (result?.error) {
-  console.error(`無法啟動 Semgrep：${result.error.message}`);
-  process.exitCode = 1;
-} else {
-  console.log(`Semgrep 已掃描 ${files.length} 個正式原始碼檔案。`);
-  process.exitCode = result?.status ?? 1;
-}
+const outcome = scannerOutcome('Semgrep', result, files.length);
+(outcome.code === 0 ? console.log : console.error)(outcome.message);
+process.exitCode = outcome.code;

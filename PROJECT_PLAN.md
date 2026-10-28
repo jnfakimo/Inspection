@@ -263,3 +263,8 @@
 - 驗證：PGlite 測試涵蓋一市場四階矩陣、二市場原三階矩陣與無關卡；前端判斷與畫面契約 11 項；typecheck、完整 npm test、gitleaks、Semgrep、deno check、CI 與 Commercial readiness 皆通過。
 - 上線：使用者先建好莊宗坤 → 簡文財的上下級並以唯讀查詢確認組織鏈 → apply-database-migration run 39371394023（HTTP 201）→ 合併 `31fbc3446` → `app-api` 與 Pages 部署成功。
 - 未驗證：登入後實際畫面、A4 列印分頁、副主任階段的名單限制（目前該市場所有主管皆有資格）。
+
+
+## 2026-10-28 GitHub 修正分支整合
+
+Codex 依使用者要求準備發布本次資安及交接簿修正，以 origin/main 939227464 為基準，保留線上人數、巡檢市場與派車新增功能。行動相依修補、掃描器狀態、報修狀態 migration、主管簽核鏈與機電提示、主管選單排除本人納入；原帳號審核可讀性重構留在原工作樹。密碼政策不變。發布至 codex/inspection-security-handover-20261028，未合併 main、不觸發正式資料庫／前端／Edge 部署。既有隔離驗證及未驗證邊界見 docs/HANDOVER_CLOSEOUT_VERIFICATION_20261028.md 與 SECURITY_FOLLOWUP_20261028.md。整合版檢查結果另記於 docs/GITHUB_PUBLISH_20261028.md。

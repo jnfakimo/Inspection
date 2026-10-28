@@ -86,7 +86,7 @@ function dbMessage(error: { code?: string; message?: string } | null, fallback: 
     // 是哪一位主管或哪一項指派不符合，而不是只看到無法處理的通用錯誤。
     const message = clean(error?.message, 300);
     const knownRule = [
-      '主管及系統管理員不可設定直屬主管', '啟用中的一般人員必須指定直屬主管',
+      '主管及系統管理員不可設定直屬主管', '系統管理員不可設定直屬主管', '直屬主管不可為本人或下屬，主管關係不可形成循環', '啟用中的一般人員必須指定直屬主管',
       '啟用中的一般人員必須指定直屬課室主管', '直屬主管必須是啟用中的帳號',
       '直屬主管必須具備單位主管或系統管理員角色', '直屬主管必須具備課室主管或系統管理員角色',
       '直屬主管必須位於人員所屬單位或其上層部／室', '直屬主管必須與人員屬於同一單位',
@@ -332,7 +332,7 @@ export async function handleAdminApiRequest(req: Request) {
       return Boolean(data);
     };
     const validateSupervisor = async (supervisorId: string | null, deptId: string | null, rbacRole: string, targetUserId = '') => {
-      if (['unit_supervisor', 'sysadmin'].includes(rbacRole)) return { supervisorId: null, message: '' };
+      if (rbacRole === 'sysadmin' || (rbacRole === 'unit_supervisor' && !supervisorId)) return { supervisorId: null, message: '' };
       if (!supervisorId) return { supervisorId: null, message: '一般人員必須指定直屬主管' };
       if (supervisorId === targetUserId) return { supervisorId: null, message: '直屬主管不可設定為本人' };
       const { data: supervisor } = await admin.from('users')
@@ -743,8 +743,7 @@ export async function handleAdminApiRequest(req: Request) {
       if (userId === profile.user_id && nextStatus === 'inactive') return reply(req, { ok: false, message: '不可停用目前登入的管理員帳號' }, 400);
       const { data: before } = await admin.from('users').select('user_id,name,status,auth_id,dept_id,supervisor_id,role,rbac_role').eq('user_id', userId).maybeSingle();
       if (!before) return reply(req, { ok: false, message: '找不到指定使用者' }, 404);
-      // 啟用前先用同一套主管規則檢查，避免只顯示資料庫約束錯誤；主管／系統
-      // 管理員若留有歷史 supervisor_id，啟用時一併清除，維持帳號階層一致。
+      // 啟用前驗證主管關係；保留單位主管的多階簽核鏈，僅系統管理員清除上級。
       const targetRole = String(before.rbac_role || (before.role === 'admin' ? 'sysadmin' : before.role === 'supervisor' ? 'unit_supervisor' : before.role === 'maintenance' ? 'technician' : before.role === 'inspector' ? 'reporter' : before.role) || 'reporter');
       if (nextStatus === 'active') {
         const supervisorValidation = await validateSupervisor(id(before.supervisor_id) || null, id(before.dept_id) || null, targetRole, userId);
@@ -761,7 +760,7 @@ export async function handleAdminApiRequest(req: Request) {
           return reply(req, { ok: false, message: `無法停用：此帳號仍是 ${dependents?.length || 0} 位啟用人員的直屬主管（${names.slice(0, 200)}），請先改派其他主管` }, 409);
         }
       }
-      const changes = { status: nextStatus, ...(nextStatus === 'active' && ['unit_supervisor', 'sysadmin'].includes(targetRole) ? { supervisor_id: null } : {}) };
+      const changes = { status: nextStatus, ...(nextStatus === 'active' && targetRole === 'sysadmin' ? { supervisor_id: null } : {}) };
       const { error } = await admin.from('users').update(changes).eq('user_id', userId);
       if (error) return reply(req, { ok: false, message: dbMessage(error, '帳號狀態更新失敗') }, 400);
       // 同步停用/啟用 Supabase Auth，確保離職/停用帳號無法再登入或延續既有 session。
@@ -926,10 +925,10 @@ export async function handleAdminApiRequest(req: Request) {
           return reply(req, { ok: false, message: `此帳號仍有 ${directReports?.length || 0} 位直屬人員（${names.slice(0, 200)}）；請到帳號管理調整角色並選擇接任主管` }, 409);
         }
       }
-      // 「使用者角色指派」也必須和帳號管理共用主管規則。升為主管時清除舊
+      // 「使用者角色指派」與帳號管理共用主管規則；僅系統管理員清除舊
       // supervisor_id；改為一般角色時保留既有主管，若已無效則明確提示改到
       // 帳號管理重新指派，避免角色頁把人員留在無法啟用的狀態。
-      const requestedSupervisorId = ['unit_supervisor', 'sysadmin'].includes(rbacRole)
+      const requestedSupervisorId = rbacRole === 'sysadmin'
         ? null
         : id(body.supervisor_id) || id(before.supervisor_id) || null;
       let normalizedSupervisorId = requestedSupervisorId;

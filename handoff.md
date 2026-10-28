@@ -144,3 +144,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 2026-10-24 · Codex · ISO 後續強化當時狀態：分支 `fix/inspection-iso-hardening-20261024`；帳號核准不設初始密碼，行動權杖／GPS 加密與 7 天期限，V2 CSP script hash，IP 格式檢查，ISO 風險工作底稿。隔離 Android／iOS bundle、V2 138 頁建置通過；正式主機、行動實機、代理覆蓋、恢復演練與組織核定仍無證據。`node-forge` 無修補版，維持待追蹤。合併／部署狀態以後續 GitHub 檢查及正式讀回為準。
 
 2026-10-20 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 收工：水果組第二批（PR #92）與上頁／登入導向（PR #94）已上線；本交接更新見分支 `codex/handoff-produce-documents`（PR #93）。Git push：✅ 已推（4441bf36a，其後的回填 commit 見 PR #93）
+
+
+## 2026-10-28 GitHub 修正分支整合
+
+Codex 依使用者要求準備發布本次資安及交接簿修正，以 origin/main 939227464 為基準，保留線上人數、巡檢市場與派車新增功能。行動相依修補、掃描器狀態、報修狀態 migration、主管簽核鏈與機電提示、主管選單排除本人納入；原帳號審核可讀性重構留在原工作樹。密碼政策不變。發布至 codex/inspection-security-handover-20261028，未合併 main、不觸發正式資料庫／前端／Edge 部署。既有隔離驗證及未驗證邊界見 docs/HANDOVER_CLOSEOUT_VERIFICATION_20261028.md 與 SECURITY_FOLLOWUP_20261028.md。整合版檢查結果另記於 docs/GITHUB_PUBLISH_20261028.md。
