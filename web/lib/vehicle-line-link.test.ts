@@ -11,7 +11,7 @@ test('狀態尚未讀到時顯示讀取中', () => {
 test('已綁定時顯示臺北時間的綁定時間', () => {
   const view = vehicleLineLinkView({ linked: true, linked_at: '2026-10-16T01:30:00Z', pending_expires_at: null }, null, NOW);
   assert.equal(view.state, 'linked');
-  assert.match(view.detail, /2026\/10\/16 09:30/);
+  assert.match(view.detail, /2026\/10\/16 上午 9:30/);
 });
 
 test('剛產生的代碼在效期內顯示倒數', () => {

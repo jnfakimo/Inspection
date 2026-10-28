@@ -113,6 +113,9 @@
   例外：textarea、checkbox／radio、file／hidden／range／color、原生日期時間欄位、列印版。
 - **日期／時間**：一律 `@/components/LocalizedDateInput`、`LocalizedDateTimeInput`、`TimeSelect`（30 分鐘級距，24 小時制）；
   禁用原生 `date`／`datetime-local`／`time`（`security:audit` 會擋）。格式 `YYYY-MM-DD`、`YYYY-MM-DD HH:mm`。
+  **例外：公務車派車管理系統（SYS-07）的時間一律用「上午／下午」12 小時制**（使用者 2026-10-28 指定）：
+  共用元件加 `hour12`（只改選項文字，值仍是 24 小時制 `HH:mm`），顯示用 `@/lib/clock-format`；
+  逾期判斷、表單預設值等比較邏輯一律用 24 小時制字串。其他系統不受影響。
 - **下拉選單**：允許空值的欄位第一列用 `BlankSelectOption` 產生真正空白值；人員清單一律經 `selectableActiveUsers()`；
   表格篩選用 `<input list><datalist>` combobox，選項顯示在地化標籤。
 - **指標卡**：`MetricCard`，`tone` 為封閉集合 `cyan|green|amber|violet|red`（狀態語意，不是系統識別色）。
