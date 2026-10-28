@@ -87,6 +87,32 @@ function numberOrNull(value: string) {
 const VEHICLE_ORIGIN_OPTIONS = ['第二市場', '市場處'];
 const VEHICLE_DESTINATION_OPTIONS = ['第一市場', '市場處'];
 const VEHICLE_PURPOSE_OPTIONS = ['會勘', '開會', '考察'];
+/** 臨時直接派車的事由選項；第一項為預設值，選「其他」可自行輸入。 */
+const VEHICLE_DIRECT_REASON_OPTIONS = ['長官臨時指派用車'];
+
+/** 下拉選單的「其他」選項值；選到時顯示輸入欄，內容由使用者自填。 */
+const VEHICLE_OTHER_VALUE = '__other__';
+
+/**
+ * 下拉選單＋「其他」手動輸入。value 是最後要送出的文字：選常用項目時等於該項目，
+ * 選「其他」時是輸入欄的內容（切到「其他」會先清空，必填檢查才不會把舊選項當成答案）。
+ */
+function VehicleSelectOther({ id, value, options, onChange, otherPlaceholder = '請輸入其他內容' }: {
+  id: string; value: string; options: string[]; onChange: (value: string) => void; otherPlaceholder?: string;
+}) {
+  const [other, setOther] = useState(() => value !== '' && !options.includes(value));
+  return <>
+    <select id={id} value={other ? VEHICLE_OTHER_VALUE : value} onChange={event => {
+      if (event.target.value === VEHICLE_OTHER_VALUE) { setOther(true); onChange(''); return; }
+      setOther(false); onChange(event.target.value);
+    }}>
+      <option value="">-- 請選擇 --</option>
+      {options.map(option => <option key={option} value={option}>{option}</option>)}
+      <option value={VEHICLE_OTHER_VALUE}>其他</option>
+    </select>
+    {other && <input value={value} placeholder={otherPlaceholder} aria-label="其他（自行輸入）" onChange={event => onChange(event.target.value)} />}
+  </>;
+}
 
 /**
  * 可輸入文字／數字、也可從常用選項挑選的派車欄位。
@@ -858,7 +884,7 @@ function DirectDispatchModal({ rows, vehicles, drivers, blockedVehicleIds, onClo
       requester_name: '', requester_department: '', requester_phone: '',
       trip_date: taipeiToday(), planned_departure_time: departure, planned_return_time: addMinutes(departure, 120),
       origin_location: '', destination_location: '', trip_purpose: '', passenger_count: '1',
-      reason: '', vehicle_id: '', driver_id: '', note: '',
+      reason: VEHICLE_DIRECT_REASON_OPTIONS[0], vehicle_id: '', driver_id: '', note: '',
     };
   });
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
@@ -916,10 +942,10 @@ function DirectDispatchModal({ rows, vehicles, drivers, blockedVehicleIds, onClo
       <VehicleFormSection icon="route" title="行程">
         <label>出發地（必填）<VehicleCombobox id="direct-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
         <label>目的地（必填）<VehicleCombobox id="direct-destination" value={form.destination_location} options={VEHICLE_DESTINATION_OPTIONS} onChange={value => set('destination_location', value)} /></label>
-        <label className="wide">用途（必填）<VehicleCombobox id="direct-purpose" value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} onChange={value => set('trip_purpose', value)} /></label>
+        <label className="wide">用途（必填）<VehicleSelectOther id="direct-purpose" value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} onChange={value => set('trip_purpose', value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="alert" title="臨時急用事由" tone="warn">
-        <label className="wide">臨時急用事由（必填）<input value={form.reason} onChange={e => set('reason', e.target.value)} placeholder="例：長官臨時需出席會議，來不及依序核准" /></label>
+        <label className="wide">臨時急用事由（必填）<VehicleSelectOther id="direct-reason" value={form.reason} options={VEHICLE_DIRECT_REASON_OPTIONS} otherPlaceholder="請輸入臨時急用事由" onChange={value => set('reason', value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="clipboard" title="指派車輛與司機">
         <label>指派車輛（必填）<select value={form.vehicle_id} onChange={e => set('vehicle_id', e.target.value)}>
