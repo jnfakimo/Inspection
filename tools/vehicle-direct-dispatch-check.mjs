@@ -40,6 +40,13 @@ assert.match(workspace, /<LocalizedDateInput aria-label="用車日期（年\/月
 // 報表（Excel、A4 列印、畫面三處）都要標示臨時直派，不得各自重新組狀態文字。
 assert.equal(workspace.match(/statusText\(r\)/g)?.length, 3, '派車報表三處輸出都必須使用 statusText 標示臨時直派');
 assert.doesNotMatch(workspace, /STATUS_LABEL\[String\(r\.status\)\]/, '報表不得繞過 statusText 直接取狀態標籤');
+// 派車報表視窗：加寬、內容有邊距、指標卡沿用交接簿 hs-kpi；v1-layout 對派車頁表格的「不換行＋省略號」不得影響報表視窗。
+assert.match(workspace, /className="handover-create-modal vehicle-report-modal"/, '報表視窗必須使用專屬版型');
+assert.match(workspace, /<div className="hs-kpi is-cyan">[\s\S]*申請單數/, '報表指標卡必須沿用交接簿 hs-kpi');
+assert.doesNotMatch(workspace, /vehicle-report-kpi"/, '報表不得退回舊的 vehicle-report-kpi 卡片');
+const formCss = fs.readFileSync('web/app/systems/[system]/[module]/vehicle-request-form.css', 'utf8');
+assert.match(formCss, /\.admin-modal\.vehicle-report-modal \.responsive-table\.vehicle-modal-table td[\s\S]*?white-space: normal/, '報表表格儲存格必須能換行，不得被截成省略號');
+assert.match(formCss, /\.vehicle-modal-table table \{\s*table-layout: auto/, '報表表格欄寬必須依內容分配');
 assert.match(workspace, /1\. 申請人填單[\s\S]*5\. 司機接單與回報/, '原五步驟流程不得被改動');
 
 console.log('公務車臨時直接派車檢查通過');

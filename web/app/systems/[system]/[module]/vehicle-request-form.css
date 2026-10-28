@@ -523,3 +523,133 @@
     grid-column: auto;
   }
 }
+
+/* 公務車派車報表視窗：加寬、篩選列標籤統一放在欄位上方、指標卡沿用交接簿 hs-kpi，
+   表格欄位不再被截成「CAR-20261…」。v1-layout.css 對派車頁內所有 .responsive-table 都設了
+   「不換行＋省略號」，這裡以更高的選擇器權重只改回報表視窗的表格。 */
+.admin-modal.vehicle-report-modal {
+  width: min(1180px, 100%);
+}
+
+.vehicle-report-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px 10px;
+}
+
+.vehicle-report-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.vehicle-report-filters label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.vehicle-report-filters input:not([type='checkbox']):not([type='radio']),
+.vehicle-report-filters select,
+.vehicle-report-filters .localized-date-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.vehicle-report-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vehicle-report-kpis .hs-kpi {
+  min-width: 0;
+}
+
+.vehicle-report-kpis .hs-kpi b {
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
+
+.admin-modal.vehicle-report-modal .responsive-table.vehicle-modal-table {
+  max-height: min(48vh, 480px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.admin-modal.vehicle-report-modal .responsive-table.vehicle-modal-table th,
+.admin-modal.vehicle-report-modal .responsive-table.vehicle-modal-table td {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+  padding: 10px 12px;
+}
+
+.admin-modal.vehicle-report-modal .responsive-table.vehicle-modal-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel2);
+  color: var(--ink);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.admin-modal.vehicle-report-modal .responsive-table.vehicle-modal-table td small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+/* 日期時段、單號與狀態、里程、加油不換行，地點、用途、單位可換行。 */
+.admin-modal.vehicle-report-modal .vehicle-modal-table td:nth-child(1),
+.admin-modal.vehicle-report-modal .vehicle-modal-table td:nth-child(2),
+.admin-modal.vehicle-report-modal .vehicle-modal-table td:nth-child(7),
+.admin-modal.vehicle-report-modal .vehicle-modal-table td:nth-child(8) {
+  white-space: nowrap;
+}
+
+/* 欄寬依內容自動分配；原本繼承的固定欄寬會讓不換行的單號溢到隔壁欄。 */
+.admin-modal.vehicle-report-modal .vehicle-modal-table table {
+  table-layout: auto;
+}
+
+@media (min-width: 801px) {
+  .admin-modal.vehicle-report-modal .vehicle-modal-table table {
+    width: 100%;
+    min-width: 960px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .vehicle-report-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicle-report-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .vehicle-report-body {
+    padding: 12px 12px 4px;
+  }
+
+  .vehicle-report-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .vehicle-report-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
