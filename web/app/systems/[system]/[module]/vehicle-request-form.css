@@ -1,4 +1,4 @@
-/* 派車申請表在桌面維持共用雙欄版型；手機將指定欄位成對排列。 */
+/* 派車表單的可輸入下拉（出發地、目的地、用途）；視窗版型見下方 .vehicle-form-*。 */
 .vehicle-combobox,
 .vehicle-combobox-control {
   position: relative;
@@ -16,39 +16,6 @@
 }
 
 @media (max-width: 800px) {
-  .vehicle-request-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 8px;
-    padding: 16px 12px;
-  }
-
-  .vehicle-request-form > label {
-    min-width: 0;
-  }
-
-  .vehicle-request-form .localized-date-input,
-  .vehicle-request-form input,
-  .vehicle-request-form select,
-  .vehicle-request-form textarea {
-    min-width: 0;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .vehicle-request-form .vehicle-request-purpose {
-    grid-column: auto;
-  }
-
-  .vehicle-request-form.admin-form-grid > label.vehicle-request-note {
-    grid-column: 1 / -1;
-  }
-
-  /* 備註是手機版唯一的長文字填寫列，輸入框要跟著整列寬度延伸。 */
-  .vehicle-request-form .vehicle-request-note textarea {
-    display: block;
-    min-height: 72px;
-  }
-
   /* iOS 會把 datalist 選項放在鍵盤上方，手機改用欄位內的展開按鈕與清單，
      選項會緊貼對應輸入框，不會和另一欄混在一起。 */
   .vehicle-combobox.is-mobile .vehicle-combobox-control > input {
@@ -170,15 +137,10 @@
 }
 
 .vehicle-direct-notice {
-  margin: 14px 20px 0;
-  font-size: 0.8rem;
-}
-
-.vehicle-direct-hint {
   margin: 0;
-  padding: 0 20px 6px;
-  color: var(--dim);
-  font-size: 0.78rem;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.84rem;
 }
 
 .vehicle-direct-flag {
@@ -194,13 +156,135 @@
   font-weight: 700;
 }
 
+/* 新增派車申請與臨時直接派車視窗：標題列沿用交接簿建立視窗的漸層（.handover-create-modal），
+   內容分成帶圖示的區塊卡片，欄位 2 或 3 欄排列、窄螢幕改單欄；不使用行內樣式。 */
+.vehicle-form-modal {
+  width: min(820px, 100%);
+}
+
+.vehicle-form-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 22px 8px;
+}
+
+.vehicle-form-section {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.vehicle-form-section > h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--primary) 6%, var(--panel2));
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.vehicle-form-section-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--primary) 14%, var(--panel));
+  color: var(--primary);
+}
+
+.vehicle-form-section.is-warn {
+  border-color: color-mix(in srgb, var(--amber) 45%, var(--line));
+}
+
+.vehicle-form-section.is-warn > h3 {
+  background: color-mix(in srgb, var(--amber) 11%, var(--panel));
+}
+
+.vehicle-form-section.is-warn .vehicle-form-section-icon {
+  background: color-mix(in srgb, var(--amber) 18%, var(--panel));
+  color: var(--ink);
+}
+
+.vehicle-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px 16px 16px;
+}
+
+.vehicle-form-fields.is-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vehicle-form-fields label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.vehicle-form-fields label.wide {
+  grid-column: 1 / -1;
+}
+
+.vehicle-form-fields input:not([type='checkbox']):not([type='radio']),
+.vehicle-form-fields select,
+.vehicle-form-fields textarea,
+.vehicle-form-fields .localized-date-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.vehicle-form-hint {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--dim);
+  font-size: 0.78rem;
+}
+
+.vehicle-form-message {
+  margin: 8px 22px 0;
+}
+
 @media (max-width: 800px) {
-  .vehicle-direct-notice,
-  .vehicle-direct-hint {
-    margin-left: 12px;
-    margin-right: 12px;
-    padding-left: 0;
-    padding-right: 0;
+  .vehicle-form-fields.is-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicle-form-fields.is-3 > label:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .vehicle-form-body {
+    padding: 12px 12px 4px;
+  }
+
+  .vehicle-form-fields,
+  .vehicle-form-fields.is-3 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .vehicle-form-fields input:not([type='checkbox']):not([type='radio']),
+  .vehicle-form-fields select {
+    min-height: var(--form-control-height);
+    font-size: 16px;
+  }
+
+  .vehicle-form-message {
+    margin: 8px 12px 0;
   }
 }
 
