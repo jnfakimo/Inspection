@@ -87,48 +87,27 @@ function numberOrNull(value: string) {
 const VEHICLE_ORIGIN_OPTIONS = ['第二市場', '市場處'];
 const VEHICLE_DESTINATION_OPTIONS = ['第一市場', '市場處'];
 const VEHICLE_PURPOSE_OPTIONS = ['會勘', '開會', '考察'];
-/** 臨時直接派車的事由選項；第一項為預設值，選「其他」可自行輸入。 */
+/** 臨時直接派車的事由常用選項；欄位預設空白，可直接輸入，也可從下拉清單挑選。 */
 const VEHICLE_DIRECT_REASON_OPTIONS = ['長官臨時指派用車'];
-
-/** 下拉選單的「其他」選項值；選到時顯示輸入欄，內容由使用者自填。 */
-const VEHICLE_OTHER_VALUE = '__other__';
-
-/**
- * 下拉選單＋「其他」手動輸入。value 是最後要送出的文字：選常用項目時等於該項目，
- * 選「其他」時是輸入欄的內容（切到「其他」會先清空，必填檢查才不會把舊選項當成答案）。
- */
-function VehicleSelectOther({ id, value, options, onChange, otherPlaceholder = '請輸入其他內容' }: {
-  id: string; value: string; options: string[]; onChange: (value: string) => void; otherPlaceholder?: string;
-}) {
-  const [other, setOther] = useState(() => value !== '' && !options.includes(value));
-  return <>
-    <select id={id} value={other ? VEHICLE_OTHER_VALUE : value} onChange={event => {
-      if (event.target.value === VEHICLE_OTHER_VALUE) { setOther(true); onChange(''); return; }
-      setOther(false); onChange(event.target.value);
-    }}>
-      <option value="">-- 請選擇 --</option>
-      {options.map(option => <option key={option} value={option}>{option}</option>)}
-      <option value={VEHICLE_OTHER_VALUE}>其他</option>
-    </select>
-    {other && <input value={value} placeholder={otherPlaceholder} aria-label="其他（自行輸入）" onChange={event => onChange(event.target.value)} />}
-  </>;
-}
 
 /**
  * 可輸入文字／數字、也可從常用選項挑選的派車欄位。
  * 桌面維持原生 datalist；手機改成欄位內的展開按鈕與 listbox，避免 iOS 把選項
  * 放到鍵盤上方，使用者能清楚看到選項屬於哪一個輸入框。
+ * menu：桌面也使用欄位內的展開箭頭與清單（欄位先留白，使用者可輸入或按箭頭挑選）。
  */
 function VehicleCombobox({
-  id, value, options, onChange, placeholder = '可輸入文字或數字',
+  id, value, options, onChange, placeholder = '可輸入文字或數字', menu = false,
 }: {
   id: string;
   value: string;
   options: string[];
   onChange: (value: string) => void;
   placeholder?: string;
+  menu?: boolean;
 }) {
-  const [mobile, setMobile] = useState(false);
+  const [touch, setTouch] = useState(false);
+  const mobile = touch || menu;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const listId = `${id}-options`;
@@ -136,7 +115,7 @@ function VehicleCombobox({
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 800px), (pointer: coarse)');
-    const update = () => setMobile(media.matches);
+    const update = () => setTouch(media.matches);
     update();
     media.addEventListener?.('change', update);
     return () => media.removeEventListener?.('change', update);
@@ -151,7 +130,7 @@ function VehicleCombobox({
     return () => document.removeEventListener('pointerdown', closeWhenOutside);
   }, [open]);
 
-  return <div ref={containerRef} className={`vehicle-combobox${mobile ? ' is-mobile' : ''}`}>
+  return <div ref={containerRef} className={`vehicle-combobox${mobile ? ' is-menu' : ''}`}>
     <div className="vehicle-combobox-control">
       <input
         id={id}
@@ -848,13 +827,27 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
 
 /** 派車表單的分區卡片：標題列帶圖示，欄位依 columns 排成 2 或 3 欄，窄螢幕自動改單欄。 */
 function VehicleFormSection({ icon, title, hint, columns = 2, tone, children }: {
-  icon: IconName; title: string; hint?: string; columns?: 2 | 3; tone?: 'warn'; children: ReactNode;
+  icon: IconName; title: string; hint?: string; columns?: 1 | 2 | 3; tone?: 'warn'; children: ReactNode;
 }) {
   return <section className={`vehicle-form-section${tone === 'warn' ? ' is-warn' : ''}`}>
     <h3><span className="vehicle-form-section-icon"><HandoverIcon name={icon} size={16} /></span>{title}</h3>
     <div className={`vehicle-form-fields is-${columns}`}>{children}</div>
     {hint && <p className="vehicle-form-hint">{hint}</p>}
   </section>;
+}
+
+/** 詳情視窗的唯讀區塊：與表單區塊同一套卡片外觀，內容是「標籤／內容」清單。 */
+function VehicleDetailSection({ icon, title, columns = 2, tone, children }: {
+  icon: IconName; title: string; columns?: 1 | 2 | 3; tone?: 'warn'; children: ReactNode;
+}) {
+  return <section className={`vehicle-form-section vehicle-detail-section${tone === 'warn' ? ' is-warn' : ''}`}>
+    <h3><span className="vehicle-form-section-icon"><HandoverIcon name={icon} size={16} /></span>{title}</h3>
+    <dl className={`vehicle-detail-list is-${columns}`}>{children}</dl>
+  </section>;
+}
+
+function VehicleDetailItem({ label, value, span = 1 }: { label: string; value: unknown; span?: 1 | 2 | 3 }) {
+  return <div className={`vehicle-detail-item span-${span}`}><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
 }
 
 /** 預設出發時間：目前時間往後進位到下一個 30 分鐘；最晚 23:30（TimeSelect 的最後一格）。 */
@@ -884,7 +877,7 @@ function DirectDispatchModal({ rows, vehicles, drivers, blockedVehicleIds, onClo
       requester_name: '', requester_department: '', requester_phone: '',
       trip_date: taipeiToday(), planned_departure_time: departure, planned_return_time: addMinutes(departure, 120),
       origin_location: '', destination_location: '', trip_purpose: '', passenger_count: '1',
-      reason: VEHICLE_DIRECT_REASON_OPTIONS[0], vehicle_id: '', driver_id: '', note: '',
+      reason: '', vehicle_id: '', driver_id: '', note: '',
     };
   });
   const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
@@ -942,10 +935,10 @@ function DirectDispatchModal({ rows, vehicles, drivers, blockedVehicleIds, onClo
       <VehicleFormSection icon="route" title="行程">
         <label>出發地（必填）<VehicleCombobox id="direct-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
         <label>目的地（必填）<VehicleCombobox id="direct-destination" value={form.destination_location} options={VEHICLE_DESTINATION_OPTIONS} onChange={value => set('destination_location', value)} /></label>
-        <label className="wide">用途（必填）<VehicleSelectOther id="direct-purpose" value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} onChange={value => set('trip_purpose', value)} /></label>
+        <label className="wide">用途（必填）<VehicleCombobox id="direct-purpose" menu value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} placeholder="可直接輸入，或按右側箭頭選擇" onChange={value => set('trip_purpose', value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="alert" title="臨時急用事由" tone="warn">
-        <label className="wide">臨時急用事由（必填）<VehicleSelectOther id="direct-reason" value={form.reason} options={VEHICLE_DIRECT_REASON_OPTIONS} otherPlaceholder="請輸入臨時急用事由" onChange={value => set('reason', value)} /></label>
+        <label className="wide">臨時急用事由（必填）<VehicleCombobox id="direct-reason" menu value={form.reason} options={VEHICLE_DIRECT_REASON_OPTIONS} placeholder="可直接輸入，或按右側箭頭選擇" onChange={value => set('reason', value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="clipboard" title="指派車輛與司機">
         <label>指派車輛（必填）<select value={form.vehicle_id} onChange={e => set('vehicle_id', e.target.value)}>
@@ -987,71 +980,106 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
   const selectedVehicleBlocked = Boolean(vehicleId && blockedVehicleIds.has(vehicleId));
   const selectedVehicleOccupied = Boolean(vehicleId && occupiedVehicleIds.has(vehicleId));
 
-  const field = (label: string, value: unknown) => <div><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
+  const direct = row.dispatch_source === 'direct';
+  // 沒有內容的選填欄位直接不顯示，避免畫面被一排「—」佔滿。
+  const has = (value: unknown) => value !== null && value !== undefined && String(value).trim() !== '';
+  const showApprovals = !direct && Boolean(row.supervisor_name || row.department_manager_name);
+  const showDispatch = Boolean(row.plate_no || row.driver_name);
+  const showTripReport = row.status === 'completed';
 
   return <AdminModal title={`派車申請｜${fmt(row.request_no)}`} className={`vehicle-detail-modal vehicle-status-${String(row.status)}`} onClose={onClose}>
-    {followup && <div className={`vehicle-followup-modal ${followup.level}`} role="alert">
-      <strong>{followup.label}</strong><span>{followup.message}</span>
-    </div>}
-    <dl className="detail-grid">
-      {field('狀態', STATUS_LABEL[String(row.status)] || row.status)}
-      {field(row.dispatch_source === 'direct' ? '用車人' : '申請人', `${fmt(row.applicant_name)}（${fmt(row.applicant_department)}）`)}
-      {row.dispatch_source === 'direct' ? field('派車方式', '臨時直接派車（免課長與部門經理核准）') : null}
-      {row.dispatch_source === 'direct' ? field('臨時急用事由', row.direct_dispatch_reason) : null}
-      {row.dispatch_source === 'direct' ? field('建單派車人員', row.direct_dispatch_by_name) : null}
-      {field('聯絡電話', row.applicant_phone)}
-      {field('用車日期', row.trip_date)}
-      {field('預計時段', `${timeText(row.planned_departure_time)} – ${timeText(row.planned_return_time)}`)}
-      {field('起訖地點', `${fmt(row.origin_location)} → ${fmt(row.destination_location)}`)}
-      {field('用途', row.trip_purpose)}
-      {field('搭乘人數', row.passenger_count)}
-      {field('備註', row.applicant_note)}
-      {row.supervisor_name ? field('課長核准', `${row.supervisor_name}｜${fmtTime(row.approved_at)}`) : null}
-      {row.supervisor_note ? field('課長意見', row.supervisor_note) : null}
-      {row.department_manager_name ? field('部門經理核准', `${row.department_manager_name}｜${fmtTime(row.department_manager_approved_at)}`) : null}
-      {row.department_manager_note ? field('部門經理意見', row.department_manager_note) : null}
-      {row.plate_no ? field('指派車輛', row.plate_no) : null}
-      {row.driver_name ? field('指派駕駛', `${row.driver_name}${row.driver_accepted_at ? `（已接單 ${fmtTime(row.driver_accepted_at)}）` : '（尚未接單）'}`) : null}
-      {row.status === 'completed' ? field('實際時段', `${fmtTime(row.actual_departure_at)} – ${fmtTime(row.actual_return_at)}`) : null}
-      {row.status === 'completed' ? field('里程', `${fmt(row.odometer_start)} → ${fmt(row.odometer_end)}（${fmt(row.total_mileage)} km）`) : null}
-      {row.refueled ? field('加油', `里程 ${fmt(row.refuel_odometer)}｜${fmt(row.refuel_cost)} 元`) : null}
-      {row.has_abnormality ? field('異常通報', row.abnormality_note) : null}
-      {row.driver_note ? field('駕駛備註', row.driver_note) : null}
-      {row.cancel_reason ? field('取消原因', row.cancel_reason) : null}
-    </dl>
+    <div className="vehicle-detail-body">
+      {followup && <div className={`vehicle-followup-modal ${followup.level}`} role="alert">
+        <strong>{followup.label}</strong><span>{followup.message}</span>
+      </div>}
 
-    {logs.length > 0 && <div className="detail-timeline">
-      <h3>流程歷程</h3>
-      <ol>{logs.map(log => <li key={String(log.log_id)}>
-        <b>{fmt(log.action)}</b><span>{fmt(log.operator_name)}</span><time>{fmtTime(log.created_at)}</time>
-        {log.note ? <p>{String(log.note)}</p> : null}
-      </li>)}</ol>
-    </div>}
+      <div className="vehicle-detail-summary">
+        <Pill value={row.status} labels={STATUS_LABEL} tones={STATUS_TONE} />
+        {direct && <span className="vehicle-direct-flag" title="臨時急用，由派車管理員直接派車，免課長與部門經理核准">臨時直派</span>}
+        <span>{fmt(row.trip_date)}　{timeText(row.planned_departure_time)}–{timeText(row.planned_return_time)}</span>
+        <span>{fmt(row.origin_location)} → {fmt(row.destination_location)}</span>
+      </div>
 
-    {['pending_approval', 'pending_manager_approval'].includes(String(row.status)) && canApprove && <div className="admin-form-grid">
-      <label className="wide">{row.status === 'pending_approval' ? '課長' : '部門經理'}意見（退回時必填）<input value={reason} onChange={e => setReason(e.target.value)} /></label>
-    </div>}
-    {row.status === 'approved' && canDispatch && <div className="admin-form-grid">
-      <label>指派車輛<select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
-        <option value="">-- 請選擇 --</option>
-        {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); const occupied = occupiedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked || occupied}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : occupied ? '（該時段已被派用）' : ''}</option>; })}
-      </select></label>
-      <label>指派駕駛<select value={driverId} onChange={e => setDriverId(e.target.value)}>
-        <option value="">-- 請選擇 --</option>
-        {drivers.map(d => <option key={String(d.user_id)} value={String(d.user_id)}>{(d.users as Row)?.name || d.user_id}</option>)}
-      </select></label>
-      <label className="wide">派車備註<input value={reason} onChange={e => setReason(e.target.value)} /></label>
-      {selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛上一趟行程尚未補齊里程，暫停派車；請先由司機完成回報。</p>}
-      {selectedVehicleOccupied && !selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block">此車輛在本申請的用車時段已被其他派車單使用，請改派其他車輛或調整用車時段。</p>}
-    </div>}
-    {canCancel && <div className="admin-form-grid">
-      <label className="wide">取消原因（取消時必填）<select value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
-        <option value=""></option>
-        <option value="未出車">未出車</option>
-        <option value="臨時取消">臨時取消</option>
-        <option value="其他">其他</option>
-      </select></label>
-    </div>}
+      <VehicleDetailSection icon="calendar" title="用車資訊" columns={3}>
+        <VehicleDetailItem label="用車日期" value={row.trip_date} />
+        <VehicleDetailItem label="預計時段" value={`${timeText(row.planned_departure_time)} – ${timeText(row.planned_return_time)}`} />
+        <VehicleDetailItem label="搭乘人數" value={has(row.passenger_count) ? `${row.passenger_count} 人` : null} />
+        <VehicleDetailItem label="起訖地點" value={`${fmt(row.origin_location)} → ${fmt(row.destination_location)}`} span={2} />
+        <VehicleDetailItem label="用途" value={row.trip_purpose} />
+        {has(row.applicant_note) && <VehicleDetailItem label="備註" value={row.applicant_note} span={3} />}
+      </VehicleDetailSection>
+
+      <VehicleDetailSection icon="users" title={direct ? '用車人' : '申請人'} columns={3}>
+        <VehicleDetailItem label={direct ? '用車人' : '申請人'} value={row.applicant_name} />
+        <VehicleDetailItem label="單位" value={row.applicant_department} />
+        <VehicleDetailItem label="聯絡電話" value={row.applicant_phone} />
+      </VehicleDetailSection>
+
+      {direct && <VehicleDetailSection icon="alert" title="臨時直接派車" columns={2} tone="warn">
+        <VehicleDetailItem label="派車方式" value="免課長與部門經理核准" />
+        <VehicleDetailItem label="建單派車人員" value={row.direct_dispatch_by_name} />
+        <VehicleDetailItem label="臨時急用事由" value={row.direct_dispatch_reason} span={2} />
+      </VehicleDetailSection>}
+
+      {showApprovals && <VehicleDetailSection icon="check" title="核准紀錄" columns={2}>
+        {has(row.supervisor_name) && <VehicleDetailItem label="課長核准" value={`${row.supervisor_name}｜${fmtTime(row.approved_at)}`} />}
+        {has(row.supervisor_note) && <VehicleDetailItem label="課長意見" value={row.supervisor_note} />}
+        {has(row.department_manager_name) && <VehicleDetailItem label="部門經理核准" value={`${row.department_manager_name}｜${fmtTime(row.department_manager_approved_at)}`} />}
+        {has(row.department_manager_note) && <VehicleDetailItem label="部門經理意見" value={row.department_manager_note} />}
+      </VehicleDetailSection>}
+
+      {showDispatch && <VehicleDetailSection icon="route" title="派車資訊" columns={3}>
+        <VehicleDetailItem label="指派車輛" value={row.plate_no} />
+        <VehicleDetailItem label="指派駕駛" value={row.driver_name} />
+        <VehicleDetailItem label="接單狀態" value={row.driver_accepted_at ? `已接單｜${fmtTime(row.driver_accepted_at)}` : '尚未接單'} />
+      </VehicleDetailSection>}
+
+      {showTripReport && <VehicleDetailSection icon="clipboard" title="行車回報" columns={3}>
+        <VehicleDetailItem label="實際時段" value={`${fmtTime(row.actual_departure_at)} – ${fmtTime(row.actual_return_at)}`} span={2} />
+        <VehicleDetailItem label="行駛里程" value={has(row.total_mileage) ? `${fmt(row.total_mileage)} km` : null} />
+        <VehicleDetailItem label="里程起訖" value={`${fmt(row.odometer_start)} → ${fmt(row.odometer_end)}`} />
+        {row.refueled && <VehicleDetailItem label="加油" value={`里程 ${fmt(row.refuel_odometer)}｜${fmt(row.refuel_cost)} 元`} span={2} />}
+        {row.has_abnormality && <VehicleDetailItem label="異常通報" value={row.abnormality_note} span={3} />}
+        {has(row.driver_note) && <VehicleDetailItem label="駕駛備註" value={row.driver_note} span={3} />}
+      </VehicleDetailSection>}
+
+      {has(row.cancel_reason) && <VehicleDetailSection icon="flag" title="取消" columns={1}>
+        <VehicleDetailItem label="取消原因" value={row.cancel_reason} />
+      </VehicleDetailSection>}
+
+      {logs.length > 0 && <div className="detail-timeline">
+        <h3>流程歷程</h3>
+        <ol>{logs.map(log => <li key={String(log.log_id)}>
+          <b>{fmt(log.action)}</b><span>{fmt(log.operator_name)}</span><time>{fmtTime(log.created_at)}</time>
+          {log.note ? <p>{String(log.note)}</p> : null}
+        </li>)}</ol>
+      </div>}
+
+      {['pending_approval', 'pending_manager_approval'].includes(String(row.status)) && canApprove && <VehicleFormSection icon="pen" title={row.status === 'pending_approval' ? '課長審核' : '部門經理審核'} columns={1}>
+        <label className="wide">{row.status === 'pending_approval' ? '課長' : '部門經理'}意見（退回時必填）<input value={reason} onChange={e => setReason(e.target.value)} /></label>
+      </VehicleFormSection>}
+      {row.status === 'approved' && canDispatch && <VehicleFormSection icon="clipboard" title="指派車輛與司機">
+        <label>指派車輛<select value={vehicleId} onChange={e => setVehicleId(e.target.value)}>
+          <option value="">-- 請選擇 --</option>
+          {vehicles.filter(v => v.status === 'active').map(v => { const blocked = blockedVehicleIds.has(String(v.vehicle_id)); const occupied = occupiedVehicleIds.has(String(v.vehicle_id)); return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked || occupied}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : occupied ? '（該時段已被派用）' : ''}</option>; })}
+        </select></label>
+        <label>指派駕駛<select value={driverId} onChange={e => setDriverId(e.target.value)}>
+          <option value="">-- 請選擇 --</option>
+          {drivers.map(d => <option key={String(d.user_id)} value={String(d.user_id)}>{(d.users as Row)?.name || d.user_id}</option>)}
+        </select></label>
+        <label className="wide">派車備註<input value={reason} onChange={e => setReason(e.target.value)} /></label>
+        {selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block wide">此車輛上一趟行程尚未補齊里程，暫停派車；請先由司機完成回報。</p>}
+        {selectedVehicleOccupied && !selectedVehicleBlocked && <p className="vehicle-followup-dispatch-block wide">此車輛在本申請的用車時段已被其他派車單使用，請改派其他車輛或調整用車時段。</p>}
+      </VehicleFormSection>}
+      {canCancel && <VehicleFormSection icon="flag" title="取消申請" columns={1}>
+        <label className="wide">取消原因（取消時必填）<select value={cancelReason} onChange={e => setCancelReason(e.target.value)}>
+          <option value=""></option>
+          <option value="未出車">未出車</option>
+          <option value="臨時取消">臨時取消</option>
+          <option value="其他">其他</option>
+        </select></label>
+      </VehicleFormSection>}
+    </div>
 
     <footer>
       <button className="secondary-btn" onClick={onClose}>關閉</button>
@@ -1113,25 +1141,38 @@ function TripReportModal({ row, vehicles, onClose, onDone }: { row: Row; vehicle
     onDone('行車回報已完成，里程已自動核算');
   };
 
-  return <AdminModal title={`行車回報｜${fmt(row.request_no)}　${fmt(row.plate_no)}`} onClose={onClose}>
-    <div className="admin-form-grid">
-      <label>實際搭乘人數<input type="number" min={0} value={form.actual_passenger_count} onChange={e => set('actual_passenger_count', e.target.value)} /></label>
-      <label>實際出發時間<LocalizedDateTimeInput ariaLabel="實際出發時間" value={form.actual_departure_at} onChange={value => set('actual_departure_at', value)} /></label>
-      <label>實際回程時間<LocalizedDateTimeInput ariaLabel="實際回程時間" value={form.actual_return_at} onChange={value => set('actual_return_at', value)} /></label>
-      <label>起始里程（km）<input type="number" step="0.1" value={form.odometer_start} onChange={e => set('odometer_start', e.target.value)} /></label>
-      <label>回程里程（km）<input type="number" step="0.1" value={form.odometer_end} onChange={e => set('odometer_end', e.target.value)} /></label>
-      <label>上次加油里程<input type="number" step="0.1" value={form.last_refuel_odometer} onChange={e => set('last_refuel_odometer', e.target.value)} /></label>
-      <label>上次加油費用<input type="number" step="1" min={0} value={form.last_refuel_cost} onChange={e => set('last_refuel_cost', e.target.value)} /></label>
-      <label className="wide checkbox"><input type="checkbox" checked={form.refueled} onChange={e => set('refueled', e.target.checked)} />本次行程有加油</label>
-      {form.refueled && <>
-        <label>加油當下里程<input type="number" step="0.1" value={form.refuel_odometer} onChange={e => set('refuel_odometer', e.target.value)} /></label>
-        <label>本次加油費用<input type="number" step="1" min={0} value={form.refuel_cost} onChange={e => set('refuel_cost', e.target.value)} /></label>
-      </>}
-      <label className="wide checkbox"><input type="checkbox" checked={form.has_abnormality} onChange={e => set('has_abnormality', e.target.checked)} />有異常需通報</label>
-      {form.has_abnormality && <label className="wide">異常內容（必填）<textarea rows={2} value={form.abnormality_note} onChange={e => set('abnormality_note', e.target.value)} /></label>}
-      <label className="wide">駕駛備註<textarea rows={2} value={form.driver_note} onChange={e => set('driver_note', e.target.value)} /></label>
+  return <AdminModal title={`行車回報｜${fmt(row.request_no)}　${fmt(row.plate_no)}`} className="handover-create-modal vehicle-form-modal" onClose={onClose}>
+    <div className="vehicle-form-body">
+      <div className="vehicle-detail-summary">
+        <span>{fmt(row.trip_date)}　預計 {timeText(row.planned_departure_time)}–{timeText(row.planned_return_time)}</span>
+        <span>{fmt(row.origin_location)} → {fmt(row.destination_location)}</span>
+        <span>司機 {fmt(row.driver_name)}</span>
+      </div>
+      <VehicleFormSection icon="clock" title="實際行程時間">
+        <label>實際出發時間<LocalizedDateTimeInput ariaLabel="實際出發時間" value={form.actual_departure_at} onChange={value => set('actual_departure_at', value)} /></label>
+        <label>實際回程時間<LocalizedDateTimeInput ariaLabel="實際回程時間" value={form.actual_return_at} onChange={value => set('actual_return_at', value)} /></label>
+      </VehicleFormSection>
+      <VehicleFormSection icon="route" title="乘車與里程" columns={3}>
+        <label>實際搭乘人數<input type="number" min={0} value={form.actual_passenger_count} onChange={e => set('actual_passenger_count', e.target.value)} /></label>
+        <label>起始里程（km）<input type="number" step="0.1" value={form.odometer_start} onChange={e => set('odometer_start', e.target.value)} /></label>
+        <label>回程里程（km）<input type="number" step="0.1" value={form.odometer_end} onChange={e => set('odometer_end', e.target.value)} /></label>
+      </VehicleFormSection>
+      <VehicleFormSection icon="box" title="加油紀錄">
+        <label>上次加油里程<input type="number" step="0.1" value={form.last_refuel_odometer} onChange={e => set('last_refuel_odometer', e.target.value)} /></label>
+        <label>上次加油費用<input type="number" step="1" min={0} value={form.last_refuel_cost} onChange={e => set('last_refuel_cost', e.target.value)} /></label>
+        <label className="wide checkbox"><input type="checkbox" checked={form.refueled} onChange={e => set('refueled', e.target.checked)} />本次行程有加油</label>
+        {form.refueled && <>
+          <label>加油當下里程<input type="number" step="0.1" value={form.refuel_odometer} onChange={e => set('refuel_odometer', e.target.value)} /></label>
+          <label>本次加油費用<input type="number" step="1" min={0} value={form.refuel_cost} onChange={e => set('refuel_cost', e.target.value)} /></label>
+        </>}
+      </VehicleFormSection>
+      <VehicleFormSection icon="note" title="異常與備註" columns={1}>
+        <label className="wide checkbox"><input type="checkbox" checked={form.has_abnormality} onChange={e => set('has_abnormality', e.target.checked)} />有異常需通報</label>
+        {form.has_abnormality && <label className="wide">異常內容（必填）<textarea rows={2} value={form.abnormality_note} onChange={e => set('abnormality_note', e.target.value)} /></label>}
+        <label className="wide">駕駛備註<textarea rows={2} value={form.driver_note} onChange={e => set('driver_note', e.target.value)} /></label>
+      </VehicleFormSection>
     </div>
-    {message && <p className="inline-message danger">{message}</p>}
+    {message && <p className="inline-message danger vehicle-form-message">{message}</p>}
     <footer>
       <button className="secondary-btn" onClick={onClose}>取消</button>
       <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '送出中…' : '送出回報'}</button>

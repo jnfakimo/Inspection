@@ -11,84 +11,78 @@
   box-sizing: border-box;
 }
 
-.vehicle-combobox-toggle {
-  display: none;
+/* 欄位內的展開箭頭與清單：手機（避免 iOS 把 datalist 放在鍵盤上方）與指定 menu 的欄位使用，
+   元件只在這兩種情況才輸出按鈕與清單，所以規則不必再限定螢幕寬度。 */
+.vehicle-combobox.is-menu .vehicle-combobox-control > input {
+  padding-right: 40px;
 }
 
-@media (max-width: 800px) {
-  /* iOS 會把 datalist 選項放在鍵盤上方，手機改用欄位內的展開按鈕與清單，
-     選項會緊貼對應輸入框，不會和另一欄混在一起。 */
-  .vehicle-combobox.is-mobile .vehicle-combobox-control > input {
-    padding-right: 40px;
-  }
+.vehicle-combobox-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
 
-  .vehicle-combobox-toggle {
-    position: absolute;
-    top: 50%;
-    right: 4px;
-    display: grid;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    transform: translateY(-50%);
-    background: transparent;
-    color: var(--muted);
-    font-size: 22px;
-    line-height: 1;
-    cursor: pointer;
-  }
+.vehicle-combobox-toggle:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 1px;
+}
 
-  .vehicle-combobox-toggle:focus-visible {
-    outline: 2px solid var(--blue);
-    outline-offset: 1px;
-  }
+.vehicle-combobox-menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 3px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 16%, transparent);
+}
 
-  .vehicle-combobox-menu {
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    display: grid;
-    gap: 3px;
-    max-height: 190px;
-    overflow-y: auto;
-    padding: 4px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--surface);
-    box-shadow: 0 10px 24px color-mix(in srgb, var(--ink) 16%, transparent);
-  }
+.vehicle-combobox-menu button {
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 
-  .vehicle-combobox-menu button {
-    min-height: 38px;
-    padding: 7px 10px;
-    border: 1px solid transparent;
-    border-radius: 6px;
-    background: var(--surface-soft);
-    color: var(--ink);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
+.vehicle-combobox-menu button:hover,
+.vehicle-combobox-menu button:focus-visible,
+.vehicle-combobox-menu button.is-selected {
+  border-color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 10%, var(--surface-soft));
+  color: var(--blue);
+  outline: none;
+}
 
-  .vehicle-combobox-menu button:hover,
-  .vehicle-combobox-menu button:focus-visible,
-  .vehicle-combobox-menu button.is-selected {
-    border-color: var(--blue);
-    background: color-mix(in srgb, var(--blue) 10%, var(--surface-soft));
-    color: var(--blue);
-    outline: none;
-  }
-
-  .vehicle-combobox-empty {
-    padding: 9px 10px;
-    color: var(--muted);
-    font-size: .82rem;
-  }
+.vehicle-combobox-empty {
+  padding: 9px 10px;
+  color: var(--muted);
+  font-size: .82rem;
 }
 
 /* 公務車主檔編輯彈窗：手機版依欄位群組排成三列；桌機維持共用表單網格。 */
@@ -170,13 +164,14 @@
 
 .vehicle-form-section {
   margin: 0;
-  overflow: hidden;
+  /* 欄位內的下拉清單會往卡片外展開，所以不能 overflow:hidden；標題列自己處理上緣圓角。 */
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--panel);
 }
 
 .vehicle-form-section > h3 {
+  border-radius: 13px 13px 0 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -405,4 +400,126 @@
   background-color: var(--primary) !important;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M8 3v4M16 3v4M3 10h18'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M8 3v4M16 3v4M3 10h18'/%3E%3C/svg%3E") center / 20px 20px no-repeat;
+}
+
+/* 單欄區塊、核取方塊列，以及區塊內整列的提示文字。 */
+.vehicle-form-fields.is-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.vehicle-form-fields label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.vehicle-form-fields p.wide {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* 派車申請詳情視窗：摘要列＋唯讀區塊卡片（同表單區塊的外觀），內容是「標籤／內容」清單。 */
+.vehicle-detail-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 8px;
+}
+
+.vehicle-detail-body .detail-timeline {
+  padding: 0;
+}
+
+.vehicle-detail-body .vehicle-followup-modal {
+  margin: 0;
+}
+
+.vehicle-detail-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.vehicle-detail-summary .vehicle-direct-flag {
+  margin-top: 0;
+}
+
+.vehicle-detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+  padding: 14px 16px 16px;
+}
+
+.vehicle-detail-list.is-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.vehicle-detail-list.is-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vehicle-detail-item {
+  min-width: 0;
+}
+
+.vehicle-detail-item.span-2 {
+  grid-column: span 2;
+}
+
+.vehicle-detail-item.span-3 {
+  grid-column: 1 / -1;
+}
+
+.vehicle-detail-item dt {
+  color: var(--muted);
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+}
+
+.vehicle-detail-item dd {
+  margin: 3px 0 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 800px) {
+  .vehicle-detail-list.is-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicle-detail-item.span-3 {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .vehicle-detail-body {
+    padding: 10px 10px 4px;
+  }
+
+  .vehicle-detail-list,
+  .vehicle-detail-list.is-3 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .vehicle-detail-item.span-2,
+  .vehicle-detail-item.span-3 {
+    grid-column: auto;
+  }
 }
