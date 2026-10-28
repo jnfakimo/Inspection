@@ -53,6 +53,17 @@ assert.doesNotMatch(workspace, /vehicle-step tone-|vehicle-tab-count is-/, '流�
 assert.doesNotMatch(adminCss, /\.tone-(cyan|amber|violet|green|blue)\{/, '不再保留裝飾用的 tone-* 色票');
 assert.doesNotMatch(adminCss + formCss, /\.vehicle-[a-z-]+[^{}]*\{[^}]*var\(--blue\)/, '派車頁面不得使用另一種藍（--blue），一律用 --primary');
 assert.doesNotMatch(workspace, /hs-kpi is-(violet|green|amber)">/, '報表指標卡一律主色，只有異常大於 0 才用紅色');
+// 版型：五個子系統頁（派車申請、公務車輛、駕駛人員、派車管理員、派車紀錄）一律用交接簿的 VehicleSheet 外框，
+// 內頁視窗一律用區塊卡片，不再各自拼欄位或自設頁面寬度。
+assert.equal(workspace.match(/<VehicleSheet title=/g)?.length, 4, '派車申請、公務車輛、名單（駕駛與管理員共用）、派車紀錄都必須使用 VehicleSheet');
+assert.match(workspace, /<VehicleSheet title="公務車派車管理表"/, '派車申請頁必須使用 VehicleSheet');
+assert.match(workspace, /<VehicleSheet title="公務車輛主檔"/, '公務車輛頁必須使用 VehicleSheet');
+assert.match(workspace, /<VehicleSheet title="派車紀錄表"/, '派車紀錄頁必須使用 VehicleSheet');
+assert.equal(workspace.match(/<HandoverSheetHeader/g)?.length, 1, '交接簿表頭只能由 VehicleSheet 輸出一次');
+assert.equal(workspace.match(/<VehicleEditModal /g)?.length, 2, '車輛新增／編輯視窗必須共用 VehicleEditModal');
+assert.doesNotMatch(workspace, /className="admin-form-grid/, '派車各視窗不得退回舊的 admin-form-grid 欄位版型');
+const v1Css = fs.readFileSync('web/app/v1-layout.css', 'utf8');
+assert.doesNotMatch(v1Css, /\.vehicle-(master|people|logs)-page\{width/, '各子系統頁不得各自縮小寬度，內容寬度由 --content-width 統一');
 assert.match(workspace, /1\. 申請人填單[\s\S]*5\. 司機接單與回報/, '原五步驟流程不得被改動');
 
 console.log('公務車臨時直接派車檢查通過');

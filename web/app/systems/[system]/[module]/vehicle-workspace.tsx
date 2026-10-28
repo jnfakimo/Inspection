@@ -394,10 +394,7 @@ function RequestsModule({ module, profile }: Props) {
     {/* 駕駛本人的 LINE 個人派車通知綁定入口（與個人資料設定共用同一元件） */}
     {isDriver && <VehicleLineLinkSection index="LINE" />}
 
-    <section className="hs-sheet vehicle-sheet" aria-label="公務車派車管理">
-    <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="公務車派車管理表"
-      dateLabel={rocDate(today)} emblem="route" kpis={kpis} />
-    <div className="vehicle-sheet-body">
+    <VehicleSheet title="公務車派車管理表" emblem="route" kpis={kpis}>
 
     {/* 申請、兩層核准、派車與回報的五步驟流程 */}
     <div className="vehicle-flow-grid">
@@ -493,8 +490,7 @@ function RequestsModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">目前沒有符合條件的派車申請</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
-    </div>
-    </section>
+    </VehicleSheet>
     </div>
 
     {creating && <CreateRequestModal profile={profile} onClose={() => setCreating(false)}
@@ -726,7 +722,8 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
     setBusy(false);
   };
 
-  return <AdminModal title="公務車主檔管理" onClose={onClose}>
+  return <AdminModal title="公務車主檔管理" className="handover-create-modal vehicle-report-modal" onClose={onClose}>
+    <div className="vehicle-report-body">
     <div className="vehicle-modal-head">
       <span>共 {vehicles.length} 台車輛</span>
       <button className="primary-btn compact" onClick={() => setEditing({ status: 'active', seats: 5, current_odometer: 0 })}>＋ 新增車輛</button>
@@ -744,24 +741,8 @@ function VehicleMasterModal({ profile: _profile, onClose }: { profile: Profile; 
       </tr>)}</tbody>
     </table></div>
 
-    {editing && <AdminModal title={editing.vehicle_id ? '編輯車輛' : '新增車輛'} onClose={() => setEditing(null)}>
-      <div className="admin-form-grid">
-        <label>車號（必填）<input value={String(editing.plate_no || '')} onChange={e => setEditing({ ...editing, plate_no: e.target.value })} /></label>
-        <label>車名<input value={String(editing.vehicle_name || '')} onChange={e => setEditing({ ...editing, vehicle_name: e.target.value })} placeholder="例：公務 7 人座" /></label>
-        <label>廠牌<input value={String(editing.brand || '')} onChange={e => setEditing({ ...editing, brand: e.target.value })} /></label>
-        <label>型號<input value={String(editing.model || '')} onChange={e => setEditing({ ...editing, model: e.target.value })} /></label>
-        <label>座位數<input type="number" min={1} value={String(editing.seats ?? 5)} onChange={e => setEditing({ ...editing, seats: e.target.value })} /></label>
-        <label>目前里程 (km)<input type="number" step="0.1" value={String(editing.current_odometer ?? 0)} onChange={e => setEditing({ ...editing, current_odometer: e.target.value })} /></label>
-        <label>狀態<select value={String(editing.status || 'active')} onChange={e => setEditing({ ...editing, status: e.target.value })}>
-          {Object.entries(VEHICLE_STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select></label>
-        <label className="wide">備註<input value={String(editing.note || '')} onChange={e => setEditing({ ...editing, note: e.target.value })} /></label>
-      </div>
-      <footer>
-        <button className="secondary-btn" onClick={() => setEditing(null)}>取消</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
-      </footer>
-    </AdminModal>}
+    {editing && <VehicleEditModal editing={editing} busy={busy} onChange={setEditing} onSave={() => void save()} onClose={() => setEditing(null)} />}
+    </div>
 
     <footer>
       <button className="secondary-btn" onClick={onClose}>關閉</button>
@@ -850,6 +831,49 @@ function VehicleDetailSection({ icon, title, columns = 2, tone, children }: {
 
 function VehicleDetailItem({ label, value, span = 1 }: { label: string; value: unknown; span?: 1 | 2 | 3 }) {
   return <div className={`vehicle-detail-item span-${span}`}><dt>{label}</dt><dd>{fmt(value)}</dd></div>;
+}
+
+/**
+ * 公務車各子系統頁共用的交接簿版型外框：機關名稱、表名、日期與指標列（HandoverSheetHeader），
+ * 表頭以下是內容區。派車申請、公務車輛、駕駛人員、派車管理員、派車紀錄五頁都用這一個，外觀才會一致。
+ */
+function VehicleSheet({ title, emblem, kpis, children }: { title: string; emblem: IconName; kpis: HandoverKpi[]; children: ReactNode }) {
+  return <section className="hs-sheet vehicle-sheet" aria-label={title}>
+    <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title={title}
+      dateLabel={rocDate(taipeiToday())} emblem={emblem} kpis={kpis} />
+    <div className="vehicle-sheet-body">{children}</div>
+  </section>;
+}
+
+/** 新增／編輯公務車的視窗，公務車輛頁與派車頁的主檔管理共用。 */
+function VehicleEditModal({ editing, busy, onChange, onSave, onClose }: {
+  editing: Row; busy: boolean; onChange: (next: Row) => void; onSave: () => void; onClose: () => void;
+}) {
+  const set = (key: string, value: string) => onChange({ ...editing, [key]: value });
+  return <AdminModal title={editing.vehicle_id ? `編輯車輛｜${fmt(editing.plate_no)}` : '新增車輛'} className="handover-create-modal vehicle-form-modal" onClose={onClose}>
+    <div className="vehicle-form-body">
+      <VehicleFormSection icon="route" title="車輛識別">
+        <label>車號（必填）<input value={String(editing.plate_no || '')} onChange={e => set('plate_no', e.target.value)} /></label>
+        <label>車名<input value={String(editing.vehicle_name || '')} onChange={e => set('vehicle_name', e.target.value)} placeholder="例：公務 7 人座" /></label>
+        <label>廠牌<input value={String(editing.brand || '')} onChange={e => set('brand', e.target.value)} /></label>
+        <label>型號<input value={String(editing.model || '')} onChange={e => set('model', e.target.value)} /></label>
+      </VehicleFormSection>
+      <VehicleFormSection icon="clipboard" title="規格與狀態" columns={3}>
+        <label>座位數<input type="number" min={1} value={String(editing.seats ?? 5)} onChange={e => set('seats', e.target.value)} /></label>
+        <label>目前里程（km）<input type="number" step="0.1" min={0} value={String(editing.current_odometer ?? 0)} onChange={e => set('current_odometer', e.target.value)} /></label>
+        <label>狀態<select value={String(editing.status || 'active')} onChange={e => set('status', e.target.value)}>
+          {Object.entries(VEHICLE_STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select></label>
+      </VehicleFormSection>
+      <VehicleFormSection icon="note" title="備註" columns={1}>
+        <label className="wide">備註<input value={String(editing.note || '')} onChange={e => set('note', e.target.value)} /></label>
+      </VehicleFormSection>
+    </div>
+    <footer>
+      <button className="secondary-btn" onClick={onClose}>取消</button>
+      <button className="primary-btn compact" disabled={busy} onClick={onSave}>{busy ? '儲存中…' : '儲存'}</button>
+    </footer>
+  </AdminModal>;
 }
 
 /** 預設出發時間：目前時間往後進位到下一個 30 分鐘；最晚 23:30（TimeSelect 的最後一格）。 */
@@ -1225,10 +1249,18 @@ function VehiclesModule({ module, profile }: Props) {
     setEditor(null); await load(); setNote(editor.vehicle_id ? '車輛資料已更新' : '車輛已新增');
   };
 
+  const kpis: HandoverKpi[] = [
+    { label: '車輛總數', value: String(rows.length), icon: 'route', tone: 'cyan' },
+    { label: '可派用', value: String(rows.filter(r => r.status === 'active').length), icon: 'check', tone: 'cyan' },
+    { label: '維修中', value: String(rows.filter(r => r.status === 'maintenance').length), icon: 'tool', tone: 'cyan' },
+    { label: '停用', value: String(rows.filter(r => r.status === 'inactive').length), icon: 'flag', tone: 'cyan' },
+  ];
+
   return <AppShell profile={profile} title={module.title}>
-    <div className="vehicle-master-page">
+    <div className="hs-page vehicle-master-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={canManageFleet ? <button className="primary-btn compact" onClick={() => setEditor({ status: 'active', seats: 5, current_odometer: 0 })}>＋ 新增車輛</button> : undefined} />
+    <VehicleSheet title="公務車輛主檔" emblem="box" kpis={kpis}>
     <section className="panel admin-panel vehicle-master-panel">
       <div className="admin-toolbar vehicle-master-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋車號、車名、廠牌或型號" />
@@ -1249,26 +1281,10 @@ function VehiclesModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">目前沒有車輛資料</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
+    </VehicleSheet>
     </div>
 
-    {editor && <AdminModal title={editor.vehicle_id ? `編輯車輛｜${fmt(editor.plate_no)}` : '新增車輛'} onClose={() => setEditor(null)}>
-      <div className="admin-form-grid vehicle-master-edit-form">
-        <label>車號（必填）<input value={String(editor.plate_no || '')} onChange={e => setEditor({ ...editor, plate_no: e.target.value })} /></label>
-        <label>車名<input value={String(editor.vehicle_name || '')} onChange={e => setEditor({ ...editor, vehicle_name: e.target.value })} placeholder="例：7人座車" /></label>
-        <label>廠牌<input value={String(editor.brand || '')} onChange={e => setEditor({ ...editor, brand: e.target.value })} /></label>
-        <label>型號<input value={String(editor.model || '')} onChange={e => setEditor({ ...editor, model: e.target.value })} /></label>
-        <label>座位數<input type="number" min={1} value={String(editor.seats ?? 5)} onChange={e => setEditor({ ...editor, seats: e.target.value })} /></label>
-        <label>目前里程（km）<input type="number" step="0.1" min={0} value={String(editor.current_odometer ?? 0)} onChange={e => setEditor({ ...editor, current_odometer: e.target.value })} /></label>
-        <label>狀態<select value={String(editor.status || 'active')} onChange={e => setEditor({ ...editor, status: e.target.value })}>
-          {Object.entries(VEHICLE_STATUS_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select></label>
-        <label className="wide">備註<input value={String(editor.note || '')} onChange={e => setEditor({ ...editor, note: e.target.value })} /></label>
-      </div>
-      <footer>
-        <button className="secondary-btn" onClick={() => setEditor(null)}>取消</button>
-        <button className="primary-btn compact" disabled={busy} onClick={() => void save()}>{busy ? '儲存中…' : '儲存'}</button>
-      </footer>
-    </AdminModal>}
+    {editor && <VehicleEditModal editing={editor} busy={busy} onChange={setEditor} onSave={() => void save()} onClose={() => setEditor(null)} />}
   </AppShell>;
 }
 
@@ -1332,10 +1348,18 @@ function RosterModule({ module, profile }: Props) {
   const pageRows = visibleRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
+  const activeCount = rows.filter(row => row.active).length;
+  const kpis: HandoverKpi[] = [
+    { label: `啟用中${roleWord}`, value: String(activeCount), icon: 'check', tone: 'cyan' },
+    { label: '已停用', value: String(inactiveCount), icon: 'flag', tone: 'cyan' },
+    { label: '名單總數', value: String(rows.length), icon: 'users', tone: 'cyan' },
+  ];
+
   return <AppShell profile={profile} title={module.title}>
-    <div className="vehicle-people-page">
+    <div className="hs-page vehicle-people-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={isAdmin ? <><button className="primary-btn compact" onClick={() => { setPick(''); setPicking(true); }}>＋ 新增{roleWord}</button><button className="secondary-btn danger compact" disabled={busy || !rows.some(row => row.active)} onClick={() => void removeAll()}>全部刪除</button></> : undefined} />
+    <VehicleSheet title={module.key === 'drivers' ? '駕駛人員名單' : '派車管理員名單'} emblem={module.key === 'drivers' ? 'users' : 'shield'} kpis={kpis}>
     <section className="panel admin-panel vehicle-people-panel">
       <div className="admin-toolbar"><span>啟用中 {rows.filter(r => r.active).length}／共 {rows.length} 人</span>
         {inactiveCount > 0 && <button className="secondary-btn compact" onClick={() => { setShowInactive(value => !value); setPage(1); }}>{showInactive ? '隱藏已停用' : `顯示已停用（${inactiveCount}）`}</button>}
@@ -1360,15 +1384,18 @@ function RosterModule({ module, profile }: Props) {
       {!busy && visibleRows.length === 0 && <p className="empty">{rows.length === 0 ? `尚未設定任何${roleWord}` : `目前沒有啟用中的${roleWord}；可按「顯示已停用」查看歷史名單`}</p>}
       {visibleRows.length > 0 && <Pager page={page} total={visibleRows.length} onPage={setPage} />}
     </section>
+    </VehicleSheet>
     </div>
 
-    {picking && <AdminModal title={`新增${roleWord}`} onClose={() => setPicking(false)}>
-      <div className="admin-form-grid">
-        <label className="wide">選擇人員<select value={pick} onChange={e => setPick(e.target.value)}>
-          <option value="">-- 請選擇 --</option>
-          {candidates.filter(user => !listed.has(String(user.user_id))).map(user =>
-            <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}（{user.username}）{user.department ? `｜${user.department}` : ''}</option>)}
-        </select></label>
+    {picking && <AdminModal title={`新增${roleWord}`} className="handover-create-modal vehicle-form-modal vehicle-pick-modal" onClose={() => setPicking(false)}>
+      <div className="vehicle-form-body">
+        <VehicleFormSection icon="users" title={`選擇${roleWord}人員`} columns={1} hint={`只列出啟用中、尚未在${roleWord}名單內的人員；既有派車紀錄不受影響。`}>
+          <label className="wide">選擇人員<select value={pick} onChange={e => setPick(e.target.value)}>
+            <option value="">-- 請選擇 --</option>
+            {candidates.filter(user => !listed.has(String(user.user_id))).map(user =>
+              <option key={String(user.user_id)} value={String(user.user_id)}>{user.name}（{user.username}）{user.department ? `｜${user.department}` : ''}</option>)}
+          </select></label>
+        </VehicleFormSection>
       </div>
       <footer>
         <button className="secondary-btn" onClick={() => setPicking(false)}>取消</button>
@@ -1403,9 +1430,18 @@ function LogsModule({ module, profile }: Props) {
   }), [rows, query]);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const today = taipeiToday();
+  const kpis: HandoverKpi[] = [
+    { label: '紀錄筆數', value: String(rows.length), icon: 'list', tone: 'cyan' },
+    { label: '符合搜尋', value: String(filtered.length), icon: 'eye', tone: 'cyan' },
+    { label: '今日異動', value: String(rows.filter(row => fmtTime(row.created_at).startsWith(today)).length), icon: 'calendar', tone: 'cyan' },
+    { label: '臨時直接派車', value: String(rows.filter(row => String(row.action || '').includes('臨時直接建單')).length), icon: 'alert', tone: 'cyan' },
+  ];
+
   return <AppShell profile={profile} title={module.title}>
-    <div className="vehicle-logs-page">
+    <div className="hs-page vehicle-logs-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load} />
+    <VehicleSheet title="派車紀錄表" emblem="clipboard" kpis={kpis}>
     <section className="panel admin-panel vehicle-logs-panel">
       <div className="admin-toolbar">
         <input value={query} onChange={e => setQuery(e.target.value)} placeholder="搜尋動作、備註、操作人員或申請編號" />
@@ -1428,6 +1464,7 @@ function LogsModule({ module, profile }: Props) {
       {!busy && paged.length === 0 && <p className="empty">目前沒有派車紀錄</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
     </section>
+    </VehicleSheet>
     </div>
   </AppShell>;
 }

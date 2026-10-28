@@ -85,38 +85,6 @@
   font-size: .82rem;
 }
 
-/* 公務車主檔編輯彈窗：手機版依欄位群組排成三列；桌機維持共用表單網格。 */
-@media (max-width: 800px) {
-  .admin-form-grid.vehicle-master-edit-form {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 12px 8px;
-  }
-
-  .admin-form-grid.vehicle-master-edit-form > label {
-    min-width: 0;
-  }
-
-  .admin-form-grid.vehicle-master-edit-form > label:nth-child(-n + 4) {
-    grid-column: span 3;
-  }
-
-  .admin-form-grid.vehicle-master-edit-form > label:nth-child(n + 5):nth-child(-n + 7) {
-    grid-column: span 2;
-  }
-
-  .admin-form-grid.vehicle-master-edit-form > label.wide {
-    grid-column: 1 / -1;
-  }
-
-  .admin-form-grid.vehicle-master-edit-form > label > input,
-  .admin-form-grid.vehicle-master-edit-form > label > select,
-  .admin-form-grid.vehicle-master-edit-form > label > textarea {
-    width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-  }
-}
-
 /* 臨時直接派車：提示、說明與列表上的「臨時直派」標記。只用語意 token，兩個主題都有值。 */
 .vehicle-flow-note,
 .vehicle-direct-notice {
@@ -291,8 +259,9 @@
   padding: 16px 20px 20px;
 }
 
+/* 指標列依項目數自動分欄（各子系統頁 3～5 項），不留空欄。 */
 .vehicle-sheet .hs-kpis {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
 
 .vehicle-sheet .vehicle-flow-grid {
@@ -354,15 +323,12 @@
   border-radius: 9px;
 }
 
-.vehicle-sheet .vehicle-request-table-panel {
+.vehicle-sheet .vehicle-request-table-panel,
+.vehicle-sheet .vehicle-master-panel,
+.vehicle-sheet .vehicle-people-panel,
+.vehicle-sheet .vehicle-logs-panel {
   margin: 0;
   border-radius: 14px;
-}
-
-@media (max-width: 1100px) {
-  .vehicle-sheet .hs-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 800px) {
