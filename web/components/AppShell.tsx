@@ -14,6 +14,7 @@ import { clearProfile } from '@/lib/profile-cache';
 import { findModule, findSystem, hasSystemAccess, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import VehicleLineLinkSection from '@/components/VehicleLineLinkSection';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
+import { useOnlineCount } from '@/lib/use-online-count';
 import { useAppBackHref } from './useAppBackHref';
 
 
@@ -33,6 +34,7 @@ export function AppShell({ profile, title, children, heading }: {
   const passwordPolicy = usePasswordPolicy();
   const pathname = usePathname();
   const [clock, setClock] = useState(taipeiClock);
+  const onlineCount = useOnlineCount();
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDetails, setProfileDetails] = useState<Profile>(profile);
   const [profileBusy, setProfileBusy] = useState(false);
@@ -128,6 +130,8 @@ export function AppShell({ profile, title, children, heading }: {
   }, [adminMenuOpen]);
 
   async function logout() {
+    // 先告知伺服器自己離線，在線人數才不會多算幾分鐘；失敗不影響登出。
+    try { await getSupabase().rpc('presence_leave'); } catch { /* 忽略 */ }
     try { await getSupabase().auth.signOut({ scope: 'local' }); }
     catch (error) { console.warn('logout failed:', error); }
     clearProfile();
@@ -186,6 +190,9 @@ export function AppShell({ profile, title, children, heading }: {
       <div className="user-meta v1-meta">
         <span>{profileDetails.department || '未設定單位'}｜{profileDetails.name}</span>
         <i><em />系統連線中</i>
+        {onlineCount !== null && <strong className="v1-online" title="最近 3 分鐘內有使用系統的人數" aria-label={`目前 ${onlineCount} 人在線`}>
+          <span className="v1-online-dot" aria-hidden="true" />{onlineCount} 人在線
+        </strong>}
         <time>{clock}</time>
       </div>
       <nav className="v1-actions" aria-label="主要導覽">

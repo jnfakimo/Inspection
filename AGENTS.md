@@ -59,7 +59,9 @@
 共同規則（`tools/system-page-heading-check.mjs` 與 `test:module-card-standard` 把關）：
 
 - **頂列**只保留 首頁、個人資料、登出；系統切換由入口頁與後台側欄承擔。最右側依序為 使用者（單位｜姓名）、連線狀態、
-  Asia/Taipei 時鐘 `YYYY-MM-DD HH:mm:ss`，全部來自共用元件，不得另做。品牌列由 `theme.js`／AppShell 自動產生。
+  **在線人數**（綠色膠囊「N 人在線」，使用者 2026-10-28 要求新增）、Asia/Taipei 時鐘 `YYYY-MM-DD HH:mm:ss`，全部來自共用元件，不得另做。
+  在線人數由 `useOnlineCount`（`web/lib/use-online-count.ts`）每分鐘呼叫 `presence_heartbeat` 取得，只拿到人數、看不到是誰；
+  `user_presence` 表不開放直接讀寫，登出時呼叫 `presence_leave`；`npm run test:online-presence` 把關。品牌列由 `theme.js`／AppShell 自動產生。
 - **系統標題**由 `AppShell` 自動插入 `SystemPageHeader`：距頂列 22px、26px、`var(--cyan)`（=`--primary`）、Logo 固定
   42×42px 且來源只能是 `modules.ts` 的 `icon`；內容區左右內距桌面 24px／手機 14px。工作區不得再手寫系統級 `<h1>`，
   功能區標題只用 `<h2>` 以下。
