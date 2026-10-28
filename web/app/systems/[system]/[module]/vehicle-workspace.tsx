@@ -376,10 +376,10 @@ function RequestsModule({ module, profile }: Props) {
 
   // 與電子交接簿同一個表頭：五項待辦數字放在表頭指標列，不另做一排卡片。
   const kpis: HandoverKpi[] = [
-    { label: '待課長核准', value: String(kApprovalCount), icon: 'pen', tone: 'amber' },
-    { label: '待部門經理核准', value: String(kManagerApprovalCount), icon: 'building', tone: 'violet' },
+    { label: '待課長核准', value: String(kApprovalCount), icon: 'pen', tone: 'cyan' },
+    { label: '待部門經理核准', value: String(kManagerApprovalCount), icon: 'building', tone: 'cyan' },
     { label: '待車管派車', value: String(kDispatchCount), icon: 'route', tone: 'cyan' },
-    { label: '今日已派行程', value: String(kTodayCount), icon: 'calendar', tone: 'green' },
+    { label: '今日已派行程', value: String(kTodayCount), icon: 'calendar', tone: 'cyan' },
     { label: '待司機回報', value: String(kDriverCount), icon: 'clipboard', tone: 'cyan' },
   ];
 
@@ -401,23 +401,23 @@ function RequestsModule({ module, profile }: Props) {
 
     {/* 申請、兩層核准、派車與回報的五步驟流程 */}
     <div className="vehicle-flow-grid">
-      <div className="vehicle-step tone-cyan">
+      <div className="vehicle-step">
         <b>1. 申請人填單</b>
         <div>線上填寫用車日期、地點、人數與事由</div>
       </div>
-      <div className="vehicle-step tone-amber">
+      <div className="vehicle-step">
         <b>2. 課長核准</b>
         <div>申請人所屬課長審核或退回</div>
       </div>
-      <div className="vehicle-step tone-violet">
+      <div className="vehicle-step">
         <b>3. 部門經理核准</b>
         <div>部門經理完成第二層審核</div>
       </div>
-      <div className="vehicle-step tone-green">
+      <div className="vehicle-step">
         <b>4. 派車人員派車</b>
         <div>兩層核准完成後指派車號與駕駛</div>
       </div>
-      <div className="vehicle-step tone-blue">
+      <div className="vehicle-step">
         <b>5. 司機接單與回報</b>
         <div>司機於用車當日接單、實際里程與加油紀錄回報</div>
       </div>
@@ -440,16 +440,16 @@ function RequestsModule({ module, profile }: Props) {
     {/* V1 四大頁籤（帶計數） */}
     <div className="vehicle-request-tabs">
       <button className={`secondary-btn ${tab === 'mine' ? 'primary-btn' : ''}`} onClick={() => setTab('mine')}>
-        我的申請 <span className="vehicle-tab-count is-mine">{mineRows.length}</span>
+        我的申請 <span className="vehicle-tab-count">{mineRows.length}</span>
       </button>
       {isDriver && <button className={`secondary-btn ${tab === 'driverToday' ? 'primary-btn' : ''}`} onClick={() => setTab('driverToday')}>
-        今日派車 <span className="vehicle-tab-count is-driver">{driverTodayRows.length}</span>
+        今日派車 <span className="vehicle-tab-count">{driverTodayRows.length}</span>
       </button>}
       <button className={`secondary-btn ${tab === 'todo' ? 'primary-btn' : ''}`} onClick={() => setTab('todo')}>
-        待我處理 <span className="vehicle-tab-count is-todo">{todoRows.length}</span>
+        待我處理 <span className="vehicle-tab-count">{todoRows.length}</span>
       </button>
       <button className={`secondary-btn ${tab === 'all' ? 'primary-btn' : ''}`} onClick={() => setTab('all')}>
-        派車總覽 <span className="vehicle-tab-count is-all">{rows.length}</span>
+        派車總覽 <span className="vehicle-tab-count">{rows.length}</span>
       </button>
     </div>
 
@@ -647,15 +647,15 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
         <span className="hs-kpi-icon"><HandoverIcon name="doc" size={19} /></span>
         <div><b>{metrics.count} 筆</b><small>申請單數</small></div>
       </div>
-      <div className="hs-kpi is-violet">
+      <div className="hs-kpi is-cyan">
         <span className="hs-kpi-icon"><HandoverIcon name="users" size={19} /></span>
         <div><b>{metrics.passengers} 人</b><small>乘車人次</small></div>
       </div>
-      <div className="hs-kpi is-green">
+      <div className="hs-kpi is-cyan">
         <span className="hs-kpi-icon"><HandoverIcon name="route" size={19} /></span>
         <div><b>{metrics.mileage.toFixed(1)} km</b><small>完成里程</small></div>
       </div>
-      <div className="hs-kpi is-amber">
+      <div className="hs-kpi is-cyan">
         <span className="hs-kpi-icon"><HandoverIcon name="box" size={19} /></span>
         <div><b>{metrics.fuel.toLocaleString('zh-TW')} 元</b><small>加油費用</small></div>
       </div>

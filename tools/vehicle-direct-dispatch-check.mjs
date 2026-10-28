@@ -47,6 +47,12 @@ assert.doesNotMatch(workspace, /vehicle-report-kpi"/, '報表不得退回舊的 
 const formCss = fs.readFileSync('web/app/systems/[system]/[module]/vehicle-request-form.css', 'utf8');
 assert.match(formCss, /\.admin-modal\.vehicle-report-modal \.responsive-table\.vehicle-modal-table td[\s\S]*?white-space: normal/, '報表表格儲存格必須能換行，不得被截成省略號');
 assert.match(formCss, /\.vehicle-modal-table table \{\s*table-layout: auto/, '報表表格欄寬必須依內容分配');
+// 配色：公務車各頁只用品牌主色，綠／黃／紅／紫只表示狀態語意（AGENTS.md §5）。
+const adminCss = fs.readFileSync('web/app/admin-workspace.css', 'utf8');
+assert.doesNotMatch(workspace, /vehicle-step tone-|vehicle-tab-count is-/, '流程步驟與頁籤計數不得再各用一種顏色');
+assert.doesNotMatch(adminCss, /\.tone-(cyan|amber|violet|green|blue)\{/, '不再保留裝飾用的 tone-* 色票');
+assert.doesNotMatch(adminCss + formCss, /\.vehicle-[a-z-]+[^{}]*\{[^}]*var\(--blue\)/, '派車頁面不得使用另一種藍（--blue），一律用 --primary');
+assert.doesNotMatch(workspace, /hs-kpi is-(violet|green|amber)">/, '報表指標卡一律主色，只有異常大於 0 才用紅色');
 assert.match(workspace, /1\. 申請人填單[\s\S]*5\. 司機接單與回報/, '原五步驟流程不得被改動');
 
 console.log('公務車臨時直接派車檢查通過');
