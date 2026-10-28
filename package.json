@@ -63,7 +63,7 @@
     "test:market-command-center": "node tools/market-command-center-check.mjs",
     "test:market-interactive-dashboard": "node tools/market-interactive-dashboard-check.mjs",
     "test:vehicle-tracking": "node tools/vehicle-tracking-schema-check.mjs && node --test tools/vehicle-tracking-ble.test.mjs",
-    "test:vehicle-approval": "node tools/vehicle-two-level-approval-check.mjs && node --test tools/vehicle-two-level-approval-db.test.mjs",
+    "test:vehicle-approval": "node tools/vehicle-two-level-approval-check.mjs && node tools/vehicle-direct-dispatch-check.mjs && node --test tools/vehicle-two-level-approval-db.test.mjs tools/vehicle-direct-dispatch-db.test.mjs",
     "test:backup": "node --test tools/backup-request.test.mjs tools/backup-storage-integrity.test.mjs tools/database-restore.test.mjs && node tools/database-backup-consistency-check.mjs",
     "backup:db": "node tools/database-backup.mjs",
     "backup:verify": "node tools/database-backup-verify.mjs",

@@ -152,6 +152,11 @@ alter table vehicle_dispatch_requests add column if not exists department_manage
 alter table vehicle_dispatch_requests add column if not exists department_manager_name text;
 alter table vehicle_dispatch_requests add column if not exists department_manager_note text;
 alter table vehicle_dispatch_requests add column if not exists department_manager_approved_at timestamptz;
+-- 臨時直接派車（長官臨時急用，由派車管理員直接建單派車）；函式與守門見 migration 20261028090000。
+alter table vehicle_dispatch_requests add column if not exists dispatch_source text not null default 'normal';
+alter table vehicle_dispatch_requests add column if not exists direct_dispatch_reason text;
+alter table vehicle_dispatch_requests add column if not exists direct_dispatch_by uuid references users(user_id);
+alter table vehicle_dispatch_requests add column if not exists direct_dispatch_by_name text;
 alter table vehicle_dispatch_requests add column if not exists vehicle_manager_id uuid references users(user_id);
 alter table vehicle_dispatch_requests add column if not exists vehicle_manager_name text;
 alter table vehicle_dispatch_requests add column if not exists vehicle_id uuid references official_vehicles(vehicle_id);

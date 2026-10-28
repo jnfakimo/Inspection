@@ -263,6 +263,7 @@ function RequestsModule({ module, profile }: Props) {
   const [statusFilter, setStatusFilter] = useState(''), [dateFilter, setDateFilter] = useState(''), [page, setPage] = useState(1);
   
   const [creating, setCreating] = useState(false);
+  const [directCreating, setDirectCreating] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [logs, setLogs] = useState<Row[]>([]);
   const [tripFor, setTripFor] = useState<Row | null>(null);
@@ -362,7 +363,10 @@ function RequestsModule({ module, profile }: Props) {
   return <AppShell profile={profile} title={module.title}>
     <div className="vehicle-request-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
-      action={<button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>} />
+      action={<>
+        {canManageFleet && <button className="secondary-btn compact" onClick={() => setDirectCreating(true)}>臨時直接派車</button>}
+        <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
+      </>} />
 
     {/* 駕駛本人的 LINE 個人派車通知綁定入口（與個人資料設定共用同一元件） */}
     {isDriver && <VehicleLineLinkSection index="LINE" />}
@@ -390,6 +394,9 @@ function RequestsModule({ module, profile }: Props) {
         <div>司機於用車當日接單、實際里程與加油紀錄回報</div>
       </div>
     </div>
+    {canManageFleet && <p className="vehicle-flow-note">
+      長官臨時急需用車時，派車管理員可按「臨時直接派車」代為建單並直接指派車輛與司機，免課長與部門經理核准；須填臨時急用事由，單據會永久標示「臨時直派」。
+    </p>}
 
     {/* 兩層核准與派車 KPI */}
     <div className="vehicle-kpi-grid">
@@ -456,6 +463,7 @@ function RequestsModule({ module, profile }: Props) {
         <div className="vehicle-request-actions">
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
+          {canManageFleet && <button className="secondary-btn" onClick={() => setDirectCreating(true)}>臨時直接派車</button>}
           <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
         </div>
       </div>
@@ -464,7 +472,7 @@ function RequestsModule({ module, profile }: Props) {
         <thead><tr><th>申請編號</th><th>狀態</th><th>用車日期／時間</th><th>起訖地點</th><th>申請人／單位</th><th>人數</th><th>車號／司機</th><th>里程</th><th>操作</th></tr></thead>
         <tbody>{paged.map(row => { const alert = vehicleFollowup(row, today, nowTime); return <tr key={row.request_id} className={alert ? `vehicle-followup-row ${alert.level}` : undefined}>
           <td><strong>{fmt(row.request_no)}</strong><small>申請日 {fmt(row.application_date)}</small></td>
-          <td><Pill value={row.status} labels={STATUS_LABEL} tones={STATUS_TONE} />{alert && <span className={`vehicle-followup-flag ${alert.level}`} title={alert.message}>{alert.label}</span>}</td>
+          <td><Pill value={row.status} labels={STATUS_LABEL} tones={STATUS_TONE} />{row.dispatch_source === 'direct' && <span className="vehicle-direct-flag" title="臨時急用，由派車管理員直接派車，免課長與部門經理核准">臨時直派</span>}{alert && <span className={`vehicle-followup-flag ${alert.level}`} title={alert.message}>{alert.label}</span>}</td>
           <td>{fmt(row.trip_date)}<small>{timeText(row.planned_departure_time)}–{timeText(row.planned_return_time)}</small></td>
           <td>{fmt(row.origin_location)} → {fmt(row.destination_location)}</td>
           <td>{fmt(row.applicant_name)}<small>{fmt(row.applicant_department)}</small></td>
@@ -487,6 +495,10 @@ function RequestsModule({ module, profile }: Props) {
 
     {creating && <CreateRequestModal profile={profile} onClose={() => setCreating(false)}
       onDone={async (message) => { setCreating(false); await load(); setNote(message); }} />}
+
+    {directCreating && <DirectDispatchModal rows={rows} vehicles={vehicles} drivers={drivers} blockedVehicleIds={blockedVehicleIds}
+      onClose={() => setDirectCreating(false)}
+      onDone={async (message) => { setDirectCreating(false); await load(); setNote(message); }} />}
 
     {detail && <DetailModal row={detail} logs={logs} busy={busy} profile={profile}
       vehicles={vehicles} drivers={drivers} canDispatch={canManageFleet || isAdmin}
@@ -803,6 +815,111 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
   </AdminModal>;
 }
 
+/** 預設出發時間：目前時間往後進位到下一個 30 分鐘；最晚 23:30（TimeSelect 的最後一格）。 */
+function nextHalfHour() {
+  const [hour, minute] = taipeiCurrentTime().split(':').map(Number);
+  const total = Math.min(Math.ceil((hour * 60 + minute + 1) / 30) * 30, 23 * 60 + 30);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+function addMinutes(time: string, minutes: number) {
+  const [hour, minute] = time.split(':').map(Number);
+  const total = Math.min(hour * 60 + minute + minutes, 23 * 60 + 30);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/**
+ * 臨時直接派車：長官臨時急需用車時，由派車管理員代為建單並直接指派車輛與司機。
+ * 後端 vehicle_direct_dispatch 在單一交易內完成建單與派車，並限定派車管理員／系統管理員；
+ * 這裡只是入口，權限與必填檢查以資料庫為準。
+ */
+function DirectDispatchModal({ rows, vehicles, drivers, blockedVehicleIds, onClose, onDone }: {
+  rows: Row[]; vehicles: Row[]; drivers: Row[]; blockedVehicleIds: Set<string>;
+  onClose: () => void; onDone: (message: string) => void;
+}) {
+  const [form, setForm] = useState(() => {
+    const departure = nextHalfHour();
+    return {
+      requester_name: '', requester_department: '', requester_phone: '',
+      trip_date: taipeiToday(), planned_departure_time: departure, planned_return_time: addMinutes(departure, 120),
+      origin_location: '', destination_location: '', trip_purpose: '', passenger_count: '1',
+      reason: '', vehicle_id: '', driver_id: '', note: '',
+    };
+  });
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState('');
+  const set = (key: string, value: string) => setForm(prev => ({ ...prev, [key]: value }));
+
+  // 與本次用車時段重疊、已被其他派車單佔用的車輛（最終仍以資料庫排除約束為準）。
+  const occupiedVehicleIds = useMemo(() => {
+    const target: Row = {
+      request_id: '', trip_date: form.trip_date,
+      planned_departure_time: form.planned_departure_time, planned_return_time: form.planned_return_time,
+    };
+    return new Set(rows.filter(row => row.vehicle_id && overlapsTripWindow(row, target)).map(row => String(row.vehicle_id)));
+  }, [rows, form.trip_date, form.planned_departure_time, form.planned_return_time]);
+  const selectedBlocked = Boolean(form.vehicle_id && blockedVehicleIds.has(form.vehicle_id));
+  const selectedOccupied = Boolean(form.vehicle_id && occupiedVehicleIds.has(form.vehicle_id));
+
+  const submit = async () => {
+    if (!form.requester_name.trim()) return setMessage('請填寫用車人（長官姓名或單位）');
+    if (!form.reason.trim()) return setMessage('請填寫臨時急用事由');
+    if (!form.trip_date || !form.planned_departure_time || !form.planned_return_time) return setMessage('請填寫用車日期與起訖時間');
+    if (form.planned_return_time <= form.planned_departure_time) return setMessage('回程時間必須晚於出發時間');
+    if (!form.origin_location.trim() || !form.destination_location.trim() || !form.trip_purpose.trim()) return setMessage('請填寫出發地、目的地與用途');
+    const passengers = Number(form.passenger_count);
+    if (!Number.isInteger(passengers) || passengers < 1) return setMessage('搭乘人數必須為大於 0 的整數');
+    if (!form.vehicle_id || !form.driver_id) return setMessage('請選擇公務車及司機');
+    if (selectedBlocked || selectedOccupied) return setMessage('所選車輛目前不可派用，請改選其他車輛或調整用車時段');
+    setBusy(true); setMessage('');
+    const { data, error } = await getSupabase().rpc('vehicle_direct_dispatch', {
+      p_requester_name: form.requester_name.trim(), p_requester_department: form.requester_department.trim() || null,
+      p_trip_date: form.trip_date, p_departure: form.planned_departure_time, p_return: form.planned_return_time,
+      p_origin: form.origin_location.trim(), p_destination: form.destination_location.trim(),
+      p_purpose: form.trip_purpose.trim(), p_passenger_count: passengers, p_reason: form.reason.trim(),
+      p_vehicle_id: form.vehicle_id, p_driver_id: form.driver_id,
+      p_requester_phone: form.requester_phone.trim() || null, p_note: form.note.trim() || null,
+    });
+    if (error) { setMessage(errorMessage(error)); setBusy(false); return; }
+    const requestNo = (Array.isArray(data) ? data[0] : data)?.request_no;
+    onDone(`臨時直接派車已完成${requestNo ? `（${requestNo}）` : ''}，司機於用車當日接單後出車`);
+  };
+
+  return <AdminModal title="臨時直接派車" onClose={onClose}>
+    <p className="vehicle-direct-notice">此單不經課長與部門經理核准，直接指派車輛與司機。臨時急用事由與派車人員會永久記錄在單據與流程歷程上，請僅用於長官臨時急需用車。</p>
+    <div className="admin-form-grid vehicle-request-form">
+      <label>用車人（必填）<input value={form.requester_name} onChange={e => set('requester_name', e.target.value)} placeholder="長官姓名或單位" /></label>
+      <label>用車人單位<input value={form.requester_department} onChange={e => set('requester_department', e.target.value)} /></label>
+      <label>聯絡電話<input value={form.requester_phone} onChange={e => set('requester_phone', e.target.value)} placeholder="分機或手機" /></label>
+      <label>搭乘人數（必填）<input type="number" min={1} value={form.passenger_count} onChange={e => set('passenger_count', e.target.value)} /></label>
+      <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
+      <span aria-hidden="true" />
+      <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
+      <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
+      <label>出發地（必填）<VehicleCombobox id="direct-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
+      <label>目的地（必填）<VehicleCombobox id="direct-destination" value={form.destination_location} options={VEHICLE_DESTINATION_OPTIONS} onChange={value => set('destination_location', value)} /></label>
+      <label className="wide vehicle-request-purpose">用途（必填）<VehicleCombobox id="direct-purpose" value={form.trip_purpose} options={VEHICLE_PURPOSE_OPTIONS} onChange={value => set('trip_purpose', value)} /></label>
+      <label className="wide">臨時急用事由（必填）<input value={form.reason} onChange={e => set('reason', e.target.value)} placeholder="例：長官臨時需出席會議，來不及依序核准" /></label>
+      <label>指派車輛（必填）<select value={form.vehicle_id} onChange={e => set('vehicle_id', e.target.value)}>
+        <option value="">-- 請選擇 --</option>
+        {vehicles.filter(v => v.status === 'active').map(v => {
+          const blocked = blockedVehicleIds.has(String(v.vehicle_id)); const occupied = occupiedVehicleIds.has(String(v.vehicle_id));
+          return <option key={String(v.vehicle_id)} value={String(v.vehicle_id)} disabled={blocked || occupied}>{v.plate_no}｜{v.vehicle_name}（{v.seats} 人座）{blocked ? '（前一趟里程未補）' : occupied ? '（該時段已被派用）' : ''}</option>;
+        })}
+      </select></label>
+      <label>指派駕駛（必填）<select value={form.driver_id} onChange={e => set('driver_id', e.target.value)}>
+        <option value="">-- 請選擇 --</option>
+        {drivers.map(d => <option key={String(d.user_id)} value={String(d.user_id)}>{(d.users as Row)?.name || d.user_id}</option>)}
+      </select></label>
+      <label className="wide vehicle-request-note">派車備註<input value={form.note} onChange={e => set('note', e.target.value)} /></label>
+    </div>
+    <p className="vehicle-direct-hint">預計出發時間須晚於目前時間；急用請選最近的下一個時段。</p>
+    {message && <p className="inline-message danger">{message}</p>}
+    <footer>
+      <button className="secondary-btn" onClick={onClose}>取消</button>
+      <button className="primary-btn compact" disabled={busy} onClick={() => void submit()}>{busy ? '派車中…' : '確認直接派車'}</button>
+    </footer>
+  </AdminModal>;
+}
+
 function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehicleIds, occupiedVehicleIds, canDispatch, canApprove, onClose, onAct, onTrip }: {
   row: Row; logs: Row[]; busy: boolean; profile: Profile; vehicles: Row[]; drivers: Row[]; canDispatch: boolean; canApprove: boolean;
   blockedVehicleIds: Set<string>; occupiedVehicleIds: Set<string>;
@@ -828,7 +945,10 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
     </div>}
     <dl className="detail-grid">
       {field('狀態', STATUS_LABEL[String(row.status)] || row.status)}
-      {field('申請人', `${fmt(row.applicant_name)}（${fmt(row.applicant_department)}）`)}
+      {field(row.dispatch_source === 'direct' ? '用車人' : '申請人', `${fmt(row.applicant_name)}（${fmt(row.applicant_department)}）`)}
+      {row.dispatch_source === 'direct' ? field('派車方式', '臨時直接派車（免課長與部門經理核准）') : null}
+      {row.dispatch_source === 'direct' ? field('臨時急用事由', row.direct_dispatch_reason) : null}
+      {row.dispatch_source === 'direct' ? field('建單派車人員', row.direct_dispatch_by_name) : null}
       {field('聯絡電話', row.applicant_phone)}
       {field('用車日期', row.trip_date)}
       {field('預計時段', `${timeText(row.planned_departure_time)} – ${timeText(row.planned_return_time)}`)}

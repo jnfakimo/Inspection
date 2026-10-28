@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const migration = fs.readFileSync('supabase/migrations/20261028090000_vehicle_direct_dispatch.sql', 'utf8');
+const workspace = fs.readFileSync('web/app/systems/[system]/[module]/vehicle-workspace.tsx', 'utf8');
+const schema = fs.readFileSync('system/sql/vehicle_dispatch.sql', 'utf8');
+
+for (const column of ['dispatch_source', 'direct_dispatch_reason', 'direct_dispatch_by', 'direct_dispatch_by_name']) {
+  assert.match(migration, new RegExp(`add column if not exists ${column}\\b`), `migration 缺少 ${column}`);
+  assert.match(schema, new RegExp(`add column if not exists ${column}\\b`), `system/sql/vehicle_dispatch.sql 缺少 ${column}`);
+}
+
+// 後端：只有派車管理員／系統管理員、事由必填、單一交易完成建單與派車、走既有 approved -> assigned 路徑。
+assert.match(migration, /create or replace function public\.vehicle_direct_dispatch\(/, '缺少直接派車 RPC');
+assert.match(migration, /只有派車管理員可以直接派車/, '直接派車必須限定派車管理員');
+assert.match(migration, /請填寫臨時急用事由/, '臨時急用事由必須必填');
+assert.match(migration, /'approved', 'direct'[\s\S]*status = 'assigned'/, '必須先以待派車建單，再走既有 approved -> assigned 派車路徑');
+assert.match(migration, /臨時直接建單（免課長與部門經理核准）/, '流程歷程必須註明免核准直派');
+assert.match(migration, /revoke all on function public\.vehicle_direct_dispatch\([^)]*\) from public, anon;/, '直接派車 RPC 不得開放給 anon');
+assert.match(migration, /grant execute on function public\.vehicle_direct_dispatch\([^)]*\) to authenticated;/);
+assert.match(migration, /建立後不得修改/, '來源與事由建立後不得被改寫');
+assert.match(migration, /old\.dispatch_source = 'direct'[\s\S]*elsif old\.supervisor_id is null/, '一般單仍須課長與部門經理核准才能派車');
+
+// 前端：只對派車管理員顯示入口，走專用 RPC，列表與詳情標示臨時直派，不新增子系統。
+assert.match(workspace, /canManageFleet && <button[\s\S]{0,120}?>臨時直接派車<\/button>/, '入口只能對派車管理員顯示');
+assert.match(workspace, /rpc\('vehicle_direct_dispatch'/, '前端必須呼叫 vehicle_direct_dispatch');
+assert.match(workspace, /dispatch_source === 'direct' && <span className="vehicle-direct-flag"/, '列表必須標示臨時直派');
+assert.match(workspace, /臨時急用事由/, '畫面必須有臨時急用事由');
+assert.match(workspace, /1\. 申請人填單[\s\S]*5\. 司機接單與回報/, '原五步驟流程不得被改動');
+
+console.log('公務車臨時直接派車檢查通過');
