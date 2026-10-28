@@ -5,6 +5,14 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-10-28）：**公務車「臨時直接派車」已合併（PR #102，合併 commit `33c7796fb`）。** 長官臨時急需用車時，派車管理員／系統管理員在「派車申請」頁按「臨時直接派車」，
+代為建單並直接指派車輛與司機，免課長與部門經理核准；不新增子系統，原五步驟不變。
+RPC `vehicle_direct_dispatch` 在單一交易內先以 `approved` 建單、再走既有 `approved -> assigned`，所以管理員檢查、司機名單、同車時段重疊約束、LINE 派車通知、司機接單與回報都照舊生效。
+單據標記 `dispatch_source='direct'`，**臨時急用事由必填**，來源與事由建立後不可改，流程歷程註明免核准；列表、詳情與派車報表（Excel、A4、畫面）都標示「臨時直派」。一般單仍須兩層核准才能派車。預計出發時間仍須晚於目前時間（既有 guard 未放寬）。
+migration `20261028090000_vehicle_direct_dispatch.sql` 已以 `apply-database-migration.yml --ref feat/vehicle-direct-dispatch-20261028` 套用到正式庫，並以唯讀查詢讀回：4 個新欄位、函式、守門 trigger、來源檢查約束皆在，anon 不可執行、authenticated 可執行，原 18 筆單皆為一般單。
+測試：`npm run test:vehicle-approval`（PGlite 9 組情境，含突變驗證）。**未驗證**：登入後實際畫面與手機版、真實派車後司機收到 LINE 通知；網站部署合併時仍在進行，以 GitHub 檢查與正式站讀回為準（Pages 約 10 分鐘快取，Ctrl+F5）。
+使用前提：派車管理員名單內要有人（派車管理員子系統），否則沒有人看得到按鈕。報表標示「臨時直派」另開分支 `feat/vehicle-direct-report-handoff-20261028`（見最後更新）。
+
 最新（2026-10-24）：**資安前三項修補與 ISO 導入基礎已透過 PR #95 合併及發布網站。**
 使用者選擇先建立巡檢系統符合要求的基礎，接著明確指定修正 Next.js、certifi、主分支與部署管制。
 G 槽保留既有未追蹤 `.claude/`；本批合併 commit 為 `83eb3b2b52f5ba358356bd100ef4481e44d60533`。Next.js 更新 16.4.3；certifi 更新 2026.10.19 並設下限。
@@ -119,6 +127,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 - 一次只有一個寫入者；commit、push、合併、部署都需使用者當次授權；不寫入任何 secret。
 
 ## 🕐 最後更新
+
+2026-10-28 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 公務車臨時直接派車：PR #102 已合併、migration 已套用並讀回；後續分支 `feat/vehicle-direct-report-handoff-20261028` 補派車報表「臨時直派」標示並更新本交接檔，尚未開 PR。G 槽工作樹的 `handoff.md` 另有 Codex 未提交的 2026-10-24 重構紀錄，合併時兩邊都要保留。
 
 2026-10-24 · Codex · 使用者決定預設密碼暫不更動；在 `fix/inspection-security-followup-20261024` 恢復原本帳號核准密碼流程，風險 R-01／R-04 維持未結案。隔離副本完整 `npm test`、V2 型別檢查、`deno check admin-api`、138 頁 hardened 建置通過；`security:audit` 0 錯誤、3 個既有警告。其他已完成的行動儲存、CSP 與 IP 格式檢查仍保留；正式主機 443／445 不通，行動實機、代理覆蓋、恢復演練與組織核定仍需證據。`node-forge` 無修補版，`zod` 上游尚未提供相容修補；都維持待追蹤。以下上一筆是當時狀態，不能當作目前結案證據。
 

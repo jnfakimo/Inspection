@@ -26,6 +26,9 @@ assert.match(workspace, /canManageFleet && <button[\s\S]{0,120}?>臨時直接派
 assert.match(workspace, /rpc\('vehicle_direct_dispatch'/, '前端必須呼叫 vehicle_direct_dispatch');
 assert.match(workspace, /dispatch_source === 'direct' && <span className="vehicle-direct-flag"/, '列表必須標示臨時直派');
 assert.match(workspace, /臨時急用事由/, '畫面必須有臨時急用事由');
+// 報表（Excel、A4 列印、畫面三處）都要標示臨時直派，不得各自重新組狀態文字。
+assert.equal(workspace.match(/statusText\(r\)/g)?.length, 3, '派車報表三處輸出都必須使用 statusText 標示臨時直派');
+assert.doesNotMatch(workspace, /STATUS_LABEL\[String\(r\.status\)\]/, '報表不得繞過 statusText 直接取狀態標籤');
 assert.match(workspace, /1\. 申請人填單[\s\S]*5\. 司機接單與回報/, '原五步驟流程不得被改動');
 
 console.log('公務車臨時直接派車檢查通過');
