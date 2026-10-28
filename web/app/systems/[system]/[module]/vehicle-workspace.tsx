@@ -629,7 +629,8 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
     popup.print();
   };
 
-  return <AdminModal title="公務車派車報表" onClose={onClose}>
+  return <AdminModal title="公務車派車報表" className="handover-create-modal vehicle-report-modal" onClose={onClose}>
+    <div className="vehicle-report-body">
     <div className="vehicle-report-filters">
       <label>開始日期<LocalizedDateInput aria-label="報表開始日期（年/月/日）" value={reportFrom} onChange={e => setReportFrom(e.target.value)} /></label>
       <label>結束日期<LocalizedDateInput aria-label="報表結束日期（年/月/日）" value={reportTo} onChange={e => setReportTo(e.target.value)} /></label>
@@ -640,27 +641,27 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
       <label>關鍵字<input value={reportQuery} onChange={e => setReportQuery(e.target.value)} placeholder="搜尋地點、車號、人員…" /></label>
     </div>
 
-    {/* 報表 KPI 統計 */}
+    {/* 報表統計：與交接簿同一種指標卡（hs-kpi） */}
     <div className="vehicle-report-kpis">
-      <div className="vehicle-report-kpi">
-        <div>申請單數</div>
-        <div>{metrics.count} 筆</div>
+      <div className="hs-kpi is-cyan">
+        <span className="hs-kpi-icon"><HandoverIcon name="doc" size={19} /></span>
+        <div><b>{metrics.count} 筆</b><small>申請單數</small></div>
       </div>
-      <div className="vehicle-report-kpi">
-        <div>乘車人次</div>
-        <div>{metrics.passengers} 人</div>
+      <div className="hs-kpi is-violet">
+        <span className="hs-kpi-icon"><HandoverIcon name="users" size={19} /></span>
+        <div><b>{metrics.passengers} 人</b><small>乘車人次</small></div>
       </div>
-      <div className="vehicle-report-kpi">
-        <div>完成里程</div>
-        <div>{metrics.mileage.toFixed(1)} km</div>
+      <div className="hs-kpi is-green">
+        <span className="hs-kpi-icon"><HandoverIcon name="route" size={19} /></span>
+        <div><b>{metrics.mileage.toFixed(1)} km</b><small>完成里程</small></div>
       </div>
-      <div className="vehicle-report-kpi">
-        <div>加油費用</div>
-        <div>{metrics.fuel.toLocaleString('zh-TW')} 元</div>
+      <div className="hs-kpi is-amber">
+        <span className="hs-kpi-icon"><HandoverIcon name="box" size={19} /></span>
+        <div><b>{metrics.fuel.toLocaleString('zh-TW')} 元</b><small>加油費用</small></div>
       </div>
-      <div className={`vehicle-report-kpi${metrics.abnormal > 0 ? ' is-alert' : ''}`}>
-        <div>異常通報</div>
-        <div>{metrics.abnormal} 件</div>
+      <div className={`hs-kpi ${metrics.abnormal > 0 ? 'is-red' : 'is-cyan'}`}>
+        <span className="hs-kpi-icon"><HandoverIcon name="alert" size={19} /></span>
+        <div><b>{metrics.abnormal} 件</b><small>異常通報</small></div>
       </div>
     </div>
 
@@ -679,6 +680,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
       </tr>)}</tbody>
     </table></div>
     {filtered.length === 0 && <p className="empty">無符合條件的派車資料</p>}
+    </div>
 
     <footer>
       <button className="secondary-btn" onClick={onClose}>關閉</button>

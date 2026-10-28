@@ -113,17 +113,10 @@
 .vehicle-flow-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:8px}
 .tone-cyan{--tone:var(--cyan)}.tone-amber{--tone:var(--amber)}.tone-violet{--tone:var(--violet)}.tone-green{--tone:var(--green)}.tone-blue{--tone:var(--blue)}
 /* 派車報表與車輛主檔彈窗 */
-.vehicle-report-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
-.vehicle-report-filters label{font-size:.7rem}
-.vehicle-report-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
-.vehicle-report-kpi{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
-.vehicle-report-kpi>div:first-child{color:var(--dim);font-size:.62rem}
-.vehicle-report-kpi>div:last-child{color:var(--cyan);font-size:1.1rem;font-weight:800}
-.vehicle-report-kpi.is-alert>div:last-child{color:var(--red)}
 .vehicle-modal-table{max-height:45vh;overflow:auto}
 .vehicle-modal-head{display:flex;justify-content:space-between;margin-bottom:8px}
 .vehicle-abnormal-text{color:var(--red)}
-@media (max-width:640px){.vehicle-report-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.vehicle-flow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.vehicle-flow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .content:has(.vehicle-flow-grid) .admin-panel{padding:14px}
 .content:has(.vehicle-flow-grid) .admin-toolbar{margin-bottom:10px}
 .content:has(.vehicle-flow-grid) .admin-panel th,.content:has(.vehicle-flow-grid) .admin-panel td{padding:8px 7px}
