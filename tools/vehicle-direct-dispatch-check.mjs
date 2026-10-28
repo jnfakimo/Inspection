@@ -26,6 +26,13 @@ assert.match(workspace, /canManageFleet && <button[\s\S]{0,120}?>臨時直接派
 assert.match(workspace, /rpc\('vehicle_direct_dispatch'/, '前端必須呼叫 vehicle_direct_dispatch');
 assert.match(workspace, /dispatch_source === 'direct' && <span className="vehicle-direct-flag"/, '列表必須標示臨時直派');
 assert.match(workspace, /臨時急用事由/, '畫面必須有臨時急用事由');
+// 臨時直接派車：用途與事由為「下拉＋其他」，事由預設「長官臨時指派用車」，用車日期走日曆選擇器。
+assert.match(workspace, /VEHICLE_DIRECT_REASON_OPTIONS = \['長官臨時指派用車'\]/, '臨時急用事由必須有預設選項');
+assert.match(workspace, /reason: VEHICLE_DIRECT_REASON_OPTIONS\[0\]/, '臨時急用事由預設為「長官臨時指派用車」');
+assert.match(workspace, /<VehicleSelectOther id="direct-purpose"/, '用途必須是下拉選單並可選「其他」');
+assert.match(workspace, /<VehicleSelectOther id="direct-reason"/, '臨時急用事由必須是下拉選單並可選「其他」');
+assert.match(workspace, /<option value=\{VEHICLE_OTHER_VALUE\}>其他<\/option>/, '下拉選單必須有「其他」選項');
+assert.match(workspace, /<LocalizedDateInput aria-label="用車日期（年\/月\/日）" value=\{form\.trip_date\} min=\{taipeiToday\(\)\}/, '用車日期必須使用日曆選擇器元件');
 // 報表（Excel、A4 列印、畫面三處）都要標示臨時直派，不得各自重新組狀態文字。
 assert.equal(workspace.match(/statusText\(r\)/g)?.length, 3, '派車報表三處輸出都必須使用 statusText 標示臨時直派');
 assert.doesNotMatch(workspace, /STATUS_LABEL\[String\(r\.status\)\]/, '報表不得繞過 statusText 直接取狀態標籤');
