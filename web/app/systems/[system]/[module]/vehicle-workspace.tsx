@@ -49,6 +49,12 @@ function Pill({ value, labels, tones }: { value: unknown; labels: Record<string,
   return <span className={`status-pill ${tones[key] || 'pending'}`}>{labels[key] || fmt(value)}</span>;
 }
 
+/** 報表用的狀態文字；臨時直接派車的單附註「臨時直派」，方便事後稽核。 */
+function statusText(row: Row) {
+  const label = STATUS_LABEL[String(row.status)] || String(row.status ?? '');
+  return row.dispatch_source === 'direct' ? `${label}（臨時直派）` : label;
+}
+
 function taipeiToday() {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' })
     .formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {} as Record<string, string>);
@@ -564,7 +570,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
     filtered.forEach((r, i) => {
       detail.getRow(7 + i).values = [
         String(r.trip_date || ''), timeText(r.planned_departure_time), timeText(r.planned_return_time),
-        String(r.request_no || ''), STATUS_LABEL[String(r.status)] || String(r.status),
+        String(r.request_no || ''), statusText(r),
         String(r.applicant_department || ''), String(r.applicant_name || ''),
         String(r.origin_location || ''), String(r.destination_location || ''),
         String(r.trip_purpose || ''), Number(r.actual_passenger_count ?? r.passenger_count ?? 0),
@@ -595,7 +601,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
     // 數值欄位先轉成數字再格式化，本身不會挾帶標記。
     const body = filtered.map(r => `<tr>
       <td>${escHtml(r.trip_date)}<br>${escHtml(timeText(r.planned_departure_time))}–${escHtml(timeText(r.planned_return_time))}</td>
-      <td>${escHtml(r.request_no)}<br>${escHtml(STATUS_LABEL[String(r.status)] || r.status)}</td>
+      <td>${escHtml(r.request_no)}<br>${escHtml(statusText(r))}</td>
       <td>${escHtml(r.applicant_department || '—')}<br>${escHtml(r.applicant_name)}</td>
       <td>${escHtml(r.origin_location)} → ${escHtml(r.destination_location)}</td>
       <td>${escHtml(r.trip_purpose)}</td>
@@ -664,7 +670,7 @@ function VehicleReportModal({ rows, profile, onClose }: { rows: Row[]; profile: 
       <thead><tr><th>日期／時段</th><th>單號／狀態</th><th>單位／申請人</th><th>起訖地點</th><th>用途</th><th>車號／司機</th><th>里程</th><th>加油</th><th>異常</th></tr></thead>
       <tbody>{filtered.map(r => <tr key={r.request_id}>
         <td>{String(r.trip_date)}<small>{timeText(r.planned_departure_time)}–{timeText(r.planned_return_time)}</small></td>
-        <td><strong>{fmt(r.request_no)}</strong><small>{STATUS_LABEL[String(r.status)] || r.status}</small></td>
+        <td><strong>{fmt(r.request_no)}</strong><small>{statusText(r)}</small></td>
         <td>{fmt(r.applicant_department)}<small>{fmt(r.applicant_name)}</small></td>
         <td>{fmt(r.origin_location)} → {fmt(r.destination_location)}</td>
         <td>{fmt(r.trip_purpose)}</td>
