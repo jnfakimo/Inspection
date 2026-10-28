@@ -24,6 +24,9 @@ import { selectableActiveUsers } from '@/lib/user-visibility';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
 import VehicleLineLinkSection from '@/components/VehicleLineLinkSection';
+import { HandoverSheetHeader, type HandoverKpi } from './handover-sheet';
+import { rocDate } from './guard-handover-shared';
+import './handover-sheet.css';
 
 type Props = { system: SystemDefinition; module: ModuleDefinition; profile: Profile };
 
@@ -366,8 +369,17 @@ function RequestsModule({ module, profile }: Props) {
     setLogs(data || []);
   };
 
+  // 與電子交接簿同一個表頭：五項待辦數字放在表頭指標列，不另做一排卡片。
+  const kpis: HandoverKpi[] = [
+    { label: '待課長核准', value: String(kApprovalCount), icon: 'pen', tone: 'amber' },
+    { label: '待部門經理核准', value: String(kManagerApprovalCount), icon: 'building', tone: 'violet' },
+    { label: '待車管派車', value: String(kDispatchCount), icon: 'route', tone: 'cyan' },
+    { label: '今日已派行程', value: String(kTodayCount), icon: 'calendar', tone: 'green' },
+    { label: '待司機回報', value: String(kDriverCount), icon: 'clipboard', tone: 'cyan' },
+  ];
+
   return <AppShell profile={profile} title={module.title}>
-    <div className="vehicle-request-page">
+    <div className="hs-page vehicle-request-page">
     <AdminHeader module={module} busy={busy} note={note} onReload={load}
       action={<>
         {canManageFleet && <button className="secondary-btn compact" onClick={() => setDirectCreating(true)}>臨時直接派車</button>}
@@ -376,6 +388,11 @@ function RequestsModule({ module, profile }: Props) {
 
     {/* 駕駛本人的 LINE 個人派車通知綁定入口（與個人資料設定共用同一元件） */}
     {isDriver && <VehicleLineLinkSection index="LINE" />}
+
+    <section className="hs-sheet vehicle-sheet" aria-label="公務車派車管理">
+    <HandoverSheetHeader org="臺北農產運銷股份有限公司　第一果菜市場" title="公務車派車管理表"
+      dateLabel={rocDate(today)} emblem="route" kpis={kpis} />
+    <div className="vehicle-sheet-body">
 
     {/* 申請、兩層核准、派車與回報的五步驟流程 */}
     <div className="vehicle-flow-grid">
@@ -403,30 +420,6 @@ function RequestsModule({ module, profile }: Props) {
     {canManageFleet && <p className="vehicle-flow-note">
       長官臨時急需用車時，派車管理員可按「臨時直接派車」代為建單並直接指派車輛與司機，免課長與部門經理核准；須填臨時急用事由，單據會永久標示「臨時直派」。
     </p>}
-
-    {/* 兩層核准與派車 KPI */}
-    <div className="vehicle-kpi-grid">
-      <div className="vehicle-kpi tone-amber">
-        <div className="vehicle-kpi-value">{kApprovalCount}</div>
-        <div className="vehicle-kpi-label">待課長核准</div>
-      </div>
-      <div className="vehicle-kpi tone-violet">
-        <div className="vehicle-kpi-value">{kManagerApprovalCount}</div>
-        <div className="vehicle-kpi-label">待部門經理核准</div>
-      </div>
-      <div className="vehicle-kpi tone-blue">
-        <div className="vehicle-kpi-value">{kDispatchCount}</div>
-        <div className="vehicle-kpi-label">待車管派車</div>
-      </div>
-      <div className="vehicle-kpi tone-violet">
-        <div className="vehicle-kpi-value">{kTodayCount}</div>
-        <div className="vehicle-kpi-label">今日已派行程</div>
-      </div>
-      <div className="vehicle-kpi tone-green">
-        <div className="vehicle-kpi-value">{kDriverCount}</div>
-        <div className="vehicle-kpi-label">待司機回報</div>
-      </div>
-    </div>
 
     {visibleFollowups.length > 0 && <div className="vehicle-followup-banner" role="alert">
       <strong>{canManageFleet ? '派車回報警示' : '請完成派車回報'}</strong>
@@ -469,8 +462,6 @@ function RequestsModule({ module, profile }: Props) {
         <div className="vehicle-request-actions">
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowReportModal(true)}>派車報表</button>}
           {canManageFleet && <button className="secondary-btn" onClick={() => setShowVehicleMasterModal(true)}>公務車主檔</button>}
-          {canManageFleet && <button className="secondary-btn" onClick={() => setDirectCreating(true)}>臨時直接派車</button>}
-          <button className="primary-btn compact" onClick={() => setCreating(true)}>＋ 新增派車申請</button>
         </div>
       </div>
 
@@ -496,6 +487,8 @@ function RequestsModule({ module, profile }: Props) {
       </table></div>
       {!busy && paged.length === 0 && <p className="empty">目前沒有符合條件的派車申請</p>}
       <Pager page={page} total={filtered.length} onPage={setPage} />
+    </section>
+    </div>
     </section>
     </div>
 
