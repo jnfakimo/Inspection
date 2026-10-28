@@ -155,3 +155,51 @@
     box-sizing: border-box;
   }
 }
+
+/* 臨時直接派車：提示、說明與列表上的「臨時直派」標記。只用語意 token，兩個主題都有值。 */
+.vehicle-flow-note,
+.vehicle-direct-notice {
+  margin: 0 0 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--info-border);
+  border-radius: 6px;
+  background: var(--info-soft);
+  color: var(--info-text);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.vehicle-direct-notice {
+  margin: 14px 20px 0;
+  font-size: 0.8rem;
+}
+
+.vehicle-direct-hint {
+  margin: 0;
+  padding: 0 20px 6px;
+  color: var(--dim);
+  font-size: 0.78rem;
+}
+
+.vehicle-direct-flag {
+  display: flex;
+  width: max-content;
+  margin-top: 5px;
+  padding: 3px 7px;
+  border: 1px solid var(--info-border);
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+@media (max-width: 800px) {
+  .vehicle-direct-notice,
+  .vehicle-direct-hint {
+    margin-left: 12px;
+    margin-right: 12px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
