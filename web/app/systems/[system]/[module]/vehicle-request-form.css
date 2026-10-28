@@ -37,7 +37,7 @@
 }
 
 .vehicle-combobox-toggle:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
@@ -73,9 +73,9 @@
 .vehicle-combobox-menu button:hover,
 .vehicle-combobox-menu button:focus-visible,
 .vehicle-combobox-menu button.is-selected {
-  border-color: var(--blue);
-  background: color-mix(in srgb, var(--blue) 10%, var(--surface-soft));
-  color: var(--blue);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-soft));
+  color: var(--primary);
   outline: none;
 }
 
@@ -652,4 +652,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
+}
+
+/* 派車各視窗的上緣色條與下拉清單的強調色一律用品牌主色（--primary），不用另一種藍（--blue）。 */
+.admin-modal.vehicle-form-modal,
+.admin-modal.vehicle-report-modal {
+  border-top-color: var(--primary);
 }
