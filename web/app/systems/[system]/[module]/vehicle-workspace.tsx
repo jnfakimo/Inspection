@@ -17,6 +17,7 @@ import { AuthGate } from '@/components/AuthGate';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { AdminHeader, AdminModal, errorMessage, fmt, fmtTime, PAGE_SIZE, Pager, type Row } from '@/components/admin/shared';
 import { TimeSelect } from '@/components/TimeSelect';
+import { dateTimeTo12, hhmmTo12 } from '@/lib/clock-format';
 import { LocalizedDateTimeInput } from '@/components/LocalizedDateTimeInput';
 import { escHtml } from '@/lib/html-escape';
 import { useFleetRole } from '@/lib/fleet-role';
@@ -68,7 +69,12 @@ function taipeiCurrentTime() {
     .formatToParts(new Date()).reduce((acc, part) => (acc[part.type] = part.value, acc), {} as Record<string, string>);
   return `${parts.hour}:${parts.minute}`;
 }
-function timeText(value: unknown) { return value ? String(value).slice(0, 5) : '—'; }
+/** 24 小時制 HH:mm：只用在比較與組表單值，畫面顯示一律用 timeText（上午／下午）。 */
+function timeText24(value: unknown) { return value ? String(value).slice(0, 5) : '—'; }
+/** 畫面與報表顯示：上午／下午 12 小時制（公務車系統依使用者要求；內部資料仍是 24 小時制）。 */
+function timeText(value: unknown) { return value ? hhmmTo12(String(value).slice(0, 5)) : '—'; }
+/** 時間戳記（YYYY-MM-DD HH:mm:ss）的上下午顯示。 */
+function vehicleTime(value: unknown) { return dateTimeTo12(fmtTime(value)); }
 function localToIso(value: string) { return value ? new Date(value).toISOString() : null; }
 function isoToLocalInput(value: unknown) {
   if (!value) return '';
@@ -174,7 +180,7 @@ function missingNumber(value: unknown) {
 
 function tripPastDue(row: Row, today: string, nowTime: string) {
   const tripDate = String(row.trip_date || '');
-  const returnTime = timeText(row.planned_return_time);
+  const returnTime = timeText24(row.planned_return_time);
   return tripDate < today || (tripDate === today && returnTime !== '—' && returnTime <= nowTime);
 }
 
@@ -786,8 +792,8 @@ function CreateRequestModal({ profile: _profile, onClose, onDone }: { profile: P
     <div className="vehicle-form-body">
       <VehicleFormSection icon="clock" title="用車時段" columns={3}>
         <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
-        <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
-        <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
+        <label>預計出發時間（必填）<TimeSelect hour12 value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
+        <label>預計回程時間（必填）<TimeSelect hour12 value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="route" title="行程">
         <label>出發地<VehicleCombobox id="vehicle-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
@@ -955,8 +961,8 @@ function DirectDispatchModal({ rows, vehicles, drivers, blockedVehicleIds, onClo
       </VehicleFormSection>
       <VehicleFormSection icon="clock" title="用車時段" columns={3} hint="預計出發時間須晚於目前時間；急用請選最近的下一個時段。">
         <label>用車日期（必填）<LocalizedDateInput aria-label="用車日期（年/月/日）" value={form.trip_date} min={taipeiToday()} onChange={e => set('trip_date', e.target.value)} /></label>
-        <label>預計出發時間（必填）<TimeSelect value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
-        <label>預計回程時間（必填）<TimeSelect value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
+        <label>預計出發時間（必填）<TimeSelect hour12 value={form.planned_departure_time} onChange={e => set('planned_departure_time', e.target.value)} /></label>
+        <label>預計回程時間（必填）<TimeSelect hour12 value={form.planned_return_time} onChange={e => set('planned_return_time', e.target.value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="route" title="行程">
         <label>出發地（必填）<VehicleCombobox id="direct-origin" value={form.origin_location} options={VEHICLE_ORIGIN_OPTIONS} onChange={value => set('origin_location', value)} /></label>
@@ -1048,20 +1054,20 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       </VehicleDetailSection>}
 
       {showApprovals && <VehicleDetailSection icon="check" title="核准紀錄" columns={2}>
-        {has(row.supervisor_name) && <VehicleDetailItem label="課長核准" value={`${row.supervisor_name}｜${fmtTime(row.approved_at)}`} />}
+        {has(row.supervisor_name) && <VehicleDetailItem label="課長核准" value={`${row.supervisor_name}｜${vehicleTime(row.approved_at)}`} />}
         {has(row.supervisor_note) && <VehicleDetailItem label="課長意見" value={row.supervisor_note} />}
-        {has(row.department_manager_name) && <VehicleDetailItem label="部門經理核准" value={`${row.department_manager_name}｜${fmtTime(row.department_manager_approved_at)}`} />}
+        {has(row.department_manager_name) && <VehicleDetailItem label="部門經理核准" value={`${row.department_manager_name}｜${vehicleTime(row.department_manager_approved_at)}`} />}
         {has(row.department_manager_note) && <VehicleDetailItem label="部門經理意見" value={row.department_manager_note} />}
       </VehicleDetailSection>}
 
       {showDispatch && <VehicleDetailSection icon="route" title="派車資訊" columns={3}>
         <VehicleDetailItem label="指派車輛" value={row.plate_no} />
         <VehicleDetailItem label="指派駕駛" value={row.driver_name} />
-        <VehicleDetailItem label="接單狀態" value={row.driver_accepted_at ? `已接單｜${fmtTime(row.driver_accepted_at)}` : '尚未接單'} />
+        <VehicleDetailItem label="接單狀態" value={row.driver_accepted_at ? `已接單｜${vehicleTime(row.driver_accepted_at)}` : '尚未接單'} />
       </VehicleDetailSection>}
 
       {showTripReport && <VehicleDetailSection icon="clipboard" title="行車回報" columns={3}>
-        <VehicleDetailItem label="實際時段" value={`${fmtTime(row.actual_departure_at)} – ${fmtTime(row.actual_return_at)}`} span={2} />
+        <VehicleDetailItem label="實際時段" value={`${vehicleTime(row.actual_departure_at)} – ${vehicleTime(row.actual_return_at)}`} span={2} />
         <VehicleDetailItem label="行駛里程" value={has(row.total_mileage) ? `${fmt(row.total_mileage)} km` : null} />
         <VehicleDetailItem label="里程起訖" value={`${fmt(row.odometer_start)} → ${fmt(row.odometer_end)}`} />
         {row.refueled && <VehicleDetailItem label="加油" value={`里程 ${fmt(row.refuel_odometer)}｜${fmt(row.refuel_cost)} 元`} span={2} />}
@@ -1076,7 +1082,7 @@ function DetailModal({ row, logs, busy, profile, vehicles, drivers, blockedVehic
       {logs.length > 0 && <div className="detail-timeline">
         <h3>流程歷程</h3>
         <ol>{logs.map(log => <li key={String(log.log_id)}>
-          <b>{fmt(log.action)}</b><span>{fmt(log.operator_name)}</span><time>{fmtTime(log.created_at)}</time>
+          <b>{fmt(log.action)}</b><span>{fmt(log.operator_name)}</span><time>{vehicleTime(log.created_at)}</time>
           {log.note ? <p>{String(log.note)}</p> : null}
         </li>)}</ol>
       </div>}
@@ -1129,8 +1135,8 @@ function TripReportModal({ row, vehicles, onClose, onDone }: { row: Row; vehicle
   const vehicle = vehicles.find(v => v.vehicle_id === row.vehicle_id);
   const [form, setForm] = useState({
     actual_passenger_count: String(row.passenger_count ?? ''),
-    actual_departure_at: isoToLocalInput(row.actual_departure_at) || `${row.trip_date}T${timeText(row.planned_departure_time)}`,
-    actual_return_at: isoToLocalInput(row.actual_return_at) || `${row.trip_date}T${timeText(row.planned_return_time)}`,
+    actual_departure_at: isoToLocalInput(row.actual_departure_at) || `${row.trip_date}T${timeText24(row.planned_departure_time)}`,
+    actual_return_at: isoToLocalInput(row.actual_return_at) || `${row.trip_date}T${timeText24(row.planned_return_time)}`,
     odometer_start: String(vehicle?.current_odometer ?? ''), odometer_end: '',
     last_refuel_odometer: '', last_refuel_cost: '',
     refueled: false, refuel_odometer: '', refuel_cost: '',
@@ -1175,8 +1181,8 @@ function TripReportModal({ row, vehicles, onClose, onDone }: { row: Row; vehicle
         <span>司機 {fmt(row.driver_name)}</span>
       </div>
       <VehicleFormSection icon="clock" title="實際行程時間">
-        <label>實際出發時間<LocalizedDateTimeInput ariaLabel="實際出發時間" value={form.actual_departure_at} onChange={value => set('actual_departure_at', value)} /></label>
-        <label>實際回程時間<LocalizedDateTimeInput ariaLabel="實際回程時間" value={form.actual_return_at} onChange={value => set('actual_return_at', value)} /></label>
+        <label>實際出發時間<LocalizedDateTimeInput hour12 ariaLabel="實際出發時間" value={form.actual_departure_at} onChange={value => set('actual_departure_at', value)} /></label>
+        <label>實際回程時間<LocalizedDateTimeInput hour12 ariaLabel="實際回程時間" value={form.actual_return_at} onChange={value => set('actual_return_at', value)} /></label>
       </VehicleFormSection>
       <VehicleFormSection icon="route" title="乘車與里程" columns={3}>
         <label>實際搭乘人數<input type="number" min={0} value={form.actual_passenger_count} onChange={e => set('actual_passenger_count', e.target.value)} /></label>
@@ -1373,7 +1379,7 @@ function RosterModule({ module, profile }: Props) {
             <td>{fmt(user.username)}</td>
             <td>{fmt(user.department)}</td>
             <td><span className={`status-pill ${row.active ? 'closed' : 'cancelled'}`}>{row.active ? '啟用' : '停用'}</span></td>
-            <td>{fmtTime(row.updated_at || row.assigned_at)}</td>
+            <td>{vehicleTime(row.updated_at || row.assigned_at)}</td>
             {isAdmin && <td><div className="admin-row-actions">
               <button className={row.active ? 'warn' : ''} onClick={() => void toggle(row)}>{row.active ? '停用' : '啟用'}</button>
               {row.active && <button className="danger" onClick={() => void remove(row)}>刪除</button>}
@@ -1452,7 +1458,7 @@ function LogsModule({ module, profile }: Props) {
         <tbody>{paged.map(row => {
           const request = (row.vehicle_dispatch_requests as Row) || {};
           return <tr key={String(row.log_id)}>
-            <td>{fmtTime(row.created_at)}</td>
+            <td>{vehicleTime(row.created_at)}</td>
             <td>{fmt(request.request_no)}{request.plate_no ? <small>{String(request.plate_no)}</small> : null}</td>
             <td>{fmt(row.action)}</td>
             <td>{STATUS_LABEL[String(row.from_status)] || fmt(row.from_status)} → {STATUS_LABEL[String(row.to_status)] || fmt(row.to_status)}</td>

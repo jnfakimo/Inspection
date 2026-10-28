@@ -1,4 +1,5 @@
 // 個人設定「LINE 派車通知」區塊的顯示邏輯（純函式，便於單元測試）。
+import { formatClock12 } from './clock-format.ts';
 
 export type VehicleLineLinkStatus = {
   linked: boolean;
@@ -19,6 +20,13 @@ const TAIPEI_TIME = new Intl.DateTimeFormat('zh-TW', {
   timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
 });
 
+/** 臺北時間「YYYY/MM/DD 上午 h:mm」；公務車系統的時間一律用上下午 12 小時制。 */
+function formatTaipeiTime12(date: Date): string {
+  const parts = TAIPEI_TIME.formatToParts(date);
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+  return `${part('year')}/${part('month')}/${part('day')} ${formatClock12(Number(part('hour')), part('minute'))}`;
+}
+
 export function formatRemaining(ms: number): string {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const minutes = Math.floor(seconds / 60);
@@ -34,7 +42,7 @@ export function vehicleLineLinkView(
   if (!status) return { state: 'loading', title: '讀取中', detail: '正在確認 LINE 綁定狀態…', remaining: '' };
   if (status.linked) {
     const at = status.linked_at && Number.isFinite(Date.parse(status.linked_at))
-      ? TAIPEI_TIME.format(new Date(status.linked_at)).replace(/\s+/g, ' ') : '';
+      ? formatTaipeiTime12(new Date(status.linked_at)) : '';
     return {
       state: 'linked',
       title: '已綁定',

@@ -11,6 +11,8 @@ type Props = {
   className?: string;
   /** 時間下拉的級距（分鐘），預設 30，與專案的時間欄位慣例一致。 */
   stepMinutes?: number;
+  /** 時間下拉改用「上午／下午 12 小時制」顯示（值仍是 24 小時制），預設 false。 */
+  hour12?: boolean;
 };
 
 /**
@@ -22,7 +24,7 @@ type Props = {
  * 時間用 TimeSelect（30 分鐘級距、24 小時制）——輸出仍是 datetime-local 的格式，
  * 呼叫端的資料處理完全不用改。
  */
-export function LocalizedDateTimeInput({ value, onChange, ariaLabel, className, stepMinutes = 30 }: Props) {
+export function LocalizedDateTimeInput({ value, onChange, ariaLabel, className, stepMinutes = 30, hour12 = false }: Props) {
   const [datePart = '', timePart = ''] = String(value || '').split('T');
   const time = timePart.slice(0, 5);
 
@@ -43,6 +45,7 @@ export function LocalizedDateTimeInput({ value, onChange, ariaLabel, className, 
     <TimeSelect
       value={time}
       stepMinutes={stepMinutes}
+      hour12={hour12}
       aria-label={ariaLabel ? `${ariaLabel}（時間）` : '時間'}
       onChange={event => emit(datePart, event.target.value)}
     />

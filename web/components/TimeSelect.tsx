@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, type SelectHTMLAttributes } from 'react';
+import { hhmmTo12 } from '@/lib/clock-format';
 
 type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'children'> & {
   value: string;
@@ -9,6 +10,8 @@ type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'children'>
   /** 是否提供「未設定」的空選項，預設 true。 */
   allowEmpty?: boolean;
   emptyLabel?: string;
+  /** 選項文字改用「上午／下午 12 小時制」；值仍是 24 小時制的 HH:mm。預設 false（全站其他欄位維持 24 小時制）。 */
+  hour12?: boolean;
 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -27,7 +30,7 @@ const toHHMM = (value: unknown) => {
  * 而且外觀與格式（上午/下午）完全交給瀏覽器語系決定，同一個系統會出現兩種樣子。
  * 這裡固定輸出 24 小時制的 `HH:mm`，與表格顯示、資料庫的 time 欄位一致。
  */
-export function TimeSelect({ value, stepMinutes = 30, allowEmpty = true, emptyLabel = '未設定', ...props }: Props) {
+export function TimeSelect({ value, stepMinutes = 30, allowEmpty = true, emptyLabel = '未設定', hour12 = false, ...props }: Props) {
   const current = toHHMM(value);
 
   const options = useMemo(() => {
@@ -47,6 +50,6 @@ export function TimeSelect({ value, stepMinutes = 30, allowEmpty = true, emptyLa
 
   return <select {...props} value={current}>
     {allowEmpty && <option value="">{emptyLabel}</option>}
-    {options.map(option => <option key={option} value={option}>{option}</option>)}
+    {options.map(option => <option key={option} value={option}>{hour12 ? hhmmTo12(option) : option}</option>)}
   </select>;
 }

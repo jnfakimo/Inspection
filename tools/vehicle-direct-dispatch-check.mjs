@@ -53,6 +53,13 @@ assert.doesNotMatch(workspace, /vehicle-step tone-|vehicle-tab-count is-/, '流�
 assert.doesNotMatch(adminCss, /\.tone-(cyan|amber|violet|green|blue)\{/, '不再保留裝飾用的 tone-* 色票');
 assert.doesNotMatch(adminCss + formCss, /\.vehicle-[a-z-]+[^{}]*\{[^}]*var\(--blue\)/, '派車頁面不得使用另一種藍（--blue），一律用 --primary');
 assert.doesNotMatch(workspace, /hs-kpi is-(violet|green|amber)">/, '報表指標卡一律主色，只有異常大於 0 才用紅色');
+// 時間：公務車系統的時間欄位與畫面顯示用上午／下午 12 小時制；內部值、比較與表單預設值仍是 24 小時制 HH:mm。
+assert.equal(workspace.match(/<TimeSelect hour12 /g)?.length, 4, '派車申請與臨時直接派車的出發／回程時間必須用 12 小時制');
+assert.equal(workspace.match(/<LocalizedDateTimeInput hour12 /g)?.length, 2, '行車回報的實際出發／回程時間必須用 12 小時制');
+assert.doesNotMatch(workspace, /<TimeSelect (?!hour12)/, '派車頁的 TimeSelect 不得漏掉 hour12');
+assert.match(workspace, /const returnTime = timeText24\(row\.planned_return_time\)/, '逾期判斷必須用 24 小時制字串比較，不得用上下午顯示文字');
+assert.match(workspace, /T\$\{timeText24\(row\.planned_departure_time\)\}/, '表單預設值必須是 24 小時制 HH:mm');
+assert.doesNotMatch(workspace, /\$\{fmtTime\(|\{fmtTime\(row\.(approved_at|driver_accepted_at|created_at|updated_at)/, '時間戳記顯示必須經 vehicleTime（上下午）');
 // 版型：五個子系統頁（派車申請、公務車輛、駕駛人員、派車管理員、派車紀錄）一律用交接簿的 VehicleSheet 外框，
 // 內頁視窗一律用區塊卡片，不再各自拼欄位或自設頁面寬度。
 assert.equal(workspace.match(/<VehicleSheet title=/g)?.length, 4, '派車申請、公務車輛、名單（駕駛與管理員共用）、派車紀錄都必須使用 VehicleSheet');
