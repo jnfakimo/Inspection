@@ -203,3 +203,103 @@
     padding-right: 0;
   }
 }
+
+/* 派車申請頁沿用電子交接簿的 hs-sheet 表頭與指標列（hs-* 外觀只在 handover-sheet.css 定義）；
+   表頭以下的內容區（流程步驟、頁籤、表格）在這裡排版，只用語意 token。 */
+.vehicle-sheet-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 20px;
+}
+
+.vehicle-sheet .hs-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.vehicle-sheet .vehicle-flow-grid {
+  gap: 10px;
+  margin: 0;
+}
+
+.vehicle-sheet .vehicle-step {
+  position: relative;
+  min-width: 0;
+  padding: 12px 14px 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--tone, var(--cyan)) 28%, var(--line));
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.vehicle-sheet .vehicle-step::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: var(--tone, var(--cyan));
+  opacity: 0.75;
+}
+
+.vehicle-sheet .vehicle-step b {
+  display: block;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.vehicle-sheet .vehicle-step > div {
+  margin-top: 4px;
+  color: var(--dim);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.vehicle-sheet .vehicle-flow-note,
+.vehicle-sheet .vehicle-followup-banner {
+  margin: 0;
+}
+
+.vehicle-sheet .vehicle-request-tabs {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+}
+
+.vehicle-sheet .vehicle-request-tabs > button {
+  border-radius: 9px;
+}
+
+.vehicle-sheet .vehicle-request-table-panel {
+  margin: 0;
+  border-radius: 14px;
+}
+
+@media (max-width: 1100px) {
+  .vehicle-sheet .hs-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .vehicle-sheet .vehicle-request-tabs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .vehicle-sheet .hs-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicle-sheet-body {
+    padding: 12px;
+  }
+}
