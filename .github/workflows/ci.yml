@@ -142,8 +142,8 @@ jobs:
         run: npm ls compression shell-quote source-map-js uuid
       - name: Bundle Android and iOS with synthetic configuration
         run: |
-          npx --no-install expo export --platform android --output-dir dist-smoke/android --max-workers 2
-          npx --no-install expo export --platform ios --output-dir dist-smoke/ios --max-workers 2
+          npm run export -- --platform android --output-dir dist-smoke/android --max-workers 2
+          npm run export -- --platform ios --output-dir dist-smoke/ios --max-workers 2
         env:
           CI: '1'
           EXPO_OFFLINE: '1'

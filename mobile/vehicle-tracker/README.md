@@ -33,9 +33,13 @@ Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 develo
 2026-10-29 已於隔離 Android API 35 模擬器完成原生加密、遷移、分段、權限拒絕／服務啟停、原密碼登入、程序重啟、同簽章更新、Android 重開機與金鑰遺失補驗。修正跨帳號勤務恢復、登出競態、Expo Android 密文介面差異及中斷遷移清理；25 項儲存／生命週期測試通過。測試 APK 使用隔離後端與私有測試入口，沒有正式簽署或發布；iOS 僅 JS bundle，未跑原生模擬器。範圍、證據及需要配合的條件見 [完整報告](../../docs/ANDROID_EMULATOR_VERIFICATION_20261029.md)。
 
 1. 複製 `.env.example` 為 `.env.local`，填入目標環境的公開匿名金鑰；不得填入 service role 金鑰。
-2. 執行 `npm install`。
-3. 執行 `npx expo prebuild` 產生原生工程。
+2. 執行 `npm ci`，由鎖檔安裝並套用經來源雜湊核對的 deepmerge 防護。
+3. 執行 `npm run native:prebuild` 產生原生工程。
 4. Android 實機使用 `npm run android`；iOS 需在 macOS／Xcode 與公司 Apple 開發者簽章環境執行 `npm run ios`。
+
+啟動使用 `npm start`；輸出 bundle 使用 `npm run export -- --platform android`（iOS 同理）。上述指令與 typecheck 均先驗證 deepmerge 補丁；即使安裝或執行時指定 `--ignore-scripts`，內嵌檢查仍會拒絕未修補版本。若漏跑安裝腳本，先執行 `npm run postinstall`，再跑 `npm run test:security-deps`。未知版本或雜湊不符時停止並重新審查，不手改雜湊放行。直接執行 `npx expo`、Gradle 或第三方建置服務不保證會跑本專案守門，必須先完成補丁檢查；正式簽署前也必須通過此檢查。
+
+2026-10-29 的 7 筆 low 均來自同一 deepmerge 公告及其間接依賴，原始 audit 告警保留；本機補丁不等於上游已發布修補版。逐項原因、防護、替代方案與驗證見 [低風險依賴報告](../../docs/LOW_DEPENDENCY_REVIEW_20261029.md)。
 
 ## 實機驗證閘門
 

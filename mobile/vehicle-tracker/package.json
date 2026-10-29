@@ -4,14 +4,15 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "expo start --dev-client",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit",
+    "start": "node scripts/patch-deepmerge.cjs --check && expo start --dev-client",
+    "android": "node scripts/patch-deepmerge.cjs --check && expo run:android",
+    "ios": "node scripts/patch-deepmerge.cjs --check && expo run:ios",
+    "export": "node scripts/patch-deepmerge.cjs --check && expo export",
+    "native:prebuild": "node scripts/patch-deepmerge.cjs --check && expo prebuild",
+    "typecheck": "node scripts/patch-deepmerge.cjs --check && tsc --noEmit",
     "test:storage": "node --test test/storage.test.cjs test/account-lifecycle.test.cjs",
     "postinstall": "node scripts/patch-deepmerge.cjs",
-    "test:security-deps": "node scripts/patch-deepmerge.cjs --check && node --test test/security-deps.test.cjs",
-    "pretypecheck": "node scripts/patch-deepmerge.cjs --check"
+    "test:security-deps": "node scripts/patch-deepmerge.cjs --check && node --test test/security-deps.test.cjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

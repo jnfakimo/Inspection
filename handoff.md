@@ -191,3 +191,7 @@ Codex 本輪唯一寫入者。修正行動分段失敗殘留、損壞索引阻�
 ## 2026-10-29 Android 模擬器原生補驗
 
 Codex 本輪唯一寫入者。已建立 WSL／KVM Android API 35 隔離模擬器與原生 debug APK，限制測試帳號對外網路。修正跨帳號勤務恢復、登出與延遲回應競態、原生加密介面差異及中斷遷移遺留明文；保留舊 Android 密文可讀及原有金鑰。25 項儲存／生命週期、3 項畫面流程、8 項 BLE、6 項安全相容性、原生登入／更新／重開機／金鑰遺失與清理補驗通過；iOS bundle 通過，原生 iOS 未驗。audit 仍 7 low、0 moderate/high/critical；Gitleaks／Semgrep 通過。見 docs/ANDROID_EMULATOR_VERIFICATION_20261029.md，內列真正需要使用者配合的設備、唯讀權限、測試供應商及異機備份條件。正式資料與密碼政策不變，同一修正分支提交推送，未部署／合併；CI／CodeQL 以本輪提交回讀為準。
+
+## 2026-10-29 低風險依賴逐項複核
+
+Codex 本輪唯一寫入者。7 low 均由 deepmerge 同一公告傳遞至 Expo 工具鏈，上游仍無修補版；同主版與最新跨主版 SDK 仍引用受影響依賴，audit 建議退回 SDK 51 不安全，未套用。已將補丁檢查內嵌於六個啟動／建置／型別指令，防止忽略 lifecycle scripts 後使用未修補依賴，CI 雙平台 bundle 同步使用守門指令。乾淨 npm ci、9 項安全回歸、25 項儲存／生命週期、typecheck、Android／iOS bundle、Gitleaks 通過；audit 仍 7 low、0 moderate/high/critical。逐項原因、補償控制、反例與待上游條件見 docs/LOW_DEPENDENCY_REVIEW_20261029.md。R-11 不結案；正式資料、密碼政策不變，推送同一修正分支，未部署或合併。CI／CodeQL 以本次提交回讀結果為準。
