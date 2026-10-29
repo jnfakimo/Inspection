@@ -5,7 +5,15 @@
 .business-handover-toolbar>.hs-toolbar-right{margin-left:auto}
 @media(min-width:801px){
   .business-handover-toolbar>.hs-date-nav{gap:6px}
-  .business-handover-toolbar>.hs-date-nav>.localized-date-input{flex-basis:160px;width:160px}
+  .business-handover-toolbar>.hs-date-nav>.localized-date-input{flex-basis:160px;width:160px;height:32px}
+  .business-handover-toolbar>.hs-date-nav>.localized-date-input>input.hs-date-input:not(.localized-date-native){height:32px;min-height:32px}
+  /* 日期列的控制項統一為共用按鈕規格 compact 的 32px，和同一列的「一市／二市」按鈕等高：
+     原本標籤、日期框、按鈕各自 42–44px，箭頭的可見邊框只有 32px，高度不一致且偏高。
+     手機版維持原本較大的觸控尺寸，所以只在桌機套用。 */
+  .business-handover-toolbar>.hs-date-nav>.hs-date-label{min-height:32px}
+  .business-handover-toolbar>.hs-date-nav>.hs-date-arrow{flex-basis:32px;width:32px;height:32px;min-height:32px!important}
+  .business-handover-toolbar>.hs-date-nav>.hs-date-arrow::before{inset:0}
+  .business-handover-toolbar>.hs-date-nav>.hs-date-today{min-height:32px;padding-block:0}
 }
 
 .business-approval-section.panel{display:grid;gap:14px;padding:16px 20px;border:1px solid var(--n-300);border-radius:14px;background:var(--n-100);box-shadow:none}
