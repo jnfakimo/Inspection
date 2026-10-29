@@ -82,6 +82,9 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
   const [users, setUsers] = useState<Row[]>([]);
   const [receivers, setReceivers] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true);
+  const [loadedReportScope, setLoadedReportScope] = useState('');
+  const reportScope = `${market}:${date}`;
+  const reportReady = !busy && loadedReportScope === reportScope;
   const [note, setNote] = useState('');
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -105,6 +108,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
   const load = useCallback(async () => {
     if (!market) { setAccess(emptyProduceApprovalAccess('unavailable')); setBusy(false); return; }
     const generation = ++loadGeneration.current;
+    setLoadedReportScope('');
     setBusy(true);
     setAccess(emptyProduceApprovalAccess('checking'));
     setNote('');
@@ -121,6 +125,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
       setShifts(day.shifts || []);
       setApprovals(day.approvals || []);
       setAccess(produceApprovalAccessFrom(day.can));
+      setLoadedReportScope(`${market}:${date}`);
       setReceivers(receiverResult.error ? [] : selectableActiveUsers((receiverResult.data as Row[]) || []));
       setUsers(userResult.error ? [] : selectableActiveUsers(userResult.data || []));
     } catch (error) {
@@ -192,9 +197,9 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
     <div className="hs-page">
       <AdminHeader module={module} hideDescription busy={busy} note={note} onReload={load} action={tab !== 'duty' ? undefined :
         <div className="hs-header-actions">
-          <button type="button" className="secondary-btn compact" onClick={() => setPreviewOpen(true)} title="在畫面上預覽 A4 報表">
+          <button type="button" className="secondary-btn compact" disabled={!reportReady} onClick={() => setPreviewOpen(true)} title="在畫面上預覽 A4 報表">
             <HandoverIcon name="eye" size={14} />預覽本日報表</button>
-          <button type="button" className="primary-btn compact" onClick={() => window.print()}>
+          <button type="button" className="primary-btn compact" disabled={!reportReady} onClick={() => window.print()}>
             <HandoverIcon name="printer" size={14} />列印本日報表</button>
         </div>} />
 
@@ -312,7 +317,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
         })}</div>
       </section>}
 
-      {market && tab === 'duty' && <section className="hs-print-sheet" aria-label={`${groupName}每日列印報表`}>
+      {market && reportReady && tab === 'duty' && <section className="hs-print-sheet" aria-label={`${groupName}每日列印報表`}>
         <ProduceReport group={group} market={market} date={date} shifts={shifts} approvals={approvals} />
       </section>}
     </div>
@@ -321,7 +326,7 @@ export function ProduceHandover({ system, module, profile, group }: Props) {
       <div className="hs-preview-bar">
         <div><strong>{previewStageItem ? `${previewStageItem.label}批核前預覽（A4 版面）` : '本日報表預覽（A4 版面）'}</strong><span>{rocDate(date)} · A4 直式排版</span></div>
         <div>
-          <button type="button" className="primary-btn compact" onClick={() => { closePreview(); setTimeout(() => window.print(), 100); }}>
+          <button type="button" className="primary-btn compact" disabled={!reportReady} onClick={() => { closePreview(); setTimeout(() => window.print(), 100); }}>
             <HandoverIcon name="printer" size={14} />列印本日報表</button>
           <button type="button" className="secondary-btn compact" onClick={closePreview} disabled={busy && Boolean(previewStageItem)}>{previewStageItem ? '取消批核' : '關閉預覽'}</button>
         </div>
