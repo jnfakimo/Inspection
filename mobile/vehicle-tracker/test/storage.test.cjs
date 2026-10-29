@@ -13,6 +13,7 @@ const asyncStorage = {
   async setItem(key, value) { disk.set(key, value); },
   async removeItem(key) { disk.delete(key); },
   async multiRemove(keys) { keys.forEach(key => disk.delete(key)); },
+  async getAllKeys() { return [...disk.keys()]; },
 };
 const secureStore = {
   async getItemAsync(key) { return keychain.get(key) ?? null; },
@@ -67,6 +68,7 @@ function loadTs(relative, mocks) {
   return compiled.exports;
 }
 const encryptedStorage = loadTs('src/encrypted-storage.ts', {
+  './native-storage-lock': { withStorageCoordinator: operation => operation(false) },
   '@react-native-async-storage/async-storage': asyncStorage,
   'expo-crypto': cryptoMock,
   'expo-secure-store': secureStore,
@@ -77,8 +79,9 @@ const storage = loadTs('src/storage.ts', {
 });
 
 // Each load has its own JS locks and key cache, but shares the persisted adapter.
-function independentEncryptedStore(adapter = asyncStorage) {
+function independentEncryptedStore(adapter = asyncStorage, coordinator = operation => operation(false)) {
   return loadTs('src/encrypted-storage.ts', {
+    './native-storage-lock': { withStorageCoordinator: coordinator },
     '@react-native-async-storage/async-storage': adapter,
     'expo-crypto': cryptoMock,
     'expo-secure-store': secureStore,
@@ -89,6 +92,141 @@ function deferred() {
   const promise = new Promise(done => { resolve = done; });
   return { promise, resolve };
 }
+
+function serialCoordinator() {
+  let tail = Promise.resolve();
+  return operation => {
+    const current = tail.then(() => operation(true));
+    tail = current.catch(() => undefined);
+    return current;
+  };
+}
+const orphanName = key => `encrypted_v1:${key}:chunk:${randomUUID()}:0`;
+
+test('coordinated collection removes only owned unreferenced chunks and preserves committed ciphertext', async () => {
+  disk.clear();
+  const store = independentEncryptedStore(asyncStorage, serialCoordinator());
+  const key = 'gc-owned';
+  await store.setItem(key, '完整內容'.repeat(60_000));
+  const live = JSON.parse(disk.get('encrypted_v1:' + key)).chunks;
+  const orphan = orphanName(key);
+  const foreign = orphanName('other-account');
+  const malformed = `encrypted_v1:${key}:chunk:not-a-generation:0`;
+  disk.set(orphan, 'abandoned ciphertext'); disk.set(foreign, 'foreign ciphertext'); disk.set(malformed, 'unknown');
+  assert.equal(await store.getItem(key), '完整內容'.repeat(60_000));
+  assert.equal(disk.has(orphan), false);
+  for (const name of [...live, foreign, malformed]) assert.ok(disk.has(name));
+});
+
+test('coordinated collector waits for a paused writer from another module before scanning', async () => {
+  disk.clear();
+  const coordinate = serialCoordinator(), entered = deferred(), resume = deferred();
+  let paused = false, scans = 0;
+  const writer = independentEncryptedStore({ ...asyncStorage, async setItem(name, value) {
+    await asyncStorage.setItem(name, value);
+    if (!paused && name.includes(':chunk:')) { paused = true; entered.resolve(); await resume.promise; }
+  } }, coordinate);
+  const reader = independentEncryptedStore({ ...asyncStorage, async getAllKeys() {
+    scans++; return asyncStorage.getAllKeys();
+  } }, coordinate);
+  const writing = writer.setItem('gc-paused', '完整新值'.repeat(60_000));
+  await entered.promise;
+  const reading = reader.getItem('gc-paused');
+  try { await new Promise(resolve => setImmediate(resolve)); assert.equal(scans, 0); }
+  finally { resume.resolve(); }
+  await writing;
+  assert.equal(await reading, '完整新值'.repeat(60_000));
+  assert.equal(scans, 1);
+});
+
+test('coordinated reads and logout recover orphan fragments even without a current index', async () => {
+  disk.clear();
+  const store = independentEncryptedStore(asyncStorage, serialCoordinator());
+  const orphan = orphanName('gc-empty'); disk.set(orphan, 'ciphertext');
+  assert.equal(await store.getItem('gc-empty'), null); assert.equal(disk.has(orphan), false);
+  await store.setItem('gc-empty', '舊'.repeat(60_000));
+  disk.set(orphan, 'ciphertext');
+  await store.removeItem('gc-empty');
+  assert.equal([...disk.keys()].filter(name => name.startsWith('encrypted_v1:gc-empty')).length, 0);
+});
+
+test('invalid manifest or failed authentication never triggers orphan collection', async () => {
+  disk.clear();
+  const store = independentEncryptedStore(asyncStorage, serialCoordinator());
+  const key = 'gc-invalid', indexKey = 'encrypted_v1:' + key, orphan = orphanName(key);
+  disk.set(indexKey, '{"chunks":["foreign-key"]}'); disk.set(orphan, 'ciphertext');
+  await assert.rejects(store.getItem(key)); assert.ok(disk.has(orphan));
+  disk.delete(indexKey); await store.setItem(key, 'valid');
+  disk.set(orphan, 'ciphertext');
+  const record = JSON.parse(disk.get(indexKey).slice('encrypted_v1:'.length));
+  record.tag = randomBytes(16).toString('base64'); disk.set(indexKey, 'encrypted_v1:' + JSON.stringify(record));
+  await assert.rejects(store.getItem(key)); assert.ok(disk.has(orphan));
+});
+
+test('interrupted cleanup is idempotent and does not remove live chunks', async () => {
+  disk.clear();
+  const key = 'gc-cleanup-error';
+  const normal = independentEncryptedStore(asyncStorage, serialCoordinator());
+  await normal.setItem(key, '資料'.repeat(60_000));
+  const a = orphanName(key), b = orphanName(key); disk.set(a, 'a'); disk.set(b, 'b');
+  const failing = independentEncryptedStore({ ...asyncStorage, async multiRemove(names) {
+    disk.delete(names[0]); throw new Error('isolated cleanup interrupted');
+  } }, serialCoordinator());
+  await assert.rejects(failing.getItem(key), /cleanup interrupted/);
+  assert.equal(await normal.getItem(key), '資料'.repeat(60_000));
+  assert.equal(disk.has(a), false); assert.equal(disk.has(b), false);
+});
+
+test('platforms without verified native coordination preserve orphan chunks', async () => {
+  disk.clear();
+  const key = 'gc-unsupported', orphan = orphanName(key);
+  await encryptedStorage.setItem(key, '可讀'); disk.set(orphan, 'ciphertext');
+  assert.equal(await encryptedStorage.getItem(key), '可讀'); assert.ok(disk.has(orphan));
+});
+
+test('native coordinator fails closed on missing module and always releases after operation failure', async () => {
+  const missing = loadTs('src/native-storage-lock.ts', {
+    expo: { requireOptionalNativeModule: () => null }, 'react-native': { Platform: { OS: 'android' } },
+  });
+  let called = false;
+  await assert.rejects(missing.withStorageCoordinator(async () => { called = true; }), /原生儲存協調/);
+  assert.equal(called, false);
+  let released = 0, acquired = 0;
+  const native = loadTs('src/native-storage-lock.ts', {
+    expo: { requireOptionalNativeModule: () => ({ protocolVersion: 1, async acquire() { return String(++acquired); }, release() { released++; } }) },
+    'react-native': { Platform: { OS: 'android' } },
+  });
+  await assert.rejects(native.withStorageCoordinator(async canCollect => { assert.equal(canCollect, true); throw new Error('injected'); }), /injected/);
+  assert.equal(await native.withStorageCoordinator(async () => 7), 7);
+  assert.equal(acquired, 2); assert.equal(released, 2);
+});
+
+test('native lock acquisition failure never enters storage; iOS never opts into collection', async () => {
+  let entered = false;
+  const busy = loadTs('src/native-storage-lock.ts', {
+    expo: { requireOptionalNativeModule: () => ({ protocolVersion: 1, async acquire() { throw new Error('busy'); }, release() { throw new Error('not acquired'); } }) },
+    'react-native': { Platform: { OS: 'android' } },
+  });
+  await assert.rejects(busy.withStorageCoordinator(async () => { entered = true; }), /busy/);
+  assert.equal(entered, false);
+  const ios = loadTs('src/native-storage-lock.ts', {
+    expo: { requireOptionalNativeModule: () => null }, 'react-native': { Platform: { OS: 'ios' } },
+  });
+  assert.equal(await ios.withStorageCoordinator(async canCollect => canCollect), false);
+});
+
+test('independent cold key caches share one persisted encryption key under the coordinator', async () => {
+  const saved = [...keychain]; disk.clear(); keychain.clear();
+  try {
+    const coordinate = serialCoordinator();
+    const first = independentEncryptedStore(asyncStorage, coordinate), second = independentEncryptedStore(asyncStorage, coordinate);
+    await Promise.all([first.setItem('gc-key-a', '甲'), second.setItem('gc-key-b', '乙')]);
+    const fresh = independentEncryptedStore(asyncStorage, coordinate);
+    assert.equal(await fresh.getItem('gc-key-a'), '甲');
+    assert.equal(await fresh.getItem('gc-key-b'), '乙');
+    assert.equal(keychain.size, 1);
+  } finally { disk.clear(); keychain.clear(); for (const [name, value] of saved) keychain.set(name, value); }
+});
 
 test('independent reader retries when committed replacement removes its previously observed chunks', async () => {
   disk.clear();
@@ -413,6 +551,7 @@ test('temporary keychain failure can retry and a lost key never returns cipherte
   const before = disk.get('encrypted_v1:key-loss');
   let unavailable = true;
   const fresh = () => loadTs('src/encrypted-storage.ts', {
+    './native-storage-lock': { withStorageCoordinator: operation => operation(false) },
     '@react-native-async-storage/async-storage': asyncStorage,
     'expo-crypto': cryptoMock,
     'expo-secure-store': {

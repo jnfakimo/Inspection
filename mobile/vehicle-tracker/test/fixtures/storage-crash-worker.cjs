@@ -55,6 +55,7 @@ class Sealed {
   async tag() { return this.authTag.toString('base64'); }
 }
 const mocks = {
+  './native-storage-lock': { withStorageCoordinator: operation => operation(false) },
   '@react-native-async-storage/async-storage': storage,
   'expo-secure-store': {
     async getItemAsync(key) { return read().keys[key] ?? null; },

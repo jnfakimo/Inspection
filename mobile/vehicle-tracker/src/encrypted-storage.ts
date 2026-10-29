@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AESEncryptionKey, AESSealedData, aesDecryptAsync, aesEncryptAsync, randomUUID } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { fromByteArray, toByteArray } from 'base64-js';
+import { withStorageCoordinator } from './native-storage-lock';
 
 const KEY_NAME = 'vehicle_tracker_storage_key_v1';
 const PREFIX = 'encrypted_v1:';
@@ -10,12 +11,31 @@ const MAX_CHUNKS = 128;
 let keyPromise: Promise<AESEncryptionKey> | undefined;
 const operations = new Map<string, Promise<void>>();
 
-function withKeyLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
-  const result = (operations.get(key) ?? Promise.resolve()).then(operation);
+function withKeyLock<T>(key: string, operation: (canCollect: boolean) => Promise<T>): Promise<T> {
+  const result = (operations.get(key) ?? Promise.resolve()).then(() => withStorageCoordinator(operation));
   const tail = result.then(() => undefined, () => undefined);
   operations.set(key, tail);
   void tail.then(() => { if (operations.get(key) === tail) operations.delete(key); });
   return result;
+}
+
+async function collectUnreferencedChunks(key: string): Promise<void> {
+  // Called only while holding the Android process-wide AND OS-wide lock. Never use age/TTL.
+  const indexKey = PREFIX + key;
+  const chunkPrefix = `${indexKey}:chunk:`;
+  const ownsChunk = (name: string) => name.startsWith(chunkPrefix)
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:(?:0|[1-9][0-9]{0,2})$/i.test(name.slice(chunkPrefix.length))
+    && Number(name.slice(name.lastIndexOf(':') + 1)) < MAX_CHUNKS;
+  const referenced = chunkKeys(key, await AsyncStorage.getItem(indexKey));
+  // An unfamiliar/corrupt manifest cannot grant deletion authority.
+  if (!referenced.every(ownsChunk) || new Set(referenced).size !== referenced.length) {
+    throw new Error('加密資料索引無法安全清理');
+  }
+  const live = new Set(referenced);
+  const candidates = (await AsyncStorage.getAllKeys()).filter(name => ownsChunk(name) && !live.has(name));
+  for (let offset = 0; offset < candidates.length; offset += MAX_CHUNKS) {
+    await AsyncStorage.multiRemove(candidates.slice(offset, offset + MAX_CHUNKS));
+  }
 }
 
 function chunkKeys(key: string, stored: string | null): string[] {
@@ -137,32 +157,41 @@ async function setItemUnlocked(key: string, value: string): Promise<void> {
 
 export const encryptedStorage = {
   getItem(key: string): Promise<string | null> {
-    return withKeyLock(key, async () => {
+    return withKeyLock(key, async canCollect => {
       const current = await readEncrypted(key);
       if (current !== null) {
         const plaintext = await decrypt(current);
         // Resume cleanup if the app stopped after publishing ciphertext but before removing legacy plaintext.
         await AsyncStorage.removeItem(key);
+        if (canCollect) await collectUnreferencedChunks(key);
         return plaintext;
       }
       const legacy = await AsyncStorage.getItem(key);
-      if (legacy === null) return null;
+      if (legacy === null) {
+        if (canCollect) await collectUnreferencedChunks(key);
+        return null;
+      }
       // Migrate only after encryption is safely persisted; never silently discard existing data.
       await setItemUnlocked(key, legacy);
+      if (canCollect) await collectUnreferencedChunks(key);
       return legacy;
     });
   },
   setItem(key: string, value: string): Promise<void> {
-    return withKeyLock(key, () => setItemUnlocked(key, value));
+    return withKeyLock(key, async canCollect => {
+      await setItemUnlocked(key, value);
+      if (canCollect) await collectUnreferencedChunks(key);
+    });
   },
   removeItem(key: string): Promise<void> {
-    return withKeyLock(key, async () => {
+    return withKeyLock(key, async canCollect => {
       const indexKey = PREFIX + key;
       const stored = await AsyncStorage.getItem(indexKey);
       let parts: string[] = [];
       // A corrupt index must not prevent logout, nor authorize deleting arbitrary keys.
       try { parts = chunkKeys(key, stored); } catch { /* Discard only the invalid index and legacy value. */ }
       await AsyncStorage.multiRemove([indexKey, key, ...parts]);
+      if (canCollect) await collectUnreferencedChunks(key);
     });
   },
 };
