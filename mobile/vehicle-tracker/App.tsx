@@ -336,7 +336,10 @@ export default function App() {
         if (!isCurrentAccount()) throw new Error("登入狀態已變更，請重新確認勤務。");
         await endTrackingSession(active);
       },
-      async clearSession() { if (isCurrentAccount()) await writeActiveSession(null); },
+      async clearSession() {
+        if (!await lifecycle.clearCompleted(active, isCurrentAccount))
+          throw new Error("登入或勤務狀態已變更，請重新確認勤務。");
+      },
     });
     if (!isCurrentAccount()) return;
     setActive(null);

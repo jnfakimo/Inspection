@@ -147,3 +147,80 @@ test('sign-out during a manual duty start leaves native tracking stopped and no 
   assert.equal(await activating, false); await clearing;
   assert.equal(calls.at(-1), 'stop'); assert.equal(h.state.stored, null);
 });
+
+test('a delayed active lookup cannot undo completion intent saved while it was pending', async () => {
+  const entered = deferred(), response = deferred(); let reads = 0;
+  const h = setup({ async isSessionActive() { if (++reads === 1) { entered.resolve(); return response.promise; } return true; } });
+  const refresh = h.lifecycle.refresh(); await entered.promise;
+  assert.equal(await h.lifecycle.markCompleting(h.state.stored, h.lifecycle.capture()), true);
+  response.resolve(true); await refresh;
+  assert.equal(h.state.starts, 0);
+  assert.equal(h.state.stored.completionPending, true);
+  assert.equal(h.state.published.session.completionPending, true);
+});
+
+test('a delayed closed lookup cannot discard a new duty activated under the same account', async () => {
+  const entered = deferred(), response = deferred(); const checked = [];
+  const h = setup({ async isSessionActive(session) { checked.push(session.sessionId); if (checked.length === 1) { entered.resolve(); return response.promise; } return true; } });
+  const refresh = h.lifecycle.refresh(); await entered.promise;
+  assert.equal(await h.lifecycle.activate({ driverId: 'driver-a', sessionId: 'new-duty' }, h.lifecycle.capture()), true);
+  response.resolve(false); await refresh;
+  assert.equal(h.state.stored.sessionId, 'new-duty');
+  assert.equal(h.state.published.session.sessionId, 'new-duty');
+  assert.equal(h.state.stops, 0);
+  assert.deepEqual(checked, ['duty-a', 'new-duty']);
+});
+
+test('a delayed lookup error cannot stop a new duty activated under the same account', async () => {
+  const entered = deferred(), response = deferred(); let reads = 0;
+  const h = setup({ async isSessionActive() { if (++reads === 1) { entered.resolve(); await response.promise; throw new Error('old request failed'); } return true; } });
+  const refresh = h.lifecycle.refresh(); await entered.promise;
+  assert.equal(await h.lifecycle.activate({ driverId: 'driver-a', sessionId: 'new-duty' }, h.lifecycle.capture()), true);
+  response.resolve(); await refresh;
+  assert.equal(h.state.stops, 0);
+  assert.equal(h.state.stored.sessionId, 'new-duty');
+  assert.equal(h.state.published.session.sessionId, 'new-duty');
+});
+
+test('a delayed active lookup cannot republish a duty whose completion was already cleared', async () => {
+  const entered = deferred(), response = deferred();
+  const h = setup({ async isSessionActive() { entered.resolve(); return response.promise; } });
+  const session = h.state.stored;
+  const refresh = h.lifecycle.refresh(); await entered.promise;
+  assert.equal(await h.lifecycle.clearCompleted(session, h.lifecycle.capture()), true);
+  response.resolve(true); await refresh;
+  assert.equal(h.state.starts, 0); assert.equal(h.state.stored, null);
+  assert.equal(h.state.published.session, null);
+});
+
+test('late completion cleanup cannot delete a different duty or cross sign-out', async () => {
+  const h = setup();
+  const stale = { driverId: 'driver-a', sessionId: 'old-duty' };
+  assert.equal(await h.lifecycle.clearCompleted(stale, h.lifecycle.capture()), false);
+  assert.equal(h.state.stored.sessionId, 'duty-a');
+  const own = h.state.stored, valid = h.lifecycle.capture();
+  await h.lifecycle.clear();
+  assert.equal(await h.lifecycle.clearCompleted(own, valid), false);
+  assert.equal(h.state.stored, null);
+});
+
+test('sign-out during completion cleanup lookup prevents its delayed result from writing', async () => {
+  const entered = deferred(), read = deferred(); const writes = [];
+  const h = setup({ async readSession() { entered.resolve(); return read.promise; }, async writeSession(session) { writes.push(session); h.state.stored = session; } });
+  const old = h.state.stored;
+  const cleanup = h.lifecycle.clearCompleted(old, h.lifecycle.capture());
+  await entered.promise; const clearing = h.lifecycle.clear(); read.resolve(old);
+  assert.equal(await cleanup, false); await clearing;
+  assert.deepEqual(writes, [null]);
+});
+
+test('completion cleanup storage failure retains the duty and a later retry can complete', async () => {
+  let fail = true;
+  const h = setup({ async writeSession(session) { if (fail) throw new Error('disk unavailable'); h.state.stored = session; } });
+  const old = h.state.stored; old.completionPending = true;
+  await assert.rejects(h.lifecycle.clearCompleted(old, h.lifecycle.capture()), /disk unavailable/);
+  assert.equal(h.state.stored.completionPending, true);
+  fail = false;
+  assert.equal(await h.lifecycle.clearCompleted(old, h.lifecycle.capture()), true);
+  assert.equal(h.state.stored, null);
+});
