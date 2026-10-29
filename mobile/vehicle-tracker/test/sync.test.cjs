@@ -106,6 +106,7 @@ test('failed upload and late queued points never close the server duty or clear 
       async stopTracking() { calls.push('stop'); },
       async flushQueue() { if (!late) throw new Error('offline'); return 1; },
       async hasPendingPoints() { return late; },
+      async markCompletionPending() { calls.push('pending'); },
       async endSession() { calls.push('end'); },
       async clearSession() { calls.push('clear'); },
     }), /勤務尚未結束/);
@@ -119,10 +120,57 @@ test('duty completes only after successful upload; server failure preserves loca
       async stopTracking() { calls.push('stop'); },
       async flushQueue() { calls.push('flush'); return 1; },
       async hasPendingPoints(id) { assert.equal(id, 's'); return false; },
+      async markCompletionPending() { calls.push('pending'); },
       async endSession(id) { assert.equal(id, 's'); calls.push('end'); if (fail) throw new Error('offline'); },
       async clearSession() { calls.push('clear'); },
     });
     if (fail) await assert.rejects(operation); else await operation;
-    assert.deepEqual(calls, fail ? ['stop', 'flush', 'end'] : ['stop', 'flush', 'end', 'clear']);
+    assert.deepEqual(calls, fail ? ['stop', 'flush', 'pending', 'end'] : ['stop', 'flush', 'pending', 'end', 'clear']);
   }
+});
+
+test('failed persistence of completion intent never sends the server end request', async () => {
+  let ended = false, cleared = false;
+  await assert.rejects(completeTrackingDuty({ sessionId: 's' }, {
+    async stopTracking() {}, async flushQueue() { return 0; }, async hasPendingPoints() { return false; },
+    async markCompletionPending() { throw new Error('disk full'); },
+    async endSession() { ended = true; }, async clearSession() { cleared = true; },
+  }), /disk full/);
+  assert.equal(ended, false); assert.equal(cleared, false);
+});
+
+test('server duty reconciliation scopes the lookup to session and driver and fails closed', async () => {
+  for (const [data, error, expected] of [[{ status: 'active' }, null, true], [{ status: 'ended' }, null, false], [null, null, false], [null, { code: 'offline' }, 'reject']]) {
+    const filters = [];
+    const q = { select(columns) { assert.equal(columns, 'status'); return q; }, eq(key, value) { filters.push([key, value]); return q; }, async maybeSingle() { return { data, error }; } };
+    const api = load('src/sync.ts', { './supabase': { supabase: { from(table) { assert.equal(table, 'vehicle_tracking_sessions'); return q; } } }, './storage': {} });
+    const result = api.isTrackingSessionActive({ sessionId: 'duty-a', driverId: 'driver-a' });
+    if (expected === 'reject') await assert.rejects(result, /暫時無法確認勤務狀態/);
+    else assert.equal(await result, expected);
+    assert.deepEqual(filters, [['session_id', 'duty-a'], ['driver_id', 'driver-a']]);
+  }
+});
+
+test('completion retry accepts a verified ended duty but never a missing or unreadable duty', async () => {
+  for (const [status, readError, pass] of [['ended', null, true], ['active', null, false], [null, null, false], ['ended', { code: 'offline' }, false]]) {
+    const calls = [];
+    const api = load('src/sync.ts', { './storage': {}, './supabase': { supabase: { from() {
+      let update = false; const filters = [];
+      const q = { update() { update = true; return q; }, select() { return q; }, eq(k,v) { filters.push([k,v]); return q; }, async maybeSingle() {
+        calls.push({ update, filters }); return update ? { data: null, error: null } : { data: status ? { status } : null, error: readError };
+      } }; return q;
+    } } } });
+    const operation = api.endTrackingSession({ sessionId: 'duty-a', driverId: 'driver-a' });
+    if (pass) await operation; else await assert.rejects(operation, /勤務結束狀態/);
+    assert.deepEqual(calls[0].filters, [['session_id', 'duty-a'], ['driver_id', 'driver-a'], ['status', 'active']]);
+    assert.deepEqual(calls[1].filters, [['session_id', 'duty-a'], ['driver_id', 'driver-a']]);
+  }
+});
+
+test('a lost end response is not treated as acknowledged even if the server may have committed it', async () => {
+  let requests = 0;
+  const q = { update() { return q; }, select() { return q; }, eq() { return q; }, async maybeSingle() { return { data: null, error: { message: 'lost response' } }; } };
+  const api = load('src/sync.ts', { './storage': {}, './supabase': { supabase: { from() { requests++; return q; } } } });
+  await assert.rejects(api.endTrackingSession({ sessionId: 'duty-a', driverId: 'driver-a' }), /勤務結束狀態/);
+  assert.equal(requests, 1);
 });

@@ -1,5 +1,28 @@
 import { supabase } from './supabase';
 import { readLocationQueue, removeQueuedLocationPoints } from './storage';
+import type { ActiveTrackingSession } from './types';
+
+/** A persisted local duty may outlive a lost completion response or an administrative close. */
+export async function isTrackingSessionActive(session: ActiveTrackingSession) {
+  const { data, error } = await supabase.from('vehicle_tracking_sessions')
+    .select('status').eq('session_id', session.sessionId).eq('driver_id', session.driverId).maybeSingle();
+  if (error) throw new Error('暫時無法確認勤務狀態，定位已暫停；請恢復網路後重新開啟程式。手機資料仍保留。');
+  return data?.status === 'active';
+}
+
+/** Retry safely after a committed update loses its response; never rewrite its original end time. */
+export async function endTrackingSession(session: ActiveTrackingSession) {
+  const message = '勤務結束狀態暫時無法回傳，請保持網路後再試一次。';
+  const { data, error } = await supabase.from('vehicle_tracking_sessions')
+    .update({ status: 'ended', ended_at: new Date().toISOString(), ended_reason: '駕駛人結束勤務' })
+    .eq('session_id', session.sessionId).eq('driver_id', session.driverId).eq('status', 'active')
+    .select('session_id').maybeSingle();
+  if (error) throw new Error(message);
+  if (data) return;
+  const { data: existing, error: readError } = await supabase.from('vehicle_tracking_sessions')
+    .select('status').eq('session_id', session.sessionId).eq('driver_id', session.driverId).maybeSingle();
+  if (readError || existing?.status !== 'ended') throw new Error(message);
+}
 
 const UPLOAD_BATCH_SIZE = 100;
 let pendingUpload: Promise<number> | null = null;

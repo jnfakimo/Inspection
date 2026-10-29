@@ -4,6 +4,7 @@ type Dependencies = {
   stopTracking(): Promise<void>;
   flushQueue(): Promise<number>;
   hasPendingPoints(sessionId: string): Promise<boolean>;
+  markCompletionPending(): Promise<void>;
   endSession(sessionId: string): Promise<void>;
   clearSession(): Promise<void>;
 };
@@ -17,6 +18,8 @@ export async function completeTrackingDuty(session: ActiveTrackingSession, deps:
   } catch {
     throw new Error('定位資料尚未完成補傳，勤務尚未結束。定位已停止，請恢復網路後再次按結束勤務。');
   }
+  // Persist the stop intent before a request that may commit even if its response is lost.
+  await deps.markCompletionPending();
   await deps.endSession(session.sessionId);
   await deps.clearSession();
 }

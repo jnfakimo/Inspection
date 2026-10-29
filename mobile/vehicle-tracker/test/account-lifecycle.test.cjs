@@ -16,6 +16,7 @@ function setup(overrides = {}) {
   const deps = {
     async readAccount() { return { profile: { user_id: 'driver-a' } }; },
     async readSession() { return state.stored; },
+    async isSessionActive() { return true; },
     async writeSession(session) { state.stored = session; },
     async startTracking() { state.starts++; },
     async stopTracking() { state.stops++; },
@@ -81,6 +82,55 @@ test('temporary account read failure does not discard offline duty data', async 
   const h = setup({ async readAccount() { throw new Error('offline'); } });
   await assert.rejects(h.lifecycle.refresh(), /offline/);
   assert.equal(h.state.stored.sessionId, 'duty-a'); assert.equal(h.state.published, null);
+});
+
+test('a server-ended duty after a lost completion response is not restarted', async () => {
+  const h = setup({ async isSessionActive(session) { assert.equal(session.sessionId, 'duty-a'); return false; } });
+  await h.lifecycle.refresh();
+  assert.equal(h.state.starts, 0);
+  assert.equal(h.state.stops, 1);
+  assert.equal(h.state.stored, null);
+  assert.equal(h.state.published.session, null);
+  assert.match(h.state.warnings[0], /勤務已結束或已無法使用/);
+});
+
+test('completion pending survives restart without resuming even when server is still active', async () => {
+  const h = setup(); h.state.stored.completionPending = true;
+  await h.lifecycle.refresh();
+  assert.equal(h.state.starts, 0); assert.equal(h.state.stops, 1);
+  assert.equal(h.state.stored.completionPending, true);
+  assert.match(h.state.warnings[0], /請再次按結束勤務/);
+});
+
+test('completion intent is serialized with sign-out and cannot restore a signed-out duty', async () => {
+  const entered = deferred(), release = deferred();
+  const h = setup({ async writeSession(session) { if (session?.completionPending) { entered.resolve(); await release.promise; } h.state.stored = session; } });
+  const mark = h.lifecycle.markCompleting(h.state.stored, h.lifecycle.capture());
+  await entered.promise; const clearing = h.lifecycle.clear(); release.resolve();
+  assert.equal(await mark, false); await clearing;
+  assert.equal(h.state.stored, null);
+});
+
+test('failed server duty lookup pauses tracking and preserves the local duty for retry', async () => {
+  let fail = true;
+  const h = setup({ async isSessionActive() { if (fail) throw new Error('lookup unavailable'); return true; } });
+  await assert.rejects(h.lifecycle.refresh(), /lookup unavailable/);
+  assert.equal(h.state.stored.sessionId, 'duty-a');
+  assert.equal(h.state.starts, 0); assert.equal(h.state.stops, 1);
+  fail = false; await h.lifecycle.refresh();
+  assert.equal(h.state.starts, 1);
+  assert.equal(h.state.published.session.sessionId, 'duty-a');
+});
+
+test('late server duty lookup cannot clear or restart a newer signed-in duty', async () => {
+  const entered = deferred(), response = deferred(); let lookups = 0;
+  const h = setup({ async isSessionActive() { if (++lookups === 1) { entered.resolve(); return response.promise; } return true; } });
+  const older = h.lifecycle.refresh(); await entered.promise;
+  h.state.stored = { driverId: 'driver-a', sessionId: 'new-duty' };
+  await h.lifecycle.refresh(); response.resolve(false); await older;
+  assert.equal(h.state.starts, 1); assert.equal(h.state.stops, 0);
+  assert.equal(h.state.stored.sessionId, 'new-duty');
+  assert.equal(h.state.published.session.sessionId, 'new-duty');
 });
 
 test('a duty creation response received after sign-out cannot persist or start tracking', async () => {

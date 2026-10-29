@@ -20,7 +20,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const isCurrent = () => !stopped && revision === trackingRevision;
   const collection = (async () => {
     const session = await readActiveSession();
-    if (!session || !isCurrent()) return null;
+    if (!session || session.completionPending || !isCurrent()) return null;
     const locations = (data as { locations?: Location.LocationObject[] }).locations || [];
     const points: QueuedLocationPoint[] = locations.map(location => ({
       client_event_id: Crypto.randomUUID(),

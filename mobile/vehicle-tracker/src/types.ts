@@ -6,6 +6,7 @@ export type ActiveTrackingSession = {
   serviceUuid: string | null;
   advertisedName: string | null;
   platformIdentifier: string | null;
+  completionPending?: boolean;
 };
 
 export type BleMonitorState = {

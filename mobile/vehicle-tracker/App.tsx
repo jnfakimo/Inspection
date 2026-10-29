@@ -23,7 +23,7 @@ import {
   stopBackgroundTracking,
 } from "./src/background-location";
 import { supabase } from "./src/supabase";
-import { flushLocationQueue } from "./src/sync";
+import { flushLocationQueue, isTrackingSessionActive, endTrackingSession } from "./src/sync";
 import {
   readActiveSession,
   readLocationQueue,
@@ -123,6 +123,7 @@ export default function App() {
   lifecycleRef.current ??= createAccountLifecycle({
     readAccount,
     readSession: readActiveSession,
+    isSessionActive: isTrackingSessionActive,
     writeSession: writeActiveSession,
     startTracking: startBackgroundTracking,
     async stopTracking() { stopBleManager(); await stopBackgroundTracking(); },
@@ -326,20 +327,14 @@ export default function App() {
       async hasPendingPoints(sessionId) {
         return (await readLocationQueue()).some(point => point.session_id === sessionId);
       },
-      async endSession(sessionId) {
+      async markCompletionPending() {
+        if (!await lifecycle.markCompleting(active, isCurrentAccount))
+          throw new Error("登入狀態已變更，請重新確認勤務。");
+        setActive({ ...active, completionPending: true });
+      },
+      async endSession() {
         if (!isCurrentAccount()) throw new Error("登入狀態已變更，請重新確認勤務。");
-        const { data, error } = await supabase
-          .from("vehicle_tracking_sessions")
-          .update({
-            status: "ended",
-            ended_at: new Date().toISOString(),
-            ended_reason: "駕駛人結束勤務",
-          })
-          .eq("session_id", sessionId)
-          .select("session_id")
-          .single();
-        if (error || !data)
-          throw new Error("勤務結束狀態暫時無法回傳，請保持網路後再試一次。");
+        await endTrackingSession(active);
       },
       async clearSession() { if (isCurrentAccount()) await writeActiveSession(null); },
     });
@@ -490,7 +485,7 @@ export default function App() {
         <Text style={styles.section}>3. 定位勤務</Text>
         <View style={styles.statusCard}>
           <Text style={styles.statusTitle}>
-            {active ? "定位勤務進行中" : "尚未開始勤務"}
+            {active?.completionPending ? "定位已停止，等待勤務結束確認" : active ? "定位勤務進行中" : "尚未開始勤務"}
           </Text>
           <Text style={styles.statusText}>
             {active

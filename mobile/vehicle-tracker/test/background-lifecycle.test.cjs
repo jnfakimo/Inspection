@@ -113,12 +113,13 @@ test('end duty drains an in-flight location before flushing and closing the serv
     stopTracking: h.stopBackgroundTracking,
     async flushQueue() { order.push('flush'); assert.equal(queue.length, 1); queue = []; return 1; },
     async hasPendingPoints() { return queue.length > 0; },
+    async markCompletionPending() { order.push('pending'); },
     async endSession() { order.push('end'); },
     async clearSession() { order.push('clear'); },
   });
   await turn(); assert.deepEqual(order, []);
   disk.resolve(); await Promise.all([callback, completion]);
-  assert.deepEqual(order, ['persist', 'flush', 'end', 'clear']);
+  assert.deepEqual(order, ['persist', 'flush', 'pending', 'end', 'clear']);
 });
 test('permission response arriving after stop cannot restart native tracking', async () => {
   const entered = deferred(), permission = deferred();
@@ -126,6 +127,12 @@ test('permission response arriving after stop cannot restart native tracking', a
   const starting = h.startBackgroundTracking(); await entered.promise;
   await h.stopBackgroundTracking(); permission.resolve(); await starting;
   assert.equal(h.state.running, false);
+});
+
+test('headless callback after process restart ignores a duty awaiting completion acknowledgement', async () => {
+  const h = setup({ storage: { async readActiveSession() { return { ...session, completionPending: true }; } } });
+  await h.callback();
+  assert.equal(h.state.points.length, 0); assert.equal(h.state.uploads, 0); assert.equal(h.state.ble, 0);
 });
 test('restarting tracking does not reactivate an earlier upload callback', async () => {
   const entered = deferred(), network = deferred();

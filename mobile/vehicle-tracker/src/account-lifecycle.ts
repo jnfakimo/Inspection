@@ -3,6 +3,7 @@ import type { ActiveTrackingSession } from './types';
 type Dependencies<Account extends { profile: { user_id: string } }> = {
   readAccount(): Promise<Account | null>;
   readSession(): Promise<ActiveTrackingSession | null>;
+  isSessionActive(session: ActiveTrackingSession): Promise<boolean>;
   writeSession(session: ActiveTrackingSession | null): Promise<void>;
   startTracking(): Promise<void>;
   stopTracking(): Promise<void>;
@@ -37,6 +38,16 @@ export function createAccountLifecycle<Account extends { profile: { user_id: str
     cancelPending() { revision++; },
     capture() { const current = revision; return () => current === revision; },
     clear,
+    markCompleting(session: ActiveTrackingSession, isCurrent: () => boolean) {
+      return enqueue(async () => {
+        if (!isCurrent()) return false;
+        await deps.stopTracking();
+        if (!isCurrent()) return false;
+        await deps.writeSession({ ...session, completionPending: true });
+        // Sign-out/new activation is serialized behind this write and owns its cleanup.
+        return isCurrent();
+      });
+    },
     activate(session: ActiveTrackingSession, isCurrent: () => boolean) {
       return enqueue(async () => {
         if (!isCurrent()) return false;
@@ -71,6 +82,26 @@ export function createAccountLifecycle<Account extends { profile: { user_id: str
       }
       if (!isCurrent()) return;
       if (session) {
+        let active: boolean;
+        try { active = await deps.isSessionActive(session); }
+        catch (error) {
+          // An unavailable lookup must not erase offline data or resume an unconfirmed duty.
+          if (!isCurrent()) return;
+          await enqueue(async () => { if (isCurrent()) await deps.stopTracking(); });
+          throw error;
+        }
+        if (!isCurrent()) return;
+        if (!active) {
+          await enqueue(async () => { if (isCurrent()) await discardTracking(); });
+          if (!isCurrent()) return;
+          session = null;
+          deps.warn('原勤務已結束或已無法使用，已停止定位；尚未補傳的資料仍保留在手機。');
+        }
+      }
+      if (session?.completionPending) {
+        await enqueue(async () => { if (isCurrent()) await deps.stopTracking(); });
+        if (isCurrent()) deps.warn('勤務結束尚待確認，定位維持停止；請再次按結束勤務。');
+      } else if (session) {
         await enqueue(async () => {
           if (!isCurrent()) return;
           try { await deps.startTracking(); }
