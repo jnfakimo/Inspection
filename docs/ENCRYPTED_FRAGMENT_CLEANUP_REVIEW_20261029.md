@@ -48,3 +48,14 @@
 | 實體抹除及原生崩潰一致性 | 檔案系統／SQLite／Keystore 與硬體 flush 不由 JS 時序測試證明 | 待原生機制完成後，以隔離裝置測試多程序、鎖持有者死亡、斷電、空間不足與升級遷移；iOS 另需 Mac／Xcode／iPhone |
 
 真正的完整修正需要原生儲存協調及相容遷移，不能只加一段 JavaScript 清理迴圈。離線維護也必須證明所有寫入者已停止、備份可恢復且不會重新啟動，單獨 SQLite 交易鎖不足以阻止另一程序之後發布先前寫好的索引；本輪不提供未達此條件的刪除指令。這是程式架構缺口，無需使用者手動刪除資料或更改密碼。
+
+## 最終同提交 CI／CodeQL
+
+修正提交 **ce88c8aa4fef2b7e4911a7699a15f88b1650af2a** 已推送原修正分支並核對遠端 SHA 一致。
+
+- [CI 40834995361](https://github.com/jnfakimo/Inspection/actions/runs/40834995361)：completed／success，6 個工作全數成功；涵蓋應用程式、隔離 PostgreSQL、資安、Signal service、Windows／IIS、Linux Gmail repair 與行動端驗證。
+- 行動端工作 123317596065 原始日誌確認：**79 tests、79 pass、0 fail**，含本輪 13 項及前輪 6 項程序中斷測試；安全補丁／Expo 相容性另 **10 tests、10 pass、0 fail**。型別檢查與 Android／iOS bundle 皆成功。
+- [CodeQL 40834998525](https://github.com/jnfakimo/Inspection/actions/runs/40834998525)：completed／success，headSha 同為上述修正提交；分析 2051808614 的 error 為空、原始 results_count 為 1。分支 open alerts 為 0，#59 維持既有 dismissed／false positive；本輪未新增排除，不將 open 為零說成原始結果零筆。
+- Gitleaks 掃描提交的 2,653 個候選檔案未發現洩密；本次產品檔與測試檔的 G 槽正本／C 槽副本雜湊一致。沒有依賴或密碼政策變更、正式寫入、合併或部署。
+
+此附錄為後續純文件提交，以上 CI 僅對應修正提交，不冒稱已對後續文件 SHA 重跑。完整自動清理仍未結案；測試通過證明讀取修正及反例成立，不證明不安全清理可以上線。
