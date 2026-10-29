@@ -14,6 +14,10 @@
    commit／push／deploy 只在使用者當次明確要求時做。
 5. 不寫入、不 commit：token、API key、service-role key、cookie、session、密碼、私有 signed URL。
 6. 所有使用者看得到的文字是繁體中文；程式碼、指令、檔名維持原文。
+7. **Claude Code 自動檢查**（`.claude/settings.json`、`.claude/hooks/`，2026-10-29 加入）：Claude Code 會在動手前攔截 `git add .`／`-A`、`git commit -a`、force push、`reset --hard`、`clean -f`、stage 機密檔，以及寫入機密樣式（service-role JWT、API key、私鑰）；
+   改 `web/` 的 ts／tsx／css 後自動跑色彩 token、系統頁標題、按鈕規格、下拉空白列檢查，結束前若改過 `web/` ts／tsx 會跑 `tsc`（缺 `node_modules/typescript` 時略過並標示未驗證）。
+   被攔截不是故障：改用逐一列出檔案等正確作法；確屬假資料的機密樣式在該行加 `allow-secret-pattern`。**Codex、OpenCode 不會執行這些 hook**，第 4、5 條仍須自行遵守，CI 是最後防線。
+   修改 hook 後執行 `node .claude/hooks/hooks.test.mjs`。
 
 ## 2. 專案概要與環境
 
@@ -155,6 +159,7 @@
 | 版型／標題 | `test:page-headings`、`test:module-card-standard`、`test:button-standard`、`test:handover-style`、`test:login-layout` |
 | 表單／字型 | `test:input-select-standard`、`test:font-tokens`、`test:css-source-balance` |
 | 資安 | `security:audit`、`test:permission-fail-closed`、`test:schema-contract` |
+| Claude Code hook | `node .claude/hooks/hooks.test.mjs` |
 
 未在瀏覽器實測的視覺項目（A4 實際列印、字體、responsive、科技版對比）一律標「未驗證」。
 
