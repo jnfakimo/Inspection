@@ -116,6 +116,7 @@ export function clearPatrolSession(storage: Storage | null = browserStorage()) {
 }
 
 export async function restorePatrolSession(client: SupabaseClient, now = Date.now(), storage: Storage | null = browserStorage()) {
+  let attempted = false, accepted = false;
   const startedAt = Date.now();
   const moment = () => now + Math.max(0, Date.now() - startedAt);
   const current = patrolSessionState(now, storage);
@@ -126,6 +127,7 @@ export async function restorePatrolSession(client: SupabaseClient, now = Date.no
     const credentials = existing.data.session || await requestSessionCredentials(current.value.user_id);
     const latest = patrolSessionState(moment(), storage);
     if (!credentials || latest.status !== 'valid' || latest.value.user_id !== current.value.user_id) return null;
+    attempted = true;
     const result = await client.auth.setSession({access_token:credentials.access_token,refresh_token:credentials.refresh_token});
     const session = result.data.session;
     if (result.error || !session || session.user.id !== current.value.user_id) {
@@ -135,10 +137,15 @@ export async function restorePatrolSession(client: SupabaseClient, now = Date.no
     const after = patrolSessionState(moment(), storage);
     if (after.status !== 'valid' || after.value.user_id !== session.user.id) return null;
     touchPatrolSession(session, moment(), storage);
+    accepted = true;
     return session;
   } catch {
     markPatrolSessionExpired(storage);
     return null;
+  } finally {
+    if (attempted && !accepted) {
+      try { await client.auth.signOut({ scope: 'local' }); } catch { /* Auth cleanup is best effort. */ }
+    }
   }
 }
 

@@ -24,7 +24,7 @@ GitHub 上 8 筆告警均於 2026-08-25 以 `won't fix` 排除，但基準提交
 | 驗證 | 結果／證據檔 |
 | --- | --- |
 | 完整 `npm test` | pass；`codeql-full-tests-20261029.log` |
-| 新增回歸＋商用稽核測試 | 12/12；`codeql-regression-20261029.log`；已接入 npm test |
+| 新增回歸＋商用稽核測試 | 13/13；`codeql-regression-20261029.log`；已接入 npm test |
 | 巡檢 session 與打卡回歸 | 10/10；含舊永久權杖遷移、登出競態、閒置逾時 |
 | V2 型別與兩支 Edge Function Deno 型別 | pass；`codeql-typecheck-20261029.log`、`codeql-edge-typecheck-20261029.log` |
 | 隔離 V2 webpack 建置 | pass；`publish-frontend-build.log` |
@@ -47,3 +47,7 @@ GitHub 上 8 筆告警均於 2026-08-25 以 `won't fix` 排除，但基準提交
 - GitHub CI／新 CodeQL 結果須以修正後提交的執行紀錄及 SARIF 確認；本文件提交前不預稱雲端通過。分支修正不表示 main／正式環境已套用。
 
 參考：[CodeQL JavaScript 字串安全說明](https://codeql.github.com/codeql-query-help/javascript/js-bad-code-sanitization/)、[MDN BroadcastChannel 同來源與儲存分區限制](https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API)。
+
+### 登出競態補強
+
+後續覆核發現「恢復中登出」即使拒絕巡檢，SDK setSession 仍可能留下登入狀態。V1 恢復期間不採納 SIGNED_IN 來重建橋接，V1／V2 恢復未獲接受時均清除本分頁 SDK session。兩版本回歸直接驗證晚到回應不復活橋接且呼叫本機 signOut；隔離瀏覽器 6 項重新通過。

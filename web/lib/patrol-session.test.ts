@@ -115,7 +115,9 @@ test('舊 V2 巡檢紀錄讀取時只保留身分與期限，永久權杖立即�
 
 test('工作階段恢復期間登出，晚到的 Auth 回應不得重新啟用巡檢',async()=>{
  const storage=new MemoryStorage();const now=7_000_000;startPatrolSession(session(),now,storage);
- const client={auth:{getSession:async()=>({data:{session:session()},error:null}),setSession:async()=>{markPatrolSessionExpired(storage);return {data:{session:session()},error:null};}}} as unknown as SupabaseClient;
+ let signedOut=0;
+ const client={auth:{getSession:async()=>({data:{session:session()},error:null}),setSession:async()=>{markPatrolSessionExpired(storage);return {data:{session:session()},error:null};},signOut:async()=>{signedOut++;return {error:null};}}} as unknown as SupabaseClient;
  assert.equal(await ensurePatrolQrSession(client,null,now,storage),null);
  assert.equal(patrolSessionState(now,storage).status,'expired');
+ assert.equal(signedOut,1);
 });

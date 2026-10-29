@@ -39,3 +39,11 @@ test('V1 巡檢橋接移除舊永久權杖，更新時不延長兩小時上限',
  assert.equal(bridge.update({user:{id:'u1'},access_token:'new-secret',refresh_token:'new-refresh'}),true);assert.equal(bridge.read().valid_until,expires);assert.equal(storage.getItem(key).includes('new-secret'),false);
  bridge.clear();assert.equal(bridge.read(),null);
 });
+
+test('V1 恢復期間登出不被晚到的 SIGNED_IN 復活，並清除已建立的 SDK session',async()=>{
+ const values=new Map(),storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ const context=vm.createContext({window:{},localStorage:storage,console});const source=fs.readFileSync('system/supabase-config.js','utf8');new vm.Script(source.slice(source.indexOf('window.PatrolSessionBridge ='),source.indexOf('window.createDb ='))).runInContext(context);
+ const bridge=context.window.PatrolSessionBridge,s={user:{id:'u1'},access_token:'ephemeral-access',refresh_token:'ephemeral-refresh'};bridge.save(s);let signedOut=0;
+ const client={auth:{getSession:async()=>({data:{session:s},error:null}),setSession:async()=>{bridge.clear();bridge.signedIn(s);return {data:{session:s},error:null};},signOut:async()=>{signedOut++;return {error:null};}}};
+ assert.equal(await bridge.restore(client),null);assert.equal(bridge.read(),null);assert.equal(signedOut,1);
+});

@@ -111,7 +111,7 @@ window.invokeEdgeAction = async function (client, functionName, body) {
 
 window.PatrolSessionBridge = (function () {
   var KEY='beinongPatrolTrustedSessionV1',CHANNEL='inspection-patrol-session-v1';
-  var MAX_AGE_MS=2*60*60*1000,provider=null;
+  var MAX_AGE_MS=2*60*60*1000,provider=null,restoring=false;
   function clear(){try{localStorage.removeItem(KEY);}catch(_e){}}
   function write(value){localStorage.setItem(KEY,JSON.stringify({version:1,user_id:value.user_id,valid_until:value.valid_until}));}
   function read(){
@@ -155,21 +155,24 @@ window.PatrolSessionBridge = (function () {
     });
   }
   async function restore(client){
-    var value=read();if(!value||!client||!client.auth)return null;
+    var value=read();if(!value||!client||!client.auth||restoring)return null;
+    var attempted=false,accepted=false;restoring=true;
     try{
       var current=await client.auth.getSession(),credentials=current.data&&current.data.session;
       if(credentials&&credentials.user.id!==value.user_id)return null;
       if(!credentials)credentials=await request(value.user_id);
       var latest=read();if(!credentials||!latest||latest.user_id!==value.user_id)return null;
+      attempted=true;
       var result=await client.auth.setSession({access_token:credentials.access_token,refresh_token:credentials.refresh_token});
       var session=result&&result.data&&result.data.session;
       latest=read();
       if(result.error||!session||!session.user||session.user.id!==value.user_id||!latest||latest.user_id!==value.user_id){clear();return null;}
-      update(session);return session;
+      update(session);accepted=true;return session;
     }catch(_e){clear();return null;}
+    finally{restoring=false;if(attempted&&!accepted){try{await client.auth.signOut({scope:"local"});}catch(_e){}clear();}}
   }
   read(); // Migrate old permanent token copies to token-free metadata only.
-  return {save:save,update:update,restore:restore,clear:clear,read:read,install:install,maxAgeMs:MAX_AGE_MS};
+  return {signedIn:function(session){if(!restoring)save(session);},save:save,update:update,restore:restore,clear:clear,read:read,install:install,maxAgeMs:MAX_AGE_MS};
 })();
 
 window.createDb = function (options) {
@@ -180,7 +183,7 @@ window.createDb = function (options) {
   if(client.auth&&client.auth.onAuthStateChange){
     client.auth.onAuthStateChange(function(event,session){
       if(event==='SIGNED_OUT'||event==='USER_DELETED')window.PatrolSessionBridge.clear();
-      else if(session&&event==='SIGNED_IN')window.PatrolSessionBridge.save(session);
+      else if(session&&event==='SIGNED_IN')window.PatrolSessionBridge.signedIn(session);
       else if(session&&['INITIAL_SESSION','TOKEN_REFRESHED','USER_UPDATED','MFA_CHALLENGE_VERIFIED'].indexOf(event)>=0)window.PatrolSessionBridge.update(session);
     });
   }
