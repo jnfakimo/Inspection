@@ -98,4 +98,55 @@ ok('Stop：沒改 web ts → 靜默放行', () => {
 });
 fs.rmSync(edited, { force: true });
 
+console.log('security-check');
+const secCheck = (relPath, content) => {
+  const abs = path.join(root, relPath);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, content);
+  try {
+    return run('security-check.mjs', { tool_name: 'Edit', tool_input: { file_path: abs } });
+  } finally {
+    fs.rmSync(abs, { force: true });
+  }
+};
+const SEC_WEB = 'web/lib/__sec-test.ts';
+const SEC_SQL = 'supabase/migrations/99990101000000_sec_test.sql';
+const evalCall = ['ev', 'al(code);'].join('');
+ok('非程式檔案：略過', () => assert.equal(post(path.join(root, 'docs', 'x.md')).code, 0));
+ok('乾淨的 web 檔案：通過且靜默', () => {
+  const r = secCheck(SEC_WEB, 'export const a = 1;\n');
+  assert.equal(r.code, 0);
+  assert.equal(r.out.trim(), '');
+});
+ok('web 出現 service_role：擋下', () => {
+  const r = secCheck(SEC_WEB, `export const k = process.env.${['SUPABASE_SERVICE', 'ROLE_KEY'].join('_')};\n`);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /service_role/);
+});
+ok('NEXT_PUBLIC_ 變數名含 TOKEN：擋下', () => assert.equal(secCheck(SEC_WEB, `export const t = process.env.NEXT_PUBLIC_${'API'}_TOKEN;\n`).code, 2));
+ok('eval：由 security-design-audit 擋下', () => {
+  const r = secCheck(SEC_WEB, `${evalCall}\n`);
+  assert.equal(r.code, 2);
+  assert.match(r.out, /動態程式碼執行/);
+});
+ok('innerHTML 賦值：提醒但不擋', () => {
+  const r = secCheck(SEC_WEB, 'host.innerHTML = userInput;\n');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /additionalContext/);
+});
+ok('innerHTML 清空：不提醒', () => assert.equal(secCheck(SEC_WEB, "host.innerHTML = '';\n").out.trim(), ''));
+ok('migration 建表沒開 RLS：擋下', () => {
+  const r = secCheck(SEC_SQL, 'begin;\ncreate table public.sec_test (id int);\ncommit;\n');
+  assert.equal(r.code, 2);
+  assert.match(r.out, /RLS/);
+});
+ok('migration 建表且開 RLS：通過', () => assert.equal(secCheck(SEC_SQL, 'begin;\ncreate table public.sec_test (id int);\nalter table public.sec_test enable row level security;\ncommit;\n').code, 0));
+ok('migration 註解裡的 RLS 不算數：擋下', () => assert.equal(secCheck(SEC_SQL, 'create table public.sec_test (id int);\n-- alter table public.sec_test enable row level security;\n').code, 2));
+ok('security definer 缺 search_path：擋下', () => {
+  const r = secCheck(SEC_SQL, 'create or replace function public.sec_fn() returns int language sql security definer as $$ select 1 $$;\n');
+  assert.equal(r.code, 2);
+  assert.match(r.out, /search_path/);
+});
+ok('security definer 有 search_path：通過', () => assert.equal(secCheck(SEC_SQL, "create or replace function public.sec_fn() returns int language sql security definer set search_path = public as $$ select 1 $$;\n").code, 0));
+
 console.log(`\n${passed} 項 hook 測試通過`);

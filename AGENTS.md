@@ -16,6 +16,8 @@
 6. 所有使用者看得到的文字是繁體中文；程式碼、指令、檔名維持原文。
 7. **Claude Code 自動檢查**（`.claude/settings.json`、`.claude/hooks/`，2026-10-29 加入）：Claude Code 會在動手前攔截 `git add .`／`-A`、`git commit -a`、force push、`reset --hard`、`clean -f`、stage 機密檔，以及寫入機密樣式（service-role JWT、API key、私鑰）；
    改 `web/` 的 ts／tsx／css 後自動跑色彩 token、系統頁標題、按鈕規格、下拉空白列檢查，結束前若改過 `web/` ts／tsx 會跑 `tsc`（缺 `node_modules/typescript` 時略過並標示未驗證）。
+   改 `web/`、`supabase/`、`system/`、`backend/` 的程式或 SQL 後另跑資安檢查（`.claude/hooks/security-check.mjs`）：重用 `npm run security:audit`（有錯誤就擋，只提醒剛改檔案的警告），並補擋
+   web 端出現 service_role、`NEXT_PUBLIC_` 變數名含 SECRET／SERVICE／PRIVATE／PASSWORD／TOKEN、migration 建表沒開 RLS、`security definer` 函式缺 `set search_path`，對 innerHTML／outerHTML／insertAdjacentHTML 賦值則提醒。
    被攔截不是故障：改用逐一列出檔案等正確作法；確屬假資料的機密樣式在該行加 `allow-secret-pattern`。**Codex、OpenCode 不會執行這些 hook**，第 4、5 條仍須自行遵守，CI 是最後防線。
    修改 hook 後執行 `node .claude/hooks/hooks.test.mjs`。
 8. **Git hook（Codex、Claude Code、手動操作都適用）**（`.githooks/`，2026-10-29 加入）：`pre-commit` 擋機密檔名與已 stage 內容中的機密樣式（與 Claude hook 共用 `.claude/hooks/secret-patterns.mjs`），
