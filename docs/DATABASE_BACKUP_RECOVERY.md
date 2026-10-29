@@ -173,3 +173,8 @@ SUPABASE_PROJECT_REF=<target-ref> SUPABASE_ACCESS_TOKEN=<token> node tools/datab
 verifyBackup 現在拒絕 manifest 清單外檔案、重複資料表、總數不符、非法名稱與符號連結。還原明列非 generated 欄位，衍生值交由 PostgreSQL 重算，identity 保留原值並在交易與表鎖內同步序號；既有較大序號不回退。預設 dry-run 與明確 project ref／execute／confirm 不變。
 
 10 項備份回歸及 PostgreSQL 17 實際 SQL 驗證通過。另以隔離 pg_dump 與資料卷完成 Auth/API/Storage 復原；該流程不是正式備份排程，也沒有把 Auth 加入本工具備份範圍。同叢集空庫復原不能代替異機重建或正式 RPO/RTO 驗收。詳見 [本輪報告](ISOLATED_REMAINING_VERIFICATION_20261029.md)。
+
+
+### 2026-10-29 獨立叢集補驗與角色還原注意事項
+
+新增 Storage 根目錄 lstat，拒絕根目錄 junction／符號連結。隔離 PostgreSQL 17 已完成新 initdb 叢集、獨立資料卷、無網路的邏輯庫及角色還原；Auth／角色密碼雜湊、成員關係與 grantor 均相符，重啟後原測試密碼 crypt 核對通過。PostgreSQL 17 的 GRANTED BY 還原必須保留來源角色管理權關係；本次以來源同名 bootstrap 超級使用者初始化，僅略過 CREATE 該已存在角色，其他 ALTER／GRANT 全保留並遇錯即停。不忽略還原錯誤，不套用到正式庫。這不是異機／正式 RPO/RTO 或完整服務恢復證明，見 ISOLATED_FOLLOWUP_20261029.md。

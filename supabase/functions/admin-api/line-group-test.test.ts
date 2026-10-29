@@ -99,11 +99,12 @@ test("LINE adapter does not read provider response bodies or expose fetch errors
     text: LINE_GROUP_TEST_MESSAGE,
     fetcher: async () => {
       providerResponse = new Response("synthetic private provider detail", { status: 401 });
+      providerResponse.text = async () => { throw new Error("provider body must not be read"); };
       return providerResponse;
     },
   });
   assert.deepEqual(failed, { ok: false, status: 401, acceptedRequestId: null });
-  assert.equal(await providerResponse?.text(), "synthetic private provider detail");
+  assert.equal(providerResponse?.bodyUsed, true); // Unused provider stream is cancelled, not retained.
 
   const networkFailure = await sendLineTextMessage({
     token: "synthetic-test-token",
