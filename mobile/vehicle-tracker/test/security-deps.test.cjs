@@ -12,6 +12,20 @@ const server = path.join(path.dirname(cliPath), 'build/src/start/server');
 const { PluginSchema, DevToolsPluginOutputSchema } = require(path.join(server, 'DevToolsPlugin.schema.js'));
 const { createMCPDevToolsExtensionSchema } = require(path.join(server, 'createMCPDevToolsExtensionSchema.js'));
 
+test('generated Android manifest permits persisted background location jobs without enabling backup', () => {
+  const { spawnSync } = require('node:child_process');
+  const cli = path.join(path.dirname(req.resolve('expo/package.json')), 'bin/cli');
+  const result = spawnSync(process.execPath, [cli, 'config', '--type', 'introspect', '--json'], {
+    cwd: path.resolve(__dirname, '..'), encoding: 'utf8', timeout: 30000,
+    env: { ...process.env, CI: '1', EXPO_OFFLINE: '1', EXPO_NO_DOTENV: '1', EXPO_NO_TELEMETRY: '1', EXPO_PUBLIC_SUPABASE_URL: 'https://example.invalid', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'offline-synthetic-placeholder' },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const manifest = JSON.parse(result.stdout)._internal.modResults.android.manifest.manifest;
+  const permissions = manifest['uses-permission'].map(permission => permission.$['android:name']);
+  assert.ok(permissions.includes('android.permission.RECEIVE_BOOT_COMPLETED'), 'TaskManager persists jobs; Android rejects them without this manifest permission');
+  assert.equal(String(manifest.application[0].$['android:allowBackup']), 'false');
+});
+
 test('all supported Expo commands check the mitigation even when lifecycle scripts are disabled', () => {
   const fs = require('node:fs');
   const { spawnSync } = require('node:child_process');

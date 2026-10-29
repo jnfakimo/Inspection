@@ -76,3 +76,6 @@ Codex 本輪唯一寫入者。已建立 WSL／KVM Android API 35 隔離模擬器
 ## 2026-10-29 低風險依賴逐項複核
 
 Codex 本輪唯一寫入者。7 low 均由 deepmerge 同一公告傳遞至 Expo 工具鏈，上游仍無修補版；同主版與最新跨主版 SDK 仍引用受影響依賴，audit 建議退回 SDK 51 不安全，未套用。已將補丁檢查內嵌於六個啟動／建置／型別指令，防止忽略 lifecycle scripts 後使用未修補依賴，CI 雙平台 bundle 同步使用守門指令。乾淨 npm ci、9 項安全回歸、25 項儲存／生命週期、typecheck、Android／iOS bundle、Gitleaks 通過；audit 仍 7 low、0 moderate/high/critical。逐項原因、補償控制、反例與待上游條件見 docs/LOW_DEPENDENCY_REVIEW_20261029.md。R-11 不結案；正式資料、密碼政策不變，推送同一修正分支，未部署或合併。CI／CodeQL 以本次提交回讀結果為準。
+## 2026-10-29 背景定位與離線勤務補驗
+
+Codex 本輪唯一寫入者。修正不同駕駛離線點混批阻塞、補傳失敗仍關閉勤務，以及 Android 真實定位回呼因缺 RECEIVE_BOOT_COMPLETED 而閃退。新增身分過濾／批次核對／補傳共用、結束前補傳與實際更新列確認、Android manifest 權限與生成檢查。32 項儲存／生命週期／補傳回歸、10 項安全／manifest 回歸、8 項 BLE、2 項 App 畫面、6 項真實隔離 API、型別與雙平台 bundle 通過；重建 APK 後 Google API 35 模擬器實際收到位置，鎖屏／Doze／停止與清理五項補驗通過。見 docs/TRACKING_FOLLOWUP_VERIFICATION_20261029.md，內列真正需要實機、Mac、正式主機唯讀權限、外部通知授權、異機及組織核准的項目。密碼政策、正式資料與 R-11 列管不變，提交推送同一修正分支，未合併／部署；CI／CodeQL 依提交回讀。

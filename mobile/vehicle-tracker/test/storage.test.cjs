@@ -258,14 +258,27 @@ test('temporary keychain failure can retry and a lost key never returns cipherte
 
 test('offline retry keeps unacknowledged points and points queued during upload', async () => {
   disk.clear();
-  const point = id => ({ client_event_id: id, recorded_at: new Date().toISOString(), latitude: 25.1 });
+  const point = id => ({ client_event_id: id, session_id: 's', recorded_by: 'driver', recorded_at: new Date().toISOString(), latitude: 25.1 });
   await storage.enqueueLocationPoints(Array.from({ length: 101 }, (_, i) => point(`point-${i}`)));
   let calls = 0;
   let fail = true;
   const accepted = new Set();
   const sync = loadTs('src/sync.ts', {
     './storage': storage,
-    './supabase': { supabase: { from(table) {
+    './supabase': { supabase: {
+      auth: {
+        async getUser() { return { data: { user: { id: 'auth-driver' } }, error: null }; },
+        async getSession() { return { data: { session: { user: { id: 'auth-driver' } } }, error: null }; },
+      },
+      from(table) {
+      if (table === 'vehicle_tracking_sessions') {
+        const query = { select() { return query; }, eq() { return query; }, then(resolve) { return Promise.resolve({ data: [{ session_id: 's' }], error: null }).then(resolve); } };
+        return query;
+      }
+      if (table === 'users') {
+        const query = { select() { return query; }, eq() { return query; }, async single() { return { data: { user_id: 'driver' }, error: null }; } };
+        return query;
+      }
       assert.equal(table, 'vehicle_location_points');
       return { async upsert(batch, options) {
         assert.deepEqual(options, { onConflict: 'client_event_id', ignoreDuplicates: true });

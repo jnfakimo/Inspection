@@ -12,6 +12,7 @@ import {
 import Constants from "expo-constants";
 import { configurationError } from "./src/config";
 import { createAccountLifecycle } from "./src/account-lifecycle";
+import { completeTrackingDuty } from "./src/duty-completion";
 import {
   matchesRegisteredDevice,
   scanNearbyDevices,
@@ -318,19 +319,31 @@ export default function App() {
 
   async function endDuty() {
     if (!active) return;
-    await stopBackgroundTracking();
-    await flushLocationQueue().catch(() => undefined);
-    const { error } = await supabase
-      .from("vehicle_tracking_sessions")
-      .update({
-        status: "ended",
-        ended_at: new Date().toISOString(),
-        ended_reason: "駕駛人結束勤務",
-      })
-      .eq("session_id", active.sessionId);
-    if (error)
-      throw new Error("勤務結束狀態暫時無法回傳，請保持網路後再試一次。");
-    await writeActiveSession(null);
+    const isCurrentAccount = lifecycle.capture();
+    await completeTrackingDuty(active, {
+      async stopTracking() { stopBleManager(); await stopBackgroundTracking(); },
+      flushQueue: flushLocationQueue,
+      async hasPendingPoints(sessionId) {
+        return (await readLocationQueue()).some(point => point.session_id === sessionId);
+      },
+      async endSession(sessionId) {
+        if (!isCurrentAccount()) throw new Error("登入狀態已變更，請重新確認勤務。");
+        const { data, error } = await supabase
+          .from("vehicle_tracking_sessions")
+          .update({
+            status: "ended",
+            ended_at: new Date().toISOString(),
+            ended_reason: "駕駛人結束勤務",
+          })
+          .eq("session_id", sessionId)
+          .select("session_id")
+          .single();
+        if (error || !data)
+          throw new Error("勤務結束狀態暫時無法回傳，請保持網路後再試一次。");
+      },
+      async clearSession() { if (isCurrentAccount()) await writeActiveSession(null); },
+    });
+    if (!isCurrentAccount()) return;
     setActive(null);
     setMatchedBleId("");
     setNotice("勤務已結束。");
