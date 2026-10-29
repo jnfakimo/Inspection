@@ -163,6 +163,21 @@ test('invalid manifest or failed authentication never triggers orphan collection
   await assert.rejects(store.getItem(key)); assert.ok(disk.has(orphan));
 });
 
+test('empty corrupt index is not mistaken for an absent record during collection', async () => {
+  disk.clear();
+  const store = independentEncryptedStore({ ...asyncStorage, async getItem(name) {
+    // Match the Android JS bridge, including its empty-string normalization.
+    return (await asyncStorage.getItem(name)) || null;
+  } }, serialCoordinator());
+  const key = 'gc-empty-index';
+  await store.setItem(key, '完整內容'.repeat(60_000));
+  disk.set('encrypted_v1:' + key, '');
+  disk.set(key, '不能回退的舊明文');
+  const before = [...disk];
+  await assert.rejects(store.getItem(key), /無法安全清理/);
+  assert.deepEqual([...disk], before);
+});
+
 test('interrupted cleanup is idempotent and does not remove live chunks', async () => {
   disk.clear();
   const key = 'gc-cleanup-error';

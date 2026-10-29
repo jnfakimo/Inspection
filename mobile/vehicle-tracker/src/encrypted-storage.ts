@@ -26,13 +26,17 @@ async function collectUnreferencedChunks(key: string): Promise<void> {
   const ownsChunk = (name: string) => name.startsWith(chunkPrefix)
     && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}:(?:0|[1-9][0-9]{0,2})$/i.test(name.slice(chunkPrefix.length))
     && Number(name.slice(name.lastIndexOf(':') + 1)) < MAX_CHUNKS;
-  const referenced = chunkKeys(key, await AsyncStorage.getItem(indexKey));
+  const allKeys = await AsyncStorage.getAllKeys();
+  const stored = await AsyncStorage.getItem(indexKey);
+  // Android's getItem normalizes an empty string to null; key presence distinguishes corruption.
+  if (stored === '' || (stored === null && allKeys.includes(indexKey))) throw new Error('加密資料索引無法安全清理');
+  const referenced = chunkKeys(key, stored);
   // An unfamiliar/corrupt manifest cannot grant deletion authority.
   if (!referenced.every(ownsChunk) || new Set(referenced).size !== referenced.length) {
     throw new Error('加密資料索引無法安全清理');
   }
   const live = new Set(referenced);
-  const candidates = (await AsyncStorage.getAllKeys()).filter(name => ownsChunk(name) && !live.has(name));
+  const candidates = allKeys.filter(name => ownsChunk(name) && !live.has(name));
   for (let offset = 0; offset < candidates.length; offset += MAX_CHUNKS) {
     await AsyncStorage.multiRemove(candidates.slice(offset, offset + MAX_CHUNKS));
   }
@@ -51,11 +55,16 @@ function chunkKeys(key: string, stored: string | null): string[] {
   return keys;
 }
 
-async function readEncrypted(key: string): Promise<string | null> {
+async function readEncrypted(key: string, coordinated: boolean): Promise<string | null> {
   const indexKey = PREFIX + key;
   for (let attempt = 0; attempt < 3; attempt++) {
     const stored = await AsyncStorage.getItem(indexKey);
-    if (!stored) return null;
+    if (!stored) {
+      if (coordinated && (await AsyncStorage.getAllKeys()).includes(indexKey)) {
+        throw new Error('加密資料索引無法安全清理');
+      }
+      return null;
+    }
     if (stored.startsWith(PREFIX)) return stored;
     const parts = await Promise.all(chunkKeys(key, stored).map(part => AsyncStorage.getItem(part)));
     if (parts.every(part => part !== null)) return parts.join('');
@@ -158,7 +167,7 @@ async function setItemUnlocked(key: string, value: string): Promise<void> {
 export const encryptedStorage = {
   getItem(key: string): Promise<string | null> {
     return withKeyLock(key, async canCollect => {
-      const current = await readEncrypted(key);
+      const current = await readEncrypted(key, canCollect);
       if (current !== null) {
         const plaintext = await decrypt(current);
         // Resume cleanup if the app stopped after publishing ciphertext but before removing legacy plaintext.
