@@ -268,3 +268,8 @@
 ## 2026-10-28 GitHub 修正分支整合
 
 Codex 依使用者要求準備發布本次資安及交接簿修正，以 origin/main 939227464 為基準，保留線上人數、巡檢市場與派車新增功能。行動相依修補、掃描器狀態、報修狀態 migration、主管簽核鏈與機電提示、主管選單排除本人納入；原帳號審核可讀性重構留在原工作樹。密碼政策不變。發布至 codex/inspection-security-handover-20261028，未合併 main、不觸發正式資料庫／前端／Edge 部署。既有隔離驗證及未驗證邊界見 docs/HANDOVER_CLOSEOUT_VERIFICATION_20261028.md 與 SECURITY_FOLLOWUP_20261028.md。整合版檢查結果另記於 docs/GITHUB_PUBLISH_20261028.md。
+
+
+## 2026-10-29 主管選單補驗完成
+
+pass：以獨立 Chromium 與真正隔離 Auth／API 完成主管選單 9 項核對，包含排除本人／跨單位／一般人員、儲存後重開、主管選填、一般人員必填、系統管理員欄位及 390px 手機操作。原主管鏈已還原，未發現需新增產品程式修正。解除先前選單 UI 待驗項目；密碼政策及正式資料不變，未新增正式部署。詳細證據見 docs/SUPERVISOR_SELECTOR_VERIFICATION_20261029.md。其他實機／正式環境與組織證據待辦不受影響。
