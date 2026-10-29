@@ -1,7 +1,7 @@
 # 北農公務車定位手機 App
 
 這是 `SYS-13 公務車定位追蹤系統` 的 iOS／Android 原生 App 原始碼。它不是一般網頁或
-Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 development build 安裝到實體手機。
+Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 development build。可先使用 Android 模擬器補驗原生儲存、登入與權限；BLE／NFC／耗電與廠牌背景限制仍須實體手機。
 
 ## 已實作（不代表已安裝或通過實機驗證）
 
@@ -29,6 +29,8 @@ Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 develo
 目前提供原始碼，沒有已簽署的 iOS 安裝包。GitHub Pages 更新只部署網站，不會把 App 安裝到手機。iOS 需可用的 Apple 簽章與 macOS/Xcode 或已授權雲端建置環境；不應把帳號密碼或簽章密鑰放進 repository。
 
 ## 建置
+
+2026-10-29 已於隔離 Android API 35 模擬器完成原生加密、遷移、分段、權限拒絕／服務啟停、原密碼登入、程序重啟、同簽章更新、Android 重開機與金鑰遺失補驗。修正跨帳號勤務恢復、登出競態、Expo Android 密文介面差異及中斷遷移清理；25 項儲存／生命週期測試通過。測試 APK 使用隔離後端與私有測試入口，沒有正式簽署或發布；iOS 僅 JS bundle，未跑原生模擬器。範圍、證據及需要配合的條件見 [完整報告](../../docs/ANDROID_EMULATOR_VERIFICATION_20261029.md)。
 
 1. 複製 `.env.example` 為 `.env.local`，填入目標環境的公開匿名金鑰；不得填入 service role 金鑰。
 2. 執行 `npm install`。

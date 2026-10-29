@@ -27,10 +27,16 @@ class EncryptionKey {
 class SealedData {
   constructor(iv, ciphertext, tag) { Object.assign(this, { nonce: iv, body: ciphertext, authTag: tag }); }
   static fromParts(iv, body, tag) {
+    // Match Android's actual ByteArray/Int bridge, not its broader TypeScript declaration.
+    assert.ok(tag instanceof Uint8Array, 'Android requires the separate GCM tag as bytes');
     return new SealedData(Buffer.from(iv, 'base64'), Buffer.from(body, 'base64'), Buffer.from(tag, 'base64'));
   }
+  static fromCombined(bytes, { ivLength, tagLength }) {
+    assert.ok(bytes instanceof Uint8Array, 'Android combined payload must be bytes');
+    return new SealedData(Buffer.from(bytes.slice(0, ivLength)), Buffer.from(bytes.slice(ivLength, -tagLength)), Buffer.from(bytes.slice(-tagLength)));
+  }
   async iv() { return this.nonce.toString('base64'); }
-  async ciphertext() { return this.body.toString('base64'); }
+  async ciphertext(options) { return options?.encoding === 'base64' ? this.body.toString('base64') : Uint8Array.from(this.body); }
   async tag() { return this.authTag.toString('base64'); }
 }
 const cryptoMock = {
@@ -89,6 +95,30 @@ test('tampered ciphertext fails closed', async () => {
   record.tag = randomBytes(16).toString('base64');
   disk.set(key, 'encrypted_v1:' + JSON.stringify(record));
   await assert.rejects(encryptedStorage.getItem('tamper'));
+});
+
+test('Android legacy numeric ciphertext stays readable and new writes use Base64 strings', async () => {
+  await encryptedStorage.setItem('android-legacy', '既有原生密文');
+  const key = 'encrypted_v1:android-legacy';
+  const record = JSON.parse(disk.get(key).slice('encrypted_v1:'.length));
+  assert.equal(typeof record.ciphertext, 'string');
+  record.ciphertext = JSON.parse(JSON.stringify(Uint8Array.from(Buffer.from(record.ciphertext, 'base64'))));
+  disk.set(key, 'encrypted_v1:' + JSON.stringify(record));
+  assert.equal(await encryptedStorage.getItem('android-legacy'), '既有原生密文');
+  delete record.ciphertext['0'];
+  disk.set(key, 'encrypted_v1:' + JSON.stringify(record));
+  await assert.rejects(encryptedStorage.getItem('android-legacy'), /格式不正確/);
+});
+
+test('reading committed ciphertext resumes interrupted legacy cleanup only after successful decryption', async () => {
+  await encryptedStorage.setItem('interrupted-migration', 'encrypted value');
+  disk.set('interrupted-migration', 'leftover plaintext');
+  assert.equal(await encryptedStorage.getItem('interrupted-migration'), 'encrypted value');
+  assert.equal(disk.has('interrupted-migration'), false);
+  disk.set('interrupted-migration', 'preserve until ciphertext validated');
+  disk.set('encrypted_v1:interrupted-migration', 'encrypted_v1:broken');
+  await assert.rejects(encryptedStorage.getItem('interrupted-migration'));
+  assert.equal(disk.get('interrupted-migration'), 'preserve until ciphertext validated');
 });
 
 test('large encrypted queue uses atomic chunks and keeps the last valid index on write failure', async () => {

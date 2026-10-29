@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test:storage": "node --test test/storage.test.cjs",
+    "test:storage": "node --test test/storage.test.cjs test/account-lifecycle.test.cjs",
     "postinstall": "node scripts/patch-deepmerge.cjs",
     "test:security-deps": "node scripts/patch-deepmerge.cjs --check && node --test test/security-deps.test.cjs",
     "pretypecheck": "node scripts/patch-deepmerge.cjs --check"
@@ -16,6 +16,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "2.116.0",
+    "base64-js": "1.5.1",
     "expo": "57.0.20",
     "expo-constants": "57.0.17",
     "expo-crypto": "57.0.4",

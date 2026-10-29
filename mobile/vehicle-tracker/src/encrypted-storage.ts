@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AESEncryptionKey, AESSealedData, aesDecryptAsync, aesEncryptAsync, randomUUID } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import { fromByteArray, toByteArray } from 'base64-js';
 
 const KEY_NAME = 'vehicle_tracker_storage_key_v1';
 const PREFIX = 'encrypted_v1:';
@@ -59,7 +60,8 @@ async function encrypt(value: string): Promise<string> {
   const sealed = await aesEncryptAsync(Uint8Array.from(binary, char => char.charCodeAt(0)), await encryptionKey());
   return PREFIX + JSON.stringify({
     iv: await sealed.iv('base64'),
-    ciphertext: await sealed.ciphertext({ encoding: 'base64' }),
+    // Android uses outputFormat internally, not the TS/web encoding option. Request bytes explicitly.
+    ciphertext: fromByteArray(await sealed.ciphertext()),
     tag: await sealed.tag('base64'),
   });
 }
@@ -67,7 +69,29 @@ async function encrypt(value: string): Promise<string> {
 async function decrypt(value: string): Promise<string> {
   if (!value.startsWith(PREFIX)) throw new Error('加密資料格式不正確');
   const { iv, ciphertext, tag } = JSON.parse(value.slice(PREFIX.length));
-  const sealed = AESSealedData.fromParts(iv, ciphertext, tag);
+  // Android's fromParts bridge rejects inputs accepted by its TS declaration.
+  // Reconstruct the authenticated binary payload while preserving the existing stored format.
+  if (typeof tag !== 'string' || tag.length !== 24) throw new Error('加密驗證標籤格式不正確');
+  const authTag = toByteArray(tag);
+  if (authTag.length !== 16) throw new Error('加密驗證標籤長度不正確');
+  if (typeof iv !== 'string') throw new Error('加密資料格式不正確');
+  const nonce = toByteArray(iv);
+  let body: Uint8Array;
+  if (typeof ciphertext === 'string') body = toByteArray(ciphertext);
+  else {
+    // Earlier Android writes serialized a Uint8Array as a numeric-key object. Preserve readable data.
+    if (!ciphertext || typeof ciphertext !== 'object' || Array.isArray(ciphertext)) throw new Error('加密資料格式不正確');
+    const keys = Object.keys(ciphertext);
+    if (!keys.every((key, index) => key === String(index) && Number.isInteger(ciphertext[key]) && ciphertext[key] >= 0 && ciphertext[key] <= 255)) {
+      throw new Error('加密資料格式不正確');
+    }
+    body = Uint8Array.from(keys.map(key => ciphertext[key]));
+  }
+  const combined = new Uint8Array(nonce.length + body.length + authTag.length);
+  combined.set(nonce);
+  combined.set(body, nonce.length);
+  combined.set(authTag, nonce.length + body.length);
+  const sealed = AESSealedData.fromCombined(combined, { ivLength: nonce.length, tagLength: authTag.length });
   const plaintext = await aesDecryptAsync(sealed, await encryptionKey());
   let encoded = '';
   for (const byte of plaintext) encoded += `%${byte.toString(16).padStart(2, '0')}`;
@@ -109,7 +133,12 @@ export const encryptedStorage = {
   getItem(key: string): Promise<string | null> {
     return withKeyLock(key, async () => {
       const current = await readEncrypted(key);
-      if (current !== null) return decrypt(current);
+      if (current !== null) {
+        const plaintext = await decrypt(current);
+        // Resume cleanup if the app stopped after publishing ciphertext but before removing legacy plaintext.
+        await AsyncStorage.removeItem(key);
+        return plaintext;
+      }
       const legacy = await AsyncStorage.getItem(key);
       if (legacy === null) return null;
       // Migrate only after encryption is safely persisted; never silently discard existing data.
