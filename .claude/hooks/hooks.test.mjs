@@ -157,4 +157,18 @@ ok('migration 建 view 沒設 security_invoker 也沒 revoke：擋下', () => {
 ok('migration 建 view 設 security_invoker：通過', () => assert.equal(secCheck(SEC_SQL, 'create view public.sec_v with (security_invoker = true) as select 1 as a;\n').code, 0));
 ok('migration 建 view 並 revoke authenticated：通過', () => assert.equal(secCheck(SEC_SQL, 'create view public.sec_v as select 1 as a;\nrevoke all on table public.sec_v from public, anon, authenticated;\n').code, 0));
 
+ok('migration policy 寫入類 using (true)：擋下', () => {
+  const r = secCheck(SEC_SQL, 'create policy allow_all on public.sec_t for all to public using (true);\n');
+  assert.equal(r.code, 2);
+  assert.match(r.out, /policy allow_all/);
+});
+ok('migration policy insert with check (true)：擋下', () => assert.equal(secCheck(SEC_SQL, 'create policy "p" on public.sec_t for insert to authenticated with check (true);\n').code, 2));
+ok('migration policy select using (true)：提醒但不擋', () => {
+  const r = secCheck(SEC_SQL, 'create policy p on public.sec_t for select to authenticated using (true);\n');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /additionalContext/);
+});
+ok('migration policy to service_role using (true)：通過', () => assert.equal(secCheck(SEC_SQL, 'create policy p on public.sec_t for all to service_role using (true) with check (true);\n').out.trim(), ''));
+ok('migration policy 依擁有者限制：通過', () => assert.equal(secCheck(SEC_SQL, 'create policy p on public.sec_t for insert to authenticated with check (user_id = auth.uid());\n').out.trim(), ''));
+
 console.log(`\n${passed} 項 hook 測試通過`);

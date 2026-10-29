@@ -59,6 +59,15 @@ if (rel.endsWith('.sql')) {
         errors.push(`view ${name} 以擁有者權限執行會繞過 RLS，Supabase 預設又授給 authenticated 全部權限：請加 with (security_invoker = true)，或明確 revoke all on ${name} from anon, authenticated。`);
       }
     }
+    // policy 寫成 using (true)／with check (true) 等於不設防：Supabase Auth 若開放自行註冊，任何人註冊後都能讀寫。
+    // 2026-10-29 已因 patrol_checkins 的 allow_all_for_now 收斂。寫入類一律擋，唯讀類只提醒；to service_role 的不算。
+    for (const m of sql.matchAll(/create\s+policy\s+("[^"]+"|\w+)\s+on\s+([\s\S]*?);/gi)) {
+      if (!/\b(?:using|with\s+check)\s*\(\s*true\s*\)/i.test(m[2]) || /\bto\s+service_role\b/i.test(m[2])) continue;
+      const cmd = (m[2].match(/\bfor\s+(select|insert|update|delete|all)\b/i)?.[1] ?? 'all').toLowerCase();
+      const name = m[1].replaceAll('"', '');
+      if (cmd === 'select') warnings.push(`policy ${name} 對所有人開放讀取（using (true)）：確認這張表本來就是公開資料，否則改成依角色限制。`);
+      else errors.push(`policy ${name}（${cmd}）寫成 using (true)／with check (true)，所有登入者都能寫入：請改成依角色或擁有者限制。`);
+    }
   }
   for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?function[\s\S]*?(?=\bas\s+(?:\$[A-Za-z_]*\$|'))/gi)) {
     if (/security\s+definer/i.test(m[0]) && !/set\s+search_path/i.test(m[0])) {
