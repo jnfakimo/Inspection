@@ -49,7 +49,11 @@
 - **漂移稽核結果（2026-10-29，唯讀）**：依序重播 190 個 migration 與正式庫目錄比對。**欄位 241 個、索引 164 個、表與 view 完全一致**；`list_migrations` 只記 66 筆，不能當套用依據。差異判定：
   ①**整份只套用一半**：`20260817130000_backend_security_state_machine.sql` 的限流表、RBAC 防呆已在正式庫，但工單狀態機 trigger（`trg_repair_request_state_guard`、`trg_maintenance_order_state_guard`、`trg_no_duplicate_active_workorder`）、
   `emit_workorder_notification` 與通知來源限制（`notifications_backend_insert`、`case_status_log_backend_insert`）都沒生效；正式庫仍是 `notifications_managed_insert`、`case_status_log_own_insert`，有 `sys_workorder` 權限的**內部帳號**（目前 3 人）可用自己的登入直接寫入這兩張表（內部偽造通知／紀錄，非外部風險）。
-  **尚未修**：兩張表是工單核心流程在用，要先確認 `app-api` 等程式寫入走服務金鑰還是使用者身分，**不可直接重跑舊 migration**（可能與後來的 RPC 流程衝突），要寫有測試的新 migration；
+  **查證結論（2026-10-29，唯讀；決定先記錄、不修）**：
+  - **寫入路徑**：所有 Edge Function 對 `notifications`／`case_status_log` 的寫入都用服務金鑰（`app-api`、`admin-api`、`official-document-timeout-check`、`error-threshold-check`、`security-monitor`）；使用者身分走的 `apply_repair_workflow`、`repair_order_transition`、`create_repair_dispatch`、`notify_vehicle_dispatch_followups` 都是 `security definer`，自己寫 log；網頁端只讀。唯一 invoker 是 `complete_repair_order`，但全專案沒有任何地方呼叫。
+  - **誰能直接寫**：兩個直接寫入 policy 都要求 `sys_workorder`；93 個啟用帳號中只有 **3 個**持有（sysadmin 2、unit_supervisor 1，後者靠個別覆寫；用 `has_system_access` 的實際語意重算，先前「3 人」是用錯的查詢碰巧得到同數字）。`case_status_log` 還限 `operator_id` 為本人，只能偽造自己名義的紀錄。風險是**內部人員、極窄**，無外部入口。
+  - **舊 migration 不可重跑（有證據）**：`enforce_workorder_state_transition` 的轉移表與現行六階段流程不相容。用 `case_status_log` 168 筆實際歷史對照，`pending_review → closed`（11 筆）與 `pending → cancelled`（9 筆）都不在舊表內，套用會把結案與取消流程擋死；它應是被六階段流程（`20260815133000` 等）取代而刻意沒套用。
+  - **若日後要修（建議範圍）**：只收掉直接寫入入口——新 migration 移除 `notifications_managed_insert`、`case_status_log_own_insert` 並收回 authenticated 的 INSERT，附 PGlite 測試；因為所有程式路徑都不依賴它們，只影響沒人呼叫的 `complete_repair_order`。**不建議**重做狀態轉移 trigger（要依實際歷史重寫轉移表，風險與效益不成比例）。
   ②`handover_field_pilot_*` policy：表在正式庫本來就不存在（migration 是條件式建立），非漏洞；③`open_inspection_cycle`、`is_secretary_under_deputy`、`purge_expired_vehicle_location_points` 三個函式未上線，位置資料表目前 0 筆，無保存期問題；④舊的 `vehicle_*_authenticated` 全開 policy 正式庫已無。
   稽核腳本看不到 DO 區塊內的條件式建立與動態刪除，列出的每一項都需人工判定。
 - **實測結果（2026-10-29）**：①以 anon 金鑰對線上 REST 做 GET，20 個表與 view 全回 401／42501；儲存桶清單為空；②模擬「剛註冊、無角色」的登入者對 71 個表做 INSERT、72 個表做 UPDATE／DELETE（整段回滾），**無任何允許**，6 張表被商業規則 trigger 先擋、其 INSERT policy 皆要求管理員或本人身分。
@@ -60,7 +64,12 @@
   **殘留**：`supabase_admin` 角色在 public 的預設授權仍會把新表授給 anon（Supabase 平台管理，只影響由它建立的表；我們的 migration 以 `postgres` 執行，不受影響）。
 - **Auth 註冊現況（2026-10-29 讀回）**：管理者已關閉自行註冊（`/auth/v1/settings` 的 `disable_signup=true`），外部不能再建帳號；`mailer_autoconfirm` 仍為 true（「Confirm email」未開）。註冊關閉後免驗證沒有可利用入口，且程式建帳號（admin-api 三處 `createUser`）都明確帶 `email_confirm: true`，開啟理論上不影響現有帳號；
   是否開啟交管理者決定，開前先確認 Supabase 寄信（SMTP）設定正常，以免日後重新開放註冊或信箱登入流程出問題。
-- **資安待辦（選擇性）**：①工單狀態機漂移（見上，需先查程式寫入路徑再寫新 migration）；②以管理者提供的真實測試帳號實打網站 API（目前只有 SQL 角色模擬與 anon 實打）；③`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；④Supabase Auth 的「外洩密碼保護」需在儀表板由管理者開啟；⑤行動端與 Python 訊號服務仍有 Dependabot 項目。
+- **外洩密碼保護（2026-10-29）**：管理者已在儀表板開啟 Email 的「Prevent use of leaked passwords」；讀回：Supabase 安全建議的 `auth_leaked_password_protection` 警告已消失。最小密碼長度仍為 6（官方建議 8 以上）。
+  **待驗證的衝突**：`admin-api` 核准帳號（`admin_approve_account_application`）以寫死的 8 位純數字連號初始密碼（`supabase/functions/admin-api/index.ts:29`）呼叫 `auth.admin.createUser`。用 HaveIBeenPwned 範圍查詢（只送雜湊前 5 碼，未送密碼本文）確認該密碼**在外洩清單內，被看見 70,606,130 次**，
+  所以開啟保護後核准帳號很可能被拒；但 Supabase 是否對「管理員 API 建帳號」也套用此檢查**未驗證**（需用測試申請走一次核准流程）。失敗行為是安全的：程式回「Auth 帳號建立失敗：…」並停止，不建立人員主檔、申請單維持待審核。
+  **決策點（交使用者）**：測試若失敗——短期可把開關關回去，核准流程立即恢復；根本解法是改為每帳號隨機初始密碼，改靠已有的啟用信（核准後 `resetPasswordForEmail`）讓使用者自己設密碼，但這會推翻 2026-10-24「共用初始密碼暫維持原狀」的決定，須由使用者決定，**代理不自行修改**。
+  補充更正：初始密碼長度為 8，所以把最小密碼長度調到 8 不會影響它；但「Password requirements」不可設成必須含英文字母，否則純數字初始密碼會被擋。
+- **資安待辦（選擇性）**：①工單狀態機漂移（已查證、決定先不修，結論與建議範圍見上；若要修只收直接寫入入口）；②以管理者提供的真實測試帳號實打網站 API（目前只有 SQL 角色模擬與 anon 實打）；③`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；④外洩密碼保護已開啟，但需用測試申請驗證帳號核准流程未被擋（見上）；⑤行動端與 Python 訊號服務仍有 Dependabot 項目。
 - **下一步**：①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
 - 🕐 最後更新：2026-10-29 收工，Claude Code @ DESKTOP-0CFB6UK；Git：本批文件經 PR 合併（見 PR 號），遠端分支與合併狀態以 GitHub 為準。
 - **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
