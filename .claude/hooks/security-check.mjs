@@ -46,6 +46,20 @@ if (rel.endsWith('.sql')) {
     const rls = new RegExp(`alter\\s+table\\s+(?:only\\s+)?(?:if\\s+exists\\s+)?(?:public\\.)?"?${name}"?\\s+(?:enable|force)\\s+row\\s+level\\s+security`, 'i');
     if (!rls.test(sql)) errors.push(`資料表 ${name} 建立後沒有在同一個 migration 啟用 RLS（alter table ${name} enable row level security）。`);
   }
+  if (rel.startsWith('supabase/migrations/')) {
+    // view 以擁有者權限執行（繞過 RLS），Supabase 又預設把新物件的全部權限授給 authenticated，
+    // 等於任何登入帳號都能讀（可更新的 view 還能寫）。2026-10-29 已因此收斂 11 個管理報表 view。
+    const statements = sql.split(';');
+    for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?(?:materialized\s+)?view\s+(?:if\s+not\s+exists\s+)?((?:public\.)?"?\w+"?)([\s\S]*?);/gi)) {
+      const name = m[1].replace(/^public\./i, '').replaceAll('"', '');
+      const invoker = /security_invoker\s*=\s*(?:true|on)/i.test(m[0]);
+      const nameRe = new RegExp(`\\b${name}\\b`, 'i');
+      const revoked = statements.some((s) => /^\s*revoke\b/i.test(s) && nameRe.test(s) && /\bauthenticated\b/i.test(s));
+      if (!invoker && !revoked) {
+        errors.push(`view ${name} 以擁有者權限執行會繞過 RLS，Supabase 預設又授給 authenticated 全部權限：請加 with (security_invoker = true)，或明確 revoke all on ${name} from anon, authenticated。`);
+      }
+    }
+  }
   for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?function[\s\S]*?(?=\bas\s+(?:\$[A-Za-z_]*\$|'))/gi)) {
     if (/security\s+definer/i.test(m[0]) && !/set\s+search_path/i.test(m[0])) {
       errors.push(`security definer 函式缺少 set search_path：${m[0].replace(/\s+/g, ' ').trim().slice(0, 70)}…`);
