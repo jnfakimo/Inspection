@@ -149,4 +149,12 @@ ok('security definer 缺 search_path：擋下', () => {
 });
 ok('security definer 有 search_path：通過', () => assert.equal(secCheck(SEC_SQL, "create or replace function public.sec_fn() returns int language sql security definer set search_path = public as $$ select 1 $$;\n").code, 0));
 
+ok('migration 建 view 沒設 security_invoker 也沒 revoke：擋下', () => {
+  const r = secCheck(SEC_SQL, 'begin;\ncreate view public.sec_v as select 1 as a;\ncommit;\n');
+  assert.equal(r.code, 2);
+  assert.match(r.out, /view sec_v/);
+});
+ok('migration 建 view 設 security_invoker：通過', () => assert.equal(secCheck(SEC_SQL, 'create view public.sec_v with (security_invoker = true) as select 1 as a;\n').code, 0));
+ok('migration 建 view 並 revoke authenticated：通過', () => assert.equal(secCheck(SEC_SQL, 'create view public.sec_v as select 1 as a;\nrevoke all on table public.sec_v from public, anon, authenticated;\n').code, 0));
+
 console.log(`\n${passed} 項 hook 測試通過`);
