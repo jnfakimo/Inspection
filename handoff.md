@@ -5,7 +5,7 @@
 
 ## ⏯️ 目前做到哪
 
-最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#122），皆已部署或生效；詳情見下。**
+最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#124），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
   臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。
 - PR #110（`8a15ddc91`）：派車報表視窗排版修正。PR #111（`dac0e686e`）：派車各頁配色統一為品牌主色，狀態色只表示狀態。
@@ -44,10 +44,23 @@
   兩個 PGlite 測試（`tools/lock-patrol-checkins-db.test.mjs`、`tools/lock-inspection-photos-db.test.mjs`）已接進 `npm test`；`security-check` hook 新增「migration 寫入類 policy 寫成 `using (true)`／`with check (true)` 就擋」，`hooks.test.mjs` 增至 73 項。
   **套用經過**：合併時 GitHub 回 502，PR 頁面一度仍顯示 OPEN，但 main 已含 `65b71477e`；其間誤觸發的一次套用流程在驗證步驟（當時 main 找不到檔案）就失敗、未碰資料庫；之後確認合併完成才依序套用兩個檔案，皆成功並唯讀讀回
   （`patrol_checkins` 無 policy、`anon`／`authenticated` 無權限、0 筆；桶 `public=false`、10485760、僅圖片類型；舊 policy 0 條；其他桶的 15 條 policy 不變；public schema 已無 `using (true)` policy）。
-- **新 skill `web-security-review`**（agentkit，已部署到 Claude／Codex／OpenCode／Antigravity，dotfiles `f174de3`）：說「資安檢查」「捕捉安全問題」即跑「本地稽核 → 線上站台唯讀掃描（`scripts/site-scan.mjs`）→ Supabase 權限檢查（`references/supabase-checks.sql`）→ 修正走 PR → 動正式庫前須同意」。
+- **新 skill `web-security-review`**（agentkit，已部署到 Claude／Codex／OpenCode／Antigravity，dotfiles `f174de3`、`f605464`；後者補上漂移稽核、anon 殘留權限與「剛註冊帳號寫入模擬」檢查）：說「資安檢查」「捕捉安全問題」即跑「本地稽核 → 線上站台唯讀掃描（`scripts/site-scan.mjs`）→ Supabase 權限檢查（`references/supabase-checks.sql`）→ 修正走 PR → 動正式庫前須同意」。
   部署時只對該 skill 路徑 `chezmoi apply`：`.claude/settings.json` 與 `.codex/AGENTS.md` 的本機版與來源版不同（`chezmoi status` 為 MM），整體 apply 會覆蓋它們，勿直接整體 apply。
-- **需要管理者本人做**：到 Supabase 儀表板 Authentication 關閉「Allow new users to sign up」並開啟「Confirm email」（網站程式不呼叫 `signUp`，帳號由管理員以 admin API 建立，關閉不影響現有流程）；這是比上述 policy 修正更根本的防線，**尚未做，Auth 仍開放註冊**。
-- **資安待辦（選擇性）**：漂移稽核（逐一比對 repo 的 migration 與正式庫實際狀態，找出其他「已寫但沒生效」的硬化）；以真實註冊的測試帳號實打網站 API 驗證被擋（目前只有 policy／權限讀回與 PGlite 測試）；`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；Supabase Auth 的「外洩密碼保護」需在儀表板由管理者開啟；行動端與 Python 訊號服務仍有 Dependabot 項目。
+- **漂移稽核結果（2026-10-29，唯讀）**：依序重播 190 個 migration 與正式庫目錄比對。**欄位 241 個、索引 164 個、表與 view 完全一致**；`list_migrations` 只記 66 筆，不能當套用依據。差異判定：
+  ①**整份只套用一半**：`20260817130000_backend_security_state_machine.sql` 的限流表、RBAC 防呆已在正式庫，但工單狀態機 trigger（`trg_repair_request_state_guard`、`trg_maintenance_order_state_guard`、`trg_no_duplicate_active_workorder`）、
+  `emit_workorder_notification` 與通知來源限制（`notifications_backend_insert`、`case_status_log_backend_insert`）都沒生效；正式庫仍是 `notifications_managed_insert`、`case_status_log_own_insert`，有 `sys_workorder` 權限的**內部帳號**（目前 3 人）可用自己的登入直接寫入這兩張表（內部偽造通知／紀錄，非外部風險）。
+  **尚未修**：兩張表是工單核心流程在用，要先確認 `app-api` 等程式寫入走服務金鑰還是使用者身分，**不可直接重跑舊 migration**（可能與後來的 RPC 流程衝突），要寫有測試的新 migration；
+  ②`handover_field_pilot_*` policy：表在正式庫本來就不存在（migration 是條件式建立），非漏洞；③`open_inspection_cycle`、`is_secretary_under_deputy`、`purge_expired_vehicle_location_points` 三個函式未上線，位置資料表目前 0 筆，無保存期問題；④舊的 `vehicle_*_authenticated` 全開 policy 正式庫已無。
+  稽核腳本看不到 DO 區塊內的條件式建立與動態刪除，列出的每一項都需人工判定。
+- **實測結果（2026-10-29）**：①以 anon 金鑰對線上 REST 做 GET，20 個表與 view 全回 401／42501；儲存桶清單為空；②模擬「剛註冊、無角色」的登入者對 71 個表做 INSERT、72 個表做 UPDATE／DELETE（整段回滾），**無任何允許**，6 張表被商業規則 trigger 先擋、其 INSERT policy 皆要求管理員或本人身分。
+  **這不是真實登入實測**：註冊已關閉，也不該由代理註冊帳號；真實登入實測需管理者提供測試帳號。
+- **PR #124（`f6a1d2de4`）：收回 10 張表殘留的 anon 權限（已套用並讀回）**：`account_applications`（姓名、Email、電話、來源 IP）、`official_document*` 4 張、`market_*` 4 張、`weather_api_cache` 的 anon 仍持有 Supabase 預設的全部權限，只靠 RLS（無 anon policy）擋；已用 anon 金鑰實打確認當時讀不到。
+  migration `20261029130000_revoke_anon_table_privileges.sql`：`revoke all … from public, anon`，並 `alter default privileges for role postgres in schema public revoke all on tables from anon`（新表不再預設授權 anon）；`authenticated`／`service_role` 不動。`tools/revoke-anon-table-privileges-db.test.mjs` 已接進 `npm test`。
+  讀回：10 張表 anon 權限皆 none、RLS 仍啟用、authenticated／service_role 不變、「anon 有權限卻無 anon policy」的表 0 張、`account_applications` 43 筆仍在；anon 實打這些表由 200 空陣列改為 401／42501。
+  **殘留**：`supabase_admin` 角色在 public 的預設授權仍會把新表授給 anon（Supabase 平台管理，只影響由它建立的表；我們的 migration 以 `postgres` 執行，不受影響）。
+- **Auth 註冊現況（2026-10-29 讀回）**：管理者已關閉自行註冊（`/auth/v1/settings` 的 `disable_signup=true`），外部不能再建帳號；`mailer_autoconfirm` 仍為 true（「Confirm email」未開）。註冊關閉後免驗證沒有可利用入口，且程式建帳號（admin-api 三處 `createUser`）都明確帶 `email_confirm: true`，開啟理論上不影響現有帳號；
+  是否開啟交管理者決定，開前先確認 Supabase 寄信（SMTP）設定正常，以免日後重新開放註冊或信箱登入流程出問題。
+- **資安待辦（選擇性）**：①工單狀態機漂移（見上，需先查程式寫入路徑再寫新 migration）；②以管理者提供的真實測試帳號實打網站 API（目前只有 SQL 角色模擬與 anon 實打）；③`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；④Supabase Auth 的「外洩密碼保護」需在儀表板由管理者開啟；⑤行動端與 Python 訊號服務仍有 Dependabot 項目。
 - **下一步**：①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
 - 🕐 最後更新：2026-10-29 收工，Claude Code @ DESKTOP-0CFB6UK；Git：本批文件經 PR 合併（見 PR 號），遠端分支與合併狀態以 GitHub 為準。
 - **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
