@@ -167,3 +167,9 @@ SUPABASE_PROJECT_REF=<target-ref> SUPABASE_ACCESS_TOKEN=<token> node tools/datab
 4. 確認密語的離線抄本還在、還讀得到
 
 不要在正式專案上演練實際寫入。要驗證完整還原，請另開一個測試專案。
+
+## 2026-10-29 還原防護與隔離演練
+
+verifyBackup 現在拒絕 manifest 清單外檔案、重複資料表、總數不符、非法名稱與符號連結。還原明列非 generated 欄位，衍生值交由 PostgreSQL 重算，identity 保留原值並在交易與表鎖內同步序號；既有較大序號不回退。預設 dry-run 與明確 project ref／execute／confirm 不變。
+
+10 項備份回歸及 PostgreSQL 17 實際 SQL 驗證通過。另以隔離 pg_dump 與資料卷完成 Auth/API/Storage 復原；該流程不是正式備份排程，也沒有把 Auth 加入本工具備份範圍。同叢集空庫復原不能代替異機重建或正式 RPO/RTO 驗收。詳見 [本輪報告](ISOLATED_REMAINING_VERIFICATION_20261029.md)。

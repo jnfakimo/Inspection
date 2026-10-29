@@ -210,6 +210,9 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const [approvals, setApprovals] = useState<BusinessApproval[]>([]);
   const [approvalAccess, setApprovalAccess] = useState<Record<ApprovalStage, ApprovalAccessState>>(() => emptyBusinessApprovalAccess());
   const [busy, setBusy] = useState(true);
+  const [loadedReportScope, setLoadedReportScope] = useState('');
+  const reportScope = `${market}:${date}`;
+  const reportReady = !busy && loadedReportScope === reportScope;
   const [note, setNote] = useState('');
   const approvalSubmitRef = useRef(false);
   const [editingShift, setEditingShift] = useState<string | null>(null);
@@ -260,6 +263,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
   const load = useCallback(async () => {
     if (!market) { setApprovalAccess(emptyBusinessApprovalAccess('unavailable')); setBusy(false); return; }
     const generation = ++loadGeneration.current;
+    setLoadedReportScope('');
     setBusy(true);
     setApprovalAccess(emptyBusinessApprovalAccess('checking'));
     setNote('');
@@ -342,6 +346,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
         mergedChecks[item.id] = loadedChecks[item.id] || { status: 'uncompleted' };
       }
       setChecks(mergedChecks);
+      setLoadedReportScope(`${market}:${date}`);
     } catch (err) {
       if (generation !== loadGeneration.current) return;
       setShiftReports([]);
@@ -591,7 +596,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
   };
 
   const print = () => {
-    window.print();
+    if (reportReady) window.print();
   };
 
   const approvalStages = approvalStageItems(market || 'market_1', date, approvals);
@@ -632,7 +637,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
               <button
                 type="button"
                 className="secondary-btn compact"
-                onClick={() => setPreviewOpen(true)}
+                disabled={!reportReady} onClick={() => setPreviewOpen(true)}
                 title="在畫面上預覽 A4報表"
               >
                 <BusinessIcon name="eye" size={14} />
@@ -648,7 +653,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
                 <BusinessIcon name="save" size={14} />
                 {savingChecks ? '儲存中…' : '儲存點檢表'}
               </button>
-              <button type="button" className="primary-btn compact business-print-button" onClick={print}>
+              <button type="button" className="primary-btn compact business-print-button" disabled={!reportReady} onClick={print}>
                 <BusinessIcon name="printer" size={14} />
                 列印本日報表
               </button>
@@ -1076,7 +1081,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
         </section>
 
         {/* 列印專用報表區 (A4精確排版) */}
-        <section className="hs-print-sheet" aria-label="業管組每日列印報表">
+        {reportReady && <section className="hs-print-sheet" aria-label="業管組每日列印報表">
           <BusinessReportContent
             market={market || 'market_1'}
             date={date}
@@ -1088,7 +1093,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
             approvals={approvals}
             userName={userName}
           />
-        </section>
+        </section>}
       </div>
 
       {/* 螢幕上預覽本日報表彈窗 (與 A4 列印完全一致) */}
@@ -1108,6 +1113,7 @@ export function BusinessHandover({ system, module, profile }: Props) {
               <button
                 type="button"
                 className="primary-btn compact"
+                disabled={!reportReady}
                 onClick={() => {
                   closePreview();
                   setTimeout(() => window.print(), 100);

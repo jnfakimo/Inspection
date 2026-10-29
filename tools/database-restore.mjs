@@ -77,7 +77,7 @@ async function primaryKey(table) {
 async function columns(table) {
   const rows = await query(
     'select column_name from information_schema.columns ' +
-    `where table_schema = 'public' and table_name = ${sqlLiteral(table)} order by ordinal_position`,
+    `where table_schema = 'public' and table_name = ${sqlLiteral(table)} and is_generated = 'NEVER' order by ordinal_position`,
     true,
   );
   return rows.map(r => r.column_name);
@@ -98,12 +98,22 @@ export function buildStatementFromLines(table, lines, pk, cols, mode) {
     if (!row || Array.isArray(row) || typeof row !== 'object') throw new Error('備份列必須是 JSON 物件。');
   }
   const payload = sqlLiteral(`[${lines.join(',')}]`);
-  const base = `insert into ${ident} select * from jsonb_populate_recordset(null::${ident}, ${payload}::jsonb)`;
+  if (!cols.length || new Set(cols).size !== cols.length || pk.some(key => !cols.includes(key))) throw new Error('還原欄位或主鍵清單無效。');
+  // Generated columns are recomputed, never inserted from backup data. Identity
+  // values retain their original keys; sequence counters are synchronized below.
+  const projection = cols.map(quoteIdent).join(', ');
+  const base = `insert into ${ident} (${projection}) overriding system value select ${projection} from jsonb_populate_recordset(null::${ident}, ${payload}::jsonb)`;
   if (mode === 'insert-missing') return `${base} on conflict do nothing`;
   const updatable = cols.filter(c => !pk.includes(c));
   if (!updatable.length) return `${base} on conflict do nothing`;
   const setClause = updatable.map(c => `${quoteIdent(c)} = excluded.${quoteIdent(c)}`).join(', ');
   return `${base} on conflict (${pk.map(quoteIdent).join(', ')}) do update set ${setClause}`;
+}
+
+export function buildSequenceSyncStatement(table, column, sequence) {
+  const ident = `public.${quoteIdent(table)}`;
+  const seq = `${sqlLiteral(sequence)}::regclass`;
+  return `select setval(${seq}, greatest(pg_sequence_last_value(${seq}), (select max(${quoteIdent(column)}) from ${ident})), true) where exists (select 1 from ${ident})`;
 }
 
 async function main() {
@@ -151,15 +161,20 @@ async function main() {
     if (!rows.length) { console.log(`  ${table.padEnd(32)} 備份中為空，略過`); continue; }
     const pk = await primaryKey(table);
     const cols = await columns(table);
+    const sequences = await query(`select column_name, pg_get_serial_sequence(${sqlLiteral(`public.${table}`)}, column_name) as sequence from information_schema.columns where table_schema = 'public' and table_name = ${sqlLiteral(table)} and pg_get_serial_sequence(${sqlLiteral(`public.${table}`)}, column_name) is not null`, true);
     if (!pk.length) throw new Error(`資料表 ${table} 沒有主鍵，已在寫入前中止。`);
     for (let i = 0; i < rows.length; i += BATCH) buildStatementFromLines(table, rows.slice(i, i + BATCH), pk, cols, args.mode);
-    plans.push({ table, rows, pk, cols });
+    plans.push({ table, rows, pk, cols, sequences });
   }
-  for (const { table, rows, pk, cols } of plans) {
+  for (const { table, rows, pk, cols, sequences } of plans) {
     let batches = 0;
     for (let i = 0; i < rows.length; i += BATCH) {
       const statement = buildStatementFromLines(table, rows.slice(i, i + BATCH), pk, cols, args.mode);
-      if (args.execute) await query(statement, false);
+      if (args.execute) {
+        const sync = sequences.map(item => buildSequenceSyncStatement(table, item.column_name, item.sequence));
+        // Block concurrent table writers until restored keys and counters agree.
+        await query(`begin; lock table public.${quoteIdent(table)} in share row exclusive mode; ${statement}; ${sync.join('; ')}; commit;`, false);
+      }
       batches += 1;
     }
     const note = `主鍵 ${pk.join('+')}`;

@@ -15,7 +15,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile, appendFile, readFile } from 'node:fs/promises';
+import { mkdir, writeFile, appendFile, readFile, readdir, lstat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { backupRequest } from './backup-request.mjs';
@@ -236,10 +236,34 @@ export async function main() {
 export async function verifyBackup(dir) {
   const manifest = JSON.parse(await readFile(path.join(dir, 'manifest.json'), 'utf8'));
   const problems = [];
+  if (!Array.isArray(manifest.tables) || !manifest.totals) {
+    return { manifest, problems: ['備份資料表清單或總計格式無效。'], warnings: [] };
+  }
+  const tablesDir = path.join(dir, 'tables');
+  const rootStat = await lstat(tablesDir).catch(() => null);
+  if (!rootStat?.isDirectory() || rootStat.isSymbolicLink()) {
+    return { manifest, problems: ['資料表目錄不存在或為符號連結。'], warnings: [] };
+  }
+  const actual = await readdir(tablesDir, { withFileTypes: true });
+  const names = new Set();
+  let expectedRows = 0;
   for (const table of manifest.tables) {
-    const file = path.join(dir, 'tables', `${table.name}.ndjson`);
+    if (!table || typeof table.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(table.name)
+      || !Number.isSafeInteger(table.rows) || table.rows < 0 || !/^[a-f0-9]{64}$/.test(table.sha256 || '')) {
+      problems.push('備份資料表名稱、筆數或雜湊格式無效。');
+      continue;
+    }
+    if (names.has(table.name)) problems.push('備份資料表清單重複。');
+    names.add(table.name);
+    expectedRows += table.rows;
+    const file = path.join(tablesDir, `${table.name}.ndjson`);
     let content = '';
     try {
+      const stat = await lstat(file);
+      if (!stat.isFile() || stat.isSymbolicLink()) {
+        problems.push(`${table.name}：資料檔不是一般檔案。`);
+        continue;
+      }
       content = await readFile(file, 'utf8');
     } catch {
       problems.push(`${table.name}：找不到 ${table.name}.ndjson`);
@@ -251,6 +275,12 @@ export async function verifyBackup(dir) {
     if (content === '' ? table.rows !== 0 : lines !== table.rows) {
       problems.push(`${table.name}：行數 ${content === '' ? 0 : lines} 與 manifest 的 ${table.rows} 不符`);
     }
+  }
+  if (actual.some(entry => !entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith('.ndjson') || !names.has(entry.name.slice(0, -7)))) {
+    problems.push('資料表目錄包含清單外檔案或非一般檔案。');
+  }
+  if (manifest.totals.tables !== names.size || manifest.totals.rows !== expectedRows) {
+    problems.push('資料表清單與總表數或總筆數不符。');
   }
   const storage = await verifyStorage(dir, manifest);
   problems.push(...storage.problems);

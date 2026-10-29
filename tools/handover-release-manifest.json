@@ -1,9 +1,9 @@
 {
-  "sourceSnapshot": "Handover full-page print pagination repair 2026-10-14 + theme token unification 2026-10-15 + bright-fill contrast 2026-10-15 + shared buttons/live badge 2026-10-15 + shift ink 2026-10-15",
+  "sourceSnapshot": "Handover full-page print pagination repair 2026-10-14 + theme token unification 2026-10-15 + bright-fill contrast 2026-10-15 + shared buttons/live badge 2026-10-15 + shift ink 2026-10-15 + report load readiness 2026-10-29",
   "files": [
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.tsx",
-      "sha256": "34CA8F0F6D4562F279A4BA91DCC6639315A60741AE28B05774BAA4F419DFC19C"
+      "sha256": "75A5E8438AC462FDC92348C501A6EE08538075AF44E0DF51FA73DB5397C773A8"
     },
     {
       "path": "web/app/systems/[system]/[module]/mechanical-handover.css",
@@ -11,7 +11,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.tsx",
-      "sha256": "EFA3B146B3AEC79C34463846AE1E066298164475AD65B3B2B3EB4E6BD8863422"
+      "sha256": "3AA1491E85C6D4EF50F0CBCFA1D34446E1D7807EB215D6EB352D80069004BF85"
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",

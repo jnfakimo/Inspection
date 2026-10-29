@@ -1,7 +1,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { PGlite } from '@electric-sql/pglite';
-import { buildStatementFromLines, buildStatement } from './database-restore.mjs';
+import { buildStatementFromLines, buildStatement, buildSequenceSyncStatement } from './database-restore.mjs';
+
+test('還原略過衍生欄位並保留 identity，衍生值由資料庫重算', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec('create table public.generated_restore (id bigint generated always as identity primary key, start_mileage numeric, end_mileage numeric, total_mileage numeric generated always as (end_mileage-start_mileage) stored)');
+    const row = { id: 15, start_mileage: 100, end_mileage: 140, total_mileage: 999 };
+    const cols = ['id','start_mileage','end_mileage'];
+    await db.exec(buildStatement('generated_restore', [row], ['id'], cols, 'upsert'));
+    await db.exec(buildStatement('generated_restore', [{ ...row, end_mileage: 150 }], ['id'], cols, 'upsert'));
+    assert.deepEqual((await db.query('select id::text,total_mileage::text from generated_restore')).rows, [{ id:'15', total_mileage:'50' }]);
+    const sync = buildSequenceSyncStatement('generated_restore','id','public.generated_restore_id_seq');
+    await db.exec(sync);
+    assert.equal((await db.query('insert into generated_restore(start_mileage,end_mileage) values(1,2) returning id')).rows[0].id,16);
+    await db.exec("select setval('generated_restore_id_seq',100,true)");
+    await db.exec(sync);
+    assert.equal((await db.query('insert into generated_restore(start_mileage,end_mileage) values(1,2) returning id')).rows[0].id,101);
+  } finally { await db.close(); }
+});
 
 test('PostgreSQL 還原保留 bigint、numeric、特殊字元與冪等行為', async () => {
   const db = new PGlite();
