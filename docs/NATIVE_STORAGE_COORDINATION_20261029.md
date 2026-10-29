@@ -44,3 +44,12 @@ Android 已加入原生 OS 檔案鎖，將加密儲存讀取、寫入、遷移�
 防護為 OS 互斥、無租約搶鎖、無未協調 fallback、保守鍵範圍、加密驗證、持續的錯誤回報及重試。原有 7 low 依賴列管未變，本輪未重新查上游公告。無需使用者手動刪除資料或更改密碼。
 
 私有證據：C:/projects/Inspection-supabase-e2e-20261028/evidence/native-gc-*；APK、SDK、dex、測試入口、日誌及資料庫不提交。測後專用 App 已 force-stop、測試資料清理已讀回，專用 Metro／接收器與模擬器停止；模擬器 console kill 回應不支援時，核對本輪專用 PID／命令與 process group 後終止，未停止其他服務。
+
+## 最終提交與 CI 回讀
+
+- 原生協調提交 d9d64f0492e49e99004c863ab4870d20b1144c16；空索引保護的最終程式提交 **14e67a5b39e508514b0823f106d5c54f1c68492b**。兩者均推送原修正分支，沒有修改 main 或部署。
+- [CI 40837814761](https://github.com/jnfakimo/Inspection/actions/runs/40837814761) 的 headSha 為最終程式提交，completed／success，6 個工作全部通過。行動端工作 123326659059 日誌確認 **89 tests／89 pass／0 fail**；原生鎖 JVM 多程序 **3/3**；安全補丁／Expo 相容性 **10/10**；型別與 Android、iOS bundle 成功。iOS bundle 不是 iOS 原生回收驗證。
+- [CodeQL 40837818441](https://github.com/jnfakimo/Inspection/actions/runs/40837818441) 為同一 headSha，completed／success。分析 2051931512 的 error 為空、原始 results_count=1；分支 open alerts=0，#59 保留原有 dismissed／false positive，本輪未新增排除。
+- Gitleaks 完整候選來源掃描及最後差異掃描沒有洩密發現；原生建置與實測的 Java／Kotlin、JS 協調器／儲存程式已核對來源。隔離模擬器及 8083、18870、5580 專用連接埠已再次確認停止。
+
+本節是後續純文件提交，CI 對應上述程式 SHA，不把舊 CI 當成文件提交的新測試。Android 已驗證範圍可結案；本報告所列 iOS／web、未觸及／未知格式歷史資料、單獨 runtime 銷毀的重啟需求及硬體斷電／抹除限制仍保留。
