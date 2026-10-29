@@ -1,0 +1,3 @@
+#!/bin/sh
+# git pre-push：擋 force push（非快轉更新）與刪除 main／master。Codex、Claude Code、手動 push 都適用。
+exec node "$(dirname "$0")/pre-push.mjs" "$@"
