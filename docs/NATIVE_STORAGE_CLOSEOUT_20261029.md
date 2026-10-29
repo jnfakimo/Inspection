@@ -43,3 +43,14 @@
 不用在聊天貼密碼、金鑰、cookie、簽章檔或正式備份。前述步驟是未來補驗的必要條件，不代表本輪已取得正式主機存取或外部發送授權。
 
 私有證據目錄：C:/projects/Inspection-supabase-e2e-20261028/evidence/。本輪檔案：storage-native-quota.json、storage-native-sqlite-full.log、storage-native-seed.json、storage-native-install.json、storage-native-reinstall.json、storage-native-relogin.json、storage-native-cleanup.json。測試 APK、SDK、帳密、session、SQLite 及原生日誌均不提交。
+
+## 後續未完成清單複核
+
+使用者再次要求繼續補驗後，重新確認遠端修正分支為 52db201b9694738e7d84a04c65ca54bad83c7f51，工作樹乾淨，與程式基準 5fa667ec0 的差異只有六份驗證／交接文件，產品與測試程式沒有變動。
+
+- 再次執行行動 npm audit：0 critical／0 high／0 moderate／7 low。七筆仍為 deepmerge 同一公告及 Expo 相依鏈；公開 npm registry 最新版本仍是 4.3.1。[GitHub 已審查公告 GHSA-gcqx-w48m-w2h4](https://github.com/advisories/GHSA-gcqx-w48m-w2h4)仍列 Patched versions: None（本次已重新讀取，補充前文未重新查上游的限制）。既有補丁與來源雜湊檢查通過，未強制降版、改鎖檔或隱藏告警。
+- Windows 當前可見的手機／ADB／MTP／WPD 裝置篩選結果為 0；專用 WSL ADB 清單為空，本機沒有 xcodebuild。這表示目前沒有可供此工作操作的手機／iOS 原生環境，不宣稱已盤點網路上或其他電腦的全部設備。
+- 本輪專用模擬器、Metro 與結果接收器的連接埠均未監聽。未啟動新的模擬器、未停止既有隔離後端、未嘗試正式登入或外部通知。
+- 綜合既有報告及本次環境檢查，目前未完成清單沒有新增可用現有隔離資源補驗的項目。上述六類驗收仍需設備、指定唯讀連線、本人授權或組織核准；重跑模擬測試無法補足這些證據。
+
+此複核沒有發現新增產品缺陷，僅更新文件。已通過且未受變更影響的功能／原生／CI 測試不重跑。最新 audit 原始結果保存在私有 evidence/remaining-review-mobile-audit.json；正式資料、數字／固定密碼政策及未部署狀態不變。
