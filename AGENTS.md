@@ -18,6 +18,10 @@
    改 `web/` 的 ts／tsx／css 後自動跑色彩 token、系統頁標題、按鈕規格、下拉空白列檢查，結束前若改過 `web/` ts／tsx 會跑 `tsc`（缺 `node_modules/typescript` 時略過並標示未驗證）。
    被攔截不是故障：改用逐一列出檔案等正確作法；確屬假資料的機密樣式在該行加 `allow-secret-pattern`。**Codex、OpenCode 不會執行這些 hook**，第 4、5 條仍須自行遵守，CI 是最後防線。
    修改 hook 後執行 `node .claude/hooks/hooks.test.mjs`。
+8. **Git hook（Codex、Claude Code、手動操作都適用）**（`.githooks/`，2026-10-29 加入）：`pre-commit` 擋機密檔名與已 stage 內容中的機密樣式（與 Claude hook 共用 `.claude/hooks/secret-patterns.mjs`），
+   `pre-push` 擋 force push（含 `--force-with-lease`）與刪除 `main`／`master`。**每個 clone 要各啟用一次**：`git config core.hooksPath .githooks`（設定不會隨 repo 傳遞）。
+   被攔截時依訊息修正；假資料在該行加 `allow-secret-pattern`。不得用 `--no-verify` 繞過，確有必要須先取得使用者同意並在回報中說明。
+   修改 hook 後執行 `node .githooks/githooks.test.mjs`。
 
 ## 2. 專案概要與環境
 
@@ -160,6 +164,7 @@
 | 表單／字型 | `test:input-select-standard`、`test:font-tokens`、`test:css-source-balance` |
 | 資安 | `security:audit`、`test:permission-fail-closed`、`test:schema-contract` |
 | Claude Code hook | `node .claude/hooks/hooks.test.mjs` |
+| Git hook | `node .githooks/githooks.test.mjs` |
 
 未在瀏覽器實測的視覺項目（A4 實際列印、字體、responsive、科技版對比）一律標「未驗證」。
 

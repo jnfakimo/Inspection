@@ -6,6 +6,7 @@
 //   - git add 機密檔（.env、auth.json、*.sqlite、*.pem、cookie…）
 // 多個 agent 共用同一份工作樹，這些動作會把別人未提交的變更一起帶走或洗掉。
 import { allow, block, readInput } from './lib.mjs';
+import { SECRET_FILE } from './secret-patterns.mjs';
 
 const input = readInput();
 if (input.tool_name && input.tool_name !== 'Bash') allow();
@@ -16,7 +17,6 @@ if (!command.trim()) allow();
 const stripQuoted = (text) => text.replace(/"(?:\\.|[^"\\])*"|'[^']*'/g, '""');
 const segments = stripQuoted(command).split(/&&|\|\||;|\||\r?\n/);
 
-const SECRET_FILE = /(^|[\\/])(\.env(\.(?!example|sample|template)[^\\/]*)?|auth\.json|[^\\/]*\.(sqlite3?|db|pem|key|p12|pfx)|cookies?\.(txt|json)|[^\\/]*service[-_]?role[^\\/]*)$/i;
 
 const problems = [];
 for (const raw of segments) {

@@ -1,0 +1,4 @@
+#!/bin/sh
+# git pre-commit：擋機密檔與機密內容。Codex、Claude Code、手動 commit 都適用。
+# 啟用：git config core.hooksPath .githooks（每個 clone 各做一次，見 AGENTS.md §1 第 8 點）
+exec node "$(dirname "$0")/pre-commit.mjs" "$@"
