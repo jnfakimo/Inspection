@@ -43,3 +43,14 @@
 | ISO 管理驗收 | 指定風險所有人，完成密碼例外、權限複核、SoA、內稽及管理審查核准 |
 
 7 筆 deepmerge 低風險與既有補償控制不變，本輪沒有再次查詢上游公告。正式資料、密碼政策與未部署狀態維持不變。私有測試與發布證據保存在 C:/projects/Inspection-supabase-e2e-20261028/evidence/process-crash-*；不提交測試產物、金鑰、session 或資料庫。測試加入同一修正分支並檢查同提交 CI／CodeQL，結果後補於本報告。
+
+## 同提交 CI／CodeQL 回讀
+
+測試提交 **0831caeb8840778f30dec44747a9834526fcf469** 已推送至 codex/inspection-security-handover-20261028，推送後以遠端 refs 核對一致。
+
+- [CI 40833662996](https://github.com/jnfakimo/Inspection/actions/runs/40833662996)：completed／success，6 個工作全部成功，包含應用程式測試與 API build、隔離 PostgreSQL、靜態資安、Signal service、Windows PowerShell／IIS 相容性、Linux Gmail repair 及行動端工作。
+- 行動端工作 123313359653 的原始日誌確認：儲存／生命週期測試 **66 tests、66 pass、0 fail**（包含本輪 6 項程序中斷測試）；安全補丁／Expo 相容性另 **10 tests、10 pass、0 fail**。型別檢查成功，Android 與 iOS 皆成功輸出 bundle。打包不等於原生裝置驗收。
+- [CodeQL 40833666115](https://github.com/jnfakimo/Inspection/actions/runs/40833666115)：completed／success，headSha 同為上述測試提交。分析 2051749237 的 error 為空、原始 results_count 為 **1**；分支 open alerts 為 **0**，#59 維持既有 dismissed／false positive。本輪沒有重新排除告警，也不將未結案為零寫成原始掃描零結果。
+- 本機 Gitleaks 完整候選來源掃描沒有洩密發現，Git diff 格式檢查成功。實際產品執行程式與依賴鎖檔沒有本輪修改。
+
+上述 CI 證據對應測試提交；本節以後續純文件提交補入，沒有把先前 CI 說成後續文件 SHA 的新執行結果。程序中斷後未引用密文殘留、真實斷電、跨原生執行個體與表列設備／權限／管理驗收仍保持未結案。
