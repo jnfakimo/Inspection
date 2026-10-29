@@ -5,7 +5,7 @@
 
 ## ⏯️ 目前做到哪
 
-最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#124），皆已部署或生效；詳情見下。**
+最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#129），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
   臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。
 - PR #110（`8a15ddc91`）：派車報表視窗排版修正。PR #111（`dac0e686e`）：派車各頁配色統一為品牌主色，狀態色只表示狀態。
@@ -69,8 +69,19 @@
   所以開啟保護後核准帳號很可能被拒；但 Supabase 是否對「管理員 API 建帳號」也套用此檢查**未驗證**（需用測試申請走一次核准流程）。失敗行為是安全的：程式回「Auth 帳號建立失敗：…」並停止，不建立人員主檔、申請單維持待審核。
   **決策點（交使用者）**：測試若失敗——短期可把開關關回去，核准流程立即恢復；根本解法是改為每帳號隨機初始密碼，改靠已有的啟用信（核准後 `resetPasswordForEmail`）讓使用者自己設密碼，但這會推翻 2026-10-24「共用初始密碼暫維持原狀」的決定，須由使用者決定，**代理不自行修改**。
   補充更正：初始密碼長度為 8，所以把最小密碼長度調到 8 不會影響它；但「Password requirements」不可設成必須含英文字母，否則純數字初始密碼會被擋。
+- **日期導覽列與全站工具列控制項統一 32px（PR #127、#128、#129，已合併並部署）**：
+  - **起因與經過**：使用者指出業管組日期列「高度太高不協調」。量測：標籤、按鈕 44px、日期框 42px、箭頭可見邊框僅 32px，且同列「一市／二市」按鈕是 32px。#127 先只調業管組（32px）→ 使用者要求其他三本交接簿與全系統一併 → 先選 36px，隨後改為 32px（「全系統統一尺寸、專案設定」）→ #128 做成 token → 使用者貼營運頁紅框（三個下拉、兩個匯出日期框仍 42px），要求所有工具列／篩選列 → #129。
+  - **最終規格**：`tokens.css` 的 `--toolbar-control-height: 32px`（桌機 ≥801px，與緊湊按鈕同高，單一來源）；`web/app/toolbar-standard.css`（`layout.tsx` 在 `control-standard.css` 之後載入）以 `:is()` 容器清單（22 個 class：`admin-toolbar`、`hs-toolbar`、`operations-*`、`dash-toolbar`、`v1list-toolbar`、車輛／權限／巡邏樣板／機械排程／資安警示／追蹤／公文／市場分析等篩選列）
+    把內部的 `select`、文字／日期輸入框、按鈕 `height`／`min-height` 設為該 token、`padding-block:0`，**用 `!important`** 壓過各頁自訂高度（優先權不一，單一來源）；核取／單選方塊只取消 `min-height` 下限；營運頁日期列與儀表板的未加 class 按鈕單獨處理。
+    交接簿日期列的特例（箭頭 32×32、`::before{inset:0}`、標籤、外框高度）留在 `handover-sheet.css`，同樣引用 token；業管組的個別覆寫已移除。
+  - **這是 42px 欄位規格的例外**，寫在 `AGENTS.md` §6「工具列／篩選列控制項」：表單、彈窗、表格內欄位仍 42px；手機版不套用（維持觸控尺寸）。排除 6 個（表格欄位標題篩選、單一搜尋框／下拉本身、標題說明區塊、市場看板分段晶片），理由寫在檢查腳本。
+  - **檢查**：`tools/toolbar-standard-check.mjs`（`npm run test:toolbar-standard`，已接進 `npm test`）：token 只能在 `tokens.css` 定義、載入順序、規則用 token 且不寫固定 px、個別頁面不得再覆寫高度，並做**容器涵蓋檢查**——掃描 tsx，凡 class 結尾為 `toolbar`／`filter(s)`／`tool-row`／`filter-row`／`datebar` 的容器，必須在清單內或在例外清單寫理由，所以**新增工具列時要把容器加進 `toolbar-standard.css` 清單**。已做反向測試（移除容器、加固定高度都會失敗）。
+  - **發行清單**：`tools/handover-release-manifest.json` 釘住 `handover-sheet.css`、`business-handover.css` 等檔的 sha256，改這些檔案**必須同一提交更新該行雜湊**（#127 第一次 CI 就因此失敗，已補）；雜湊用 git 實際內容（LF）計算，本機 Windows 的 `test:handover-source-parity` 因 CRLF 會失敗屬已知，CI 不受影響。
+  - **驗證**：用載入真實樣式檔的靜態比對頁量測（以 origin/main 對照）：營運頁三個下拉與兩個匯出日期框 42→32px；管理後台、交接簿、儀表板、資安警示、追蹤等七種工具列全是 32px，垂直中心對齊；**工具列外的表單欄位仍是 42／36px**；手機寬度（600px）前後數值相同；33 項相關標準檢查與測試全過；每次部署後都下載線上樣式檔確認 token 與規則已上線（部署工作流程 security-gate／build／deploy／verify-deployment 皆成功）。
+  - **未驗證**：沒有登入看過真實頁面；營運頁收窄版型、資安警示格狀篩選列、市場分析篩選區的實際排版，以及按鈕固定 32px 後長標籤是否被切到，請使用者部署後看一眼。
+  - **注意**：G 槽 Codex 有未提交的 `handover-sheet.css`、`business-handover.css` 與發行清單修改，更新 G 槽時這幾個檔案可能衝突；本機 8766 埠是 Codex 的復原前端，比對頁伺服器別用該埠（這幾輪用 8777／8788／8799，用完已關）。
 - **資安待辦（選擇性）**：①工單狀態機漂移（已查證、決定先不修，結論與建議範圍見上；若要修只收直接寫入入口）；②以管理者提供的真實測試帳號實打網站 API（目前只有 SQL 角色模擬與 anon 實打）；③`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；④外洩密碼保護已開啟，但需用測試申請驗證帳號核准流程未被擋（見上）；⑤行動端與 Python 訊號服務仍有 Dependabot 項目。
-- **下一步**：①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
+- **下一步**：（新）部署後登入檢視營運頁、管理後台、資安警示、市場分析的篩選列與長標籤按鈕是否被切到；①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
 - 🕐 最後更新：2026-10-29 收工，Claude Code @ DESKTOP-0CFB6UK；Git：本批文件經 PR 合併（見 PR 號），遠端分支與合併狀態以 GitHub 為準。
 - **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
 - 既知環境問題：G 槽 `.git` 內有空的 `packed-refs.lock`（2026-10-29 早上留下，未確認是否有 git 程序使用，故未刪），會讓部分 `git branch／push` 的追蹤設定報「another git process」；不影響 push 本身。
