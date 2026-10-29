@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { htmlScripts, isClassicInlineScript } from './html-audit-parser.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -76,11 +77,9 @@ function auditHtml(file){
     if(!fs.existsSync(target) || (fs.statSync(target).isDirectory() && !fs.existsSync(path.join(target,'index.html'))))add('error','missing-asset',file,`找不到本機資源：${raw}`);
   }
 
-  for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
-    const attrs=match[1],code=match[2].trim();
-    const external=attrs.match(/\bsrc=["'](https:\/\/[^"']+)["']/i);
-    if(external&&!/\bintegrity=["']sha(?:256|384|512)-/i.test(attrs))add('error','script-integrity',file,`外部程式缺少 SRI：${external[1]}`);
-    if(!code||/\bsrc\s*=/i.test(attrs)||/\btype=["'](?:module|application\/ld\+json|application\/json)["']/i.test(attrs))continue;
+  for(const {attrs,code} of htmlScripts(html)){
+    if(attrs.src?.startsWith('https:') && !/^sha(?:256|384|512)-/.test(attrs.integrity || ''))add('error','script-integrity',file,`外部程式缺少 SRI：${attrs.src}`);
+    if(!code.trim() || !isClassicInlineScript(attrs))continue;
     try{new vm.Script(code,{filename:path.relative(root,file)});}catch(error){add('error','inline-js-syntax',file,String(error.message).split('\n')[0]);}
   }
   for(const match of html.matchAll(/<link\b([^>]*\brel=["']stylesheet["'][^>]*)>/gi)){

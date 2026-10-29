@@ -48,18 +48,19 @@ test('每次掃碼或操作都把閒置期限往後延長十分鐘', () => {
   assert.equal(touched.status, 'valid');
   if (touched.status === 'valid') {
     assert.equal(touched.value.valid_until, activityAt + PATROL_IDLE_TIMEOUT_MS);
-    assert.equal(touched.value.access_token, 'access-2');
+    assert.equal(storage.getItem(PATROL_SESSION_STORAGE_KEY)?.includes('access-2'), false);
   }
   assert.equal(patrolSessionState(activityAt + PATROL_IDLE_TIMEOUT_MS + 1, storage).status, 'expired');
 });
 
-test('新掃碼分頁可恢復有效登入，過期後即使仍有舊分頁 session 也必須重登', async () => {
+test('有效瀏覽器 session 可恢復巡檢狀態，過期後舊分頁也必須重登', async () => {
   const storage = new MemoryStorage();
   const now = 2_000_000;
   startPatrolSession(session(), now, storage);
   let restored = 0;
   const client = {
     auth: {
+      getSession: async () => ({data:{session:session()},error:null}),
       setSession: async () => { restored += 1; return { data: { session: session('auth-user-1', 'restored') }, error: null }; },
     },
   } as unknown as SupabaseClient;
@@ -102,4 +103,19 @@ test('瀏覽器封鎖本機儲存時不會阻斷原本的登入流程', () => {
   assert.equal(startPatrolSession(session(), 5_000_000, blocked), false);
   assert.equal(patrolSessionState(5_000_000, blocked).status, 'missing');
   assert.doesNotThrow(() => markPatrolSessionExpired(blocked));
+});
+
+test('舊 V2 巡檢紀錄讀取時只保留身分與期限，永久權杖立即移除',()=>{
+ const storage=new MemoryStorage();const now=6_000_000;
+ storage.setItem(PATROL_SESSION_STORAGE_KEY,JSON.stringify({version:2,user_id:'auth-user-1',access_token:'legacy-secret',refresh_token:'legacy-refresh',last_activity_at:now,valid_until:now+10000}));
+ assert.equal(patrolSessionState(now,storage).status,'valid');
+ const raw=storage.getItem(PATROL_SESSION_STORAGE_KEY)||'';
+ assert.equal(raw.includes('legacy-secret'),false);assert.equal(raw.includes('access_token'),false);
+});
+
+test('工作階段恢復期間登出，晚到的 Auth 回應不得重新啟用巡檢',async()=>{
+ const storage=new MemoryStorage();const now=7_000_000;startPatrolSession(session(),now,storage);
+ const client={auth:{getSession:async()=>({data:{session:session()},error:null}),setSession:async()=>{markPatrolSessionExpired(storage);return {data:{session:session()},error:null};}}} as unknown as SupabaseClient;
+ assert.equal(await ensurePatrolQrSession(client,null,now,storage),null);
+ assert.equal(patrolSessionState(now,storage).status,'expired');
 });

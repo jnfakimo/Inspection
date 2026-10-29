@@ -6,7 +6,7 @@
 // 用法：頁面在建立 client 前載入本檔（<script src="supabase-config.js">，需排在
 // @supabase/supabase-js 之後），改用 window.createDb() 取代原本的
 // supabase.createClient(SUPA_URL, SUPA_KEY)。一般登入憑證只放 sessionStorage；
-// 巡檢 QR 另有最長 2 小時的跨分頁橋接，供手機掃碼開新分頁時恢復工作階段。
+// 巡檢 QR 另有最長 2 小時的跨分頁橋接；僅期限／身分留在 localStorage，權杖由仍開啟的同來源分頁即時傳遞。
 // 自建站台所在網路連不到 *.supabase.co，沿用目前 origin 讓 IIS 反向代理轉發到本機 Supabase。
 var isSelfHosted = typeof window !== 'undefined' && (
   /^https?:\/\/(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.|1\.34\.|localhost|127\.0\.0\.1)/.test(window.location.origin) ||
@@ -110,53 +110,73 @@ window.invokeEdgeAction = async function (client, functionName, body) {
 })();
 
 window.PatrolSessionBridge = (function () {
-  var KEY='beinongPatrolTrustedSessionV1';
-  var MAX_AGE_MS=2*60*60*1000;
+  var KEY='beinongPatrolTrustedSessionV1',CHANNEL='inspection-patrol-session-v1';
+  var MAX_AGE_MS=2*60*60*1000,provider=null;
   function clear(){try{localStorage.removeItem(KEY);}catch(_e){}}
+  function write(value){localStorage.setItem(KEY,JSON.stringify({version:1,user_id:value.user_id,valid_until:value.valid_until}));}
   function read(){
     try{
       var value=JSON.parse(localStorage.getItem(KEY)||'null');
-      if(!value||value.version!==1||!value.access_token||!value.refresh_token||!value.user_id||Number(value.valid_until)<=Date.now()){clear();return null;}
-      return value;
+      if(!value||value.version!==1||typeof value.user_id!=='string'||!value.user_id||!Number.isFinite(value.valid_until)||value.valid_until<=Date.now()){clear();return null;}
+      var safe={version:1,user_id:value.user_id,valid_until:value.valid_until};
+      if('access_token' in value||'refresh_token' in value)write(safe);
+      return safe;
     }catch(_e){clear();return null;}
   }
   function save(session){
     if(!session||!session.access_token||!session.refresh_token||!session.user||!session.user.id)return false;
     try{
-      var existing=read();
-      var sameUser=existing&&existing.user_id===session.user.id;
-      var validUntil=sameUser?Number(existing.valid_until):Date.now()+MAX_AGE_MS;
-      if(!Number.isFinite(validUntil)||validUntil<=Date.now()){clear();return false;}
-      localStorage.setItem(KEY,JSON.stringify({version:1,user_id:session.user.id,access_token:session.access_token,refresh_token:session.refresh_token,valid_until:validUntil}));
-      return true;
+      var existing=read(),sameUser=existing&&existing.user_id===session.user.id;
+      write({user_id:session.user.id,valid_until:sameUser?existing.valid_until:Date.now()+MAX_AGE_MS});return true;
     }catch(_e){return false;}
   }
-  function update(session){
-    var existing=read();
-    if(!existing||!session||!session.user||existing.user_id!==session.user.id||!session.access_token||!session.refresh_token)return false;
-    try{
-      localStorage.setItem(KEY,JSON.stringify({version:1,user_id:existing.user_id,access_token:session.access_token,refresh_token:session.refresh_token,valid_until:existing.valid_until}));
-      return true;
-    }catch(_e){return false;}
+  function update(session){var current=read();return !!(current&&session&&session.user&&current.user_id===session.user.id&&save(session));}
+  function install(client){
+    if(provider)provider.close();provider=null;
+    try{provider=new BroadcastChannel(CHANNEL);}catch(_e){return;}
+    provider.onmessage=async function(event){
+      var m=event.data,current=read();
+      if(!m||m.type!=='request'||typeof m.id!=='string'||!current||m.user_id!==current.user_id)return;
+      try{
+        var result=await client.auth.getSession(),session=result.data&&result.data.session,latest=read();
+        if(result.error||!session||!latest||latest.user_id!==m.user_id||session.user.id!==m.user_id)return;
+        provider.postMessage({type:'response',id:m.id,user_id:m.user_id,access_token:session.access_token,refresh_token:session.refresh_token});
+      }catch(_e){}
+    };
+  }
+  function request(userId){
+    return new Promise(function(resolve){
+      var channel,id,timer;
+      try{channel=new BroadcastChannel(CHANNEL);id=crypto.randomUUID();}catch(_e){resolve(null);return;}
+      function finish(value){clearTimeout(timer);channel.close();resolve(value);}
+      channel.onmessage=function(event){var m=event.data;if(m&&m.type==='response'&&m.id===id&&m.user_id===userId&&typeof m.access_token==='string'&&typeof m.refresh_token==='string')finish(m);};
+      timer=setTimeout(function(){finish(null);},1500);
+      channel.postMessage({type:'request',id:id,user_id:userId});
+    });
   }
   async function restore(client){
-    var value=read();
-    if(!value||!client||!client.auth)return null;
+    var value=read();if(!value||!client||!client.auth)return null;
     try{
-      var result=await client.auth.setSession({access_token:value.access_token,refresh_token:value.refresh_token});
+      var current=await client.auth.getSession(),credentials=current.data&&current.data.session;
+      if(credentials&&credentials.user.id!==value.user_id)return null;
+      if(!credentials)credentials=await request(value.user_id);
+      var latest=read();if(!credentials||!latest||latest.user_id!==value.user_id)return null;
+      var result=await client.auth.setSession({access_token:credentials.access_token,refresh_token:credentials.refresh_token});
       var session=result&&result.data&&result.data.session;
-      if(result.error||!session||!session.user||session.user.id!==value.user_id||Number(value.valid_until)<=Date.now()){clear();return null;}
-      save(session);
-      return session;
+      latest=read();
+      if(result.error||!session||!session.user||session.user.id!==value.user_id||!latest||latest.user_id!==value.user_id){clear();return null;}
+      update(session);return session;
     }catch(_e){clear();return null;}
   }
-  return {save:save,update:update,restore:restore,clear:clear,read:read,maxAgeMs:MAX_AGE_MS};
+  read(); // Migrate old permanent token copies to token-free metadata only.
+  return {save:save,update:update,restore:restore,clear:clear,read:read,install:install,maxAgeMs:MAX_AGE_MS};
 })();
 
 window.createDb = function (options) {
   var config=Object.assign({},options||{});
   config.auth=Object.assign({persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.sessionStorage},config.auth||{});
   var client=supabase.createClient(window.SUPA_URL, window.SUPA_KEY, config);
+  window.PatrolSessionBridge.install(client);
   if(client.auth&&client.auth.onAuthStateChange){
     client.auth.onAuthStateChange(function(event,session){
       if(event==='SIGNED_OUT'||event==='USER_DELETED')window.PatrolSessionBridge.clear();
