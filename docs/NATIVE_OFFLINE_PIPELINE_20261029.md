@@ -45,3 +45,5 @@
 7 筆 deepmerge 低風險依賴仍依既有補丁與雜湊守門列管，本輪未重新查詢上游版本，也未宣稱消除公告。帳密、金鑰、session、APK 及資料庫不進 Git；無需在聊天提供這些秘密。
 
 私有證據目錄 C:/projects/Inspection-supabase-e2e-20261028/evidence/：native-offline-flow.json、native-offline-server-initial.json、native-offline-pending.json、native-offline-end-failed.json、native-offline-server-offline.json、native-offline-end-recovered.json、native-offline-server-final.json、native-offline-server-repeat.json、native-offline-server-cleanup.json、native-offline-device-cleanup.json、native-offline-firewall-blocked.txt／restored.txt。私有測試入口與 fixture 工具留在隔離目錄，不混入產品。
+
+後續補驗：本報告未涵蓋的「後端已寫入但成功回應遺失、App 強制關閉後重送」已另完成 6/6 原生整合檢查，見 [原生回應遺失與重送報告](NATIVE_ACK_REPLAY_20261029.md)。兩份報告的測試 fixture 與證據分開，不能混用筆數。
