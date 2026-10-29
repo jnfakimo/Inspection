@@ -76,6 +76,189 @@ const storage = loadTs('src/storage.ts', {
   './encrypted-storage': { encryptedStorage },
 });
 
+// Each load has its own JS locks and key cache, but shares the persisted adapter.
+function independentEncryptedStore(adapter = asyncStorage) {
+  return loadTs('src/encrypted-storage.ts', {
+    '@react-native-async-storage/async-storage': adapter,
+    'expo-crypto': cryptoMock,
+    'expo-secure-store': secureStore,
+  }).encryptedStorage;
+}
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+test('independent reader retries when committed replacement removes its previously observed chunks', async () => {
+  disk.clear();
+  const key = 'gc-reader-replacement';
+  await encryptedStorage.setItem(key, '舊'.repeat(60_000));
+  const entered = deferred(), resume = deferred();
+  let paused = false;
+  const reader = independentEncryptedStore({ ...asyncStorage, async getItem(name) {
+    if (!paused && name.includes(':chunk:')) {
+      paused = true; entered.resolve(); await resume.promise;
+    }
+    return asyncStorage.getItem(name);
+  } });
+  const reading = reader.getItem(key);
+  try {
+    await entered.promise;
+    await encryptedStorage.setItem(key, '完整新資料');
+  } finally { resume.resolve(); }
+  assert.equal(await reading, '完整新資料');
+});
+
+test('independent reader observes removal instead of reporting stale missing chunks', async () => {
+  disk.clear();
+  const key = 'gc-reader-logout';
+  await encryptedStorage.setItem(key, '舊'.repeat(60_000));
+  const entered = deferred(), resume = deferred();
+  let paused = false;
+  const reader = independentEncryptedStore({ ...asyncStorage, async getItem(name) {
+    if (!paused && name.includes(':chunk:')) {
+      paused = true; entered.resolve(); await resume.promise;
+    }
+    return asyncStorage.getItem(name);
+  } });
+  const reading = reader.getItem(key);
+  try {
+    await entered.promise;
+    await encryptedStorage.removeItem(key);
+  } finally { resume.resolve(); }
+  assert.equal(await reading, null);
+});
+
+for (const replacement of ['chunked', 'tampered', 'invalid-index']) {
+  test(`independent reader authenticates and validates replacement after retry: ${replacement}`, async () => {
+    disk.clear();
+    const key = 'gc-retry-validation', indexKey = 'encrypted_v1:' + key;
+    await encryptedStorage.setItem(key, '舊'.repeat(60_000));
+    const entered = deferred(), resume = deferred();
+    let paused = false;
+    const reader = independentEncryptedStore({ ...asyncStorage, async getItem(name) {
+      if (!paused && name.includes(':chunk:')) {
+        paused = true; entered.resolve(); await resume.promise;
+      }
+      return asyncStorage.getItem(name);
+    } });
+    const reading = reader.getItem(key);
+    const checked = replacement === 'chunked'
+      ? reading.then(value => assert.equal(value, '新'.repeat(60_000)))
+      : assert.rejects(reading);
+    try {
+      await entered.promise;
+      await encryptedStorage.setItem(key, replacement === 'chunked' ? '新'.repeat(60_000) : '新值');
+      if (replacement === 'tampered') {
+        const record = JSON.parse(disk.get(indexKey).slice('encrypted_v1:'.length));
+        record.tag = randomBytes(16).toString('base64');
+        disk.set(indexKey, 'encrypted_v1:' + JSON.stringify(record));
+      }
+      if (replacement === 'invalid-index') disk.set(indexKey, '{"chunks":["other-account-record"]}');
+      disk.set('other-account-record', '不可刪除');
+    } finally { resume.resolve(); }
+    await checked;
+    assert.equal(disk.get('other-account-record'), '不可刪除');
+  });
+}
+
+test('missing chunks under an unchanged index remain an error and preserve legacy data', async () => {
+  disk.clear();
+  const key = 'gc-unchanged-corruption';
+  await encryptedStorage.setItem(key, '舊'.repeat(60_000));
+  const manifest = JSON.parse(disk.get('encrypted_v1:' + key));
+  disk.delete(manifest.chunks[0]);
+  disk.set(key, '不可悄悄回退的舊明文');
+  await assert.rejects(independentEncryptedStore().getItem(key), /加密資料不完整/);
+  assert.equal(disk.get(key), '不可悄悄回退的舊明文');
+});
+
+test('index recheck storage failure propagates without deleting any further data', async () => {
+  disk.clear();
+  const key = 'gc-recheck-error', indexKey = 'encrypted_v1:' + key;
+  await encryptedStorage.setItem(key, '舊'.repeat(60_000));
+  disk.delete(JSON.parse(disk.get(indexKey)).chunks[0]);
+  const before = [...disk];
+  let reads = 0;
+  const reader = independentEncryptedStore({ ...asyncStorage, async getItem(name) {
+    if (name === indexKey && ++reads === 2) throw new Error('isolated storage unavailable');
+    return asyncStorage.getItem(name);
+  } });
+  await assert.rejects(reader.getItem(key), /isolated storage unavailable/);
+  assert.deepEqual([...disk], before);
+});
+
+test('continuously changing missing generations have bounded retries', async () => {
+  disk.clear();
+  const key = 'gc-churn', indexKey = 'encrypted_v1:' + key;
+  let indexReads = 0;
+  const reader = independentEncryptedStore({ ...asyncStorage, async getItem(name) {
+    if (name === indexKey) return JSON.stringify({ chunks: [indexKey + ':chunk:' + (++indexReads) + ':0'] });
+    return null;
+  } });
+  await assert.rejects(reader.getItem(key), /讀取期間持續變更/);
+  assert.equal(indexReads, 6, 'three attempts, each with an index read and recheck');
+  assert.equal(disk.size, 0);
+});
+
+// Deliberately unsafe collectors below exist ONLY as counterexamples in this test.
+// Absence from an index (even twice or for a long time) is not deletion authority.
+for (const policy of ['snapshot', 'double-check', 'age-threshold', 'preserve']) {
+  test(`orphan cleanup safety: ${policy} while another runtime has an unpublished chunk`, async () => {
+    disk.clear();
+    const key = 'gc-in-flight', indexKey = 'encrypted_v1:' + key;
+    await encryptedStorage.setItem(key, '舊值'); // Seed keychain before concurrent access.
+    const entered = deferred(), resume = deferred();
+    let paused = false, clock = 0, chunkWrittenAt;
+    const writer = independentEncryptedStore({ ...asyncStorage, async setItem(name, value) {
+      await asyncStorage.setItem(name, value);
+      if (!paused && name.startsWith(indexKey + ':chunk:')) {
+        paused = true; chunkWrittenAt = clock; entered.resolve(); await resume.promise;
+      }
+    } });
+    const writing = writer.setItem(key, '完整新資料'.repeat(60_000));
+    try {
+      await entered.promise;
+      const index = await asyncStorage.getItem(indexKey);
+      const candidates = [...disk.keys()].filter(name => name.startsWith(indexKey + ':chunk:'));
+      assert.equal(candidates.length, 1);
+      if (policy === 'double-check') assert.equal(await asyncStorage.getItem(indexKey), index);
+      if (policy === 'age-threshold') {
+        clock += 366 * 24 * 60 * 60 * 1000;
+        assert.ok(clock - chunkWrittenAt > 30 * 24 * 60 * 60 * 1000);
+      }
+      if (policy !== 'preserve') await asyncStorage.multiRemove(candidates);
+    } finally { resume.resolve(); }
+    await writing;
+    if (policy === 'preserve') assert.equal(await independentEncryptedStore().getItem(key), '完整新資料'.repeat(60_000));
+    else await assert.rejects(independentEncryptedStore().getItem(key), /加密資料不完整/);
+  });
+}
+
+test('index recheck immediately before sweep still races with publication in another runtime', async () => {
+  disk.clear();
+  const key = 'gc-publication-race', indexKey = 'encrypted_v1:' + key;
+  await encryptedStorage.setItem(key, '舊值');
+  const ready = deferred(), publish = deferred();
+  const writer = independentEncryptedStore({ ...asyncStorage, async setItem(name, value) {
+    if (name === indexKey) { ready.resolve(); await publish.promise; }
+    return asyncStorage.setItem(name, value);
+  } });
+  const writing = writer.setItem(key, '新'.repeat(60_000));
+  let candidates;
+  try {
+    await ready.promise;
+    const index = await asyncStorage.getItem(indexKey);
+    candidates = [...disk.keys()].filter(name => name.startsWith(indexKey + ':chunk:'));
+    assert.ok(candidates.length > 1);
+    assert.equal(await asyncStorage.getItem(indexKey), index);
+  } finally { publish.resolve(); }
+  await writing; // Publication happens in the gap after the check, before removal.
+  await asyncStorage.multiRemove(candidates);
+  await assert.rejects(independentEncryptedStore().getItem(key), /加密資料不完整/);
+});
+
 test('legacy auth and location data migrate only after encrypted write', async () => {
   disk.clear();
   await asyncStorage.setItem('sb-session', '{"access_token":"secret-token","label":"臺北農產"}');

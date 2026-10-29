@@ -32,12 +32,18 @@ function chunkKeys(key: string, stored: string | null): string[] {
 }
 
 async function readEncrypted(key: string): Promise<string | null> {
-  const stored = await AsyncStorage.getItem(PREFIX + key);
-  if (!stored) return null;
-  if (stored.startsWith(PREFIX)) return stored;
-  const parts = await Promise.all(chunkKeys(key, stored).map(part => AsyncStorage.getItem(part)));
-  if (parts.some(part => part === null)) throw new Error('加密資料不完整');
-  return parts.join('');
+  const indexKey = PREFIX + key;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const stored = await AsyncStorage.getItem(indexKey);
+    if (!stored) return null;
+    if (stored.startsWith(PREFIX)) return stored;
+    const parts = await Promise.all(chunkKeys(key, stored).map(part => AsyncStorage.getItem(part)));
+    if (parts.every(part => part !== null)) return parts.join('');
+    // A different JS runtime may have replaced the index and reclaimed its old chunks.
+    // Retry only a changed generation; actual corruption and storage errors still fail closed.
+    if (await AsyncStorage.getItem(indexKey) === stored) throw new Error('加密資料不完整');
+  }
+  throw new Error('加密資料在讀取期間持續變更，請重試');
 }
 
 async function encryptionKey(): Promise<AESEncryptionKey> {
