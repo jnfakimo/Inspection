@@ -178,3 +178,13 @@ verifyBackup 現在拒絕 manifest 清單外檔案、重複資料表、總數不
 ### 2026-10-29 獨立叢集補驗與角色還原注意事項
 
 新增 Storage 根目錄 lstat，拒絕根目錄 junction／符號連結。隔離 PostgreSQL 17 已完成新 initdb 叢集、獨立資料卷、無網路的邏輯庫及角色還原；Auth／角色密碼雜湊、成員關係與 grantor 均相符，重啟後原測試密碼 crypt 核對通過。PostgreSQL 17 的 GRANTED BY 還原必須保留來源角色管理權關係；本次以來源同名 bootstrap 超級使用者初始化，僅略過 CREATE 該已存在角色，其他 ALTER／GRANT 全保留並遇錯即停。不忽略還原錯誤，不套用到正式庫。這不是異機／正式 RPO/RTO 或完整服務恢復證明，見 ISOLATED_FOLLOWUP_20261029.md。
+
+### 2026-10-29 獨立服務復原：附屬資料庫不可漏列
+
+本輪將還原後主庫接上全新 Auth／REST／Storage／Edge 時，Storage 因缺少附屬 `storage_vectors` 庫的 vector 擴充套件而無法啟動。從隔離來源完整還原該庫（vector 0.8.2）後，實際附件下載／匿名拒絕及整組重啟均通過。沒有提高應用角色權限或停用錯誤檢查。
+
+完整災難復原前應先盤點來源 `pg_database` 的所有非範本資料庫及各庫的 `pg_extension`、擁有權、服務連線設定、角色／成員授權、Auth、Storage 原始檔與機密設定保存方式。不同 Supabase 版本／代管方案的附屬庫可能不同，不能直接假設正式環境也有同名庫；須以授權盤點結果為準。禁止只憑主庫表數相符就宣稱全服務復原。
+
+自架的新隔離目標須依盤點逐庫備份／還原，保留 extension 所需權限與版本，遇錯即停；排程與對外通知先隔離。若初始化已產生不完整附屬庫，先保留該隔離庫及錯誤證據，使用明確的新隔離目標完成還原，不能把本演練操作套用正式庫。
+
+驗收須包含原帳號密碼 Auth 登入、Edge 確認還原目標、REST／RLS、私有 Storage 位元組與 SHA-256、匿名拒絕、測試 SMTP 成功與故障、整組服務重啟。正式演練另須異機與核定 RPO/RTO。既有 Management API 備份仍是 public 資料與 Storage 範圍，不含 Auth／角色／其他資料庫；此輪未修改正式備份排程。完整證據見 [隔離故障補驗報告](ISOLATED_FAULT_VERIFICATION_20261029.md)。

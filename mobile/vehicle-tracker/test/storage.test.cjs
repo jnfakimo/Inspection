@@ -123,3 +123,247 @@ test('queue encrypts GPS data, expires old points and preserves concurrent addit
   await storage.removeQueuedLocationPoints([points[0].client_event_id]);
   assert.equal((await storage.readLocationQueue()).length, 1);
 });
+
+test('partial chunk and index write failures leave no new orphan chunks', async () => {
+  for (const failure of ['second-chunk', 'index']) {
+    disk.clear();
+    await encryptedStorage.setItem('atomic', 'old session');
+    const before = new Map(disk);
+    const original = asyncStorage.setItem;
+    let chunks = 0;
+    asyncStorage.setItem = async (key, value) => {
+      if (key.includes(':chunk:') && ++chunks === 2 && failure === 'second-chunk') throw new Error('disk full');
+      if (key === 'encrypted_v1:atomic' && failure === 'index') throw new Error('index unavailable');
+      return original(key, value);
+    };
+    try { await assert.rejects(encryptedStorage.setItem('atomic', '甲'.repeat(100_000))); }
+    finally { asyncStorage.setItem = original; }
+    assert.deepEqual(disk, before, failure);
+    assert.equal(await encryptedStorage.getItem('atomic'), 'old session');
+  }
+});
+
+test('logout removes corrupt auth index and legacy value without following foreign chunk references', async () => {
+  disk.clear();
+  for (const corrupt of ['{broken', JSON.stringify({ chunks: ['unrelated-secret'] })]) {
+    disk.set('encrypted_v1:logout', corrupt);
+    disk.set('logout', 'legacy session');
+    disk.set('unrelated-secret', 'keep');
+    await encryptedStorage.removeItem('logout');
+    assert.equal(disk.has('encrypted_v1:logout'), false);
+    assert.equal(disk.has('logout'), false);
+    assert.equal(disk.get('unrelated-secret'), 'keep');
+  }
+});
+
+test('an index error reported after commit never deletes the now-published chunks', async () => {
+  disk.clear();
+  await encryptedStorage.setItem('ambiguous', 'old');
+  const original = asyncStorage.setItem;
+  asyncStorage.setItem = async (key, value) => {
+    await original(key, value);
+    if (key === 'encrypted_v1:ambiguous') throw new Error('native acknowledgement lost');
+  };
+  try { await assert.rejects(encryptedStorage.setItem('ambiguous', '甲'.repeat(100_000)), /acknowledgement/); }
+  finally { asyncStorage.setItem = original; }
+  assert.equal(await encryptedStorage.getItem('ambiguous'), '甲'.repeat(100_000));
+  await encryptedStorage.removeItem('ambiguous');
+  assert.equal(disk.size, 0);
+});
+
+test('logout waits for an earlier in-flight write and does not resurrect the session', async () => {
+  disk.clear();
+  const original = asyncStorage.setItem;
+  let release;
+  let entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  asyncStorage.setItem = async (key, value) => {
+    if (key === 'encrypted_v1:race') { entered(); await gate; }
+    return original(key, value);
+  };
+  try {
+    const writing = encryptedStorage.setItem('race', 'session');
+    await started;
+    const removing = encryptedStorage.removeItem('race');
+    // Let an unlocked removal finish while the write is suspended.
+    await new Promise(resolve => setImmediate(resolve));
+    release();
+    await Promise.all([writing, removing]);
+    assert.equal(await encryptedStorage.getItem('race'), null);
+  } finally { release(); asyncStorage.setItem = original; }
+});
+
+test('temporary keychain failure can retry and a lost key never returns ciphertext as plaintext', async () => {
+  disk.clear();
+  await encryptedStorage.setItem('key-loss', 'private location');
+  const before = disk.get('encrypted_v1:key-loss');
+  let unavailable = true;
+  const fresh = () => loadTs('src/encrypted-storage.ts', {
+    '@react-native-async-storage/async-storage': asyncStorage,
+    'expo-crypto': cryptoMock,
+    'expo-secure-store': {
+      ...secureStore,
+      async getItemAsync(key) {
+        if (unavailable) throw new Error('keychain locked');
+        return secureStore.getItemAsync(key);
+      },
+    },
+  }).encryptedStorage;
+  const restarted = fresh();
+  await assert.rejects(restarted.getItem('key-loss'), /keychain locked/);
+  assert.equal(disk.get('encrypted_v1:key-loss'), before);
+  unavailable = false;
+  assert.equal(await restarted.getItem('key-loss'), 'private location');
+  const savedKeys = new Map(keychain);
+  keychain.clear();
+  try {
+    await assert.rejects(fresh().getItem('key-loss'));
+    assert.equal(disk.get('encrypted_v1:key-loss'), before);
+  } finally {
+    keychain.clear();
+    for (const [key, value] of savedKeys) keychain.set(key, value);
+  }
+});
+
+test('offline retry keeps unacknowledged points and points queued during upload', async () => {
+  disk.clear();
+  const point = id => ({ client_event_id: id, recorded_at: new Date().toISOString(), latitude: 25.1 });
+  await storage.enqueueLocationPoints(Array.from({ length: 101 }, (_, i) => point(`point-${i}`)));
+  let calls = 0;
+  let fail = true;
+  const accepted = new Set();
+  const sync = loadTs('src/sync.ts', {
+    './storage': storage,
+    './supabase': { supabase: { from(table) {
+      assert.equal(table, 'vehicle_location_points');
+      return { async upsert(batch, options) {
+        assert.deepEqual(options, { onConflict: 'client_event_id', ignoreDuplicates: true });
+        calls++;
+        if (calls === 1) await storage.enqueueLocationPoints([point('during-upload')]);
+        if (calls === 2 && fail) return { error: { message: 'offline' } };
+        batch.forEach(row => accepted.add(row.client_event_id));
+        return { error: null };
+      } };
+    } } },
+  });
+  await assert.rejects(sync.flushLocationQueue(), /已保留/);
+  assert.deepEqual((await storage.readLocationQueue()).map(p => p.client_event_id), ['point-100', 'during-upload']);
+  fail = false;
+  assert.equal(await sync.flushLocationQueue(), 2);
+  assert.equal(accepted.size, 102);
+  assert.deepEqual(await storage.readLocationQueue(), []);
+});
+
+test('background callback persists GPS before offline upload and ignores callbacks after session removal', async () => {
+  disk.clear();
+  let callback;
+  let uploads = 0;
+  let bleChecks = 0;
+  let permission = 'denied';
+  let running = false;
+  let starts = 0;
+  let stops = 0;
+  const background = loadTs('src/background-location.ts', {
+    'react-native': { Platform: { OS: 'android' } },
+    'expo-crypto': cryptoMock,
+    'expo-task-manager': { defineTask(name, handler) { callback = handler; } },
+    'expo-location': {
+      Accuracy: { High: 4 }, ActivityType: { AutomotiveNavigation: 1 },
+      async requestForegroundPermissionsAsync() { return { status: permission }; },
+      async requestBackgroundPermissionsAsync() { return { status: permission }; },
+      async hasStartedLocationUpdatesAsync() { return running; },
+      async startLocationUpdatesAsync() { running = true; starts++; },
+      async stopLocationUpdatesAsync() { running = false; stops++; },
+    },
+    './storage': storage,
+    './sync': { async flushLocationQueue() {
+      uploads++;
+      assert.equal((await storage.readLocationQueue()).length, 1);
+      throw new Error('offline');
+    } },
+    './ble-monitor': { async monitorBlePresence() { bleChecks++; throw new Error('BLE unavailable'); } },
+  });
+  await assert.rejects(background.startBackgroundTracking(), /必須允許/);
+  assert.equal(starts, 0);
+  permission = 'granted';
+  await background.startBackgroundTracking();
+  await background.startBackgroundTracking();
+  assert.equal(starts, 1);
+  await storage.writeActiveSession({ sessionId: 's', vehicleId: 'v', deviceId: 'd', driverId: 'u' });
+  const data = { locations: [{ timestamp: Date.now(), coords: { latitude: 25, longitude: 121, speed: -1, heading: -1, accuracy: 5, altitude: null }, mocked: true }] };
+  await callback({ data });
+  const [point] = await storage.readLocationQueue();
+  assert.equal(point.speed_kmh, 0);
+  assert.equal(point.heading_deg, null);
+  assert.equal(point.is_mocked, true);
+  assert.equal(uploads, 1);
+  assert.equal(bleChecks, 1);
+  await storage.writeActiveSession(null);
+  await callback({ data });
+  await callback({ data, error: new Error('native callback error') });
+  assert.equal(uploads, 1);
+  assert.equal((await storage.readLocationQueue()).length, 1);
+  await background.stopBackgroundTracking();
+  await background.stopBackgroundTracking();
+  assert.equal(stops, 1);
+});
+
+test('failed BLE event upload preserves transition for retry and throttles only after success', async () => {
+  let state = { lastCheckedAt: 0, presence: 'present' };
+  let fail = true;
+  let calls = 0;
+  const monitor = loadTs('src/ble-monitor.ts', {
+    'react-native': { Platform: { OS: 'android' } },
+    './ble': { async findRegisteredDevice() { return null; } },
+    './storage': { async readBleMonitorState() { return state; }, async writeBleMonitorState(next) { state = next; } },
+    './supabase': { supabase: { from(table) {
+      assert.equal(table, 'vehicle_tracking_events');
+      return { async insert(event) {
+        calls++;
+        assert.equal(event.event_type, 'ble_disconnected');
+        return { error: fail ? new Error('offline') : null };
+      } };
+    } } },
+  });
+  const session = { deviceId: 'd', vehicleId: 'v', sessionId: 's', platformIdentifier: 'bound-id' };
+  await assert.rejects(monitor.monitorBlePresence(session), /稍後/);
+  assert.deepEqual(state, { lastCheckedAt: 0, presence: 'present' });
+  fail = false;
+  await monitor.monitorBlePresence(session);
+  assert.equal(state.presence, 'missing');
+  await monitor.monitorBlePresence(session);
+  assert.equal(calls, 2);
+});
+
+test('BLE identity rejects same-name tags and cancellation holds lock until native cleanup', async () => {
+  let scanned;
+  let releaseStop;
+  let stopStarted;
+  let subscriptionsRemoved = 0;
+  const started = new Promise(resolve => { scanned = resolve; });
+  const stopping = new Promise(resolve => { stopStarted = resolve; });
+  const stopGate = new Promise(resolve => { releaseStop = resolve; });
+  class FakeManager {
+    onStateChange(handler) { handler('on'); return { remove() { subscriptionsRemoved++; } }; }
+    async startDeviceScan() { scanned(); }
+    async stopDeviceScan() { stopStarted(); await stopGate; }
+  }
+  const ble = loadTs('src/ble.ts', {
+    'react-native': { Platform: { OS: 'ios' }, PermissionsAndroid: {} },
+    'react-native-ble-plx': { BleManager: FakeManager, State: { PoweredOn: 'on' } },
+  });
+  const registered = { advertised_name: 'Tag', service_uuid: 'service', platform_identifiers: { ios: 'bound-id' } };
+  assert.equal(ble.matchesRegisteredDevice({ id: 'other-id', name: 'Tag', serviceUuids: ['service'] }, registered), false);
+  assert.equal(ble.matchesRegisteredDevice({ id: 'bound-id' }, registered), true);
+  const first = ble.scanNearbyDevices(() => {}, 'service');
+  const rejected = assert.rejects(first, /取消/);
+  try {
+    await started;
+    ble.stopBleManager();
+    await stopping;
+    await assert.rejects(ble.scanNearbyDevices(() => {}, 'service'), /正在進行/);
+  } finally { releaseStop(); }
+  await rejected;
+  assert.equal(subscriptionsRemoved, 1);
+});

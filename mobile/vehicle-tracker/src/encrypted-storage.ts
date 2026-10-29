@@ -7,6 +7,15 @@ const PREFIX = 'encrypted_v1:';
 const CHUNK_SIZE = 200_000;
 const MAX_CHUNKS = 128;
 let keyPromise: Promise<AESEncryptionKey> | undefined;
+const operations = new Map<string, Promise<void>>();
+
+function withKeyLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const result = (operations.get(key) ?? Promise.resolve()).then(operation);
+  const tail = result.then(() => undefined, () => undefined);
+  operations.set(key, tail);
+  void tail.then(() => { if (operations.get(key) === tail) operations.delete(key); });
+  return result;
+}
 
 function chunkKeys(key: string, stored: string | null): string[] {
   if (!stored || stored.startsWith(PREFIX)) return [];
@@ -65,41 +74,60 @@ async function decrypt(value: string): Promise<string> {
   return decodeURIComponent(encoded);
 }
 
-export const encryptedStorage = {
-  async getItem(key: string): Promise<string | null> {
-    const encryptedKey = PREFIX + key;
-    const current = await readEncrypted(key);
-    if (current !== null) return decrypt(current);
-    const legacy = await AsyncStorage.getItem(key);
-    if (legacy === null) return null;
-    // Migrate only after encryption is safely persisted; never silently discard existing data.
-    await this.setItem(key, legacy);
-    await AsyncStorage.removeItem(key);
-    return legacy;
-  },
-  async setItem(key: string, value: string): Promise<void> {
-    const indexKey = PREFIX + key;
-    const previous = chunkKeys(key, await AsyncStorage.getItem(indexKey));
-    const ciphertext = await encrypt(value);
-    if (ciphertext.length <= CHUNK_SIZE) {
-      await AsyncStorage.setItem(indexKey, ciphertext);
-    } else {
-      const count = Math.ceil(ciphertext.length / CHUNK_SIZE);
-      if (count > MAX_CHUNKS) throw new Error('加密資料超出裝置儲存上限');
-      const generation = randomUUID();
-      const parts = Array.from({ length: count }, (_, index) => `${indexKey}:chunk:${generation}:${index}`);
+async function setItemUnlocked(key: string, value: string): Promise<void> {
+  const indexKey = PREFIX + key;
+  const previous = chunkKeys(key, await AsyncStorage.getItem(indexKey));
+  const ciphertext = await encrypt(value);
+  if (ciphertext.length <= CHUNK_SIZE) {
+    await AsyncStorage.setItem(indexKey, ciphertext);
+  } else {
+    const count = Math.ceil(ciphertext.length / CHUNK_SIZE);
+    if (count > MAX_CHUNKS) throw new Error('加密資料超出裝置儲存上限');
+    const generation = randomUUID();
+    const parts = Array.from({ length: count }, (_, index) => `${indexKey}:chunk:${generation}:${index}`);
+    const manifest = JSON.stringify({ chunks: parts });
+    try {
       for (let index = 0; index < count; index++) {
         await AsyncStorage.setItem(parts[index]!, ciphertext.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE));
       }
-      // The index changes only after every new chunk is written. Old chunks stay readable on failure.
-      await AsyncStorage.setItem(indexKey, JSON.stringify({ chunks: parts }));
+      // Publish only complete generations; readers and logout use the same per-key lock.
+      await AsyncStorage.setItem(indexKey, manifest);
+    } catch (error) {
+      // A native error may arrive after commit. Delete only a generation known to be unpublished.
+      const current = await AsyncStorage.getItem(indexKey).catch(() => undefined);
+      if (current !== undefined && current !== manifest) {
+        await AsyncStorage.multiRemove(parts).catch(() => undefined);
+      }
+      throw error;
     }
-    await AsyncStorage.removeItem(key);
-    if (previous.length) await AsyncStorage.multiRemove(previous);
+  }
+  await AsyncStorage.removeItem(key);
+  if (previous.length) await AsyncStorage.multiRemove(previous);
+}
+
+export const encryptedStorage = {
+  getItem(key: string): Promise<string | null> {
+    return withKeyLock(key, async () => {
+      const current = await readEncrypted(key);
+      if (current !== null) return decrypt(current);
+      const legacy = await AsyncStorage.getItem(key);
+      if (legacy === null) return null;
+      // Migrate only after encryption is safely persisted; never silently discard existing data.
+      await setItemUnlocked(key, legacy);
+      return legacy;
+    });
   },
-  async removeItem(key: string): Promise<void> {
-    const indexKey = PREFIX + key;
-    const parts = chunkKeys(key, await AsyncStorage.getItem(indexKey));
-    await AsyncStorage.multiRemove([indexKey, key, ...parts]);
+  setItem(key: string, value: string): Promise<void> {
+    return withKeyLock(key, () => setItemUnlocked(key, value));
+  },
+  removeItem(key: string): Promise<void> {
+    return withKeyLock(key, async () => {
+      const indexKey = PREFIX + key;
+      const stored = await AsyncStorage.getItem(indexKey);
+      let parts: string[] = [];
+      // A corrupt index must not prevent logout, nor authorize deleting arbitrary keys.
+      try { parts = chunkKeys(key, stored); } catch { /* Discard only the invalid index and legacy value. */ }
+      await AsyncStorage.multiRemove([indexKey, key, ...parts]);
+    });
   },
 };
