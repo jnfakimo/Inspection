@@ -5,7 +5,7 @@
 
 ## ⏯️ 目前做到哪
 
-最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#117），皆已部署或生效；詳情見下。**
+最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#120），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
   臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。
 - PR #110（`8a15ddc91`）：派車報表視窗排版修正。PR #111（`dac0e686e`）：派車各頁配色統一為品牌主色，狀態色只表示狀態。
@@ -28,6 +28,15 @@
   設在 G 槽共用 `.git/config` 會影響 Codex 的 commit／push，故等 Codex 收尾、G 槽更新後再啟用。Linux／macOS 上的執行權限（已設 100755）未實測。
 - **G 槽現況（2026-10-29 唯讀檢查）**：分支 `refactor/inspection-account-review-20261024`，**落後 main 30 個提交**（HEAD 已在 main 內，可快轉），有 Codex 的 31 個未提交修改與 16 個未追蹤檔；
   與 main 重疊的有 `handoff.md`、`AGENTS.md`、`package.json`、`supabase/functions/app-api/index.ts`。**Codex 收尾前不要動 G 槽**；收尾後順序：刪 `.claude/` 副本 → 快轉 main →（衝突手動合併 `handoff.md`）→ 啟用 `core.hooksPath` → 開新 session 確認 hook 載入。
+- **PR #119（`e87809262`）：改完即查的資安 hook**（`.claude/hooks/security-check.mjs`，PostToolUse）：Claude 改 `web/`、`supabase/`、`system/`、`backend/` 的程式或 SQL 後，重用 `tools/security-design-audit.mjs` 並補查
+  web 端出現 service_role、`NEXT_PUBLIC_` 變數名含 SECRET／TOKEN 等、migration 的 create table 沒開 RLS、security definer 函式沒設 `search_path`；`innerHTML` 賦值只提醒不擋。錯誤 exit 2 讓 Claude 當場修。
+- **PR #120（`7ee02583f`）：正式庫資安修正——11 個管理報表 view 收回權限**。**發現**：`vw_manager_*` 8 個與 `equipment_annual_cost_summary`、`equipment_central_monitoring_registry`、`equipment_lifecycle_overview` 共 11 個 view 以擁有者權限執行（繞過 RLS），
+  Supabase 預設又把新物件全部權限授給 `authenticated`，任何登入帳號（含最低權限的報修人員）都能經 `/rest/v1/<view>` 讀到全部報修、巡檢、維修單與設備費用，其中 `vw_manager_equipment` 可更新、能繞過 `equipment` 的 RLS 寫入。網站、Edge Function、資料庫函式皆未使用這些 view（已逐一查證）。
+  **修正**：migration `20261029100000_restrict_manager_views.sql`（只 `revoke all … from public, anon, authenticated`，不動資料）；`tools/restrict-manager-views-db.test.mjs`（PGlite：修正前重現、修正後無權限、`office_manager` 唯讀不變）已接進 `npm test`；
+  `security-check` hook 新增「migration 建 view 未設 `security_invoker` 也未 revoke `authenticated`」規則，`hooks.test.mjs` 增至 68 項。
+  **已套用正式庫**（合併後以 `apply-database-migration.yml` 在 main 執行，成功）並**唯讀讀回**：11 個 view 的 `anon`／`authenticated` 讀寫權限皆為 false；8 個 `vw_manager_*` 的 `office_manager` 仍只有 SELECT；Supabase 資安建議已無 view 項目。
+  **注意**：3 個 `equipment_*` view 的 `office_manager` 本來就沒有 SELECT（repo migration 無相關授權，套用前實際狀態未讀取）；若 LibreOffice 報表要用，須逐一明確授權並在 PR 說明。尚未以 `authenticated` 身分實際打網站 API 驗證，只有權限讀回與 PGlite 測試。
+- **資安待辦（選擇性）**：`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；Supabase Auth 的「外洩密碼保護」需在儀表板由管理者開啟；行動端與 Python 訊號服務仍有 Dependabot 項目。
 - **下一步**：①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
 - 🕐 最後更新：2026-10-29 收工，Claude Code @ DESKTOP-0CFB6UK；Git：本批文件經 PR 合併（見 PR 號），遠端分支與合併狀態以 GitHub 為準。
 - **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
