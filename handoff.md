@@ -5,6 +5,26 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#115），皆已部署或生效；詳情見下。**
+- PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
+  臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。
+- PR #110（`8a15ddc91`）：派車報表視窗排版修正。PR #111（`dac0e686e`）：派車各頁配色統一為品牌主色，狀態色只表示狀態。
+- PR #112（`4f4bba1a0`）：五個子系統頁與視窗統一用 `VehicleSheet`（`HandoverSheetHeader` 外殼）電子交接簿版型。
+- PR #113（`f6095afa3`）：公務車派車管理系統（SYS-07）時間改**上午／下午 12 小時制**（使用者指定的唯一例外，其餘系統仍 24 小時制）：
+  `TimeSelect`、`LocalizedDateTimeInput` 加 `hour12` 選項只改顯示，值仍是 `HH:mm`；顯示用 `web/lib/clock-format.ts`。
+- PR #114（`939227464`）：上方工作列「N 人在線」徽章。表 `user_presence`＋`presence_heartbeat／presence_leave`（security definer，RLS 啟用且不設政策），
+  最近 3 分鐘有回報、帳號啟用的不重複使用者數；前端只拿到人數，不記頁面、IP、裝置，登出視為離線（調整時間，不實體刪除）。
+  migration `20261028120000_online_presence.sql` 已套用到正式庫並讀回；`npm run test:online-presence`（PGlite 資料庫測試＋靜態檢查）已納入 `npm test`。
+- **未驗證**：以上畫面皆以專案實際 CSS 組靜態樣張與程式檢查驗證，**登入後實際頁面、手機版、多人同時在線的人數**未驗證。
+- **PR #115（`40bbabb47`）：Claude Code 專用自動檢查**（`.claude/settings.json`＋`.claude/hooks/`，規則摘要見 `AGENTS.md` §1 第 7 點）。
+  PreToolUse 擋 `git add .`／`-A`、`git commit -a`、force push、`reset --hard`、`clean -f`、stage 機密檔，並擋機密樣式與機密檔名的寫入；
+  PostToolUse 於改 `web/` 的 ts／tsx／css 後跑 4 個快速守門檢查；Stop 於本次改過 `web/` ts／tsx 時跑 `tsc`（缺 `node_modules/typescript` 則略過並標示未驗證）。
+  驗證：`node .claude/hooks/hooks.test.mjs` 53 項通過；真實 tsc 對故意型別錯誤會擋、修正後通過；**G 槽新 session 實測 `git add .` 與 force push 皆被攔截，個別檔案 `git add` 放行**。
+  限制：只有 Claude Code 會執行，Codex／OpenCode 不會，CI 仍是最後防線；G 槽（雲端硬碟）無完整 `node_modules`，型別檢查在那裡會略過。
+- **待處理**：G 槽 `.claude/` 的 `settings.json` 與 `hooks/` 是從 PR #115 複製的**未追蹤副本**（內容與 main 一致，已用雜湊比對）；把 main 帶進 G 槽分支**之前要先刪掉**，否則 `git pull／merge` 會因同名未追蹤檔失敗（`.claude/settings.local.json` 不動）。
+- **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
+- 既知環境問題：G 槽 `.git` 內有空的 `packed-refs.lock`（2026-10-29 早上留下，未確認是否有 git 程序使用，故未刪），會讓部分 `git branch／push` 的追蹤設定報「another git process」；不影響 push 本身。
+
 最新（2026-10-28）：**公務車「臨時直接派車」已合併（PR #102，合併 commit `33c7796fb`）。** 長官臨時急需用車時，派車管理員／系統管理員在「派車申請」頁按「臨時直接派車」，
 代為建單並直接指派車輛與司機，免課長與部門經理核准；不新增子系統，原五步驟不變。
 RPC `vehicle_direct_dispatch` 在單一交易內先以 `approved` 建單、再走既有 `approved -> assigned`，所以管理員檢查、司機名單、同車時段重疊約束、LINE 派車通知、司機接單與回報都照舊生效。
