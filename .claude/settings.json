@@ -31,6 +31,12 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-check.mjs\"",
             "timeout": 90,
             "statusMessage": "快速守門檢查…"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/security-check.mjs\"",
+            "timeout": 90,
+            "statusMessage": "資安檢查…"
           }
         ]
       }
