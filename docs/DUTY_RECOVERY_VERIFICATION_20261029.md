@@ -58,3 +58,13 @@ Android／iOS 本機 bundle 曾在本輪第一版修正通過；最終共用結�
 | ISO 管理驗收 | 指定風險所有人，核准密碼例外、權限複核、SoA、內稽及管理審查 |
 
 無需重做已通過的隔離測試，也不需要在聊天提供任何秘密。
+
+## 推送後 CI／CodeQL 回讀
+
+程式提交 **88d2ce651c904225521f42bf0792838279930d39** 已推送同一修正分支，遠端 SHA 與本機一致：
+
+- [CI 40830688043](https://github.com/jnfakimo/Inspection/actions/runs/40830688043)：completed／success，6 個工作全部成功；行動工作日誌明確列出 53 tests／53 pass／0 fail，安全檢查通過，最終 Android 與 iOS bundle 均成功。
+- [CodeQL 40830691669](https://github.com/jnfakimo/Inspection/actions/runs/40830691669)：completed／success，對應同一 SHA；分析 2051622042 error 為空。分支 open alerts 為 0，但原始 results_count 為 1；既有 #59（system/supabase-config.js、js/clear-text-storage-of-sensitive-data）仍為 dismissed／false positive，本輪沒有重新排除或更動告警。不把「開啟告警 0」寫成「原始掃描結果 0」。
+- 測後獨立讀回 5 筆合成勤務均 ended，車輛與設備 inactive、刪除列數 0。手機佇列／勤務清空、定位停止且登出；8083／18868／18869／5580 均無監聽，既有隔離 Kong 運行、原 IPv4／IPv6 防火牆保留。正本與發布副本本輪相關檔案雜湊一致。
+
+本節為後續文件補登；上述 CI 結果只屬於明列的程式提交，不冒稱後續純文件提交另有 CI。正式資料、密碼政策與未部署狀態不變。
