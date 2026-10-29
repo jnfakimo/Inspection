@@ -51,3 +51,15 @@ GitHub 上 8 筆告警均於 2026-08-25 以 `won't fix` 排除，但基準提交
 ### 登出競態補強
 
 後續覆核發現「恢復中登出」即使拒絕巡檢，SDK setSession 仍可能留下登入狀態。V1 恢復期間不採納 SIGNED_IN 來重建橋接，V1／V2 恢復未獲接受時均清除本分頁 SDK session。兩版本回歸直接驗證晚到回應不復活橋接且呼叫本機 signOut；隔離瀏覽器 6 項重新通過。
+
+## GitHub CodeQL 複驗與剩餘告警 #59
+
+程式提交：`f4d9e09cf32e32f28279aa80a2bdffd9415a1a3f`（含主修正 `c2d4905b48c7467f56c68a5d8c159e996592a904`）。[CodeQL 執行 40797879167](https://github.com/jnfakimo/Inspection/actions/runs/40797879167) success；分析 ID `2050262611`、CodeQL 2.27.3、error 為空。SARIF 實際結果由基準的 8 筆降為 **1 筆**：原 #2/#3/#4/#5/#6/#12/#14/#15 均不在新結果內。
+
+新結果是 [#59](https://github.com/jnfakimo/Inspection/security/code-scanning/59)，規則 `js/clear-text-storage-of-sensitive-data`，指向 V1 `write()`。逐一追蹤 SARIF 四條路徑，來源為舊巡檢紀錄的 getItem，流入 JSON.stringify 的欄位只有 `user_id` 與 `valid_until`；輸出物件以白名單重建，另外只有固定 version，沒有 access_token／refresh_token。它將含敏感資訊的舊紀錄整體標成敏感來源，沒有區分遷移後的非認證欄位。因此本輪將其判為「對 bearer 憑證持久儲存風險的誤報」，不是尚未移除的權杖副本。
+
+證據：`codeql-f4d9e09cf.sarif`、13 項回歸中的 V1 舊紀錄遷移與永久儲存欄位驗證，以及真實 SDK 跨分頁瀏覽器驗證。身分 ID 仍是可識別帳號的中繼資料，沒有宣稱匿名；只持有這個 ID／期限不能建立有效工作階段，還要取得活躍同來源分頁的真實 Auth 憑證並由 Auth 驗證。
+
+**#59 保持 open，沒有修改告警狀態、降級或加入掃描排除。** 原 8 筆的歷史 dismissed 狀態也保留，因此 GitHub 全域清單不能用來推論新分析仍有 8 筆。結論是原 8 筆已修正／補強，新分析 1 筆已完成人工資料流覆核，不能寫成 CodeQL 零告警。
+
+[CI 執行 40797876205](https://github.com/jnfakimo/Inspection/actions/runs/40797876205) 對應上述程式提交，六項工作全部 success：Application tests and API build、static-security、mobile-vehicle-tracker、signal-service-security、iis-powershell-compatibility、gmail-repair-linux。此節文件提交不改產品程式。
