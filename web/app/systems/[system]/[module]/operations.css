@@ -192,3 +192,10 @@
   .operations-tool-row .operations-filter-row .export-date,
   .operations-tool-row .operations-filter-row .operations-export{display:none}
 }
+
+/* 日期列（◀／日期框／▶／今天）桌機版統一為 --date-bar-control-height（tokens.css），與交接簿、巡邏班別工具列同一組尺寸。
+   原本按鈕寫死 42px；手機版不套用，維持上方的收窄排版。 */
+@media screen and (min-width:801px){
+  .operations-datebar>button{min-height:var(--date-bar-control-height)}
+  .operations-datebar .localized-date-input input{height:var(--date-bar-control-height);min-height:var(--date-bar-control-height)}
+}

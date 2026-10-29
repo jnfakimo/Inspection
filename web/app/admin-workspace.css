@@ -438,3 +438,10 @@ html[data-theme="tech"] .handover-submit-btn{background:var(--info-soft);color:v
 }
 
 @media(max-width:360px){.security-alert-filters{grid-template-columns:minmax(0,1fr)}.security-alert-filters>.security-alert-date{white-space:normal}}
+
+/* 巡邏班別工具列的日期導覽（前一天／日期框／後一天／今天）：桌機版日期框與三顆導覽按鈕同為 --date-bar-control-height（tokens.css）。
+   日期框原本依欄位規格 42px、導覽按鈕是標準按鈕 36px，兩者不等高。手機版維持原樣。 */
+@media screen and (min-width:801px){
+  .patrol-shift-toolbar .admin-toolbar-date input{height:var(--date-bar-control-height);min-height:var(--date-bar-control-height)}
+  .patrol-shift-toolbar>.secondary-btn{min-height:var(--date-bar-control-height);padding-block:0}
+}

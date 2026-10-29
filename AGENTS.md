@@ -123,6 +123,10 @@
   幾何、hover、disabled、focus 全在 `web/app/button-standard.css`。`.btn`、`.btn-primary`、`.btn-danger` 為舊名別名。
 - **表單欄位**：一般 input／select 桌面、平板、手機一律 `--form-control-height: 42px`（`control-standard.css`，僅 screen）。
   例外：textarea、checkbox／radio、file／hidden／range／color、原生日期時間欄位、列印版。
+- **日期導覽列**（前一天／日期框／後一天／今天這組控制項）：桌機（≥801px）所有控制項一律 `--date-bar-control-height: 32px`
+  （`tokens.css`，與緊湊按鈕 `.compact` 同高）；日期框在這種列內是 42px 欄位規格的**例外**（使用者 2026-10-29 指定，同日由 36px 改為 32px）。手機版維持較大的觸控尺寸。
+  適用：`HandoverDateNavigation`（四本交接簿）、巡邏班別工具列（`.patrol-shift-toolbar`）、營運頁日期列（`.operations-datebar`）；
+  新增日期導覽列必須用這個 token，不得另寫 32／44px 等固定高度。`tools/date-bar-standard-check.mjs` 把關。
 - **日期／時間**：一律 `@/components/LocalizedDateInput`、`LocalizedDateTimeInput`、`TimeSelect`（30 分鐘級距，24 小時制）；
   禁用原生 `date`／`datetime-local`／`time`（`security:audit` 會擋）。格式 `YYYY-MM-DD`、`YYYY-MM-DD HH:mm`。
   **例外：公務車派車管理系統（SYS-07）的時間一律用「上午／下午」12 小時制**（使用者 2026-10-28 指定）：

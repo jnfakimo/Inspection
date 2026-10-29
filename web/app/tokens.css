@@ -132,6 +132,12 @@
   :root { --form-control-height: 42px; }
 }
 
+/* 日期導覽列（前一天／日期框／後一天／今天）桌機版的控制項高度，與緊湊按鈕（.compact）32px 一致；
+   日期框在這種列內是 42px 欄位規格的例外（AGENTS.md §6）。手機版維持較大的觸控尺寸。 */
+@media screen and (min-width: 801px) {
+  :root { --date-bar-control-height: 32px; }
+}
+
 /* ---- 一般版 -------------------------------------------------------------- */
 :root[data-theme="light"] {
   color-scheme: light;
