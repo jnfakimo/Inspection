@@ -27,7 +27,12 @@ async function inventory(root) {
       else throw new Error('Storage 備份包含非一般檔案。');
     }
   }
-  try { await visit(root); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  try {
+    const stat = await lstat(root);
+    if (stat.isSymbolicLink()) throw new Error('Storage 備份根目錄不得為符號連結。');
+    if (!stat.isDirectory()) throw new Error('Storage 備份根目錄必須為目錄。');
+    await visit(root);
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
   return found;
 }
 

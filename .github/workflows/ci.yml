@@ -136,12 +136,16 @@ jobs:
         run: npm run typecheck
       - name: Verify encrypted mobile storage and retention
         run: npm run test:storage
+      - name: Verify native storage coordination across independent JVM processes
+        run: python3 test/native-lock.test.py
+      - name: Verify mobile security patches and Expo schema compatibility
+        run: npm run test:security-deps
       - name: Verify mobile dependency tree
         run: npm ls compression shell-quote source-map-js uuid
       - name: Bundle Android and iOS with synthetic configuration
         run: |
-          npx --no-install expo export --platform android --output-dir dist-smoke/android --max-workers 2
-          npx --no-install expo export --platform ios --output-dir dist-smoke/ios --max-workers 2
+          npm run export -- --platform android --output-dir dist-smoke/android --max-workers 2
+          npm run export -- --platform ios --output-dir dist-smoke/ios --max-workers 2
         env:
           CI: '1'
           EXPO_OFFLINE: '1'

@@ -1,6 +1,7 @@
 'use client';
 
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { installSessionResponder, requestSessionCredentials } from './patrol-session-transfer.ts';
 
 export const PATROL_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 export const PATROL_SESSION_STORAGE_KEY = 'beinongPatrolTrustedSessionV2';
@@ -9,8 +10,6 @@ export const PATROL_IDLE_LOGOUT_MESSAGE_KEY = 'beinongPatrolIdleLogoutMessage';
 type PatrolSessionRecord = {
   version: 2;
   user_id: string;
-  access_token: string;
-  refresh_token: string;
   last_activity_at: number;
   valid_until: number;
 };
@@ -33,8 +32,6 @@ function parseRecord(raw: string | null): PatrolSessionRecord | null {
     return {
       version: 2,
       user_id: String(value.user_id),
-      access_token: String(value.access_token),
-      refresh_token: String(value.refresh_token),
       last_activity_at: Number(value.last_activity_at),
       valid_until: Number(value.valid_until),
     };
@@ -59,11 +56,14 @@ export function patrolSessionState(now = Date.now(), storage: Storage | null = b
     try { storage.removeItem(PATROL_SESSION_STORAGE_KEY); } catch { /* ignore */ }
     return { status: 'invalid', value: null };
   }
-  if (value.valid_until <= now) return { status: 'expired', value };
-  if (!value.access_token || !value.refresh_token) {
-    try { storage.removeItem(PATROL_SESSION_STORAGE_KEY); } catch { /* ignore */ }
-    return { status: 'invalid', value: null };
+  // Rewrite legacy records to a whitelist without persistent bearer credentials.
+  if (raw.includes('access_token') || raw.includes('refresh_token')) {
+    try { storage.setItem(PATROL_SESSION_STORAGE_KEY, JSON.stringify(value)); } catch {
+      try { storage.removeItem(PATROL_SESSION_STORAGE_KEY); } catch { /* unavailable */ }
+      return { status: 'invalid', value: null };
+    }
   }
+  if (value.valid_until <= now) return { status: 'expired', value };
   return { status: 'valid', value };
 }
 
@@ -72,8 +72,6 @@ export function startPatrolSession(session: Session, now = Date.now(), storage: 
   const record: PatrolSessionRecord = {
     version: 2,
     user_id: session.user.id,
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
     last_activity_at: now,
     valid_until: now + PATROL_IDLE_TIMEOUT_MS,
   };
@@ -89,8 +87,6 @@ export function touchPatrolSession(session?: Session | null, now = Date.now(), s
   if (session?.user?.id && session.user.id !== current.value.user_id) return false;
   const next: PatrolSessionRecord = {
     ...current.value,
-    access_token: session?.access_token || current.value.access_token,
-    refresh_token: session?.refresh_token || current.value.refresh_token,
     last_activity_at: now,
     valid_until: now + PATROL_IDLE_TIMEOUT_MS,
   };
@@ -109,8 +105,6 @@ export function markPatrolSessionExpired(storage: Storage | null = browserStorag
     storage.setItem(PATROL_SESSION_STORAGE_KEY, JSON.stringify({
       ...current,
       // 過期墓碑保留使用者與期限，用來阻止仍開著的舊分頁繞過逾時；權杖立即清除。
-      access_token: '',
-      refresh_token: '',
       last_activity_at: Math.min(current.last_activity_at, Date.now() - PATROL_IDLE_TIMEOUT_MS),
       valid_until: 0,
     }));
@@ -122,23 +116,36 @@ export function clearPatrolSession(storage: Storage | null = browserStorage()) {
 }
 
 export async function restorePatrolSession(client: SupabaseClient, now = Date.now(), storage: Storage | null = browserStorage()) {
+  let attempted = false, accepted = false;
+  const startedAt = Date.now();
+  const moment = () => now + Math.max(0, Date.now() - startedAt);
   const current = patrolSessionState(now, storage);
   if (current.status !== 'valid') return null;
   try {
-    const result = await client.auth.setSession({
-      access_token: current.value.access_token,
-      refresh_token: current.value.refresh_token,
-    });
+    const existing = await client.auth.getSession();
+    if (existing.error || (existing.data.session && existing.data.session.user.id !== current.value.user_id)) return null;
+    const credentials = existing.data.session || await requestSessionCredentials(current.value.user_id);
+    const latest = patrolSessionState(moment(), storage);
+    if (!credentials || latest.status !== 'valid' || latest.value.user_id !== current.value.user_id) return null;
+    attempted = true;
+    const result = await client.auth.setSession({access_token:credentials.access_token,refresh_token:credentials.refresh_token});
     const session = result.data.session;
     if (result.error || !session || session.user.id !== current.value.user_id) {
       markPatrolSessionExpired(storage);
       return null;
     }
-    touchPatrolSession(session, now, storage);
+    const after = patrolSessionState(moment(), storage);
+    if (after.status !== 'valid' || after.value.user_id !== session.user.id) return null;
+    touchPatrolSession(session, moment(), storage);
+    accepted = true;
     return session;
   } catch {
     markPatrolSessionExpired(storage);
     return null;
+  } finally {
+    if (attempted && !accepted) {
+      try { await client.auth.signOut({ scope: 'local' }); } catch { /* Auth cleanup is best effort. */ }
+    }
   }
 }
 
@@ -208,4 +215,11 @@ export function installPatrolIdleTimer(client: SupabaseClient, onExpired: () => 
     window.removeEventListener('storage', storageChanged);
     document.removeEventListener('visibilitychange', visibilityChanged);
   };
+}
+
+export function installPatrolSessionResponder(client: SupabaseClient) {
+  return installSessionResponder(client, () => {
+    const state = patrolSessionState();
+    return state.status === 'valid' ? state.value : null;
+  });
 }

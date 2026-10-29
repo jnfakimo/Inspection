@@ -2,7 +2,7 @@
  * P0 帳號申請與派車核可階層端到端測試。
  *
  * 流程：公開帳號申請 → 系統管理員核准並指定直屬主管 →
- * 一般使用者送出派車申請 → 單位主管核可 → 派車管理員派車 → 駕駛接單。
+ * 一般使用者送出派車申請 → 課長核准 → 部門經理核准 → 派車管理員派車 → 駕駛接單。
  *
  * 需要 SUPABASE_URL、SUPABASE_ANON_KEY、SUPABASE_SERVICE_ROLE_KEY。
  * SUPABASE_E2E_BOOTSTRAP=1 會建立一次性 hidden 測試帳號與車輛；測試結束
@@ -42,7 +42,7 @@ async function request(path, { key = ANON_KEY, token, method = 'GET', body, pref
     const message = typeof payload === 'object' && payload
       ? payload.message || payload.error_description || payload.error || JSON.stringify(payload)
       : String(payload || response.statusText);
-    throw new Error(`${method} ${path} [${response.status}] ${message}`);
+    throw Object.assign(new Error(`${method} ${path} [${response.status}] ${message}`), { status: response.status });
   }
   return payload;
 }
@@ -168,6 +168,7 @@ async function createBootstrapFixture() {
   const deptId = 'ca6d761d-4c32-4b8a-898a-5c563f4c5438';
   const sysadmin = await createProfile({ label: '系統管理員測試', emailLabel: 'sysadmin', usernamePrefix: 'p0_car_sys', role: 'admin', rbacRole: 'sysadmin' });
   const supervisor = await createProfile({ label: '單位主管測試', emailLabel: 'supervisor', usernamePrefix: 'p0_car_sup', role: 'supervisor', rbacRole: 'unit_supervisor', deptId });
+  const departmentManager = await createProfile({ label: '部門經理測試', emailLabel: 'department-manager', usernamePrefix: 'p0_car_dept', role: 'supervisor', rbacRole: 'mgmt_supervisor', deptId, supervisorId: supervisor.profile.user_id });
   const dispatcher = await createProfile({ label: '派車管理員測試', emailLabel: 'dispatcher', usernamePrefix: 'p0_car_mgr', role: 'maintenance', rbacRole: 'dispatcher', supervisorId: supervisor.profile.user_id, deptId });
   const driver = await createProfile({ label: '駕駛測試', emailLabel: 'driver', usernamePrefix: 'p0_car_driver', role: 'maintenance', rbacRole: 'duty', supervisorId: supervisor.profile.user_id, deptId });
 
@@ -204,7 +205,7 @@ async function createBootstrapFixture() {
   // admin-api 依安全設計只寄送啟用連結；測試帳號改成已知密碼，不影響正式帳號。
   const applicantPassword = `P0Vehicle!${randomUUID().replaceAll('-', '').slice(0, 18)}a1`;
   await authAdmin(`/users/${applicantProfile.auth_id}`, { method: 'PUT', body: { password: applicantPassword, email_confirm: true } });
-  return { sysadmin, supervisor, dispatcher, driver, applicant: { email: applicantEmail, password: applicantPassword, profile: applicantProfile }, vehicle, applicationId };
+  return { sysadmin, departmentManager, supervisor, dispatcher, driver, applicant: { email: applicantEmail, password: applicantPassword, profile: applicantProfile }, vehicle, applicationId };
 }
 
 function assert(condition, message) {
@@ -213,7 +214,7 @@ function assert(condition, message) {
 
 async function readVehicleFlow(requestId) {
   const [rows, logs] = await Promise.all([
-    rest(`/vehicle_dispatch_requests?request_id=eq.${requestId}&select=request_id,request_no,status,applicant_id,supervisor_id,vehicle_manager_id,vehicle_id,driver_id,driver_accepted_at,driver_accepted_by&limit=1`, { key: SERVICE_KEY, token: SERVICE_KEY }),
+    rest(`/vehicle_dispatch_requests?request_id=eq.${requestId}&select=request_id,request_no,status,applicant_id,supervisor_id,department_manager_id,vehicle_manager_id,vehicle_id,driver_id,driver_accepted_at,driver_accepted_by&limit=1`, { key: SERVICE_KEY, token: SERVICE_KEY }),
     rest(`/vehicle_dispatch_logs?request_id=eq.${requestId}&select=from_status,to_status,action,operator_id&order=created_at.asc`, { key: SERVICE_KEY, token: SERVICE_KEY }),
   ]);
   return { request: rows[0] || null, logs };
@@ -244,7 +245,7 @@ function sameDayTripSlot() {
 }
 
 const fixture = BOOTSTRAP ? await createBootstrapFixture() : null;
-if (!fixture) throw new Error('目前 P0 派車驗收需要 SUPABASE_E2E_BOOTSTRAP=1，以確保四種角色彼此分離');
+if (!fixture) throw new Error('目前 P0 派車驗收需要 SUPABASE_E2E_BOOTSTRAP=1，以確保五種流程角色彼此分離');
 
 let requestId = '';
 const result = { ok: false, bootstrap: true, roleSeparated: true, accountApplicationId: fixture.applicationId, stages: [], negativeGuard: false };
@@ -252,6 +253,7 @@ const result = { ok: false, bootstrap: true, roleSeparated: true, accountApplica
 try {
   const applicantToken = await signIn(fixture.applicant.email, fixture.applicant.password);
   const supervisorToken = await signIn(fixture.supervisor.email, fixture.supervisor.password);
+  const departmentManagerToken = await signIn(fixture.departmentManager.email, fixture.departmentManager.password);
   const dispatcherToken = await signIn(fixture.dispatcher.email, fixture.dispatcher.password);
   const driverToken = await signIn(fixture.driver.email, fixture.driver.password);
   const trip = sameDayTripSlot();
@@ -275,15 +277,28 @@ try {
     await vehicleAction(dispatcherToken, requestId, 'approve', { note: '不應由派車管理員核可' });
     throw new Error('派車管理員不應能代替單位主管核可');
   } catch (error) {
-    assert(/沒有異動|核可權限|unit|主管|42501|目前角色/u.test(String(error.message)), `越權核可未被阻擋：${error.message}`);
+    assert(error.status === 403, `越權核可必須回傳 403：${error.message}`);
     result.negativeGuard = true;
   }
 
   await vehicleAction(supervisorToken, requestId, 'approve', { note: 'P0 單位主管核可' });
   let state = await readVehicleFlow(requestId);
-  assert(state.request?.status === 'approved', `主管核可後狀態應為 approved，實際為 ${state.request?.status}`);
+  assert(state.request?.status === 'pending_manager_approval', `課長核准後應等待部門經理，實際為 ${state.request?.status}`);
   assert(state.request?.supervisor_id === fixture.supervisor.profile.user_id, '核可主管不是申請人直屬主管');
   result.stages.push({ action: 'supervisor_approve', status: state.request.status, operator_id: state.request.supervisor_id });
+
+  try {
+    await vehicleAction(dispatcherToken, requestId, 'dispatch', { vehicleId: fixture.vehicle.vehicle_id, driverId: fixture.driver.profile.user_id });
+    throw new Error('部門經理核准前不應能派車');
+  } catch (error) {
+    assert([400, 409].includes(error.status), `提前派車必須被流程狀態阻擋：${error.message}`);
+    result.managerApprovalGuard = true;
+  }
+  await vehicleAction(departmentManagerToken, requestId, 'approve', { note: 'P0 部門經理核准' });
+  state = await readVehicleFlow(requestId);
+  assert(state.request?.status === 'approved', `經理核准後應為 approved，實際為 ${state.request?.status}`);
+  assert(state.request?.department_manager_id === fixture.departmentManager.profile.user_id, '部門經理核准紀錄不一致');
+  result.stages.push({ action: 'department_manager_approve', status: state.request.status, operator_id: state.request.department_manager_id });
 
   await vehicleAction(dispatcherToken, requestId, 'dispatch', { vehicleId: fixture.vehicle.vehicle_id, driverId: fixture.driver.profile.user_id, note: 'P0 派車管理員派車' });
   state = await readVehicleFlow(requestId);
@@ -298,7 +313,7 @@ try {
   assert(state.request?.driver_accepted_at && state.request?.driver_accepted_by === fixture.driver.profile.user_id, '駕駛接單欄位未正確寫入');
   result.stages.push({ action: 'driver_accept', status: state.request.status, operator_id: state.request.driver_accepted_by });
   const actions = state.logs.map((row) => row.action);
-  for (const expected of ['單位主管核可', '派車管理員完成派車', '司機接單']) assert(actions.includes(expected), `流程歷程缺少「${expected}」`);
+  for (const expected of ['課長核准', '部門經理核准', '派車管理員完成派車', '司機接單']) assert(actions.includes(expected), `流程歷程缺少「${expected}」`);
   result.requestId = requestId;
   result.logCount = state.logs.length;
   result.finalStatus = state.request.status;
@@ -317,7 +332,7 @@ try {
     await rest(`/vehicle_dispatch_managers?user_id=eq.${fixture.dispatcher.profile.user_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { active: false } }).catch(() => undefined);
     await rest(`/vehicle_dispatch_drivers?user_id=eq.${fixture.driver.profile.user_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { active: false } }).catch(() => undefined);
     await rest(`/official_vehicles?vehicle_id=eq.${fixture.vehicle.vehicle_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { status: 'inactive' } }).catch(() => undefined);
-    const people = [fixture.applicant, fixture.dispatcher, fixture.driver, fixture.supervisor, fixture.sysadmin];
+    const people = [fixture.applicant, fixture.dispatcher, fixture.driver, fixture.supervisor, fixture.departmentManager, fixture.sysadmin];
     for (const person of people) {
       await rest(`/users?user_id=eq.${person.profile.user_id}`, { key: SERVICE_KEY, token: SERVICE_KEY, method: 'PATCH', body: { status: 'inactive', hidden: true } }).catch(() => undefined);
       await authAdmin(`/users/${person.profile.auth_id}`, { method: 'PUT', body: { ban_duration: '876000h' } }).catch(() => undefined);
