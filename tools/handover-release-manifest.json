@@ -15,7 +15,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/business-handover.css",
-      "sha256": "9C42F2913269FBFEF822F7224FE839FE9D2995F8D2079B480E05968E38247B87"
+      "sha256": "A0425973970069B8B02B9ABBCB880223A8DDEC7518997CC9FC44758DB7678D39"
     },
     {
       "path": "web/app/systems/[system]/[module]/guard-handover.tsx",
@@ -35,7 +35,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-sheet.css",
-      "sha256": "02FA2ABF4685CBB45EF880160E8BFCB303715F865EEF51691C7B8808B86D1294"
+      "sha256": "13FEDFCF404267E1C35719EC528A2CA2D55B911A944B47D11A7887EF0AAA9459"
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-workspace.tsx",

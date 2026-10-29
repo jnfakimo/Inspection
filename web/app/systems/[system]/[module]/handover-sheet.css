@@ -41,6 +41,16 @@
 .hs-date-nav>.hs-date-arrow>span{position:relative;z-index:1}
 .hs-date-nav>.hs-date-arrow:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
 .hs-date-nav>.hs-date-today{min-height:44px;border-radius:0}
+/* 桌機版四本交接簿共用同一組日期列高度（--date-bar-control-height，定義在 tokens.css）。
+   原本標籤、日期框、按鈕各自 42–44px，箭頭的可見邊框只有 32px，彼此不一致；手機版維持上面較大的觸控尺寸。 */
+@media screen and (min-width:801px){
+  .hs-date-nav>.hs-date-label{min-height:var(--date-bar-control-height)}
+  .hs-date-nav>.localized-date-input{height:var(--date-bar-control-height)}
+  .hs-date-nav>.localized-date-input>input.hs-date-input:not(.localized-date-native){height:var(--date-bar-control-height);min-height:var(--date-bar-control-height)}
+  .hs-date-nav>.hs-date-arrow{flex-basis:var(--date-bar-control-height);width:var(--date-bar-control-height);height:var(--date-bar-control-height);min-height:var(--date-bar-control-height)!important}
+  .hs-date-nav>.hs-date-arrow::before{inset:0}
+  .hs-date-nav>.hs-date-today{min-height:var(--date-bar-control-height);padding-block:0}
+}
 .hs-date-range-field>.localized-date-input{box-sizing:border-box;display:block;width:100%;min-width:0;height:44px}
 .hs-date-range-field>.localized-date-input>input:not(.localized-date-native){position:absolute;top:50%;left:0;box-sizing:border-box;width:100%;height:var(--form-control-height);min-height:var(--form-control-height);transform:translateY(-50%)}
 .hs-market-switch{display:inline-flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
