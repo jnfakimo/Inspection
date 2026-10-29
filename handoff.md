@@ -5,7 +5,7 @@
 
 ## ⏯️ 目前做到哪
 
-最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#115），皆已部署或生效；詳情見下。**
+最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#117），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
   臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。
 - PR #110（`8a15ddc91`）：派車報表視窗排版修正。PR #111（`dac0e686e`）：派車各頁配色統一為品牌主色，狀態色只表示狀態。
@@ -22,6 +22,14 @@
   驗證：`node .claude/hooks/hooks.test.mjs` 53 項通過；真實 tsc 對故意型別錯誤會擋、修正後通過；**G 槽新 session 實測 `git add .` 與 force push 皆被攔截，個別檔案 `git add` 放行**。
   限制：只有 Claude Code 會執行，Codex／OpenCode 不會，CI 仍是最後防線；G 槽（雲端硬碟）無完整 `node_modules`，型別檢查在那裡會略過。
 - **待處理**：G 槽 `.claude/` 的 `settings.json` 與 `hooks/` 是從 PR #115 複製的**未追蹤副本**（內容與 main 一致，已用雜湊比對）；把 main 帶進 G 槽分支**之前要先刪掉**，否則 `git pull／merge` 會因同名未追蹤檔失敗（`.claude/settings.local.json` 不動）。
+- **PR #116／#117**：#116 把上述紀錄與 hook 規則寫進 `handoff.md`／`AGENTS.md`；**#117（`e882ce732`）新增 Git 層 hook**（`.githooks/pre-commit`、`pre-push`，Codex、Claude、手動操作都適用）：
+  擋機密檔名與已 stage 的機密樣式、擋 force push（含 `--force-with-lease`）與刪除 `main`／`master`；機密樣式抽成 `.claude/hooks/secret-patterns.mjs` 與 Claude hook 共用。
+  `node .githooks/githooks.test.mjs` 19 項通過（臨時 repo＋本機 bare 遠端實測）；CI 9 項全過。**尚未在任何 clone 啟用**：`core.hooksPath` 是本地設定，需在每個 clone 執行 `git config core.hooksPath .githooks`，
+  設在 G 槽共用 `.git/config` 會影響 Codex 的 commit／push，故等 Codex 收尾、G 槽更新後再啟用。Linux／macOS 上的執行權限（已設 100755）未實測。
+- **G 槽現況（2026-10-29 唯讀檢查）**：分支 `refactor/inspection-account-review-20261024`，**落後 main 30 個提交**（HEAD 已在 main 內，可快轉），有 Codex 的 31 個未提交修改與 16 個未追蹤檔；
+  與 main 重疊的有 `handoff.md`、`AGENTS.md`、`package.json`、`supabase/functions/app-api/index.ts`。**Codex 收尾前不要動 G 槽**；收尾後順序：刪 `.claude/` 副本 → 快轉 main →（衝突手動合併 `handoff.md`）→ 啟用 `core.hooksPath` → 開新 session 確認 hook 載入。
+- **下一步**：①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
+- 🕐 最後更新：2026-10-29 收工，Claude Code @ DESKTOP-0CFB6UK；Git：本批文件經 PR 合併（見 PR 號），遠端分支與合併狀態以 GitHub 為準。
 - **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
 - 既知環境問題：G 槽 `.git` 內有空的 `packed-refs.lock`（2026-10-29 早上留下，未確認是否有 git 程序使用，故未刪），會讓部分 `git branch／push` 的追蹤設定報「another git process」；不影響 push 本身。
 
