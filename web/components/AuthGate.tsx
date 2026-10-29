@@ -5,7 +5,7 @@ import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { setErrorTrackerUser } from '@/lib/error-tracker';
 import { setSecurityAuditProfile } from '@/lib/security-audit';
 import { clearProfile, saveProfile } from '@/lib/profile-cache';
-import { ensurePatrolQrSession, installPatrolIdleTimer, isPatrolQrDestination } from '@/lib/patrol-session';
+import { ensurePatrolQrSession, installPatrolIdleTimer, installPatrolSessionResponder, isPatrolQrDestination } from '@/lib/patrol-session';
 import type { Profile } from '@/types/app';
 
 const AUTO_RETRY_LIMIT = 2;
@@ -24,9 +24,12 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
     let active = true;
     let retryTimer: number | undefined;
     let patrolIdleCleanup: (() => void) | undefined;
+    let stopSessionResponder = () => {};
     async function verify() {
       try {
         const client = getSupabase();
+        stopSessionResponder();
+        stopSessionResponder = installPatrolSessionResponder(client);
         const returnTo = `${location.pathname}${location.search}${location.hash}`;
         const patrolQrRoute = isPatrolQrDestination(returnTo);
         const { data } = await client.auth.getSession();
@@ -85,6 +88,7 @@ export function AuthGate({ children }: { children: (profile: Profile) => React.R
       active = false;
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       patrolIdleCleanup?.();
+      stopSessionResponder();
       setErrorTrackerUser(null);
       setSecurityAuditProfile(null);
     };

@@ -143,6 +143,9 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   const [workItems, setWorkItems] = useState<Row[]>([]);
   const [historyItems, setHistoryItems] = useState<string[]>([]);
   const [busy, setBusy] = useState(true);
+  const loadGeneration = useRef(0);
+  const [loadedReportScope, setLoadedReportScope] = useState('');
+  const reportReady = !busy && loadedReportScope === `${market}:${date}`;
   const [note, setNote] = useState('');
   const [editingShift, setEditingShift] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<Row | null>(null);
@@ -221,6 +224,8 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   }, [previewOpen]);
 
   const load = useCallback(async () => {
+    const generation = ++loadGeneration.current;
+    setLoadedReportScope('');
     if (!market) { setBusy(false); return; }
     setBusy(true); setNote('');
     const client = getSupabase();
@@ -239,6 +244,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
       invokeAppApi<MechanicalShiftReport[]>('mechanical_handover_day', { market_code: market, handover_date: date }).then(data => ({ data, error: null })).catch(error => ({ data: [] as MechanicalShiftReport[], error })),
       invokeAppApi<Row[]>('mechanical_handover_receivers', { market_code: market }).then(data => ({ data, error: null })).catch(error => ({ data: [] as Row[], error })),
     ]);
+    if (generation !== loadGeneration.current) return;
     const mechanicalDeptIds = new Set((departments.data || []).map(department => String(department.dept_id)));
     const secondMarketUserIds = new Set((marketScopes.data || []).map(row => String(row.user_id)));
     const scopedPeople = selectableActiveUsers(people.data || []).filter(person => mechanicalDeptIds.has(String(person.dept_id)) && secondMarketUserIds.has(String(person.user_id)));
@@ -252,6 +258,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
         ? '失敗：地端資料服務連線設定異常，請通知系統管理員'
         : `失敗：${errorMessage(failure, '機電交接資料載入失敗')}`);
     }
+    if (!failure) setLoadedReportScope(`${market}:${date}`);
     const itemCounts = new Map<string, number>();
     (history.data || []).forEach(row => { const item = String(row.work_item || ''); if (item) itemCounts.set(item, (itemCounts.get(item) || 0) + 1); });
     setEntries(work.data || []); setCorrections(correctionRows.data || []); setSignatures(signs.data || []); setApprovals(approvalRows.data || []); setUsers(scopedPeople); setDirectoryUsers(people.data || []); setScheduleRows(scopedScheduleRows);
@@ -372,7 +379,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
   return <AppShell profile={profile} title={module.title} heading={{ system, module, title: module.title, metaTitle: system.title }}>
     <div className="hs-page">
       <AdminHeader module={module} busy={busy} note={note} onReload={load} hideDescription
-        action={<>{canManageOptions && <button className="secondary-btn compact" disabled={busy} onClick={() => setOptionsOpen(true)}>管理工作選項</button>}<button className="secondary-btn compact" disabled={busy} onClick={() => { setPrintData(null); setPrintRequested(false); setPreviewOpen(true); }}>預覽本日報表</button><button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button></>} />
+        action={<>{canManageOptions && <button className="secondary-btn compact" disabled={busy} onClick={() => setOptionsOpen(true)}>管理工作選項</button>}<button className="secondary-btn compact" disabled={!reportReady} onClick={() => { setPrintData(null); setPrintRequested(false); setPreviewOpen(true); }}>預覽本日報表</button><button className="primary-btn compact mechanical-print-button" onClick={() => { setPrintFrom(date); setPrintTo(date); setPrintError(''); setPrintOpen(true); }}>列印每日報表</button></>} />
       <section className="panel hs-toolbar">
         {allowedMarkets.length > 1 && <div className="hs-market-switch" role="group" aria-label="市場別">{allowedMarkets.map(code =>
           <button key={code} type="button" className={`secondary-btn compact${market === code ? ' is-active' : ''}`}
@@ -448,12 +455,12 @@ export function MechanicalHandover({ system, module, profile }: Props) {
             </div>
           </div>
           <div className="hs-approval-actions mechanical-approval-actions">
-            {hasApprovalRole && <button type="button" className="secondary-btn compact hs-approval-action" disabled={busy} onClick={() => setPreviewOpen(true)}>{approval ? '查看已簽核日報表' : '核閱並完成簽核'}</button>}
+            {hasApprovalRole && <button type="button" className="secondary-btn compact hs-approval-action" disabled={!reportReady} onClick={() => setPreviewOpen(true)}>{approval ? '查看已簽核日報表' : '核閱並完成簽核'}</button>}
           </div>
         </section>
       </section>
 
-      {mounted && market && createPortal(<section className="mechanical-print-preview" aria-label="每日列印報表">
+      {mounted && market && (printData || reportReady) && createPortal(<section className="mechanical-print-preview" aria-label="每日列印報表">
         {(printData?.dates || [date]).map(printDate => <PrintSheet key={printDate} market={market} date={printDate}
           entries={correctedEntries((printData?.entries || entries).filter(row => String(row.work_date) === printDate), printData?.corrections || corrections)}
           signatures={(printData?.signatures || signatures).filter(row => String(row.work_date) === printDate)}
@@ -461,7 +468,7 @@ export function MechanicalHandover({ system, module, profile }: Props) {
           approval={(printData?.approvals || approvals).find(row => String(row.work_date) === printDate)}
           userName={userName} />)}
       </section>, document.body)}
-      {mounted && previewOpen && market && createPortal(<DailyReportPreview market={market} date={date} entries={displayEntries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} canCorrect={hasApprovalRole} canApprove={canApprove} approvalHint={approvalHint} approvalPresentation={approvalPresentation} approvalNote={approvalNote} busy={busy} onApprovalNote={setApprovalNote} onApprove={() => void approveDaily()} onClose={() => setPreviewOpen(false)} onPrint={() => window.print()} onEditEntry={editReportEntry} onCorrectEntry={row => setCorrectingEntry(row)} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
+      {mounted && previewOpen && market && createPortal(<DailyReportPreview market={market} date={date} entries={displayEntries} signatures={signatures} shiftReports={shiftReports} approval={approval} userName={userName} canCorrect={hasApprovalRole} canApprove={canApprove} approvalHint={approvalHint} approvalPresentation={approvalPresentation} approvalNote={approvalNote} busy={busy} onApprovalNote={setApprovalNote} onApprove={() => void approveDaily()} onClose={() => setPreviewOpen(false)} onPrint={() => { if (reportReady) window.print(); }} onEditEntry={editReportEntry} onCorrectEntry={row => setCorrectingEntry(row)} onAddEntry={shiftCode => { setEditingEntry(null); setCarrySource(null); setPresetItem(''); setEditingShift(shiftCode); }} />, document.body)}
     </div>
     {printOpen && <PrintRangeModal error={printError} from={printFrom} to={printTo} busy={printBusy} onFrom={setPrintFrom} onTo={setPrintTo} onClose={() => setPrintOpen(false)} onPrint={() => void preparePrint()} />}
     {optionsOpen && <MechanicalWorkOptionsModal categories={workCategories} items={workItems} onClose={() => setOptionsOpen(false)} onDone={load} />}
