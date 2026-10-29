@@ -1,0 +1,81 @@
+/* 工具列／篩選列控制項高度標準（AGENTS.md §6「工具列／篩選列控制項」）。
+   桌機（≥801px）螢幕輸出，下列容器內的下拉、文字／日期輸入框與按鈕一律 --toolbar-control-height（tokens.css，32px）。
+   - 這是 42px 欄位規格（control-standard.css）與標準按鈕 36px 的例外，只限容器清單內；表單、彈窗、表格內的欄位不受影響。
+   - 各頁原本自訂的高度（42／44px 等）優先權不一，所以這裡用 !important 壓過，單一來源。
+   - 新增工具列或篩選列：把容器 class 加進下面的清單，或在 tools/toolbar-standard-check.mjs 的例外清單寫明理由。
+   - 手機版不套用，維持較大的觸控尺寸。 */
+@media screen and (min-width: 801px) {
+  :is(
+    .admin-toolbar,
+    .hs-toolbar,
+    .operations-tool-row,
+    .operations-datebar,
+    .operations-filter-row,
+    .dash-toolbar,
+    .v1list-toolbar,
+    .produce-doc-toolbar,
+    .vehicle-request-toolbar,
+    .vehicle-master-toolbar,
+    .vehicle-report-filters,
+    .permission-people-toolbar,
+    .patrol-template-toolbar,
+    .mechanical-schedule-toolbar,
+    .security-alert-filters,
+    .tracking-filter,
+    .od-people-filters,
+    .market-import-toolbar,
+    .market-value-filters,
+    .market-filter-actions,
+    .market-drill-toolbar,
+    .market-command-slicers
+  ) :is(
+    select,
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([hidden]):not([type="range"]):not([type="color"]):not([type="image"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+    .primary-btn,
+    .secondary-btn,
+    .danger-btn,
+    .btn,
+    .btn-primary,
+    .btn-danger
+  ) {
+    box-sizing: border-box;
+    height: var(--toolbar-control-height) !important;
+    min-height: var(--toolbar-control-height) !important;
+    padding-block: 0 !important;
+  }
+
+  /* 核取／單選方塊不套高度，但管理後台工具列的 input 規則會給它們 min-height（42px），把整列撐高，所以只取消這個下限。 */
+  :is(
+    .admin-toolbar,
+    .hs-toolbar,
+    .operations-tool-row,
+    .operations-filter-row,
+    .dash-toolbar,
+    .v1list-toolbar,
+    .produce-doc-toolbar,
+    .vehicle-request-toolbar,
+    .vehicle-master-toolbar,
+    .vehicle-report-filters,
+    .permission-people-toolbar,
+    .patrol-template-toolbar,
+    .mechanical-schedule-toolbar,
+    .security-alert-filters,
+    .tracking-filter,
+    .od-people-filters,
+    .market-value-filters,
+    .market-filter-actions,
+    .market-drill-toolbar,
+    .market-command-slicers
+  ) :is(input[type="checkbox"], input[type="radio"]) {
+    min-height: 0 !important;
+  }
+
+  /* 營運頁日期列與儀表板工具列的按鈕沒有套 .secondary-btn 等 class，單獨處理。 */
+  :is(.operations-datebar, .dash-toolbar) > button,
+  .dash-toolbar button {
+    box-sizing: border-box;
+    height: var(--toolbar-control-height) !important;
+    min-height: var(--toolbar-control-height) !important;
+    padding-block: 0 !important;
+  }
+}
