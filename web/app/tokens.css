@@ -132,10 +132,11 @@
   :root { --form-control-height: 42px; }
 }
 
-/* 日期導覽列（前一天／日期框／後一天／今天）桌機版的控制項高度，與緊湊按鈕（.compact）32px 一致；
-   日期框在這種列內是 42px 欄位規格的例外（AGENTS.md §6）。手機版維持較大的觸控尺寸。 */
+/* 工具列／篩選列（含日期導覽列）內的控制項高度，桌機版與緊湊按鈕（.compact）32px 一致；
+   套用的容器清單與例外見 toolbar-standard.css 與 AGENTS.md §6。表單、彈窗內的欄位仍是上面的 42px，
+   手機版維持較大的觸控尺寸。 */
 @media screen and (min-width: 801px) {
-  :root { --date-bar-control-height: 32px; }
+  :root { --toolbar-control-height: 32px; }
 }
 
 /* ---- 一般版 -------------------------------------------------------------- */

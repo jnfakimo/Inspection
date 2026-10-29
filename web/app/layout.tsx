@@ -4,6 +4,7 @@ import './handover-pilot/pilot.css';
 import './handover-pilot/pilot-light.css';
 import './button-standard.css';
 import './control-standard.css';
+import './toolbar-standard.css';
 import './profile-modal-responsive.css';
 import { ErrorTrackerMount } from '@/components/ErrorTrackerMount';
 import { SecurityAuditMount } from '@/components/SecurityAuditMount';

@@ -35,7 +35,7 @@
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-sheet.css",
-      "sha256": "13FEDFCF404267E1C35719EC528A2CA2D55B911A944B47D11A7887EF0AAA9459"
+      "sha256": "65814695EA7B9B9B42D15FD9B76F3DE19076106AF9FEC1C8EB9607A946A85102"
     },
     {
       "path": "web/app/systems/[system]/[module]/handover-workspace.tsx",
