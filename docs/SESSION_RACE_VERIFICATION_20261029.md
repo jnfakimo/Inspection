@@ -40,3 +40,13 @@
 | ISO 管理驗收 | 指定風險所有人，核准密碼例外、權限複核、SoA、內稽與管理審查 |
 
 這些條件未具備前不宣稱結案；無需重做已通過的隔離測試，也不需在聊天提供任何秘密。正式資料、密碼政策與未部署狀態不變。
+
+## 推送後驗證回讀
+
+程式提交 **c51d687c8299f8311323e80034eb2fe3e8745668** 已推送 codex/inspection-security-handover-20261028，遠端 SHA 核對一致：
+
+- [CI 40831810664](https://github.com/jnfakimo/Inspection/actions/runs/40831810664) completed／success，6 個工作全部成功；日誌確認完整 60 tests／60 pass／0 fail、行動安全檢查成功、Android 與 iOS bundle 均成功。
+- [CodeQL 40831814346](https://github.com/jnfakimo/Inspection/actions/runs/40831814346) completed／success，對應同一程式 SHA。分析 2051669241 無執行錯誤；分支 open alerts 0，原始 results_count 1。既有 #59 仍為 dismissed／false positive，本輪沒有修改或重新排除告警。
+- 產品檔、回歸測試與報告的 G 槽正本／C 槽發布副本雜湊核對一致；diff 與 Gitleaks 通過。未更動正式資料、密碼政策或部署狀態。
+
+本節為後續純文件補登；上述 CI 屬於明列的程式提交，不冒稱文件補登另有一輪 CI。
