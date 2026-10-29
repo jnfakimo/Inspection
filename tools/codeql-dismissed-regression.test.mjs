@@ -47,3 +47,30 @@ test('V1 恢復期間登出不被晚到的 SIGNED_IN 復活，並清除已建立
  const client={auth:{getSession:async()=>({data:{session:s},error:null}),setSession:async()=>{bridge.clear();bridge.signedIn(s);return {data:{session:s},error:null};},signOut:async()=>{signedOut++;return {error:null};}}};
  assert.equal(await bridge.restore(client),null);assert.equal(bridge.read(),null);assert.equal(signedOut,1);
 });
+
+function isolatedV1Bridge(initial) {
+ const key='beinongPatrolTrustedSessionV1',values=new Map(),writes=[];
+ const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>{values.set(k,v);writes.push(JSON.parse(v));},removeItem:k=>values.delete(k)};
+ if(initial)values.set(key,JSON.stringify(initial));
+ class SilentChannel { postMessage(){} close(){} }
+ const context=vm.createContext({window:{},localStorage:storage,console,crypto,BroadcastChannel:SilentChannel,setTimeout,clearTimeout});
+ const source=fs.readFileSync('system/supabase-config.js','utf8');new vm.Script(source.slice(source.indexOf('window.PatrolSessionBridge ='),source.indexOf('window.createDb ='))).runInContext(context);
+ return {bridge:context.window.PatrolSessionBridge,key,values,writes};
+}
+test('CodeQL #59：遷移、登入與更新的每筆永久寫入僅含固定白名單',()=>{
+ const user='00000000-0000-4000-8000-000000000059',expires=Date.now()+60000;
+ const {bridge,writes}=isolatedV1Bridge({version:1,user_id:user,valid_until:expires,access_token:'legacy-access-secret',refresh_token:'legacy-refresh-secret',password:'ignored-secret',extra:{secret:'nested-secret'}});
+ const s={user:{id:user,email:'ignored@example.invalid'},access_token:'active-access-secret',refresh_token:'active-refresh-secret'};
+ assert.equal(bridge.save(s),true);assert.equal(bridge.update(s),true);assert.equal(writes.length,3);
+ for(const value of writes){assert.deepEqual(Object.keys(value).sort(),['user_id','valid_until','version']);assert.deepEqual(value,{version:1,user_id:user,valid_until:expires});assert.equal(JSON.stringify(value).includes('secret'),false);}
+});
+test('CodeQL #59：只有可修改的身分與期限不能建立 SDK session',async()=>{
+ const {bridge}=isolatedV1Bridge({version:1,user_id:'claimed-user',valid_until:Date.now()+60000});let calls=0;
+ const client={auth:{getSession:async()=>({data:{session:null},error:null}),setSession:async()=>{calls++;throw Error('must not be called');}}};
+ assert.equal(await bridge.restore(client),null);assert.equal(calls,0);
+});
+test('CodeQL #59：中繼資料與既有登入者不符時拒絕借用 session',async()=>{
+ const {bridge}=isolatedV1Bridge({version:1,user_id:'other-user',valid_until:Date.now()+60000});let calls=0;
+ const client={auth:{getSession:async()=>({data:{session:{user:{id:'real-user'},access_token:'ephemeral',refresh_token:'ephemeral-refresh'}},error:null}),setSession:async()=>{calls++;throw Error('must not be called');}}};
+ assert.equal(await bridge.restore(client),null);assert.equal(calls,0);
+});

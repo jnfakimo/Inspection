@@ -63,3 +63,29 @@ GitHub 上 8 筆告警均於 2026-08-25 以 `won't fix` 排除，但基準提交
 **#59 保持 open，沒有修改告警狀態、降級或加入掃描排除。** 原 8 筆的歷史 dismissed 狀態也保留，因此 GitHub 全域清單不能用來推論新分析仍有 8 筆。結論是原 8 筆已修正／補強，新分析 1 筆已完成人工資料流覆核，不能寫成 CodeQL 零告警。
 
 [CI 執行 40797876205](https://github.com/jnfakimo/Inspection/actions/runs/40797876205) 對應上述程式提交，六項工作全部 success：Application tests and API build、static-security、mobile-vehicle-tracker、signal-service-security、iis-powershell-compatibility、gmail-repair-linux。此節文件提交不改產品程式。
+
+## 2026-10-29 #59 再複核與排除決策
+
+使用者本輪明確要求再確認，若為誤報則附完整理由排除。本輪重新讀取 GitHub 告警／instances 與分析 2050262611 的 SARIF；#59 僅有修正分支的 instance，程式仍為 f4d9e09cf（後續 8f6193ca2 僅文件）。本次新增測試與文件，不修改產品程式、掃描規則或排除路徑。
+
+### 資料流與敏感性判定
+
+四條 SARIF 路徑的共同來源是 `system/supabase-config.js:119` 的 getItem，sink 是第 116 行的 write。兩條路徑是 user_id 經遷移白名單進入序列化（其中一條包含物件欄位步驟）；一條是 valid_until 經遷移寫回；另一條是同一使用者登入時保留原 valid_until。所有 sink 都明確重建 `{version:1,user_id,valid_until}`，沒有擴展原物件，也沒有 access_token、refresh_token、密碼、電子郵件或額外巢狀欄位。
+
+此告警的敏感來源標記沿著舊紀錄傳遞到了非認證欄位；從實際四條路徑與輸出白名單判斷，是對「仍在持久保存認證秘密」的誤報。user_id 是帳號識別中繼資料，不能兌換工作階段、不能作為 API 授權，也不是密碼／API key。valid_until 是本機 UX 期限，不能作為後端授權證據。二者不是匿名資訊，也沒有宣稱加密；持有它們不會獲得 bearer 憑證。
+
+恢復登入需要本分頁既有的真實 Auth session，或仍開啟且身分相符的同來源分頁回覆暫存憑證，再交給 SDK setSession。送出者在讀取 session 前後檢查中繼資料與使用者一致；恢復端也檢查身分與期限，未接受的恢復會清除本分頁 SDK session。後端 Auth／RLS 不以 localStorage 身分作為授權依據。
+
+### 本輪可重現驗證
+
+- `npm run test:codeql-dismissed`：16/16 pass。新增三個 #59 專項測試，直接執行實際 V1 橋接程式：追蹤遷移／登入／更新的每筆 setItem，逐筆確認恰好三個白名單欄位，額外敏感欄位均未寫入；僅中繼資料且無活躍 session 時不呼叫 setSession；既有登入身分與中繼資料不同時不借用該 session。
+- 真實隔離 Supabase Auth＋Chromium：7/7 pass。重驗先前六項，另新增「活躍來源分頁仍開啟時，竄改 user_id 為另一個身分，新分頁恢復失敗且 SDK session 為空」。V1、V2 的永久儲存均未留下權杖。
+- 證據：私有 evidence/codeql-59-recheck.sarif、codeql-59-dataflow.json、codeql-59-regression.log、codeql-59-browser.json。實際測試帳密與 session 未提交；專用 Docker 子網外連 REJECT 規則已核對，瀏覽器僅允許測試 loopback 來源。
+
+### 排除方式與重新檢視條件
+
+決策：僅 #59 使用 GitHub `false positive` 理由排除，完整註解包含上述資料流、測試與風險界線，並連回本報告。這取代上一節「先保留 open」的階段性決定。排除操作以 GitHub 回讀的 dismissed_reason、dismissed_comment 與 dismissed_at 核對；不更動其他告警、不以全域掃描排除遮蔽程式。
+
+若 write 白名單將來加入憑證／敏感個資、使用展開運算複製原物件、允許單憑中繼資料還原登入，或恢復端移除 Auth／身分核對，必須重新開啟 #59 複核。原始 SARIF 命中仍可能為 1；已排除不等於掃描結果變成 0。
+
+同來源 XSS／惡意擴充功能讀取有效 sessionStorage 或記憶體，是獨立架構風險；此排除不代表整體瀏覽器認證完全無風險，也不適用於舊 #6 的真實永久 bearer token 儲存問題。正式資料、密碼／CAPTCHA 政策未變，未部署或合併 main。
