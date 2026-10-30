@@ -1,5 +1,17 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/ci-status.mjs\"",
+            "timeout": 20,
+            "statusMessage": "讀取 main 的 CI 狀態…"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -47,8 +59,8 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-typecheck.mjs\"",
-            "timeout": 180,
-            "statusMessage": "型別檢查（tsc）…"
+            "timeout": 300,
+            "statusMessage": "結束前驗證（測試＋tsc）…"
           }
         ]
       }
