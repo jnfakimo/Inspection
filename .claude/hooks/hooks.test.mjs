@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
@@ -88,7 +88,7 @@ ok('Stop：有改 web ts 但缺 node_modules → 略過並提示', () => {
   fs.writeFileSync(edited, 'web/lib/x.ts\n');
   const r = run('stop-typecheck.mjs', { stop_hook_active: false }, { CLAUDE_PROJECT_DIR: os.tmpdir() });
   assert.equal(r.code, 0);
-  assert.match(r.out, /已略過型別檢查/);
+  assert.match(r.out, /尚未驗證/);
 });
 ok('Stop：沒改 web ts → 靜默放行', () => {
   fs.rmSync(edited, { force: true });
@@ -170,5 +170,108 @@ ok('migration policy select using (true)：提醒但不擋', () => {
 });
 ok('migration policy to service_role using (true)：通過', () => assert.equal(secCheck(SEC_SQL, 'create policy p on public.sec_t for all to service_role using (true) with check (true);\n').out.trim(), ''));
 ok('migration policy 依擁有者限制：通過', () => assert.equal(secCheck(SEC_SQL, 'create policy p on public.sec_t for insert to authenticated with check (user_id = auth.uid());\n').out.trim(), ''));
+
+console.log('affected-tests 對照表（臨時專案）');
+{
+  const { affectedFor, affectedForAll } = await import(pathToFileURL(path.join(root, 'tools', 'affected-tests.mjs')).href);
+  const fx = fs.mkdtempSync(path.join(os.tmpdir(), 'affected-fixture-'));
+  const put = (name, content = '') => {
+    fs.mkdirSync(path.dirname(path.join(fx, name)), { recursive: true });
+    fs.writeFileSync(path.join(fx, name), content);
+  };
+  try {
+    put('supabase/migrations/20260101000000_alpha.sql', 'select 1;');
+    put('supabase/migrations/20260101000001_beta.sql', 'select 2;');
+    put('tools/alpha-db.test.mjs', "readFileSync('../supabase/migrations/20260101000000_alpha.sql')");
+    put('tools/schema-contract-check.mjs', '');
+    put('web/lib/foo.ts', 'export const a = 1;');
+    put('web/lib/foo.test.ts', "import { a } from './foo.ts';");
+    put('web/lib/bar.ts', "import { a } from './foo.ts';");
+    put('web/lib/uses-foo.test.mjs', "import x from './foo';");
+    put('supabase/functions/app-api/handlers/h.ts', '');
+    put('supabase/functions/app-api/handlers/h.test.ts', '');
+    put('supabase/functions/app-api/index.ts', '');
+    put('tools/other.test.mjs', "import './index.ts'");
+    const names = (rel) => affectedFor(fx, rel).files.sort();
+    ok('migration → 提到它檔名的測試＋schema-contract-check', () => assert.deepEqual(names('supabase/migrations/20260101000000_alpha.sql'), ['tools/alpha-db.test.mjs', 'tools/schema-contract-check.mjs']));
+    ok('沒人提到的 migration → 只有 schema-contract-check', () => assert.deepEqual(names('supabase/migrations/20260101000001_beta.sql'), ['tools/schema-contract-check.mjs']));
+    ok('web/lib 程式 → 同名 sibling 測試＋import 它的測試', () => assert.deepEqual(names('web/lib/foo.ts'), ['web/lib/foo.test.ts', 'web/lib/uses-foo.test.mjs']));
+    ok('handler → 同目錄 sibling 測試', () => assert.deepEqual(names('supabase/functions/app-api/handlers/h.ts'), ['supabase/functions/app-api/handlers/h.test.ts']));
+    ok('index.ts 這類通用名稱 → 不做反向比對', () => assert.deepEqual(names('supabase/functions/app-api/index.ts'), []));
+    ok('改測試本身 → 只跑自己', () => assert.deepEqual(names('web/lib/foo.test.ts'), ['web/lib/foo.test.ts']));
+    ok('不相關檔案（文件）→ 無', () => assert.deepEqual(names('docs/x.md'), []));
+    ok('多檔合併去重', () => assert.deepEqual(affectedForAll(fx, ['web/lib/foo.ts', 'web/lib/foo.test.ts']).files.sort(), ['web/lib/foo.test.ts', 'web/lib/uses-foo.test.mjs']));
+  } finally {
+    fs.rmSync(fx, { recursive: true, force: true });
+  }
+}
+
+console.log('post-edit-check（受影響測試）');
+{
+  const sql = path.join(root, 'supabase', 'migrations');
+  const anyMigration = fs.existsSync(sql) ? fs.readdirSync(sql).filter((f) => f.endsWith('.sql')).at(-1) : null;
+  ok('改 migration：跑對照到的測試並通過／略過（不誤擋）', () => {
+    if (!anyMigration) return;
+    const r = run('post-edit-check.mjs', { tool_name: 'Edit', tool_input: { file_path: path.join(sql, anyMigration) } });
+    assert.equal(r.code, 0, r.out);
+  });
+  const brokenTest = path.join(root, 'tools', '__hook-test-broken.test.mjs');
+  fs.writeFileSync(brokenTest, "throw new Error('故意失敗');\n");
+  try {
+    ok('改到會失敗的測試：exit 2 並回報檔名', () => {
+      const r = run('post-edit-check.mjs', { tool_name: 'Edit', tool_input: { file_path: brokenTest } });
+      assert.equal(r.code, 2);
+      assert.match(r.out, /__hook-test-broken\.test\.mjs/);
+    });
+  } finally {
+    fs.rmSync(brokenTest, { force: true });
+  }
+}
+
+console.log('stop-typecheck（補跑測試）');
+{
+  const brokenTest = path.join(root, 'tools', '__hook-test-broken2.test.mjs');
+  fs.writeFileSync(brokenTest, "throw new Error('故意失敗');\n");
+  try {
+    ok('改過的測試在 Stop 補跑失敗 → block', () => {
+      fs.mkdirSync(path.dirname(edited), { recursive: true });
+      fs.writeFileSync(edited, 'tools/__hook-test-broken2.test.mjs\n');
+      const r = run('stop-typecheck.mjs', { stop_hook_active: false });
+      assert.equal(r.code, 0);
+      assert.match(r.out, /"decision":"block"/);
+      assert.match(r.out, /__hook-test-broken2/);
+    });
+    ok('已續跑過一次（stop_hook_active）→ 只警告不再擋', () => {
+      fs.writeFileSync(edited, 'tools/__hook-test-broken2.test.mjs\n');
+      const r = run('stop-typecheck.mjs', { stop_hook_active: true });
+      assert.equal(r.code, 0);
+      assert.doesNotMatch(r.out, /"decision":"block"/);
+      assert.match(r.out, /驗證未通過/);
+    });
+  } finally {
+    fs.rmSync(brokenTest, { force: true });
+    fs.rmSync(edited, { force: true });
+    fs.rmSync(path.join(os.tmpdir(), 'claude-hooks', `${sessionId}.verified`), { force: true });
+  }
+}
+
+console.log('ci-status');
+{
+  const { failingLatest, formatFailures } = await import(pathToFileURL(path.join(here, 'ci-status.mjs')).href);
+  const runs = [
+    { workflowName: 'CI', status: 'completed', conclusion: 'failure', event: 'schedule', createdAt: '2026-10-30T21:00:00Z', url: 'u1' },
+    { workflowName: 'CI', status: 'completed', conclusion: 'success', createdAt: '2026-10-29T21:00:00Z' },
+    { workflowName: 'CodeQL', status: 'completed', conclusion: 'success' },
+    { workflowName: 'CodeQL', status: 'completed', conclusion: 'failure' },
+    { workflowName: 'No-JavaScript synthetic probe', status: 'completed', conclusion: 'failure' },
+    { workflowName: 'Commercial readiness', status: 'in_progress', conclusion: '' },
+  ];
+  ok('只取每個 workflow 最新一筆；忽略探針與進行中', () => {
+    const f = failingLatest(runs);
+    assert.deepEqual(f.map((r) => r.workflowName), ['CI']);
+    assert.match(formatFailures(f), /CI：failure/);
+  });
+  ok('沒有失敗 → 空', () => assert.deepEqual(failingLatest([{ workflowName: 'CI', status: 'completed', conclusion: 'success' }]), []));
+}
 
 console.log(`\n${passed} 項 hook 測試通過`);

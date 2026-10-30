@@ -95,6 +95,35 @@ try {
     assert.equal(git(['push', '-q', 'origin', 'HEAD:refs/heads/tmp-branch']).code, 0);
     assert.equal(git(['push', '-q', 'origin', '--delete', 'tmp-branch']).code, 0);
   });
+  console.log('pre-push 測試閘門');
+  const mapSource = fs.readFileSync(path.join(hooksDir, '..', 'tools', 'affected-tests.mjs'), 'utf8');
+  ok('受影響的測試失敗 → 推送被攔下並指出檔名', () => {
+    put('tools/affected-tests.mjs', mapSource);
+    put('tools/gate-sample.test.mjs', "throw new Error('故意失敗');\n");
+    git(['add', '--', 'tools/affected-tests.mjs', 'tools/gate-sample.test.mjs']);
+    assert.equal(git(['commit', '-q', '-m', 'add failing test']).code, 0);
+    const r = git(['push', 'origin', 'HEAD:refs/heads/gate-bad']);
+    assert.notEqual(r.code, 0);
+    assert.match(r.out, /已攔截推送/);
+    assert.match(r.out, /gate-sample\.test\.mjs/);
+  });
+  ok('SKIP_PREPUSH_TESTS=1 可緊急略過（並留下警告）', () => {
+    const r = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/gate-skip'], { cwd: work, encoding: 'utf8', env: { ...process.env, SKIP_PREPUSH_TESTS: '1' } });
+    assert.equal(r.status, 0);
+    assert.match(`${r.stdout}${r.stderr}`, /略過測試閘門/);
+  });
+  ok('測試修好後可推送', () => {
+    put('tools/gate-sample.test.mjs', "import assert from 'node:assert/strict';\nassert.equal(1, 1);\n");
+    git(['add', '--', 'tools/gate-sample.test.mjs']);
+    assert.equal(git(['commit', '-q', '-m', 'fix test']).code, 0);
+    assert.equal(git(['push', '-q', 'origin', 'HEAD:refs/heads/gate-good']).code, 0);
+  });
+  ok('只改文件的推送不跑測試也能過', () => {
+    put('notes.md', 'x\n');
+    git(['add', '--', 'notes.md']);
+    assert.equal(git(['commit', '-q', '-m', 'docs']).code, 0);
+    assert.equal(git(['push', '-q', 'origin', 'HEAD:refs/heads/gate-docs']).code, 0);
+  });
   ok('遠端內容仍是原本的快轉結果（未被強推覆蓋）', () => {
     const remoteLog = git(['log', '--format=%s', 'main'], remote).out.trim().split('\n');
     assert.equal(remoteLog[0], 'second');

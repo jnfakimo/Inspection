@@ -23,36 +23,69 @@ export const block = (message) => {
 
 export const allow = () => process.exit(0);
 
-// 本 session 改過哪些檔案：PostToolUse 寫入，Stop 讀取。放系統暫存區，不進 repo。
-const stateFile = (sessionId) => {
+// 本 session 的狀態檔：PostToolUse 寫入，Stop 讀取。放系統暫存區，不進 repo。
+//   edited：改過哪些檔案；verified：改檔當下已跑過且通過的測試（Stop 不重跑）。
+const stateFile = (sessionId, kind = 'edited') => {
   const dir = path.join(os.tmpdir(), 'claude-hooks');
   fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, `${String(sessionId || 'default').replace(/[^\w.-]/g, '_')}.edited`);
+  return path.join(dir, `${String(sessionId || 'default').replace(/[^\w.-]/g, '_')}.${kind}`);
 };
 
-export const recordEdited = (sessionId, relPath) => {
+const appendState = (sessionId, kind, line) => {
   try {
-    fs.appendFileSync(stateFile(sessionId), `${relPath}\n`);
+    fs.appendFileSync(stateFile(sessionId, kind), `${line}\n`);
   } catch {
     /* 狀態檔寫不進去就算了，只是少一次收尾檢查 */
   }
 };
 
-export const readEdited = (sessionId) => {
+const readState = (sessionId, kind) => {
   try {
-    return [...new Set(fs.readFileSync(stateFile(sessionId), 'utf8').split('\n').filter(Boolean))];
+    return [...new Set(fs.readFileSync(stateFile(sessionId, kind), 'utf8').split('\n').filter(Boolean))];
   } catch {
     return [];
   }
 };
 
+export const recordEdited = (sessionId, relPath) => appendState(sessionId, 'edited', relPath);
+export const readEdited = (sessionId) => readState(sessionId, 'edited');
+export const recordVerified = (sessionId, relPath) => appendState(sessionId, 'verified', relPath);
+export const readVerified = (sessionId) => readState(sessionId, 'verified');
+
 export const clearEdited = (sessionId) => {
-  try {
-    fs.rmSync(stateFile(sessionId), { force: true });
-  } catch {
-    /* ignore */
+  for (const kind of ['edited', 'verified']) {
+    try {
+      fs.rmSync(stateFile(sessionId, kind), { force: true });
+    } catch {
+      /* ignore */
+    }
   }
 };
+
+// worktree 沒有自己的 node_modules 時，退到主工作樹那份（git common dir 的上一層）。
+// 以 typescript/package.json 非空判斷「裝好了」：雲端硬碟上的 npm ci 可能留下 0 byte 的壞檔。
+export const findNodeModules = (root) => {
+  const usable = (dir) => {
+    try {
+      return fs.statSync(path.join(dir, 'node_modules', 'typescript', 'package.json')).size > 0;
+    } catch {
+      return false;
+    }
+  };
+  if (usable(root)) return path.join(root, 'node_modules');
+  try {
+    const common = path.resolve(root, fs.readFileSync(path.join(root, '.git'), 'utf8').match(/^gitdir:\s*(.+)$/m)?.[1].trim() ?? '', '..', '..');
+    const main = path.dirname(common);
+    if (usable(main)) return path.join(main, 'node_modules');
+  } catch {
+    /* 不是 worktree 或讀不到 .git：略過 */
+  }
+  return null;
+};
+
+// PostToolUse／SessionStart 的「提醒但不阻擋」訊息。
+export const addContext = (eventName, text) =>
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: eventName, additionalContext: text } }));
 
 // 回傳 repo 相對路徑（正斜線）；不在 repo 內回傳 null。
 export const toRelative = (root, filePath) => {
