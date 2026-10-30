@@ -7,9 +7,11 @@ const usersAdmin = readFileSync(new URL('../web/components/admin/UsersAdmin.tsx'
 assert.match(adminApi, /const ACCOUNT_APPLICATION_INITIAL_PASSWORD = '12345678';/);
 assert.match(adminApi, /password:\s*ACCOUNT_APPLICATION_INITIAL_PASSWORD/);
 assert.doesNotMatch(adminApi, /temporaryNumericPassword/);
-assert.match(adminApi, /初始密碼為 12345678；啟用連結已寄出/);
+assert.match(adminApi, /初始密碼為 \$\{ACCOUNT_APPLICATION_INITIAL_PASSWORD\}；\$\{activationMessage\}/);
+assert.match(adminApi, /啟用連結已寄出/);
+assert.match(adminApi, /啟用郵件寄送失敗，請通知使用者登入後立即變更密碼/);
 assert.match(usersAdmin, /核准後初始密碼為 <strong>12345678<\/strong>/);
-assert.match(usersAdmin, />核准並建立帳號<\/button>/);
+assert.match(usersAdmin, />\s*核准並建立帳號\s*<\/button>/);
 
 // 初始密碼不得進入既有帳號建立稽核內容。
 const approvalAuditStart = adminApi.indexOf("await audit('users'");

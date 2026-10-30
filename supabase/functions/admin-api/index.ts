@@ -623,7 +623,14 @@ export async function handleAdminApiRequest(req: Request) {
         rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId,
         activation_email_sent: !mailError,
       });
-      return reply(req, { ok: true, data: { user_id: createdProfile.user_id, activation_email_sent: !mailError }, message: mailError ? '帳號已核准，初始密碼為 12345678；啟用郵件寄送失敗，請通知使用者登入後立即變更密碼' : '帳號已核准，初始密碼為 12345678；啟用連結已寄出' });
+      const activationMessage = mailError
+        ? '啟用郵件寄送失敗，請通知使用者登入後立即變更密碼'
+        : '啟用連結已寄出';
+      return reply(req, {
+        ok: true,
+        data: { user_id: createdProfile.user_id, activation_email_sent: !mailError },
+        message: `帳號已核准，初始密碼為 ${ACCOUNT_APPLICATION_INITIAL_PASSWORD}；${activationMessage}`,
+      });
     }
 
     if (action === 'admin_reject_account_application') {
