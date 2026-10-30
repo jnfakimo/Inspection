@@ -1,7 +1,7 @@
 # 北農公務車定位手機 App
 
 這是 `SYS-13 公務車定位追蹤系統` 的 iOS／Android 原生 App 原始碼。它不是一般網頁或
-Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 development build 安裝到實體手機。
+Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 development build。可先使用 Android 模擬器補驗原生儲存、登入與權限；BLE／NFC／耗電與廠牌背景限制仍須實體手機。
 
 ## 已實作（不代表已安裝或通過實機驗證）
 
@@ -10,6 +10,9 @@ Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 develo
 - 前景 BLE 掃描、掃描結果選取，以及 iOS／Android 分別綁定設備識別碼。
 - 勤務開始／結束、30～60 秒移動定位、Android 常駐通知。
 - 最多 10,000 筆手機離線佇列，依 `client_event_id` 去重補傳。
+- 補傳先確認目前登入的啟用人員，只送該駕駛的點；其他帳號資料保留供原駕駛登入後補傳。補傳失敗時不關閉伺服器勤務，畫面會提示定位已停止、勤務尚未結束，恢復網路後須再次按結束勤務。
+- Android 背景定位的持久化排程需要 `RECEIVE_BOOT_COMPLETED`，已在 app config 明確宣告並由產生 manifest 的測試把關；變更需重建原生 APK，僅更新 JavaScript bundle 不會補上權限。
+  本輪背景回呼、鎖屏、Doze 與離線勤務證據見 [續驗報告](../../docs/TRACKING_FOLLOWUP_VERIFICATION_20261029.md)；短時間模擬器測試不代表八小時實機驗收。
 - 登入資料、勤務狀態與位置佇列以 AES-GCM 加密存放，金鑰由作業系統 SecureStore 保護；舊明文值成功遷移後才刪除。大量密文會分成每段最多 200 KB，所有新段寫完才切換索引，避免單筆讀取上限與中斷寫入造成資料遺失。位置佇列保留 7 天，到期自動移除；到期前仍須完成補傳。
 - Android 已停用應用程式自動備份，避免只還原密文、未還原 Keystore 金鑰而無法讀取。換機或重裝前須先連線補傳，離線佇列不會移轉到新手機。
 - iOS／Android 權限說明皆為繁體中文。
@@ -30,10 +33,16 @@ Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 develo
 
 ## 建置
 
+2026-10-29 已於隔離 Android API 35 模擬器完成原生加密、遷移、分段、權限拒絕／服務啟停、原密碼登入、程序重啟、同簽章更新、Android 重開機與金鑰遺失補驗。修正跨帳號勤務恢復、登出競態、Expo Android 密文介面差異及中斷遷移清理；25 項儲存／生命週期測試通過。測試 APK 使用隔離後端與私有測試入口，沒有正式簽署或發布；iOS 僅 JS bundle，未跑原生模擬器。範圍、證據及需要配合的條件見 [完整報告](../../docs/ANDROID_EMULATOR_VERIFICATION_20261029.md)。
+
 1. 複製 `.env.example` 為 `.env.local`，填入目標環境的公開匿名金鑰；不得填入 service role 金鑰。
-2. 執行 `npm install`。
-3. 執行 `npx expo prebuild` 產生原生工程。
+2. 執行 `npm ci`，由鎖檔安裝並套用經來源雜湊核對的 deepmerge 防護。
+3. 執行 `npm run native:prebuild` 產生原生工程。
 4. Android 實機使用 `npm run android`；iOS 需在 macOS／Xcode 與公司 Apple 開發者簽章環境執行 `npm run ios`。
+
+啟動使用 `npm start`；輸出 bundle 使用 `npm run export -- --platform android`（iOS 同理）。上述指令與 typecheck 均先驗證 deepmerge 補丁；即使安裝或執行時指定 `--ignore-scripts`，內嵌檢查仍會拒絕未修補版本。若漏跑安裝腳本，先執行 `npm run postinstall`，再跑 `npm run test:security-deps`。未知版本或雜湊不符時停止並重新審查，不手改雜湊放行。直接執行 `npx expo`、Gradle 或第三方建置服務不保證會跑本專案守門，必須先完成補丁檢查；正式簽署前也必須通過此檢查。
+
+2026-10-29 的 7 筆 low 均來自同一 deepmerge 公告及其間接依賴，原始 audit 告警保留；本機補丁不等於上游已發布修補版。逐項原因、防護、替代方案與驗證見 [低風險依賴報告](../../docs/LOW_DEPENDENCY_REVIEW_20261029.md)。
 
 ## 實機驗證閘門
 

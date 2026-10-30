@@ -106,7 +106,8 @@ Deno.serve(async req=>{
 
     return reply({ok:true,checked:(bookedRows||[]).length,results});
   }catch(e){
-    const msg=e instanceof Error?e.message:typeof e==="object"&&e?JSON.stringify(e):String(e);
-    return reply({ok:false,msg},500);
+    const incidentId=crypto.randomUUID();
+    console.error("meeting-booking-check failed",incidentId);
+    return reply({ok:false,msg:"服務暫時無法完成作業，請稍後重試",incident_id:incidentId},500);
   }
 });

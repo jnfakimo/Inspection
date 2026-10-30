@@ -6,8 +6,10 @@ import type { ActiveTrackingSession, TrackingDevice } from './types';
 
 const BLE_CHECK_INTERVAL_MS = 5 * 60_000;
 
-export async function monitorBlePresence(session: ActiveTrackingSession) {
+export async function monitorBlePresence(session: ActiveTrackingSession, isCurrent: () => boolean = () => true) {
+  if (!isCurrent()) return;
   const previous = await readBleMonitorState();
+  if (!isCurrent()) return;
   const now = Date.now();
   if (now - previous.lastCheckedAt < BLE_CHECK_INTERVAL_MS) return;
   if (!session.platformIdentifier && !session.serviceUuid && !session.advertisedName) return;
@@ -24,6 +26,7 @@ export async function monitorBlePresence(session: ActiveTrackingSession) {
     platform_identifiers: session.platformIdentifier ? { [Platform.OS]: session.platformIdentifier } : null,
   };
   const found = await findRegisteredDevice(registered);
+  if (!isCurrent()) return;
   const presence = found ? 'present' : 'missing';
   if (previous.presence === 'unknown' || previous.presence === presence) {
     await writeBleMonitorState({ lastCheckedAt: now, presence });
@@ -42,6 +45,7 @@ export async function monitorBlePresence(session: ActiveTrackingSession) {
     occurred_at: new Date(now).toISOString(),
     details: { platform: Platform.OS },
   });
+  if (!isCurrent()) return;
   if (error) throw new Error('藍牙連線事件暫時無法寫入，系統稍後會再次確認。');
   await writeBleMonitorState({ lastCheckedAt: now, presence });
 }

@@ -4,15 +4,20 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "expo start --dev-client",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit",
-    "test:storage": "node --test test/storage.test.cjs"
+    "start": "node scripts/patch-deepmerge.cjs --check && expo start --dev-client",
+    "android": "node scripts/patch-deepmerge.cjs --check && expo run:android",
+    "ios": "node scripts/patch-deepmerge.cjs --check && expo run:ios",
+    "export": "node scripts/patch-deepmerge.cjs --check && expo export",
+    "native:prebuild": "node scripts/patch-deepmerge.cjs --check && expo prebuild",
+    "typecheck": "node scripts/patch-deepmerge.cjs --check && tsc --noEmit",
+    "test:storage": "node --test test/storage.test.cjs test/storage-crash.test.cjs test/account-lifecycle.test.cjs test/sync.test.cjs test/background-lifecycle.test.cjs",
+    "postinstall": "node scripts/patch-deepmerge.cjs",
+    "test:security-deps": "node scripts/patch-deepmerge.cjs --check && node --test test/security-deps.test.cjs"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "2.116.0",
+    "base64-js": "1.5.1",
     "expo": "57.0.20",
     "expo-constants": "57.0.17",
     "expo-crypto": "57.0.4",
@@ -31,6 +36,9 @@
     "typescript": "~6.0.3"
   },
   "overrides": {
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "@expo/cli": {
+      "zod": "4.6.7"
+    }
   }
 }

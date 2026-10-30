@@ -1,3 +1,4 @@
+import { javascriptStringLiteral } from './javascript-literal.mjs';
 import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createHash, createPublicKey, sign as signPayload, verify as verifySignature } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -270,8 +271,8 @@ function cspDirectiveSources(policy, directiveName) {
 }
 
 function addJavaScriptProvenance(source, relativePath) {
-  const registry = JSON.stringify(provenanceNamespace);
-  const marker = JSON.stringify(provenanceMarker(relativePath));
+  const registry = javascriptStringLiteral(provenanceNamespace);
+  const marker = javascriptStringLiteral(provenanceMarker(relativePath));
   return `(()=>{const k=Symbol.for(${registry}),g=globalThis;if(!g[k])Object.defineProperty(g,k,{value:new Set,enumerable:false,configurable:false,writable:false});g[k].add(${marker})})();\n${source}`;
 }
 

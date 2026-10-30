@@ -45,6 +45,8 @@ export async function sendLineTextMessage({
     const acceptedRequestId = rawAcceptedRequestId && /^[A-Za-z0-9._:-]{1,200}$/.test(rawAcceptedRequestId)
       ? rawAcceptedRequestId
       : null;
+    // Discard the unused stream without reading provider data or changing delivery classification.
+    try { await response.body?.cancel(); } catch { /* Cleanup failure must not trigger duplicate delivery. */ }
     return { ok: response.ok, status: response.status, acceptedRequestId };
   } catch {
     return { ok: false, status: null };

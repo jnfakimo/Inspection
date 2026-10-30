@@ -56,3 +56,19 @@ test("malformed retry keys fail closed without making a network request", async 
   assert.deepEqual(result, { ok: false, status: null });
   assert.equal(calls, 0);
 });
+
+
+test("LINE response body is cancelled without changing an accepted result", async () => {
+  let cancelled = 0;
+  const body = new ReadableStream({ cancel() { cancelled++; } });
+  const result = await sendLineTextMessage({ token:"synthetic-token", recipient:"Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", text:"synthetic notice",
+    fetcher:async()=>new Response(body,{status:200}) });
+  assert.equal(result.status,200); assert.equal(cancelled,1);
+});
+
+test("LINE response cancellation failure does not turn acceptance into a retry", async () => {
+  const body = new ReadableStream({ cancel() { throw new Error("synthetic cleanup failure"); } });
+  const result = await sendLineTextMessage({ token:"synthetic-token", recipient:"Uaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", text:"synthetic notice",
+    fetcher:async()=>new Response(body,{status:409,headers:{"x-line-accepted-request-id":"known-accepted"}}) });
+  assert.deepEqual(result,{ok:false,status:409,acceptedRequestId:"known-accepted"});
+});

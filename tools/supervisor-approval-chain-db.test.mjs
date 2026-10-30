@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {PGlite} from '@electric-sql/pglite';
+const read=name=>readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8');
+const db=new PGlite();
+const id=n=>'00000000-0000-4000-8000-'+String(n).padStart(12,'0');
+try {
+ await db.exec(`create role anon; create role authenticated;
+ create table departments(dept_id uuid primary key,parent_id uuid,name text,code text,status text default 'active');
+ create table users(user_id uuid primary key,supervisor_id uuid references users(user_id),dept_id uuid,department text,name text,status text,role text,rbac_role text);
+ `);
+ await db.exec(read('20260831140000_supervisor_hierarchy_alignment.sql'));
+ await db.exec(`create trigger test_supervisor_guard before insert or update on users for each row execute function guard_user_supervisor_hierarchy();`);
+ await db.query('insert into departments(dept_id,name,code) values ($1,$2,$3),($4,$5,$6)',[id(100),'同單位','MKT1',id(200),'外單位','MKT2']);
+ const add=(n,role='unit_supervisor',supervisor=null,dept=id(100),status='active')=>db.query('insert into users(user_id,dept_id,name,status,role,rbac_role,supervisor_id) values($1,$2,$3,$4,$5,$5,$6)',[id(n),dept,'隔離'+n,status,role,supervisor&&id(supervisor)]);
+ const parent=(n,boss)=>db.query('update users set supervisor_id=$1 where user_id=$2',[boss&&id(boss),id(n)]);
+ await add(1);
+ await assert.rejects(add(2,'unit_supervisor',1),/主管及系統管理員不可/);
+ const migration=read('20261028170000_allow_supervisor_approval_chain.sql');
+ await db.exec(migration);
+ await add(2,'unit_supervisor',1);await add(3,'unit_supervisor',2);await add(4,'reporter',3);
+ await add(5,'unit_supervisor',null,id(200));await add(6,'unit_supervisor',null,id(100),'inactive');await add(7,'sysadmin');
+ await assert.rejects(parent(1,3),/循環/);
+ await assert.rejects(parent(3,3),/本人|循環/);
+ await assert.rejects(parent(3,4),/循環|角色/);
+ await assert.rejects(parent(3,5),/上層/);
+ await assert.rejects(parent(3,6),/啟用/);
+ await assert.rejects(parent(7,1),/系統管理員不可/);
+ await assert.rejects(parent(4,null),/必須指定/);
+ await assert.rejects(db.query("update users set status='inactive' where user_id=$1",[id(2)]),/直屬|底下/);
+ await assert.rejects(db.query("update users set rbac_role='reporter',role='reporter' where user_id=$1",[id(2)]),/直屬|底下/);
+ await db.exec(migration);
+ assert.equal((await db.query('select supervisor_id from users where user_id=$1',[id(3)])).rows[0].supervisor_id,id(2));
+ console.log('PASS 主管鏈：重現舊衝突、三階、循環／自指／非主管／跨單位／停用拒絕、必填、原主管保護及可重跑。');
+}finally{await db.close();}

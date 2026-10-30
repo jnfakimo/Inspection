@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -41,4 +41,16 @@ test('Storage 路徑拒絕越界與平台分隔符，不輸出原始敏感路徑
     assert.throws(() => backupObjectPath(root, 'bucket', name), /路徑/);
   }
   for (const bucket of ['..', '.', 'a/b', 'a\\b', 'C:']) assert.throws(() => backupObjectPath(root, bucket, 'x'), /路徑/);
+});
+
+
+test('Storage 根目錄為符號連結或 Windows junction 時拒絕驗證', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'storage-root-link-'));
+  const backup = path.join(dir, 'backup'), outside = path.join(dir, 'outside');
+  try {
+    await mkdir(backup); await mkdir(outside);
+    await symlink(outside, path.join(backup, 'storage'), process.platform === 'win32' ? 'junction' : 'dir');
+    const manifest = {version:2,scope:{storage_objects:true},totals:{storage_objects:0,storage_bytes:0},storage:[]};
+    await assert.rejects(verifyStorage(backup, manifest), /符號連結/);
+  } finally { await rm(dir, {recursive:true,force:true}); }
 });

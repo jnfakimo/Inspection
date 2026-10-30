@@ -3922,7 +3922,11 @@ export async function handleAppApiRequest(req: Request) {
         const { data, error } = await userDb.from('mechanical_handover_daily_approvals').insert(payload).select('approval_id,approved_at').single();
         if (error) {
           if (String(error.code || '') === '23505') return reply(req, { ok: false, message: '本日交接簿已完成課長簽核' }, 409);
-          if (String(error.code || '') === '23514') return reply(req, { ok: false, message: '每日交接簿須於隔日起由課長簽核' }, 409);
+          if (String(error.code || '') === '23514') {
+            const reconciliationMessage = '本市場三個班別都必須完成交班與接班雙方勾稽後，才能進行每日簽核';
+            return reply(req, { ok: false, message: error.message === reconciliationMessage
+              ? reconciliationMessage : '每日交接簿須於隔日起由課長簽核' }, 409);
+          }
           throw error;
         }
         await writeAudit(userDb, profile.user_id, 'mechanical_handover_daily_approvals', data.approval_id, 'insert', null, payload);

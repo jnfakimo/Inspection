@@ -1,3 +1,4 @@
+import { htmlElements, htmlScripts, isClassicInlineScript } from './html-audit-parser.mjs';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -43,10 +44,9 @@ async function sourcePagePaths() {
 
 function compileInlineScripts(html, file) {
   let count = 0;
-  const scripts = html.matchAll(/<script(?![^>]*\bsrc=)(?![^>]*\btype=["'](?:module|application\/ld\+json|application\/json)["'])[^>]*>([\s\S]*?)<\/script>/gi);
-  for (const match of scripts) {
-    if (!match[1].trim()) continue;
-    new vm.Script(match[1], { filename: `${file}:inline-${count + 1}` });
+  for (const {attrs, code} of htmlScripts(html)) {
+    if (!isClassicInlineScript(attrs) || !code.trim()) continue;
+    new vm.Script(code, { filename: `${file}:inline-${count + 1}` });
     count += 1;
   }
   return count;
@@ -77,13 +77,12 @@ function localReferenceTarget(pagePath, rawReference) {
 
 function validateStaticReferences(html, pagePath) {
   const missing = [];
-  const markupOnly = html.replace(/<script(?:\s[^>]*)?>[\s\S]*?<\/script>/gi, '');
-  const attributes = markupOnly.matchAll(/\b(?:href|src|manifest)\s*=\s*["']([^"']*)["']/gi);
-  for (const match of attributes) {
-    const target = localReferenceTarget(pagePath, match[1]);
+  for (const node of htmlElements(html)) for (const attr of node.attrs) {
+    if (!['href','src','manifest'].includes(attr.name)) continue;
+    const target = localReferenceTarget(pagePath, attr.value);
     if (!target) continue;
     const absoluteTarget = path.join(outputRoot, ...target.split('/'));
-    if (!existsSync(absoluteTarget)) missing.push(`${match[1]} → ${target}`);
+    if (!existsSync(absoluteTarget)) missing.push(`${attr.value} → ${target}`);
   }
   if (missing.length) {
     throw new Error(`${pagePath} 包含不存在的本機連結：\n${missing.map((item) => `  - ${item}`).join('\n')}`);

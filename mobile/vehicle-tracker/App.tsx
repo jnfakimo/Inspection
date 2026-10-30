@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Platform,
   Pressable,
@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import Constants from "expo-constants";
 import { configurationError } from "./src/config";
+import { createAccountLifecycle } from "./src/account-lifecycle";
+import { completeTrackingDuty } from "./src/duty-completion";
 import {
   matchesRegisteredDevice,
   scanNearbyDevices,
@@ -21,7 +23,7 @@ import {
   stopBackgroundTracking,
 } from "./src/background-location";
 import { supabase } from "./src/supabase";
-import { flushLocationQueue } from "./src/sync";
+import { flushLocationQueue, isTrackingSessionActive, endTrackingSession } from "./src/sync";
 import {
   readActiveSession,
   readLocationQueue,
@@ -35,6 +37,7 @@ import type {
 } from "./src/types";
 
 type Profile = { user_id: string; name: string };
+type Account = { profile: Profile; vehicles: Vehicle[]; devices: TrackingDevice[] };
 
 const zhError = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message.trim() : "";
@@ -77,19 +80,22 @@ export default function App() {
     setQueued((await readLocationQueue()).length);
   }
 
-  async function loadAccount() {
-    const { data: auth } = await supabase.auth.getUser();
-    if (!auth.user) {
-      setProfile(null);
-      return;
-    }
+  async function readAccount() {
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError?.name === "AuthRetryableFetchError")
+      throw new Error("暫時無法確認帳號，請恢復網路後再試；既有離線勤務資料仍保留。");
+    if (!auth.user) return null;
     const { data: user, error: userError } = await supabase
       .from("users")
       .select("user_id,name")
       .eq("auth_id", auth.user.id)
       .eq("status", "active")
       .single();
-    if (userError || !user)
+    if (userError?.code === "PGRST116" || (!userError && !user)) {
+      setNotice("找不到啟用中的人員帳號，請聯絡管理員。");
+      return null;
+    }
+    if (userError)
       throw new Error("找不到啟用中的人員帳號，請聯絡管理員。");
     const [
       { data: vehicleRows, error: vehicleError },
@@ -110,33 +116,47 @@ export default function App() {
     ]);
     if (vehicleError || deviceError)
       throw new Error("無法讀取公務車或藍牙設備資料，請確認定位系統權限。");
-    setProfile(user as Profile);
-    setVehicles((vehicleRows || []) as Vehicle[]);
-    setDevices((deviceRows || []) as TrackingDevice[]);
-    const stored = await readActiveSession();
-    if (stored) {
-      setActive(stored);
-      setVehicleId(stored.vehicleId);
-      setDeviceId(stored.deviceId);
-      await startBackgroundTracking().catch(() =>
-        setNotice("定位勤務仍在進行，但背景定位權限需要重新確認。"),
-      );
-    }
+    return { profile: user as Profile, vehicles: (vehicleRows || []) as Vehicle[], devices: (deviceRows || []) as TrackingDevice[] };
   }
+
+  const lifecycleRef = useRef<ReturnType<typeof createAccountLifecycle<Account>> | null>(null);
+  lifecycleRef.current ??= createAccountLifecycle({
+    readAccount,
+    readSession: readActiveSession,
+    isSessionActive: isTrackingSessionActive,
+    writeSession: writeActiveSession,
+    startTracking: startBackgroundTracking,
+    async stopTracking() { stopBleManager(); await stopBackgroundTracking(); },
+    clearAccount() {
+      setProfile(null); setVehicles([]); setDevices([]); setActive(null);
+      setVehicleId(""); setDeviceId(""); setNearby([]); setMatchedBleId(""); setLastScanAt(0);
+    },
+    publish(account, session) {
+      setProfile(account.profile); setVehicles(account.vehicles); setDevices(account.devices); setActive(session);
+      if (session) { setVehicleId(session.vehicleId); setDeviceId(session.deviceId); }
+    },
+    warn: setNotice,
+  });
+  const lifecycle = lifecycleRef.current;
 
   useEffect(() => {
     let disposed = false;
     let authTimer: ReturnType<typeof setTimeout> | undefined;
-    void loadAccount().catch((error) =>
+    void lifecycle.refresh().catch((error) =>
       setNotice(zhError(error, "讀取帳號失敗")),
     );
-    void refreshQueueCount();
+    void refreshQueueCount().catch(error => setNotice(zhError(error, "無法讀取手機中的定位資料。")));
     const listener = supabase.auth.onAuthStateChange(
-      () => {
+      (event) => {
         // Leave the auth callback before calling Supabase again (avoid its session lock).
         clearTimeout(authTimer);
+        lifecycle.cancelPending();
+        if (event === "SIGNED_OUT") {
+          void lifecycle.clear().catch(error => setNotice(zhError(error, "清理定位勤務失敗，請重新開啟本程式。")));
+          return;
+        }
         authTimer = setTimeout(() => {
-          if (!disposed) void loadAccount().catch((error) =>
+          if (!disposed) void lifecycle.refresh().catch((error) =>
             setNotice(zhError(error, "讀取帳號失敗")),
           );
         }, 0);
@@ -144,6 +164,7 @@ export default function App() {
     );
     return () => {
       disposed = true;
+      lifecycle.cancelPending();
       clearTimeout(authTimer);
       listener.data.subscription.unsubscribe();
       stopBleManager();
@@ -165,7 +186,7 @@ export default function App() {
       setNotice(zhError(error, "操作失敗，請稍後再試。"));
     } finally {
       setBusy(false);
-      await refreshQueueCount();
+      await refreshQueueCount().catch(error => setNotice(zhError(error, "無法讀取手機中的定位資料。")));
     }
   }
 
@@ -248,6 +269,7 @@ export default function App() {
   }
 
   async function beginDuty() {
+    const isCurrentAccount = lifecycle.capture();
     if (!profile || !vehicleId || !selectedDevice)
       throw new Error("請先選擇公務車及藍牙設備。");
     if (!bleVerified || Date.now() - lastScanAt > 60_000)
@@ -277,40 +299,49 @@ export default function App() {
         matchedBleId ||
         null,
     };
-    await writeActiveSession(session);
     try {
-      await startBackgroundTracking();
+      if (!await lifecycle.activate(session, isCurrentAccount))
+        throw new Error("登入狀態已變更，勤務未在手機啟動，請重新確認。");
     } catch (error) {
-      await writeActiveSession(null);
       await supabase
         .from("vehicle_tracking_sessions")
         .update({
           status: "interrupted",
           ended_at: new Date().toISOString(),
-          ended_reason: "定位權限未完成",
+          ended_reason: "手機定位未啟動",
         })
         .eq("session_id", data.session_id);
       throw error;
     }
+    if (!isCurrentAccount()) return;
     setActive(session);
     setNotice("勤務已開始，手機會依移動狀態回傳定位。");
   }
 
   async function endDuty() {
     if (!active) return;
-    await stopBackgroundTracking();
-    await flushLocationQueue().catch(() => undefined);
-    const { error } = await supabase
-      .from("vehicle_tracking_sessions")
-      .update({
-        status: "ended",
-        ended_at: new Date().toISOString(),
-        ended_reason: "駕駛人結束勤務",
-      })
-      .eq("session_id", active.sessionId);
-    if (error)
-      throw new Error("勤務結束狀態暫時無法回傳，請保持網路後再試一次。");
-    await writeActiveSession(null);
+    const isCurrentAccount = lifecycle.capture();
+    await completeTrackingDuty(active, {
+      async stopTracking() { stopBleManager(); await stopBackgroundTracking(); },
+      flushQueue: flushLocationQueue,
+      async hasPendingPoints(sessionId) {
+        return (await readLocationQueue()).some(point => point.session_id === sessionId);
+      },
+      async markCompletionPending() {
+        if (!await lifecycle.markCompleting(active, isCurrentAccount))
+          throw new Error("登入狀態已變更，請重新確認勤務。");
+        setActive({ ...active, completionPending: true });
+      },
+      async endSession() {
+        if (!isCurrentAccount()) throw new Error("登入狀態已變更，請重新確認勤務。");
+        await endTrackingSession(active);
+      },
+      async clearSession() {
+        if (!await lifecycle.clearCompleted(active, isCurrentAccount))
+          throw new Error("登入或勤務狀態已變更，請重新確認勤務。");
+      },
+    });
+    if (!isCurrentAccount()) return;
     setActive(null);
     setMatchedBleId("");
     setNotice("勤務已結束。");
@@ -388,7 +419,9 @@ export default function App() {
             onPress={() =>
               void run(async () => {
                 if (active) throw new Error("請先結束勤務再登出。");
-                await supabase.auth.signOut();
+                const { error } = await supabase.auth.signOut();
+                if (error) throw new Error("登出暫時無法完成，請稍後再試。");
+                await lifecycle.clear();
               })
             }
           >
@@ -455,7 +488,7 @@ export default function App() {
         <Text style={styles.section}>3. 定位勤務</Text>
         <View style={styles.statusCard}>
           <Text style={styles.statusTitle}>
-            {active ? "定位勤務進行中" : "尚未開始勤務"}
+            {active?.completionPending ? "定位已停止，等待勤務結束確認" : active ? "定位勤務進行中" : "尚未開始勤務"}
           </Text>
           <Text style={styles.statusText}>
             {active

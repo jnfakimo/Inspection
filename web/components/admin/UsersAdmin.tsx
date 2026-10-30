@@ -145,14 +145,15 @@ export function UsersAdmin({ profile, module }: AdminProps) {
   }, [activeDepartments, secretaryReportsToDeputy]);
   const rootDepartments = useMemo(() => activeDepartments.filter(dept => !dept.parent_id), [activeDepartments]);
   const supervisors = useMemo(() => users.filter(user => user.status === 'active' && ['unit_supervisor', 'sysadmin'].includes(userRole(user))), [users]);
-  const supervisorOptions = useCallback((memberDeptId: unknown, currentSupervisorId = '') => {
+  const supervisorOptions = useCallback((memberDeptId: unknown, currentSupervisorId = '', memberUserId = '') => {
     const eligible = supervisors.filter(supervisor => {
+      if (memberUserId && String(supervisor.user_id) === memberUserId) return false;
       // 尚未選擇部／室時，不列出任意部門主管，避免誤把跨單位人員指定為直屬主管；
       // 系統管理員仍可跨單位協助處理例外帳號。
       if (userRole(supervisor) === 'sysadmin') return true;
       return Boolean(memberDeptId) && supervisorMatchesDepartment(supervisor.dept_id, memberDeptId);
     });
-    if (currentSupervisorId && !eligible.some(supervisor => String(supervisor.user_id) === currentSupervisorId)) {
+    if (currentSupervisorId && currentSupervisorId !== memberUserId && !eligible.some(supervisor => String(supervisor.user_id) === currentSupervisorId)) {
       // 現任主管已經不符規則（換了單位、被降級或停用）時仍要列出來，否則欄位會變空白、
       // 看不出原本掛的是誰；但一定要標記，不然它看起來跟正常選項一樣，
       // 管理員按下儲存才會被資料庫退回。
@@ -215,7 +216,8 @@ export function UsersAdmin({ profile, module }: AdminProps) {
     if (!['unit_supervisor', 'sysadmin'].includes(selectedRole) && !editor.supervisor_id) { setEditorError('失敗：一般人員必須指定直屬主管'); return; }
     // 與 admin-api validateSupervisor 及資料庫 guard_user_supervisor_hierarchy 同一條規則：
     // 主管必須在人員所屬單位或其上層部／室。先在前端擋，才不會送出去才被退回。
-    if (!['unit_supervisor', 'sysadmin'].includes(selectedRole) && editor.supervisor_id) {
+    if (selectedRole !== 'sysadmin' && editor.supervisor_id) {
+      if (editor.supervisor_id === editor.user_id) { setEditorError('失敗：上級主管不可設定為本人'); return; }
       const picked = users.find(supervisor => String(supervisor.user_id) === String(editor.supervisor_id));
       if (!picked || picked.status !== 'active' || !['unit_supervisor', 'sysadmin'].includes(userRole(picked))) {
         setEditorError('失敗：所選主管已不是啟用中的單位主管，請改派其他主管'); return;
@@ -284,7 +286,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       sorted.forEach((user, index) => {
         const [root, child] = departmentParts(user.dept_id);
         sheet.addRow({ seq: index + 1, name: user.name || '', username: user.username || '', email: user.email || '', phone: user.phone || '', root, child,
-          role: roleLabel(userRole(user), roles), supervisor: ['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id),
+          role: roleLabel(userRole(user), roles), supervisor: userRole(user) === 'sysadmin' ? '—' : supervisorName(user.supervisor_id),
           status: user.status === 'active' ? '啟用' : '停用', createdAt: fmtTime(user.created_at) });
       });
       sheet.views = [{ state: 'frozen', ySplit: 1 }];
@@ -388,6 +390,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
         if (!selectedRole || !roles.some(role => String(role.role_id) === selectedRole)) { details.push(`第 ${rowNumber} 列「${username}」：系統角色「${roleRaw}」無法辨識或已停用`); failed += 1; continue; }
         const supervisorRaw = value(supervisorIndex);
         const supervisor = supervisorRaw ? supervisors.find(user => accountKey(user.username) === accountKey(supervisorRaw) || importKey(user.name) === importKey(supervisorRaw)) : undefined;
+        if (selectedRole === 'unit_supervisor' && supervisorRaw && (!supervisor || (userRole(supervisor) !== 'sysadmin' && !supervisorMatchesDepartment(supervisor.dept_id, deptId)))) { details.push(`第 ${rowNumber} 列「${username}」：上級主管必須是所屬單位或上層部室的有效主管`); failed += 1; continue; }
         if (!['unit_supervisor', 'sysadmin'].includes(selectedRole) && (!supervisor || !supervisorMatchesDepartment(supervisor.dept_id, deptId))) { details.push(`第 ${rowNumber} 列「${username}」：請填寫所屬單位可管理的直屬主管帳號`); failed += 1; continue; }
         const passwordCell = value(passwordIndex);
         const generatedPassword = !passwordCell || passwordCell === '000000000';
@@ -448,7 +451,7 @@ export function UsersAdmin({ profile, module }: AdminProps) {
       </tr>)}</tbody></table></div>
     </section>}
     <section className="panel admin-panel"><div className="admin-toolbar"><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜尋姓名、帳號、電子郵件、單位或角色"/><select value={status} onChange={event => setStatus(event.target.value)}><option value="">全部狀態</option><option value="active">啟用</option><option value="inactive">停用</option></select><span>啟用 {users.filter(user => user.status === 'active').length}／停用 {users.filter(user => user.status === 'inactive').length}</span></div>
-      <div className="responsive-table"><table><thead><tr><th>姓名</th><th>登入帳號</th><th>單位</th><th>角色</th><th>直屬主管</th><th>狀態</th><th>建立時間</th><th>操作</th></tr></thead><tbody>{rows.map(user => <tr key={user.user_id}><td><strong>{user.name}</strong><small>{user.email || '—'}</small></td><td>{user.username || '—'}</td><td>{deptName(user.dept_id) !== '—' ? deptName(user.dept_id) : user.department || '—'}</td><td>{roleLabel(userRole(user), roles)}</td><td>{['unit_supervisor', 'sysadmin'].includes(userRole(user)) ? '—' : supervisorName(user.supervisor_id)}</td><td><StatusPill value={user.status}/></td><td>{fmtTime(user.created_at)}</td><td><div className="admin-row-actions"><button onClick={() => openEditor({ ...user, rbac_role: userRole(user) })}>編輯</button><button onClick={() => setPasswordUser(user)}>重設密碼</button>{user.user_id !== profile.user_id && <button className={user.status === 'active' ? 'warn' : ''} onClick={() => window.confirm(`確定${user.status === 'active' ? '停用' : '啟用'}「${user.name}」？`) && void run({ action: 'admin_toggle_user', user_id: user.user_id, status: user.status === 'active' ? 'inactive' : 'active' }, user.status === 'active' ? '帳號已停用' : '帳號已啟用')}>{user.status === 'active' ? '停用' : '啟用'}</button>}{user.status === 'inactive' && !String(user.username || '').startsWith('deidentified-') && <button className="danger" onClick={() => window.confirm(`確定將「${user.name}」個資去識別化？此操作無法復原。`) && void run({ action: 'admin_deidentify_user', user_id: user.user_id }, '個資已去識別化')}>去識別化</button>}</div></td></tr>)}</tbody></table></div>
+      <div className="responsive-table"><table><thead><tr><th>姓名</th><th>登入帳號</th><th>單位</th><th>角色</th><th>直屬主管</th><th>狀態</th><th>建立時間</th><th>操作</th></tr></thead><tbody>{rows.map(user => <tr key={user.user_id}><td><strong>{user.name}</strong><small>{user.email || '—'}</small></td><td>{user.username || '—'}</td><td>{deptName(user.dept_id) !== '—' ? deptName(user.dept_id) : user.department || '—'}</td><td>{roleLabel(userRole(user), roles)}</td><td>{userRole(user) === 'sysadmin' ? '—' : supervisorName(user.supervisor_id)}</td><td><StatusPill value={user.status}/></td><td>{fmtTime(user.created_at)}</td><td><div className="admin-row-actions"><button onClick={() => openEditor({ ...user, rbac_role: userRole(user) })}>編輯</button><button onClick={() => setPasswordUser(user)}>重設密碼</button>{user.user_id !== profile.user_id && <button className={user.status === 'active' ? 'warn' : ''} onClick={() => window.confirm(`確定${user.status === 'active' ? '停用' : '啟用'}「${user.name}」？`) && void run({ action: 'admin_toggle_user', user_id: user.user_id, status: user.status === 'active' ? 'inactive' : 'active' }, user.status === 'active' ? '帳號已停用' : '帳號已啟用')}>{user.status === 'active' ? '停用' : '啟用'}</button>}{user.status === 'inactive' && !String(user.username || '').startsWith('deidentified-') && <button className="danger" onClick={() => window.confirm(`確定將「${user.name}」個資去識別化？此操作無法復原。`) && void run({ action: 'admin_deidentify_user', user_id: user.user_id }, '個資已去識別化')}>去識別化</button>}</div></td></tr>)}</tbody></table></div>
       {!busy && usersLoaded && rows.length === 0 && <p className="empty">查無符合條件的人員</p>}<Pager page={page} total={filtered.length} onPage={setPage}/>
     </section>
     {editor && (() => {
@@ -464,8 +467,8 @@ export function UsersAdmin({ profile, module }: AdminProps) {
           <label>聯絡電話<input value={editor.phone || ''} onChange={event => setEditor({ ...editor, phone: event.target.value })}/></label>
           <label>部／室<select value={selectedRootId} onChange={event => setEditor({ ...editor, department_root_id: event.target.value, dept_id: event.target.value || null, supervisor_id: '', replacement_supervisor_id: '' })}><option value="">-- 未指定 --</option>{rootDepartments.map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select></label>
           <label>課／組／隊<select value={editor.dept_id || ''} disabled={!selectedRootId} onChange={event => setEditor({ ...editor, dept_id: event.target.value || null, supervisor_id: '', replacement_supervisor_id: '' })}><option value={selectedRootId}>整個部／室（未指定課／組）</option>{childDepartments.map(dept => <option value={dept.dept_id} key={dept.dept_id}>{dept.name}</option>)}</select>{selectedRootId && childDepartments.length === 0 && <small>此部／室目前沒有可選的課／組／隊。</small>}</label>
-          <label>系統角色<select value={editor.rbac_role || 'reporter'} disabled={editor.user_id === profile.user_id} onChange={event => setEditor({ ...editor, rbac_role: event.target.value, supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value) ? '' : editor.supervisor_id, replacement_supervisor_id: '' })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select>{editor.user_id === profile.user_id && <small>為避免中斷管理權限，不可變更自己的角色</small>}</label>
-          {!['unit_supervisor', 'sysadmin'].includes(String(editor.rbac_role || 'reporter')) && <label className="wide">直屬主管（必填）<select value={editor.supervisor_id || ''} onChange={event => setEditor({ ...editor, supervisor_id: event.target.value })}><option value="">{editor.dept_id ? '-- 請選擇 --' : '-- 請先選擇部／室 --'}</option>{supervisorOptions(editor.dept_id, String(editor.supervisor_id || '')).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}{supervisor.__ineligible ? `（${supervisor.__ineligibleReason || '不符合主管條件'}，請改派）` : ''}</option>)}</select>{!editor.dept_id && <small>請先選擇部／室，才會顯示該單位可管理的主管。</small>}</label>}
+          <label>系統角色<select value={editor.rbac_role || 'reporter'} disabled={editor.user_id === profile.user_id} onChange={event => setEditor({ ...editor, rbac_role: event.target.value, supervisor_id: event.target.value === 'sysadmin' ? '' : editor.supervisor_id, replacement_supervisor_id: '' })}>{roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}</select>{editor.user_id === profile.user_id && <small>為避免中斷管理權限，不可變更自己的角色</small>}</label>
+          {String(editor.rbac_role || 'reporter') !== 'sysadmin' && <label className="wide">{editor.rbac_role === 'unit_supervisor' ? '上級主管（多階簽核時設定）' : '直屬主管（必填）'}<select value={editor.supervisor_id || ''} onChange={event => setEditor({ ...editor, supervisor_id: event.target.value })}><option value="">{editor.dept_id ? '-- 請選擇 --' : '-- 請先選擇部／室 --'}</option>{supervisorOptions(editor.dept_id, String(editor.supervisor_id || ''), String(editor.user_id || '')).map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}{supervisor.__ineligible ? `（${supervisor.__ineligibleReason || '不符合主管條件'}，請改派）` : ''}</option>)}</select>{!editor.dept_id && <small>請先選擇部／室，才會顯示該單位可管理的主管。</small>}</label>}
           {reportsToReassign.length > 0 && <label className="wide">原直屬人員改派主管（必填）<select value={editor.replacement_supervisor_id || ''} onChange={event => setEditor({ ...editor, replacement_supervisor_id: event.target.value })}><option value="">-- 請選擇接任主管 --</option>{replacementOptions.map(supervisor => <option key={supervisor.user_id} value={supervisor.user_id}>{supervisor.name}｜{deptName(supervisor.dept_id)}</option>)}</select><small>因單位或角色調整，原直屬人員 {reportsToReassign.map(report => report.name).join('、')} 將一併改派，所有變更會同時完成。</small></label>}
           {!editor.user_id && <label className="wide">初始密碼（{passwordPolicy.hint}）<input type="password" {...passwordInputProps(passwordPolicy)} value={editor.password || ''} onChange={event => setEditor({ ...editor, password: event.target.value })}/></label>}
         </div>
@@ -493,16 +496,16 @@ export function UsersAdmin({ profile, module }: AdminProps) {
               onChange={event => setApplicationReview({
                 ...applicationReview,
                 rbac_role: event.target.value,
-                supervisor_id: ['unit_supervisor', 'sysadmin'].includes(event.target.value)
+                supervisor_id: event.target.value === 'sysadmin'
                   ? '' : applicationReview.supervisor_id,
               })}
             >
               {roles.map(role => <option key={role.role_id} value={role.role_id}>{role.name}</option>)}
             </select>
           </label>
-          {!['unit_supervisor', 'sysadmin'].includes(String(applicationReview.rbac_role)) && (
+          {String(applicationReview.rbac_role) !== 'sysadmin' && (
             <label>
-              直屬主管（必填）
+              {applicationReview.rbac_role === 'unit_supervisor' ? '上級主管（多階簽核時設定）' : '直屬主管（必填）'}
               <select
                 value={applicationReview.supervisor_id || ''}
                 onChange={event => setApplicationReview({ ...applicationReview, supervisor_id: event.target.value })}
