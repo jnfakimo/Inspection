@@ -6,9 +6,11 @@ import {
   sha256Hex,
   verifyLineWebhookSignature,
 } from "./vehicle-line-link.ts";
+import { isLineGroupId, lineGroupRegisterNotice, parseLineGroupRegisterCommand } from "./line-group-register.ts";
 
 const LINE_BOT_INFO_URL = "https://api.line.me/v2/bot/info";
 const LINE_ACCOUNT_LINK_TOKEN_URL = "https://api.line.me/v2/bot/user/";
+const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "content-type, x-line-signature",
@@ -19,7 +21,13 @@ type RpcOutcome = { outcome: string; userId?: string | null };
 export type VehicleLineWebhookStore = {
   ensureLinkSchema(): Promise<void>;
   loadChannelAccessToken(): Promise<string | null>;
-  saveGroupId(groupId: string): Promise<void>;
+  // 只有管理員產生的一次性登記碼能改變通知群組；其他群組事件一律不寫入設定。
+  consumeGroupRegisterCode(input: {
+    codeHash: string;
+    groupId: string;
+    groupIdHash: string;
+    now: string;
+  }): Promise<string>;
   consumeLinkIntent(input: {
     codeHash: string;
     lineUserIdHash: string;
@@ -49,8 +57,11 @@ type LinkCandidate =
   | { kind: "code"; lineUserId: string; code: string }
   | { kind: "accountLink"; lineUserId: string; nonce: string; result: "ok" | "failed" };
 
+type GroupRegistration = { groupId: string; code: string; replyToken: string | null };
+
 type WebhookEvent = {
   type?: unknown;
+  replyToken?: unknown;
   source?: { type?: unknown; userId?: unknown; groupId?: unknown };
   message?: { type?: unknown; text?: unknown };
   link?: { nonce?: unknown; result?: unknown };
@@ -130,6 +141,20 @@ async function issueLinkToken(
   }
 }
 
+async function replyText(token: string, replyToken: string, text: string, fetcher: typeof fetch) {
+  try {
+    const response = await fetcher(LINE_REPLY_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ replyToken, messages: [{ type: "text", text }] }),
+      signal: AbortSignal.timeout(5000),
+    });
+    try { await response.body?.cancel(); } catch { /* 回覆失敗不影響登記結果 */ }
+  } catch {
+    // 回覆只是提示，失敗時登記結果仍以資料庫為準。
+  }
+}
+
 function accountLinkNotice(outcome: string): string | null {
   if (outcome === "linked") return "LINE 帳號已完成綁定；您之後可隨時回系統解除綁定。";
   if (outcome === "binding_conflict" || outcome === "already_linked") {
@@ -189,70 +214,82 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
       }
       return [];
     });
-    const groupIds = events.flatMap((event) => {
-      const groupId = getText(event.source?.groupId);
-      return event.source?.type === "group" && groupId ? [groupId] : [];
+    // 群組只處理「登記 XXXX-XXXX」文字訊息；被拉進陌生群組或一般聊天都不會改變任何設定。
+    const registrations = events.flatMap((event): GroupRegistration[] => {
+      const groupId = event.source?.groupId;
+      if (event.type !== "message" || event.source?.type !== "group" || !isLineGroupId(groupId)) return [];
+      if (event.message?.type !== "text") return [];
+      const code = parseLineGroupRegisterCommand(getText(event.message.text) ?? "");
+      return code ? [{ groupId, code, replyToken: getText(event.replyToken) }] : [];
     });
 
-    if (!linkCandidates.length && !groupIds.length) return json({ ok: true });
+    if (!linkCandidates.length && !registrations.length) return json({ ok: true });
 
     try {
       const store = await deps.createStore();
-      if (linkCandidates.length) {
-        await store.ensureLinkSchema();
-        const token = await store.loadChannelAccessToken();
-        if (!token) return json({ ok: false, message: "LINE link service unavailable" }, 503);
-        const owner = await verifyChannelOwner(token, payload.destination, deps.fetcher);
-        if (owner === "mismatch") return json({ ok: false, message: "LINE channel mismatch" }, 401);
-        if (owner !== "match") return json({ ok: false, message: "LINE link service unavailable" }, 503);
+      if (linkCandidates.length) await store.ensureLinkSchema();
+      const token = await store.loadChannelAccessToken();
+      if (!token) return json({ ok: false, message: "LINE link service unavailable" }, 503);
+      const owner = await verifyChannelOwner(token, payload.destination, deps.fetcher);
+      if (owner === "mismatch") return json({ ok: false, message: "LINE channel mismatch" }, 401);
+      if (owner !== "match") return json({ ok: false, message: "LINE link service unavailable" }, 503);
 
-        for (const candidate of linkCandidates) {
-          const at = now().toISOString();
-          const lineUserIdHash = await sha256Hex(candidate.lineUserId);
+      for (const candidate of linkCandidates) {
+        const at = now().toISOString();
+        const lineUserIdHash = await sha256Hex(candidate.lineUserId);
 
-          if (candidate.kind === "code") {
-            const nonce = createNonce();
-            if (!/^[A-Za-z0-9_-]{32,128}$/.test(nonce)) continue;
-            const consumed = await store.consumeLinkIntent({
-              codeHash: await sha256Hex(candidate.code),
-              lineUserIdHash,
-              nonceHash: await sha256Hex(nonce),
-              now: at,
-            });
-            if (consumed.outcome !== "ready") continue;
-
-            const linkToken = await issueLinkToken(token, candidate.lineUserId, deps.fetcher);
-            if (!linkToken) continue;
-            const linkUrl = createLineAccountLinkUrl(linkToken, nonce);
-            await sendMessage({
-              token,
-              recipient: candidate.lineUserId,
-              text: `請在 10 分鐘內開啟此連結完成帳號綁定；您之後可隨時回系統解除綁定。\n${linkUrl}`,
-              fetcher: deps.fetcher,
-            });
-            continue;
-          }
-
-          const outcome = await store.completeAccountLink({
-            nonceHash: await sha256Hex(candidate.nonce),
+        if (candidate.kind === "code") {
+          const nonce = createNonce();
+          if (!/^[A-Za-z0-9_-]{32,128}$/.test(nonce)) continue;
+          const consumed = await store.consumeLinkIntent({
+            codeHash: await sha256Hex(candidate.code),
             lineUserIdHash,
-            lineUserId: candidate.lineUserId,
-            result: candidate.result,
+            nonceHash: await sha256Hex(nonce),
             now: at,
           });
-          const notice = accountLinkNotice(outcome);
-          if (notice) {
-            await sendMessage({
-              token,
-              recipient: candidate.lineUserId,
-              text: notice,
-              fetcher: deps.fetcher,
-            });
-          }
+          if (consumed.outcome !== "ready") continue;
+
+          const linkToken = await issueLinkToken(token, candidate.lineUserId, deps.fetcher);
+          if (!linkToken) continue;
+          const linkUrl = createLineAccountLinkUrl(linkToken, nonce);
+          await sendMessage({
+            token,
+            recipient: candidate.lineUserId,
+            text: `請在 10 分鐘內開啟此連結完成帳號綁定；您之後可隨時回系統解除綁定。\n${linkUrl}`,
+            fetcher: deps.fetcher,
+          });
+          continue;
+        }
+
+        const outcome = await store.completeAccountLink({
+          nonceHash: await sha256Hex(candidate.nonce),
+          lineUserIdHash,
+          lineUserId: candidate.lineUserId,
+          result: candidate.result,
+          now: at,
+        });
+        const notice = accountLinkNotice(outcome);
+        if (notice) {
+          await sendMessage({
+            token,
+            recipient: candidate.lineUserId,
+            text: notice,
+            fetcher: deps.fetcher,
+          });
         }
       }
 
-      for (const groupId of groupIds) await store.saveGroupId(groupId);
+      for (const registration of registrations) {
+        const outcome = await store.consumeGroupRegisterCode({
+          codeHash: await sha256Hex(registration.code),
+          groupId: registration.groupId,
+          groupIdHash: await sha256Hex(registration.groupId),
+          now: now().toISOString(),
+        });
+        if (registration.replyToken) {
+          await replyText(token, registration.replyToken, lineGroupRegisterNotice(outcome), deps.fetcher);
+        }
+      }
       return json({ ok: true });
     } catch {
       // Do not log request bodies, LINE IDs, tokens, link codes, or provider responses.

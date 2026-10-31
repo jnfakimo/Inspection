@@ -9,6 +9,7 @@ const botUserId = `U${"b".repeat(32)}`;
 const lineUserId = `U${"a".repeat(32)}`;
 const linkCode = `LINK-${"C".repeat(32)}`;
 const fixedNonce = `N${"x".repeat(31)}`;
+const groupId = `C${"d".repeat(32)}`;
 
 async function signature(rawBody: string) {
   const key = await webcrypto.subtle.importKey(
@@ -27,11 +28,11 @@ function signedRequest(rawBody: string, signatureValue: string) {
 }
 
 function makeStore(overrides: Partial<VehicleLineWebhookStore> = {}) {
-  const calls: Record<string, unknown[]> = { groups: [], consumed: [], completed: [] };
+  const calls: Record<string, unknown[]> = { registrations: [], consumed: [], completed: [] };
   const store: VehicleLineWebhookStore = {
     ensureLinkSchema: async () => { calls.schemaChecked = [true]; },
     loadChannelAccessToken: async () => "synthetic-token",
-    saveGroupId: async (groupId) => { calls.groups.push(groupId); },
+    consumeGroupRegisterCode: async (input) => { calls.registrations.push(input); return "registered"; },
     consumeLinkIntent: async (input) => { calls.consumed.push(input); return { outcome: "ready", userId: "synthetic-user" }; },
     completeAccountLink: async (input) => { calls.completed.push(input); return "linked"; },
     ...overrides,
@@ -60,6 +61,7 @@ function mockedLineFetch(calls: Array<{ url: string; init?: RequestInit }> = [],
       return Response.json({ linkToken: "syntheticLinkToken000001" });
     }
     if (url === "https://api.line.me/v2/bot/message/push") return new Response(null, { status: 200 });
+    if (url === "https://api.line.me/v2/bot/message/reply") return new Response(null, { status: 200 });
     throw new Error(`Unexpected external request: ${url}`);
   };
 }
@@ -132,13 +134,13 @@ test("signed payload for another LINE bot cannot consume a code or write group s
     destination: botUserId,
     events: [
       { type: "message", source: { type: "user", userId: lineUserId }, message: { type: "text", text: linkCode } },
-      { type: "message", source: { type: "group", groupId: "synthetic-group" }, message: { type: "text", text: "hello" } },
+      { type: "message", replyToken: "r1", source: { type: "group", groupId }, message: { type: "text", text: "登記 ABCD-2345" } },
     ],
   });
   const response = await handler(signedRequest(raw, await signature(raw)));
   assert.equal(response.status, 401);
   assert.equal(calls.consumed.length, 0);
-  assert.equal(calls.groups.length, 0);
+  assert.equal(calls.registrations.length, 0);
   assert.deepEqual(externalCalls.map((call) => call.url), ["https://api.line.me/v2/bot/info"]);
 });
 
@@ -193,16 +195,72 @@ test("LINE account-link callback records conflict by LINE identity, not a suppli
   assert.match(push.messages[0].text, /不會自動移轉/);
 });
 
-test("group capture stays on its signed path and direct chat filtering stays isolated", async () => {
+test("ordinary group traffic never writes the notification group", async () => {
   const { store, calls } = makeStore();
   const externalCalls: Array<{ url: string; init?: RequestInit }> = [];
   const handler = makeHandler(store, mockedLineFetch(externalCalls), calls);
   const raw = JSON.stringify({ destination: botUserId, events: [
-    { type: "message", source: { type: "group", groupId: "synthetic-group" }, message: { type: "text", text: linkCode } },
-    { type: "message", source: { type: "room", roomId: "synthetic-room" }, message: { type: "text", text: linkCode } },
+    { type: "join", replyToken: "r0", source: { type: "group", groupId } },
+    { type: "message", replyToken: "r1", source: { type: "group", groupId }, message: { type: "text", text: "hello" } },
+    { type: "message", replyToken: "r2", source: { type: "group", groupId }, message: { type: "text", text: linkCode } },
+    { type: "message", replyToken: "r3", source: { type: "room", roomId: "synthetic-room" }, message: { type: "text", text: "登記 ABCD-2345" } },
+    { type: "message", replyToken: "r4", source: { type: "user", userId: lineUserId }, message: { type: "text", text: "登記 ABCD-2345" } },
+    { type: "message", replyToken: "r5", source: { type: "group", groupId: "not-a-group-id" }, message: { type: "text", text: "登記 ABCD-2345" } },
   ] });
   assert.equal((await handler(signedRequest(raw, await signature(raw)))).status, 200);
-  assert.deepEqual(calls.groups, ["synthetic-group"]);
+  assert.equal(calls.storeCreated, undefined);
+  assert.equal(calls.registrations.length, 0);
   assert.equal(calls.consumed.length, 0);
   assert.equal(externalCalls.length, 0);
+});
+
+test("group registration code is hashed, consumed once, and answered with a free reply", async () => {
+  const { store, calls } = makeStore();
+  const externalCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const handler = makeHandler(store, mockedLineFetch(externalCalls), calls);
+  const raw = JSON.stringify({ destination: botUserId, events: [
+    { type: "message", replyToken: "reply-token-1", source: { type: "group", groupId, userId: lineUserId }, message: { type: "text", text: " 登記 abcd-2345 " } },
+  ] });
+  assert.equal((await handler(signedRequest(raw, await signature(raw)))).status, 200);
+  assert.deepEqual(calls.registrations, [{
+    codeHash: await sha256Hex("ABCD2345", webcrypto),
+    groupId,
+    groupIdHash: await sha256Hex(groupId, webcrypto),
+    now: "2026-10-08T07:00:00.000Z",
+  }]);
+  assert.equal(calls.schemaChecked, undefined);
+  assert.deepEqual(externalCalls.map((call) => call.url), [
+    "https://api.line.me/v2/bot/info",
+    "https://api.line.me/v2/bot/message/reply",
+  ]);
+  const reply = JSON.parse(String(externalCalls[1].init?.body));
+  assert.equal(reply.replyToken, "reply-token-1");
+  assert.match(reply.messages[0].text, /已將此群組登記/);
+  assert.equal(JSON.stringify(reply).includes("ABCD"), false);
+});
+
+test("expired or reused group codes are refused with a reply and no other side effect", async () => {
+  for (const [outcome, pattern] of [["expired", /已過期/], ["already_used", /無效或已使用/], ["invalid_code", /無效或已使用/]] as const) {
+    const { store, calls } = makeStore({ consumeGroupRegisterCode: async (input) => { calls.registrations.push(input); return outcome; } });
+    const externalCalls: Array<{ url: string; init?: RequestInit }> = [];
+    const handler = makeHandler(store, mockedLineFetch(externalCalls), calls);
+    const raw = JSON.stringify({ destination: botUserId, events: [
+      { type: "message", replyToken: "reply-token-2", source: { type: "group", groupId }, message: { type: "text", text: "登記ABCD2345" } },
+    ] });
+    assert.equal((await handler(signedRequest(raw, await signature(raw)))).status, 200);
+    assert.equal(calls.registrations.length, 1);
+    const reply = JSON.parse(String(externalCalls.at(-1)?.init?.body));
+    assert.match(reply.messages[0].text, pattern);
+  }
+});
+
+test("group registration fails closed when the store is unavailable", async () => {
+  const { store, calls } = makeStore({ consumeGroupRegisterCode: async () => { throw new Error("db down"); } });
+  const externalCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const handler = makeHandler(store, mockedLineFetch(externalCalls), calls);
+  const raw = JSON.stringify({ destination: botUserId, events: [
+    { type: "message", replyToken: "reply-token-3", source: { type: "group", groupId }, message: { type: "text", text: "登記 ABCD-2345" } },
+  ] });
+  assert.equal((await handler(signedRequest(raw, await signature(raw)))).status, 503);
+  assert.deepEqual(externalCalls.map((call) => call.url), ["https://api.line.me/v2/bot/info"]);
 });
