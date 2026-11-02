@@ -17,10 +17,17 @@ test('signed webhook dispatch happens before legacy JSON parsing and service-cli
 
 test('new link path uses the existing shared group token, group setting, and message adapter', () => {
   assert.match(source, /select\("value"\)\.eq\("key", "line_channel_token"\)/);
-  assert.match(source, /key: "line_group_id"/);
+  assert.match(source, /consume_line_group_register_code/);
   assert.match(source, /sendLineTextMessage/);
   assert.match(source, /global: \{ fetch: fetcher \}/);
   assert.match(webhookSource, /fetcher: deps\.fetcher/);
   assert.match(source, /consume_vehicle_line_link_intent/);
   assert.match(source, /complete_vehicle_line_account_link/);
+});
+
+test('webhook never writes the notification group directly', () => {
+  assert.doesNotMatch(source, /key: "line_group_id"/);
+  assert.doesNotMatch(source, /saveGroupId/);
+  assert.doesNotMatch(webhookSource, /saveGroupId/);
+  assert.match(webhookSource, /parseLineGroupRegisterCommand/);
 });

@@ -324,6 +324,7 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [groupRegisterCode, setGroupRegisterCode] = useState<{ code: string; expiresAt: string } | null>(null);
 
   const loadSettings = useCallback(async () => {
     const result = await invokeAdminApi<unknown>('admin_get_settings');
@@ -513,6 +514,36 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
       setNotice({ kind: 'success', text: '測試訊息已送出，請至設定的 LINE 群組確認。' });
     } catch (error) {
       setNotice({ kind: 'error', text: `LINE 測試推播失敗：${messageOf(error)}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const createGroupRegisterCode = async () => {
+    setBusy('line-register');
+    setNotice({ kind: 'info', text: '正在產生群組登記碼…' });
+    try {
+      const result = await invokeAdminApi<{ data?: { code?: unknown; expires_at?: unknown } }>('admin_create_line_group_register_code');
+      const code = stringOf(result.data?.code);
+      const expiresAt = stringOf(result.data?.expires_at);
+      if (!code || !expiresAt) throw new Error('後台管理服務未回傳登記碼');
+      setGroupRegisterCode({ code, expiresAt });
+      setNotice({ kind: 'success', text: `請在 10 分鐘內到要接收通知的 LINE 群組輸入「登記 ${code}」，完成後按「重新讀取群組」。` });
+    } catch (error) {
+      setNotice({ kind: 'error', text: `群組登記碼產生失敗：${messageOf(error)}` });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reloadRegisteredGroup = async () => {
+    setBusy('line-register');
+    try {
+      const snapshot = normalizeSettings(await invokeAdminApi<unknown>('admin_get_settings'));
+      setLine(current => ({ ...current, groupId: snapshot.line.groupId }));
+      setNotice({ kind: 'success', text: snapshot.line.groupId ? '已讀取目前登記的 LINE 群組。' : '目前尚未登記 LINE 群組。' });
+    } catch (error) {
+      setNotice({ kind: 'error', text: `群組設定讀取失敗：${messageOf(error)}` });
     } finally {
       setBusy(null);
     }
@@ -899,7 +930,16 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
             placeholder="Cxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
             onChange={event => setLine(current => ({ ...current, groupId: event.target.value }))}
           />
-          <small>將 Bot 加入群組並傳送訊息後，可於 Edge Function 日誌確認 groupId。</small>
+          <small>
+            將 Bot 加入群組後按「產生群組登記碼」，在該群組輸入「登記 XXXX-XXXX」（換成實際登記碼）即完成登記；
+            其他群組的訊息不會改變此設定。
+          </small>
+          {groupRegisterCode && (
+            <small>
+              目前登記碼：<strong>{groupRegisterCode.code}</strong>，
+              有效至 {new Date(groupRegisterCode.expiresAt).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' })}
+            </small>
+          )}
         </label>
       </div>
       <fieldset className={styles.toggleGroup}>
@@ -966,6 +1006,22 @@ function SettingsWorkspace({ profile }: { profile: Profile }) {
           onClick={() => void testLinePush()}
         >
           {busy === 'line-test' ? '傳送中…' : '傳送測試訊息'}
+        </button>
+        <button
+          className={styles.secondaryButton}
+          disabled={busy === 'line-register' || busy === 'line'}
+          type="button"
+          onClick={() => void createGroupRegisterCode()}
+        >
+          {busy === 'line-register' ? '處理中…' : '產生群組登記碼'}
+        </button>
+        <button
+          className={styles.secondaryButton}
+          disabled={busy === 'line-register' || busy === 'line'}
+          type="button"
+          onClick={() => void reloadRegisteredGroup()}
+        >
+          重新讀取群組
         </button>
         <button
           className={styles.secondaryButton}

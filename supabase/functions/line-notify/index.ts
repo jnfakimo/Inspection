@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 import { sendLineTextMessage } from "../_shared/line-message.ts";
 import { createVehicleLineWebhookHandler, type VehicleLineWebhookStore } from "../_shared/vehicle-line-webhook.ts";
-import { verifyLineWebhookSignature } from "../_shared/vehicle-line-link.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -20,10 +19,6 @@ function safeEqual(a: string, b: string) {
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0;
-}
-
-async function validLineSignature(rawBody: string, signature: string | null) {
-  return verifyLineWebhookSignature(rawBody, signature, Deno.env.get("LINE_CHANNEL_SECRET") || "");
 }
 
 const fetcher = fetch;
@@ -60,11 +55,15 @@ const lineWebhook = createVehicleLineWebhookHandler({
         if (error) throw error;
         return typeof data?.value === "string" && data.value ? data.value : null;
       },
-      async saveGroupId(groupId) {
-        const { error } = await db.from("system_settings").upsert(
-          [{ key: "line_group_id", value: groupId }], { onConflict: "key" },
-        );
+      async consumeGroupRegisterCode(input) {
+        const { data, error } = await db.rpc("consume_line_group_register_code", {
+          p_code_hash: input.codeHash,
+          p_group_id: input.groupId,
+          p_group_id_hash: input.groupIdHash,
+          p_now: input.now,
+        });
         if (error) throw error;
+        return typeof data === "string" ? data : "invalid_request";
       },
       async consumeLinkIntent(input) {
         const { data, error } = await db.rpc("consume_vehicle_line_link_intent", {
@@ -150,22 +149,9 @@ Deno.serve(async (req) => {
     const rawBody = await req.text();
     const payload = JSON.parse(rawBody || "{}");
 
-    // ── Incoming LINE Webhook (from LINE → capture groupId) ───────────────────
+    // LINE 事件只走上方的簽章路徑；沒有簽章的事件一律拒絕，也不再自動寫入群組 ID。
     if (Array.isArray(payload.events)) {
-      if (!await validLineSignature(rawBody, req.headers.get("x-line-signature"))) {
-        return json({ ok: false, msg: "Invalid LINE signature" }, 401);
-      }
-      for (const ev of payload.events) {
-        const src = ev.source;
-        if (src?.type === "group" && src.groupId) {
-          // Auto-save groupId to system_settings
-          await db.from("system_settings").upsert(
-            [{ key: "line_group_id", value: src.groupId }],
-            { onConflict: "key" },
-          );
-        }
-      }
-      return new Response("ok", { status: 200 });
+      return json({ ok: false, msg: "Invalid LINE signature" }, 401);
     }
 
     const profile = await authenticatedProfile(req, db);

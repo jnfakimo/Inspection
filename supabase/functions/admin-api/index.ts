@@ -5,6 +5,7 @@ import { canonicalFloor } from '../_shared/floor.ts';
 import { sendLineTextMessage } from '../_shared/line-message.ts';
 import { BOARD_NOTICE_ACTIONS, handleBoardNotices } from './board-notices.ts';
 import { executeLineGroupTestAction, LINE_GROUP_TEST_ACTION } from './line-group-test.ts';
+import { executeLineGroupRegisterAction, LINE_GROUP_REGISTER_ACTION } from './line-group-register.ts';
 import { executeVehicleLinePersonalAdminAction, VEHICLE_LINE_PERSONAL_ACTIONS } from './vehicle-line-personal.ts';
 
 type PortableRuntime = {
@@ -509,6 +510,22 @@ export async function handleAdminApiRequest(req: Request) {
       if (result.audit) {
         await audit('system_settings', 'line_group_test', 'status_change', result.audit);
       }
+      return reply(req, result.body, result.status);
+    }
+
+    if (action === LINE_GROUP_REGISTER_ACTION) {
+      const result = await executeLineGroupRegisterAction(body, {
+        userId: String(profile.user_id),
+        createIntent: async ({ userId, codeHash, now }) => {
+          const { data, error } = await admin.rpc('create_line_group_register_code', {
+            p_user_id: userId, p_code_hash: codeHash, p_now: now,
+          });
+          if (error) throw new Error('line_group_register_unavailable');
+          const row = (Array.isArray(data) ? data[0] : data) as { outcome?: unknown; expires_at?: unknown } | null;
+          return { outcome: String(row?.outcome || ''), expiresAt: typeof row?.expires_at === 'string' ? row.expires_at : null };
+        },
+      });
+      if (result.audit) await audit('system_settings', 'line_group_register_code', 'insert', result.audit);
       return reply(req, result.body, result.status);
     }
 
