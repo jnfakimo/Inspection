@@ -99,6 +99,7 @@
     "test:localized-date-input": "node --experimental-strip-types --test web/lib/localized-date-input-access.test.ts web/lib/localized-date-input-validation.test.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1161.0",
     "@supabase/supabase-js": "2.112.2",
     "@zxing/browser": "0.2.1",
     "chart.js": "^4.5.1",
