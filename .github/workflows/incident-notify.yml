@@ -1,0 +1,61 @@
+# Installed path: .github/workflows/incident-notify.yml
+# Does not run repository code, read logs, repair code, or deploy.
+name: Inspection incident notification
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - CodeQL Analysis
+      - Hardened Pages deployment
+      - Edge functions deployment
+      - Apply database migration
+      - Database backup
+      - Supabase platform log monitor
+      - Error threshold notification
+      - No-JavaScript synthetic probe
+    types: [completed]
+    branches: [main]
+permissions:
+  issues: write
+concurrency:
+  group: inspection-incident-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+jobs:
+  notify:
+    if: >-
+      github.repository == 'jnfakimo/Inspection' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main' &&
+      contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
+      contains(fromJSON('["failure","timed_out","action_required","startup_failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 建立最小內容異常通知
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const {owner, repo} = context.repo;
+            const allowed = new Set(['CI', 'CodeQL Analysis', 'Hardened Pages deployment',
+              'Edge functions deployment', 'Apply database migration', 'Database backup',
+              'Supabase platform log monitor', 'Error threshold notification', 'No-JavaScript synthetic probe']);
+            if (owner !== 'jnfakimo' || repo !== 'Inspection' ||
+                run.head_repository?.full_name !== 'jnfakimo/Inspection' ||
+                run.head_branch !== 'main' || !allowed.has(run.name) ||
+                !['push', 'schedule', 'workflow_dispatch'].includes(run.event) ||
+                !['failure', 'timed_out', 'action_required', 'startup_failure'].includes(run.conclusion)) return;
+            if (!Number.isSafeInteger(run.id) || run.id <= 0) throw new Error('Invalid run ID');
+            const marker = `<!-- inspection-incident:run:${run.id} -->`;
+            // Paginate all issues, including closed ones, to deduplicate redelivery/reruns.
+            const issues = await github.paginate(github.rest.issues.listForRepo,
+              {owner, repo, state: 'all', creator: 'github-actions[bot]', per_page: 100});
+            if (issues.some(issue => !issue.pull_request && issue.body?.includes(marker))) return;
+            const body = [marker, '@jnfakimo：指定工作流程發生異常，請檢視執行紀錄。', '',
+              `工作流程：${run.name}`, `執行編號：${run.id}`,
+              `紀錄：https://github.com/jnfakimo/Inspection/actions/runs/${run.id}`, '',
+              '此通知不包含日誌、錯誤內容、個人資料或安全告警細節。',
+              '尚未執行 AI 修復、重新部署或資料庫異動。'].join('\n');
+            await github.rest.issues.create({owner, repo,
+              title: `[自動監控] 工作流程異常 #${run.id}`, body});
+
