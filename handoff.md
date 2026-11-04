@@ -1,5 +1,11 @@
 # handoff.md — 交接快照
 
+## 2026-11-04 LINE 設備查詢機器人（隔離分支）
+
+Codex 已在 `codex/line-equipment-bot-20261104` 核對 `git status`、現有 LINE webhook、設備資料表與權限來源。OpenCode CLI 執行第一輪時，本機 Ollama API `127.0.0.1:11434` 回覆 `ECONNREFUSED`，未進行修改；執行紀錄只留在隔離副本的 `.codex-handoff/runs/20261104-155215-232/`，不納入 Git。Codex 接手實作並獨立驗收。使用者於 2026-11-04 明確授權本次 commit、push；本次不部署。
+
+交付範圍：本人同意後的 LINE Account Link、私訊設備編號即時查詢與 Flex 卡片、個人逐臺訂閱／取消、監控事件 outbox 與每五分鐘 worker。權限撤銷後仍可解除綁定及取消訂閱；推播前重查訂閱、帳號及權限。操作與驗收矩陣見 `docs/LINE_BOT_DESIGN.md`。本機 `npm run test:line-equipment`（29 項程式測試＋8 項 PGlite 測試）、`npm run test:vehicle-line-notifications`（68＋32 項）、`npm run typecheck:v2`、三支 Edge Function `deno check`、新檔 `deno lint`、個人資料版型／標題／按鈕／色彩規格、`security:audit`（0 錯誤、3 個既有警告）及 `security:secrets` 均通過。正式資料庫遷移、LINE 實際收發、GitHub 排程與行動裝置尚未驗證；先完成發布授權及受控上線驗收。
+
 > 標準在 `AGENTS.md`，進度與證據在 `PROJECT_PLAN.md`，業務與資料規則在 `docs/DOMAIN_RULES.md`。
 > 舊版交接紀錄封存於 `docs/archive/2026-10-15-pre-unification/`。
 

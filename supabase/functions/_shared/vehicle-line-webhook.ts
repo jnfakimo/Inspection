@@ -33,6 +33,18 @@ export type VehicleLineWebhookStore = {
     result: "ok" | "failed";
     now: string;
   }): Promise<string>;
+  // Equipment enquiry is an independent account link; optional for existing vehicle tests.
+  ensureEquipmentSchema?(): Promise<void>;
+  consumeEquipmentLinkIntent?(input: {
+    codeHash: string; lineUserIdHash: string; nonceHash: string; now: string;
+  }): Promise<string>;
+  completeEquipmentAccountLink?(input: {
+    nonceHash: string; lineUserIdHash: string; lineUserId: string;
+    result: "ok" | "failed"; now: string;
+  }): Promise<string>;
+  replyEquipmentQuery?(input: {
+    lineUserId: string; code: string; replyToken: string; token: string; now: Date;
+  }): Promise<void>;
 };
 
 export type VehicleLineWebhookDependencies = {
@@ -54,7 +66,21 @@ type WebhookEvent = {
   source?: { type?: unknown; userId?: unknown; groupId?: unknown };
   message?: { type?: unknown; text?: unknown };
   link?: { nonce?: unknown; result?: unknown };
+  replyToken?: unknown;
 };
+
+export function parseEquipmentQuery(text: string): string | null {
+  const match = /^設備(?:\s+|[:：])([^\r\n]{1,80})$/u.exec(text.trim());
+  const code = match?.[1]?.trim();
+  // deno-lint-ignore no-control-regex
+  return code && !/[\u0000-\u001f\u007f]/u.test(code) ? code : null;
+}
+
+function equipmentSchemaMissing(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  return ['PGRST202', 'PGRST204', 'PGRST205', '42883', '42P01']
+    .includes(String((error as { code?: unknown }).code || ''));
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -194,12 +220,35 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
       return event.source?.type === "group" && groupId ? [groupId] : [];
     });
 
-    if (!linkCandidates.length && !groupIds.length) return json({ ok: true });
+    const equipmentQueries = events.flatMap((event) => {
+      if (event.type !== "message" || event.message?.type !== "text"
+        || event.source?.type !== "user" || !isLineUserId(event.source.userId)) return [];
+      const code = parseEquipmentQuery(getText(event.message.text) ?? "");
+      const replyToken = getText(event.replyToken);
+      return code && replyToken ? [{ lineUserId: event.source.userId, code, replyToken }] : [];
+    });
+
+    if (!linkCandidates.length && !equipmentQueries.length && !groupIds.length) return json({ ok: true });
 
     try {
       const store = await deps.createStore();
-      if (linkCandidates.length) {
+      if (linkCandidates.length || equipmentQueries.length) {
+        if (equipmentQueries.length && !store.replyEquipmentQuery) {
+          return json({ ok: false, message: "Equipment enquiry unavailable" }, 503);
+        }
         await store.ensureLinkSchema();
+        let equipmentReady = false;
+        if (store.ensureEquipmentSchema) {
+          try {
+            await store.ensureEquipmentSchema();
+            equipmentReady = true;
+          } catch (error) {
+            if (!equipmentSchemaMissing(error)) throw error;
+          }
+        }
+        if (equipmentQueries.length && !equipmentReady) {
+          return json({ ok: false, message: "Equipment enquiry unavailable" }, 503);
+        }
         const token = await store.loadChannelAccessToken();
         if (!token) return json({ ok: false, message: "LINE link service unavailable" }, 503);
         const owner = await verifyChannelOwner(token, payload.destination, deps.fetcher);
@@ -213,10 +262,28 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
           if (candidate.kind === "code") {
             const nonce = createNonce();
             if (!/^[A-Za-z0-9_-]{32,128}$/.test(nonce)) continue;
+            const codeHash = await sha256Hex(candidate.code);
+            const nonceHash = await sha256Hex(nonce);
+            const equipmentOutcome = equipmentReady && store.consumeEquipmentLinkIntent
+              ? await store.consumeEquipmentLinkIntent({
+                codeHash, lineUserIdHash, nonceHash, now: at,
+              }) : "invalid_or_expired";
+            if (equipmentOutcome === "ready") {
+              const linkToken = await issueLinkToken(token, candidate.lineUserId, deps.fetcher);
+              if (!linkToken) throw new Error("LINE link token unavailable");
+              const delivered = await sendMessage({
+                token, recipient: candidate.lineUserId,
+                text: `請在 10 分鐘內開啟此連結，完成中央巡檢系統設備查詢的 LINE 綁定；可隨時在個人設定解除。\n${createLineAccountLinkUrl(linkToken, nonce)}`,
+                fetcher: deps.fetcher,
+              });
+              if (!delivered.ok) throw new Error("LINE link notice failed");
+              continue;
+            }
+            if (equipmentOutcome !== "invalid_or_expired") continue;
             const consumed = await store.consumeLinkIntent({
-              codeHash: await sha256Hex(candidate.code),
+              codeHash,
               lineUserIdHash,
-              nonceHash: await sha256Hex(nonce),
+              nonceHash,
               now: at,
             });
             if (consumed.outcome !== "ready") continue;
@@ -233,6 +300,19 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
             continue;
           }
 
+          const equipmentOutcome = equipmentReady && store.completeEquipmentAccountLink
+            ? await store.completeEquipmentAccountLink({
+              nonceHash: await sha256Hex(candidate.nonce),
+              lineUserIdHash, lineUserId: candidate.lineUserId,
+              result: candidate.result, now: at,
+            }) : "invalid_or_expired";
+          if (equipmentOutcome !== "invalid_or_expired") {
+            const notice = accountLinkNotice(equipmentOutcome);
+            if (notice) {
+              await sendMessage({ token, recipient: candidate.lineUserId, text: notice, fetcher: deps.fetcher });
+            }
+            continue;
+          }
           const outcome = await store.completeAccountLink({
             nonceHash: await sha256Hex(candidate.nonce),
             lineUserIdHash,
@@ -248,6 +328,11 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
               text: notice,
               fetcher: deps.fetcher,
             });
+          }
+        }
+        if (equipmentQueries.length && store.replyEquipmentQuery) {
+          for (const query of equipmentQueries) {
+            await store.replyEquipmentQuery({ ...query, token, now: now() });
           }
         }
       }

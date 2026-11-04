@@ -2,6 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.110.7";
 import { sendLineTextMessage } from "../_shared/line-message.ts";
 import { createVehicleLineWebhookHandler, type VehicleLineWebhookStore } from "../_shared/vehicle-line-webhook.ts";
 import { verifyLineWebhookSignature } from "../_shared/vehicle-line-link.ts";
+import { replyEquipmentLineQuery } from "../_shared/equipment-line-query.ts";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -87,6 +88,39 @@ const lineWebhook = createVehicleLineWebhookHandler({
         });
         if (error) throw error;
         return typeof data === "string" ? data : "invalid_request";
+      },
+      async ensureEquipmentSchema() {
+        for (const [table, column] of [
+          ["inspection_line_bindings", "user_id"],
+          ["inspection_line_link_requests", "request_id"],
+        ]) {
+          const { error } = await db.from(table).select(column).limit(0);
+          if (error) throw error;
+        }
+      },
+      async consumeEquipmentLinkIntent(input) {
+        const { data, error } = await db.rpc("consume_inspection_line_link", {
+          p_code_hash: input.codeHash,
+          p_line_user_id_hash: input.lineUserIdHash,
+          p_nonce_hash: input.nonceHash,
+          p_now: input.now,
+        });
+        if (error) throw error;
+        return typeof data === "string" ? data : "invalid_request";
+      },
+      async completeEquipmentAccountLink(input) {
+        const { data, error } = await db.rpc("complete_inspection_line_link", {
+          p_nonce_hash: input.nonceHash,
+          p_line_user_id_hash: input.lineUserIdHash,
+          p_line_user_id: input.lineUserId,
+          p_result: input.result,
+          p_now: input.now,
+        });
+        if (error) throw error;
+        return typeof data === "string" ? data : "invalid_request";
+      },
+      async replyEquipmentQuery(input) {
+        await replyEquipmentLineQuery({ db, ...input, fetcher });
       },
     };
   },

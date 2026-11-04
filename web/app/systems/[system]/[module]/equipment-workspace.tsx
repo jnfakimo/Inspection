@@ -349,6 +349,11 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
   const [categories, setCategories] = useState<Row[]>([]);
   const [busy, setBusy] = useState(true), [note, setNote] = useState('');
   const [query, setQuery] = useState(''), [equipmentFilter, setEquipmentFilter] = useState(''), [page, setPage] = useState(1);
+  useEffect(() => {
+    if (spec.table !== 'equipment') return;
+    const asset = new URLSearchParams(window.location.search).get('asset');
+    if (asset && asset.length <= 80) setQuery(asset);
+  }, [spec.table]);
   const [editor, setEditor] = useState<Row | null>(null);
   // 載入以序號丟棄過期回應（切換頁面或重新載入時），並在任一查詢失敗時清空清單。
   const loadSequence = useRef(createRequestSequence());

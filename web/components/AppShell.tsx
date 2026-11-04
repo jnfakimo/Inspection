@@ -11,8 +11,9 @@ import type { Profile } from '@/types/app';
 import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
 import { usePasswordPolicy } from '@/lib/use-password-policy';
 import { clearProfile } from '@/lib/profile-cache';
-import { findModule, findSystem, hasSystemAccess, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
+import { findModule, findSystem, hasModuleAccess, hasSystemAccess, type ModuleDefinition, type SystemDefinition } from '@/lib/modules';
 import VehicleLineLinkSection from '@/components/VehicleLineLinkSection';
+import EquipmentLineLinkSection from '@/components/EquipmentLineLinkSection';
 import { SystemPageHeader } from '@/components/SystemPageHeader';
 import { useOnlineCount } from '@/lib/use-online-count';
 import { useAppBackHref } from './useAppBackHref';
@@ -37,6 +38,9 @@ export function AppShell({ profile, title, children, heading }: {
   const onlineCount = useOnlineCount();
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDetails, setProfileDetails] = useState<Profile>(profile);
+  const vehicleLineAvailable = hasSystemAccess(profile, 'vehicle');
+  const equipmentLineAvailable = hasModuleAccess(profile, 'equipment', 'assets');
+  const [equipmentLineLinked, setEquipmentLineLinked] = useState(false);
   const [profileBusy, setProfileBusy] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
@@ -67,18 +71,21 @@ export function AppShell({ profile, title, children, heading }: {
     setProfileBusy(true);
     setProfileMessage('');
     try {
-      const [details, google] = await Promise.all([
+      const [details, google, equipmentLine] = await Promise.all([
         invokeAppApi<Profile>('profile'),
         invokeGoogleCalendar<GoogleCalendarStatus>('status').catch(() => null),
+        equipmentLineAvailable ? Promise.resolve(null)
+          : invokeAppApi<{ linked: boolean }>('equipment_line_link_status').catch(() => null),
       ]);
       setProfileDetails(details);
       setCalendarStatus(google);
+      setEquipmentLineLinked(equipmentLine?.linked === true);
     } catch {
       setProfileMessage('個人資料載入失敗，請稍後再試');
     } finally {
       setProfileBusy(false);
     }
-  }, []);
+  }, [equipmentLineAvailable]);
 
   const openProfile = useCallback(() => {
     setPasswordMessage('');
@@ -265,9 +272,12 @@ export function AppShell({ profile, title, children, heading }: {
           </section>
 
           {hasSystemAccess(profile, 'vehicle') && <VehicleLineLinkSection index="03" />}
+          {(equipmentLineAvailable || equipmentLineLinked) && <EquipmentLineLinkSection
+            index={vehicleLineAvailable ? '04' : '03'} assetsAllowed={equipmentLineAvailable}
+            monitoringAllowed={hasModuleAccess(profile, 'equipment', 'monitoring')} />}
 
           <form className="profile-section profile-section-security" onSubmit={changePassword}>
-            <div className="profile-section-title"><span>{hasSystemAccess(profile, 'vehicle') ? '04' : '03'}</span><div><b>登入安全</b><small>{passwordPolicy.hint}</small></div></div>
+            <div className="profile-section-title"><span>{vehicleLineAvailable && (equipmentLineAvailable || equipmentLineLinked) ? '05' : vehicleLineAvailable || equipmentLineAvailable || equipmentLineLinked ? '04' : '03'}</span><div><b>登入安全</b><small>{passwordPolicy.hint}</small></div></div>
             <div className="profile-form-grid"><label>新密碼<input type="password" name="password" {...passwordInputProps(passwordPolicy)} required autoComplete="new-password" /></label><label>確認新密碼<input type="password" name="confirm" {...passwordInputProps(passwordPolicy)} required autoComplete="new-password" /></label></div>
             {passwordMessage && <p className="profile-message">{passwordMessage}</p>}
             <div className="profile-actions"><button className="primary-btn compact">更新密碼</button></div>

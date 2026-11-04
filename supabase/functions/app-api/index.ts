@@ -9,6 +9,7 @@ import { readMarketBoardNotices } from './market-board-notices.ts';
 import { text, validISODate } from './validate.ts';
 import { writeAudit } from './audit.ts';
 import { handleVehicleAction } from './handlers/vehicle.ts';
+import { handleEquipmentLineAction } from './handlers/equipment-line.ts';
 import { handleMeetingAction } from './handlers/meeting.ts';
 import { handlePatrolShiftAction } from './handlers/patrol-shifts.ts';
 import { handleBusinessHandoverAction } from './handlers/business-handover.ts';
@@ -1175,6 +1176,12 @@ export async function handleAppApiRequest(req: Request) {
       vehicle_create_request: 'admin-api:write',
       vehicle_roster_update: 'admin-api:write',
       vehicle_roster_remove_all: 'admin-api:write',
+      equipment_line_link_start: 'admin-api:write',
+      equipment_line_link_status: 'app-api',
+      equipment_line_unlink: 'admin-api:write',
+      equipment_line_subscriptions: 'app-api',
+      equipment_line_subscribe: 'admin-api:write',
+      equipment_line_unsubscribe: 'admin-api:write',
       patrol_shift_delete: 'admin-api:write',
       patrol_shift_delete_from_date: 'admin-api:write',
       patrol_shift_apply_all_templates: 'admin-api:write',
@@ -3077,6 +3084,9 @@ export async function handleAppApiRequest(req: Request) {
     // 拋出的錯誤一樣由本函式最外層的 catch 統一處理，行為與搬移前相同。
     const vehicleResponse = await handleVehicleAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
     if (vehicleResponse) return vehicleResponse;
+
+    const equipmentLineResponse = await handleEquipmentLineAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
+    if (equipmentLineResponse) return equipmentLineResponse;
 
     const patrolShiftResponse = await handlePatrolShiftAction(action, { req, body, profile, admin, userDb, reply, can, canModule, isAdmin, isSysadmin });
     if (patrolShiftResponse) return patrolShiftResponse;

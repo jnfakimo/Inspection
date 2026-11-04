@@ -37,6 +37,8 @@ const READ_ACTION_LABELS: Record<string, string> = {
 const EDGE_ONLY_ACTIONS = new Set([
   'official_document_create', 'official_document_action', 'business_handover_action', 'mechanical_handover_action',
   'vehicle_line_link_start', 'vehicle_line_link_status', 'vehicle_line_unlink',
+  'equipment_line_link_start', 'equipment_line_link_status', 'equipment_line_unlink',
+  'equipment_line_subscriptions', 'equipment_line_subscribe', 'equipment_line_unsubscribe',
 ]);
 
 const recordAppRead = (action: string) => {

@@ -4,6 +4,12 @@
 > 標準本身在 [`AGENTS.md`](AGENTS.md)；交接快照在 [`handoff.md`](handoff.md)；
 > 舊版 1652 行流水帳封存於 `docs/archive/2026-10-15-pre-unification/PROJECT_PLAN.md`（含 2026-10-09 之前所有驗證證據與 SHA-256）。
 
+## 2026-11-04 LINE 設備查詢與本人訂閱異常通知
+
+- 隔離分支 `codex/line-equipment-bot-20261104` 已完成本人 LINE 帳號綁定、私訊設備編號查詢、具權限的 Flex 卡片、本人逐臺訂閱／取消、事件佇列及定時推播 worker；操作與驗收條件見 `docs/LINE_BOT_DESIGN.md`。
+- 本機驗收：新功能 29 項程式測試與 8 項 PGlite 測試、公務車 LINE 既有流程 100 項測試、V2 型別、Edge Function Deno 檢查、個人資料版型與安全檢查均通過；資安設計檢查 0 錯誤、3 項既有警告。
+- 正式資料庫遷移、LINE 帳號實際收發、排程與行動裝置仍未驗證；推送分支不等於合併或部署。
+
 ## 1. 目標
 
 2026-10-24 追加目標：先建立巡檢系統的 ISO/IEC 27001 導入與證據基礎；使用者指定優先修正 Next.js、certifi、主分支／發布管制。

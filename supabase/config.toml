@@ -37,3 +37,7 @@ verify_jwt = false
 # The vehicle dispatch worker authenticates every invocation with the server-side CRON_SECRET.
 [functions.vehicle-line-dispatch-worker]
 verify_jwt = false
+
+# Equipment alerts authenticate every scheduled invocation with CRON_SECRET.
+[functions.line-equipment-alert-worker]
+verify_jwt = false
