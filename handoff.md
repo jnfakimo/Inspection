@@ -5,6 +5,8 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-11-04）：**車輛追蹤 App 以 npm override 固定 `node-forge@1.4.3`。** `npm audit` 不再列出 `node-forge`。`zod@3.25.76` 與 `deepmerge@4.3.1` 仍在，因為修補需要 Expo SDK 58 或不相容的主版本覆蓋，本次不升級。驗證：`npm ci`、型別、儲存測試 4 項、Android／iOS `expo export`。實機簽章未驗證。未改 Supabase migrations。
+
 最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#129），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
   臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。
@@ -217,6 +219,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 - 一次只有一個寫入者；commit、push、合併、部署都需使用者當次授權；不寫入任何 secret。
 
 ## 🕐 最後更新
+
+2026-11-04 · 車輛追蹤 App：`node-forge` override 1.4.3。`zod` 與 `deepmerge` 維持未修，原因見 `docs/ISO27001_BASELINE.md` 同日小節。
 
 2026-10-28 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 公務車臨時直接派車：PR #102 合併、migration 已套用並讀回；PR #104–#107 介面調整已合併部署（見上）。本批交接更新在分支 `docs/handoff-vehicle-ui-20261028`，尚未開 PR。G 槽工作樹的 `handoff.md` 另有 Codex 未提交的 2026-10-24 重構紀錄（分支 `refactor/inspection-account-review-20261024`），合併時兩邊都要保留。
 
