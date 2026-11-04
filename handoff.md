@@ -5,6 +5,14 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-11-04）：**公務車定位 App 由 Expo SDK 57 升到 SDK 58**（`mobile/vehicle-tracker`，未改 Supabase migrations）。
+`expo` 58.0.23、React 19.3.0、React Native 0.88.1，其餘 `expo-*` 由 `npx expo install --fix` 對齊。
+React Native 0.88 的嚴格型別把藍牙權限陣列推斷成單一權限，`src/ble.ts` 改標成 `Permission[]`。
+`zod`（GHSA-mrhx-c7xc-m3w5）與 `deepmerge`（GHSA-gcqx-w48m-w2h4）已不在安裝樹；`node-forge` 由 SDK 58 解析為 1.4.3，不必再加 PR #137 的 override。
+`glob` 14.0.3 與 `minimatch` 11.0.4 的 override 仍要留：拿掉後會回到有公告的 13.0.6／10.2.6。`uuid` 11.1.1 override 保留，目前安裝樹沒有這個套件。
+本機 `npm ci`、`npm audit`（0）、`typecheck`、`test:storage`（4）、BLE 回歸（8）、Android／iOS `expo export`、`expo-doctor` 20/20 通過。
+**未驗證**：實體手機的 development build、背景定位、藍牙、SecureStore 升級、Android release 的 R8，以及 iOS 27 視窗可調整大小。
+
 最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#129），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
   臨時直接派車的「用途」與「臨時急用事由」改為**先空白、點開下拉選、也可自行輸入**（`VehicleCombobox`，`menu` 屬性），取代上方 PR #107 的下拉＋「其他」。

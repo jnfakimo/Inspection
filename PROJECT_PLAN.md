@@ -263,3 +263,12 @@
 - 驗證：PGlite 測試涵蓋一市場四階矩陣、二市場原三階矩陣與無關卡；前端判斷與畫面契約 11 項；typecheck、完整 npm test、gitleaks、Semgrep、deno check、CI 與 Commercial readiness 皆通過。
 - 上線：使用者先建好莊宗坤 → 簡文財的上下級並以唯讀查詢確認組織鏈 → apply-database-migration run 39371394023（HTTP 201）→ 合併 `31fbc3446` → `app-api` 與 Pages 部署成功。
 - 未驗證：登入後實際畫面、A4 列印分頁、副主任階段的名單限制（目前該市場所有主管皆有資格）。
+
+## 24. 公務車定位 App 升級 Expo SDK 58（2026-11-04）
+
+- 範圍只限 `mobile/vehicle-tracker`。未改 Supabase migrations、網站或 Edge Functions。
+- 版本：Expo 57.0.20 → 58.0.23，React 19.2.3 → 19.3.0，React Native 0.86.3 → 0.88.1；`expo-constants`、`expo-crypto`、`expo-dev-client`、`expo-location`、`expo-secure-store`、`expo-system-ui`、`expo-task-manager`、`@types/react` 由 `npx expo install --fix` 對齊 SDK 58。
+- 程式：React Native 0.88 嚴格型別下，`PermissionsAndroid.requestMultiple` 的權限陣列必須是 `Permission[]`（`src/ble.ts`）。未使用已移除的 `InteractionManager`、`Touchable`、`Modal.animated` 或已移除的 `StatusBar` 屬性；沒有 Expo Router，也沒有提交 `android`／`ios` 目錄。
+- 公告：安裝樹不再含 `zod` 或 `deepmerge`。`node-forge` 為 1.4.3，與未合併的 PR #137 目標版本相同，SDK 58 不需要該 override。`glob` 14.0.3 與 `minimatch` 11.0.4 的 override 仍需要；拿掉後 `npm audit` 回到 5 個 moderate。
+- 驗證：`npm ci`、`npm audit` 0、`npm run typecheck`、`npm run test:storage` 4 項、`tools/vehicle-tracking-ble.test.mjs` 8 項、Android／iOS `expo export`（Hermes）、`expo-doctor` 20/20。
+- 未驗證：實體 iPhone／Android 的新 development build、背景定位、藍牙、既有安裝的加密儲存升級、Android release R8、iOS 27 可調整視窗。

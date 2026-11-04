@@ -35,6 +35,8 @@ Expo Go 專案：背景定位與 BLE 都需要原生模組，必須建立 develo
 3. 執行 `npx expo prebuild` 產生原生工程。
 4. Android 實機使用 `npm run android`；iOS 需在 macOS／Xcode 與公司 Apple 開發者簽章環境執行 `npm run ios`。
 
+此專案使用 Expo SDK 58（React Native 0.88）。升級後必須重新建立 development build：若本機已有舊的 `android`／`ios` 目錄，先刪除再執行 `npx expo prebuild`。既有安裝包不能載入這次的 JavaScript。iOS 27 把直向視為偏好，視窗可能被調整大小，畫面需能捲動。
+
 ## 實機驗證閘門
 
 照片無法辨識 BLE 協定。正式試辦前必須記錄同一顆標籤在 iOS／Android 的廣播名稱、
