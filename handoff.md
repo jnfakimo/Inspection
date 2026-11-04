@@ -6,6 +6,8 @@ Codex 已在 `codex/line-equipment-bot-20261104` 核對 `git status`、現有 LI
 
 交付範圍：本人同意後的 LINE Account Link、私訊設備編號即時查詢與 Flex 卡片、個人逐臺訂閱／取消、監控事件 outbox 與每五分鐘 worker。權限撤銷後仍可解除綁定及取消訂閱；推播前重查訂閱、帳號及權限。操作與驗收矩陣見 `docs/LINE_BOT_DESIGN.md`。本機 `npm run test:line-equipment`（29 項程式測試＋8 項 PGlite 測試）、`npm run test:vehicle-line-notifications`（68＋32 項）、`npm run typecheck:v2`、三支 Edge Function `deno check`、新檔 `deno lint`、個人資料版型／標題／按鈕／色彩規格、`security:audit`（0 錯誤、3 個既有警告）及 `security:secrets` 均通過。正式資料庫遷移、LINE 實際收發、GitHub 排程與行動裝置尚未驗證；先完成發布授權及受控上線驗收。
 
+首次推送被 pre-push 測試閘門攔下：既有 `tools/username-login-routing.test.mjs` 使用 data URL 載入 TypeScript，未替換後來新增的相對 import，且仍期待舊的同源路由與 CAPTCHA 錯誤文字。已只修測試載入與預期值，未改登入功能；該測試 2 項已通過，待重新執行完整 pre-push 閘門。
+
 > 標準在 `AGENTS.md`，進度與證據在 `PROJECT_PLAN.md`，業務與資料規則在 `docs/DOMAIN_RULES.md`。
 > 舊版交接紀錄封存於 `docs/archive/2026-10-15-pre-unification/`。
 

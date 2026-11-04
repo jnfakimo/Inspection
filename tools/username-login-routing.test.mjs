@@ -7,6 +7,11 @@ const moduleUrl = source => `data:text/javascript;base64,${Buffer.from(stripType
 const originSource = await readFile(new URL('../web/lib/backend-origin.ts', import.meta.url), 'utf8');
 const configSource = await readFile(new URL('../web/lib/config.ts', import.meta.url), 'utf8');
 const loginSource = await readFile(new URL('../web/lib/username-login.ts', import.meta.url), 'utf8');
+const loginErrorUrl = moduleUrl(await readFile(new URL('../web/lib/username-login-error.ts', import.meta.url), 'utf8'));
+const loginRoutingUrl = moduleUrl(await readFile(new URL('../web/lib/username-login-routing.ts', import.meta.url), 'utf8'));
+const resolveLoginImports = source => source
+  .replace("'./username-login-error'", JSON.stringify(loginErrorUrl))
+  .replace("'./username-login-routing'", JSON.stringify(loginRoutingUrl));
 
 test('development uses existing cloud Supabase despite stale settings; production IP deployments stay same-origin', async () => {
   const savedWindow = globalThis.window;
@@ -25,14 +30,16 @@ test('development uses existing cloud Supabase despite stale settings; productio
         assert.equal(config.SUPABASE_ANON_KEY === 'configured-public-key', !development);
         let edgeCalls = 0;
         let sameOriginCalls = 0;
-        globalThis.fetch = async url => {
+        const sameOrigin = new URL(origin).hostname === '192.168.50.192';
+        globalThis.fetch = async (url, options) => {
           sameOriginCalls++;
-          assert.equal(url, `${config.SUPABASE_URL}/functions/v1/username-login`);
+          const action = JSON.parse(options.body).action;
+          assert.equal(url, `${action === 'login' && sameOrigin ? origin : config.SUPABASE_URL}/functions/v1/username-login`);
           return Response.json({ challenge_id: 'test' });
         };
-        const loginUrl = moduleUrl(loginSource
+        const loginUrl = moduleUrl(resolveLoginImports(loginSource
           .replace("import { getSupabase } from './supabase';", `const getSupabase = () => ({ functions: { invoke: async () => { globalThis.__loginEdgeCall(); return { data: { challenge_id: 'test' }, error: null }; } } });`)
-          .replace("'./config'", JSON.stringify(configUrl + `#${origin}`)));
+          .replace("'./config'", JSON.stringify(configUrl + `#${origin}`))));
         globalThis.__loginEdgeCall = () => { edgeCalls++; };
         const { invokeUsernameLogin } = await import(loginUrl);
         assert.deepEqual(await invokeUsernameLogin({ action: 'captcha' }, '失敗'), { challenge_id: 'test' });
@@ -40,8 +47,8 @@ test('development uses existing cloud Supabase despite stale settings; productio
         assert.equal(sameOriginCalls, 1);
         edgeCalls = 0; sameOriginCalls = 0;
         await invokeUsernameLogin({ action: 'login' }, '失敗');
-        assert.equal(edgeCalls, development ? 1 : 0);
-        assert.equal(sameOriginCalls, development ? 0 : 1);
+        assert.equal(edgeCalls, sameOrigin ? 0 : 1);
+        assert.equal(sameOriginCalls, sameOrigin ? 1 : 0);
       }
     }
   } finally {
@@ -58,7 +65,7 @@ test('captcha bypasses a blocked Auth client, aborts on timeout, and does not re
     const source = loginSource
       .replace("import { getSupabase } from './supabase';", 'const getSupabase = () => { throw new Error("Auth client must not be used for captcha"); };')
       .replace("import { SUPABASE_ANON_KEY, SUPABASE_URL } from './config';", 'const SUPABASE_ANON_KEY = "public-key"; const SUPABASE_URL = "https://cloud.test";');
-    const { invokeUsernameLogin } = await import(moduleUrl(source));
+    const { invokeUsernameLogin } = await import(moduleUrl(resolveLoginImports(source)));
     globalThis.window = { setTimeout: callback => setTimeout(callback, 10), clearTimeout };
     globalThis.fetch = async (url, options) => {
       assert.equal(url, 'https://cloud.test/functions/v1/username-login');
@@ -69,10 +76,10 @@ test('captcha bypasses a blocked Auth client, aborts on timeout, and does not re
     globalThis.fetch = (url, options) => new Promise((resolve, reject) => {
       options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
     });
-    await assert.rejects(invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 0 }), /逾時/);
+    await assert.rejects(invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 0 }), /captcha_timeout/);
     let calls = 0;
     globalThis.fetch = async () => { calls++; return Response.json({ message: '請稍後再試' }, { status: 429 }); };
-    await assert.rejects(invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 3 }), /請稍後再試/);
+    await assert.rejects(invokeUsernameLogin({ action: 'captcha' }, '失敗', { retries: 3 }), /captcha_rate_limited/);
     assert.equal(calls, 1);
   } finally {
     if (savedWindow === undefined) delete globalThis.window; else globalThis.window = savedWindow;
