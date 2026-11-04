@@ -70,4 +70,10 @@
 - 本機沒有訊號服務正式安裝，已知地端主機本次網路不可達；遠端 `certifi`、IIS 實際路徑與版本都維持未驗證。
 - [風險與候選控制工作底稿](ISO27001_RISK_REGISTER.md) 已建立；正式範圍、風險所有人、完整 SoA、恢復演練、內部稽核、管理審查與接受紀錄仍需組織執行。
 
+## 2026-11-04 行動端 node-forge
+
+- `mobile/vehicle-tracker` 以 npm override 將 `node-forge` 固定為 **1.4.3**。`@expo/cli@57.0.22` 與 `@expo/code-signing-certificates@0.0.6` 宣告 `^1.3.3`，1.4.3 落在該範圍。`npm audit` 不再列出 `node-forge`。
+- 自簽憑證與 `Buffer` PEM 解碼、型別檢查、四項儲存測試、Android／iOS `expo export` 通過。實機簽章與上架未驗證。
+- `zod@3.25.76`（GHSA-mrhx-c7xc-m3w5，修補版 4.6.6 起）與 `deepmerge@4.3.1`（GHSA-gcqx-w48m-w2h4，無修補版）仍在。兩者的 `npm audit` 修復路徑都是 Expo SDK 58，本次不升級。
+
 參考：[ISO 標準說明](https://www.iso.org/standard/27001)、[2024 修訂](https://www.iso.org/standard/88435.html)。
