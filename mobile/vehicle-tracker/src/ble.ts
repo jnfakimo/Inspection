@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform, type Permission } from 'react-native';
 import { BleManager, State, type Device, type Subscription } from 'react-native-ble-plx';
 import type { NearbyBleDevice, TrackingDevice } from './types';
 
@@ -11,7 +11,7 @@ const getManager = () => manager ||= new BleManager({
 
 async function requestAndroidBluetoothPermission() {
   if (Platform.OS !== 'android') return;
-  const permissions = [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+  const permissions: Permission[] = [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
   if (Number(Platform.Version) >= 31) permissions.push(
     PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
     PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,

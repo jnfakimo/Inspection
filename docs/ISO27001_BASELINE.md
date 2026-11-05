@@ -74,6 +74,12 @@
 
 - `mobile/vehicle-tracker` 以 npm override 將 `node-forge` 固定為 **1.4.3**。`@expo/cli@57.0.22` 與 `@expo/code-signing-certificates@0.0.6` 宣告 `^1.3.3`，1.4.3 落在該範圍。`npm audit` 不再列出 `node-forge`。
 - 自簽憑證與 `Buffer` PEM 解碼、型別檢查、四項儲存測試、Android／iOS `expo export` 通過。實機簽章與上架未驗證。
-- `zod@3.25.76`（GHSA-mrhx-c7xc-m3w5，修補版 4.6.6 起）與 `deepmerge@4.3.1`（GHSA-gcqx-w48m-w2h4，無修補版）仍在。兩者的 `npm audit` 修復路徑都是 Expo SDK 58，本次不升級。
+- `zod@3.25.76`（GHSA-mrhx-c7xc-m3w5，修補版 4.6.6 起）與 `deepmerge@4.3.1`（GHSA-gcqx-w48m-w2h4，無修補版）仍在。兩者的 `npm audit` 修復路徑都是 Expo SDK 58，該次不升級；見下一節。
+
+## 2026-11-04 行動端 Expo SDK 58
+
+- `mobile/vehicle-tracker` 由 Expo SDK 57 升至 58.0.23（React 19.3.0、React Native 0.88.1）。未改資料庫 migration。
+- 該目錄乾淨 `npm ci` 後 `npm audit` 為 0。安裝樹沒有 `zod`、沒有 `deepmerge`——上一節無法硬修的兩項由這次升級解決；`node-forge` 由 SDK 58 自行解析為 1.4.3，上一節的 override 仍保留當保險。`glob` 14.0.3 與 `minimatch` 11.0.4 的 override 仍需要，否則會回到有公告的 13.0.6／10.2.6。
+- 這是鎖檔與本機指令的結果，不是權責人結案，也不是實體手機驗證。Android／iOS Hermes bundle 與 `expo-doctor` 已通過；development build、背景定位、藍牙與加密儲存升級仍未在實機執行。
 
 參考：[ISO 標準說明](https://www.iso.org/standard/27001)、[2024 修訂](https://www.iso.org/standard/88435.html)。

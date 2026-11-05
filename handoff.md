@@ -5,7 +5,14 @@
 
 ## ⏯️ 目前做到哪
 
-最新（2026-11-04）：**車輛追蹤 App 以 npm override 固定 `node-forge@1.4.3`。** `npm audit` 不再列出 `node-forge`。`zod@3.25.76` 與 `deepmerge@4.3.1` 仍在，因為修補需要 Expo SDK 58 或不相容的主版本覆蓋，本次不升級。驗證：`npm ci`、型別、儲存測試 4 項、Android／iOS `expo export`。實機簽章未驗證。未改 Supabase migrations。
+最新（2026-11-04）：**公務車定位 App 由 Expo SDK 57 升到 SDK 58**（`mobile/vehicle-tracker`，未改 Supabase migrations）。
+`expo` 58.0.23、React 19.3.0、React Native 0.88.1，其餘 `expo-*` 由 `npx expo install --fix` 對齊。
+React Native 0.88 的嚴格型別把藍牙權限陣列推斷成單一權限，`src/ble.ts` 改標成 `Permission[]`。
+`zod`（GHSA-mrhx-c7xc-m3w5）與 `deepmerge`（GHSA-gcqx-w48m-w2h4）已不在安裝樹——PR #137 當時無法硬修（修補要 SDK 58 或不相容的主版本覆蓋），由這次升級解決。
+`node-forge` 由 SDK 58 自行解析為 1.4.3；PR #137（先合併進 main）加的 `node-forge@1.4.3` override 在合併後保留，當作日後解析回 `<=1.4.0` 的保險。
+`glob` 14.0.3 與 `minimatch` 11.0.4 的 override 仍要留：拿掉後會回到有公告的 13.0.6／10.2.6。`uuid` 11.1.1 override 保留，目前安裝樹沒有這個套件。
+本機 `npm ci`、`npm audit`（0）、`typecheck`、`test:storage`（4）、BLE 回歸（8）、Android／iOS `expo export`、`expo-doctor` 20/20 通過。
+**未驗證**：實體手機的 development build、背景定位、藍牙、SecureStore 升級、Android release 的 R8、iOS 27 視窗可調整大小，以及實機簽章與上架。
 
 最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#129），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
