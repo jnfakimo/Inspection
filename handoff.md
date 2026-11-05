@@ -8,10 +8,11 @@
 最新（2026-11-04）：**公務車定位 App 由 Expo SDK 57 升到 SDK 58**（`mobile/vehicle-tracker`，未改 Supabase migrations）。
 `expo` 58.0.23、React 19.3.0、React Native 0.88.1，其餘 `expo-*` 由 `npx expo install --fix` 對齊。
 React Native 0.88 的嚴格型別把藍牙權限陣列推斷成單一權限，`src/ble.ts` 改標成 `Permission[]`。
-`zod`（GHSA-mrhx-c7xc-m3w5）與 `deepmerge`（GHSA-gcqx-w48m-w2h4）已不在安裝樹；`node-forge` 由 SDK 58 解析為 1.4.3，不必再加 PR #137 的 override。
+`zod`（GHSA-mrhx-c7xc-m3w5）與 `deepmerge`（GHSA-gcqx-w48m-w2h4）已不在安裝樹——PR #137 當時無法硬修（修補要 SDK 58 或不相容的主版本覆蓋），由這次升級解決。
+`node-forge` 由 SDK 58 自行解析為 1.4.3；PR #137（先合併進 main）加的 `node-forge@1.4.3` override 在合併後保留，當作日後解析回 `<=1.4.0` 的保險。
 `glob` 14.0.3 與 `minimatch` 11.0.4 的 override 仍要留：拿掉後會回到有公告的 13.0.6／10.2.6。`uuid` 11.1.1 override 保留，目前安裝樹沒有這個套件。
 本機 `npm ci`、`npm audit`（0）、`typecheck`、`test:storage`（4）、BLE 回歸（8）、Android／iOS `expo export`、`expo-doctor` 20/20 通過。
-**未驗證**：實體手機的 development build、背景定位、藍牙、SecureStore 升級、Android release 的 R8，以及 iOS 27 視窗可調整大小。
+**未驗證**：實體手機的 development build、背景定位、藍牙、SecureStore 升級、Android release 的 R8、iOS 27 視窗可調整大小，以及實機簽章與上架。
 
 最新（2026-10-29）：**公務車介面延伸、在線人數與 Claude Code 自動檢查已合併（PR #109–#129），皆已部署或生效；詳情見下。**
 - PR #109（`d50eef7e1`）：公務車詳情與行車回報視窗改為分區卡片（`VehicleDetailSection／VehicleDetailItem`、`VehicleEditModal`）；
@@ -225,6 +226,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 - 一次只有一個寫入者；commit、push、合併、部署都需使用者當次授權；不寫入任何 secret。
 
 ## 🕐 最後更新
+
+2026-11-04 · 車輛追蹤 App：`node-forge` override 1.4.3。`zod` 與 `deepmerge` 維持未修，原因見 `docs/ISO27001_BASELINE.md` 同日小節。
 
 2026-10-28 · Claude Code（Sonnet 5.5）@ DESKTOP-0CFB6UK · 公務車臨時直接派車：PR #102 合併、migration 已套用並讀回；PR #104–#107 介面調整已合併部署（見上）。本批交接更新在分支 `docs/handoff-vehicle-ui-20261028`，尚未開 PR。G 槽工作樹的 `handoff.md` 另有 Codex 未提交的 2026-10-24 重構紀錄（分支 `refactor/inspection-account-review-20261024`），合併時兩邊都要保留。
 
