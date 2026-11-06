@@ -10,6 +10,9 @@ on:
     - cron: '0 21 * * *' # 臺灣時間每日 05:00（UTC 21:00）自動執行 CI 檢查
     - cron: '0 0 * * 0' # weekly run for dependency checks
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -22,6 +25,7 @@ jobs:
       - name: Checkout complete history
         uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Install verified Gitleaks 8.30.1
@@ -58,6 +62,8 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Verify Gmail repair with Linux file permissions
         run: python3 tools/gmail-repair.test.py
       - name: Verify security scan failures cannot pass
@@ -70,6 +76,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -101,6 +109,8 @@ jobs:
         working-directory: backend/signal-service
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -125,6 +135,8 @@ jobs:
         working-directory: mobile/vehicle-tracker
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -156,6 +168,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
