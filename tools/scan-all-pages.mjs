@@ -102,6 +102,9 @@ async function scanLocalArtifact(pagePaths) {
     if (!/name="copyright" content="Copyright © 2026 jnfakimo\. All rights reserved\."/.test(html)) {
       throw new Error(`頁面缺少權利標記：${pagePath}`);
     }
+    if (!/<meta\b[^>]*\bname\s*=\s*["']referrer["'][^>]*\bcontent\s*=\s*["'](?:strict-origin-when-cross-origin|strict-origin|same-origin|no-referrer)["']/i.test(html)) {
+      throw new Error(`頁面缺少 Referrer-Policy：${pagePath}`);
+    }
     if (!hasCompleteRobotsMeta(html)) {
       throw new Error(`頁面缺少完整防索引標記：${pagePath}`);
     }
