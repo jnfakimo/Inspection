@@ -11,11 +11,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
 const sessionId = `hooks-test-${process.pid}`;
 
+// 本檔若被 `node --test`（推送前閘門）執行，環境會帶 NODE_TEST_CONTEXT；子程序再跑 `node --test` 時會繼承它，
+// 把失敗的測試回報成 exit 0，導致「改到會失敗的測試：exit 2」誤判。hook 實際執行時沒有這個變數，所以測試也要拿掉。
+const childEnv = { ...process.env, CLAUDE_PROJECT_DIR: root };
+delete childEnv.NODE_TEST_CONTEXT;
+
 const run = (script, payload, extraEnv = {}) => {
   const r = spawnSync(process.execPath, [path.join(here, script)], {
     input: JSON.stringify({ session_id: sessionId, ...payload }),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root, ...extraEnv },
+    env: { ...childEnv, ...extraEnv },
     timeout: 120_000,
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
