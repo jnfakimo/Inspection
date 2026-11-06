@@ -5,6 +5,16 @@
 
 ## ⏯️ 目前做到哪
 
+## 2026-11-06 告警等級顯示獨立修復
+
+- 基底：最新 `main` `0465a35dc744651541d1c240bbca5f0e79056bc1`；獨立分支 `fix/equipment-severity-20261106`，工作區 `/workspace/Inspection-severity-release`，本批由 Codex 單一寫入。
+- 僅修正設備概覽、追溯及事件明細的告警等級：一般／警告／嚴重，缺少、非法及原型屬性名稱一律顯示「未知」。新增純顯示 helper 與 4 項聚焦測試，接入既有 `test:equipment-energy`；共用 Pill、其他狀態欄位、API enum、資料庫與告警判斷不變。
+- 已通過：`npm test`（含 PGlite、既有派車回歸、最新資安邊界及設備測試）、`npm run typecheck:v2`、`npm run security:audit`、`npm run security:secrets`、`npm run security:gitleaks`、`npm run security:semgrep`、`npm run build:pages`（138 頁）、`git diff --check`。安全設計檢查 0 錯誤、3 個既有警告；Semgrep 0 findings。
+- 獨立建置產物以 Chromium 模擬資料驗證：174 項通過、0 執行錯誤、21 張截圖；桌面 1440×1000、手機模擬 390×844／320×740。網址 `http://127.0.0.1:4173/Inspection/v2/systems/equipment/assets/` 與 `monitoring/`；資料／驗證路由攔截，沒有正式 API 操作。證據在隔離環境 `/workspace/inspection-line-evidence/release/`（`results.json`、`results.jsonl`、各測試 log、截圖）。
+- 依使用者「提交或部署」先走獨立本地提交；未推送、開 PR、合併或部署，正式站與實機未驗證。原 LINE 混合工作區保留，不納入本批；沒有 migration、Edge Function、workflow 或 LINE 發送／啟用變更。未同步 G 槽，未修改尚待確認的藍圖。
+- 後續發布前重新確認 main 與衝突；發布影響為前端 Pages 重建，不需資料庫或 Edge 部署。倉庫沒有 CODEOWNERS；歷史作者不等於目前負責者，其他機器未推送工作不可見。
+
+
 最新（2026-11-06）：**資安檢查（`web-security-review`，全程唯讀）：未發現可被外部利用的漏洞；外洩密碼保護實際未開啟，需到儀表板處理。** 對象為 `origin/main` `3ba85f1e`（PR #140）與正式庫 `qztffronusdhgxhjjubt`，未改程式、資料庫或 Auth 設定。
 - **需處理**：Supabase advisor 仍報 `auth_leaked_password_protection`（未開啟），與 2026-10-29 紀錄「已開啟」不符。請到 Authentication → Sign In / Providers → Email 開啟「Prevent use of leaked passwords」（可能需 Pro 方案），開啟後再跑 advisor 讀回。
 - **通過**：`security-design-audit` 錯誤 0（3 個既有警告）、祕密掃描、89 項 hook 測試；前端無 service_role／`NEXT_PUBLIC_*` 機密／`eval`；`vehicle-workspace.tsx` 列印報表逐欄 `escHtml`。正式站 `/Inspection/v2/` 掃描 0 錯誤。

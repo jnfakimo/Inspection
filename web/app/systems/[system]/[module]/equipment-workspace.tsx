@@ -19,6 +19,7 @@ import { ComboboxSelect } from '@/components/ComboboxSelect';
 import { LocalizedDateInput } from '@/components/LocalizedDateInput';
 import { createRequestSequence } from '@/lib/request-sequence';
 import { firstQueryError } from '@/lib/async-load-safety';
+import { equipmentSeverity } from '@/lib/equipment-severity';
 import { EquipmentOperationsEnergy, type EquipmentOperationalAsset } from './equipment-operations-energy';
 import type { ModuleDefinition, SystemDefinition } from '@/lib/modules';
 import type { Profile } from '@/types/app';
@@ -60,7 +61,6 @@ const DOC_TYPE = {
   plc_program: 'PLC 程式', parameter_backup: '參數備份', photo: '設備照片', certificate: '證明文件', contract: '合約', other: '其他',
 };
 const COST_SOURCE = { import: '匯入', manual: '人工登錄', calculated: '系統計算' };
-const SEVERITY = { info: '一般', warning: '警告', critical: '嚴重' };
 const EVENT_STATE = { open: '未處理', acknowledged: '已確認', resolved: '已解除', suppressed: '已抑制' };
 const MATERIAL_STATUS = { active: '啟用', inactive: '停用' };
 const CRITICALITY = { high: '高', medium: '中', low: '低' };
@@ -291,7 +291,10 @@ const SPECS: Record<string, Spec> = {
       { key: 'occurred_at', label: '發生時間', render: r => fmtTime(r.occurred_at) },
       { key: 'equipment_id', label: '設備', render: (r, c) => equipmentLabel(r, c) },
       { key: 'title', label: '事件', render: r => <>{fmt(r.title)}<small>{[r.external_system, r.event_code].filter(Boolean).join('｜') || '—'}</small></> },
-      { key: 'severity', label: '等級', render: r => <Pill value={r.severity} labels={SEVERITY} /> },
+      { key: 'severity', label: '等級', render: r => {
+        const severity = equipmentSeverity(r.severity);
+        return <span className={`status-pill ${severity.tone}`}>{severity.label}</span>;
+      } },
       { key: 'message', label: '內容' },
       { key: 'event_state', label: '狀態', render: r => <Pill value={r.event_state} labels={EVENT_STATE} /> },
     ],
@@ -369,7 +372,7 @@ function EntityWorkspace({ spec, module, profile }: { spec: Spec; module: Module
       alarms.push({
         eventId,
         title: String(event.title || event.event_code || '監控事件'),
-        severityLabel: String(event.severity || 'unknown'),
+        severityLabel: equipmentSeverity(event.severity).label,
         occurredAt: typeof event.occurred_at === 'string' ? event.occurred_at : null,
         receivedAt: typeof event.received_at === 'string' ? event.received_at : null,
       });
