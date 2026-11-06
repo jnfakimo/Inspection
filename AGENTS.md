@@ -158,6 +158,9 @@
 - **權限判斷失敗即拒絕**：權限表查詢失敗一律不放行（`test:permission-fail-closed`）。
 - 新 API 寫進 `supabase/functions/app-api/handlers/<業務>.ts`，不再加進 `index.ts`；每支 handler 附 `*.test.ts`。
 - 讀取稽核由根版面的 `access-audit.ts` 統一攔截 fetch，頁面不得自行補呼叫；`security_action` 回應必須強制登出。
+- **發布頁面的安全標記由建置注入**：GitHub Pages 不能設回應標頭，CSP、防索引、Referrer-Policy（`strict-origin-when-cross-origin`）都以 meta 由
+  `tools/build-hardened-pages.mjs` 加入，缺少即建置失敗，`tools/scan-all-pages.mjs` 部署後再查。頁面不得自行放寬（例如 `unsafe-url`）；
+  `nosniff`、`frame-ancestors` 只能靠回應標頭，meta 無效。
 - 新增／改動資料表欄位：`create table if not exists` 不會 alter，必須補 `alter table … add column if not exists`。
 - 樓層命名 `B1F` 與 `B1` 要以 `canonicalFloor()` 對齊。
 

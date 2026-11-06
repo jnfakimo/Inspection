@@ -272,3 +272,15 @@
 - 公告：安裝樹不再含 `zod` 或 `deepmerge`。`node-forge` 為 1.4.3，與未合併的 PR #137 目標版本相同，SDK 58 不需要該 override。`glob` 14.0.3 與 `minimatch` 11.0.4 的 override 仍需要；拿掉後 `npm audit` 回到 5 個 moderate。
 - 驗證：`npm ci`、`npm audit` 0、`npm run typecheck`、`npm run test:storage` 4 項、`tools/vehicle-tracking-ble.test.mjs` 8 項、Android／iOS `expo export`（Hermes）、`expo-doctor` 20/20。
 - 未驗證：實體 iPhone／Android 的新 development build、背景定位、藍牙、既有安裝的加密儲存升級、Android release R8、iOS 27 可調整視窗。
+
+## 25. 唯讀資安檢查與 Referrer-Policy（2026-11-06，PR #141、#142）
+
+- 範圍：以 `web-security-review` 檢查 `origin/main` `3ba85f1e`（PR #140）與正式庫，全程唯讀；結果與證據摘要見 `handoff.md` 同日條目（PR #141）。
+- 結論：**未發現可被外部利用的漏洞**。RLS、definer view、全開 policy、definer 函式 `search_path`、公開桶、anon 殘留權限皆 0 列；
+  模擬無角色登入者讀 106 張表／view 為 0 筆，寫入 71／72 張表全被擋；Auth `disable_signup=true`；`verify_jwt=false` 的 4 個 Edge Function 已確認有簽章／state／排程密鑰／captcha 把關。
+- 需使用者處理：Supabase advisor 顯示**外洩密碼保護未開啟**，與 2026-10-29 紀錄不符；須在儀表板 Authentication → Email 開啟後以 advisor 讀回。
+- 修正（PR #142）：GitHub Pages 無法設回應標頭，`tools/build-hardened-pages.mjs` 在每個 HTML 注入 `<meta name="referrer" content="strict-origin-when-cross-origin">`，
+  缺少即建置失敗；`tools/scan-all-pages.mjs` 部署後同樣檢查。本機 `build:pages` 138 頁、全站掃描、commercial readiness 0 錯誤、`npm test`（除 Windows CRLF 已知的 `test:handover-source-parity`）通過。
+- 檢查工具：`site-scan.mjs` 的 meta CSP 比對遇單引號截斷，造成「缺 `object-src 'none'`」誤報（正式站本來就有），已在 dotfiles `439630f` 修正並部署。
+- 不做：`nosniff`、`frame-ancestors` 只能用回應標頭（需 CDN／代理）；`btree_gist` 移出 public schema 無實際攻擊面，且可能影響公務車時段排除約束，不動正式庫。
+- 未涵蓋：真實帳號實打 API、Edge Function 逐行審查、`cwa-weather`／`vehicle-line-dispatch-worker` 的把關確認、`mobile/`。
