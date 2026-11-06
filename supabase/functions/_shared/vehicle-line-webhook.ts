@@ -189,12 +189,8 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
       }
       return [];
     });
-    const groupIds = events.flatMap((event) => {
-      const groupId = getText(event.source?.groupId);
-      return event.source?.type === "group" && groupId ? [groupId] : [];
-    });
-
-    if (!linkCandidates.length && !groupIds.length) return json({ ok: true });
+    // LINE 簽章證明事件來源，不代表群組獲准接收全系統通知。
+    if (!linkCandidates.length) return json({ ok: true });
 
     try {
       const store = await deps.createStore();
@@ -252,7 +248,6 @@ export function createVehicleLineWebhookHandler(deps: VehicleLineWebhookDependen
         }
       }
 
-      for (const groupId of groupIds) await store.saveGroupId(groupId);
       return json({ ok: true });
     } catch {
       // Do not log request bodies, LINE IDs, tokens, link codes, or provider responses.

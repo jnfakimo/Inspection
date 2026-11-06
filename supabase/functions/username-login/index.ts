@@ -1,3 +1,4 @@
+import { captchaImage } from '../_shared/captcha-image.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.2";
 import {
   enforceDurableRateLimit,
@@ -37,28 +38,6 @@ type AdminClient = {
 const clientIp = clientIpFromRequest;
 const CAPTCHA_TTL_SECONDS = 300;
 const CAPTCHA_LENGTH = 6;
-const CAPTCHA_SEGMENTS: Record<string, string[]> = {
-  "0": ["a", "b", "c", "d", "e", "f"],
-  "1": ["b", "c"],
-  "2": ["a", "b", "d", "e", "g"],
-  "3": ["a", "b", "c", "d", "g"],
-  "4": ["b", "c", "f", "g"],
-  "5": ["a", "c", "d", "f", "g"],
-  "6": ["a", "c", "d", "e", "f", "g"],
-  "7": ["a", "b", "c"],
-  "8": ["a", "b", "c", "d", "e", "f", "g"],
-  "9": ["a", "b", "c", "d", "f", "g"]
-};
-const CAPTCHA_PATHS: Record<string, string> = {
-  a: "M4 2H20L17 5H7Z",
-  b: "M21 4V18L18 21V7Z",
-  c: "M21 22V36L18 33V25Z",
-  d: "M4 38H20L17 35H7Z",
-  e: "M3 22V36L6 33V25Z",
-  f: "M3 4V18L6 21V7Z",
-  g: "M4 20H20L17 23H7Z"
-};
-
 const randomCode = () => {
   const bytes = new Uint8Array(CAPTCHA_LENGTH);
   crypto.getRandomValues(bytes);
@@ -92,32 +71,6 @@ const safeEqual = (left: string, right: string) => {
   return diff === 0;
 };
 
-const captchaImage = (code: string) => {
-  const random = new Uint8Array(32);
-  crypto.getRandomValues(random);
-  const digits = code.split("").map((digit, index) => {
-    const paths = (CAPTCHA_SEGMENTS[digit] || []).map((segment) => CAPTCHA_PATHS[segment]).join(" ");
-    const x = 12 + index * 34 + (random[index] % 5) - 2;
-    const y = 12 + (random[index + 6] % 7) - 3;
-    const rotate = (random[index + 12] % 15) - 7;
-    return `<g transform="translate(${x} ${y}) rotate(${rotate} 12 20)"><path d="${paths}"/></g>`;
-  }).join("");
-  const noiseLines = Array.from({ length: 8 }, (_, index) => {
-    const x1 = random[index * 2] % 220;
-    const y1 = random[index * 2 + 1] % 70;
-    const x2 = random[index * 2 + 8] % 220;
-    const y2 = random[index * 2 + 9] % 70;
-    return `<path d="M${x1} ${y1}L${x2} ${y2}"/>`;
-  }).join("");
-  const dots = Array.from({ length: 18 }, (_, index) => {
-    const x = (random[index % random.length] * (index + 7)) % 220;
-    const y = (random[(index + 11) % random.length] * (index + 3)) % 70;
-    const radius = 1 + (random[(index + 19) % random.length] % 2);
-    return `<circle cx="${x}" cy="${y}" r="${radius}"/>`;
-  }).join("");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="70" viewBox="0 0 220 70" role="img"><defs><filter id="w"><feTurbulence type="fractalNoise" baseFrequency=".012 .035" numOctaves="1" seed="${random[31]}" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2"/></filter></defs><rect width="220" height="70" rx="10" fill="#f8fafc"/><g fill="none" stroke="#94a3b8" stroke-width="1" opacity=".42">${noiseLines}</g><g fill="#6366f1" opacity=".28">${dots}</g><g fill="#172554" filter="url(#w)">${digits}</g><rect x="1" y="1" width="218" height="68" rx="9" fill="none" stroke="#cbd5e1" stroke-width="2"/></svg>`;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
-};
 
 async function issueCaptcha(admin: AdminClient, req: Request, requestId: string) {
   const ipAddress = clientIp(req);

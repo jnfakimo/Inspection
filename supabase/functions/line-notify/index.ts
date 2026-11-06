@@ -155,16 +155,7 @@ Deno.serve(async (req) => {
       if (!await validLineSignature(rawBody, req.headers.get("x-line-signature"))) {
         return json({ ok: false, msg: "Invalid LINE signature" }, 401);
       }
-      for (const ev of payload.events) {
-        const src = ev.source;
-        if (src?.type === "group" && src.groupId) {
-          // Auto-save groupId to system_settings
-          await db.from("system_settings").upsert(
-            [{ key: "line_group_id", value: src.groupId }],
-            { onConflict: "key" },
-          );
-        }
-      }
+      // 目的群組只可由已驗證管理員設定；一般 webhook 不修改。
       return new Response("ok", { status: 200 });
     }
 

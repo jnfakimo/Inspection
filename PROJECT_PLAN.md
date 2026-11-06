@@ -284,3 +284,11 @@
 - 檢查工具：`site-scan.mjs` 的 meta CSP 比對遇單引號截斷，造成「缺 `object-src 'none'`」誤報（正式站本來就有），已在 dotfiles `439630f` 修正並部署。
 - 不做：`nosniff`、`frame-ancestors` 只能用回應標頭（需 CDN／代理）；`btree_gist` 移出 public schema 無實際攻擊面，且可能影響公務車時段排除約束，不動正式庫。
 - 未涵蓋：真實帳號實打 API、Edge Function 逐行審查、`cwa-weather`／`vehicle-line-dispatch-worker` 的把關確認、`mobile/`。
+
+## 2026-11-06 八項資安修補發布候選
+
+- 使用者授權正式發布；以最新 main 為基底整合 G 槽八項修補，隔離其他未提交工作。
+- 修補範圍：附件誤刪、LINE 群組自動接管、共用初始密碼、業管／會議模組拒絕繞過、樓層 XSS、OAuth 跨瀏覽器綁定、SVG 驗證碼答案外洩。
+- 新增 `20261106050736_codex_security_boundary_fixes.sql`，先套正式庫再發布 Edge 與 Pages。
+- 發布候選的六項攻擊路徑與合法對照測試、V2 型別檢查已通過。完整 CI、正式 migration 與部署驗證結果待發布後補記。
+- 現有使用者密碼不會自動變更；舊共用密碼帳號的精準清查／重設與 session 撤銷、真實 Google 同意及郵件送達，均須另有驗證證據。

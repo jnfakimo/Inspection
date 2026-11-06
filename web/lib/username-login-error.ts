@@ -10,16 +10,16 @@ type CaptchaPayload = {
   image?: unknown;
 };
 
-const CAPTCHA_IMAGE_PREFIX = 'data:image/svg+xml;base64,';
+const CAPTCHA_IMAGE_PREFIX = 'data:image/png;base64,';
 
-/** Accepts only the documented CAPTCHA response shape and its inline SVG image. */
+/** Accepts only the documented CAPTCHA response shape and its inline PNG image. */
 export function parseCaptchaPayload(value: unknown): { id: string; image: string } | null {
   if (!value || typeof value !== 'object') return null;
   const payload = value as CaptchaPayload;
   if (typeof payload.challenge_id !== 'string' || !payload.challenge_id.trim()) return null;
   if (typeof payload.image !== 'string' || !payload.image.startsWith(CAPTCHA_IMAGE_PREFIX)) return null;
-  const encodedSvg = payload.image.slice(CAPTCHA_IMAGE_PREFIX.length);
-  if (!encodedSvg || !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedSvg) || encodedSvg.length % 4 !== 0) return null;
+  const encodedPng = payload.image.slice(CAPTCHA_IMAGE_PREFIX.length);
+  if (!encodedPng || !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedPng) || encodedPng.length % 4 !== 0) return null;
   return { id: payload.challenge_id, image: payload.image };
 }
 

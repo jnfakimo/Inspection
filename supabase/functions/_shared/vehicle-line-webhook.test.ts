@@ -193,7 +193,7 @@ test("LINE account-link callback records conflict by LINE identity, not a suppli
   assert.match(push.messages[0].text, /不會自動移轉/);
 });
 
-test("group capture stays on its signed path and direct chat filtering stays isolated", async () => {
+test("signed group events cannot change notification destination or consume private link codes", async () => {
   const { store, calls } = makeStore();
   const externalCalls: Array<{ url: string; init?: RequestInit }> = [];
   const handler = makeHandler(store, mockedLineFetch(externalCalls), calls);
@@ -202,7 +202,7 @@ test("group capture stays on its signed path and direct chat filtering stays iso
     { type: "message", source: { type: "room", roomId: "synthetic-room" }, message: { type: "text", text: linkCode } },
   ] });
   assert.equal((await handler(signedRequest(raw, await signature(raw)))).status, 200);
-  assert.deepEqual(calls.groups, ["synthetic-group"]);
+  assert.deepEqual(calls.groups, []);
   assert.equal(calls.consumed.length, 0);
   assert.equal(externalCalls.length, 0);
 });

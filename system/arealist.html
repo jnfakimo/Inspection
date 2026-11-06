@@ -417,7 +417,7 @@ function render(){
     const to=Math.min(start+PAGE_SIZE,items.length);
     const isC=!filterActive&&collapsed.has(f);
     return `<div class="floor-block">
-      <div class="floor-head${isC?' collapsed':''}" onclick="toggleFloor('${esc(f)}')">
+      <div class="floor-head${isC?' collapsed':''}" data-floor-action="toggle" data-floor="${esc(f)}">
         <span class="caret">▼</span>
         <span class="fname">${esc(f)}</span>
         <span class="fcount">${items.length} 個空間</span>
@@ -441,13 +441,26 @@ function render(){
         </div>`;}).join('')}
         <div class="pager">
           <span class="page-info">每頁 10 筆，目前 ${from}-${to} 筆，共 ${items.length} 筆，第 ${page}/${totalPages} 頁</span>
-          <button class="page-btn" onclick="setFloorPage('${esc(f)}',${page-1})" ${page<=1?'disabled':''}>上一頁</button>
-          <button class="page-btn" onclick="setFloorPage('${esc(f)}',${page+1})" ${page>=totalPages?'disabled':''}>下一頁</button>
+          <button class="page-btn" data-floor-action="page" data-floor="${esc(f)}" data-page="${page-1}" ${page<=1?'disabled':''}>上一頁</button>
+          <button class="page-btn" data-floor-action="page" data-floor="${esc(f)}" data-page="${page+1}" ${page>=totalPages?'disabled':''}>下一頁</button>
         </div>
       </div>
     </div>`;
   }).join('');
 }
+
+// 樓層文字只作資料，不進入行內 JavaScript。事件委派也涵蓋重新 render 的按鈕。
+document.getElementById('list').addEventListener('click', event => {
+  const target = event.target instanceof Element ? event.target.closest('[data-floor-action]') : null;
+  if (!target || target.disabled || !document.getElementById('list').contains(target)) return;
+  const floor = target.dataset.floor;
+  if (typeof floor !== 'string') return;
+  if (target.dataset.floorAction === 'toggle') toggleFloor(floor);
+  if (target.dataset.floorAction === 'page') {
+    const page = Number(target.dataset.page);
+    if (Number.isInteger(page) && page > 0) setFloorPage(floor, page);
+  }
+});
 
 function toggleFloor(f){collapsed.has(f)?collapsed.delete(f):collapsed.add(f);render();}
 

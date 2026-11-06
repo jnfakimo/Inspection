@@ -29,11 +29,11 @@ test('network and timeout diagnostics never expose raw transport text', () => {
   assert.doesNotMatch(`${network} ${timeout}`, /example\.test|apikey|secret/i);
 });
 
-test('the documented CAPTCHA success contract is accepted as an inline SVG image', () => {
+test('the documented CAPTCHA success contract is accepted as an inline PNG image', () => {
   const payload = {
     ok: true,
     challenge_id: '00000000-0000-4000-8000-000000000001',
-    image: 'data:image/svg+xml;base64,PHN2Zy8+',
+    image: 'data:image/png;base64,PHN2Zy8+',
     expires_in: 300,
   };
   assert.deepEqual(parseCaptchaPayload(payload), { id: payload.challenge_id, image: payload.image });
@@ -41,7 +41,7 @@ test('the documented CAPTCHA success contract is accepted as an inline SVG image
 
 test('malformed CAPTCHA payloads and non-inline image URLs are rejected', () => {
   assert.equal(parseCaptchaPayload({ challenge_id: 'synthetic', image: '' }), null);
-  assert.equal(parseCaptchaPayload({ challenge_id: '', image: 'data:image/svg+xml;base64,PHN2Zy8+' }), null);
+  assert.equal(parseCaptchaPayload({ challenge_id: '', image: 'data:image/png;base64,PHN2Zy8+' }), null);
   assert.equal(parseCaptchaPayload({ challenge_id: 'synthetic', image: 'https://example.test/captcha.svg' }), null);
-  assert.equal(parseCaptchaPayload({ challenge_id: 'synthetic', image: 'data:image/svg+xml;base64,%%%=' }), null);
+  assert.equal(parseCaptchaPayload({ challenge_id: 'synthetic', image: 'data:image/png;base64,%%%=' }), null);
 });

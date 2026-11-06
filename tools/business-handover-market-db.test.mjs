@@ -43,7 +43,7 @@ try {
       created_at timestamptz default now(),updated_at timestamptz default now(),constraint uq_business_handover_approval_stage unique(handover_date,stage));
     create function active_user_id() returns uuid language sql stable as $$select nullif(current_setting('test.actor',true),'')::uuid$$;
     create function active_rbac_role() returns text language sql stable as $$select coalesce((select rbac_role from public.users where user_id=public.active_user_id()),'reporter')$$;
-    create function has_handover_module_access(text) returns boolean language sql stable as $$select true$$;
+    create function has_handover_module_access(text) returns boolean language sql stable as $$select coalesce(current_setting('test.business_module',true),'allow')<>'deny'$$;
     create function handover_staff_market(uuid,text) returns text language sql stable as
       $$select coalesce(case when department in ('market_1','market_2') then department end,
         case user_id when '${one}'::uuid then 'market_1' when '${two}'::uuid then 'market_2' end)
@@ -212,5 +212,18 @@ try {
   } finally {
     await query('reset role');
   }
+  // 真正 RPC 與 RLS 也必須遵守模組撤權，不能只在 Edge 判斷。
+  const boundaryFix = readFileSync(new URL('../supabase/migrations/20261106050736_codex_security_boundary_fixes.sql', import.meta.url), 'utf8');
+  const boundaryStart = boundaryFix.indexOf('create or replace function public.business_market_allowed');
+  const boundaryEnd = boundaryFix.indexOf('-- RESTRICTIVE');
+  await db.exec(boundaryFix.slice(boundaryStart, boundaryEnd));
+  await query('set role authenticated');
+  await actor(one);
+  await query(`select set_config('test.business_module','deny',false)`);
+  await assert.rejects(query(`select public.business_market_day('market_1',date '2026-11-06')`), /未開放所選市場/);
+  assert.equal((await query(`select count(*)::int n from business_handover_entries`)).rows[0].n, 0);
+  await query(`select set_config('test.business_module','allow',false)`);
+  assert.ok((await query(`select public.business_market_day('market_1',date '2026-11-06') as result`)).rows[0].result);
+  await query('reset role');
   console.log('業管組交接：市場隔離、簽核角色／階段矩陣、authenticated 自身權限 RPC、RLS 讀取與跨市場拒絕均通過。');
 } finally { await db.close(); }
