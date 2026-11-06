@@ -33,6 +33,10 @@ const robotsDirectives = [
 ];
 const robotsContent = robotsDirectives.join(',');
 const robotsMeta = `<meta name="robots" content="${robotsContent}">`;
+// GitHub Pages 無法自訂 Referrer-Policy 標頭，改以 meta 宣告：跨站連結只送 origin，
+// 避免網址路徑與查詢字串（例如 Storage 限時網址、頁面篩選條件）外流到第三方。
+const referrerPolicy = 'strict-origin-when-cross-origin';
+const referrerMeta = `<meta name="referrer" content="${referrerPolicy}">`;
 
 function configuredHttpsOrigin(rawValue, variableName) {
   const value = String(rawValue || '').trim();
@@ -234,6 +238,9 @@ function addHtmlDirectives(html, relativePath) {
   if (!/\bname\s*=\s*["']application-provenance["']/i.test(html)) {
     directives.push(`<meta name="application-provenance" content="TAPM1:${provenanceMarker(relativePath)}">`);
   }
+  if (!/\bname\s*=\s*["']referrer["']/i.test(html)) {
+    directives.push(referrerMeta);
+  }
   if (!/\bname\s*=\s*["']copyright["']/i.test(html)) {
     directives.push('<meta name="copyright" content="Copyright © 2026 jnfakimo. All rights reserved.">');
   }
@@ -420,6 +427,9 @@ async function verifyArtifact() {
     }
     if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !hasCompleteRobotsMeta(text)) {
       throw new Error(`正式頁面缺少完整防索引標記：${relative}`);
+    }
+    if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !/<meta\b[^>]*\bname\s*=\s*["']referrer["'][^>]*\bcontent\s*=\s*["'](?:strict-origin-when-cross-origin|strict-origin|same-origin|no-referrer)["']/i.test(text)) {
+      throw new Error(`正式頁面缺少 Referrer-Policy：${relative}`);
     }
     if (relative.endsWith('.html') && !isSearchConsoleVerificationFile && !/name="application-provenance" content="TAPM1:[A-Za-z0-9_-]{32}"/.test(text)) {
       throw new Error(`正式頁面缺少隱藏來源指紋：${relative}`);
