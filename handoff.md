@@ -5,6 +5,16 @@
 
 ## ⏯️ 目前做到哪
 
+最新（2026-11-06）：**資安檢查（`web-security-review`，全程唯讀）：未發現可被外部利用的漏洞；外洩密碼保護實際未開啟，需到儀表板處理。** 對象為 `origin/main` `3ba85f1e`（PR #140）與正式庫 `qztffronusdhgxhjjubt`，未改程式、資料庫或 Auth 設定。
+- **需處理**：Supabase advisor 仍報 `auth_leaked_password_protection`（未開啟），與 2026-10-29 紀錄「已開啟」不符。請到 Authentication → Sign In / Providers → Email 開啟「Prevent use of leaked passwords」（可能需 Pro 方案），開啟後再跑 advisor 讀回。
+- **通過**：`security-design-audit` 錯誤 0（3 個既有警告）、祕密掃描、89 項 hook 測試；前端無 service_role／`NEXT_PUBLIC_*` 機密／`eval`；`vehicle-workspace.tsx` 列印報表逐欄 `escHtml`。正式站 `/Inspection/v2/` 掃描 0 錯誤。
+- **資料庫（唯讀 SQL）**：無 RLS 表、definer view、`using (true)` policy、缺 `search_path` 的 definer 函式（PR #140 已補齊）、公開桶、anon 殘留權限皆 0 列。模擬無角色登入者：106 張表／view 讀到 0 筆；71 張表 INSERT、72 張表 UPDATE、DELETE 全被擋（6 張表為 trigger 先報錯，已核對 INSERT policy 皆需 `active_user_id()`／管理員）。anon 可呼叫的 6 個非 trigger definer 函式皆在函式內驗管理員或 FindTag token 雜湊。
+- **Auth**：`disable_signup=true`，故 `mailer_autoconfirm=true` 不構成風險。
+- **Edge Functions**：`verify_jwt=false` 的 `line-notify`（LINE 簽章）、`google-calendar-callback`（OAuth state＋UA 雜湊）、`google-calendar-worker`（`x-cron-secret`）、`username-login`（captcha）已確認有把關；`cwa-weather`、`vehicle-line-dispatch-worker` 及另一個未具名項目未逐一確認。
+- **漂移**：重播 migration 結果與 2026-10-29 判定一致，無新增差異。
+- **低風險**：GitHub Pages 無法加 `nosniff`／`Referrer-Policy`／`frame-ancestors`；CSP 可補 `object-src 'none'`；`btree_gist` 在 public schema。
+- **未涵蓋**：真實帳號實打 API、Edge Function 逐行審查、`mobile/`。Claude Security 多代理掃描因本工作階段無 Workflow 工具未執行。
+
 最新（2026-11-04）：**公務車定位 App 由 Expo SDK 57 升到 SDK 58**（`mobile/vehicle-tracker`，未改 Supabase migrations）。
 `expo` 58.0.23、React 19.3.0、React Native 0.88.1，其餘 `expo-*` 由 `npx expo install --fix` 對齊。
 React Native 0.88 的嚴格型別把藍牙權限陣列推斷成單一權限，`src/ble.ts` 改標成 `Permission[]`。
@@ -89,7 +99,7 @@ React Native 0.88 的嚴格型別把藍牙權限陣列推斷成單一權限，`s
   - **驗證**：用載入真實樣式檔的靜態比對頁量測（以 origin/main 對照）：營運頁三個下拉與兩個匯出日期框 42→32px；管理後台、交接簿、儀表板、資安警示、追蹤等七種工具列全是 32px，垂直中心對齊；**工具列外的表單欄位仍是 42／36px**；手機寬度（600px）前後數值相同；33 項相關標準檢查與測試全過；每次部署後都下載線上樣式檔確認 token 與規則已上線（部署工作流程 security-gate／build／deploy／verify-deployment 皆成功）。
   - **未驗證**：沒有登入看過真實頁面；營運頁收窄版型、資安警示格狀篩選列、市場分析篩選區的實際排版，以及按鈕固定 32px 後長標籤是否被切到，請使用者部署後看一眼。
   - **注意**：G 槽 Codex 有未提交的 `handover-sheet.css`、`business-handover.css` 與發行清單修改，更新 G 槽時這幾個檔案可能衝突；本機 8766 埠是 Codex 的復原前端，比對頁伺服器別用該埠（這幾輪用 8777／8788／8799，用完已關）。
-- **資安待辦（選擇性）**：①工單狀態機漂移（已查證、決定先不修，結論與建議範圍見上；若要修只收直接寫入入口）；②以管理者提供的真實測試帳號實打網站 API（目前只有 SQL 角色模擬與 anon 實打）；③`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；④外洩密碼保護已開啟，但需用測試申請驗證帳號核准流程未被擋（見上）；⑤行動端與 Python 訊號服務仍有 Dependabot 項目。
+- **資安待辦（選擇性）**：①工單狀態機漂移（已查證、決定先不修，結論與建議範圍見上；若要修只收直接寫入入口）；②以管理者提供的真實測試帳號實打網站 API（目前只有 SQL 角色模擬與 anon 實打）；③`admin_reset_user_password`、`get_auth_user_id_by_email` 兩個函式缺 `search_path`（僅 service_role 可呼叫，風險低）；④外洩密碼保護：2026-11-06 advisor 顯示**未開啟**（與本項原紀錄不符，見最上方），開啟後仍需用測試申請驗證帳號核准流程未被擋；⑤行動端與 Python 訊號服務仍有 Dependabot 項目。
 - **下一步**：（新）部署後登入檢視營運頁、管理後台、資安警示、市場分析的篩選列與長標籤按鈕是否被切到；①Codex 收尾後更新 G 槽並啟用 Git hook；②公司電腦開新 session 確認 Claude hook 有載入；③登入後實測公務車各頁、手機版與在線人數；④Gemini 評估書待簽核後再決定是否做無金鑰假資料原型。
 - 🕐 最後更新：2026-10-29 收工，Claude Code @ DESKTOP-0CFB6UK；Git：本批文件經 PR 合併（見 PR 號），遠端分支與合併狀態以 GitHub 為準。
 - **待決策**：電子交接簿導入 Gemini AI 彙整的資安評估書（Docs：https://claude.ai/artifact/Xc2X7CJdto199kCWLu3dEP ，私人連結）已交付，**等資安與主管簽核**；尚未寫任何程式、未使用任何金鑰或真實資料。
@@ -226,6 +236,8 @@ LINE webhook Verify 成功，022443 完成本人綁定並收到個人測試訊�
 - 一次只有一個寫入者；commit、push、合併、部署都需使用者當次授權；不寫入任何 secret。
 
 ## 🕐 最後更新
+
+2026-11-06 · Claude Code（Opus 5.5）· 唯讀資安檢查，結果見「目前做到哪」最上方；只更新本檔，分支 `docs/security-review-handoff-20261106`。
 
 2026-11-04 · 車輛追蹤 App：`node-forge` override 1.4.3。`zod` 與 `deepmerge` 維持未修，原因見 `docs/ISO27001_BASELINE.md` 同日小節。
 
