@@ -4199,7 +4199,7 @@ export async function handleAppApiRequest(req: Request) {
         const storedSize = Number((stored?.metadata as Record<string, unknown> | undefined)?.size || 0);
         if (!stored || !storedSize) return reply(req, { ok: false, message: '找不到已上傳的檔案，請重新上傳' }, 409);
         if (storedSize > GUARD_ATTACHMENT_MAX_BYTES) {
-          await admin.storage.from(GUARD_ATTACHMENT_BUCKET).remove([path]);
+          // 客戶提供的 path 可能已被其他交接索引引用，失敗不得刪除實體物件。
           return reply(req, { ok: false, message: `單一附件上限 ${GUARD_ATTACHMENT_MAX_BYTES / 1048576} MB` }, 400);
         }
         const originalSize = Number(body.original_size);
@@ -4211,8 +4211,7 @@ export async function handleAppApiRequest(req: Request) {
         const { data, error } = await admin.from('guard_handover_attachments').insert(payload)
           .select('attachment_id,shift_name,incident_id,file_name,content_type,file_size,original_size,compressed,uploaded_by,uploaded_at').single();
         if (error || !data) {
-          // 沒有索引的物件不會被任何人讀到（桶上沒有讀取政策），直接清掉以免佔用空間。
-          await admin.storage.from(GUARD_ATTACHMENT_BUCKET).remove([path]);
+          // 客戶提供的 path 可能已被其他交接索引引用，失敗不得刪除實體物件。
           return reply(req, { ok: false, message: dbMessage(error, '附件登錄失敗') }, 409);
         }
         await writeAudit(admin, profile.user_id, 'guard_handover_attachments', data.attachment_id, 'insert', null, data);

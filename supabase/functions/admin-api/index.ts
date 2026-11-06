@@ -26,7 +26,10 @@ function requiredEnvironment(name: string) {
 const SUPABASE_URL = requiredEnvironment('SUPABASE_URL');
 const SERVICE_ROLE_KEY = requiredEnvironment('SUPABASE_SERVICE_ROLE_KEY');
 const ANON_KEY = requiredEnvironment('SUPABASE_ANON_KEY');
-const ACCOUNT_APPLICATION_INITIAL_PASSWORD = '12345678';
+// 僅用於建立 Auth 帳號；256-bit 隨機啟動密碼不傳出、不記錄，使用者由郵件設密。
+export function createAccountBootstrapPassword() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('');
+}
 const ROLES = new Set(['reporter', 'duty', 'dispatcher', 'technician', 'unit_supervisor', 'sysadmin']);
 // Node.js 與 Edge Function 共用同一支處理器；前端會先檢查此版本，
 // 避免 Render 尚未更新時把新欄位送給舊後端而遺失。
@@ -579,10 +582,9 @@ export async function handleAdminApiRequest(req: Request) {
         return reply(req, { ok: false, message: '登入帳號或電子郵件已存在，無法核准此申請' }, 409);
       }
 
-      // 使用者指定帳號申請核准後採固定 8 位數初始密碼；啟用連結仍會寄出，
-      // 讓使用者可立即改成自己的密碼。稽核紀錄不得保存密碼本文。
+      // 郵件 recovery 讓本人設定既有規範的密碼；未寄達時由管理員重寄。
       const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: application.email, password: ACCOUNT_APPLICATION_INITIAL_PASSWORD, email_confirm: true,
+        email: application.email, password: createAccountBootstrapPassword(), email_confirm: true,
         user_metadata: { name: application.name, username: application.username },
       });
       if (createError || !created.user) return reply(req, { ok: false, message: `Auth 帳號建立失敗：${createError?.message || '未知錯誤'}` }, 400);
@@ -623,7 +625,14 @@ export async function handleAdminApiRequest(req: Request) {
         rbac_role: rbacRole, supervisor_id: supervisorValidation.supervisorId,
         activation_email_sent: !mailError,
       });
-      return reply(req, { ok: true, data: { user_id: createdProfile.user_id, activation_email_sent: !mailError }, message: mailError ? '帳號已核准，初始密碼為 12345678；啟用郵件寄送失敗，請通知使用者登入後立即變更密碼' : '帳號已核准，初始密碼為 12345678；啟用連結已寄出' });
+      const activationMessage = mailError
+        ? '設密郵件寄送失敗，請由管理員重寄重設密碼郵件'
+        : '啟用連結已寄出';
+      return reply(req, {
+        ok: true,
+        data: { user_id: createdProfile.user_id, activation_email_sent: !mailError },
+        message: `帳號已核准，請使用者透過郵件設定密碼；${activationMessage}`,
+      });
     }
 
     if (action === 'admin_reject_account_application') {

@@ -7,6 +7,7 @@ import { AdminSidebar } from '@/components/AdminSidebar';
 import { ResponsiveTableLabels } from '@/components/ResponsiveTableLabels';
 import { getSupabase, invokeAppApi } from '@/lib/supabase';
 import { invokeGoogleCalendar, type GoogleCalendarStatus } from '@/lib/google-calendar';
+import { startCalendarLink, consumeCalendarReturn } from '@/lib/google-calendar-browser';
 import type { Profile } from '@/types/app';
 import { passwordInputProps, passwordPolicyMessage } from '@/lib/password-policy';
 import { usePasswordPolicy } from '@/lib/use-password-policy';
@@ -96,6 +97,21 @@ export function AppShell({ profile, title, children, heading }: {
       url.searchParams.delete('profile');
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
+    if (new URLSearchParams(url.hash.slice(1)).get('google_calendar') === 'finish') {
+      // 在任何非同步工作前清除 code/state，避免保留在網址與後續導覽。
+      window.history.replaceState({}, '', `${url.pathname}${url.search}`);
+      openProfile();
+      try {
+        const payload = consumeCalendarReturn(url, profile.user_id, window.sessionStorage);
+        if (payload) void invokeGoogleCalendar('oauth_finish', payload).then(async () => {
+          await loadPersonalProfile();
+          setCalendarMessage('Google 個人行事曆已連結，預約將開始同步。');
+        }).catch(() => setCalendarMessage('Google 授權未完成，請由原帳號與瀏覽器重新連結。'));
+      } catch {
+        setCalendarMessage('請回到發起授權的帳號與瀏覽器重新連結。');
+      }
+      url.hash = '';
+    }
     const result = url.searchParams.get('google_calendar');
     if (result) {
       openProfile();
@@ -104,7 +120,7 @@ export function AppShell({ profile, title, children, heading }: {
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
     return () => window.removeEventListener('open-personal-profile', handleOpen);
-  }, [openProfile]);
+  }, [openProfile, profile.user_id, loadPersonalProfile]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -166,8 +182,8 @@ export function AppShell({ profile, title, children, heading }: {
   async function connectGoogle() {
     setProfileBusy(true); setCalendarMessage('');
     try {
-      const result = await invokeGoogleCalendar<{ url: string }>('oauth_start', { return_to: window.location.href });
-      window.location.assign(result.url);
+      const url = await startCalendarLink(invokeGoogleCalendar, window.sessionStorage, profile.user_id, window.location.href);
+      window.location.assign(url);
     } catch (error) {
       setCalendarMessage(error instanceof Error ? error.message : 'Google 授權啟動失敗'); setProfileBusy(false);
     }

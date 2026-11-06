@@ -1,21 +1,23 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-
-const adminApi = readFileSync(new URL('../supabase/functions/admin-api/index.ts', import.meta.url), 'utf8');
-const usersAdmin = readFileSync(new URL('../web/components/admin/UsersAdmin.tsx', import.meta.url), 'utf8');
-
-assert.match(adminApi, /const ACCOUNT_APPLICATION_INITIAL_PASSWORD = '12345678';/);
-assert.match(adminApi, /password:\s*ACCOUNT_APPLICATION_INITIAL_PASSWORD/);
-assert.doesNotMatch(adminApi, /temporaryNumericPassword/);
-assert.match(adminApi, /初始密碼為 12345678；啟用連結已寄出/);
-assert.match(usersAdmin, /核准後初始密碼為 <strong>12345678<\/strong>/);
-assert.match(usersAdmin, />核准並建立帳號<\/button>/);
-
-// 初始密碼不得進入既有帳號建立稽核內容。
-const approvalAuditStart = adminApi.indexOf("await audit('users'");
-const approvalAuditEnd = adminApi.indexOf('return reply(req', approvalAuditStart);
-assert.ok(approvalAuditStart >= 0 && approvalAuditEnd > approvalAuditStart, '找不到帳號核准稽核區塊');
-const approvalAudit = adminApi.slice(approvalAuditStart, approvalAuditEnd);
-assert.doesNotMatch(approvalAudit, /12345678|initial_password|temporaryPassword|password\s*:/i);
-
-console.log('帳號申請核准檢查通過：初始密碼固定為 12345678、畫面提示一致，稽核不保存密碼本文。');
+import vm from 'node:vm';
+const source = readFileSync(new URL('../supabase/functions/admin-api/index.ts', import.meta.url), 'utf8');
+const ui = readFileSync(new URL('../web/components/admin/UsersAdmin.tsx', import.meta.url), 'utf8');
+const fn = source.match(/export function createAccountBootstrapPassword\(\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(fn);
+const context = vm.createContext({ crypto });
+vm.runInContext(fn.replace('export ', ''), context);
+const passwords = Array.from({ length: 100 }, () => context.createAccountBootstrapPassword());
+assert.equal(new Set(passwords).size, 100);
+assert.ok(passwords.every(value => /^[a-f0-9]{64}$/.test(value)));
+assert.doesNotMatch(source, /ACCOUNT_APPLICATION_INITIAL_PASSWORD|初始密碼為/);
+assert.match(source, /password:\s*createAccountBootstrapPassword\(\)/);
+assert.match(source, /resetPasswordForEmail\(application.email/);
+assert.match(source, /設密郵件寄送失敗，請由管理員重寄/);
+assert.match(ui, /透過郵件設定自己的密碼/);
+assert.doesNotMatch(ui, /核准後初始密碼/);
+const approval = source.slice(source.indexOf("if (action === 'admin_approve_account_application')"));
+const start = approval.indexOf("await audit('users'");
+assert.ok(start >= 0);
+assert.doesNotMatch(approval.slice(start, approval.indexOf('const activationMessage', start)), /initial_password|temporaryPassword|password\s*:/i);
+console.log('帳號核准：100組獨立256-bit bootstrap、郵件設密、回應與稽核不揭露密碼。');
