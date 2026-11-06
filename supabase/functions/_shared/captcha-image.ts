@@ -13,6 +13,27 @@ const GLYPHS = [
 ];
 export const CAPTCHA_WIDTH = 220;
 export const CAPTCHA_HEIGHT = 70;
+// 視覺參數由預先建立的有限值域均勻選取；不縮放／取整 CSPRNG 輸出。
+const visualRange = (length: number, start = 0, step = 1) => Array.from({ length }, (_, index) => start + index * step);
+const VISUAL = {
+  x: visualRange(CAPTCHA_WIDTH), y: visualRange(CAPTCHA_HEIGHT), noise: visualRange(60, 175),
+  phase: visualRange(64, 0, 6 / 64), scale: visualRange(32, 3.7, 0.5 / 32),
+  angle: visualRange(64, -0.16, 0.32 / 64), offsetX: visualRange(32, 0, 3 / 32),
+  originY: visualRange(64, 17, 7 / 64), ink: visualRange(30, 20),
+};
+export function createVisualSampler() {
+  const bytes = new Uint8Array(2048);
+  let cursor = bytes.length;
+  return (values: readonly number[]) => {
+    if (!values.length || values.length > 256) throw new Error('Invalid visual range');
+    for (;;) {
+      if (cursor === bytes.length) { crypto.getRandomValues(bytes); cursor = 0; }
+      const value = bytes[cursor++];
+      // 拒絕超出值域的 byte，沒有 modulo bias，也不循環重用舊亂數。
+      if (value < values.length) return values[value];
+    }
+  };
+}
 function u32(n: number) { return Uint8Array.of(n >>> 24, n >>> 16, n >>> 8, n); }
 function join(...parts: Uint8Array[]) {
   const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
@@ -46,24 +67,22 @@ function png(pixels: Uint8Array) {
 }
 export function captchaImage(code: string): string {
   if (!/^\d{6}$/.test(code)) throw new Error('Invalid CAPTCHA code');
-  const random = crypto.getRandomValues(new Uint8Array(2048));
-  let cursor = 0;
-  const rand = () => random[cursor++ % random.length] / 256;
+  const sample = createVisualSampler();
   const pixels = new Uint8Array(CAPTCHA_WIDTH * CAPTCHA_HEIGHT).fill(248);
   const dot = (x: number, y: number, value: number) => {
     x = Math.round(x); y = Math.round(y);
     if (x >= 0 && x < CAPTCHA_WIDTH && y >= 0 && y < CAPTCHA_HEIGHT) pixels[y * CAPTCHA_WIDTH + x] = value;
   };
-  for (let i = 0; i < 600; i++) dot(rand() * CAPTCHA_WIDTH, rand() * CAPTCHA_HEIGHT, 175 + Math.floor(rand() * 60));
+  for (let i = 0; i < 600; i++) dot(sample(VISUAL.x), sample(VISUAL.y), sample(VISUAL.noise));
   for (let i = 0; i < 5; i++) {
-    const y = rand() * CAPTCHA_HEIGHT, phase = rand() * 6;
+    const y = sample(VISUAL.y), phase = sample(VISUAL.phase);
     for (let x = 0; x < CAPTCHA_WIDTH; x++) dot(x, y + 6 * Math.sin(x / 21 + phase), 190);
   }
   for (let index = 0; index < 6; index++) {
-    const glyph = GLYPHS[Number(code[index])], scale = 3.7 + rand() * 0.5;
-    const angle = (rand() - 0.5) * 0.32, cos = Math.cos(angle), sin = Math.sin(angle);
-    const originX = 12 + index * 34 + rand() * 3, originY = 17 + rand() * 7;
-    const phase = rand() * 6, ink = 20 + Math.floor(rand() * 30);
+    const glyph = GLYPHS[Number(code[index])], scale = sample(VISUAL.scale);
+    const angle = sample(VISUAL.angle), cos = Math.cos(angle), sin = Math.sin(angle);
+    const originX = 12 + index * 34 + sample(VISUAL.offsetX), originY = sample(VISUAL.originY);
+    const phase = sample(VISUAL.phase), ink = sample(VISUAL.ink);
     for (let y = 0; y < Math.ceil(7 * scale); y++) for (let x = 0; x < Math.ceil(5 * scale); x++) {
       if (glyph[Math.min(6, Math.floor(y / scale))][Math.min(4, Math.floor(x / scale))] !== '1') continue;
       const dx = x - 10, dy = y - 14;

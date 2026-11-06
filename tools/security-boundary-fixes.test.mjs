@@ -8,6 +8,18 @@ import { transform } from 'esbuild';
 import { captchaImage } from '../supabase/functions/_shared/captcha-image.ts';
 import { startCalendarLink, consumeCalendarReturn } from '../web/lib/google-calendar-browser.ts';
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+test('visual sampler rejects out-of-range bytes and refreshes exhausted entropy', async () => {
+ const { code } = await transform(read('supabase/functions/_shared/captcha-image.ts'), { loader: 'ts', format: 'cjs' });
+ let calls = 0;
+ const context = vm.createContext({ module: { exports: {} }, crypto: { getRandomValues(bytes) {
+   calls++; bytes.fill(255); bytes[0] = calls === 1 ? 254 : 1; return bytes;
+ } } });
+ vm.runInContext(code, context);
+ const sample = context.module.exports.createVisualSampler();
+ assert.equal(sample([17, 29]), 29); assert.equal(calls, 2);
+ assert.equal(sample([17, 29]), 29); assert.equal(calls, 3);
+ assert.throws(() => sample([])); assert.throws(() => sample(Array(257).fill(0)));
+});
 test('CAPTCHA outputs randomized decodable PNG without SVG/answer metadata', () => {
  const image=captchaImage('012345'),bytes=Buffer.from(image.split(',')[1],'base64');
  assert.ok(image.startsWith('data:image/png;base64,'));
