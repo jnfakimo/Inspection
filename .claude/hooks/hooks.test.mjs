@@ -148,6 +148,13 @@ ok('security definer 缺 search_path：擋下', () => {
   assert.match(r.out, /search_path/);
 });
 ok('security definer 有 search_path：通過', () => assert.equal(secCheck(SEC_SQL, "create or replace function public.sec_fn() returns int language sql security definer set search_path = public as $$ select 1 $$;\n").code, 0));
+ok('security invoker 缺 search_path：提醒但不擋', () => {
+  const r = secCheck(SEC_SQL, 'create or replace function public.sec_fn() returns int language sql as $$ select 1 $$;\n');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /additionalContext/);
+  assert.match(r.out, /function_search_path_mutable/);
+});
+ok('security invoker 有 search_path：不提醒', () => assert.equal(secCheck(SEC_SQL, "create or replace function public.sec_fn() returns int language sql set search_path = '' as $$ select 1 $$;\n").out.trim(), ''));
 
 ok('migration 建 view 沒設 security_invoker 也沒 revoke：擋下', () => {
   const r = secCheck(SEC_SQL, 'begin;\ncreate view public.sec_v as select 1 as a;\ncommit;\n');

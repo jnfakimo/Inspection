@@ -72,6 +72,9 @@ if (rel.endsWith('.sql')) {
   for (const m of sql.matchAll(/create\s+(?:or\s+replace\s+)?function[\s\S]*?(?=\bas\s+(?:\$[A-Za-z_]*\$|'))/gi)) {
     if (/security\s+definer/i.test(m[0]) && !/set\s+search_path/i.test(m[0])) {
       errors.push(`security definer 函式缺少 set search_path：${m[0].replace(/\s+/g, ' ').trim().slice(0, 70)}…`);
+    } else if (rel.startsWith('supabase/migrations/') && !/security\s+definer/i.test(m[0]) && !/set\s+search_path/i.test(m[0])) {
+      // security invoker 沒有提權風險所以只提醒；但 CREATE OR REPLACE 會清掉先前用 ALTER FUNCTION 固定的 search_path（2026-11-06 已固定 15 個）。
+      warnings.push(`函式未設定 set search_path（Supabase 資安建議 function_search_path_mutable；CREATE OR REPLACE 會清掉先前固定的設定）：${m[0].replace(/\s+/g, ' ').trim().slice(0, 70)}…`);
     }
   }
 }
