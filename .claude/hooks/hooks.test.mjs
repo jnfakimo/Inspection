@@ -11,11 +11,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..', '..');
 const sessionId = `hooks-test-${process.pid}`;
 
+// 本檔若被 `node --test`（推送前閘門）執行，環境會帶 NODE_TEST_CONTEXT；子程序再跑 `node --test` 時會繼承它，
+// 把失敗的測試回報成 exit 0，導致「改到會失敗的測試：exit 2」誤判。hook 實際執行時沒有這個變數，所以測試也要拿掉。
+const childEnv = { ...process.env, CLAUDE_PROJECT_DIR: root };
+delete childEnv.NODE_TEST_CONTEXT;
+
 const run = (script, payload, extraEnv = {}) => {
   const r = spawnSync(process.execPath, [path.join(here, script)], {
     input: JSON.stringify({ session_id: sessionId, ...payload }),
     encoding: 'utf8',
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root, ...extraEnv },
+    env: { ...childEnv, ...extraEnv },
     timeout: 120_000,
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
@@ -148,6 +153,13 @@ ok('security definer 缺 search_path：擋下', () => {
   assert.match(r.out, /search_path/);
 });
 ok('security definer 有 search_path：通過', () => assert.equal(secCheck(SEC_SQL, "create or replace function public.sec_fn() returns int language sql security definer set search_path = public as $$ select 1 $$;\n").code, 0));
+ok('security invoker 缺 search_path：提醒但不擋', () => {
+  const r = secCheck(SEC_SQL, 'create or replace function public.sec_fn() returns int language sql as $$ select 1 $$;\n');
+  assert.equal(r.code, 0);
+  assert.match(r.out, /additionalContext/);
+  assert.match(r.out, /function_search_path_mutable/);
+});
+ok('security invoker 有 search_path：不提醒', () => assert.equal(secCheck(SEC_SQL, "create or replace function public.sec_fn() returns int language sql set search_path = '' as $$ select 1 $$;\n").out.trim(), ''));
 
 ok('migration 建 view 沒設 security_invoker 也沒 revoke：擋下', () => {
   const r = secCheck(SEC_SQL, 'begin;\ncreate view public.sec_v as select 1 as a;\ncommit;\n');
