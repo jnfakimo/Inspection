@@ -445,3 +445,39 @@
 [本機文件驗收結果](docs/verification/2026-11-11-finding-evidence-review/verification.txt)
 
 ![八項 Finding Evidence Review 本機文件驗收](docs/verification/2026-11-11-finding-evidence-review/document-verification.jpg)
+
+## 2026-11-11 Git 鎖檔修復與 upstream 驗證補記（建議版本 V1.0.1，僅本機文件）
+
+- **文件版本與影響範圍**：本節為前述審查文件 V1.0.0 的維護補記，建議版本 V1.0.1；更新日期 2026-11-11（Asia/Taipei）。只記錄已完成的本機 Git 修復與驗證，不調整應用程式、SECURITY.md 或八項 Finding Evidence Review 判定；不代表新版本已發布或部署。
+- **時序與範圍**：下列修復／GitHub 讀取是在上一輪經使用者授權的作業中完成。本輪只補記藍圖及本機文件驗收產物，並唯讀核對本機狀態；不重新修復設定、不連 GitHub／正式環境，不提交、推送、合併或部署。
+
+### 已完成的鎖檔修復（上一輪操作紀錄）
+
+| 項目 | 已確認證據與處理 |
+|---|---|
+| `config.lock` | 0 bytes；建立及最後修改時間為 2026-11-06 06:04:03.111 UTC。 |
+| `packed-refs.lock` | 0 bytes；建立及最後修改時間為 2026-11-02 10:20:36.653 UTC。 |
+| 使用狀態 | 多次程序清單檢查未發現 Git／scalar／Git SSH 傳輸程序；兩檔均通過 `FileShare.None` 獨占讀寫開啟檢查，移動前再次確認為空檔。此為當時觀察，不推定之後永遠沒有 Git 程序。 |
+| 安全修復 | 先備份 `.git/config` 為 `config.before`，再將兩個鎖檔移入備份目錄並加上 `.stale`；沒有刪除鎖檔內容、終止程序或重寫 Git 歷史。 |
+| 備份位置 | `G:\我的雲端硬碟\AI\Codex\北農巡檢系統\.git\codex-lock-recovery-20261111-133256`；屬本機 Git 中繼資料，不是可攜式證據包，不將 config 備份內容複製進文件。 |
+
+### upstream 設定與原因（上一輪操作紀錄）
+
+- 文件分支：`codex/finding-evidence-review-20261111`；操作 worktree：`C:\projects\Inspection-finding-review-20261111`，與 G 槽共用 Git 設定。
+- 既有 `origin` 只追蹤指定分支，未包含本次文件分支；先從 GitHub 讀取該分支建立本機遠端追蹤參照，但初次 `--set-upstream-to` 仍因缺少 fetch 對應而失敗。
+- 保留全部原有 fetch 對應，僅新增 `remote.origin.fetch = refs/heads/codex/finding-evidence-review-20261111:refs/remotes/origin/codex/finding-evidence-review-20261111`，未改為抓取所有分支。
+- 隨後成功設定 `branch.codex/finding-evidence-review-20261111.remote = origin` 與 `branch.codex/finding-evidence-review-20261111.merge = refs/heads/codex/finding-evidence-review-20261111`。
+- 與 `config.before` 比對後確認只有上述三筆設定新增，既有設定未移除或改寫。文件提交仍為 `8a507eff8ee81ee961bc5c2c6ec002616fcda1ec`；本次補記尚未納入該提交。
+
+### 驗證結果與界線
+
+- **上一輪修復驗收：pass**。兩個原路徑的鎖檔已不存在，備份的兩個 `.stale` 空檔及 `config.before` 均保留；文件 worktree 為乾淨狀態。
+- **upstream 讀回：pass**。`HEAD` 與 `@{upstream}` 同為 `8a507eff8ee81ee961bc5c2c6ec002616fcda1ec`；`git rev-list --left-right --count 'HEAD...@{upstream}'` 回傳 `0 0`，即領先 0／落後 0。本輪本機讀回亦一致；這是與本機遠端追蹤參照的比較，並非重新查詢遠端目前狀態。
+- **既有工作保留：pass**。上一輪前後的 G 槽 156 個已修改／未追蹤檔案雜湊、Git status、未暫存與已暫存 diff、index、HEAD 均一致；文件 worktree 的 HEAD 與狀態亦一致。
+- **密碼與環境邊界**：既有帳號密碼維持不變；未重設密碼、撤銷登入或寄信。修復及本次補記均未合併、部署或連正式環境；上一輪只讀取 GitHub 該文件分支，沒有再提交或推送。
+- **本輪文件驗收**：驗收藍圖原有位元組前綴、其他既有檔案、Git index／config／HEAD 與本次新增文件範圍；結果記錄於下方本機驗收文件。沒有執行應用測試、build、資安掃描或正式環境驗證。
+- **截圖範圍**：本機記事本顯示實際文件驗收紀錄；僅佐證文件補記與本機核對，不是正式環境畫面。既有八項審查截圖及原始驗收紀錄保持不變。
+
+[Git 修復補記的本機文件驗收](docs/verification/2026-11-11-git-lock-repair/verification.txt)
+
+![Git 鎖檔修復與 upstream 本機文件驗收](docs/verification/2026-11-11-git-lock-repair/document-verification.jpg)

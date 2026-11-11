@@ -1,0 +1,24 @@
+Git 鎖檔修復與 upstream｜本機文件補記驗收
+建議版本 V1.0.1｜僅文件，未提交／未發布
+檢查時間：2026-11-11T13:36:15+08:00
+
+結果：PASS（本機唯讀核對及文件檢查）
+前次修復：兩個空鎖檔確認無使用，備份後移開。
+本次讀回：原鎖檔不存在；兩份 .stale 與 config.before 保留。
+upstream：origin/codex/finding-evidence-review-20261111
+HEAD 與 upstream：8a507eff8ee81ee961bc5c2c6ec002616fcda1ec
+領先 0／落後 0（本機追蹤參照；本次未查遠端）。
+
+藍圖原有內容逐位元組保留：PASS
+其他 155 個既有修改／未追蹤檔案雜湊未變：PASS
+Git index／config／HEAD 保持不變：PASS
+git diff --check -- PROJECT_PLAN.md：PASS
+只新增藍圖補記與本機文件驗收產物。
+
+既有帳號密碼維持不變。
+本次未提交、推送、合併、部署或連正式環境。
+本次未連 GitHub、未執行應用測試或 build。
+此畫面是本機文件驗收，不是正式環境驗證。
+
+補記後藍圖 SHA-256：
+c7d7cfaca811f308ee4c20d9f7286ed4adb16ec020bbef07f616bd1d73448e84
