@@ -1,0 +1,25 @@
+PR #150 CI／CodeQL｜本機文件補記驗收
+建議版本 V1.0.2｜本次補記未提交／未發布
+檢查時間：2026-11-11T13:47:05+08:00
+
+結果：PASS（文件檢查；不是重新執行 CI）
+歷史 CI／CodeQL／Commercial readiness：completed／success
+對應 head：ebef350fdaec481ac79a4ca95a97b2bd4e9f7855
+PR 檢查狀態：9 項成功；連結檢查不算通過。
+缺口：Input URL required，被 || true 忽略。
+既有工作流設定；本次未修復，驗收缺口保持開啟。
+
+原藍圖逐位元組保留：PASS
+其他 158 個既有修改／未追蹤檔案雜湊未變：PASS
+非藍圖 tracked diff 與 Git index／config／HEAD 未變：PASS
+git diff --check -- PROJECT_PLAN.md：PASS
+三個 run、9 項狀態及錯誤原因已核對：PASS
+
+本次只更新藍圖及本機文件驗收產物。
+未提交、推送、合併、部署或連正式環境。
+未重新連 GitHub、未重跑應用測試／build／掃描。
+既有帳號密碼維持不變。
+此畫面不是 GitHub Checks 或正式環境截圖。
+
+補記後藍圖 SHA-256：
+69d774ccb796517ae44f803a6a0cd17a3348f03aaa888b22377408dc36b03aa3

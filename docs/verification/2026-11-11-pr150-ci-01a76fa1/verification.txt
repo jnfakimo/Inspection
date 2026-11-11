@@ -1,0 +1,27 @@
+PR #150／01a76fa1｜本機文件續記驗收
+建議版本 V1.0.3｜本次補記未提交／未發布
+檢查時間：2026-11-11T13:57:08+08:00
+
+結果：PASS（文件檢查；非重新執行 CI）
+證據 head：01a76fa1c7beade6cbb53365d80c4c9f1fe074af
+CI：42968306099，success；六個 job 無失敗步驟。
+CodeQL：42968306146，success；結果上傳處理完成。
+Commercial readiness：42968306079，success。
+PR 共 9 個檢查狀態成功；不是全站無漏洞證明。
+
+連結檢查再次出現 Input URL required。
+既有 || true 忽略錯誤；缺口仍存在，未驗證／未修復。
+不能判定連結檢查通過。
+
+原藍圖逐位元組保留：PASS
+其他 161 個既有修改／未追蹤檔案雜湊未變：PASS
+非藍圖 tracked diff 與 Git index／config／HEAD 未變：PASS
+git diff --check -- PROJECT_PLAN.md：PASS
+
+本次只更新藍圖與文件驗收產物；既有密碼不變。
+未提交、推送、合併、部署或連正式環境。
+未重新連 GitHub、未重跑應用測試／build／掃描。
+此為本機文件驗收，非 GitHub Checks 或正式環境截圖。
+
+補記後藍圖 SHA-256：
+df02c4b464d9420e9d4dd81bc6c47c42567e580120237e000895f3142596fac5

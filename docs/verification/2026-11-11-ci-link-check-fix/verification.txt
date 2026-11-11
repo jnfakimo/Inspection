@@ -1,0 +1,61 @@
+CI 本機連結檢查修正驗收 — 建議版本 V1.0.6
+日期：2026-11-11（Asia/Taipei）
+狀態：pass（本機）；GitHub 尚未推送驗證
+
+修正：移除 broken-link-checker . || true。
+CI 執行失敗偵測測試；Commercial readiness 建置 _site 後嚴格稽核。
+測試：13 / 13 通過；遺失頁面、圖片、CSS 及無產物均 exit 1。
+既有本機封存產物：130 HTML，0 errors，exit 0。
+隔離副本注入壞頁面＋圖片：2 errors，exit 1；還原後 exit 0。
+範圍：HTML href/src 與 CSS url 的本機檔案存在性。
+限制：不驗外部 URL、fragment ID、JavaScript 動態連結；未重新 build。
+封存產物非本次 G 槽重新建置，不能證明目前 G 槽完整網站均通過。
+未提交、推送、合併、部署或連正式環境；既有帳號密碼維持不變。
+
+--- 測試原始輸出 ---
+✔ 路由目錄存在但缺少 index.html 仍阻擋發布 (78.8104ms)
+✔ 部署基底網址、中文資源及 CSS 查詢參數均解析至產物 (74.3568ms)
+✔ 遺漏 CSP 的實際產物仍阻擋發布 (78.731ms)
+✔ 缺檔與缺少外部完整性防護仍會失敗 (84.2184ms)
+✔ 不把 hydration 字串中的範例網址當 DOM 資源，仍檢查腳本語法 (156.1235ms)
+✔ HTML 解析保留腳本資源、忽略原始文字內容與特殊結束標記 (161.4911ms)
+✔ V2 頁面及 CSS 資源納入檢查 (82.3488ms)
+✔ 合法相對路由、部署基底、中文編碼與查詢參數通過；不連外 (77.9613ms)
+✔ 遺失頁面連結單獨造成非零退出狀態 (75.6315ms)
+✔ 遺失圖片單獨造成非零退出狀態 (74.5923ms)
+✔ 遺失 CSS 圖片單獨造成非零退出狀態 (73.5613ms)
+✔ 沒有建置產物單獨造成非零退出狀態 (63.1338ms)
+✔ CI 與完整產物工作流均保留稽核失敗狀態 (0.632ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1140.8783
+
+--- 隔離產物實測 ---
+[
+  {
+    "case": "existing archived artifact",
+    "exit": 0,
+    "output": "Commercial readiness audit: 130 HTML files\nErrors: 0 | Warnings: 0 | Info: 0\n"
+  },
+  {
+    "case": "injected missing page and image",
+    "exit": 1,
+    "output": "Commercial readiness audit: 130 HTML files\nErrors: 2 | Warnings: 0 | Info: 0\n[ERROR] _site/v2/index.html (missing-asset) 找不到本機資源：/__ci_missing_page__.html\n[ERROR] _site/v2/index.html (missing-asset) 找不到本機資源：/__ci_missing_image__.png\n"
+  },
+  {
+    "case": "restored artifact",
+    "exit": 0,
+    "output": "Commercial readiness audit: 130 HTML files\nErrors: 0 | Warnings: 0 | Info: 0\n"
+  }
+]
+--- 保存與差異核對 ---
+PASS: 其餘 169 個既有修改檔案 SHA-256 不變。
+PASS: 原藍圖位元組前綴、Git index 與 HEAD 不變。
+PASS: G 槽三份修正檔與已測隔離副本一致（換行正規化）。
+PASS: git diff --check。原文件分支工作樹仍乾淨。
+PASS: 藍圖證據連結與實際截圖 SHA-256 一致。

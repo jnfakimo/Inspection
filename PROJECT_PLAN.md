@@ -331,3 +331,308 @@
 [正式發布驗證原始結果](docs/verification/2026-11-11-security-policy/release-verification.json)
 
 ![政策 V1.0.0 正式 Pages 發布與部署後驗證成功](docs/verification/2026-11-11-security-policy/pages-release-54091d2.jpg)
+
+## 2026-11-11 八項最終 Finding Evidence Review（建議版本 V1.0.0，僅本機文件）
+
+- **需求與範圍**：依使用者已確認的逐項審查結論，彙整原始證據、G 槽修補後現況及剩餘證據缺口。此版本僅指本節審查文件，不變更應用程式／SECURITY.md 版本；尚未提交、推送或發布。
+- **本次作業**：只更新本藍圖與本機文件驗收證據；不連正式環境、不修改程式／migration、不執行應用測試或 PoC、不提交或部署。既有未提交工作與歷史段落保留。
+- **最終判定**：2 項 `accept`、6 項 `needs more validation`、0 項 `unsupported`。判定沿用本次對話的審查編號，不依 findings.json 陣列順序。
+- **判定語意**：`accept` 表示原始弱點主張有充分證據，不表示風險已補救完畢或接受所有殘留風險；`needs more validation` 表示仍缺會影響完整路徑判斷的事實，不表示沒有問題。
+- **與歷史發布紀錄的關係**：上方 2026-11-06「pass」是當時修補／發布驗收紀錄，不等於八項原始正式攻擊鏈均已驗證。本節是其證據解讀的最新補充，不刪改原始歷史。
+- **使用者決定**：既有帳號密碼維持不變；不批次重設、不撤銷登入、不寄送設密郵件。保留風險不等於抑制或關閉第 3 項。
+
+### 判定與證據分類
+
+| 項次 | 原始問題 | Severity | 最終 Verdict | Confidence 範圍 |
+|---|---|---|---|---|
+| 1 | V1 樓層儲存型 XSS | 條件式 Medium | needs more validation | 原始程式缺口 High；歷史完整可利用性未充分證實 |
+| 2 | 業管交接 RPC／RLS 未套用模組拒絕 | Medium | needs more validation | 原始缺口 High；完整歷史入口與帳號條件仍需驗證 |
+| 3 | 共用初始密碼、未強制首次更換 | Medium | accept | High，限原始弱點與歷史殘留風險 |
+| 4 | 附件登錄錯誤清理可能刪除已簽附件 | Medium | needs more validation | 程式機制 High；完整歷史路徑 Medium |
+| 5 | LINE 群組事件覆寫共用通知目的地 | Medium | needs more validation | 程式機制 High；完整歷史路徑 Medium |
+| 6 | 會議預約 RLS 忽略系統／模組拒絕 | Medium | needs more validation | 原始 RLS 缺口 High；完整 REST 讀寫路徑 Medium |
+| 7 | Google OAuth 僅以 User-Agent 綁定回呼 | Low | needs more validation | 原始缺口 High；整體歷史可利用性 Medium |
+| 8 | SVG 驗證碼固定 path 洩露答案 | Low | accept | High，限原始結構可直接還原答案 |
+
+- **Independently Verified**：先前唯讀審查已直接讀取比對的本機來源、Git 物件或既有原始回傳；標為「歷史紀錄」者不是本次重新查詢或測試。
+- **Report-Supplied**：掃描主張、部署摘要或沒有對應原始回傳的歷史敘述，不提升為已獨立驗證的正式事實。
+- **User-Confirmed**：使用者確認當時僅系統管理員可建立／修改樓層，以及既有密碼保留決定。
+- **Unknown**：未取得或不足以串接完整路徑的證據。缺少利用事件不等於漏洞不成立；事件調查與可利用性是不同問題。
+- Severity 表示條件成立時的風險評估；不能僅因證據不足而調降。Confidence 與 Coverage 另列，不把來源缺口 High 擴張成正式端到端 High。
+
+### 第 1 項：V1 樓層儲存型 XSS
+
+- **規則與判定**：`v1-floor-inline-stored-xss`；`needs more validation`。
+- **原始證據／影響**：舊模板將 `floor_spaces.floor` 放入 `onclick` 的 JavaScript 字串；HTML entity 會在事件執行前解碼，單純 HTML escaping 不足。凍結來源與 Git `3885742b` 相符；三份修補前簽署發布清單與頁面雜湊補強產物包含缺陷的證據。離線 PoC 是自行組裝事件與 VM 模型，不是真實瀏覽器重現。
+- **前提與反證**：依使用者確認，當時只有系統管理員可建立／修改樓層；不採一般使用者可寫入的假設。仍須另一位使用者能讀取資料、開啟 V1 並點擊，且有效 CSP 允許行內事件；不能推定取得 session 或額外管理權。
+- **G 槽現況**：三處模板改用 `data-floor`／`data-floor-action`，透過事件監聽器傳值，移除本項注入位置。[目前頁面](system/arealist.html)
+- **剩餘缺口／最小補證**：修補前該頁完整 HTTP 回應（含有效 CSP）、URL 可達性及跨使用者讀取同筆資料的歷史紀錄。IIS 範本及簽署清單不能代替實際回應標頭。
+
+### 第 2 項：業管交接 RPC／RLS 未套用模組拒絕
+
+- **規則與判定**：`business-module-deny-bypass`；`needs more validation`。
+- **原始證據／影響**：修補前 `business_market_allowed()` 只檢查市場資格；歷史資料庫回傳支持缺少模組檢查，且 authenticated 可執行該 helper。符合資格的拒權使用者可能直接讀取／操作同市場允許編輯的交接資料。
+- **前提與反證**：需要有效身分、目標市場資格與有效模組拒絕；不是匿名或任意跨市場。歷史 deny 統計不能當成可利用帳號數；後續拒權案例未保留市場資格條件，拒絕可能同時源於市場不足。SQL 介面切角色不等於真 JWT 經 PostgREST。
+- **G 槽現況**：helper 新增 `active_user_id()` 與 `has_handover_module_access('business')`，再檢查市場；本機 migration 與發布提交一致，歷史讀回支持當時已套用。[修補 SQL](supabase/migrations/20261106050736_codex_security_boundary_fixes.sql)
+- **剩餘缺口／最小補證**：同時期完整業管 RPC／資料表 grants、PostgREST exposed schemas／前置授權設定，以及同一帳號的啟用、有效工作階段、市場與 deny 交叉紀錄。空 schema 檔及合成隔離庫不能補足。
+
+### 第 3 項：共用初始密碼、未強制首次更換
+
+- **規則與判定**：`shared-initial-account-password`；`accept`。
+- **原始證據／影響**：原始核准流程使用固定共用密碼，立即建立 email confirmed／active 帳號，寄設密郵件不是登入前置條件。歷史清查有 39 筆啟用 profile 關聯到匹配舊共用密碼的 Auth 紀錄；原始登入路徑支持可能冒用該帳號原有權限。
+- **前提與反證**：仍需管理員核准、目標尚未換密碼、攻擊者知道帳號與共用密碼並通過其他登入條件。不能直接取得管理權；39 筆不代表全部可登入、由同一流程建立、曾受入侵或現在仍受影響。
+- **G 槽現況**：新核准帳號改用每次獨立的 32 bytes 隨機啟動密碼，不回傳或記錄該密碼；仍保留 email confirmed／active，沒有新增「完成首次設密才啟用」的全面狀態門檻。[核准流程](supabase/functions/admin-api/index.ts)
+- **既有帳號決定**：既有帳號密碼維持不變；不重設、不撤銷登入、不寄設密郵件。程式修補不會替既有帳號換密碼，殘留風險保留，不能記為所有帳號補救完成。
+- **剩餘缺口／最小補證**：目前殘留數量、歷史帳號來源與額外登入限制，以及郵件送達／完成設密／失敗分支的既有證據；實際冒用需另有事件紀錄。本次不新增清查或登入操作。
+
+### 第 4 項：附件登錄錯誤清理可能刪除已簽附件
+
+- **規則與判定**：`guard-attachment-error-cleanup`；`needs more validation`。
+- **原始證據／影響**：舊 API 依提交班別檢查鎖定，但附件路徑未綁班別；重送既有路徑、改填同日可提交班別，重複索引新增失敗後仍以服務權限呼叫 Storage 刪除，可能使已簽索引留下失效附件。歷史 Git 版本亦含相同兩處刪除分支。
+- **前提與反證**：需駐警交接與市場權限、符合條件的附件及可提交班別；直接提交已簽班別或當日主管已簽核會拒絕。不是匿名或任意跨市場刪檔；索引表禁止實體刪除的 trigger 不等於 Storage API 禁止刪除。
+- **G 槽現況**：相關錯誤分支兩處 Storage 刪除呼叫已移除，登錄失敗直接回傳錯誤；相關區塊與修補提交及 app-api version 127 封存相符。[附件處理](supabase/functions/app-api/index.ts)
+- **剩餘缺口／最小補證**：同時期正式 API／schema／Storage 設定、索引與 trigger 有效狀態、班別與附件關聯紀錄，以及 Storage 對該操作的既有結果。模擬 Storage 回歸不是實際刪除整合證明。
+
+### 第 5 項：LINE 群組事件覆寫共用通知目的地
+
+- **規則與判定**：`line-group-destination-authorization`；`needs more validation`。
+- **原始證據／影響**：舊 Webhook 在合法簽章群組事件後自動呼叫 `saveGroupId()`；HMAC 證明 LINE 來源，不代表群組獲准收訊。歷史查詢支持群組設定曾存在，部署／Verify 摘要提供線索，但不等於原始設定匯出。
+- **前提與反證**：bot 必須能加入未核准且攻擊者可控制的群組，事件須進入受影響部署。不能任意偽造簽章；影響限使用共用 `line_group_id` 的群組通知，不包含所有個人通知或其他管道。
+- **G 槽現況**：一般群組事件不再呼叫 `saveGroupId()`，舊直接覆寫分支亦移除；保留介面本身不代表原路徑仍可達。兩個相關檔案與 line-notify version 34 封存相符。[共用 handler](supabase/functions/_shared/vehicle-line-webhook.ts)／[入口](supabase/functions/line-notify/index.ts)
+- **剩餘缺口／最小補證**：當時邀群與 Webhook 設定、修補前部署來源；事件→目的地異動→推播回應的去識別化紀錄用於判斷實際影響。設定值存在及「測試成功」摘要均不能證明群組實際收訊或曾外洩。
+
+### 第 6 項：會議預約 RLS 忽略系統／模組拒絕
+
+- **規則與判定**：`meeting-module-deny-bypass`；`needs more validation`。
+- **原始證據／影響**：修補前資料庫政策回傳確認 SELECT 僅要求有效身分，INSERT／UPDATE 檢查本人或管理員；active helper 未代查模組授權。可能讓會議拒權帳號直接讀取預約及操作本人預約。
+- **前提與反證**：仍需有效帳號與工作階段；一般使用者不能依此修改他人預約，不能推定 DELETE 權限。時間與 Calendar 欄位 trigger 仍在；count(*) 成功不能單獨證明所有欄位或寫入權限。
+- **G 槽現況**：新增 `AS RESTRICTIVE FOR ALL TO authenticated` 政策，要求有效身分及 `has_module_access('meetingroom','bookings')`，與原有政策取 AND。[修補 SQL](supabase/migrations/20261106050736_codex_security_boundary_fixes.sql)
+- **剩餘缺口／最小補證**：修補前表／欄位 ACL、PostgREST 暴露與前置授權，以及有效但被拒會議權限帳號的直接入口證據。歷史 deniedUser 是業管案例；無身分 0 筆、管理員 8 筆及隔離資料歸屬測試均不能替代會議拒權案例。PGlite 先套修補再斷言，不是舊漏洞重現。
+
+### 第 7 項：Google OAuth 僅以 User-Agent 綁定回呼
+
+- **規則與判定**：`oauth-account-link-csrf`；`needs more validation`。
+- **原始證據／影響**：攻擊者以有效帳號發起授權、分享網址，受害者同意後，舊 callback 僅核對有效 state 與 UA，依發起者 user_id 寫入 Google 連結；可能揭露連結 email 並將攻擊者預約同步至受害者行事曆。歷史來源副本與掃描版本相符。
+- **前提與反證**：需 OAuth 設定有效、受害者屬允許對象、十分鐘內同意且 UA 相符。state／PKCE 有效，不能稱為任意偽造或無互動接管。原始 google_subject 唯一索引若有效，會阻擋其他紀錄已占用的 Google 身分，且不限 active 狀態；未證明 raw token 外洩或任意讀取全部行事曆。
+- **G 槽現況**：公開 callback 不直接交換 token／寫入連結；登入中的 oauth_finish 同時核對 user_id、state、瀏覽器 verifier 與期限，原子消耗交易後才交換。前端清除回傳片段，重用 refresh token 另須相同 Google subject。[API](supabase/functions/google-calendar/index.ts)／[callback](supabase/functions/google-calendar-callback/index.ts)／[瀏覽器 helper](web/lib/google-calendar-browser.ts)
+- **剩餘缺口／最小補證**：修補前部署讀回、當時 Google audience／Testing／Production／測試對象與組織限制、歷史唯一索引有效狀態及同步結果。早期測試使用者摘要未獨立核實，原始紀錄不在本機；不能推定只開放一人或已全面開放。worker 個別失敗仍可能回傳 HTTP 200，Actions 成功不足以證明 synced > 0。
+
+### 第 8 項：SVG 驗證碼固定 path 洩露答案
+
+- **規則與判定**：`deterministic-svg-captcha`；`accept`。
+- **原始證據／影響**：數字固定 path 不受旋轉／位移／雜訊改變，來源與 Git 基準一致。既有腳本抽取原始產生器後解碼，歷史執行與結果記載 100/100 成功、10 種數字簽章；本次未重跑。降低自動化登入嘗試及帳號申請成本。
+- **前提與反證**：需取得有效 challenge，於 300 秒內、符合 IP 與單次消耗條件提交。HMAC、帳密、啟用狀態及限流仍存在；不能稱為無限制暴力登入或直接核准帳號。來源 IP 控制依賴可信代理標頭，不能從程式存在就推定正式限流完整有效。
+- **G 槽現況**：改為像素 PNG，只建立 IHDR／IDAT／IEND，移除固定 SVG path 輸出；入口與發布封存相符，圖片 helper 僅有檔尾空白差異。既有 PNG 格式測試與歷史 smoke 支持輸出有效，並非本次正式查詢。[圖片產生器](supabase/functions/_shared/captcha-image.ts)／[測試原碼](tools/security-boundary-fixes.test.mjs)
+- **剩餘缺口／最小補證**：修補前正式部署精確版本、真實 API 的錯誤答案／逾時／重放／IP 不符／限流完整證據，以及 PNG 的 OCR／像素辨識抵抗力。格式測試不等於完整防機器人驗收；缺口不推翻原始 SVG 結構洩露。
+
+### 證據索引與整體 Coverage
+
+- 原始 scan ID：`5d6ba110-f505-4f3f-9d58-2196d706f98c`；掃描 HEAD：`3885742bde404b393cea4be229b0f6dd12b69544`。掃描時工作樹有未提交修改，只有已個別比對的檔案可聲稱與 HEAD 一致。
+- [本機原始報告](C:/Users/jnfa/.codex/state/plugins/codex-security/scans/北農巡檢系統/3885742bde404b393cea4be229b0f6dd12b69544_20261106T042138Z_lx3sje1v/report.md)、同目錄 findings.json 與 artifacts：原始主張及離線 PoC／結果；未將原始 session 或秘密複製進專案。
+- [本機修補發布紀錄](C:/Users/jnfa/.codex/state/plugins/codex-security/scans/-/artifacts-db16f47985bb3962655c8ba79f4f18e8cd48034d9de80e5d013a372fcf3a1010/artifacts/deployment-report.md)及 verification 下的 deployed-edge-sources-final.json、production-database-20261106.json、production-smoke.json、release-focused.log：歷史來源／測試／查詢封存，不代表本次重新驗證。
+- 修補提交 `d56b396a62eed8825e7ba208cce7d61503744a25`、部署工作流提交 `0465a35dc744651541d1c240bbca5f0e79056bc1` 是歷史對照，不是本次新發布；本機來源差異以逐項審查為準。
+- 本機歷史對話／原始工具回傳定位：`C:\Users\jnfa\.codex\sessions\2026\11\06\rollout-2026-11-06T12-11-36-01a1af0e-0d7e-7653-9c4f-409ea88aa039.jsonl`。此路徑僅供本機追查，不是可攜式證據包；不得將整份 session 提交。
+- 已涵蓋八項所列入口、直接關聯資料流、歷史來源、修補差異及既有測試／部署紀錄；沒有重新做全 repo 掃描、正式攻擊重現、Google／LINE／郵件端到端驗證、帳號清查或事件調查。
+- 部分歷史 Git 物件及舊對話不在本機，未從遠端補抓。空 schema、隔離合成資料、mock／PGlite、離線模型、HTTP smoke 與部署成功不能互相替代。
+- 六項待補證不要求先證明曾遭利用，但不能省略會改變可達性、授權或實際影響範圍的控制。原始缺陷與修補後現況分開記錄；不宣稱全站安全或八項風險全部關閉。
+
+### 本次文件驗收與截圖
+
+- 驗收對象：本節八項結論、原文保留、文件連結與作業範圍。原始證據審查為唯讀；本次唯一新增寫入範圍是專案藍圖與本節文件驗收產物。
+- 本機驗收結果見下方紀錄；核對八項編號／規則／判定、2 accept／6 needs more validation、既有密碼決策、原始文件前綴不變與非藍圖既有 tracked diff 不變。未執行應用測試、build、掃描、commit、push 或部署。
+- 截圖日期：2026-11-11（Asia/Taipei）；來源為本機記事本開啟實際文件驗收結果。截圖只佐證本機文件更新，不是正式環境、應用執行或新一輪資安測試證據。精確檢查／擷取時間記錄於驗收資料。
+
+[本機文件驗收結果](docs/verification/2026-11-11-finding-evidence-review/verification.txt)
+
+![八項 Finding Evidence Review 本機文件驗收](docs/verification/2026-11-11-finding-evidence-review/document-verification.jpg)
+
+## 2026-11-11 Git 鎖檔修復與 upstream 驗證補記（建議版本 V1.0.1，僅本機文件）
+
+- **文件版本與影響範圍**：本節為前述審查文件 V1.0.0 的維護補記，建議版本 V1.0.1；更新日期 2026-11-11（Asia/Taipei）。只記錄已完成的本機 Git 修復與驗證，不調整應用程式、SECURITY.md 或八項 Finding Evidence Review 判定；不代表新版本已發布或部署。
+- **時序與範圍**：下列修復／GitHub 讀取是在上一輪經使用者授權的作業中完成。本輪只補記藍圖及本機文件驗收產物，並唯讀核對本機狀態；不重新修復設定、不連 GitHub／正式環境，不提交、推送、合併或部署。
+
+### 已完成的鎖檔修復（上一輪操作紀錄）
+
+| 項目 | 已確認證據與處理 |
+|---|---|
+| `config.lock` | 0 bytes；建立及最後修改時間為 2026-11-06 06:04:03.111 UTC。 |
+| `packed-refs.lock` | 0 bytes；建立及最後修改時間為 2026-11-02 10:20:36.653 UTC。 |
+| 使用狀態 | 多次程序清單檢查未發現 Git／scalar／Git SSH 傳輸程序；兩檔均通過 `FileShare.None` 獨占讀寫開啟檢查，移動前再次確認為空檔。此為當時觀察，不推定之後永遠沒有 Git 程序。 |
+| 安全修復 | 先備份 `.git/config` 為 `config.before`，再將兩個鎖檔移入備份目錄並加上 `.stale`；沒有刪除鎖檔內容、終止程序或重寫 Git 歷史。 |
+| 備份位置 | `G:\我的雲端硬碟\AI\Codex\北農巡檢系統\.git\codex-lock-recovery-20261111-133256`；屬本機 Git 中繼資料，不是可攜式證據包，不將 config 備份內容複製進文件。 |
+
+### upstream 設定與原因（上一輪操作紀錄）
+
+- 文件分支：`codex/finding-evidence-review-20261111`；操作 worktree：`C:\projects\Inspection-finding-review-20261111`，與 G 槽共用 Git 設定。
+- 既有 `origin` 只追蹤指定分支，未包含本次文件分支；先從 GitHub 讀取該分支建立本機遠端追蹤參照，但初次 `--set-upstream-to` 仍因缺少 fetch 對應而失敗。
+- 保留全部原有 fetch 對應，僅新增 `remote.origin.fetch = refs/heads/codex/finding-evidence-review-20261111:refs/remotes/origin/codex/finding-evidence-review-20261111`，未改為抓取所有分支。
+- 隨後成功設定 `branch.codex/finding-evidence-review-20261111.remote = origin` 與 `branch.codex/finding-evidence-review-20261111.merge = refs/heads/codex/finding-evidence-review-20261111`。
+- 與 `config.before` 比對後確認只有上述三筆設定新增，既有設定未移除或改寫。文件提交仍為 `8a507eff8ee81ee961bc5c2c6ec002616fcda1ec`；本次補記尚未納入該提交。
+
+### 驗證結果與界線
+
+- **上一輪修復驗收：pass**。兩個原路徑的鎖檔已不存在，備份的兩個 `.stale` 空檔及 `config.before` 均保留；文件 worktree 為乾淨狀態。
+- **upstream 讀回：pass**。`HEAD` 與 `@{upstream}` 同為 `8a507eff8ee81ee961bc5c2c6ec002616fcda1ec`；`git rev-list --left-right --count 'HEAD...@{upstream}'` 回傳 `0 0`，即領先 0／落後 0。本輪本機讀回亦一致；這是與本機遠端追蹤參照的比較，並非重新查詢遠端目前狀態。
+- **既有工作保留：pass**。上一輪前後的 G 槽 156 個已修改／未追蹤檔案雜湊、Git status、未暫存與已暫存 diff、index、HEAD 均一致；文件 worktree 的 HEAD 與狀態亦一致。
+- **密碼與環境邊界**：既有帳號密碼維持不變；未重設密碼、撤銷登入或寄信。修復及本次補記均未合併、部署或連正式環境；上一輪只讀取 GitHub 該文件分支，沒有再提交或推送。
+- **本輪文件驗收**：驗收藍圖原有位元組前綴、其他既有檔案、Git index／config／HEAD 與本次新增文件範圍；結果記錄於下方本機驗收文件。沒有執行應用測試、build、資安掃描或正式環境驗證。
+- **截圖範圍**：本機記事本顯示實際文件驗收紀錄；僅佐證文件補記與本機核對，不是正式環境畫面。既有八項審查截圖及原始驗收紀錄保持不變。
+
+[Git 修復補記的本機文件驗收](docs/verification/2026-11-11-git-lock-repair/verification.txt)
+
+![Git 鎖檔修復與 upstream 本機文件驗收](docs/verification/2026-11-11-git-lock-repair/document-verification.jpg)
+
+## 2026-11-11 PR #150 CI／CodeQL 完成結果與驗收缺口（建議版本 V1.0.2，僅本機文件）
+
+- **版本、日期與範圍**：2026-11-11（Asia/Taipei），前述審查文件補記由建議版本 V1.0.1 增補為 V1.0.2；只新增本節與文件驗收產物，不改應用程式／SECURITY.md 版本、程式或工作流。尚未提交、推送或發布本次補記，PR 不會自動包含這段本機新增內容。
+- **證據時點**：以下為上一輪已完成的 GitHub 唯讀追蹤與日誌查核結果，不是本輪重新查詢或重跑。對象為 [草稿 PR #150](https://github.com/jnfakimo/Inspection/pull/150)，head `ebef350fdaec481ac79a4ca95a97b2bd4e9f7855`，分支 `codex/finding-evidence-review-20261111`。
+
+### 完成結果：工作流狀態 pass；連結檢查仍有驗收缺口
+
+| 工作流 | Run ID | 最終狀態 | 查核結果 |
+|---|---|---|---|
+| [CI](https://github.com/jnfakimo/Inspection/actions/runs/42967332227) | 42967332227 | completed／success | 六個 job 均成功；另有下述被忽略的連結檢查錯誤，不能以綠燈代替該項驗收。 |
+| [CodeQL Analysis](https://github.com/jnfakimo/Inspection/actions/runs/42967332177) | 42967332177 | completed／success | 分析完成，日誌確認結果成功上傳，2026-11-11 05:42:02 UTC 回報分析上傳處理完成。 |
+| [Commercial readiness checks](https://github.com/jnfakimo/Inspection/actions/runs/42967332415) | 42967332415 | completed／success | static-audit 成功；此為 CI 產物／靜態檢查，不是部署或正式環境驗證。 |
+
+- PR 最終顯示 **9 個檢查全部 COMPLETED／SUCCESS**：`static-security`、`gmail-repair-linux`、`iis-powershell-compatibility`、`signal-service-security`、`mobile-vehicle-tracker`、`Application tests and API build`、`static-audit`、`CodeQL Analysis (javascript)`、`CodeQL`。
+- 9 個檢查不等於 9 個獨立工作流；其中 `CodeQL` 是結果處理檢查，查核時 annotations_count 為 0。這不等於全站無漏洞或所有既有警示已清除。
+- 當時 PR 仍為 OPEN／draft，mergedAt 為 null、autoMergeRequest 為 null；未合併或啟用自動合併。追蹤作業前後 G 槽 159 個已修改／未追蹤檔案的雜湊、Git status、diff、index、config 與 HEAD 均未變。
+
+### 已查明的驗收缺口：broken-link-checker 錯誤被忽略
+
+- **實際錯誤**：CI job `Application tests and API build` 的 `Check broken links and images` 步驟，於 2026-11-11 05:44:08.5634132 UTC 回報 `Error: Input URL required. Use --help for more options`。[對應 job 與日誌](https://github.com/jnfakimo/Inspection/actions/runs/42967332227/job/130347478386)
+- **原因與遮蔽機制**：既有 [ci.yml 第 225 行](https://github.com/jnfakimo/Inspection/blob/ebef350fdaec481ac79a4ca95a97b2bd4e9f7855/.github/workflows/ci.yml#L225) 執行 `npx -y broken-link-checker . || true`。傳入的是本機目錄 `.`，工具未取得必要的輸入 URL；結尾 `|| true` 使錯誤不造成工作流失敗。
+- **歸屬確認**：已比較 PR 基底 `bf3308ee5e0af18795c3347206904aca3e5c4c43` 與 head 的 `.github/workflows/ci.yml` Git 內容，兩者相同。此為原有工作流缺口，不是 PR #150 文件修改引入的回歸。
+- **驗收判定**：工作流整體狀態可記為 success；「連結檢查通過」「沒有失效連結／圖片」則**未驗證，不能判定通過**。此錯誤也不能證明實際存在壞連結。
+- **後續待辦（本次不實作）**：另行確認檢查範圍，採適合本機建置產物的連結檢查器，或將產物以隔離的本機 HTTP 服務提供給工具，供應有效 URL 並限制掃描邊界；改為保留真實退出狀態，驗證故意放入的壞連結會使檢查失敗。不得為補驗收而自行連正式網站。
+- 本次沒有改寫工作流、重新執行 CI 或修補連結檢查；該缺口保持開啟，未假設已修復。
+
+### 文件驗收與操作邊界
+
+- 本節保留八項 Finding Evidence Review 的 **2 accept／6 needs more validation** 與原有證據缺口；CI 綠燈不會自動改變原始弱點判定或證明八項攻擊鏈已完整驗證。
+- 既有帳號密碼維持不變；不重設密碼、不撤銷登入、不寄信。本輪只更新藍圖與本機文件驗收產物，不提交、不推送、不合併、不部署、不連正式環境，也不重新連 GitHub。
+- 文件驗收核對原藍圖位元組前綴、其他既有檔案與 tracked diff、Git index／config／HEAD、結果數量及錯誤描述；未在本機重跑應用測試、build 或資安掃描。
+- 下方截圖為本機記事本顯示文件驗收結果，只佐證此次補記；不是 GitHub Checks 或正式環境截圖。CI 的原始來源為上方既有 run／job 連結，時間與狀態均依上一輪查核紀錄。
+
+[PR #150 CI 補記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-results/verification.txt)
+
+![PR #150 CI 結果與驗收缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-results/document-verification.jpg)
+
+## 2026-11-11 PR #150 提交 01a76fa1 的 CI 結果續記（建議版本 V1.0.3，僅本機文件）
+
+- **文件版本與影響範圍**：2026-11-11（Asia/Taipei）；在建議版本 V1.0.2 後新增 V1.0.3 維護紀錄，保留前文與原驗收產物。本節僅補記最新一輪結果，不變更應用程式、SECURITY.md、工作流或八項審查判定；本次補記尚未提交、推送或發布，也尚未納入 PR。
+- **證據對象與時點**：以下引用上一輪已完成的 GitHub 唯讀查核，對應 [草稿 PR #150](https://github.com/jnfakimo/Inspection/pull/150) 的完整 head `01a76fa1c7beade6cbb53365d80c4c9f1fe074af`。不是沿用 `ebef350f` 的綠燈，也不是本次重新查詢、重跑或正式環境驗證。
+
+### 最新一輪完成結果
+
+| 工作流 | Run ID | 最終狀態 | 查核證據 |
+|---|---|---|---|
+| [CI](https://github.com/jnfakimo/Inspection/actions/runs/42968306099) | 42968306099 | completed／success | 六個 job 均成功，failed_steps 均為空；Application tests and API build 於 2026-11-11 05:52:50 UTC 完成。仍有下述被忽略的連結檢查錯誤。 |
+| [CodeQL Analysis](https://github.com/jnfakimo/Inspection/actions/runs/42968306146) | 42968306146 | completed／success | 日誌於 05:51:14.6876726 UTC 確認結果成功上傳，05:51:19.9939103 UTC 確認上傳處理完成；job 於 05:51:23 UTC 完成（日期皆為 2026-11-11）。 |
+| [Commercial readiness checks](https://github.com/jnfakimo/Inspection/actions/runs/42968306079) | 42968306079 | completed／success | static-audit 於 2026-11-11 05:50:55 UTC 完成。 |
+
+- PR 共 **9 個檢查均為 COMPLETED／SUCCESS**：`static-security`、`gmail-repair-linux`、`iis-powershell-compatibility`、`signal-service-security`、`mobile-vehicle-tracker`、`Application tests and API build`、`static-audit`、`CodeQL Analysis (javascript)`、`CodeQL`。
+- [CodeQL 結果處理檢查](https://github.com/jnfakimo/Inspection/runs/130351009829) 為 completed／success，annotations_count 為 0。這是流程與結果處理證據，不代表全站無漏洞、所有既有警示清零或八項攻擊鏈已完整驗證。
+
+### 連結檢查缺口再次出現，維持未驗證
+
+- [本輪 CI job 日誌](https://github.com/jnfakimo/Inspection/actions/runs/42968306099/job/130350601660) 的 `Check broken links and images` 步驟，於 2026-11-11 05:52:45.0891760 UTC 再次出現 `Error: Input URL required. Use --help for more options`。
+- 原因仍是 [ci.yml 第 225 行](https://github.com/jnfakimo/Inspection/blob/01a76fa1c7beade6cbb53365d80c4c9f1fe074af/.github/workflows/ci.yml#L225) 的 `npx -y broken-link-checker . || true`：傳入目錄 `.` 未提供工具必要的 URL，且 `|| true` 忽略錯誤。因此該步驟沒有令 job 失敗，不能由整體綠燈推論連結檢查通過。
+- 已在上一輪比較基底 `bf3308ee5e0af18795c3347206904aca3e5c4c43` 與此次 head 的 `.github/workflows/ci.yml`，沒有差異；此為既有設定，不是 `01a76fa1` 文件提交引入的回歸。
+- **結論**：CI／CodeQL 工作流狀態為 pass；連結／圖片完整性仍是**未驗證，不能判定通過**。既有缺口仍存在且未修復，亦不能據此斷言實際有失效連結。前節列出的隔離本機檢查、真實退出狀態及壞連結測試等後續待辦維持開啟，本次不實作。
+
+### 保留狀態與本次文件驗收
+
+- 上一輪查核時 PR 仍為 OPEN／draft，mergedAt 與 autoMergeRequest 均為 null；分支維持 `codex/finding-evidence-review-20261111`，未合併、未部署、未連正式環境。
+- 上一輪核對 G 槽 162 個已修改／未追蹤檔案、Git status、diff、index、config 與 HEAD，與上次推送時保存的基準一致；本次另建立文件修改前基準，核對原藍圖前綴及其他既有修改仍保留。
+- 八項 Finding Evidence Review 維持 **2 accept／6 needs more validation**；既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- 本次只更新本節與本機文件驗收產物，不提交、不推送、不合併、不部署、不連正式環境、不重新連 GitHub，也不執行應用測試、build、掃描或工作流修補。
+- 下方截圖為本機記事本顯示文件驗收紀錄，不是 GitHub Checks 或正式環境截圖。驗收包括版本與提交對應、run／job 識別、缺口未關閉、原文保留、檔案範圍、Git 狀態與截圖雜湊；各來源連結依上一輪既有結果保留，本次不連線重驗。
+
+[01a76fa1 結果續記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-01a76fa1/verification.txt)
+
+![01a76fa1 CI 完成與連結檢查缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-01a76fa1/document-verification.jpg)
+
+## 2026-11-11 PR #150 提交 70769370 的 CI 結果續記（建議版本 V1.0.4，僅本機文件）
+
+- **版本與範圍**：更新日期 2026-11-11（Asia/Taipei）；在建議版本 V1.0.3 後補記 V1.0.4。只新增本節及文件驗收產物，保留歷史段落與截圖，不修改應用程式、SECURITY.md、工作流或八項審查判定。本次補記尚未提交、推送或發布，也尚未納入 PR。
+- **證據對象與時點**：以下依上一輪已完成的 GitHub 唯讀查核，對應 [草稿 PR #150](https://github.com/jnfakimo/Inspection/pull/150) 的 head `70769370abf52a7ffe3cc0b6d5ffe45255c42857`；不是沿用 `01a76fa1` 的結果，也不是本次重新查詢或重跑。
+
+### 70769370 完成結果
+
+| 工作流 | Run ID | 最終狀態 | 查核結果 |
+|---|---|---|---|
+| [CI](https://github.com/jnfakimo/Inspection/actions/runs/42969352666) | 42969352666 | completed／success | 無失敗 job；Application tests and API build 於 2026-11-11 06:03:35 UTC 完成。仍有下述被忽略的連結檢查錯誤。 |
+| [CodeQL Analysis](https://github.com/jnfakimo/Inspection/actions/runs/42969352639) | 42969352639 | completed／success | 2026-11-11 06:00:49.4652244 UTC 成功上傳結果，06:00:54.8579891 UTC 確認上傳處理完成；job 於 06:00:58 UTC 完成。 |
+| [Commercial readiness checks](https://github.com/jnfakimo/Inspection/actions/runs/42969352656) | 42969352656 | completed／success | static-audit 於 2026-11-11 06:01:00 UTC 完成。 |
+
+- PR 共 **9 個檢查全部 COMPLETED／SUCCESS**：`static-security`、`gmail-repair-linux`、`iis-powershell-compatibility`、`signal-service-security`、`mobile-vehicle-tracker`、`Application tests and API build`、`static-audit`、`CodeQL Analysis (javascript)`、`CodeQL`。
+- [CodeQL 結果處理檢查](https://github.com/jnfakimo/Inspection/runs/130354270378) 為 completed／success，annotations_count 為 0；此為流程完成證據，不等於全站無漏洞、所有警示清零或完整正式環境驗收。
+
+### 連結檢查缺口仍存在，不能判定通過
+
+- [本輪 CI job 日誌](https://github.com/jnfakimo/Inspection/actions/runs/42969352666/job/130353962038) 的 `Check broken links and images`，於 2026-11-11 06:03:29.5909498 UTC 再次回報 `Error: Input URL required. Use --help for more options`。
+- 原因仍是 [ci.yml 第 225 行](https://github.com/jnfakimo/Inspection/blob/70769370abf52a7ffe3cc0b6d5ffe45255c42857/.github/workflows/ci.yml#L225) 的 `npx -y broken-link-checker . || true`：傳入目錄 `.` 而未提供工具必要的 URL，`|| true` 又忽略失敗退出狀態，所以未使整體工作流失敗。
+- 上一輪已比對 PR 基底 `bf3308ee5e0af18795c3347206904aca3e5c4c43` 與此 head 的 `.github/workflows/ci.yml`，沒有差異；缺口屬既有設定，並非本次文件提交新增的回歸。
+- **結論**：CI／CodeQL 工作流狀態為 pass；連結／圖片完整性仍是**未驗證，不能判定通過**。缺口持續存在、未修復；綠燈不能證明沒有失效連結，這個錯誤也不能證明實際有壞連結。前節隔離本機檢查、真實退出狀態與壞連結案例驗證等待辦保持開啟，本次不實作。
+
+### 保留狀態、界線與文件驗收
+
+- 上一輪結束時 PR 仍為 OPEN／draft，mergedAt 與 autoMergeRequest 均為 null，未合併或啟用自動合併。G 槽 165 個既有修改／未追蹤檔案及 Git status、diff、index、config、HEAD 的前後比對均未變；這是當時已核實結果，不是本輪重新查詢 PR 狀態。
+- 八項 Finding Evidence Review 維持 **2 accept／6 needs more validation**；既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- 本次只新增本節與本機文件驗收產物，不提交、不推送、不合併、不部署、不連正式環境、不重新連 GitHub，不修改工作流，也不重跑應用測試、build 或資安掃描。
+- 本機文件驗收核對原藍圖位元組前綴、其他既有檔案及 tracked diff、Git index／config／HEAD、提交與 run／job 對應、缺口未關閉、文件連結與截圖雜湊。截圖僅是本機記事本顯示實際文件驗收紀錄，**不是 GitHub Checks 或正式環境截圖**；外部來源連結沿用上一輪證據，本次未連線重驗。
+
+[70769370 結果續記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-70769370/verification.txt)
+
+![70769370 CI 完成與連結檢查缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-70769370/document-verification.jpg)
+
+## 2026-11-11 PR #150 提交 6ed7edc9 的 CI 結果續記（建議版本 V1.0.5，僅本機文件）
+
+- **版本與範圍**：更新日期 2026-11-11（Asia/Taipei）；在建議版本 V1.0.4 後新增 V1.0.5 維護紀錄。只新增本節與文件驗收產物，保留歷史內容；不修改應用程式、SECURITY.md、工作流或八項審查判定。本次補記尚未提交、推送或發布，也尚未納入 PR。
+- **證據對象與時點**：以下引用上一輪已完成的 GitHub 唯讀查核，對應 [草稿 PR #150](https://github.com/jnfakimo/Inspection/pull/150) 的 head `6ed7edc96e93cf3a4060e2c8e91338ffd1594eec`，不是沿用 `70769370` 的結果；本次沒有重新查詢遠端或重跑檢查。
+
+### 6ed7edc9 完成結果
+
+| 工作流 | Run ID | 最終狀態 | 查核證據 |
+|---|---|---|---|
+| [CI](https://github.com/jnfakimo/Inspection/actions/runs/42970333634) | 42970333634 | completed／success | 無失敗 job；Application tests and API build 於 2026-11-11 06:11:48 UTC 完成。仍有下述被忽略的連結檢查錯誤。 |
+| [CodeQL Analysis](https://github.com/jnfakimo/Inspection/actions/runs/42970333671) | 42970333671 | completed／success | 2026-11-11 06:09:43.3606814 UTC 成功上傳結果，06:09:48.6933180 UTC 確認上傳處理完成；job 於 06:09:52 UTC 完成。 |
+| [Commercial readiness checks](https://github.com/jnfakimo/Inspection/actions/runs/42970333627) | 42970333627 | completed／success | static-audit 於 2026-11-11 06:09:24 UTC 完成。 |
+
+- PR 共 **9 個檢查均為 COMPLETED／SUCCESS**：`static-security`、`gmail-repair-linux`、`iis-powershell-compatibility`、`signal-service-security`、`mobile-vehicle-tracker`、`Application tests and API build`、`static-audit`、`CodeQL Analysis (javascript)`、`CodeQL`。
+- [CodeQL 結果處理檢查](https://github.com/jnfakimo/Inspection/runs/130357530449) 為 completed／success，annotations_count 為 0。這是流程完成證據，不代表全站無漏洞、所有既有警示清零或八項攻擊鏈已完成正式驗證。
+
+### 連結檢查缺口再次確認，仍未關閉
+
+- [本輪 CI job 日誌](https://github.com/jnfakimo/Inspection/actions/runs/42970333634/job/130357079112) 的 `Check broken links and images`，於 2026-11-11 06:11:44.4031204 UTC 再次回報 `Error: Input URL required. Use --help for more options`。
+- 原因仍是 [ci.yml 第 225 行](https://github.com/jnfakimo/Inspection/blob/6ed7edc96e93cf3a4060e2c8e91338ffd1594eec/.github/workflows/ci.yml#L225) 的 `npx -y broken-link-checker . || true`：傳入目錄 `.` 未提供必要的 URL，且 `|| true` 忽略錯誤，所以未使整體工作流失敗。
+- 上一輪已比對 PR 基底 `bf3308ee5e0af18795c3347206904aca3e5c4c43` 與此 head 的 `.github/workflows/ci.yml`，沒有差異；這是既有設定，不是本次文件提交新增的回歸，本次亦未修正。
+- **結論**：CI／CodeQL 工作流狀態為 pass；連結／圖片完整性仍為**未驗證，不能判定通過**。缺口仍存在、未修復；綠燈不能證明沒有失效連結，該錯誤也不能證明實際有壞連結。前文所列隔離本機檢查、保留失敗退出狀態與壞連結案例驗證等待辦維持開啟，本次不實作。
+
+### 保留狀態與文件驗收界線
+
+- 上一輪結束時 PR 為 OPEN／draft，mergedAt 與 autoMergeRequest 均為 null；未合併或啟用自動合併。G 槽 168 個既有修改／未追蹤檔案及 Git status、diff、index、config、HEAD 的前後比對均未變；此為當時已查核事實，不是本次重新讀取 PR 狀態。
+- 八項 Finding Evidence Review 維持 **2 accept／6 needs more validation**；既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- 本次只新增本節與本機文件驗收產物，不提交、不推送、不合併、不部署、不連正式環境、不重新連 GitHub；不修改程式／工作流，也不重跑應用測試、build 或資安掃描。
+- 本機文件驗收核對原藍圖位元組前綴、其他既有檔案與 tracked diff、Git index／config／HEAD、提交與 run／job 對應、缺口未關閉、文件連結及截圖雜湊。下方截圖為本機記事本顯示實際文件驗收紀錄，**不是 GitHub Checks 或正式環境截圖**；外部連結沿用上一輪證據，本次不連線重驗。
+
+[6ed7edc9 結果續記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-6ed7edc9/verification.txt)
+
+![6ed7edc9 CI 完成與連結檢查缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-6ed7edc9/document-verification.jpg)
+
+## 2026-11-11 CI 連結檢查實質驗證修正（建議版本 V1.0.6，未發布）
+
+- **版本與範圍**：更新日期 2026-11-11；修改 `.github/workflows/ci.yml`、`.github/workflows/commercial-readiness.yml` 與 `tools/commercial-readiness-audit.test.mjs`。保留既有修改及前述歷史審查紀錄；不更改八項 Finding Evidence Review 的 2 accept／6 needs more validation 判定。
+- **原因與修正**：移除將目錄 `.` 當 URL 並以 `|| true` 忽略錯誤的 `broken-link-checker` 呼叫。CI 改執行稽核失敗偵測測試；完整網站的本機連結／圖片檢查由既有 Commercial readiness 工作流，在 `build:v2` 與 unsigned `_site` 建置成功後執行 `commercial-readiness-audit.mjs`，保留非零退出狀態。此為重用既有實質稽核，不重複建置、不新增另一套掃描器。
+- **獨立驗收**：13 項測試全數通過（0 skip）；分別證明遺失頁面 href、img、CSS url 與沒有產物會 exit 1，合法相對路徑、部署基底、中文編碼及查詢參數通過。工作流回歸檢查確認先建置再稽核，且相關稽核沒有 `continue-on-error`／`|| true`。
+- **實際本機產物**：唯讀取用既有 `C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime\_site` 封存產物，130 HTML、0 錯誤。複製到隔離目錄後注入不存在的頁面與圖片，得到 2 個 missing-asset、exit 1；還原後 0 錯誤、exit 0。原封存產物沒有修改。
+- **驗證界線**：本次沒有重新 build；封存產物未證明對應目前 G 槽全部未提交程式，不能聲稱現況全站已通過。檢查涵蓋 HTML href/src 與 CSS url 的本機檔案存在性；不驗外部 URL 可達性、fragment ID、JavaScript 動態連結或正式 HTTP 回應。GitHub 上的新工作流仍待授權推送後驗證；歷史 CI 的假成功紀錄仍成立。
+- **執行紀錄**：隔離目錄為 `C:\projects\Inspection-link-check-20261111`。指定 OpenCode 代理不存在，停止未產生修改的委派；由 Codex 完成有限範圍修正與驗收。只將三檔差異套回 G 槽，保留 CI 中既有手機測試變更。
+- **保留界線**：未提交、推送、合併、部署或連正式環境；原文件分支與 PR #150 未變動。既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- **截圖性質**：下方為本機記事本顯示實測驗收紀錄的真實截圖，不是 GitHub Checks 或正式環境截圖。
+
+[本機驗收與測試原始輸出](docs/verification/2026-11-11-ci-link-check-fix/verification.txt)
+
+![CI 連結檢查本機驗收](docs/verification/2026-11-11-ci-link-check-fix/document-verification.jpg)
