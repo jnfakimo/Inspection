@@ -1,0 +1,86 @@
+{
+  "schema_version": "triage-finding/v0",
+  "repository": {
+    "path": "C:/projects/Inspection-evidence-v108-20261111",
+    "revision": "1a656e462387a19faf148019b8f8f37923828b30"
+  },
+  "findings": [
+    {
+      "triage_item_id": "triage-001",
+      "input_id": "github-code-scanning-67",
+      "source_type": "sarif",
+      "title": "CodeQL js/insufficient-password-hash on OAuth state lookup in archived local harness",
+      "normalized_input": {
+        "vulnerable_component": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/run-integration.mjs",
+        "claimed_source": "CodeQL labels the return value from oauth() as a password",
+        "claimed_sink": "createHash(sha256).update(v).digest(base64url) at line 23",
+        "claimed_control": "Password hashing lacks a computationally expensive password KDF",
+        "affected_version_or_path": "PR #151 merge ref eba1033f3f636b61c900b6a62a06ba6408c37daa; local head 1a656e462387a19faf148019b8f8f37923828b30",
+        "preconditions": [
+          "Input must actually be a human password and its fast digest used as a password verifier"
+        ],
+        "impact": "Offline password cracking if the premise were true",
+        "references": [
+          "https://github.com/jnfakimo/Inspection/security/code-scanning/67",
+          "https://github.com/jnfakimo/Inspection/runs/130436706958"
+        ]
+      },
+      "verdict": "not_actionable",
+      "confidence": "high",
+      "affected_locations": [
+        {
+          "label": "reported sink",
+          "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/run-integration.mjs",
+          "lines": "23",
+          "detail": "SHA-256 helper is invoked for a synthetic browser verifier and returned OAuth state, not account passwords"
+        },
+        {
+          "label": "actual source",
+          "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/run-integration.mjs",
+          "lines": "87-95",
+          "detail": "oauth_start response r.data.data.state flows through start() into SQL state_hash lookup assertions"
+        },
+        {
+          "label": "server generation",
+          "path": "supabase/functions/google-calendar/index.ts",
+          "lines": "71-78",
+          "detail": "state is base64Url(crypto.getRandomValues(new Uint8Array(32))); database stores digest(state) for single-use OAuth transaction"
+        }
+      ],
+      "reachable_path": [
+        "oauth_start response at harness line 87",
+        "r.data.data.state returned by start",
+        "state assigned at line 88",
+        "hash(state) at lines 90 and 95 used only for querying google_calendar_oauth_states.state_hash",
+        "SHA-256 helper at line 23"
+      ],
+      "boundary_assessment": {
+        "product_surface": "test/fixture",
+        "source_trust": "local_only",
+        "boundary_crossed": false,
+        "policy_basis": "Root SECURITY.md requires actual source/boundary evidence and forbids excluding an alert only because it is in tests/docs. The claim is defeated by the data being a 32-byte random OAuth state, not by its directory."
+      },
+      "exploitability_stack_rank": {
+        "rank_queue": null,
+        "rank": null,
+        "rationale": "The reported source is not a password and the digest is not an account password verifier.",
+        "drivers": []
+      },
+      "evidence": [
+        "SARIF analysis 2142661749 has two flows, both from oauth_start response state through lines 90/95 to line 23.",
+        "Local head and reported PR merge artifact contain the same affected harness lines.",
+        "Application oauth_start generates 32 random bytes and separately stores state_hash; token/browser verification is independent."
+      ],
+      "counterevidence": [
+        "Actual synthetic account passwords are sent to GoTrue password login; no account password reaches this hash helper.",
+        "Changing SHA-256 to a password KDF here would break equality with the implemented state_hash representation without improving account-password storage.",
+        "No global CodeQL exclusion, severity reduction, hashing algorithm change or application code change is proposed."
+      ],
+      "proof_gaps": [
+        "Static assessment only for alert #67; not a new runtime test or blanket assessment of password security."
+      ],
+      "recommended_next_step": "Dismiss only alert 67 as false positive with this dataflow evidence, then verify CodeQL result check and required CI before merge.",
+      "fix_finding_handoff": null
+    }
+  ]
+}

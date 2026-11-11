@@ -704,3 +704,5 @@
 - **發布方式與保留**：只在既有乾淨 C 槽文件分支追加本案文件與驗收產物；G 槽其他修改及既有帳號密碼保留。不重設密碼、不撤銷既有登入、不寄信。網站發布由 main 的 CI／CodeQL／Commercial readiness 與 Hardened Pages 閘門執行，最終結果與同提交簽章核對將於完成後續記。
 
 [V1.0.12 發布前核對](docs/verification/2026-11-11-evidence-release-v112/release-preflight.json) · [發布與驗收結果](docs/verification/2026-11-11-evidence-release-v112/verification.txt)
+
+- **CodeQL #67 靜態審查**：本次封存 harness 的 SHA-256 被 js/insufficient-password-hash 標為 high；SARIF 兩條資料流實際都是 oauth_start 回傳的隨機 state 經第 90／95 行查詢 state_hash，不是帳號密碼。依 SECURITY.md 核對後判定 not_actionable／high confidence，只針對 #67 以 false positive 處理，不新增全域掃描排除、不改雜湊或應用程式。完整反證：[CodeQL #67 審查](docs/verification/2026-11-11-evidence-release-v112/codeql-67-triage.json)。其他歷史八項判定不變。
