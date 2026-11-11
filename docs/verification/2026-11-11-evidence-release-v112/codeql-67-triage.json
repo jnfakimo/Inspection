@@ -43,7 +43,7 @@
         {
           "label": "server generation",
           "path": "supabase/functions/google-calendar/index.ts",
-          "lines": "71-78",
+          "lines": "70-75",
           "detail": "state is base64Url(crypto.getRandomValues(new Uint8Array(32))); database stores digest(state) for single-use OAuth transaction"
         }
       ],
