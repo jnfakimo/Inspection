@@ -1,0 +1,92 @@
+{
+  "result": "pass",
+  "document_version": "建議版本 V1.0.0（已核准本機套用；未發布）",
+  "captured_at": "2026-11-11T10:39:44.644290+08:00",
+  "target": "G:\\我的雲端硬碟\\AI\\Codex\\北農巡檢系統\\SECURITY.md",
+  "sha256": "080f5a3355880321a8ad689b87a1a8c60f2dfb5b404ef85e6cf2636e6cca7fb9",
+  "checks": [
+    "核准草案套用後讀回一致；僅更新核准狀態",
+    "UTF-8、檔案大小、控制字元及政策連結通過",
+    "保留既有密碼決策；沒有新增排除",
+    "9 個範圍政策解析一致",
+    "git diff --check -- SECURITY.md：exit 0"
+  ],
+  "policy_chains": [
+    {
+      "scope": ".",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "web",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "system",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "backend/node-api",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "supabase/functions",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "supabase/migrations",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "mobile/vehicle-tracker",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": ".github/workflows",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    },
+    {
+      "scope": "tools",
+      "chain": [
+        "\"SECURITY.md\""
+      ],
+      "exit_code": 0,
+      "matches_applied_policy": true
+    }
+  ],
+  "limitations": [
+    "本次為政策文件驗證，未重新執行資安掃描或正式部署",
+    "未提交或推送；應用程式版本與既有帳號未變更"
+  ]
+}
