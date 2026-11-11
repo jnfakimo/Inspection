@@ -331,3 +331,117 @@
 [正式發布驗證原始結果](docs/verification/2026-11-11-security-policy/release-verification.json)
 
 ![政策 V1.0.0 正式 Pages 發布與部署後驗證成功](docs/verification/2026-11-11-security-policy/pages-release-54091d2.jpg)
+
+## 2026-11-11 八項最終 Finding Evidence Review（建議版本 V1.0.0，僅本機文件）
+
+- **需求與範圍**：依使用者已確認的逐項審查結論，彙整原始證據、G 槽修補後現況及剩餘證據缺口。此版本僅指本節審查文件，不變更應用程式／SECURITY.md 版本；尚未提交、推送或發布。
+- **本次作業**：只更新本藍圖與本機文件驗收證據；不連正式環境、不修改程式／migration、不執行應用測試或 PoC、不提交或部署。既有未提交工作與歷史段落保留。
+- **最終判定**：2 項 `accept`、6 項 `needs more validation`、0 項 `unsupported`。判定沿用本次對話的審查編號，不依 findings.json 陣列順序。
+- **判定語意**：`accept` 表示原始弱點主張有充分證據，不表示風險已補救完畢或接受所有殘留風險；`needs more validation` 表示仍缺會影響完整路徑判斷的事實，不表示沒有問題。
+- **與歷史發布紀錄的關係**：上方 2026-11-06「pass」是當時修補／發布驗收紀錄，不等於八項原始正式攻擊鏈均已驗證。本節是其證據解讀的最新補充，不刪改原始歷史。
+- **使用者決定**：既有帳號密碼維持不變；不批次重設、不撤銷登入、不寄送設密郵件。保留風險不等於抑制或關閉第 3 項。
+
+### 判定與證據分類
+
+| 項次 | 原始問題 | Severity | 最終 Verdict | Confidence 範圍 |
+|---|---|---|---|---|
+| 1 | V1 樓層儲存型 XSS | 條件式 Medium | needs more validation | 原始程式缺口 High；歷史完整可利用性未充分證實 |
+| 2 | 業管交接 RPC／RLS 未套用模組拒絕 | Medium | needs more validation | 原始缺口 High；完整歷史入口與帳號條件仍需驗證 |
+| 3 | 共用初始密碼、未強制首次更換 | Medium | accept | High，限原始弱點與歷史殘留風險 |
+| 4 | 附件登錄錯誤清理可能刪除已簽附件 | Medium | needs more validation | 程式機制 High；完整歷史路徑 Medium |
+| 5 | LINE 群組事件覆寫共用通知目的地 | Medium | needs more validation | 程式機制 High；完整歷史路徑 Medium |
+| 6 | 會議預約 RLS 忽略系統／模組拒絕 | Medium | needs more validation | 原始 RLS 缺口 High；完整 REST 讀寫路徑 Medium |
+| 7 | Google OAuth 僅以 User-Agent 綁定回呼 | Low | needs more validation | 原始缺口 High；整體歷史可利用性 Medium |
+| 8 | SVG 驗證碼固定 path 洩露答案 | Low | accept | High，限原始結構可直接還原答案 |
+
+- **Independently Verified**：先前唯讀審查已直接讀取比對的本機來源、Git 物件或既有原始回傳；標為「歷史紀錄」者不是本次重新查詢或測試。
+- **Report-Supplied**：掃描主張、部署摘要或沒有對應原始回傳的歷史敘述，不提升為已獨立驗證的正式事實。
+- **User-Confirmed**：使用者確認當時僅系統管理員可建立／修改樓層，以及既有密碼保留決定。
+- **Unknown**：未取得或不足以串接完整路徑的證據。缺少利用事件不等於漏洞不成立；事件調查與可利用性是不同問題。
+- Severity 表示條件成立時的風險評估；不能僅因證據不足而調降。Confidence 與 Coverage 另列，不把來源缺口 High 擴張成正式端到端 High。
+
+### 第 1 項：V1 樓層儲存型 XSS
+
+- **規則與判定**：`v1-floor-inline-stored-xss`；`needs more validation`。
+- **原始證據／影響**：舊模板將 `floor_spaces.floor` 放入 `onclick` 的 JavaScript 字串；HTML entity 會在事件執行前解碼，單純 HTML escaping 不足。凍結來源與 Git `3885742b` 相符；三份修補前簽署發布清單與頁面雜湊補強產物包含缺陷的證據。離線 PoC 是自行組裝事件與 VM 模型，不是真實瀏覽器重現。
+- **前提與反證**：依使用者確認，當時只有系統管理員可建立／修改樓層；不採一般使用者可寫入的假設。仍須另一位使用者能讀取資料、開啟 V1 並點擊，且有效 CSP 允許行內事件；不能推定取得 session 或額外管理權。
+- **G 槽現況**：三處模板改用 `data-floor`／`data-floor-action`，透過事件監聽器傳值，移除本項注入位置。[目前頁面](system/arealist.html)
+- **剩餘缺口／最小補證**：修補前該頁完整 HTTP 回應（含有效 CSP）、URL 可達性及跨使用者讀取同筆資料的歷史紀錄。IIS 範本及簽署清單不能代替實際回應標頭。
+
+### 第 2 項：業管交接 RPC／RLS 未套用模組拒絕
+
+- **規則與判定**：`business-module-deny-bypass`；`needs more validation`。
+- **原始證據／影響**：修補前 `business_market_allowed()` 只檢查市場資格；歷史資料庫回傳支持缺少模組檢查，且 authenticated 可執行該 helper。符合資格的拒權使用者可能直接讀取／操作同市場允許編輯的交接資料。
+- **前提與反證**：需要有效身分、目標市場資格與有效模組拒絕；不是匿名或任意跨市場。歷史 deny 統計不能當成可利用帳號數；後續拒權案例未保留市場資格條件，拒絕可能同時源於市場不足。SQL 介面切角色不等於真 JWT 經 PostgREST。
+- **G 槽現況**：helper 新增 `active_user_id()` 與 `has_handover_module_access('business')`，再檢查市場；本機 migration 與發布提交一致，歷史讀回支持當時已套用。[修補 SQL](supabase/migrations/20261106050736_codex_security_boundary_fixes.sql)
+- **剩餘缺口／最小補證**：同時期完整業管 RPC／資料表 grants、PostgREST exposed schemas／前置授權設定，以及同一帳號的啟用、有效工作階段、市場與 deny 交叉紀錄。空 schema 檔及合成隔離庫不能補足。
+
+### 第 3 項：共用初始密碼、未強制首次更換
+
+- **規則與判定**：`shared-initial-account-password`；`accept`。
+- **原始證據／影響**：原始核准流程使用固定共用密碼，立即建立 email confirmed／active 帳號，寄設密郵件不是登入前置條件。歷史清查有 39 筆啟用 profile 關聯到匹配舊共用密碼的 Auth 紀錄；原始登入路徑支持可能冒用該帳號原有權限。
+- **前提與反證**：仍需管理員核准、目標尚未換密碼、攻擊者知道帳號與共用密碼並通過其他登入條件。不能直接取得管理權；39 筆不代表全部可登入、由同一流程建立、曾受入侵或現在仍受影響。
+- **G 槽現況**：新核准帳號改用每次獨立的 32 bytes 隨機啟動密碼，不回傳或記錄該密碼；仍保留 email confirmed／active，沒有新增「完成首次設密才啟用」的全面狀態門檻。[核准流程](supabase/functions/admin-api/index.ts)
+- **既有帳號決定**：既有帳號密碼維持不變；不重設、不撤銷登入、不寄設密郵件。程式修補不會替既有帳號換密碼，殘留風險保留，不能記為所有帳號補救完成。
+- **剩餘缺口／最小補證**：目前殘留數量、歷史帳號來源與額外登入限制，以及郵件送達／完成設密／失敗分支的既有證據；實際冒用需另有事件紀錄。本次不新增清查或登入操作。
+
+### 第 4 項：附件登錄錯誤清理可能刪除已簽附件
+
+- **規則與判定**：`guard-attachment-error-cleanup`；`needs more validation`。
+- **原始證據／影響**：舊 API 依提交班別檢查鎖定，但附件路徑未綁班別；重送既有路徑、改填同日可提交班別，重複索引新增失敗後仍以服務權限呼叫 Storage 刪除，可能使已簽索引留下失效附件。歷史 Git 版本亦含相同兩處刪除分支。
+- **前提與反證**：需駐警交接與市場權限、符合條件的附件及可提交班別；直接提交已簽班別或當日主管已簽核會拒絕。不是匿名或任意跨市場刪檔；索引表禁止實體刪除的 trigger 不等於 Storage API 禁止刪除。
+- **G 槽現況**：相關錯誤分支兩處 Storage 刪除呼叫已移除，登錄失敗直接回傳錯誤；相關區塊與修補提交及 app-api version 127 封存相符。[附件處理](supabase/functions/app-api/index.ts)
+- **剩餘缺口／最小補證**：同時期正式 API／schema／Storage 設定、索引與 trigger 有效狀態、班別與附件關聯紀錄，以及 Storage 對該操作的既有結果。模擬 Storage 回歸不是實際刪除整合證明。
+
+### 第 5 項：LINE 群組事件覆寫共用通知目的地
+
+- **規則與判定**：`line-group-destination-authorization`；`needs more validation`。
+- **原始證據／影響**：舊 Webhook 在合法簽章群組事件後自動呼叫 `saveGroupId()`；HMAC 證明 LINE 來源，不代表群組獲准收訊。歷史查詢支持群組設定曾存在，部署／Verify 摘要提供線索，但不等於原始設定匯出。
+- **前提與反證**：bot 必須能加入未核准且攻擊者可控制的群組，事件須進入受影響部署。不能任意偽造簽章；影響限使用共用 `line_group_id` 的群組通知，不包含所有個人通知或其他管道。
+- **G 槽現況**：一般群組事件不再呼叫 `saveGroupId()`，舊直接覆寫分支亦移除；保留介面本身不代表原路徑仍可達。兩個相關檔案與 line-notify version 34 封存相符。[共用 handler](supabase/functions/_shared/vehicle-line-webhook.ts)／[入口](supabase/functions/line-notify/index.ts)
+- **剩餘缺口／最小補證**：當時邀群與 Webhook 設定、修補前部署來源；事件→目的地異動→推播回應的去識別化紀錄用於判斷實際影響。設定值存在及「測試成功」摘要均不能證明群組實際收訊或曾外洩。
+
+### 第 6 項：會議預約 RLS 忽略系統／模組拒絕
+
+- **規則與判定**：`meeting-module-deny-bypass`；`needs more validation`。
+- **原始證據／影響**：修補前資料庫政策回傳確認 SELECT 僅要求有效身分，INSERT／UPDATE 檢查本人或管理員；active helper 未代查模組授權。可能讓會議拒權帳號直接讀取預約及操作本人預約。
+- **前提與反證**：仍需有效帳號與工作階段；一般使用者不能依此修改他人預約，不能推定 DELETE 權限。時間與 Calendar 欄位 trigger 仍在；count(*) 成功不能單獨證明所有欄位或寫入權限。
+- **G 槽現況**：新增 `AS RESTRICTIVE FOR ALL TO authenticated` 政策，要求有效身分及 `has_module_access('meetingroom','bookings')`，與原有政策取 AND。[修補 SQL](supabase/migrations/20261106050736_codex_security_boundary_fixes.sql)
+- **剩餘缺口／最小補證**：修補前表／欄位 ACL、PostgREST 暴露與前置授權，以及有效但被拒會議權限帳號的直接入口證據。歷史 deniedUser 是業管案例；無身分 0 筆、管理員 8 筆及隔離資料歸屬測試均不能替代會議拒權案例。PGlite 先套修補再斷言，不是舊漏洞重現。
+
+### 第 7 項：Google OAuth 僅以 User-Agent 綁定回呼
+
+- **規則與判定**：`oauth-account-link-csrf`；`needs more validation`。
+- **原始證據／影響**：攻擊者以有效帳號發起授權、分享網址，受害者同意後，舊 callback 僅核對有效 state 與 UA，依發起者 user_id 寫入 Google 連結；可能揭露連結 email 並將攻擊者預約同步至受害者行事曆。歷史來源副本與掃描版本相符。
+- **前提與反證**：需 OAuth 設定有效、受害者屬允許對象、十分鐘內同意且 UA 相符。state／PKCE 有效，不能稱為任意偽造或無互動接管。原始 google_subject 唯一索引若有效，會阻擋其他紀錄已占用的 Google 身分，且不限 active 狀態；未證明 raw token 外洩或任意讀取全部行事曆。
+- **G 槽現況**：公開 callback 不直接交換 token／寫入連結；登入中的 oauth_finish 同時核對 user_id、state、瀏覽器 verifier 與期限，原子消耗交易後才交換。前端清除回傳片段，重用 refresh token 另須相同 Google subject。[API](supabase/functions/google-calendar/index.ts)／[callback](supabase/functions/google-calendar-callback/index.ts)／[瀏覽器 helper](web/lib/google-calendar-browser.ts)
+- **剩餘缺口／最小補證**：修補前部署讀回、當時 Google audience／Testing／Production／測試對象與組織限制、歷史唯一索引有效狀態及同步結果。早期測試使用者摘要未獨立核實，原始紀錄不在本機；不能推定只開放一人或已全面開放。worker 個別失敗仍可能回傳 HTTP 200，Actions 成功不足以證明 synced > 0。
+
+### 第 8 項：SVG 驗證碼固定 path 洩露答案
+
+- **規則與判定**：`deterministic-svg-captcha`；`accept`。
+- **原始證據／影響**：數字固定 path 不受旋轉／位移／雜訊改變，來源與 Git 基準一致。既有腳本抽取原始產生器後解碼，歷史執行與結果記載 100/100 成功、10 種數字簽章；本次未重跑。降低自動化登入嘗試及帳號申請成本。
+- **前提與反證**：需取得有效 challenge，於 300 秒內、符合 IP 與單次消耗條件提交。HMAC、帳密、啟用狀態及限流仍存在；不能稱為無限制暴力登入或直接核准帳號。來源 IP 控制依賴可信代理標頭，不能從程式存在就推定正式限流完整有效。
+- **G 槽現況**：改為像素 PNG，只建立 IHDR／IDAT／IEND，移除固定 SVG path 輸出；入口與發布封存相符，圖片 helper 僅有檔尾空白差異。既有 PNG 格式測試與歷史 smoke 支持輸出有效，並非本次正式查詢。[圖片產生器](supabase/functions/_shared/captcha-image.ts)／[測試原碼](tools/security-boundary-fixes.test.mjs)
+- **剩餘缺口／最小補證**：修補前正式部署精確版本、真實 API 的錯誤答案／逾時／重放／IP 不符／限流完整證據，以及 PNG 的 OCR／像素辨識抵抗力。格式測試不等於完整防機器人驗收；缺口不推翻原始 SVG 結構洩露。
+
+### 證據索引與整體 Coverage
+
+- 原始 scan ID：`5d6ba110-f505-4f3f-9d58-2196d706f98c`；掃描 HEAD：`3885742bde404b393cea4be229b0f6dd12b69544`。掃描時工作樹有未提交修改，只有已個別比對的檔案可聲稱與 HEAD 一致。
+- [本機原始報告](C:/Users/jnfa/.codex/state/plugins/codex-security/scans/北農巡檢系統/3885742bde404b393cea4be229b0f6dd12b69544_20261106T042138Z_lx3sje1v/report.md)、同目錄 findings.json 與 artifacts：原始主張及離線 PoC／結果；未將原始 session 或秘密複製進專案。
+- [本機修補發布紀錄](C:/Users/jnfa/.codex/state/plugins/codex-security/scans/-/artifacts-db16f47985bb3962655c8ba79f4f18e8cd48034d9de80e5d013a372fcf3a1010/artifacts/deployment-report.md)及 verification 下的 deployed-edge-sources-final.json、production-database-20261106.json、production-smoke.json、release-focused.log：歷史來源／測試／查詢封存，不代表本次重新驗證。
+- 修補提交 `d56b396a62eed8825e7ba208cce7d61503744a25`、部署工作流提交 `0465a35dc744651541d1c240bbca5f0e79056bc1` 是歷史對照，不是本次新發布；本機來源差異以逐項審查為準。
+- 本機歷史對話／原始工具回傳定位：`C:\Users\jnfa\.codex\sessions\2026\11\06\rollout-2026-11-06T12-11-36-01a1af0e-0d7e-7653-9c4f-409ea88aa039.jsonl`。此路徑僅供本機追查，不是可攜式證據包；不得將整份 session 提交。
+- 已涵蓋八項所列入口、直接關聯資料流、歷史來源、修補差異及既有測試／部署紀錄；沒有重新做全 repo 掃描、正式攻擊重現、Google／LINE／郵件端到端驗證、帳號清查或事件調查。
+- 部分歷史 Git 物件及舊對話不在本機，未從遠端補抓。空 schema、隔離合成資料、mock／PGlite、離線模型、HTTP smoke 與部署成功不能互相替代。
+- 六項待補證不要求先證明曾遭利用，但不能省略會改變可達性、授權或實際影響範圍的控制。原始缺陷與修補後現況分開記錄；不宣稱全站安全或八項風險全部關閉。
+
+### 本次文件驗收與截圖
+
+- 驗收對象：本節八項結論、原文保留、文件連結與作業範圍。原始證據審查為唯讀；本次唯一新增寫入範圍是專案藍圖與本節文件驗收產物。
+- 本機驗收結果見下方紀錄；核對八項編號／規則／判定、2 accept／6 needs more validation、既有密碼決策、原始文件前綴不變與非藍圖既有 tracked diff 不變。未執行應用測試、build、掃描、commit、push 或部署。
+- 截圖日期：2026-11-11（Asia/Taipei）；來源為本機記事本開啟實際文件驗收結果。截圖只佐證本機文件更新，不是正式環境、應用執行或新一輪資安測試證據。精確檢查／擷取時間記錄於驗收資料。
+
+[本機文件驗收結果](docs/verification/2026-11-11-finding-evidence-review/verification.txt)
+
+![八項 Finding Evidence Review 本機文件驗收](docs/verification/2026-11-11-finding-evidence-review/document-verification.jpg)
