@@ -1,0 +1,226 @@
+[
+  {
+    "path": "current\\supabase\\functions\\google-calendar\\index.ts",
+    "sha256": "76870D14508EF6EEACB5A85941AC10704DB39184346C60E43CC529CD578544B4"
+  },
+  {
+    "path": "current\\supabase\\functions\\google-calendar-callback\\index.ts",
+    "sha256": "69B1CFC43394BC6168E87B2D275DFF21F7765F1FCBC36244F38281CA1D1CFD39"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\captcha-image.ts",
+    "sha256": "59EE68294850612227C11C3A28DD1BD2E8A1EEF9BC08ED1CA7BF1BEC80B50949"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\client-ip.test.ts",
+    "sha256": "CE1D396B2588CC4507B75194164B64C151B9143459B5A9BEED097A5668F2845F"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\client-ip.ts",
+    "sha256": "ED2019920AB050A22021CC819A3DD388901D317546BC145FC769C92F7E471B71"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\floor.ts",
+    "sha256": "E601122583BE5163F964E5BE8D9EA2B5718332F2E341D397B7B76D5532A3A716"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\line-message.test.ts",
+    "sha256": "9D4C3D590F50BFCF3C1D70E3FD92C064A0842740A9384DD0F54845894059F0AF"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\line-message.ts",
+    "sha256": "B0A723007AF2CEDA0EE519DDE2D01EAB82D0D8DBCFD07D3DECABDAAF7D4A8755"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\mechanical-cost.ts",
+    "sha256": "9EFE87294DB12A566DB47BD7941390FA69C96308CFD7F2C518E91D80E9712074"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\mechanical-schedule.ts",
+    "sha256": "B04B12B6312900EB593C5DA88DF421D0933BFBA4C6C7E4E86CEF555C4CAE5ACB"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\password-policy.ts",
+    "sha256": "83D0F8BFEFDB3031BA72DF291EA7833E59A61D1D7D0564DC89408FDBEC05823A"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\security-monitor.ts",
+    "sha256": "D03015695FAF759C8D071044E3DEDCBBC377EF36ABCD7AB742B1DD21C344D117"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-dispatch-line-outbox-db.test.mjs",
+    "sha256": "86A494CEB4A1EB60AA6FEE90298924D14C77B46E7C33E891552FC6C65C71C8BF"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-dispatch-line-retry.ts",
+    "sha256": "7AB7267966E224C0D2D63350EB2202DC0C151801898A165808635E89C641921F"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-dispatch-line-worker-db.test.mjs",
+    "sha256": "068D456AA909ECE3B79D2F13433F814CD4F2106A7CC8C13698AB9701D7BFB1DB"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-dispatch-line-worker.test.ts",
+    "sha256": "F63568150B1BDA68C3EB7805FF08AD142EF5CB94E01E94C496DCD3BF1ED4B3AD"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-dispatch-line-worker.ts",
+    "sha256": "7E31F27D84E161E1C562393CCAA45CDC4BFA8E75AB25F2E9233B9D79FEC4CEAF"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-link-db.test.mjs",
+    "sha256": "AD7ED4D62951123AF3422BBF50AD4AB290CC9C972E72B0FBD9B6DB50D08C9817"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-link-start-db.test.mjs",
+    "sha256": "2D680422A344B97E9240A0A26558D00BCF6291CD0E34D050F7F3E80E133A400D"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-link.test.ts",
+    "sha256": "07AD62B902EA69A8F31D2E9C29136E163688A7E8FB36F002195358206C16204F"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-link.ts",
+    "sha256": "F7D15C2504305287CA3A02E143E516EF5046A8389CACA62D716EE22697A426A7"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-loopback.test.mjs",
+    "sha256": "68F93C125093670EE7C8584BC07D5B67315EA0EEBEAE992199D9BBF80D87F471"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-webhook.test.ts",
+    "sha256": "9AD2F5F901493FB67266FB0F052CF2445A56BC4D9A94955E8EFD7F539E7645B6"
+  },
+  {
+    "path": "current\\supabase\\functions\\_shared\\vehicle-line-webhook.ts",
+    "sha256": "5026CCE6966494C51E12555D91C56FE9624A87CEC83D517C4CA5444E73A19915"
+  },
+  {
+    "path": "current\\supabase\\migrations\\20260808090000_non_admin_bulk_read_cutoff.sql",
+    "sha256": "AE64A3FBEC9F8E0D0D91E6B836C8807C6F981542D9CA91B319D4A83D4932801C"
+  },
+  {
+    "path": "current\\supabase\\migrations\\20260914220000_access_control_schema_reconciliation.sql",
+    "sha256": "FC663D4BBC59CE1377AE219A1718A84FE1E8540A1B7800C397BE34DCE1D73849"
+  },
+  {
+    "path": "current\\supabase\\migrations\\20260916132000_business_handover_market.sql",
+    "sha256": "FC6273646C244F3832EF4589F6888DC06E1B86289F6F9679C8A077B4EC344747"
+  },
+  {
+    "path": "current\\supabase\\migrations\\20261106050736_codex_security_boundary_fixes.sql",
+    "sha256": "5352ABA2914617A226FA05E8603D26F1FAB762F6BFE1EF80E7D850BC7231E380"
+  },
+  {
+    "path": "current\\system\\arealist.html",
+    "sha256": "F89FC45363D0D45292828CF0FF20A6469794424799948B6BED07E195D66DD012"
+  },
+  {
+    "path": "current\\tools\\security-boundary-db.test.mjs",
+    "sha256": "9F2863BAD35AE835A145ADF38B20BB13FF6FC0679919BE78EC0539A8F70FC4B9"
+  },
+  {
+    "path": "current\\tools\\security-boundary-fixes.test.mjs",
+    "sha256": "FD4F73AE253966FA667C8A49B585ABDB29BC4F578FFEEFAE11C891A558DC5E92"
+  },
+  {
+    "path": "current\\tools\\security-oauth-flow.test.mjs",
+    "sha256": "E70DDFE4E4C18A367B25FAB13D960D67A352998E8439D538501BFB1EB625CC56"
+  },
+  {
+    "path": "current\\web\\lib\\google-calendar-browser.ts",
+    "sha256": "E70079E943A99A3D80B43E5BB756AA54B10C1EE140106DC0EC5B06E2B4E9BC62"
+  },
+  {
+    "path": "original\\supabase\\functions\\google-calendar\\index.ts",
+    "sha256": "CE7E1110CC8621EEC3BA2A5F0CAE20767608AC27EE85E90311421F4829076052"
+  },
+  {
+    "path": "original\\supabase\\functions\\google-calendar-callback\\index.ts",
+    "sha256": "52B60510575513DD40BF1E3C3751E836F62B7413F507CC7AB0865CAE2798887C"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\client-ip.test.ts",
+    "sha256": "CE1D396B2588CC4507B75194164B64C151B9143459B5A9BEED097A5668F2845F"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\client-ip.ts",
+    "sha256": "ED2019920AB050A22021CC819A3DD388901D317546BC145FC769C92F7E471B71"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\floor.ts",
+    "sha256": "28EF31C1C7F15B85AB68A8D92BD183B46670725E82980391F5E0E26B0FABD78B"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\line-message.test.ts",
+    "sha256": "770063365B366D1A5733C8691CE0C64AAE15BFC4A65F26084359836FDB4379B3"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\line-message.ts",
+    "sha256": "41514BB71A224C6B3B38FC42EB8D01F2E55C07772117E9ED89E4F6E85B8A49E5"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\mechanical-cost.ts",
+    "sha256": "E72CC5A1D2719042E4D10154FFADBC9A6734AD3B1B306C8855451EC33D3263C5"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\mechanical-schedule.ts",
+    "sha256": "E555D6801D30B234BDC969A559E97BEE49A5845DD85CAE05CF1DD4F2663D63DD"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\password-policy.ts",
+    "sha256": "5C4C21B8EEA5938FB902100D98613446F444597C9F2BD5FA2A106BD28C2370DA"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\security-monitor.ts",
+    "sha256": "D03015695FAF759C8D071044E3DEDCBBC377EF36ABCD7AB742B1DD21C344D117"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-dispatch-line-outbox-db.test.mjs",
+    "sha256": "86A494CEB4A1EB60AA6FEE90298924D14C77B46E7C33E891552FC6C65C71C8BF"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-dispatch-line-retry.ts",
+    "sha256": "7AB7267966E224C0D2D63350EB2202DC0C151801898A165808635E89C641921F"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-dispatch-line-worker-db.test.mjs",
+    "sha256": "068D456AA909ECE3B79D2F13433F814CD4F2106A7CC8C13698AB9701D7BFB1DB"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-dispatch-line-worker.test.ts",
+    "sha256": "F63568150B1BDA68C3EB7805FF08AD142EF5CB94E01E94C496DCD3BF1ED4B3AD"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-dispatch-line-worker.ts",
+    "sha256": "7E31F27D84E161E1C562393CCAA45CDC4BFA8E75AB25F2E9233B9D79FEC4CEAF"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-line-link-db.test.mjs",
+    "sha256": "AD7ED4D62951123AF3422BBF50AD4AB290CC9C972E72B0FBD9B6DB50D08C9817"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-line-link-start-db.test.mjs",
+    "sha256": "2D680422A344B97E9240A0A26558D00BCF6291CD0E34D050F7F3E80E133A400D"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-line-link.test.ts",
+    "sha256": "07AD62B902EA69A8F31D2E9C29136E163688A7E8FB36F002195358206C16204F"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-line-link.ts",
+    "sha256": "F7D15C2504305287CA3A02E143E516EF5046A8389CACA62D716EE22697A426A7"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-line-webhook.test.ts",
+    "sha256": "D07C77F34AFBFA186B3C57AE995543D5B25788FA9371EF9BCBB3977CE26794B7"
+  },
+  {
+    "path": "original\\supabase\\functions\\_shared\\vehicle-line-webhook.ts",
+    "sha256": "074FCA59F1DCF5EDD2AC9A5F833EED1DBC2F59F010EC502615062FD05A654B03"
+  },
+  {
+    "path": "original\\system\\arealist.html",
+    "sha256": "C256DF9B38EAA57DBCB847B6FFE47184D63B145B480BC737B7371240E9484652"
+  }
+]

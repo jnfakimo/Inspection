@@ -1,0 +1,7 @@
+{
+  "url": "http://127.0.0.1:8774/fixture/old/strict",
+  "status": 200,
+  "csp": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'",
+  "source": "actual loopback HTTP response",
+  "checked_at": "2026-11-11T16:05:18.9877847+08:00"
+}

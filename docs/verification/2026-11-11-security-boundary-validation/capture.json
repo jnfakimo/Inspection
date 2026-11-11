@@ -1,0 +1,10 @@
+{
+  "version": "V1.0.10",
+  "file": "verification-browser.jpg",
+  "source": "Edge browser; loopback verification summary rendered from actual local test outputs",
+  "captured_file_timestamp": "2026-11-11T16:07:57.4500000+08:00",
+  "sha256": "9E6C4DA1194395CD5EAACB6D095CDB9E79E4CC29367FD6231E51D3CC8711EC56",
+  "bytes": 84950,
+  "scope": "Local synthetic evidence only; not production or historical platform setting",
+  "visually_verified": true
+}

@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const p=import.meta.dirname+'/results/';
+const rest=JSON.parse(fs.readFileSync(p+'rest-boundary.json','utf8'));
+const line=JSON.parse(fs.readFileSync(p+'line-oauth-summary.json','utf8'));
+const browser=JSON.parse(fs.readFileSync(p+'browser-csp.json','utf8'));
+const raw=fs.readFileSync(p+'line-oauth-tests.txt','utf8');
+assert.equal(rest.status,'pass');assert.equal(rest.checks.length,29);assert.ok(rest.checks.every(x=>x.pass));
+for(const [name,count] of [['tests',17],['pass',17],['fail',0],['skipped',0]])assert.match(raw,new RegExp('\\b'+name+' '+count+'\\b'));
+assert.equal(line.status,'pass');assert.equal(Object.keys(browser.cases).length,4);assert.ok(Object.values(browser.cases).every(x=>x.pass));
+const result={document_version:'V1.0.10',status:'pass',rest_checks:29,line_oauth_tests:17,browser_cases:4,historical_verdict:{accept:2,needs_more_validation:6},source:'Parsed original local verification artifacts',limits:['Not historical production reconstruction','No real Google consent, LINE invitation/delivery, full app Auth or Storage E2E']};
+fs.writeFileSync(p+'validation-summary.json',JSON.stringify(result,null,2));
+const rows=Object.entries(browser.cases).map(([k,v])=>'<tr><td>'+k+'</td><td>'+(v.xss?'執行':'未執行')+'</td><td>'+v.calls.length+'</td><td>pass</td></tr>').join('');
+fs.writeFileSync(p+'summary.html','<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>V1.0.10 隔離資安補證驗收</title><link rel="stylesheet" href="/style.css"><h1>V1.0.10 隔離資安補證驗收</h1><p>2026-11-11｜原始版本 3885742b 與 G 槽修補快照對照</p><h2>結果：pass（隔離驗證範圍）</h2><p>實際 PostgreSQL / PostgREST / JWT：29 項通過<br>LINE / OAuth 實際處理程式＋合成依賴：17 項通過，0 跳過<br>真實瀏覽器 CSP 情境：4 組通過</p><table border="1" cellpadding="12"><tr><th>版本／CSP</th><th>XSS</th><th>功能呼叫數</th><th>情境判定</th></tr>'+rows+'</table><p>old = 原始模板；new = 修補模板。weak 含 unsafe-inline；strict 僅 self。</p><h2>歷史結論：2 accept、6 needs more validation</h2><p>這是本機合成資料的條件式驗證，不能回填當年 CSP、grants、LINE 邀群或 Google audience。</p><p>未操作正式帳號、平台設定、訊息或 Google 授權；既有密碼維持不變。<br>本輪新建 DB／REST 容器已停止；無對外發布埠。</p></html>');
+console.log(JSON.stringify(result));

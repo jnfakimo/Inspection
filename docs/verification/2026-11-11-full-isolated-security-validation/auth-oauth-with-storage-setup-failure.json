@@ -1,0 +1,263 @@
+{
+  "status": "fail",
+  "phase": "storage",
+  "checks": [
+    {
+      "phase": "setup",
+      "name": "actual Auth password login A",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "real Auth session stored A",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "actual Auth password login B",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "real Auth session stored B",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "real authorized actor seeds business fixture",
+      "pass": true,
+      "details": {
+        "status": 201
+      }
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "active_user_id maps actual JWT A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "same business market qualification A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "actual session gate allows A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "active_user_id maps actual JWT B",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "same business market qualification B",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "actual session gate allows B",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A reads real meeting table",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "denied B cannot read same meeting rows",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "denied B own booking update changes zero rows",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "B booking retained after denial",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A updates own booking",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A cannot update B booking",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "denied B cannot insert booking",
+      "pass": true,
+      "details": {
+        "status": 403,
+        "code": "42501"
+      }
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A reads full business table",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "qualified-market denied B cannot read business rows",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "real SECURITY DEFINER business day RPC rejects B",
+      "pass": true,
+      "details": {
+        "status": 403,
+        "code": "42501"
+      }
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "real business day RPC accepts A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "A cannot cross to unassigned market",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "real persisted session block invalidates B identity",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "anonymous direct table access denied",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "B fresh unblocked Auth session before OAuth",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "different actual Auth user cannot consume A state",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "wrong-user attempt preserves PostgreSQL state",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "wrong verifier rejected",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "six concurrent HTTP finishes yield exactly one success",
+      "pass": true,
+      "details": {
+        "statuses": [
+          400,
+          400,
+          200,
+          400,
+          400,
+          400
+        ]
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "state consumed exactly once in real PostgreSQL",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "only one provider exchange after concurrent state consumption",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "one real connection row for A",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "B fresh Auth session login succeeds",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "real unique index permits one concurrent owner only",
+      "pass": true,
+      "details": {
+        "statuses": [
+          200,
+          400
+        ]
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "shared Google subject has exactly one DB owner",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "inactive existing subject still protected by real unique index",
+      "pass": true,
+      "details": {
+        "status": 400
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "real app-api prepares signed Storage upload",
+      "pass": false,
+      "details": {
+        "status": 404,
+        "message": "巡檢排班找不到這個班別，請重新載入"
+      }
+    }
+  ],
+  "error": "real app-api prepares signed Storage upload"
+}

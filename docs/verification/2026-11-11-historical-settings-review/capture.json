@@ -1,0 +1,26 @@
+{
+  "document_version": "V1.0.9",
+  "date": "2026-11-11",
+  "timezone": "Asia/Taipei",
+  "method": "Unaltered browser screenshots via cua_repl; LINE capture uses page clip excluding access-token section",
+  "scope": "Current settings only, not historical settings or attack reproduction",
+  "captures": [
+    {
+      "file": "google-audience-current.jpg",
+      "captured_file_timestamp": "2026-11-11T15:35:22.6440000+08:00",
+      "source": "Google Cloud / firstmarket-16e1a / Google Auth Platform / Audience",
+      "bytes": 50433,
+      "sha256": "14E10B32BAC53C24DE1A1E25EC2CAB8C1F02408D1CA8AC5C577558453725B8AC",
+      "visually_verified": true
+    },
+    {
+      "file": "line-settings-current.jpg",
+      "captured_file_timestamp": "2026-11-11T15:37:04.1340000+08:00",
+      "source": "LINE Developers / channel 2010493763 / Messaging API",
+      "bytes": 46143,
+      "sha256": "39139C18304E88C049EA235BD117F166AB3506AE18983711022216C5CB8F5DCD",
+      "visually_verified": true
+    }
+  ],
+  "timestamp_note": "Timestamps are local file creation times immediately after capture; not platform-signed timestamps"
+}

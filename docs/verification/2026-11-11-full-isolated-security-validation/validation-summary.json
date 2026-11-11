@@ -1,0 +1,412 @@
+{
+  "document_version": "V1.0.11",
+  "status": "pass",
+  "assertions": 63,
+  "failed_final": 0,
+  "skipped": 0,
+  "groups": {
+    "auth_and_setup": 26,
+    "oauth_postgres": 15,
+    "storage": 21,
+    "network_guard": 1
+  },
+  "historical_verdict": {
+    "accept": 2,
+    "needs_more_validation": 6
+  },
+  "checks": [
+    {
+      "phase": "setup",
+      "name": "actual Auth password login A",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "real Auth session stored A",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "actual Auth password login B",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "real Auth session stored B",
+      "pass": true
+    },
+    {
+      "phase": "setup",
+      "name": "real authorized actor seeds business fixture",
+      "pass": true,
+      "details": {
+        "status": 201
+      }
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "active_user_id maps actual JWT A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "same business market qualification A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "actual session gate allows A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "active_user_id maps actual JWT B",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "same business market qualification B",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "actual session gate allows B",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A reads real meeting table",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "denied B cannot read same meeting rows",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "denied B own booking update changes zero rows",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "B booking retained after denial",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A updates own booking",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A cannot update B booking",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "denied B cannot insert booking",
+      "pass": true,
+      "details": {
+        "status": 403,
+        "code": "42501"
+      }
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "allowed A reads full business table",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "qualified-market denied B cannot read business rows",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "real SECURITY DEFINER business day RPC rejects B",
+      "pass": true,
+      "details": {
+        "status": 403,
+        "code": "42501"
+      }
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "real business day RPC accepts A",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "A cannot cross to unassigned market",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "real persisted session block invalidates B identity",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "anonymous direct table access denied",
+      "pass": true
+    },
+    {
+      "phase": "full-schema-auth",
+      "name": "B fresh unblocked Auth session before OAuth",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "different actual Auth user cannot consume A state",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "wrong-user attempt preserves PostgreSQL state",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "wrong verifier rejected",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "six concurrent HTTP finishes yield exactly one success",
+      "pass": true,
+      "details": {
+        "statuses": [
+          400,
+          400,
+          200,
+          400,
+          400,
+          400
+        ]
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "state consumed exactly once in real PostgreSQL",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "only one provider exchange after concurrent state consumption",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "one real connection row for A",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "B fresh Auth session login succeeds",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "real unique index permits one concurrent owner only",
+      "pass": true,
+      "details": {
+        "statuses": [
+          200,
+          400
+        ]
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "shared Google subject has exactly one DB owner",
+      "pass": true
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "OAuth start stores PostgreSQL state",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "oauth-postgres",
+      "name": "inactive existing subject still protected by real unique index",
+      "pass": true,
+      "details": {
+        "status": 400
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "real app-api prepares signed Storage upload",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "actual Storage signed upload succeeds",
+      "pass": true,
+      "details": {}
+    },
+    {
+      "phase": "storage",
+      "name": "uploaded bytes read back with matching SHA256",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "valid attachment commit succeeds",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "cross-shift duplicate triggers actual unique-index failure",
+      "pass": true,
+      "details": {
+        "status": 409,
+        "message": "資料已存在，請勿重複提交"
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "existing Storage bytes survive duplicate failure",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "original attachment index remains linked to original shift",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "prepare second synthetic object",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "second Storage object uploaded",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "actual PostgreSQL error returns safe commit failure",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "Storage bytes survive actual DB failure",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "denied B cannot commit attachment",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "A cannot commit into unassigned market",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "B has same actual guard market qualification",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "qualified-market module-denied B attachment blocked",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "declared oversized upload rejected",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "actual DB permits legal draft to submitted transition",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "signed shift blocks attachment mutation",
+      "pass": true,
+      "details": {
+        "status": 409,
+        "message": "這班已交班簽名，附件已鎖定"
+      }
+    },
+    {
+      "phase": "storage-final",
+      "name": "signed attachment object remains byte-identical",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "no fault injection trigger remains",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "both newly uploaded Storage objects still exist",
+      "pass": true
+    },
+    {
+      "phase": "final",
+      "name": "no unexpected external network attempts",
+      "pass": true
+    }
+  ],
+  "setup_failures_resolved": [
+    "Restore role/grantor order fixed with original bootstrap role; no schema guard weakened",
+    "Windows relay uses private container IP inside internal network",
+    "Synthetic active users require supervisors; bookings require contact phone; business seed uses actual authenticated REST actor",
+    "Storage shift needs patrol_shift_template, not only patrol_shifts",
+    "Signed handover must use legal draft to submitted transition and eligible receiver"
+  ],
+  "application_code_changes": 0,
+  "existing_passwords_unchanged": true,
+  "limits": [
+    "Full LOCAL source-built schema, not historical or current production parity proof",
+    "Real GoTrue, PostgreSQL, PostgREST, Storage; Google token/userinfo responses are synthetic only",
+    "Application handlers run via Node/esbuild Deno adapter, not deployed Edge runtime",
+    "Oversize metadata declaration rejection tested; actual object exceeding 50 MiB and whole business UI not tested",
+    "No historical CSP, full production gateway, LINE invite or Google audience reconstruction"
+  ],
+  "cleanup": {
+    "owned_containers_stopped": 5,
+    "gateway_port_55440_closed": true,
+    "own_wsl_keepalive_stopped": true
+  }
+}

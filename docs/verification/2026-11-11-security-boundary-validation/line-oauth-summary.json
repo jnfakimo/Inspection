@@ -1,0 +1,18 @@
+{
+  "version": "V1.0.10",
+  "status": "pass",
+  "tests": 17,
+  "passed": 17,
+  "failed": 0,
+  "skipped": 0,
+  "line_cases": 12,
+  "oauth_cases": 5,
+  "source": "node --test line-oauth-differential.test.mjs",
+  "implementation": "Codex direct fallback after configured OpenCode agent unavailable and default local provider connection refused; no OpenCode code changes",
+  "limits": [
+    "Actual old/current source bundled with esbuild; Supabase/Google/LINE dependencies are synthetic replacements, no external requests",
+    "OAuth concurrency uses an in-memory atomic-delete model; not production database concurrency",
+    "Google unique-index failure is simulated as SQLSTATE23505; not a real index test",
+    "Assumed eligible Google audience and valid LINE signed events; cannot establish historical platform settings"
+  ]
+}

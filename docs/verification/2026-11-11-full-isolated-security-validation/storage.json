@@ -1,0 +1,83 @@
+{
+  "status": "fail",
+  "phase": "storage",
+  "checks": [
+    {
+      "phase": "storage",
+      "name": "real app-api prepares signed Storage upload",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "actual Storage signed upload succeeds",
+      "pass": true,
+      "details": {}
+    },
+    {
+      "phase": "storage",
+      "name": "uploaded bytes read back with matching SHA256",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "valid attachment commit succeeds",
+      "pass": true,
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "cross-shift duplicate triggers actual unique-index failure",
+      "pass": true,
+      "details": {
+        "status": 409,
+        "message": "資料已存在，請勿重複提交"
+      }
+    },
+    {
+      "phase": "storage",
+      "name": "existing Storage bytes survive duplicate failure",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "original attachment index remains linked to original shift",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "prepare second synthetic object",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "second Storage object uploaded",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "actual PostgreSQL error returns safe commit failure",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "Storage bytes survive actual DB failure",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "denied B cannot commit attachment",
+      "pass": true
+    },
+    {
+      "phase": "storage",
+      "name": "A cannot commit into unassigned market",
+      "pass": true
+    }
+  ],
+  "error": "SQL failed; private diagnostic saved"
+}

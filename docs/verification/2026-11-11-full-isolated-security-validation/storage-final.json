@@ -1,0 +1,64 @@
+{
+  "status": "pass",
+  "version": "V1.0.11",
+  "checks": [
+    {
+      "phase": "storage-final",
+      "name": "B has same actual guard market qualification",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "qualified-market module-denied B attachment blocked",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "declared oversized upload rejected",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "actual DB permits legal draft to submitted transition",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "signed shift blocks attachment mutation",
+      "pass": true,
+      "details": {
+        "status": 409,
+        "message": "這班已交班簽名，附件已鎖定"
+      }
+    },
+    {
+      "phase": "storage-final",
+      "name": "signed attachment object remains byte-identical",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "no fault injection trigger remains",
+      "pass": true
+    },
+    {
+      "phase": "storage-final",
+      "name": "both newly uploaded Storage objects still exist",
+      "pass": true
+    },
+    {
+      "phase": "final",
+      "name": "no unexpected external network attempts",
+      "pass": true
+    }
+  ],
+  "counts": {
+    "storage-final": 8,
+    "final": 1
+  },
+  "limits": [
+    "Google token/userinfo are synthetic provider responses; Auth, REST, schema, PostgreSQL operations/indexes and Storage are real local services",
+    "New isolated clone only; no production operations",
+    "Existing local database is a full source-built schema with synthetic data; cron excluded and pre-existing Storage bytes not cloned"
+  ]
+}

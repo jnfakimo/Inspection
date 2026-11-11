@@ -1,0 +1,27 @@
+Finding Evidence Review 續審 — V1.0.8
+驗收時間：2026-11-11T07:25:06.668Z
+文件範圍：第 1、2、4、5、6、7 項；第 3、8 項沿用原判定。
+
+文件／證據驗收：pass
+八項判定：2 accept / 6 needs more validation / 0 unsupported
+正式端到端攻擊驗證：未執行；歷史證據缺口仍存在。
+
+本輪新增證據：
+1. 舊 V1 部署掃描含 arealist；現況 HTTP 200、原事件插值移除。
+2. 正式業管 helper 有模組閘門，會議 restrictive RLS 存在。
+3. 舊附件 API、LINE 來源有對應部署日誌。
+4. LINE 與 Google 相關四個檔案與 G 槽相符（換行正規化）。
+5. app-api 整檔不同；附件修補區塊一致，無錯誤清理刪除。
+6. 正式 OAuth verifier 欄位、Google subject 唯一索引有效。
+7. 舊 Google 發起端部署可證；callback 與 audience 仍缺證。
+8. 歷史同步 run 成功但 synced=0，不當作寫入成功。
+
+保留驗收：
+原 180 個修改／未追蹤檔案中，僅 PROJECT_PLAN.md 追加。
+其他 179 檔 SHA-256 全相同；原藍圖內容前綴保留。
+Git HEAD、index 雜湊不變。
+既有帳號密碼維持不變；沒有重設、撤銷登入或寄信。
+沒有修改程式、migration 或正式設定；未提交、推送或部署。
+
+證據：同資料夾 review.md、evidence.json。
+本畫面為本機文件驗收，不是正式環境攻擊／端到端測試。

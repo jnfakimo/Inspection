@@ -1,0 +1,39 @@
+Finding Evidence Review — V1.0.9
+更新日期：2026-11-11（Asia/Taipei）
+文件驗收：pass
+歷史完整可利用性驗收：blocked（證據未完整，不是檢查失敗或漏洞不存在）
+範圍：歷史 CSP、權限／資料入口、LINE 邀群、Google audience 補證。
+
+已完成：
+1. review.md 與 evidence.json 分開列原始／歷史證據、目前設定、反證、缺口。
+2. 判定維持 accept：3、8；needs more validation：1、2、4、5、6、7。
+3. 目前選定 DB metadata：10 組表權限、198 筆欄位權限、22 支函式授權。
+4. 修補前 4 筆 REST 200 全屬伺服器金鑰，沒有被升格為拒權使用者存取證明。
+5. LINE 目前邀群與 Webhook 啟用；4 筆歷史管理端紀錄沒有被升格為 Webhook 接管。
+6. Google 目前 External／In production；6 筆歷史事件中 2 筆 Brand request／response 未包含 audience 值。未展開 secret 事件。
+7. 兩張真實設定截圖已目視檢查並直接嵌入 PROJECT_PLAN.md；capture.json SHA256 核對通過。
+8. 本輪 evidence.json、capture.json JSON 解析及數量核對通過。
+9. 本輪報告本機連結存在性檢查通過（外部 URL 不屬本機存在性檢查）。
+10. 原 PROJECT_PLAN.md 文字前綴完全保留；只有追加 V1.0.9。新增段落的多餘 EOF 空行已修正，git diff --check -- PROJECT_PLAN.md 通過。
+11. 185 個原有修改／未追蹤檔案中，除 PROJECT_PLAN.md 外 184 個檔案 SHA256 全部一致，沒有缺檔。
+12. Git HEAD 3885742bde404b393cea4be229b0f6dd12b69544 未變。
+13. Git index SHA256 52F128AF3415FC601673F8B88798F32EE5FA9805A4EF277E76032A2A7C941A2A 未變。
+14. 分支仍為 refactor/inspection-account-review-20261024；未切換、stage、commit、push、merge 或 deploy。
+15. 本目錄文字產物的常見 JWT／secret key／private key／Google access token 樣式檢查未匹配；這是有限樣式檢查，不是保證不存在任何敏感資料。歷史 DOM 摘錄的電子郵件已遮蔽。
+
+驗收使用：
+- Git 唯讀 status／ls-files／rev-parse／show／diff --check。
+- PowerShell Get-FileHash、ConvertFrom-Json、Test-Path 與本輪 Markdown 相對連結核對。
+- Supabase 唯讀 catalog／指定歷史日誌查詢；LINE／Google 控制台唯讀畫面查核。
+- browser screenshot 與檔案 SHA256 核對；未生成示意圖。
+
+未完成與限制：
+- 同時期有效 HTTP CSP／跨使用者路徑未補齊。
+- 歷史完整 grants／gateway exposure／pre-request／有效拒權帳號交集未補齊。
+- LINE 修補前邀群開關與共用推播條件未補齊。
+- Google 歷史 audience／舊 callback 精確部署／當時索引仍未補齊。
+- 第 4 項 schema／Storage／班別附件前提沒有新證據。
+- 沒有程式測試、build、攻擊重現、正式負向權限或第三方端到端測試。
+- 沒有改平台設定／資料、邀群、發送訊息、Google 授權／同步。
+- 既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- 僅本機文件補記；草稿 PR #151 未在本輪更新。
