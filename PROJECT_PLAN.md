@@ -621,3 +621,18 @@
 [6ed7edc9 結果續記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-6ed7edc9/verification.txt)
 
 ![6ed7edc9 CI 完成與連結檢查缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-6ed7edc9/document-verification.jpg)
+
+## 2026-11-11 CI 連結檢查實質驗證修正（建議版本 V1.0.6，未發布）
+
+- **版本與範圍**：更新日期 2026-11-11；修改 `.github/workflows/ci.yml`、`.github/workflows/commercial-readiness.yml` 與 `tools/commercial-readiness-audit.test.mjs`。保留既有修改及前述歷史審查紀錄；不更改八項 Finding Evidence Review 的 2 accept／6 needs more validation 判定。
+- **原因與修正**：移除將目錄 `.` 當 URL 並以 `|| true` 忽略錯誤的 `broken-link-checker` 呼叫。CI 改執行稽核失敗偵測測試；完整網站的本機連結／圖片檢查由既有 Commercial readiness 工作流，在 `build:v2` 與 unsigned `_site` 建置成功後執行 `commercial-readiness-audit.mjs`，保留非零退出狀態。此為重用既有實質稽核，不重複建置、不新增另一套掃描器。
+- **獨立驗收**：13 項測試全數通過（0 skip）；分別證明遺失頁面 href、img、CSS url 與沒有產物會 exit 1，合法相對路徑、部署基底、中文編碼及查詢參數通過。工作流回歸檢查確認先建置再稽核，且相關稽核沒有 `continue-on-error`／`|| true`。
+- **實際本機產物**：唯讀取用既有 `C:\Users\jnfa\Documents\Codex\2026-10-09\Inspection-G-runtime\_site` 封存產物，130 HTML、0 錯誤。複製到隔離目錄後注入不存在的頁面與圖片，得到 2 個 missing-asset、exit 1；還原後 0 錯誤、exit 0。原封存產物沒有修改。
+- **驗證界線**：本次沒有重新 build；封存產物未證明對應目前 G 槽全部未提交程式，不能聲稱現況全站已通過。檢查涵蓋 HTML href/src 與 CSS url 的本機檔案存在性；不驗外部 URL 可達性、fragment ID、JavaScript 動態連結或正式 HTTP 回應。GitHub 上的新工作流仍待授權推送後驗證；歷史 CI 的假成功紀錄仍成立。
+- **執行紀錄**：隔離目錄為 `C:\projects\Inspection-link-check-20261111`。指定 OpenCode 代理不存在，停止未產生修改的委派；由 Codex 完成有限範圍修正與驗收。只將三檔差異套回 G 槽，保留 CI 中既有手機測試變更。
+- **保留界線**：未提交、推送、合併、部署或連正式環境；原文件分支與 PR #150 未變動。既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- **截圖性質**：下方為本機記事本顯示實測驗收紀錄的真實截圖，不是 GitHub Checks 或正式環境截圖。
+
+[本機驗收與測試原始輸出](docs/verification/2026-11-11-ci-link-check-fix/verification.txt)
+
+![CI 連結檢查本機驗收](docs/verification/2026-11-11-ci-link-check-fix/document-verification.jpg)

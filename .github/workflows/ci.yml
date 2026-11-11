@@ -219,10 +219,10 @@ jobs:
           console.log(`Validated ${scripts.length} inline login script(s)`);
           NODE
 
-      # Check for broken links and images
-      - name: Check broken links and images
-        run: |
-          npx -y broken-link-checker . || true
+      # Full local links/images audit runs on the built _site artifact in
+      # commercial-readiness.yml. Here verify that missing assets fail closed.
+      - name: Verify local link and image audit failure detection
+        run: node --test tools/commercial-readiness-audit.test.mjs
 
       # Verify Subresource Integrity hashes (optional helper)
       - name: Verify SRI hashes
