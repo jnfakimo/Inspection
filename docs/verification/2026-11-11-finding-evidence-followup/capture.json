@@ -1,0 +1,10 @@
+{
+  "capturedAt": "2026-11-11T07:26:06.675Z",
+  "source": "Windows Notepad displaying verification.txt via @oai/sky",
+  "screenshotId": "screenshot-0",
+  "width": 609,
+  "height": 667,
+  "mime": "image/jpeg",
+  "sha256": "30d4487c886cecd38eecd18386d4be9ad6e4e6681d05732df4f3e0280245a51a",
+  "scope": "Local document evidence; not production exploit or end-to-end test"
+}

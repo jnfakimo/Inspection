@@ -636,3 +636,17 @@
 [本機驗收與測試原始輸出](docs/verification/2026-11-11-ci-link-check-fix/verification.txt)
 
 ![CI 連結檢查本機驗收](docs/verification/2026-11-11-ci-link-check-fix/document-verification.jpg)
+
+## 2026-11-11 六項待補證問題續審（文件 V1.0.8，本機補記）
+
+- **版本與範圍**：更新日期 2026-11-11；續審第 1、2、4、5、6、7 項，維持 **2 accept／6 needs more validation／0 unsupported**。V1.0.8 只指審查文件，不是新應用發布；保留前文歷史結論與既有修改。
+- **本輪權限界線**：沿用使用者允許連正式環境的授權，唯讀查詢 Supabase 中繼資料／已部署函式原始碼、GitHub 既有工作流日誌與正式 V1 靜態 HTTP 回應。沒有執行攻擊、讀取業務資料、LINE 推播、Google 授權、測試／build、提交、推送、合併或部署；只補文件與驗收產物。
+- **新歷史證據**：舊 Pages run 40053489789 的掃描器含 arealist 並要求 HTTP 200，補強當次 V1 可達性；app-api run 40471340612 與 LINE run 40046791041 可連到含原缺陷的來源及正式專案。OAuth run 32865903745 只證明發起端部署，不能連帶證明 callback；同步 run 40468830432 的 synced=0，不能當成行事曆寫入證明。
+- **修補後現況**：正式業管 helper 已檢查模組權限；會議預約限制型 RLS 已存在。LINE 兩檔、Google API／callback 與 G 槽正規化換行後一致。app-api 整檔有差異，僅本案附件區塊一致且兩個錯誤分支無 Storage.remove；不宣稱整檔同步。OAuth verifier 欄位及 subject 唯一索引有效。
+- **剩餘缺口**：歷史 CSP／跨使用者路徑、完整 grants／API 暴露／拒權帳號前提、Storage／班別附件條件、LINE 邀群與通知設定、Google audience／舊 callback 與歷史索引仍未補齊。管理 SQL 會話的 pgrst 設定 NULL 不是正式 gateway 設定證明。現況修補證據與原始可利用性分開判斷，未完成正式負向權限或第三方端到端驗證。
+- **密碼決定**：既有帳號密碼維持不變，不重設、不撤銷登入、不寄信；第 3 項殘留風險保留。第 3、8 項本輪未重審，沿用 accept。
+- **驗收與截圖**：本輪報告逐項列出 Claim anatomy、證據分類、反證、Severity／Confidence、Coverage、Proof Gaps 與最小下一步。以下為本機文件驗收畫面，不是正式攻擊重現。僅本機文件補記，未提交／推送。
+
+[完整 Finding Evidence Review 續審](docs/verification/2026-11-11-finding-evidence-followup/review.md) · [本輪查詢與日誌證據](docs/verification/2026-11-11-finding-evidence-followup/evidence.json) · [文件驗收](docs/verification/2026-11-11-finding-evidence-followup/verification.txt)
+
+![六項待補證續審的本機文件驗收](docs/verification/2026-11-11-finding-evidence-followup/document-verification.jpg)

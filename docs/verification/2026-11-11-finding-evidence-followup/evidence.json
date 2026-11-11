@@ -1,0 +1,583 @@
+{
+  "documentVersion": "V1.0.8",
+  "retrievedAt": "2026-11-11T07:22:38.288Z",
+  "scope": "Read-only metadata, source and existing deployment log review; no exploit or business data queries",
+  "project": "qztffronusdhgxhjjubt",
+  "originalCommit": "3885742bde404b393cea4be229b0f6dd12b69544",
+  "functions": [
+    {
+      "schema": "public",
+      "proname": "active_user_id",
+      "args": "",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "definition": "CREATE OR REPLACE FUNCTION public.active_user_id()\n RETURNS uuid\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select user_id from public.users\n  where auth_id=auth.uid()\n    and status='active'\n    and public.security_session_allowed()\n  limit 1\n$function$\n"
+    },
+    {
+      "schema": "public",
+      "proname": "business_market_allowed",
+      "args": "p_market text",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "definition": "CREATE OR REPLACE FUNCTION public.business_market_allowed(p_market text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select coalesce(public.active_user_id() is not null\n    and public.has_handover_module_access('business')\n    and p_market in ('market_1','market_2')\n    and (public.active_rbac_role()='sysadmin'\n      or exists(select 1 from jsonb_array_elements_text(public.handover_staff_markets(public.active_user_id(),'business')) m(value)\n        where m.value=p_market)),false)\n$function$\n"
+    },
+    {
+      "schema": "public",
+      "proname": "has_handover_module_access",
+      "args": "p_module_key text",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "definition": "CREATE OR REPLACE FUNCTION public.has_handover_module_access(p_module_key text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$ select public.has_module_access('handover',p_module_key) $function$\n"
+    },
+    {
+      "schema": "public",
+      "proname": "has_module_access",
+      "args": "p_system_key text, p_module_key text",
+      "security_definer": true,
+      "authenticated_execute": true,
+      "definition": "CREATE OR REPLACE FUNCTION public.has_module_access(p_system_key text, p_module_key text)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO ''\nAS $function$\n  select public.active_rbac_role()='sysadmin' or (\n    public.has_system_access('sys_'||p_system_key) and coalesce(\n      (select case uma.mode when 'allow' then true when 'deny' then false else null end\n        from public.user_module_access uma\n        where uma.user_id=public.active_user_id()\n          and uma.system_key=p_system_key and uma.module_key=p_module_key\n        limit 1),\n      (select case rma.mode when 'allow' then true when 'deny' then false else null end\n        from public.role_module_access rma\n        where rma.role_id=public.active_rbac_role()\n          and rma.system_key=p_system_key and rma.module_key=p_module_key\n        limit 1),\n      true)\n  )\n$function$\n"
+    }
+  ],
+  "policies": [
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_approvals",
+      "policyname": "business_handover_approvals_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "((approver_id = active_user_id()) AND business_market_can_approve(market_code, stage))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_approvals",
+      "policyname": "business_handover_approvals_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "business_market_allowed(market_code)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_approvals",
+      "policyname": "business_handover_approvals_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "business_market_allowed(market_code)",
+      "with_check": "((approver_id = active_user_id()) AND business_market_can_approve(market_code, stage))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_completions",
+      "policyname": "business_completion_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(EXISTS ( SELECT 1\n   FROM business_handover_entries e\n  WHERE ((e.entry_id = business_handover_completions.entry_id) AND business_market_allowed(e.market_code))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_entries",
+      "policyname": "business_handover_entries_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(business_market_allowed(market_code) AND (created_by = active_user_id()))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_entries",
+      "policyname": "business_handover_entries_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "business_market_allowed(market_code)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_entries",
+      "policyname": "business_handover_entries_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "business_market_allowed(market_code)",
+      "with_check": "(business_market_allowed(market_code) AND (updated_by = active_user_id()))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "business_handover_transfers",
+      "policyname": "business_transfer_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "business_market_allowed(market_code)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "floor_spaces",
+      "policyname": "floor_spaces_active_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(active_user_id() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "floor_spaces",
+      "policyname": "floor_spaces_managed_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(has_system_access('sys_structuremap'::text) AND has_app_permission('create'::text))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "floor_spaces",
+      "policyname": "floor_spaces_managed_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(has_system_access('sys_structuremap'::text) AND has_app_permission('update'::text))",
+      "with_check": "(has_system_access('sys_structuremap'::text) AND has_app_permission('update'::text))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "meeting_bookings",
+      "policyname": "meeting_bookings_authenticated_read",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "SELECT",
+      "qual": "(active_user_id() IS NOT NULL)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "meeting_bookings",
+      "policyname": "meeting_bookings_module_gate",
+      "permissive": "RESTRICTIVE",
+      "roles": "{authenticated}",
+      "cmd": "ALL",
+      "qual": "((active_user_id() IS NOT NULL) AND has_module_access('meetingroom'::text, 'bookings'::text))",
+      "with_check": "((active_user_id() IS NOT NULL) AND has_module_access('meetingroom'::text, 'bookings'::text))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "meeting_bookings",
+      "policyname": "meeting_bookings_own_insert",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(user_id = active_user_id())"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "meeting_bookings",
+      "policyname": "meeting_bookings_own_or_admin_update",
+      "permissive": "PERMISSIVE",
+      "roles": "{authenticated}",
+      "cmd": "UPDATE",
+      "qual": "(is_admin() OR (user_id = active_user_id()))",
+      "with_check": "(is_admin() OR (user_id = active_user_id()))"
+    }
+  ],
+  "tables": [
+    {
+      "relname": "business_handover_approvals",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    },
+    {
+      "relname": "business_handover_completions",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres}"
+    },
+    {
+      "relname": "business_handover_entries",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    },
+    {
+      "relname": "business_handover_transfers",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres}"
+    },
+    {
+      "relname": "google_calendar_oauth_states",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    },
+    {
+      "relname": "guard_handover_attachments",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,service_role=arwdDxtm/postgres,authenticated=r/postgres}"
+    },
+    {
+      "relname": "meeting_bookings",
+      "relrowsecurity": true,
+      "relforcerowsecurity": true,
+      "relacl": "{postgres=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    }
+  ],
+  "indexes": [
+    {
+      "relname": "google_calendar_connections",
+      "index_name": "google_calendar_connections_pkey",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_connections_pkey ON public.google_calendar_connections USING btree (connection_id)"
+    },
+    {
+      "relname": "google_calendar_connections",
+      "index_name": "google_calendar_connections_user_id_key",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_connections_user_id_key ON public.google_calendar_connections USING btree (user_id)"
+    },
+    {
+      "relname": "google_calendar_connections",
+      "index_name": "uq_google_calendar_connections_subject",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX uq_google_calendar_connections_subject ON public.google_calendar_connections USING btree (google_subject) WHERE (google_subject IS NOT NULL)"
+    },
+    {
+      "relname": "google_calendar_oauth_states",
+      "index_name": "google_calendar_oauth_states_pkey",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_oauth_states_pkey ON public.google_calendar_oauth_states USING btree (state_hash)"
+    },
+    {
+      "relname": "google_calendar_oauth_states",
+      "index_name": "idx_google_calendar_oauth_states_expiry",
+      "indisunique": false,
+      "indisvalid": true,
+      "definition": "CREATE INDEX idx_google_calendar_oauth_states_expiry ON public.google_calendar_oauth_states USING btree (expires_at)"
+    },
+    {
+      "relname": "google_calendar_sync_jobs",
+      "index_name": "google_calendar_sync_jobs_booking_id_key",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_sync_jobs_booking_id_key ON public.google_calendar_sync_jobs USING btree (booking_id)"
+    },
+    {
+      "relname": "google_calendar_sync_jobs",
+      "index_name": "google_calendar_sync_jobs_pkey",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_sync_jobs_pkey ON public.google_calendar_sync_jobs USING btree (job_id)"
+    },
+    {
+      "relname": "google_calendar_sync_jobs",
+      "index_name": "idx_google_calendar_sync_jobs_pending",
+      "indisunique": false,
+      "indisvalid": true,
+      "definition": "CREATE INDEX idx_google_calendar_sync_jobs_pending ON public.google_calendar_sync_jobs USING btree (status, next_attempt_at, created_at)"
+    },
+    {
+      "relname": "guard_handover_attachments",
+      "index_name": "guard_handover_attachments_pkey",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX guard_handover_attachments_pkey ON public.guard_handover_attachments USING btree (attachment_id)"
+    },
+    {
+      "relname": "guard_handover_attachments",
+      "index_name": "guard_handover_market_attachments",
+      "indisunique": false,
+      "indisvalid": true,
+      "definition": "CREATE INDEX guard_handover_market_attachments ON public.guard_handover_attachments USING btree (market_code, duty_date, shift_name, incident_id) WHERE (NOT is_deleted)"
+    },
+    {
+      "relname": "guard_handover_attachments",
+      "index_name": "idx_guard_handover_attachments_path",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX idx_guard_handover_attachments_path ON public.guard_handover_attachments USING btree (storage_path)"
+    },
+    {
+      "relname": "guard_handover_attachments",
+      "index_name": "idx_guard_handover_attachments_shift",
+      "indisunique": false,
+      "indisvalid": true,
+      "definition": "CREATE INDEX idx_guard_handover_attachments_shift ON public.guard_handover_attachments USING btree (duty_date, shift_name, incident_id) WHERE (NOT is_deleted)"
+    }
+  ],
+  "controls": [
+    {
+      "kind": "column",
+      "table_name": "google_calendar_oauth_states",
+      "name": "browser_verifier_hash",
+      "detail": "text"
+    },
+    {
+      "kind": "trigger",
+      "table_name": "guard_handover_attachments",
+      "name": "trg_prevent_removal",
+      "detail": "CREATE TRIGGER trg_prevent_removal BEFORE DELETE OR TRUNCATE ON public.guard_handover_attachments FOR EACH STATEMENT EXECUTE FUNCTION reject_physical_data_removal()"
+    },
+    {
+      "kind": "trigger",
+      "table_name": "guard_handover_attachments",
+      "name": "trg_protect_guard_handover_attachment",
+      "detail": "CREATE TRIGGER trg_protect_guard_handover_attachment BEFORE INSERT OR UPDATE ON public.guard_handover_attachments FOR EACH ROW EXECUTE FUNCTION protect_guard_handover_attachment()"
+    },
+    {
+      "kind": "trigger",
+      "table_name": "meeting_bookings",
+      "name": "trg_enqueue_google_calendar_sync",
+      "detail": "CREATE TRIGGER trg_enqueue_google_calendar_sync AFTER INSERT OR UPDATE OF room_id, user_id, purpose, booking_date, start_time, end_time, status, google_sync_enabled ON public.meeting_bookings FOR EACH ROW EXECUTE FUNCTION enqueue_google_calendar_sync()"
+    },
+    {
+      "kind": "trigger",
+      "table_name": "meeting_bookings",
+      "name": "trg_guard_meeting_booking_input",
+      "detail": "CREATE TRIGGER trg_guard_meeting_booking_input BEFORE INSERT OR UPDATE OF room_id, booking_date, start_time, end_time, booker_phone, contact_phone ON public.meeting_bookings FOR EACH ROW EXECUTE FUNCTION guard_meeting_booking_input()"
+    },
+    {
+      "kind": "trigger",
+      "table_name": "meeting_bookings",
+      "name": "trg_prevent_removal",
+      "detail": "CREATE TRIGGER trg_prevent_removal BEFORE DELETE OR TRUNCATE ON public.meeting_bookings FOR EACH STATEMENT EXECUTE FUNCTION reject_physical_data_removal()"
+    },
+    {
+      "kind": "trigger",
+      "table_name": "meeting_bookings",
+      "name": "trg_protect_google_calendar_booking_fields",
+      "detail": "CREATE TRIGGER trg_protect_google_calendar_booking_fields BEFORE INSERT OR UPDATE ON public.meeting_bookings FOR EACH ROW EXECUTE FUNCTION protect_google_calendar_booking_fields()"
+    }
+  ],
+  "postgrestSessionOnly": [
+    {
+      "session_pgrst_db_schemas": null,
+      "session_pgrst_db_pre_request": null
+    }
+  ],
+  "edgeSourceComparisons": [
+    {
+      "slug": "app-api",
+      "version": 127,
+      "path": "supabase/functions/app-api/index.ts",
+      "localSha256": "AF6BA75D6081E4CC15E77BFAD71629180B6F859BDB44B9541762E9A1FF5ABDAD",
+      "normalizedEqual": false
+    },
+    {
+      "slug": "line-notify",
+      "version": 34,
+      "path": "supabase/functions/line-notify/index.ts",
+      "localSha256": "DCAB78570402D4652F3DDA89929D01D2A7F36108E9B77F0B4331E88E89D0ACB1",
+      "normalizedEqual": true
+    },
+    {
+      "slug": "line-notify",
+      "version": 34,
+      "path": "supabase/functions/_shared/vehicle-line-webhook.ts",
+      "localSha256": "5026CCE6966494C51E12555D91C56FE9624A87CEC83D517C4CA5444E73A19915",
+      "normalizedEqual": true
+    },
+    {
+      "slug": "google-calendar",
+      "version": 16,
+      "path": "supabase/functions/google-calendar/index.ts",
+      "localSha256": "76870D14508EF6EEACB5A85941AC10704DB39184346C60E43CC529CD578544B4",
+      "normalizedEqual": true
+    },
+    {
+      "slug": "google-calendar-callback",
+      "version": 15,
+      "path": "supabase/functions/google-calendar-callback/index.ts",
+      "localSha256": "69B1CFC43394BC6168E87B2D275DFF21F7765F1FCBC36244F38281CA1D1CFD39",
+      "normalizedEqual": true
+    }
+  ],
+  "attachmentRelevantBlock": {
+    "localStart": 4197,
+    "localEnd": 4225,
+    "remoteStart": 4193,
+    "remoteEnd": 4221,
+    "matched": true,
+    "containsStorageRemove": false
+  },
+  "http": {
+    "url": "https://jnfakimo.github.io/Inspection/system/arealist.html?evidence=20261111",
+    "status": 200,
+    "csp": null,
+    "cspReportOnly": null,
+    "meta": [
+      "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' blob:\">"
+    ],
+    "hasOldInline": false,
+    "hasDataFloor": true
+  },
+  "historicalDeployments": [
+    {
+      "runId": 40471340612,
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/40471340612",
+      "exit": 0,
+      "lines": [
+        "deploy\tUNKNOWN STEP\t2026-10-27T08:07:21.5268363Z   ref: c3fcd8e2ff1b1cf7b9630823a0efddbe5b96c51f",
+        "deploy\tUNKNOWN STEP\t2026-10-27T08:09:28.2640799Z Bundling Function: app-api",
+        "deploy\tUNKNOWN STEP\t2026-10-27T08:09:53.4727383Z Deploying Function: app-api (script size: 236 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-27T08:09:54.0706878Z Bundling Function: patrol-timeout-check",
+        "deploy\tUNKNOWN STEP\t2026-10-27T08:09:54.4755042Z Deploying Function: patrol-timeout-check (script size: 72 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-27T08:09:55.5709798Z Deployed Functions on project qztffronusdhgxhjjubt: app-api, patrol-timeout-check"
+      ]
+    },
+    {
+      "runId": 40046791041,
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/40046791041",
+      "exit": 0,
+      "lines": [
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:48:34.9133185Z   ref: 453d968d7a03db379a5c3e5942f2b3a76a0961d3",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:16.2751645Z Bundling Function: admin-api",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:29.6145773Z Deploying Function: admin-api (script size: 118 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:30.1398576Z Bundling Function: app-api",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:30.7430843Z Deploying Function: app-api (script size: 236 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:31.2975155Z Bundling Function: audit-event",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:31.8236331Z Deploying Function: audit-event (script size: 89 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:32.3432313Z Bundling Function: error-threshold-check",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:32.8908002Z Deploying Function: error-threshold-check (script size: 82 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:34.2589508Z Bundling Function: line-notify",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:34.9295618Z Bundling Function: patrol-checkin",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:35.4200120Z Deploying Function: patrol-checkin (script size: 66 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:35.9267392Z Bundling Function: patrol-timeout-check",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:36.4629177Z Bundling Function: platform-log-alert",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:36.9912547Z Deploying Function: platform-log-alert (script size: 77 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:37.5277338Z Bundling Function: username-login",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:38.0249915Z Deploying Function: username-login (script size: 85 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:38.5482778Z Bundling Function: vehicle-line-dispatch-worker",
+        "deploy\tUNKNOWN STEP\t2026-10-24T00:51:39.4744206Z Deployed Functions on project qztffronusdhgxhjjubt: admin-api, app-api, audit-event, error-threshold-check, line-notify, patrol-checkin, patrol-timeout-check, platform-log-alert, username-login, vehicle-line-dispatch-worker"
+      ]
+    },
+    {
+      "runId": 39381216491,
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/39381216491",
+      "exit": 0,
+      "lines": [
+        "deploy\tUNKNOWN STEP\t2026-10-20T06:35:21.2025188Z Bundling Function: admin-api",
+        "deploy\tUNKNOWN STEP\t2026-10-20T06:35:34.8643402Z Deploying Function: admin-api (script size: 118 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-20T06:35:35.8019721Z Bundling Function: app-api",
+        "deploy\tUNKNOWN STEP\t2026-10-20T06:35:36.4293724Z Deploying Function: app-api (script size: 235 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-20T06:35:38.3546820Z Deployed Functions on project qztffronusdhgxhjjubt: admin-api, app-api"
+      ]
+    },
+    {
+      "runId": 39371445303,
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/39371445303",
+      "exit": 0,
+      "lines": [
+        "deploy\tUNKNOWN STEP\t2026-10-20T04:47:54.3386338Z Bundling Function: app-api",
+        "deploy\tUNKNOWN STEP\t2026-10-20T04:48:20.9519846Z Deploying Function: app-api (script size: 235 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-20T04:48:22.0093906Z Deployed Functions on project qztffronusdhgxhjjubt: app-api"
+      ]
+    },
+    {
+      "runId": 38829266322,
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/38829266322",
+      "exit": 0,
+      "lines": [
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:28.8883264Z Bundling Function: admin-api",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:41.8441060Z Deploying Function: admin-api (script size: 118 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:42.8142370Z Bundling Function: app-api",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:43.4811275Z Deploying Function: app-api (script size: 235 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:44.5105046Z Bundling Function: line-notify",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:45.0512817Z Deploying Function: line-notify (script size: 71 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:45.9428139Z Bundling Function: vehicle-line-dispatch-worker",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:46.4638053Z Deploying Function: vehicle-line-dispatch-worker (script size: 67 kB)",
+        "deploy\tUNKNOWN STEP\t2026-10-16T00:24:48.1415206Z Deployed Functions on project qztffronusdhgxhjjubt: admin-api, app-api, line-notify, vehicle-line-dispatch-worker"
+      ]
+    },
+    {
+      "runId": 32865903745,
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/32865903745",
+      "exit": 0,
+      "lines": [
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:36.1470115Z c837d98246f3f35ee499fde6c2df8e61812e182d",
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:36.5426293Z c837d98246f3f35ee499fde6c2df8e61812e182d",
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:36.6082988Z ^[[36;1m    changed=\"$(git diff --name-only \"$base\" \"c837d98246f3f35ee499fde6c2df8e61812e182d\" -- supabase/functions/)\"^[[0m",
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:36.6086997Z ^[[36;1m    if git diff --name-only \"$base\" \"c837d98246f3f35ee499fde6c2df8e61812e182d\" -- supabase/config.toml | grep -q .; then^[[0m",
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:42.7859020Z Bundling Function: google-calendar",
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:52.0414978Z Deploying Function: google-calendar (script size: 65 kB)",
+        "deploy\tUNKNOWN STEP\t2026-08-25T15:27:52.3582894Z Deployed Functions on project qztffronusdhgxhjjubt: google-calendar"
+      ]
+    }
+  ],
+  "historicalPages": {
+    "runId": 40053489789,
+    "url": "https://github.com/jnfakimo/Inspection/actions/runs/40053489789",
+    "selectedLog": [
+      "verify-deployment\tUNKNOWN STEP\t2026-10-24T02:20:38.9261876Z   EXPECTED_COMMIT: 3885742bde404b393cea4be229b0f6dd12b69544",
+      "verify-deployment\tUNKNOWN STEP\t2026-10-24T02:20:40.2294434Z 正式全站掃描通過：38 個頁面、4 個敏感路徑封鎖、數位簽章有效。"
+    ],
+    "artifactListEmpty": true,
+    "limitation": "scanner checks HTTP 200/HTML/provenance; no effective CSP capture"
+  },
+  "historicalCalendarSync": {
+    "runId": 40468830432,
+    "url": "https://github.com/jnfakimo/Inspection/actions/runs/40468830432",
+    "selectedLog": [
+      "sync\tUNKNOWN STEP\t2026-10-27T07:43:33.2272740Z {\"ok\":true,\"data\":{\"processed\":0,\"synced\":0,\"failed\":0,\"skipped\":0}}"
+    ]
+  },
+  "limitations": [
+    "Current settings do not establish past settings",
+    "NULL pgrst GUCs describe only management SQL session, not gateway configuration",
+    "Full app-api differs; only scoped attachment block equality established",
+    "No business rows, passwords, tokens or LINE/Google event data retrieved",
+    "No tests, builds, exploit payloads or deployment performed"
+  ],
+  "verdicts": [
+    {
+      "item": 1,
+      "verdict": "needs more validation"
+    },
+    {
+      "item": 2,
+      "verdict": "needs more validation"
+    },
+    {
+      "item": 3,
+      "verdict": "accept",
+      "reviewedThisRound": false
+    },
+    {
+      "item": 4,
+      "verdict": "needs more validation"
+    },
+    {
+      "item": 5,
+      "verdict": "needs more validation"
+    },
+    {
+      "item": 6,
+      "verdict": "needs more validation"
+    },
+    {
+      "item": 7,
+      "verdict": "needs more validation"
+    },
+    {
+      "item": 8,
+      "verdict": "accept",
+      "reviewedThisRound": false
+    }
+  ],
+  "passwordDecision": "Existing passwords unchanged"
+}
