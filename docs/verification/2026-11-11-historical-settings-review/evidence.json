@@ -1,0 +1,1669 @@
+{
+  "document_version": "V1.0.9",
+  "observed_date": "2026-11-11",
+  "timezone": "Asia/Taipei",
+  "mode": "Read-only remote and local evidence review; only local documentation created",
+  "verdicts": {
+    "accept": [
+      3,
+      8
+    ],
+    "needs_more_validation": [
+      1,
+      2,
+      4,
+      5,
+      6,
+      7
+    ],
+    "unsupported": []
+  },
+  "original_source": {
+    "head": "3885742bde404b393cea4be229b0f6dd12b69544",
+    "scan_id": "5d6ba110-f505-4f3f-9d58-2196d706f98c",
+    "prior_review": "../2026-11-11-finding-evidence-followup/review.md"
+  },
+  "csp": {
+    "status": "Historical effective HTTP CSP unknown",
+    "searched_local_roots": [
+      "G:\\我的雲端硬碟\\AI\\Codex\\北農巡檢系統",
+      "C:\\projects\\Inspection-pages-safe-release-20261029",
+      "C:\\projects\\Inspection-security-audit-20261024"
+    ],
+    "archive_lookup": "Exact V1 arealist URL, bounded through 2026-11-05; CDX returned empty array; not proof that no archive exists",
+    "available_template": "tools/selfhosted-iis-supabase-proxy.web.config",
+    "limitation": "Template is not an effective deployment snapshot; prior historical HTTP200 scan did not preserve headers"
+  },
+  "current_database": {
+    "project": "qztffronusdhgxhjjubt",
+    "scope": "5 target public tables; anon/authenticated; 22 selected business and authorization functions. Not a cluster-wide or historical ACL inventory",
+    "table_privileges": [
+      {
+        "table_name": "business_handover_approvals",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "anon",
+        "can_select": false,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "authenticated",
+        "can_select": true,
+        "can_insert": true,
+        "can_update": true,
+        "can_delete": true
+      },
+      {
+        "table_name": "business_handover_completions",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "anon",
+        "can_select": false,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "business_handover_completions",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "authenticated",
+        "can_select": true,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "business_handover_entries",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "anon",
+        "can_select": false,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "business_handover_entries",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "authenticated",
+        "can_select": true,
+        "can_insert": true,
+        "can_update": true,
+        "can_delete": true
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "anon",
+        "can_select": false,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "authenticated",
+        "can_select": true,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "meeting_bookings",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "anon",
+        "can_select": false,
+        "can_insert": false,
+        "can_update": false,
+        "can_delete": false
+      },
+      {
+        "table_name": "meeting_bookings",
+        "relrowsecurity": true,
+        "relforcerowsecurity": true,
+        "role_name": "authenticated",
+        "can_select": true,
+        "can_insert": true,
+        "can_update": true,
+        "can_delete": true
+      }
+    ],
+    "column_privileges": [
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approval_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approval_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approval_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approval_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approved_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approved_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approved_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approved_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approver_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approver_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approver_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "approver_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "note",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "note",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "note",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "note",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage_label",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage_label",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage_label",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "stage_label",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_approvals",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_completions",
+        "column_name": "completed_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_completions",
+        "column_name": "completed_by",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_completions",
+        "column_name": "completed_date",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_completions",
+        "column_name": "completed_name",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_completions",
+        "column_name": "completed_shift",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_completions",
+        "column_name": "entry_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "absent_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "absent_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "absent_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "absent_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "category",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "category",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "category",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "category",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_by",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_by",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_by",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "created_by",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_by",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_by",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_by",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "deleted_by",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "description",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "description",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "description",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "description",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "entry_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "entry_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "entry_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "entry_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "expected_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "expected_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "expected_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "expected_attendance",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "is_deleted",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "is_deleted",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "is_deleted",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "is_deleted",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "shift_code",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "shift_code",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "shift_code",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "shift_code",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_by",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_by",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_by",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_entries",
+        "column_name": "updated_by",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "handed_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "handed_by",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "handed_name",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "handover_date",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "items",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "market_code",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "next_date",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "next_shift",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "received_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "received_by",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "received_name",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "receiver_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "receiver_name",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "revision",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "shift_code",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "business_handover_transfers",
+        "column_name": "transfer_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booker_phone",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booker_phone",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booker_phone",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booker_phone",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_date",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_date",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_date",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_date",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_no",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_no",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_no",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "booking_no",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "checked_in_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "checked_in_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "checked_in_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "checked_in_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "contact_phone",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "contact_phone",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "contact_phone",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "contact_phone",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "created_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "end_time",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "end_time",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "end_time",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "end_time",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_error",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_error",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_error",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_error",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_status",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_status",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_status",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_sync_status",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_synced_at",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_synced_at",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_synced_at",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_calendar_synced_at",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_event_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_event_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_event_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_event_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_sync_enabled",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_sync_enabled",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_sync_enabled",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "google_sync_enabled",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "purpose",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "purpose",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "purpose",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "purpose",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "room_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "room_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "room_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "room_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "start_time",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "start_time",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "start_time",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "start_time",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "status",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "status",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "status",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "status",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "time_range",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "time_range",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "time_range",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "time_range",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "user_id",
+        "grantee": "authenticated",
+        "privilege_type": "INSERT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "user_id",
+        "grantee": "authenticated",
+        "privilege_type": "REFERENCES"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "user_id",
+        "grantee": "authenticated",
+        "privilege_type": "SELECT"
+      },
+      {
+        "table_name": "meeting_bookings",
+        "column_name": "user_id",
+        "grantee": "authenticated",
+        "privilege_type": "UPDATE"
+      }
+    ],
+    "rpc_privileges": [
+      {
+        "proname": "active_user_id",
+        "arguments": "",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "ecddcd8e55a09117ed3eddb9f88d3b0d"
+      },
+      {
+        "proname": "business_approval_require_deputy_director",
+        "arguments": "",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "915fd3ade9075bb437f1682de8ed752d"
+      },
+      {
+        "proname": "business_deputy_director_effective_date",
+        "arguments": "p_market text",
+        "security_definer": false,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "aa0769bbf930b5fd3a546188c3fb38f4"
+      },
+      {
+        "proname": "business_deputy_director_enabled",
+        "arguments": "p_market text",
+        "security_definer": false,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "05e3294253de207ad007889477107c04"
+      },
+      {
+        "proname": "business_handover_action",
+        "arguments": "p_action text, p_date date, p_shift text, p_entry uuid, p_receiver uuid, p_revision text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "542e411a1073242194343f536245e2b8"
+      },
+      {
+        "proname": "business_handover_day",
+        "arguments": "p_date date",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "32483e2543bc7b5024691364837fbd5f"
+      },
+      {
+        "proname": "business_handover_receivers",
+        "arguments": "",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "d7d01143f1d7092e7de43be736e3ad48"
+      },
+      {
+        "proname": "business_market_action",
+        "arguments": "p_market text, p_action text, p_date date, p_shift text, p_entry uuid, p_receiver uuid, p_revision text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "29fd8790473d5f1b967f78ba5a0121c9"
+      },
+      {
+        "proname": "business_market_allowed",
+        "arguments": "p_market text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "556b95b4934647406ce15b5df4dfdaa9"
+      },
+      {
+        "proname": "business_market_approval_allowed",
+        "arguments": "p_user uuid, p_market text, p_stage text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "f06fe1739af51e90859b13f19968e815"
+      },
+      {
+        "proname": "business_market_can_approve",
+        "arguments": "p_market text, p_stage text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "47e76fe33bf3ab1c67a7d6a23369f406"
+      },
+      {
+        "proname": "business_market_day",
+        "arguments": "p_market text, p_date date",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "8dd9fff40fee3b12c94e59988790e030"
+      },
+      {
+        "proname": "business_market_receiver_allowed",
+        "arguments": "p_user uuid, p_market text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "b65b73a07a80029afcd1987a2c24c556"
+      },
+      {
+        "proname": "business_market_receivers",
+        "arguments": "p_market text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "24ec74786ff75d12812626318d92653f"
+      },
+      {
+        "proname": "business_market_shift_items",
+        "arguments": "p_market text, p_date date, p_shift text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "278e484c74da14b5736cb615f0a3b221"
+      },
+      {
+        "proname": "business_receiver_allowed",
+        "arguments": "p_user uuid",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "b0e607d562a5fb870373b257d50d0795"
+      },
+      {
+        "proname": "business_shift_items",
+        "arguments": "p_date date, p_shift text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "fb242960c9fdbb489cbdecbe4cc259bc"
+      },
+      {
+        "proname": "business_shift_start",
+        "arguments": "p_date date, p_shift text",
+        "security_definer": false,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "1b9e53a599d745d776a2f480cd92b61f"
+      },
+      {
+        "proname": "business_supervisor_within",
+        "arguments": "p_user uuid, p_market text, p_depth integer",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "definition_md5": "92556f16914a33e45c29d969e67181b2"
+      },
+      {
+        "proname": "has_handover_module_access",
+        "arguments": "p_module_key text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "2317c6b2808b0bc3916e5c272c8b4ff3"
+      },
+      {
+        "proname": "has_module_access",
+        "arguments": "p_system_key text, p_module_key text",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "506f10be92a32af156303435440f7cce"
+      },
+      {
+        "proname": "security_session_allowed",
+        "arguments": "",
+        "security_definer": true,
+        "anon_execute": false,
+        "authenticated_execute": true,
+        "definition_md5": "ac04bbecbb46e360c4eac113fdb5b9dd"
+      }
+    ],
+    "role_gateway_settings": [],
+    "role_gateway_settings_filter": [
+      "pgrst.db_schemas",
+      "pgrst.db_pre_request",
+      "pgrst.db_extra_search_path"
+    ],
+    "limitation": "Empty role settings do not establish externally configured PostgREST settings; grants do not bypass RLS"
+  },
+  "historical_logs": {
+    "start_inclusive": "2026-11-05T00:00:00Z",
+    "end_exclusive": "2026-11-06T00:00:00Z",
+    "available_counts": {
+      "postgres_logs": 1177,
+      "edge_logs": 3908,
+      "function_edge_logs": 700
+    },
+    "meeting_rest": {
+      "path": "/rest/v1/meeting_bookings",
+      "method": "GET",
+      "status": 200,
+      "result": [
+        {
+          "apikey_jwt_role": "",
+          "authorization_role": "",
+          "content_range": "*/*",
+          "has_auth_user": 0,
+          "requests": 4,
+          "server_key_prefix": 1
+        }
+      ],
+      "interpretation": "All four matched requests used a server/secret key prefix; missing JWT role is not anon; content_range */* does not prove rows returned or denied-user access"
+    },
+    "selected_function_ids": {
+      "line_notify": "b804c387-6cfa-479f-8f05-7ceb1fc7151c",
+      "google_calendar": "0dedb236-8a6a-4945-a0bd-f0cd7cf9792c",
+      "google_calendar_callback": "462cae64-3b9d-491e-a150-a362aeb024fe"
+    },
+    "function_matches": {
+      "result": [
+        {
+          "deployment": "qztffronusdhgxhjjubt_0dedb236-8a6a-4945-a0bd-f0cd7cf9792c_14",
+          "function_id": "0dedb236-8a6a-4945-a0bd-f0cd7cf9792c",
+          "path": "",
+          "requests": 6,
+          "status": "200"
+        }
+      ]
+    },
+    "function_filter_note": "Initial request.path filter was ineffective because this field was empty; corrected to function_id. Matched version14 is initiating function only, not callback.",
+    "selected_postgres_commands": {
+      "result": [
+        {
+          "command": "BIND",
+          "entries": 4
+        },
+        {
+          "command": "SELECT",
+          "entries": 22
+        }
+      ]
+    },
+    "limitations": [
+      "24-hour retained-log slice only; absence is not proof of no events",
+      "No historical effective complete grants, PostgREST schema exposure or pre-request configuration captured",
+      "No actual auth-user IDs, key values, query bodies, business contents or response bodies retained"
+    ]
+  },
+  "backup": {
+    "run_url": "https://github.com/jnfakimo/Inspection/actions/runs/42127566613",
+    "source_commit": "a8e088423927ba9f9074912658268b1f9643b799",
+    "artifact_id": 13463026786,
+    "name": "inspection-backup-20261105T233504Z.tar.gz.gpg",
+    "size_bytes": 108128521,
+    "created_at": "2026-11-05T23:35:13Z",
+    "expired_at_observation": false,
+    "downloaded": false,
+    "decrypted": false,
+    "source_documents": [
+      "tools/database-backup.mjs",
+      "docs/DATABASE_BACKUP_RECOVERY.md"
+    ],
+    "coverage": "Row NDJSON and Storage; schema/RLS excluded; auth_users=false; database_roles=false",
+    "limitation": "Artifact existence does not establish backup recovery success or reconstruct historical grants"
+  },
+  "line": {
+    "channel_id": "2010493763",
+    "channel_name": "臺北農產巡檢通知",
+    "current": {
+      "webhook_url": "https://qztffronusdhgxhjjubt.supabase.co/functions/v1/line-notify",
+      "use_webhook": true,
+      "allow_bot_to_join_group_chats": true,
+      "webhook_redelivery": false,
+      "error_statistics_aggregation": false
+    },
+    "historical_admin_audit": [
+      {
+        "action": "update",
+        "source": "v2-admin",
+        "no_operator": false,
+        "events": 4,
+        "earliest": "2026-08-25 15:42:27.259303+00",
+        "latest": "2026-08-26 04:36:59.539469+00"
+      }
+    ],
+    "audit_filter": "table_name=system_settings; record_id=line_group_id OR changes text mentions line_group_id; operated_at<2026-11-06T00:00:00Z",
+    "limitation": "Audit rows are authenticated v2-admin setting updates mentioning the key, not demonstrated webhook overwrite or four verified value changes. Current invite setting cannot prove historic setting.",
+    "screenshot": "line-settings-current.jpg"
+  },
+  "google": {
+    "project": "firstmarket-16e1a",
+    "client_name": "臺北農產會議室預約系統",
+    "client_id": "555730080635-v8q0ndnq9njb7v6du94debc1mogvonpg.apps.googleusercontent.com",
+    "redirect_uri": "https://qztffronusdhgxhjjubt.supabase.co/functions/v1/google-calendar-callback",
+    "current": {
+      "audience": "External",
+      "publishing_status": "In production",
+      "verification_warning": true,
+      "oauth_users_count": 1,
+      "oauth_users_cap": 100
+    },
+    "current_count_limitation": "Usage count is not a one-person testing allowlist",
+    "audit_query": "timestamp >= \"2026-08-18T00:00:00Z\"\ntimestamp < \"2026-11-06T00:00:00Z\"\nprotoPayload.serviceName =~ \"(?i)(oauth|authconfig)\"",
+    "audit_service": "clientauthconfig.googleapis.com",
+    "audit_total_events": 6,
+    "audit_method_counts": {
+      "CreateBrand": 1,
+      "CreateClient": 1,
+      "AddClientSecret": 1,
+      "UpdateClientSecret": 1,
+      "UpdateBrandWithMask": 2
+    },
+    "secret_events_expanded": false,
+    "expanded_brand_events": [
+      {
+        "timestamp": "2026-08-18T03:50:33.451618Z",
+        "insert_id": "nxe5q3d3dec",
+        "artifact": "google-brand-audit-second-redacted.txt"
+      },
+      {
+        "timestamp": "2026-08-18T03:59:36.630527Z",
+        "insert_id": "nxe5q3d3dmu",
+        "artifact": "google-brand-audit-redacted.txt"
+      }
+    ],
+    "audit_limitation": "Expanded requests/responses contain brandId/type/supportEmail but no audience, publishing status, test users or update-mask value. Other collapsed metadata was not expanded. Empty status object is not a setting value.",
+    "historical_memory_note": "Prior local summary reported adding one test user on 2026-08-18; original session not available at referenced local path. Secondary reported evidence only; not a complete allowlist or publishing history.",
+    "screenshot": "google-audience-current.jpg"
+  },
+  "constraints": {
+    "existing_passwords_unchanged": true,
+    "settings_changed": false,
+    "messages_sent": false,
+    "oauth_authorization_performed": false,
+    "secret_values_collected": false,
+    "committed": false,
+    "pushed": false,
+    "merged": false,
+    "deployed": false
+  }
+}

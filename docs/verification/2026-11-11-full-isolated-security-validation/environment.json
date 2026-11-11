@@ -1,0 +1,29 @@
+{
+  "status": "ready",
+  "source": "Existing LOCAL synthetic Supabase stack; no production dump or connection",
+  "network_internal": true,
+  "ports_bound_to_loopback": [
+    55441,
+    55442,
+    55443
+  ],
+  "full_database_dump_sha256": "9a0d2bccc28dc682322e80cd568100e257ce6aa587da9438649f48ce6c2559af",
+  "clone_auth_hashes_match": true,
+  "source_auth_unchanged": true,
+  "counts": {
+    "public_tables": 127,
+    "public_functions": 416,
+    "rls_tables": 127,
+    "auth_users": 50,
+    "cron_extension": 0
+  },
+  "applied_migration": "20261106050736_codex_security_boundary_fixes.sql",
+  "migration_sha256": "5352aba2914617a226fa05e8603d26f1fab762f6bfe1ef80e7d850bc7231e380",
+  "excluded": "pg_cron extension/schema to avoid scheduled jobs; existing Storage object bytes not cloned, test uses newly uploaded synthetic objects",
+  "containers": [
+    "inspection_v111_db_v2",
+    "inspection_v111_auth_v2",
+    "inspection_v111_rest_v2",
+    "inspection_v111_storage_v2"
+  ]
+}

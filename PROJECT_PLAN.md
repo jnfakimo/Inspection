@@ -650,3 +650,57 @@
 [完整 Finding Evidence Review 續審](docs/verification/2026-11-11-finding-evidence-followup/review.md) · [本輪查詢與日誌證據](docs/verification/2026-11-11-finding-evidence-followup/evidence.json) · [文件驗收](docs/verification/2026-11-11-finding-evidence-followup/verification.txt)
 
 ![六項待補證續審的本機文件驗收](docs/verification/2026-11-11-finding-evidence-followup/document-verification.jpg)
+
+## 2026-11-11 歷史 CSP、權限入口、LINE 與 Google 設定補證（文件 V1.0.9，本機補記）
+
+- **版本與範圍**：更新日期 2026-11-11；只補審查文件，不是應用發布版號。沿用八項 **2 accept／6 needs more validation**；第 3、8 項未重審。V1.0.8 文件已在草稿 PR #151；本節與本次產物尚未提交／推送。
+- **實際查核**：唯讀檢查本機封存、Git 歷史、Supabase catalog／歷史日誌、LINE Developers 與 Google Cloud 設定。使用者完成 LINE 登入後續查；未變更任何平台設定、操作 Google 授權、邀群或發訊。
+- **歷史 CSP**：舊部署 HTTP 200 證據保留；新增封存查找僅取得 IIS 模板，指定 Internet Archive 查詢為空，仍沒有同時期有效 HTTP CSP。不能用模板／目前回應倒推歷史；第 1 項跨使用者條件仍缺。
+- **權限／入口**：目前已保存指定 5 表的 10 組表權限、198 筆欄位權限及 22 支函式授權；role 層 pgrst 設定為空不代表 gateway 無前置防線。修補前 24 小時日誌有 4 筆 meeting_bookings GET 200，全部是伺服器金鑰，不能當成被拒權帳號可直連。找到 11 月 5 日加密備份，但同 SHA 的備份規格不含 schema／RLS／角色；未解密，不能補成歷史完整 ACL。第 2、6 項歷史 grants、入口與拒權帳號交集仍缺，第 4 項相關歷史條件未補齊。
+- **LINE**：目前正確 channel 顯示允許邀群、Webhook 啟用且端點對應正式 line-notify；歷史 4 筆 v2-admin 設定稽核只證明提及 line_group_id，不證明 Webhook 接管或 4 次目的地值改變。未取得修補前邀群開關與共用推播條件，第 5 項維持待補證。已修補的自動存群組路徑沿用 V1.0.8 對照。
+- **Google**：目前正確 client 顯示「外部／實際運作中」，1／100 是使用量，並非單一測試使用者限制。Cloud Audit 取得 8 月 18 日 6 筆 OAuth 設定事件，僅展開 2 筆 UpdateBrandWithMask；request／response 沒有歷史 audience／publishing／test users 值。11 月 5 日 google-calendar version 14 的 6 筆 200 只證明發起端，不證明 callback 或同步寫入。第 7 項歷史受眾、callback、索引仍未補齊。
+- **保留與驗收界線**：既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。只新增本次文件產物及追加本節；沒有程式／正式設定變更，未提交、推送、合併、部署或執行攻擊測試。其他既有修改與 Git HEAD／index 依驗收紀錄核對。下圖為本輪控制台真實現況，不能當成歷史或端到端驗收；時間與雜湊保存在 capture.json。
+
+[完整歷史設定補證審查](docs/verification/2026-11-11-historical-settings-review/review.md) · [唯讀查詢證據](docs/verification/2026-11-11-historical-settings-review/evidence.json) · [文件驗收](docs/verification/2026-11-11-historical-settings-review/verification.txt)
+
+![2026-11-11 LINE 目前邀群與 Webhook 設定](docs/verification/2026-11-11-historical-settings-review/line-settings-current.jpg)
+
+![2026-11-11 Google 目前受眾與發布狀態](docs/verification/2026-11-11-historical-settings-review/google-audience-current.jpg)
+
+## 2026-11-11 原始與修補版本的隔離邊界補證（文件 V1.0.10，本機補記）
+
+- **版本與範圍**：更新日期 2026-11-11；新增驗證腳本、原始輸出與審查報告，不是應用程式發布。本輪隔離驗證 pass，八項歷史判定仍是 **2 accept／6 needs more validation**。第 3、8 項未重審，第 4 項未新增驗證。
+- **REST／RPC 補證**：全新專用 PostgreSQL 17.11／PostgREST 16.5 容器、internal network、無發布埠，29 項真實 HTTP／JWT 檢查通過。原始政策下同一 active＋session-valid＋市場資格＋module deny 合成帳號可存取；套用未修改的 20261106050736 migration 後，拒權讀寫阻擋，正常本人／管理員操作及市場界線保留。身分／session fixture 與 business_probe 是最小模型，不是完整正式 Auth／業管 schema。
+- **XSS／CSP 補證**：Edge 真實點擊實際抽取模板，4 組情境通過：原始＋unsafe-inline 執行注入；原始＋嚴格 HTTP CSP 不執行但原正常行內操作也停止；修補版在兩種 CSP 都不執行注入且 6 個正常／特殊文字控制項均運作。首輪 CSP violation 計數未取得，保留失敗輸出；改以實際 header 與正反行為驗證，不把事件計數說成成功。只驗抽取控制項，沒有跨使用者讀取流程。
+- **LINE／OAuth 補證**：實際 old/current 程式搭配合成外部依賴共 17 項通過、0 skip。合法 HMAC 群組事件在舊版寫共用目的地，目前零寫入；個人 LINK 正控制仍成立。舊 callback 在相同 UA／有效 state 下把另一 Google 身分連到發起者；目前錯帳號／verifier／過期拒絕、正常流程成功。並行消耗及 23505 用記憶體／錯誤替身，不能冒充資料庫或第三方端到端驗收。
+- **歷史缺口**：本輪條件式重現不補出當年 CSP、完整 grants／gateway、LINE 邀群或 Google audience 值；V1.0.9 的控制台現況與歷史摘要保持原證據分類。第 1、2、5、6、7 項的程式／修補證據增強，歷史判定未升格；第 4 項 schema／Storage／班別附件缺口仍在。
+- **執行與保留**：隔離目錄 C:\projects\Inspection-evidence-v110-20261111。OpenCode 代理／本機 provider 無法執行且未產生修改，由 Codex 完成；DB 首次就緒探測 socket 問題已修正。WSL 原先停止，查核時啟動；新建 DB／REST 容器已停止，既有服務設定未更改。沒有程式修補、正式操作、CI／CodeQL、build、提交、推送、合併或部署；既有帳號密碼維持不變。
+- **文件驗收**：保留原藍圖前綴與其他既有修改，核對來源／產物 SHA256、JSON、實測計數、連結與 Git HEAD／index。下圖是本機瀏覽器呈現實測驗收彙整，不是正式／歷史控制台截圖。
+
+[完整 V1.0.10 補證報告](docs/verification/2026-11-11-security-boundary-validation/review.md) · [彙整結果](docs/verification/2026-11-11-security-boundary-validation/validation-summary.json) · [文件驗收](docs/verification/2026-11-11-security-boundary-validation/verification.txt)
+
+![V1.0.10 隔離資安補證驗收](docs/verification/2026-11-11-security-boundary-validation/verification-browser.jpg)
+
+
+## 2026-11-11 完整 schema、真實 Auth、OAuth 與 Storage 隔離實測（文件 V1.0.11，本機補記）
+
+- **版本與範圍**：2026-11-11；V1.0.11 為驗收文件版本，不是應用發布。指定三組實測 pass，合計 **63 項通過、0 項待修正、0 skip**：完整 schema／Auth 含準備 26、OAuth 15、Storage 21、外連檢查 1。歷史審查仍為 **2 accept／6 needs more validation**。
+- **真實服務**：複製本機合成完整 schema 至全新 internal network，127 public 表、416 函式、127 RLS 表；使用 GoTrue 新建雙帳號與真實 session、PostgREST 實表／RPC、PostgreSQL 真實索引及 Storage 真實 signed upload。只在副本套用原 security migration；不以最小 fixture 取代身分／市場 helper。Google token／userinfo 仍為合成回應，處理程式採 Node/esbuild Deno 相容層，未部署 Edge。
+- **主要結果**：同市場資格 module deny 帳號無法讀寫會議／業管或經 RPC 繞過；正常本人、跨使用者及 session block 控制符合預期。6 個 OAuth 並行 finish 僅 1 成功、state 消耗一次；不同帳號共用 subject 僅一位擁有者，disconnected 列亦受索引保護。附件重複 path 與限定 incident 的真實 DB 錯誤後原檔 SHA256 不變；拒權／跨市場／已簽班別均阻擋。
+- **準備失敗與修正**：角色還原／本機轉送、主管與聯絡電話、真實業管 actor、班別範本及 draft→submitted 種子依完整 schema 規則修正；沒有停用原觸發器／RLS。保留兩段停止時的原始輸出並完成後續驗證，詳見報告。本輪沒有發現需要新增應用程式修補的失敗，G 槽程式未修改。
+- **保留與清理**：既有帳號密碼維持不變；原本機與副本既有 50 帳號密碼雜湊均一致，只建立兩個合成測試帳號。五個本輪專用容器、API 閘道及專用 keepalive 已停止。私有 dump／credentials 留在 C 槽、不納入 G 槽。未操作正式環境、Google 真實授權或 LINE，未提交、推送、合併或部署；只追加本節及驗收產物。
+- **證據限制**：不證明正式 schema 完全一致、歷史 CSP／入口／LINE／Google 受眾、真實 Google 授權同步、完整業務 UI、實際超過 50 MiB 物件 commit 分支或長時間競爭。截圖是本機實測結果摘要，不是正式或歷史畫面。其他既有修改與藍圖原前綴依 verification.txt 雜湊核對。
+
+[完整 V1.0.11 實測報告](docs/verification/2026-11-11-full-isolated-security-validation/review.md) · [63 項結果](docs/verification/2026-11-11-full-isolated-security-validation/validation-summary.json) · [保留與文件驗收](docs/verification/2026-11-11-full-isolated-security-validation/verification.txt)
+
+![V1.0.11 三項隔離實測驗收](docs/verification/2026-11-11-full-isolated-security-validation/verification-browser.jpg)
+
+
+## 2026-11-11 隔離資安證據整合與發布準備（文件 V1.0.12，本機補記）
+
+- **版本與範圍**：V1.0.12 是發布驗收文件，不是應用版號。依本輪授權提交、Git 推送並部署；使用者明確排除 LINE 推播。整合 PR #151 的 V1.0.8 與後續 V1.0.9／V1.0.10／V1.0.11 補證，保留 **2 accept／6 needs more validation**，不以發布替代缺失的歷史證據。
+- **發布前正式唯讀核對**：業管模組 gate、會議限制型 RLS、browser_verifier_hash、Google subject 唯一索引皆存在。正式 google-calendar version 16、callback version 15 與 G 槽／發布分支全文一致（正規化換行）；app-api version 127 僅附件 prepare／commit 區塊一致，不宣稱整檔同步。既有修補已存在，本次沒有新程式、migration 或需重新部署的 Edge Function。
+- **Google 界線**：V1.0.11 的真實 Auth／PostgreSQL／Storage 63 項通過保留；Google token／userinfo 仍是合成回應。真實 OAuth 需指定測試帳號及本人同意，尚未執行；不替任意既有帳號新增授權、不自行改 Google audience。歷史封存缺口不能由現在的授權或部署回填。
+- **發布方式與保留**：只在既有乾淨 C 槽文件分支追加本案文件與驗收產物；G 槽其他修改及既有帳號密碼保留。不重設密碼、不撤銷既有登入、不寄信。網站發布由 main 的 CI／CodeQL／Commercial readiness 與 Hardened Pages 閘門執行，最終結果與同提交簽章核對將於完成後續記。
+
+[V1.0.12 發布前核對](docs/verification/2026-11-11-evidence-release-v112/release-preflight.json) · [發布與驗收結果](docs/verification/2026-11-11-evidence-release-v112/verification.txt)

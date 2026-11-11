@@ -1,0 +1,27 @@
+✔ original signed LINE join (13.9066ms)
+✔ original signed LINE message (0.7555ms)
+✔ original signed LINE leave (0.6021ms)
+✔ original signed LINE multi-group (0.5603ms)
+✔ original signed LINE bad-signature (0.5179ms)
+✔ original signed LINE personal-LINK (3.2666ms)
+✔ current signed LINE join (1.5304ms)
+✔ current signed LINE message (0.4777ms)
+✔ current signed LINE leave (0.443ms)
+✔ current signed LINE multi-group (0.3947ms)
+✔ current signed LINE bad-signature (0.2886ms)
+✔ current signed LINE personal-LINK (0.9967ms)
+✔ original callback binds consenting Google identity to initiating system user under assumed audience (11.7855ms)
+Google OAuth callback rejected: 授權瀏覽器驗證失敗
+✔ original callback rejects wrong-UA (1.2957ms)
+Google OAuth callback rejected: Google 授權未完成或已逾期
+✔ original callback rejects expired (0.9588ms)
+✔ fixed callback non-mutating; wrong actor/verifier denied; valid flow and concurrent replay (3.3267ms)
+✔ fixed expiry and simulated unique-index error never create a connection (2.0624ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 303.4141

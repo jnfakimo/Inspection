@@ -1,0 +1,47 @@
+Finding Evidence Review 隔離邊界補證 V1.0.10
+更新日期：2026-11-11（Asia/Taipei）
+文件與隔離驗證：pass
+完整歷史證據：blocked（仍缺同時期設定，不能改判為已證實歷史可利用性）
+
+實測：
+- PostgreSQL 17.11／PostgREST 16.5 真實 HTTP／JWT：29 checks pass。
+- LINE／OAuth 原始與修補來源＋合成依賴：17 tests pass，0 fail，0 skipped。
+- Edge 抽取模板的 CSP 情境：4 cases pass。
+- 各證據層獨立，不合併宣稱完整正式 E2E。
+- 歷史 Finding 判定維持 2 accept／6 needs more validation。
+
+來源與保留：
+- 33 個目前來源快照與 G 槽對應檔 SHA256 全數一致。
+- 原始來源由 Git 3885742bde404b393cea4be229b0f6dd12b69544 archive 取得。
+- 原 PROJECT_PLAN.md 文字前綴完整保留，僅追加 V1.0.10。
+- 原有 193 個修改／未追蹤檔案，扣除藍圖，其餘 192 檔 SHA256 一致。
+- Git HEAD 3885742bde404b393cea4be229b0f6dd12b69544 不變。
+- Git index SHA256 52F128AF3415FC601673F8B88798F32EE5FA9805A4EF277E76032A2A7C941A2A 不變。
+- git diff --check -- PROJECT_PLAN.md 通過。
+- 沒有應用程式／正式設定變更、stage、commit、push、merge、deploy。
+- 既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+
+執行中修正：
+- OpenCode：隔離目錄代理找不到且本機 provider 連線拒絕，未產生修改，Codex 直接完成。
+- DB 首輪：Unix socket 探測錯誤，案例未開始；修正 /tmp 後以新容器完成。
+- CSP 首輪：事件計數未取得，保留 browser-csp-initial.json；行為與實際 HTTP header 核對後，重驗嚴格情境通過。未宣稱 violation event count 驗證完成。
+
+環境收尾：
+- 新建 inspection_evidence_v110_db、inspection_evidence_v110_db_v2、inspection_evidence_v110_rest_v2 均停止。
+- 本輪 127.0.0.1:8774 證據伺服器已停止。
+- 專用 WSL 從 Stopped 啟動，既有自動啟動容器未改設定；沒有停止其他既有服務。
+- 新建 internal network／已停止容器留存；未刪除既有測試資料。
+
+限制：
+- active/session/market 是合成 fixture，business_probe 是最小表，不是完整正式 schema／Auth。
+- OAuth 並行消耗是記憶體原子刪除模型，23505 是替身，不是 PostgreSQL 索引／並行驗收。
+- LINE／Google 未走真實邀群、訊息、同意授權或行事曆同步。
+- XSS 僅抽取來源控制項，未驗真實跨使用者讀取。
+- 第 4 項 Storage／班別附件條件本輪未測。
+- 歷史 CSP、完整 grants／gateway、LINE 邀群、Google audience／舊 callback／索引仍缺。
+- 無新 CI／CodeQL、應用 build 或正式攻擊重現。
+
+驗收命令與證據：
+- rest-boundary.py、line-oauth-differential.test.mjs、browser-evidence-server.mjs、summarize-results.mjs。
+- 原始 JSON／測試輸出及 SHA256 留在本目錄；JSON、相對連結、SHA256 與測試計數已核對。
+- verification-browser.jpg 是真實瀏覽器顯示本機驗收彙整，已嵌入 PROJECT_PLAN.md。

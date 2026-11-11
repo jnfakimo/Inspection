@@ -1,0 +1,124 @@
+{
+  "scope": "Extracted actual controls, live browser, synthetic server CSP; not historical effective headers",
+  "cases": {
+    "old/weak": {
+      "version": "old",
+      "csp": "weak",
+      "xss": 1,
+      "calls": [
+        [
+          "toggle",
+          "B1F"
+        ],
+        [
+          "page",
+          "B1F",
+          1
+        ],
+        [
+          "page",
+          "B1F",
+          3
+        ],
+        [
+          "toggle",
+          ""
+        ],
+        [
+          "page",
+          "",
+          null
+        ],
+        [
+          "page",
+          "",
+          null
+        ]
+      ],
+      "violations": 0,
+      "pass": true
+    },
+    "old/strict": {
+      "version": "old",
+      "csp": "strict",
+      "xss": 0,
+      "calls": [],
+      "violations": 0,
+      "pass": true
+    },
+    "new/weak": {
+      "version": "new",
+      "csp": "weak",
+      "xss": 0,
+      "calls": [
+        [
+          "toggle",
+          "B1F"
+        ],
+        [
+          "page",
+          "B1F",
+          1
+        ],
+        [
+          "page",
+          "B1F",
+          3
+        ],
+        [
+          "toggle",
+          "');window.__evidenceXss=1;//"
+        ],
+        [
+          "page",
+          "');window.__evidenceXss=1;//",
+          1
+        ],
+        [
+          "page",
+          "');window.__evidenceXss=1;//",
+          3
+        ]
+      ],
+      "violations": 0,
+      "pass": true
+    },
+    "new/strict": {
+      "version": "new",
+      "csp": "strict",
+      "xss": 0,
+      "calls": [
+        [
+          "toggle",
+          "B1F"
+        ],
+        [
+          "page",
+          "B1F",
+          1
+        ],
+        [
+          "page",
+          "B1F",
+          3
+        ],
+        [
+          "toggle",
+          "');window.__evidenceXss=1;//"
+        ],
+        [
+          "page",
+          "');window.__evidenceXss=1;//",
+          1
+        ],
+        [
+          "page",
+          "');window.__evidenceXss=1;//",
+          3
+        ]
+      ],
+      "violations": 0,
+      "pass": true
+    }
+  }
+}

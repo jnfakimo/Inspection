@@ -1,0 +1,244 @@
+{
+  "status": "pass",
+  "original_local_auth_credentials_unchanged": true,
+  "clone_existing_50_auth_credentials_unchanged": true,
+  "new_synthetic_auth_accounts": 2,
+  "network_internal": true,
+  "containers": [
+    {
+      "name": "inspection_v111_db_v2",
+      "image": "public.ecr.aws/supabase/postgres:17.11.0.006",
+      "running": true
+    },
+    {
+      "name": "inspection_v111_auth_v2",
+      "image": "public.ecr.aws/supabase/gotrue:v2.197.0",
+      "running": true
+    },
+    {
+      "name": "inspection_v111_rest_v2",
+      "image": "public.ecr.aws/supabase/postgrest:v16.5",
+      "running": true
+    },
+    {
+      "name": "inspection_v111_storage_v2",
+      "image": "public.ecr.aws/supabase/storage-api:v1.84.19",
+      "running": true
+    }
+  ],
+  "unique_indexes": [
+    {
+      "relname": "google_calendar_connections_pkey",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_connections_pkey ON public.google_calendar_connections USING btree (connection_id)"
+    },
+    {
+      "relname": "google_calendar_connections_user_id_key",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX google_calendar_connections_user_id_key ON public.google_calendar_connections USING btree (user_id)"
+    },
+    {
+      "relname": "guard_handover_attachments_pkey",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX guard_handover_attachments_pkey ON public.guard_handover_attachments USING btree (attachment_id)"
+    },
+    {
+      "relname": "idx_guard_handover_attachments_path",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX idx_guard_handover_attachments_path ON public.guard_handover_attachments USING btree (storage_path)"
+    },
+    {
+      "relname": "uq_google_calendar_connections_subject",
+      "indisunique": true,
+      "indisvalid": true,
+      "definition": "CREATE UNIQUE INDEX uq_google_calendar_connections_subject ON public.google_calendar_connections USING btree (google_subject) WHERE (google_subject IS NOT NULL)"
+    }
+  ],
+  "actual_table_grants": [
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "DELETE"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "SELECT"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "authenticated",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "DELETE"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "SELECT"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "table_name": "business_handover_entries",
+      "grantee": "service_role",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "authenticated",
+      "privilege_type": "SELECT"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "DELETE"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "SELECT"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "table_name": "guard_handover_attachments",
+      "grantee": "service_role",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "DELETE"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "SELECT"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "authenticated",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "DELETE"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "INSERT"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "SELECT"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "table_name": "meeting_bookings",
+      "grantee": "service_role",
+      "privilege_type": "UPDATE"
+    }
+  ],
+  "fault_trigger_remaining": 0
+}

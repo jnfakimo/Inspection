@@ -1,0 +1,16 @@
+{
+  "document_version": "V1.0.10",
+  "status": "pass",
+  "rest_checks": 29,
+  "line_oauth_tests": 17,
+  "browser_cases": 4,
+  "historical_verdict": {
+    "accept": 2,
+    "needs_more_validation": 6
+  },
+  "source": "Parsed original local verification artifacts",
+  "limits": [
+    "Not historical production reconstruction",
+    "No real Google consent, LINE invitation/delivery, full app Auth or Storage E2E"
+  ]
+}

@@ -1,0 +1,22 @@
+V1.0.11 local isolated validation — pass
+Verified at: 2026-11-11T09:04:09.013Z
+63 assertions: pass; final unresolved 0; skipped 0
+26 Auth/setup (includes 5 setup); 15 OAuth/PostgreSQL; 21 Storage; 1 fetch boundary
+Original run failures retained and mapped to completed follow-up checks; see review.md
+Existing modified/untracked baseline: 210
+Other existing files preserved: 209
+PROJECT_PLAN.md original byte prefix unchanged: true
+Git HEAD unchanged: 3885742bde404b393cea4be229b0f6dd12b69544
+Git index SHA256 unchanged: 52F128AF3415FC601673F8B88798F32EE5FA9805A4EF277E76032A2A7C941A2A
+G function/migration snapshot parity: 256 files
+JSON parsed: 10
+Private key/password/JWT literal artifact checks: pass
+Real browser screenshot JPEG: 114676 bytes; SHA256 02790FF33F32FB3B6EE6C8EC3F152C75607D0072B3A4F73DAD0BC7CE74244D20
+Artifact hashes: artifact-manifest.json
+Screenshot is a LOCAL test report, not production or historical evidence
+Existing local and cloned 50 account password hashes unchanged; production untouched
+New containers stopped: inspection_v111_db, inspection_v111_db_v2, inspection_v111_auth_v2, inspection_v111_rest_v2, inspection_v111_storage_v2
+API gateway 55440 listener closed; own WSL keepalive stopped
+No commit, push, merge, deployment, production connection, real Google consent, or message sending
+Historical verdict remains: 2 accept / 6 needs more validation
+New blueprint links verified: 4 / 4

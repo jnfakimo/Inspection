@@ -1,0 +1,31 @@
+{
+insertId: "nxe5q3d3dec"
+internalId: {1}
+internalMetadata: {5}
+logName: "projects/firstmarket-16e1a/logs/cloudaudit.googleapis.com%2Factivity"
+protoPayload: {
+@type: "type.googleapis.com/google.cloud.audit.AuditLog"
+authenticationInfo: {1}
+authorizationInfo: [1]
+methodName: "UpdateBrandWithMask"
+request: {
+@type: "type.googleapis.com/google.identity.clientauthconfig.v1.UpdateBrandWithMaskRequest"
+brandId: "555730080635"
+}
+requestMetadata: {3}
+resourceName: "brands/555730080635"
+response: {
+@type: "type.googleapis.com/google.identity.clientauthconfig.v1.Brand"
+brandId: "555730080635"
+supportEmail: "[redacted-email]"
+}
+serviceName: "clientauthconfig.googleapis.com"
+status: {}
+}
+receiveLocation: "us-west1"
+receiveTimestamp: "2026-08-18T03:50:35.294066495Z"
+resource: {2}
+severity: "NOTICE"
+timestamp: "2026-08-18T03:50:33.451618Z"
+writerEmailAddress: "[redacted-email]"
+}

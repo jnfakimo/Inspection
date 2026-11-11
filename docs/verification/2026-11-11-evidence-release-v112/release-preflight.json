@@ -1,0 +1,62 @@
+{
+  "document_version": "V1.0.12",
+  "checked_at": "2026-11-11T09:22:17.630Z",
+  "repository": "jnfakimo/Inspection",
+  "pr": 151,
+  "scope": "Read-only production metadata and deployed source comparison; no business records or secrets read",
+  "production_database_gates": {
+    "business_market_allowed_module_check": true,
+    "meeting_restrictive_gate": true,
+    "browser_verifier_hash": true,
+    "google_subject_unique_valid": true
+  },
+  "deployed_source": [
+    {
+      "slug": "google-calendar",
+      "version": 16,
+      "status": "ACTIVE",
+      "scope": "whole_function",
+      "production_matches_g": true,
+      "release_matches_g": true,
+      "normalized_sha256": "76870d14508ef6eeacb5a85941ac10704db39184346c60e43cc529cd578544b4"
+    },
+    {
+      "slug": "google-calendar-callback",
+      "version": 15,
+      "status": "ACTIVE",
+      "scope": "whole_function",
+      "production_matches_g": true,
+      "release_matches_g": true,
+      "normalized_sha256": "69b1cfc43394bc6168e87b2d275dff21f7765f1fcbc36244f38281ca1d1cfd39"
+    },
+    {
+      "slug": "app-api",
+      "version": 127,
+      "status": "ACTIVE",
+      "scope": "attachment_prepare_commit",
+      "production_matches_g": true,
+      "release_matches_g": true,
+      "normalized_sha256": "ef418a3dcb7fc21bbf8349b5467bded8d978b975cf5ddf9d33aedbcce3870408"
+    }
+  ],
+  "application_changes": 0,
+  "migration_needed": false,
+  "edge_redeployment_needed": false,
+  "historical_verdict": {
+    "accept": [
+      3,
+      8
+    ],
+    "needs_more_validation": [
+      1,
+      2,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "google_live_consent": "not performed; dedicated test identity and user consent required",
+  "password_policy": "Existing passwords unchanged",
+  "line_notification": "User explicitly requested Git push only; no LINE notification"
+}

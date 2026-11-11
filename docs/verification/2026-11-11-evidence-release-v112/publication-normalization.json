@@ -1,0 +1,182 @@
+{
+  "document_version": "V1.0.12",
+  "status": "pass",
+  "note": "Only publication copies have trailing whitespace/EOF and LF normalization; G originals and historical capture manifests retain original-byte hashes. Use this map for changed published text. Binary screenshots unchanged.",
+  "changed": [
+    {
+      "path": "PROJECT_PLAN.md",
+      "original_source_sha256": "c8f64eba580cd5d1adae1d3ed4c8f38332f453a16f807234fbed5059adb0f5a8",
+      "published_lf_sha256": "53683c7a88b5f95002645bd1a4f242c7b7194909c8e864e2ba6bc442f9556329"
+    },
+    {
+      "path": "docs/verification/2026-11-11-evidence-release-v112/release-preflight.json",
+      "original_source_sha256": "fbd1bf5ba23af3931087efb344808e7e07661cb138d920d55cf3106f5f8beca7",
+      "published_lf_sha256": "a17398ec2d46e7eec0d2cb978f5ff10f398e41d3b7a2bde8bfe8286e5d9d64ab"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/actual-functions.json",
+      "original_source_sha256": "0c77cccb9360f71e999097af9a5ef307b6d4fae6a815ef04684a5c556b4fa69c",
+      "published_lf_sha256": "d841ba7f0a6697cc8201133c9ed259c0b9821fc5e4852043c97f52079eb546b2"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/artifact-manifest.json",
+      "original_source_sha256": "9d4f91dd741b03a76f929d1afe64a504061d54f12f330d1b3c2ca898b0dbb9ec",
+      "published_lf_sha256": "1cdc98b368fd62b7dc9d99a71d685dc06dc42159165070cc704b1c65df083a94"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/auth-oauth-with-storage-setup-failure.json",
+      "original_source_sha256": "7785adf377cf9cdca275dec69d1421255e1778fb616daf66755e523c1a4979a2",
+      "published_lf_sha256": "94231b896cc4d62a8cf2ffe9d5b81701782b53bac3d2d280837e3bc8fe4b0bdf"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/constraints.json",
+      "original_source_sha256": "8dfbd132bc364241067d2139080c5cc5ba3f6988e1a708b6683261961aec30ff",
+      "published_lf_sha256": "b1732354f2e1a1570797ce8da537cd478546860eca9cc4c4b3f8b556e096b9b2"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/environment.json",
+      "original_source_sha256": "5f8f4e222719dff3c847418757dab71d9e326f09dc33e6b8950a3f0a23d89964",
+      "published_lf_sha256": "526803d9adc41601aad1f56d39cc41b7779ecaa4f272b742ab571d0060cf19ce"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/final-environment-audit.json",
+      "original_source_sha256": "157e109c07fe9c732c47a2ea739257fb31719e8265b1e518500234c4d43fe97a",
+      "published_lf_sha256": "da0b8d3cddd073044d3d855557ba0bf49876e2bd7f50734b748ec5e811226d75"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/schema-columns.json",
+      "original_source_sha256": "b898198d2ef5cb1b8df1bf3a05ed5de2c8ad1d907119bef0fce8d755acd12f07",
+      "published_lf_sha256": "e921d3a1f95281345894b340b843b682882946075a034960cec26a725aa7939b"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/clone-local.py",
+      "original_source_sha256": "2836ca530c674162c13bd40b2e48ec76baf98845814ba453340686e8597658f6",
+      "published_lf_sha256": "a5b4808b2bca8645f7bf681402fa90f047b3861c80d5d4daf4c9f9e679e231c1"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/internal-relay.py",
+      "original_source_sha256": "c107d5762fdff93f7a345437caedf7d7d708811ae464b62248090ba0cecc6848",
+      "published_lf_sha256": "777c735cdfbbfb61c2d59121b97828790fff55c76c94de3615a54f5063f77e0d"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/local-gateway.mjs",
+      "original_source_sha256": "3a95a3f10312be0e66785734a9c174597b17ed1fd3a971912bbc4223fec566a2",
+      "published_lf_sha256": "acd951367507386d5991168f28e5332c59a3e7cc71d5699caf2c9702e55b823e"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/run-integration.mjs",
+      "original_source_sha256": "76c081b0e7dfb24375dede44ab6de640a9679368e6d9cb10d854f1ad1c6ccedf",
+      "published_lf_sha256": "5bf1dc0213042b280a2aa09ddd7940fc422d0cbe49a90d075fd8237b97aa88c4"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/run-storage-final.mjs",
+      "original_source_sha256": "09f1b99f305f3f7e86d4dcf6145ae448f6d598e8361ee40faa39faa39076fce4",
+      "published_lf_sha256": "8841ea642aea886f07bb6b19a2128923d9d6307c31a64c5320a54661b604bb9a"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/scripts/run-storage.mjs",
+      "original_source_sha256": "342a248a65fd1e52685ca628e2b115989a20f6a00f48e9eac2e6726e7fafdf66",
+      "published_lf_sha256": "0b30551369af706da21f2a78a26633e18d4abfa1b4e0b4573365f46d18a007c2"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/source-manifest.json",
+      "original_source_sha256": "37c9ccf4ae1ac7efaf5f242dd0c9d7af00c12275ae7ac990bde43048f0f560c4",
+      "published_lf_sha256": "8e30fc03ed12337dd298ce9a30c606afc041252d5e0e928fbbc00264e8874828"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/storage-final.json",
+      "original_source_sha256": "f7b0aeecdc96181cea5d4b6e7b094def002ebd9d8c0db3fe46618463fa23e74c",
+      "published_lf_sha256": "289fa9bb35aae2d0b44bd92f841bf58e59fcba58720815e21ddbb23633865a63"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/storage.json",
+      "original_source_sha256": "a9c6861604d2f1b3bff0423bc85d2b9924fb7eb88c7e32aad77bd764a2d3acaa",
+      "published_lf_sha256": "8acd5d8c13d9216d986e4524f9607ec8563bb30dac07b4b5c8041a229891707c"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/summary.html",
+      "original_source_sha256": "0c22c3f83d34d3aa69ce6048c0b78cde6528e1db058a6683ebad0f6d019ada56",
+      "published_lf_sha256": "f00d7990f579c4e03afe9c3804a287f8367e176a483a4d41ac1104893e25e5d1"
+    },
+    {
+      "path": "docs/verification/2026-11-11-full-isolated-security-validation/validation-summary.json",
+      "original_source_sha256": "40c577503a4daf880c94c859ab1145dbc33a732cc2ab37993f8e4ecae504e5e2",
+      "published_lf_sha256": "54cf2ea6818956b2c53292f9fc94edeab355b79f097a60c21c897f359bbc447f"
+    },
+    {
+      "path": "docs/verification/2026-11-11-historical-settings-review/google-brand-audit-redacted.txt",
+      "original_source_sha256": "f2c3e4d70f23f1841ee3f117d3c3a1a7930ebd204ff07c78a618fc4633c87121",
+      "published_lf_sha256": "5076fc1413c0f4bc8fbfcc04dc16e62bf9d754c9400ad3e66bcdcd01d9100303"
+    },
+    {
+      "path": "docs/verification/2026-11-11-historical-settings-review/google-brand-audit-second-redacted.txt",
+      "original_source_sha256": "b60fb8b6923f66f18e579ca3ef1891610433a04c50f0631af2df76a4aab0e1cf",
+      "published_lf_sha256": "95806dcdcb638891baa7cacd50ae9400c0e46cfdb5136ae24b0136086cdf389f"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/artifact-sha256.json",
+      "original_source_sha256": "3cd3b0c2f4b8ad86bc74d8e30b836d95aa1d95f2fcaff6f04b327a639b83bbb6",
+      "published_lf_sha256": "6dd1e1a7c96642e71888ede1f778acf1f9dfd0343a5c8551fb2bf759de04eaff"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/browser-csp-http-header.json",
+      "original_source_sha256": "ede50ccf3ca7e52b2b79049b38a4d1d886002d4400257be647453de018d448b3",
+      "published_lf_sha256": "283ffb463d6b0790127e3b1c74edbcea2ecaf3917f7809e7a2799087b889a04c"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/browser-csp-initial.json",
+      "original_source_sha256": "44b0a2a28d2dee29f10c904d0dc835a75267213f5bb6d6872133c021642da369",
+      "published_lf_sha256": "36ddc0bf8b7d46665fdbe594ac1c8841b17366b0fbdb726e714853d24408b13a"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/browser-csp.json",
+      "original_source_sha256": "216770b1b39ddb170c7c803787cdc6ab76efe8ed969aa85e6fb63401ce5f8b27",
+      "published_lf_sha256": "fac3e06a20277d67029db7f7dae0b3369007e59c49b42708a7253c259abffbbc"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/browser-evidence-server.mjs",
+      "original_source_sha256": "15d0db9f5688888ceb056ee2ffb8032c45dec63cf82df46416716212e77776a5",
+      "published_lf_sha256": "961b4db4eaa4f3b9d98ce865392db31c27c9cd5261be8ed2d94700579646552c"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/capture.json",
+      "original_source_sha256": "7ec6b7f04c7351bb5379a8cb9e3cf5aa9650b78a5320a771d3b105b0e71ba01a",
+      "published_lf_sha256": "bac9dd06a68a814c5d41c2816d0df6de6aea34c78a83377f200e09806b6f0c7c"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/line-oauth-differential.test.mjs",
+      "original_source_sha256": "3eb72e448b356562770aff92f3ba006a5f2a9fdb652ef03709f810fde6eecb5e",
+      "published_lf_sha256": "9a0125e8373140bcda107684e1fddf3dc6e55f730f9720ad770a88e2eeb088f5"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/line-oauth-tests.txt",
+      "original_source_sha256": "9bf010def433d6af66e14f60b7e3f2b4eafc7e188cde7e776007cff77c2a3035",
+      "published_lf_sha256": "7a9d9ac8212bb0fcc386eb6841f599dcd91285c16bb42259002364c1c02b84c6"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/rest-boundary.json",
+      "original_source_sha256": "3c31182ba23b4a8e2da144118f4503fd5f5c50f90072ba4afd79dae2590a8596",
+      "published_lf_sha256": "7e8d39bddd533c84fd5e63dd92e277c46af5ad0c19c74f2b60b8b3d6e33a5ccf"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/rest-boundary.py",
+      "original_source_sha256": "f05b56e4926535ce5777ac2e6278dc685804c23b4f90b6fb85b74062dc3621b8",
+      "published_lf_sha256": "790928cbd75d4d545d5862ec2dbd814addd36f4270ca7d6bbb1d805785d35279"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/source-sha256.json",
+      "original_source_sha256": "a93c1ae2473e63df345d7f79ed8c5d43c3d442390c132b1250a5c7af05d0fd71",
+      "published_lf_sha256": "98d9d965bdbcaf13f4f79c180212c7bdfd2a31cd72a5e773ad8b7e188569ff26"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/summarize-results.mjs",
+      "original_source_sha256": "3217bc2fec7a4d83a87bcd26d6256d272fee541686342a1069693cd836c4c007",
+      "published_lf_sha256": "1c54b08f7e869bbfb3fbef91d1db71e9dec725d6a4a2198c74e5347a2597f1e7"
+    },
+    {
+      "path": "docs/verification/2026-11-11-security-boundary-validation/validation-summary.json",
+      "original_source_sha256": "cfd826f3130fec3e937d7a73af2c255bbaca8ed2c8e10e6b05bbf1df792c1546",
+      "published_lf_sha256": "e38e07c459f323d75d824239fd4869857a62a0e433ba161716292e967adcdefa"
+    }
+  ]
+}

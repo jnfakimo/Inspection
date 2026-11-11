@@ -1,0 +1,170 @@
+{
+  "status": "pass",
+  "checks": [
+    {
+      "name": "original active+valid-session+module-deny can read bookings",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "original denied user can update own booking",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "original denied user can read qualified market only",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "original direct RPC ignores business module deny",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "original market boundary remains enforced",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed denied user cannot read bookings",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed denied user cannot update own booking",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "denied update leaves original row unchanged",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed denied user cannot insert own booking",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed denied user cannot read business market",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed direct RPC enforces module deny",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed denied user cannot write qualified market",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "expired JWT rejected by real PostgREST",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "forged JWT rejected by real PostgREST",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "anonymous table access denied",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed allowed user reads legitimate bookings",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed allowed user updates own booking",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed allowed user cannot update others",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed allowed user inserts own booking",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed allowed user retains market boundary",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "system deny overrides module allow /meeting_bookings?select=booking_id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "system deny overrides module allow /business_probe?select=id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "invalid session denied /meeting_bookings?select=booking_id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "invalid session denied /business_probe?select=id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "inactive user denied /meeting_bookings?select=booking_id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "inactive user denied /business_probe?select=id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "fixed administrator legitimate update",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "isolated network internal, no published ports",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "name": "authenticator cannot bypass RLS",
+      "pass": true,
+      "detail": null
+    }
+  ],
+  "count": 29,
+  "environment": {
+    "postgres": "17.11",
+    "postgrest": "16.5",
+    "db_schemas": "public",
+    "db_pre_request": "",
+    "network_internal": true,
+    "published_ports": 0,
+    "real_http": true,
+    "real_jwt_verification": true
+  },
+  "limitations": [
+    "Synthetic identity/session/market fixtures; not production active_user_id implementation or Auth login",
+    "Real source permission helpers and original meeting policy plus unmodified security migration; business_probe is synthetic minimal table, not full business schema/triggers",
+    "No proof of historical production grants, gateway configuration, identities or event history"
+  ],
+  "created_containers_stopped": [
+    "inspection_evidence_v110_db_v2",
+    "inspection_evidence_v110_rest_v2"
+  ]
+}
