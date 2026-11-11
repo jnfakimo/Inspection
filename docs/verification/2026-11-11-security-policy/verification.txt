@@ -1,0 +1,26 @@
+﻿資安政策套用驗證：PASS
+建議版本 V1.0.0（已核准本機套用；未發布）
+時間：2026-11-11T10:39:44.644290+08:00
+目標：G:\我的雲端硬碟\AI\Codex\北農巡檢系統\SECURITY.md
+
+PASS  核准草案套用後讀回一致；僅更新核准狀態
+PASS  UTF-8、檔案大小、控制字元及政策連結通過
+PASS  保留既有密碼決策；沒有新增排除
+PASS  9 個範圍政策解析一致
+PASS  git diff --check -- SECURITY.md：exit 0
+
+政策鏈（9 個範圍均成功）：
+. -> SECURITY.md | exit 0
+web -> SECURITY.md | exit 0
+system -> SECURITY.md | exit 0
+backend/node-api -> SECURITY.md | exit 0
+supabase/functions -> SECURITY.md | exit 0
+supabase/migrations -> SECURITY.md | exit 0
+mobile/vehicle-tracker -> SECURITY.md | exit 0
+.github/workflows -> SECURITY.md | exit 0
+tools -> SECURITY.md | exit 0
+
+SHA-256: 080f5a3355880321a8ad689b87a1a8c60f2dfb5b404ef85e6cf2636e6cca7fb9
+本次為政策文件驗證，未重新執行資安掃描或正式部署
+未提交或推送；應用程式版本與既有帳號未變更
+來源：實際 validation.json 與 resolved-0.md 至 resolved-8.md

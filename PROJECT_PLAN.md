@@ -302,3 +302,16 @@
 - 獨立建置產物以 Chromium 模擬資料驗證：174 項通過、0 執行錯誤、21 張截圖；桌面 1440×1000、手機模擬 390×844／320×740。網址 `http://127.0.0.1:4173/Inspection/v2/systems/equipment/assets/` 與 `monitoring/`；資料／驗證路由攔截，沒有正式 API 操作。證據在隔離環境 `/workspace/inspection-line-evidence/release/`（`results.json`、`results.jsonl`、各測試 log、截圖）。
 - 依使用者「提交或部署」先走獨立本地提交；未推送、開 PR、合併或部署，正式站與實機未驗證。原 LINE 混合工作區保留，不納入本批；沒有 migration、Edge Function、workflow 或 LINE 發送／啟用變更。未同步 G 槽，未修改尚待確認的藍圖。
 - 後續發布前重新確認 main 與衝突；發布影響為前端 Pages 重建，不需資料庫或 Edge 部署。倉庫沒有 CODEOWNERS；歷史作者不等於目前負責者，其他機器未推送工作不可見。
+
+## 2026-11-11 資安政策 V1.0.0 發布
+
+- 使用者已核准 G 槽政策寫入，並於本輪授權提交、推送與部署；唯一 writer 為 Codex。
+- 從遠端 main 97102ed67c365ad341970be6e74ad196cc88d2b1 建立 codex/security-policy-20261111 隔離分支，只整合 SECURITY.md、此次紀錄與文件驗證證據，保留 G 槽其他未提交修改。
+- SECURITY.md 補齊系統邊界、威脅模型、九項安全要求、弱點與嚴重度背景、風險及限制。未新增掃描排除或調低嚴重度；保留既有帳號密碼，不重設、不撤銷登入、不寄信。
+- 版本 V1.0.0 僅屬政策文件，應用程式與網站名稱不變。相較已核准內容只更新發布狀態；沒有產品程式、migration 或 Edge 變更。
+- G 槽先前本機驗證：9 個範圍 resolver 都只解析到根 SECURITY.md，內容一致；文件編碼、控制字元、相對連結、密碼決策與差異格式檢查通過。以下截圖與 validation.json 記錄當時本機套用版本，不作為 GitHub 或部署成功證據。
+- 發布流程：受保護 main 經 PR 與必要 CI 後合併，既有 Hardened Pages 工作流自動部署；實際結果完成後補記，不以送出 PR 當作已部署。
+
+[本機驗證結果](docs/verification/2026-11-11-security-policy/validation.json)｜[可讀紀錄](docs/verification/2026-11-11-security-policy/verification.txt)
+
+![本機政策套用與九範圍解析通過；非正式部署證據](docs/verification/2026-11-11-security-policy/policy-verification.jpg)
