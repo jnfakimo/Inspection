@@ -1,0 +1,85 @@
+{
+  "result": "pass",
+  "policy_version": "V1.0.0",
+  "captured_at": "2026-11-11T11:08:55.276325+08:00",
+  "pr": {
+    "mergeCommit": {
+      "oid": "54091d27cccb3ccd47ed4322b208256966ede4cd"
+    },
+    "mergedAt": "2026-11-11T03:02:54Z",
+    "state": "MERGED",
+    "url": "https://github.com/jnfakimo/Inspection/pull/148"
+  },
+  "merge_commit": "54091d27cccb3ccd47ed4322b208256966ede4cd",
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 42950100082,
+      "headSha": "54091d27cccb3ccd47ed4322b208256966ede4cd",
+      "name": "CI",
+      "status": "completed",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100082"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 42950100157,
+      "headSha": "54091d27cccb3ccd47ed4322b208256966ede4cd",
+      "name": "CodeQL Analysis",
+      "status": "completed",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100157"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 42950100147,
+      "headSha": "54091d27cccb3ccd47ed4322b208256966ede4cd",
+      "name": "Commercial readiness checks",
+      "status": "completed",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100147"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 42950100092,
+      "headSha": "54091d27cccb3ccd47ed4322b208256966ede4cd",
+      "name": "Hardened Pages deployment",
+      "status": "completed",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100092"
+    }
+  ],
+  "pages_jobs": [
+    {
+      "name": "security-gate",
+      "conclusion": "success",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100092/job/130292128272"
+    },
+    {
+      "name": "build",
+      "conclusion": "success",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100092/job/130293249416"
+    },
+    {
+      "name": "deploy",
+      "conclusion": "success",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100092/job/130293591894"
+    },
+    {
+      "name": "verify-deployment",
+      "conclusion": "success",
+      "url": "https://github.com/jnfakimo/Inspection/actions/runs/42950100092/job/130293720227"
+    }
+  ],
+  "production": {
+    "url": "https://jnfakimo.github.io/Inspection/",
+    "provenance_commit": "54091d27cccb3ccd47ed4322b208256966ede4cd",
+    "generatedAt": "2026-11-11T03:06:47.852Z",
+    "scan_evidence": [
+      "build\tVerify signed provenance manifest\t2026-11-11T03:06:48.1857304Z 來源簽章有效：jnfakimo/Inspection@54091d27cccb3ccd47ed4322b208256966ede4cd，共 2301 個檔案。",
+      "verify-deployment\tScan every deployed website page\t2026-11-11T03:07:24.3475866Z 正式全站掃描通過：38 個頁面、4 個敏感路徑封鎖、數位簽章有效。"
+    ]
+  },
+  "policy_source_matches_g": true,
+  "screenshot": {
+    "file": "pages-release-54091d2.jpg",
+    "sha256": "a2bc2ba50a318edc792b8372cf75a868da38a5eca93f0d96a98d4829d3651610"
+  },
+  "scope": "政策與文件發布；沒有新增程式、migration 或 Edge 變更"
+}

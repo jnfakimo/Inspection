@@ -315,3 +315,19 @@
 [本機驗證結果](docs/verification/2026-11-11-security-policy/validation.json)｜[可讀紀錄](docs/verification/2026-11-11-security-policy/verification.txt)
 
 ![本機政策套用與九範圍解析通過；非正式部署證據](docs/verification/2026-11-11-security-policy/policy-verification.jpg)
+
+## 2026-11-11 資安政策 V1.0.0 正式發布驗收
+
+**結果：pass（政策提交、推送、合併、Pages 部署與部署後驗證）。** 本節補足先前待發布狀態；證據只對應下列精確版本，不推定後續版本均已驗證。
+
+- 提交：222d0a986f245c247ecbfee7cc7da7053fecf60d；[PR #148](https://github.com/jnfakimo/Inspection/pull/148) 已合併，main 54091d27cccb3ccd47ed4322b208256966ede4cd。只發布政策及文件證據，G 槽其他程式修改保留。
+- 主分支 [CI](https://github.com/jnfakimo/Inspection/actions/runs/42950100082)、[CodeQL](https://github.com/jnfakimo/Inspection/actions/runs/42950100157)、[Commercial readiness](https://github.com/jnfakimo/Inspection/actions/runs/42950100147) 均成功；包含應用測試與 API 建置、靜態資安、手機與相容性檢查。
+- [Hardened Pages run 42950100092](https://github.com/jnfakimo/Inspection/actions/runs/42950100092) 的 security-gate、build、deploy、verify-deployment 四個工作全部成功。正式全站掃描：38 個頁面、4 個敏感路徑封鎖、數位簽章有效。
+- 正式 provenance.json 已讀回 commit 54091d27cccb3ccd47ed4322b208256966ede4cd，與部署相符；遠端 SECURITY.md 與 G 槽政策內容一致（正規化換行後比較）。
+- 沒有產品程式、migration 或 Edge 變更，因此沒有另外套用 migration 或重推 Edge／Node API。V1.0.0 是政策版本，網站顯示名稱及應用程式版本不變；目前對話名稱已同步為「北農巡檢｜資安政策 V1.0.0 發布驗證」並讀回。
+- 既有帳號密碼、登入狀態及保留風險不變；本次未寄信、未發 LINE。此次證據不代表新一輪深度安全掃描、全部業務流程、實體裝置或復原演練完成。
+- 截圖擷取時間：2026-11-11T11:08:55.276325+08:00；來源為上述 GitHub Actions 實際完成頁面。下列證據檔與截圖為本次驗收紀錄補提交，不更動政策內容。
+
+[正式發布驗證原始結果](docs/verification/2026-11-11-security-policy/release-verification.json)
+
+![政策 V1.0.0 正式 Pages 發布與部署後驗證成功](docs/verification/2026-11-11-security-policy/pages-release-54091d2.jpg)
