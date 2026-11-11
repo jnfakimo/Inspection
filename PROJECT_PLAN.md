@@ -587,3 +587,37 @@
 [70769370 結果續記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-70769370/verification.txt)
 
 ![70769370 CI 完成與連結檢查缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-70769370/document-verification.jpg)
+
+## 2026-11-11 PR #150 提交 6ed7edc9 的 CI 結果續記（建議版本 V1.0.5，僅本機文件）
+
+- **版本與範圍**：更新日期 2026-11-11（Asia/Taipei）；在建議版本 V1.0.4 後新增 V1.0.5 維護紀錄。只新增本節與文件驗收產物，保留歷史內容；不修改應用程式、SECURITY.md、工作流或八項審查判定。本次補記尚未提交、推送或發布，也尚未納入 PR。
+- **證據對象與時點**：以下引用上一輪已完成的 GitHub 唯讀查核，對應 [草稿 PR #150](https://github.com/jnfakimo/Inspection/pull/150) 的 head `6ed7edc96e93cf3a4060e2c8e91338ffd1594eec`，不是沿用 `70769370` 的結果；本次沒有重新查詢遠端或重跑檢查。
+
+### 6ed7edc9 完成結果
+
+| 工作流 | Run ID | 最終狀態 | 查核證據 |
+|---|---|---|---|
+| [CI](https://github.com/jnfakimo/Inspection/actions/runs/42970333634) | 42970333634 | completed／success | 無失敗 job；Application tests and API build 於 2026-11-11 06:11:48 UTC 完成。仍有下述被忽略的連結檢查錯誤。 |
+| [CodeQL Analysis](https://github.com/jnfakimo/Inspection/actions/runs/42970333671) | 42970333671 | completed／success | 2026-11-11 06:09:43.3606814 UTC 成功上傳結果，06:09:48.6933180 UTC 確認上傳處理完成；job 於 06:09:52 UTC 完成。 |
+| [Commercial readiness checks](https://github.com/jnfakimo/Inspection/actions/runs/42970333627) | 42970333627 | completed／success | static-audit 於 2026-11-11 06:09:24 UTC 完成。 |
+
+- PR 共 **9 個檢查均為 COMPLETED／SUCCESS**：`static-security`、`gmail-repair-linux`、`iis-powershell-compatibility`、`signal-service-security`、`mobile-vehicle-tracker`、`Application tests and API build`、`static-audit`、`CodeQL Analysis (javascript)`、`CodeQL`。
+- [CodeQL 結果處理檢查](https://github.com/jnfakimo/Inspection/runs/130357530449) 為 completed／success，annotations_count 為 0。這是流程完成證據，不代表全站無漏洞、所有既有警示清零或八項攻擊鏈已完成正式驗證。
+
+### 連結檢查缺口再次確認，仍未關閉
+
+- [本輪 CI job 日誌](https://github.com/jnfakimo/Inspection/actions/runs/42970333634/job/130357079112) 的 `Check broken links and images`，於 2026-11-11 06:11:44.4031204 UTC 再次回報 `Error: Input URL required. Use --help for more options`。
+- 原因仍是 [ci.yml 第 225 行](https://github.com/jnfakimo/Inspection/blob/6ed7edc96e93cf3a4060e2c8e91338ffd1594eec/.github/workflows/ci.yml#L225) 的 `npx -y broken-link-checker . || true`：傳入目錄 `.` 未提供必要的 URL，且 `|| true` 忽略錯誤，所以未使整體工作流失敗。
+- 上一輪已比對 PR 基底 `bf3308ee5e0af18795c3347206904aca3e5c4c43` 與此 head 的 `.github/workflows/ci.yml`，沒有差異；這是既有設定，不是本次文件提交新增的回歸，本次亦未修正。
+- **結論**：CI／CodeQL 工作流狀態為 pass；連結／圖片完整性仍為**未驗證，不能判定通過**。缺口仍存在、未修復；綠燈不能證明沒有失效連結，該錯誤也不能證明實際有壞連結。前文所列隔離本機檢查、保留失敗退出狀態與壞連結案例驗證等待辦維持開啟，本次不實作。
+
+### 保留狀態與文件驗收界線
+
+- 上一輪結束時 PR 為 OPEN／draft，mergedAt 與 autoMergeRequest 均為 null；未合併或啟用自動合併。G 槽 168 個既有修改／未追蹤檔案及 Git status、diff、index、config、HEAD 的前後比對均未變；此為當時已查核事實，不是本次重新讀取 PR 狀態。
+- 八項 Finding Evidence Review 維持 **2 accept／6 needs more validation**；既有帳號密碼維持不變，不重設、不撤銷登入、不寄信。
+- 本次只新增本節與本機文件驗收產物，不提交、不推送、不合併、不部署、不連正式環境、不重新連 GitHub；不修改程式／工作流，也不重跑應用測試、build 或資安掃描。
+- 本機文件驗收核對原藍圖位元組前綴、其他既有檔案與 tracked diff、Git index／config／HEAD、提交與 run／job 對應、缺口未關閉、文件連結及截圖雜湊。下方截圖為本機記事本顯示實際文件驗收紀錄，**不是 GitHub Checks 或正式環境截圖**；外部連結沿用上一輪證據，本次不連線重驗。
+
+[6ed7edc9 結果續記的本機文件驗收](docs/verification/2026-11-11-pr150-ci-6ed7edc9/verification.txt)
+
+![6ed7edc9 CI 完成與連結檢查缺口本機文件驗收](docs/verification/2026-11-11-pr150-ci-6ed7edc9/document-verification.jpg)

@@ -1,0 +1,27 @@
+PR #150／6ed7edc9｜本機文件續記驗收
+建議版本 V1.0.5｜本次補記未提交／未發布
+檢查時間：2026-11-11T14:17:00+08:00
+
+結果：PASS（文件檢查；非重新執行 CI）
+證據 head：6ed7edc96e93cf3a4060e2c8e91338ffd1594eec
+CI：42970333634，success；無失敗 job。
+CodeQL：42970333671，success；上傳處理完成。
+Commercial readiness：42970333627，success。
+PR 共 9 個檢查狀態成功；不是全站無漏洞證明。
+
+連結檢查再次回報 Input URL required。
+既有 || true 忽略錯誤；缺口仍存在，未驗證／未修復。
+不能判定連結檢查通過。
+
+原藍圖逐位元組保留：PASS
+其他 167 個既有修改／未追蹤檔案雜湊未變：PASS
+非藍圖 tracked diff 與 Git index／config／HEAD 未變：PASS
+git diff --check -- PROJECT_PLAN.md：PASS
+
+本次只更新藍圖與文件驗收產物；既有密碼不變。
+未提交、推送、合併、部署或連正式環境。
+未重新連 GitHub、未重跑應用測試／build／掃描。
+此為本機文件驗收，非 GitHub Checks 或正式環境截圖。
+
+補記後藍圖 SHA-256：
+7b6bdf9297a06981980dfd34be7e354aa1dc2a593ae321b93eef734278fbbecd
