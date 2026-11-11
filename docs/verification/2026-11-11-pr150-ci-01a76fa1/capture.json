@@ -1,0 +1,9 @@
+{
+  "captured_at": "2026-11-11T05:57:58.842Z",
+  "source": "Local Notepad displaying verification.txt",
+  "scope": "Document-only verification of historical PR 150 head 01a76fa1 results; not GitHub Checks or production screenshot",
+  "width": 1463,
+  "height": 775,
+  "screenshot_sha256": "09a92a2db8fbf745691555a4521938adadcf6676c6580b4c36c20af2a7602184",
+  "blueprint_sha256": "df02c4b464d9420e9d4dd81bc6c47c42567e580120237e000895f3142596fac5"
+}
